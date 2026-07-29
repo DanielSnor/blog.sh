@@ -53,6 +53,13 @@
       render: function (it) {
         return block(it.date, '<p>' + esc(it.text).replace(/\n/g, '<br>') + '</p>', it.url);
       }
+    },
+    {
+      id: 'last-rss',
+      src: '/rss.json',
+      render: function (it) {
+        return block(it.date, '<p>' + esc(it.title) + '</p>', it.url);
+      }
     }
   ];
 

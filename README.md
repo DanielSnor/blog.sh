@@ -128,9 +128,9 @@ deploy step around exactly that. A few of the choices that came out of it:
 - Quoted phrases, `-word` exclusion, diacritic-insensitive
 
 **Sidebar widgets**
-- Latest toots, Bluesky posts, Pixelfed posts, commits -- fetched
-  server-side on a cron (`scripts/refresh-sidebar.sh`), never by the
-  visitor's browser
+- Latest toots, Bluesky posts, Pixelfed posts, commits, or any RSS/Atom
+  feed -- fetched server-side on a cron (`scripts/refresh-sidebar.sh`),
+  never by the visitor's browser
 - Per-post stats (likes/boosts/replies) for announced posts -- live for
   the last 90 days, refreshed weekly beyond that
 
@@ -371,14 +371,16 @@ generalizing for anyone else to adopt this as-is:
   cached by cron into same-origin JSON (~30min latency) instead of the
   live threads Mastodon and Bluesky give the visitor's browser for
   free. The design is sketched; implementation waits for real demand.
-- **More sidebar widgets** -- today's three (Mastodon toots, Pixelfed,
-  GitHub commits) are each independently optional; recent posts from
-  Bluesky, Instagram, Threads or Twitter/X would follow the same fetcher
-  pattern (server-side, cron, same-origin JSON). Honest caveat: it's not
-  yet clear which of these are actually feasible -- Bluesky's public API
-  makes it straightforward, while Instagram, Threads and X all gate or
-  charge for read access, so some may only be possible with an app token,
-  or not at all.
+- **More sidebar widgets** -- five ship today (Mastodon toots, Bluesky,
+  Pixelfed, GitHub commits, and a generic RSS/Atom feed), each
+  independently optional. The rest was investigated (July 2026):
+  **X** only works through a self-hosted Nitter instance -- point the
+  RSS widget at it; the official API bills per read and official embeds
+  are third-party JS, both non-starters here. **Threads** is feasible
+  via its free API (`/me/threads`) but carries the same friction as its
+  comments backend -- a Meta developer app and 60-day tokens with an
+  auto-refresh cron -- so it waits for real demand. **Instagram** has no
+  usable read API since the Basic Display API shutdown; no plan.
 
 ## Example deployment
 

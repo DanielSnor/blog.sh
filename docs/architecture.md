@@ -186,7 +186,8 @@ origins:
   `Blog.escapeHtml`; Bluesky reply text is plain text and is escaped
   wholesale.
 - **Widgets** (`sidebar.js`) read same-origin JSON (`toots.json`,
-  `bluesky.json`, `pixelfed.json`, `commits.json`, `stats.json`) that
+  `bluesky.json`, `pixelfed.json`, `commits.json`, `rss.json`,
+  `stats.json`) that
   **cron** (`scripts/refresh_sidebar.rb`) fetched server-side -- the
   visitor's browser never contacts GitHub, the Fediverse or Bluesky for
   them. A failed cron fetch keeps the previous JSON rather than

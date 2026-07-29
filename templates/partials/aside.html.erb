@@ -27,4 +27,10 @@
           <div id="last-bluesky"></div>
         </div>
 <% end %>
+<% if WIDGETS['rss'] %>
+        <div class="card">
+          <h3><%= h(WIDGETS['rss']['heading']) %></h3>
+          <div id="last-rss"></div>
+        </div>
+<% end %>
       </aside>

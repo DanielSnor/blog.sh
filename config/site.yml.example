@@ -105,6 +105,12 @@ widgets:
     # it only when the widget shows an account other than the site's own.
     # handle: "you.bsky.social"
     limit: 3
+  rss:
+    heading: "Elsewhere"
+    # Any RSS 2.0 or Atom feed: another blog, a YouTube channel, a
+    # podcast -- or X through a self-hosted Nitter instance.
+    feed_url: "https://example.com/feed.xml"
+    limit: 3
 
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's

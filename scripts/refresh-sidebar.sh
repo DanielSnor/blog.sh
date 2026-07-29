@@ -19,4 +19,4 @@ set -a
 source env.sh
 set +a
 ruby scripts/refresh_sidebar.rb
-exec ./scripts/deploy-web.sh --only=pixelfed.json,toots.json,commits.json,bluesky.json,stats.json
+exec ./scripts/deploy-web.sh --only=pixelfed.json,toots.json,commits.json,bluesky.json,rss.json,stats.json
