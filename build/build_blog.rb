@@ -79,6 +79,12 @@ SITE_AUTHOR = SiteConfig.fetch('site', 'author')
 SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
 SITE_LOCALE = SiteConfig.get('site', 'locale', default: 'en_US')
 BANNER = SiteConfig.fetch('banner')
+# Independently optional -- a banner image busy enough on its own (or a
+# site that just doesn't want the overlay) can drop either line without
+# losing the other. Both default to true, so an existing site's banner
+# renders exactly as it did before these keys existed.
+BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
+BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
 ANALYTICS = SiteConfig.get('analytics')
 ABOUT = SiteConfig.fetch('about')
 FOOTER = SiteConfig.fetch('footer')
@@ -138,7 +144,15 @@ def color_properties(mode)
     'pill-bg' => color_for(mode, 'pill_bg'),
     'search-bg' => mode == 'dark' ? '#eeeeee' : '#ffffff',
     'hover-invert' => mode == 'dark' ? '#ffffff' : meta_text,
-    'badge-hover-text' => mode == 'dark' ? 'var(--accent)' : '#ffffff'
+    'badge-hover-text' => mode == 'dark' ? 'var(--accent)' : '#ffffff',
+    # Independently optional (config/site.yml's colors.<mode>.banner_title/
+    # banner_claim) since the banner overlay's title and claim can be shown
+    # or colored independently -- see BANNER_SHOW_TITLE/_CLAIM below. Same
+    # default either falls back to as before this pair existed: nav-bg in
+    # light mode (a readable tone against most banner images without being
+    # pure white), white in dark mode.
+    'banner-title-color' => color_for(mode, 'banner_title') || (mode == 'dark' ? '#ffffff' : nav_bg),
+    'banner-claim-color' => color_for(mode, 'banner_claim') || (mode == 'dark' ? '#ffffff' : nav_bg)
   }
 end
 

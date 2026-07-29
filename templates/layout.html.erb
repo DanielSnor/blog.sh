@@ -43,8 +43,8 @@
   <div class="wrap">
     <div class="banner-wrap">
       <a href="/" class="banner-link"><img class="banner" src="<%= h(BANNER['src']) %>" alt="<%= h(BANNER['alt']) %>" width="<%= BANNER['width'] %>" height="<%= BANNER['height'] %>"></a>
-      <p class="banner-title"><%= h(SITE_SHORT_NAME) %></p>
-      <p class="banner-claim"><%= h(SITE_DESCRIPTION) %></p>
+      <% if BANNER_SHOW_TITLE %><p class="banner-title"><%= h(SITE_SHORT_NAME) %></p><% end %>
+      <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= h(SITE_DESCRIPTION) %></p><% end %>
       <button id="theme-toggle" type="button">☀︎/☾︎</button>
     </div>
     <%= partial('nav', search: true) %>

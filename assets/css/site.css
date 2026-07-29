@@ -183,27 +183,13 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
   z-index: 2;
   margin: 0;
   font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  /* Light default: the menu's own background color -- overridden to white
-     for dark mode below, since --nav-bg is a dark, low-contrast tone there. */
-  color: var(--nav-bg);
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
 
-/* Same light/dark override pattern as colors.css: light is the unqualified
-   default above, dark needs the explicit media+data-theme pair. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .banner-title,
-  :root:not([data-theme="light"]) .banner-claim {
-    color: #ffffff;
-  }
-}
-
-:root[data-theme="dark"] .banner-title,
-:root[data-theme="dark"] .banner-claim {
-  color: #ffffff;
-}
-
+/* Colors come from colors.css (config/site.yml's colors.<mode>.banner_title/
+   banner_claim, independently optional) -- no light/dark override pair
+   needed here, colors.css already carries both modes. */
 .banner-title {
   top: 20px;
   left: 24px;
@@ -211,6 +197,7 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
   font-size: 45px;
   font-weight: 700;
   line-height: 1.15;
+  color: var(--banner-title-color);
 }
 
 .banner-claim {
@@ -221,6 +208,7 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
   font-weight: 400;
   line-height: 1.35;
   text-align: right;
+  color: var(--banner-claim-color);
 }
 
 @media (max-width: 700px) {

@@ -40,6 +40,11 @@ banner:
   # The file's actual dimensions -- reserves space before the image loads.
   width: 940
   height: 300
+  # Optional, independent of each other (default true for both): whether
+  # site.short_name / site.description render as text overlaid on the
+  # banner image. Turn either off if the image is busy enough on its own.
+  # show_title: true
+  # show_claim: true
 
 about:
   heading: "About"
@@ -145,6 +150,12 @@ analytics:
 # build/build_blog.rb), not separately configurable, since it's never
 # varied independently across any palette this engine has shipped.
 # Rebuild after changing any value here: ./blog.sh rebuild.
+#
+# banner_title / banner_claim are the one exception: two more OPTIONAL
+# keys per mode, independent of each other and of the 7 above, for the
+# banner overlay text's color (see banner.show_title/show_claim above).
+# Default when omitted: nav_bg in light mode, white in dark mode -- the
+# same look the banner had before these keys existed.
 colors:
   light:
     bg: "#f5f8fa"
@@ -154,6 +165,8 @@ colors:
     nav_bg: "#eaf5fd"
     border: "#e1e8ed"
     pill_bg: "#d6ecfc"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
   dark:
     bg: "#111111"
     text: "#ffffff"
@@ -162,3 +175,5 @@ colors:
     nav_bg: "#192734"
     border: "#263340"
     pill_bg: "#16324a"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
