@@ -19,7 +19,10 @@ module Publishing
   MEDIA_DIR = File.join(ROOT, 'media.nosync')
 
   PEREX_LENGTH = 250
-  TOOT_LENGTH = 500
+  # Mastodon's default status limit -- but instances routinely raise it,
+  # so mastodon.toot_length in config/site.yml can too; the perex budget
+  # scales with it.
+  TOOT_LENGTH = SiteConfig.get('mastodon', 'toot_length', default: 500)
 
   module_function
 

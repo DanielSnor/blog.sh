@@ -340,10 +340,6 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Config** -- `config/site.yml` (public) and `env.sh` (secrets) are
-  already split by sensitivity; some settings used by individual
-  `lib/*_fetcher.rb` files could still be consolidated into `site.yml` for
-  a single source of truth.
 - **Imports** -- `migrate_tumblr.rb` and `migrate_twitter.rb` cover the two
   platforms this deployment actually migrated from. Instagram, WordPress,
   Threads and Bluesky importers should follow the same pattern: each

@@ -24,6 +24,10 @@ site:
   locale: "en_US"
   # Overridden by the SITE_BASE_URL environment variable, if set.
   base_url: "https://example.com"
+  # Optional: posts per listing page (default 10). Set it ONCE, before
+  # the first deploy -- pagination is anchored so page contents never
+  # change, and changing this later renumbers every existing page.
+  # page_size: 10
 
 banner:
   src: "/assets/images/banner.png"
@@ -82,7 +86,9 @@ social:
 widgets:
   toots:
     heading: "Recent toots"
-    instance: "mastodon.social"
+    # instance is optional -- it falls back to mastodon.instance above,
+    # so set it only when the widget shows an account living elsewhere.
+    # instance: "mastodon.social"
     account_id: "000000000000000000" # numeric Mastodon account id, not the @handle
     limit: 3
   pixelfed:
@@ -100,6 +106,9 @@ widgets:
 # here, since it's a secret.
 mastodon:
   instance: "mastodon.social"
+  # Optional: your instance's status character limit (default 500).
+  # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
+  # toot_length: 500
 
 # Optional. Omit this whole section (or any key inside it) to fall back to
 # blog.sh's own blue palette (build/build_blog.rb's DEFAULT_COLORS). Each

@@ -33,7 +33,11 @@ PUBLIC_DIR = File.join(ROOT, 'public.nosync')
 # stylesheet immediately. A version baked into the <link> would instead make
 # every single page differ (and get re-uploaded by a content-hash deploy
 # script) on any CSS edit, buying nothing.
-PAGE_SIZE = 10
+# Posts per listing page. Optional site.page_size in config/site.yml --
+# a taste knob worth setting ONCE, before the first deploy: pagination is
+# anchored to the oldest post precisely so page contents never change,
+# and changing the size later renumbers every existing page.
+PAGE_SIZE = SiteConfig.get('site', 'page_size', default: 10)
 EXCERPT_TEXT_THRESHOLD = 400 # plain-text chars; CSS max-height does the actual visual clipping
 RSS_ITEM_LIMIT = 30
 META_DESCRIPTION_LENGTH = 160
