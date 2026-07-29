@@ -71,6 +71,7 @@ js:
   stats_boosted: "Boostnuto"
   stats_comments: "Komentářů"
   reply_on_mastodon: "Reagovat na Mastodonu"
+  reply_on_bluesky: "Reagovat na Bluesky"
   results_one: "výsledek"
   results_few: "výsledky"
   results_many: "výsledků"
@@ -126,14 +127,29 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
   preview_label: "Náhled: %{url}"
-  what_next_prompt: "Co dál? [p] publikovat  [d] nechat draftem  [e] zpět do editace: "
+  what_next_prompt: "Co dál? [p] publikovat  [s] naplánovat  [d] nechat draftem  [e] zpět do editace: "
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
-  unknown_choice_pde: "Nerozumím, zkus p / d / e."
+  unknown_choice_pde: "Nerozumím, zkus p / s / d / e."
+  schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, prázdné = zrušit): "
+  schedule_date_invalid: "Tohle datum neumím přečíst — čekám např. 2026-08-15 09:00."
+  schedule_date_not_future: "Datum publikace musí být v budoucnosti."
 
-  date_outside_window_prompt: "Datum %{date} je mimo 24h okno pro automatický toot. Otootovat přesto? [a/N] "
+  date_outside_window_prompt: "Datum %{date} je mimo 24h okno pro automatické oznámení. Oznámit přesto? [a/N] "
   confirm_yes_char: "a"
-  base_url_missing_toot: "SITE_BASE_URL není nastavený, toot k postu se nevytvořil."
-  backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), toot se nevytvořil."
+  base_url_missing_toot: "SITE_BASE_URL není nastavený, oznámení k postu se neposlalo."
+  use_bluesky_command: "Tenhle web oznamuje na Bluesky — místo toot použij ./blog.sh bluesky."
+  use_toot_command: "Tenhle web oznamuje na Mastodonu (nebo nemá síť nastavenou) — místo bluesky použij ./blog.sh toot."
+  already_has_bluesky: "Post už oznámení na Bluesky má: %{url}"
+  bluesky_posted: "Oznámeno na Bluesky: %{url}"
+  bluesky_failed: "Oznámení na Bluesky se neposlalo."
+  deleting_bluesky: "Mažu oznámení na Bluesky: %{url}"
+  delete_bluesky_failed: "Smazání oznámení na Bluesky selhalo — smaž ho ručně."
+  backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), oznámení se neposlalo."
+  schedule_only_drafts: "Post '%{slug}' už je publikovaný — plánovat jde jen drafty."
+  schedule_needs_future_date: "Post '%{slug}' potřebuje nejdřív budoucí datum — nastav ho přes ./blog.sh edit %{slug}. (Nedotčené datum vytvoření by znamenalo „publikovat hned“, a na to je publish.)"
+  scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
+  schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Opětovné schedule plán zruší."
+  unscheduled_label: "Plán zrušen: '%{slug}' zůstává draftem."
 
   already_published: "Post '%{slug}' už je publikovaný: %{url}"
   publish_date_now: "Datum publikace: %{date} (nastaveno na teď)"
@@ -191,10 +207,12 @@ cli:
       ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
       ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
+      ./blog.sh schedule [<slug>]    naplánuje draft k automatické publikaci v jeho (budoucím) datu; opětovné spuštění plán zruší
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
       ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
-      ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot, bez slugu nabídne posledních %{recent_count} postů
+      ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
+      ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
       ./blog.sh rebuild              přebuilduje a nasadí celý web, bez vazby na konkrétní post
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 zobrazí tuhle nápovědu
@@ -208,9 +226,16 @@ cli:
   wizard_menu_add: "Nový příspěvek"
   wizard_menu_edit: "Upravit příspěvek"
   wizard_menu_publish: "Publikovat draft (ukáže náhled, zeptá se, co dál)"
+  wizard_menu_schedule: "Naplánovat draft (publikuje se automaticky, až přijde jeho datum)"
   wizard_menu_unpublish: "Vrátit publikovaný post zpátky do draftu"
   wizard_menu_delete: "Smazat příspěvek (přesune do koše)"
   wizard_menu_restore: "Obnovit příspěvek z koše"
-  wizard_menu_toot: "(Znovu) poslat komentářový toot"
+  wizard_menu_toot: "(Znovu) poslat komentářový toot (Mastodon)"
+  wizard_menu_bluesky: "(Znovu) poslat oznámení na Bluesky"
   wizard_menu_list: "Seznam všech postů (bez editace, jen pro rozkoukání)"
   wizard_menu_rebuild: "Rebuild a nasadit web (bez vazby na konkrétní post)"
+
+cron:
+  no_scheduled_due: "Žádný naplánovaný post není na řadě."
+  published_scheduled: "Publikován naplánovaný post '%{slug}' (datum %{date})."
+  publishing_scheduled: "Publikuji %{count} naplánovaný(é) post(y)"

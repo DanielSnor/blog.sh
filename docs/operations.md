@@ -17,25 +17,39 @@ built around drafts:
    `/draft/<token>/<slug>/` address with `noindex` -- invisible in every
    listing, shareable by URL (that's the point: open the preview on a
    phone or send it to someone before publishing).
-2. The CLI then asks: **publish / keep as draft / back to editing.**
-   Publishing sets the date (now, unless you edited the date field),
-   moves the post to its real URL and -- with Mastodon configured --
-   sends the comment toot.
+2. The CLI then asks: **publish / schedule / keep as draft / back to
+   editing.** Publishing sets the date (now, unless you edited the date
+   field), moves the post to its real URL and -- with a comments
+   network configured (Mastodon or Bluesky, see
+   [install.md](install.md#8-comments-network-optional-mastodon-or-bluesky)) --
+   sends the announcement post that replies-as-comments hang off.
 3. **`edit <slug>`** round-trips the stored post back to Markdown in
    your editor. A save that would drop content markdown can't express
    (an imported embed, a link card) warns and asks before proceeding.
-4. **`unpublish <slug>`** returns a post to draft and deletes its toot
-   (a toot pointing at a dead URL helps nobody). The next publish gets a
-   fresh date. **`delete <slug>`** moves the post and its media to
-   `trash/` -- **`restore <slug>`** brings it back. Trash keeps only the
-   most recent deletion per slug.
-5. **`toot <slug>`** (re-)sends the comment toot for an already
-   published post -- typically an imported one that never had a toot.
-   An existing toot is never overwritten.
+4. **`unpublish <slug>`** returns a post to draft and deletes its
+   announcement on the network (an announcement pointing at a dead URL
+   helps nobody). The next publish gets a fresh date.
+   **`delete <slug>`** moves the post and its media to `trash/` --
+   **`restore <slug>`** brings it back. Trash keeps only the most
+   recent deletion per slug.
+5. **`toot <slug>`** (Mastodon sites) or **`bluesky <slug>`** (Bluesky
+   sites) (re-)sends the announcement for an already published post --
+   typically an imported one that never had one. An existing
+   announcement is never overwritten.
 
 Publishing a **backdated** post (date edited to the past) skips the
 auto-toot unless you confirm it, and lands in the archive rather than on
 the homepage -- the CLI says so when it happens.
+
+**Scheduled publishing:** in the post-save dialog, choose `[s]` and
+enter the publish date and time directly -- the
+[publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) then
+publishes the draft (toot included) once that date arrives, keeping it
+as the post's date. The standalone `./blog.sh schedule <slug>` does the
+same for a draft whose date was already edited to the future (an
+untouched creation-time date is refused -- that would just mean
+"publish now"). Running `schedule` again cancels; `list` shows such
+drafts as `[SCHEDULED]`.
 
 ## Writing from a phone
 
@@ -84,9 +98,9 @@ Things worth knowing:
 
 ## Cron (sidebar widgets and post stats)
 
-`scripts/refresh-sidebar.sh` refetches the widget JSON (toots, Pixelfed,
-commits) and per-post stats, then uploads **only those four files** --
-no site rebuild:
+`scripts/refresh-sidebar.sh` refetches the widget JSON (toots, Bluesky,
+Pixelfed, commits, RSS) and per-post stats, then uploads **only those
+files** -- no site rebuild:
 
 ```
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh
@@ -99,6 +113,14 @@ known content** rather than publishing an empty widget -- a one-minute
 network hiccup never blanks the sidebar. Systems without cron: a
 systemd timer or launchd job invoking the same script does the same
 thing. No widgets configured = no cron needed.
+
+A second, optional job publishes scheduled drafts
+(`./blog.sh schedule`) once their date arrives -- it exits immediately
+when nothing is due, so a tight interval costs nothing:
+
+```
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+```
 
 ## Backup
 
@@ -128,6 +150,7 @@ The same list is exactly what to move when changing machines.
 | Deploy stopped with a "% drop/increase" message | The shrink/growth guard -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. |
 | `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer UI and update `SURFER_TOKEN`. |
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
+| `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
 | Sidebar widget disappeared from the page | Its fetch returned nothing repeatedly (`refresh-sidebar` logs say which) -- the widget card hides when its JSON is empty/unreachable. Check the instance/feed URL in `config/site.yml`. |
 | `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues; the page just has a broken image until fixed. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |

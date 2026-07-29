@@ -4,6 +4,8 @@ require 'json'
 require_relative 'pixelfed_fetcher'
 require_relative 'mastodon_fetcher'
 require_relative 'github_fetcher'
+require_relative 'bluesky_fetcher'
+require_relative 'rss_fetcher'
 
 # lib/sidebar.rb -- writes one JSON file per configured sidebar widget (see
 # config/site.yml's `widgets:` section -- any subset, including none, is
@@ -22,7 +24,9 @@ module Sidebar
   ALL_FEEDS = {
     'pixelfed.json' => PixelfedFetcher,
     'toots.json' => MastodonFetcher,
-    'commits.json' => GithubFetcher
+    'commits.json' => GithubFetcher,
+    'bluesky.json' => BlueskyFetcher,
+    'rss.json' => RssFetcher
   }.freeze
   FEEDS = ALL_FEEDS.select { |_, fetcher| fetcher.configured? }.freeze
 

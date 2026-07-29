@@ -4,17 +4,15 @@
               <%= date_badge(post) %>
               <div class="post-body">
                 <% if post['title'] %><h1><%= h(post['title']) %></h1><% end %>
-                <% if post['mastodon_url'] %>
-                  <div class="post-stats" data-toot-url="<%= h(post['mastodon_url']) %>"></div>
-                <% end %>
+                <%= post_stats_html(post) %>
                 <div class="content">
                   <%= content_html %>
                 </div>
                 <%= tags_html(post) %>
-                <% if post['mastodon_url'] %>
+                <% if post['mastodon_url'] || post['bluesky_uri'] %>
                   <div class="comments">
                     <h3><%= h(t('post.comments_heading')) %></h3>
-                    <div id="comments" data-toot-url="<%= h(post['mastodon_url']) %>"></div>
+                    <div id="comments"<%= comments_attrs(post) %>></div>
                   </div>
                 <% end %>
               </div>

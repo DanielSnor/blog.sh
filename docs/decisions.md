@@ -28,12 +28,16 @@ space, and migrations must download everything up front.
 
 ## Publishing and comments
 
-**Comments are Mastodon replies to an auto-toot.** No comment database,
-no moderation queue, no GDPR surface, no spam plugin -- replies live
-where people already are, and the visitor's browser reads the public
-thread API directly. *Cost:* comments require a Mastodon presence, and
-deleting the toot deletes the discussion (which `unpublish` does
-deliberately, to never leave a toot pointing at a dead URL).
+**Comments are replies to an announcement post -- on exactly one
+network.** No comment database, no moderation queue, no GDPR surface,
+no spam plugin -- replies live where people already are (Mastodon or
+Bluesky, both with public unauthenticated thread APIs the visitor's
+browser reads directly). The two networks are deliberately exclusive:
+configuring both would split every post's discussion into two
+half-threads, so the build refuses it. *Cost:* comments require a
+presence on the chosen network, and deleting the announcement deletes
+the discussion (which `unpublish` does deliberately, to never leave an
+announcement pointing at a dead URL).
 
 **Everything starts as a draft, and drafts live on the public site
 behind a `SecureRandom` token with `noindex`.** The whole point is

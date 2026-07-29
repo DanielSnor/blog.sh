@@ -52,7 +52,9 @@ dedup by `source`).
 | `created_at` | string | drafts only -- publish-time "was the date edited?" check |
 | `type` | string | explicit dominant content type; absent = derived from blocks |
 | `source` | object | `platform` plus optionally `account`, `original_id` -- the re-import dedup key |
-| `mastodon_url` | string | the post's comment toot, set on publish/`toot` |
+| `mastodon_url` | string | the post's comment toot (Mastodon sites), set on publish/`toot` |
+| `bluesky_url` | string | the announcement's human link (Bluesky sites), set on publish/`bluesky` |
+| `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
 
 **Blocks** (`content` array entries), by `type`:
 
@@ -174,16 +176,22 @@ The deploy script owns the *what*; backends own the *how*:
 Small single-purpose vanilla JS files, no framework, no third-party
 origins:
 
-- **Comments** (`comments.js`): a published post's toot URL is baked
-  into the page; the visitor's browser fetches the reply thread from
-  the Mastodon instance's public context API. Everything except the
-  Mastodon-sanitized status HTML is escaped via `Blog.escapeHtml`.
-- **Widgets** (`sidebar.js`) read same-origin JSON
-  (`toots.json`, `pixelfed.json`, `commits.json`, `stats.json`) that
+- **Comments** (`comments.js`): a published post's announcement
+  reference is baked into the page (`data-toot-url` or
+  `data-bluesky-uri` -- exactly one network per site, see
+  `SiteConfig.comment_network`); the visitor's browser fetches the
+  reply thread from the Mastodon instance's public context API or from
+  Bluesky's public AppView (`getPostThread`, no auth). Everything
+  except Mastodon's own sanitized status HTML is escaped via
+  `Blog.escapeHtml`; Bluesky reply text is plain text and is escaped
+  wholesale.
+- **Widgets** (`sidebar.js`) read same-origin JSON (`toots.json`,
+  `bluesky.json`, `pixelfed.json`, `commits.json`, `rss.json`,
+  `stats.json`) that
   **cron** (`scripts/refresh_sidebar.rb`) fetched server-side -- the
-  visitor's browser never contacts GitHub or the Fediverse for them. A
-  failed cron fetch keeps the previous JSON rather than publishing an
-  empty widget.
+  visitor's browser never contacts GitHub, the Fediverse or Bluesky for
+  them. A failed cron fetch keeps the previous JSON rather than
+  publishing an empty widget.
 - **Search** (`search.js`) runs entirely client-side over the two
   index files, with the same diacritic folding the build used to create
   them.

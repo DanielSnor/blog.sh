@@ -24,6 +24,10 @@ site:
   locale: "en_US"
   # Overridden by the SITE_BASE_URL environment variable, if set.
   base_url: "https://example.com"
+  # Optional: posts per listing page (default 10). Set it ONCE, before
+  # the first deploy -- pagination is anchored so page contents never
+  # change, and changing this later renumbers every existing page.
+  # page_size: 10
 
 banner:
   src: "/assets/images/banner.png"
@@ -57,16 +61,23 @@ footer:
   copyright: "All rights reserved &copy; 2026"
   social_heading: "Find me on"
 
-# icon = a name from the built-in set (mastodon, pixelfed, linkedin, github).
+# icon = a name from the built-in set: mastodon, pixelfed, linkedin,
+# github, bluesky, instagram, threads, youtube, rss, email.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 social:
   - name: "Mastodon"
     url: "https://mastodon.social/@yourname"
     icon: "mastodon"
     rel: "me"
+  - name: "Bluesky"
+    url: "https://bsky.app/profile/yourname.bsky.social"
+    icon: "bluesky"
   - name: "GitHub"
     url: "https://github.com/yourname"
     icon: "github"
+  - name: "E-mail"
+    url: "mailto:you@example.com"
+    icon: "email"
 
 # Optional, and each entry independently so. Sidebar widget data is fetched
 # by the server (lib/sidebar.rb), not the visitor's browser, and refreshed
@@ -75,7 +86,9 @@ social:
 widgets:
   toots:
     heading: "Recent toots"
-    instance: "mastodon.social"
+    # instance is optional -- it falls back to mastodon.instance above,
+    # so set it only when the widget shows an account living elsewhere.
+    # instance: "mastodon.social"
     account_id: "000000000000000000" # numeric Mastodon account id, not the @handle
     limit: 3
   pixelfed:
@@ -86,13 +99,38 @@ widgets:
     heading: "Recent commits"
     username: "yourname"
     limit: 3
+  bluesky:
+    heading: "Recent Bluesky posts"
+    # handle is optional -- it falls back to bluesky.handle above, so set
+    # it only when the widget shows an account other than the site's own.
+    # handle: "you.bsky.social"
+    limit: 3
+  rss:
+    heading: "Elsewhere"
+    # Any RSS 2.0 or Atom feed: another blog, a YouTube channel, a
+    # podcast -- or X through a self-hosted Nitter instance.
+    feed_url: "https://example.com/feed.xml"
+    limit: 3
 
-# Optional. Omit this whole section for a site with no Mastodon integration
-# at all -- no auto-toot on publish, no Mastodon-based comments, no post
-# stats. The access token itself goes in env.sh (MASTODON_ACCESS_TOKEN), not
-# here, since it's a secret.
+# Optional. The comments/announcement network: every published post is
+# announced there, and replies to that announcement are the post's
+# comments. Configure EITHER mastodon: OR bluesky: -- never both; the
+# build refuses a config with two networks, since comments live in
+# exactly one place. Omit both sections for a site with no network
+# integration at all (no announcements, no comments, no post stats).
+#
+# The secrets go in env.sh, not here: MASTODON_ACCESS_TOKEN for
+# Mastodon, BLUESKY_APP_PASSWORD for Bluesky.
 mastodon:
   instance: "mastodon.social"
+  # Optional: your instance's status character limit (default 500).
+  # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
+  # toot_length: 500
+
+# The Bluesky alternative (uncomment this and remove mastodon: above):
+# bluesky:
+#   handle: "you.bsky.social"
+#   # pds: "https://bsky.social"   # only for a self-hosted PDS
 
 # Optional. Omit this whole section (or any key inside it) to fall back to
 # blog.sh's own blue palette (build/build_blog.rb's DEFAULT_COLORS). Each

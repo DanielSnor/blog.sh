@@ -14,12 +14,14 @@ require 'securerandom'
 require 'shellwords'
 require_relative '../lib/post_writer'
 require_relative '../lib/mastodon_poster'
+require_relative '../lib/bluesky_poster'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
+require_relative '../lib/publishing'
 require_relative '../lib/i18n'
 
 def t(key, **vars)
@@ -166,37 +168,16 @@ end
 
 # --- Mastodon comments -----------------------------------------------------
 
-# Posts a "reply here to comment" toot for a freshly-written post and returns
-# its URL (or nil, e.g. if SITE_BASE_URL / MASTODON_ACCESS_TOKEN aren't set --
-# see lib/mastodon_poster.rb). Never raises: a failed toot must not block
-# writing the post itself.
-PEREX_LENGTH = 250
-TOOT_LENGTH = 500
-TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old Mastodon thread) don't get an auto toot
+# Sends the "reply here to comment" announcement (a Mastodon toot or a
+# Bluesky post, whichever network the site configured -- see
+# SiteConfig.comment_network) and returns the post fields to store, or
+# nil (e.g. when SITE_BASE_URL or the network's token isn't set). Never
+# raises: a failed announcement must not block publishing the post
+# itself. Composition and dispatch live in lib/publishing.rb, shared
+# with the scheduled-publish cron.
+TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old thread) don't get an auto announcement
 
-# Up to `max_length` chars of the post's plain text (capped at PEREX_LENGTH),
-# trimmed to a whole word and marked with an ellipsis if it got cut off.
-def perex_for(blocks, max_length = PEREX_LENGTH)
-  limit = [max_length, PEREX_LENGTH].min
-  # Soft line breaks the author typed inside a paragraph (just to make the
-  # source readable) are invisible once rendered as HTML, but Mastodon shows
-  # a toot as plain text -- so collapse all internal whitespace, including
-  # newlines, down to single spaces before excerpting.
-  plain = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'] }.join(' ').gsub(/\s+/, ' ').strip
-  return plain if plain.length <= limit
-  return '' if limit <= 0
-
-  "#{plain[0, limit].sub(/\s+\S*\z/, '')}…"
-end
-
-def hashtags_for(tags)
-  tags.map { |t| "##{t.to_s.gsub(/\s+/, '')}" }.join(' ')
-end
-
-# title/url/hashtags must never be truncated (a cut-off URL is a dead link,
-# a cut-off hashtag is a broken one) -- only the perex shrinks to make the
-# whole toot fit under Mastodon's TOOT_LENGTH limit.
-def post_toot(title:, slug:, year:, blocks:, tags:, date:, force: false)
+def announce_post(post, year:, date:, force: false)
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_toot')
     return nil
@@ -207,13 +188,7 @@ def post_toot(title:, slug:, year:, blocks:, tags:, date:, force: false)
     return nil
   end
 
-  post_url = "#{SITE_BASE_URL.chomp('/')}/posts/#{year}/#{slug}/"
-  hashtags = hashtags_for(tags)
-  fixed_length = [title, post_url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length
-  budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
-
-  parts = [title, perex_for(blocks, budget), post_url, hashtags].reject { |p| p.to_s.strip.empty? }
-  MastodonPoster.publish(parts.join("\n\n"))
+  Publishing.announce(post, year: year)
 end
 
 # --- commands ------------------------------------------------------------
@@ -315,6 +290,7 @@ def draft_decision_loop(slug)
     print t('cli.what_next_prompt')
     case $stdin.gets&.strip.to_s.downcase
     when 'p' then return publish_draft(slug)
+    when 's' then return if schedule_from_dialog(path, post)
     when 'e' then edit_post(slug)
     when 'd', ''
       puts
@@ -326,7 +302,40 @@ def draft_decision_loop(slug)
   end
 end
 
-def toot_on_publish(post, slug, year, date)
+# The [s] choice in draft_decision_loop: asks for a publish date right in
+# the dialog and schedules the draft under it -- unlike the standalone
+# `schedule` command, no prior `edit` is needed to set the date. Returns
+# true when scheduled (the dialog ends), false on cancel/invalid input
+# (the dialog comes around again). The preview is rebuilt because the
+# entered date becomes the post's date and shows on the draft page.
+def schedule_from_dialog(path, post)
+  print t('cli.schedule_date_prompt')
+  input = $stdin.gets&.strip.to_s
+  return false if input.empty?
+
+  date = begin
+    Time.parse(input)
+  rescue ArgumentError
+    nil
+  end
+  if date.nil?
+    puts t('cli.schedule_date_invalid')
+    return false
+  end
+  if date <= Time.now
+    puts t('cli.schedule_date_not_future')
+    return false
+  end
+
+  File.write(path, JSON.pretty_generate(post.merge('date' => date.iso8601, 'scheduled' => true)))
+  rebuild_and_deploy(t('cli.updating_preview'))
+  puts t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format')))
+  puts t('cli.schedule_cron_note')
+  puts
+  true
+end
+
+def announce_on_publish(post, year, date)
   force = false
   if (date - Time.now).abs > TOOT_RECENCY_WINDOW
     print t('cli.date_outside_window_prompt', date: date.strftime(t('date_format')))
@@ -335,8 +344,7 @@ def toot_on_publish(post, slug, year, date)
     force = true
   end
 
-  post_toot(title: post['title'], slug: slug, year: year, blocks: post['content'],
-            tags: post['tags'] || [], date: date, force: force)
+  announce_post(post, year: year, date: date, force: force)
 end
 
 def publish_draft(slug)
@@ -359,24 +367,12 @@ def publish_draft(slug)
   puts(untouched ? t('cli.publish_date_now', date: date.strftime(t('date_time_format')))
                  : t('cli.publish_date_kept', date: date.strftime(t('date_time_format'))))
 
-  old_year = File.basename(File.dirname(path))
   new_year = date.year.to_s
+  new_path, updated = Publishing.publish(path, post, date: date)
 
-  updated = post.merge('state' => PUBLISHED, 'date' => date.iso8601)
-  updated.delete('draft_token')
-
-  new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
-  if new_year != old_year
-    FileUtils.mkdir_p(File.dirname(new_path))
-    old_media = File.join(MEDIA_DIR, old_year, slug)
-    FileUtils.mv(old_media, File.join(MEDIA_DIR, new_year, slug)) if Dir.exist?(old_media)
-    File.delete(path)
-  end
-  File.write(new_path, JSON.pretty_generate(updated))
-
-  mastodon_url = toot_on_publish(updated, slug, new_year, date)
-  if mastodon_url
-    updated['mastodon_url'] = mastodon_url
+  fields = announce_on_publish(updated, new_year, date)
+  if fields
+    updated.merge!(fields)
     File.write(new_path, JSON.pretty_generate(updated))
   end
 
@@ -402,6 +398,12 @@ end
 # overwritten -- there's no reason for a second toot on the same post (see
 # unpublish, where the old one can be deleted).
 def cmd_toot(slug)
+  if SiteConfig.comment_network == :bluesky
+    puts t('cli.use_bluesky_command')
+    puts
+    return
+  end
+
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
@@ -420,15 +422,55 @@ def cmd_toot(slug)
 
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
-  mastodon_url = toot_on_publish(post, slug, year, date)
-  unless mastodon_url
+  fields = announce_on_publish(post, year, date)
+  unless fields
     warn t('cli.toot_failed')
     warn ''
     return
   end
 
-  File.write(path, JSON.pretty_generate(post.merge('mastodon_url' => mastodon_url)))
-  puts t('cli.tooted', url: mastodon_url)
+  File.write(path, JSON.pretty_generate(post.merge(fields)))
+  puts t('cli.tooted', url: fields['mastodon_url'])
+  puts
+end
+
+# The Bluesky counterpart of cmd_toot: a standalone (re-)send of the
+# announcement, for sites whose comment network is Bluesky. Same rules --
+# published posts only, an existing announcement is never overwritten.
+def cmd_bluesky(slug)
+  unless SiteConfig.comment_network == :bluesky
+    puts t('cli.use_toot_command')
+    puts
+    return
+  end
+
+  path = find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  if draft?(post)
+    warn t('cli.still_draft_toot', slug: slug)
+    warn ''
+    return
+  end
+
+  if post['bluesky_url']
+    puts t('cli.already_has_bluesky', url: post['bluesky_url'])
+    puts
+    return
+  end
+
+  year = File.basename(File.dirname(path))
+  date = Time.parse(post['date'])
+  fields = announce_on_publish(post, year, date)
+  unless fields
+    warn t('cli.bluesky_failed')
+    warn ''
+    return
+  end
+
+  File.write(path, JSON.pretty_generate(post.merge(fields)))
+  puts t('cli.bluesky_posted', url: fields['bluesky_url'])
   puts
 end
 
@@ -448,6 +490,46 @@ def cmd_publish(slug)
   end
 
   draft_decision_loop(slug)
+end
+
+# Marks a draft for automatic publishing by cron
+# (scripts/publish-scheduled.sh) once its date arrives -- or cancels the
+# mark when run on an already scheduled post (a toggle). The date must be
+# deliberately set to the future via `edit` first: an untouched
+# creation-time date would mean "publish immediately", and for that
+# `publish` exists.
+def cmd_schedule(slug)
+  path = find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  unless draft?(post)
+    puts t('cli.schedule_only_drafts', slug: slug)
+    puts
+    return
+  end
+
+  if post['scheduled']
+    updated = post.dup
+    updated.delete('scheduled')
+    File.write(path, JSON.pretty_generate(updated))
+    puts t('cli.unscheduled_label', slug: slug)
+    puts
+    return
+  end
+
+  date = Time.parse(post['date'])
+  untouched = post['created_at'] && post['date'] == post['created_at']
+  if untouched || date <= Time.now
+    warn t('cli.schedule_needs_future_date', slug: slug)
+    warn ''
+    return
+  end
+
+  File.write(path, JSON.pretty_generate(post.merge('scheduled' => true)))
+  puts t('cli.scheduled_label', slug: slug, date: date.strftime(t('date_time_format')))
+  puts t('cli.schedule_cron_note')
+  puts
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -481,9 +563,15 @@ def cmd_unpublish(slug)
     puts t('cli.deleting_toot', url: post['mastodon_url'])
     warn t('cli.delete_toot_failed') unless MastodonPoster.delete(post['mastodon_url'])
   end
+  if post['bluesky_uri']
+    puts t('cli.deleting_bluesky', url: post['bluesky_url'])
+    warn t('cli.delete_bluesky_failed') unless BlueskyPoster.delete(post['bluesky_uri'])
+  end
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'])
   updated.delete('mastodon_url')
+  updated.delete('bluesky_url')
+  updated.delete('bluesky_uri')
   File.write(path, JSON.pretty_generate(updated))
   puts t('cli.reverted_to_draft', path: path)
 
@@ -575,8 +663,11 @@ def edit_post(slug)
   }
   updated['type'] = new_type if new_type
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
+  updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
+  updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']
   updated['created_at'] = post['created_at'] if post['created_at']
   updated['draft_token'] = post['draft_token'] if post['draft_token']
+  updated['scheduled'] = true if post['scheduled']
 
   if new_dir != File.dirname(path)
     File.delete(path)
@@ -691,7 +782,14 @@ def post_summary(file)
   post = JSON.parse(File.read(file, encoding: 'utf-8'))
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
-    state: post['state'] || PUBLISHED }
+    state: post['state'] || PUBLISHED, scheduled: post['scheduled'] }
+end
+
+def state_marker(post)
+  return '  [SCHEDULED]' if post[:scheduled]
+  return '  [DRAFT]' if post[:state] == DRAFT
+
+  ''
 end
 
 def load_posts_summary
@@ -710,7 +808,7 @@ def cmd_list(filters)
   posts.reverse!
   posts.each do |p|
     date = Time.parse(p[:date]).strftime('%Y-%m-%d')
-    puts "#{date}  [#{p[:type]}]#{p[:state] == DRAFT ? '  [DRAFT]' : ''}  #{p[:slug]}  #{p[:title]}"
+    puts "#{date}  [#{p[:type]}]#{state_marker(p)}  #{p[:slug]}  #{p[:title]}"
   end
   drafts = posts.count { |p| p[:state] == DRAFT }
   puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
@@ -734,7 +832,7 @@ def pick_from_list(posts, empty_message)
 
   posts.each_with_index do |p, i|
     date = Time.parse(p[:date]).strftime('%Y-%m-%d')
-    puts "#{i + 1}) #{date}  [#{p[:type]}]#{p[:state] == DRAFT ? '  [DRAFT]' : ''}  #{p[:slug]}  #{p[:title]}"
+    puts "#{i + 1}) #{date}  [#{p[:type]}]#{state_marker(p)}  #{p[:slug]}  #{p[:title]}"
   end
   puts
   print t('cli.enter_number_or_slug')
@@ -813,29 +911,11 @@ def fill_image_dimensions(blocks, media_files, media_dir = nil)
   end
 end
 
-# Build and deploy as one question. It used to only ask about the build,
-# with deploy called separately -- understandable back when deploying meant
-# uploading thousands of files. Today one new post costs seven to nine
-# files, so there's no reason to split it into two steps and risk the
-# second one being forgotten.
-#
-# --prune is deliberately included: after `delete` (and after an edit that
-# changes the slug or the date's year), live pages remain on the deploy
-# target that the build no longer generates. Without prune, nothing would
-# ever clean them up.
+# Build and deploy as one step -- the mechanics (and the reasoning for
+# the built-in --prune) live in Publishing.rebuild_and_deploy, shared
+# with the scheduled-publish cron.
 def rebuild_and_deploy(reason = nil)
-  reason ||= t('cli.default_rebuild_reason')
-  puts
-  puts "#{reason}…"
-  unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
-    warn t('cli.build_failed')
-    return false
-  end
-
-  return true if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
-
-  warn t('cli.deploy_failed')
-  false
+  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'))
 end
 
 def maybe_rebuild
@@ -865,10 +945,12 @@ WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
   ['edit', t('cli.wizard_menu_edit')],
   ['publish', t('cli.wizard_menu_publish')],
+  ['schedule', t('cli.wizard_menu_schedule')],
   ['unpublish', t('cli.wizard_menu_unpublish')],
   ['delete', t('cli.wizard_menu_delete')],
   ['restore', t('cli.wizard_menu_restore')],
   ['toot', t('cli.wizard_menu_toot')],
+  ['bluesky', t('cli.wizard_menu_bluesky')],
   ['list', t('cli.wizard_menu_list')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
 ].freeze
@@ -878,10 +960,12 @@ def run_wizard_choice(command)
   when 'add' then cmd_add
   when 'edit' then cmd_edit(pick_slug_interactively)
   when 'publish' then cmd_publish(pick_draft_interactively)
+  when 'schedule' then cmd_schedule(pick_draft_interactively)
   when 'unpublish' then cmd_unpublish(pick_published_interactively)
   when 'delete' then cmd_delete(pick_slug_interactively)
   when 'restore' then cmd_restore(pick_trash_interactively)
   when 'toot' then cmd_toot(pick_slug_interactively)
+  when 'bluesky' then cmd_bluesky(pick_slug_interactively)
   when 'list' then cmd_list({})
   when 'rebuild' then cmd_rebuild
   end
@@ -942,12 +1026,18 @@ else
   when 'publish'
     slug = ARGV.shift || pick_draft_interactively
     cmd_publish(slug)
+  when 'schedule'
+    slug = ARGV.shift || pick_draft_interactively
+    cmd_schedule(slug)
   when 'unpublish'
     slug = ARGV.shift || pick_published_interactively
     cmd_unpublish(slug)
   when 'toot'
     slug = ARGV.shift || pick_slug_interactively
     cmd_toot(slug)
+  when 'bluesky'
+    slug = ARGV.shift || pick_slug_interactively
+    cmd_bluesky(slug)
   when 'rebuild'
     cmd_rebuild
   when 'list'

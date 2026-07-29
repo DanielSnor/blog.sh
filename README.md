@@ -9,6 +9,7 @@
 [![HTML](https://img.shields.io/badge/HTML-ERB_templates-E34F26?logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![CSS](https://img.shields.io/badge/CSS-Handwritten-1572B6?logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
 [![Mastodon](https://img.shields.io/badge/Mastodon-Instance-6364FF?logo=mastodon&logoColor=white)](https://joinmastodon.org)
+[![Bluesky](https://img.shields.io/badge/Bluesky-Comments-0285FF?logo=bluesky&logoColor=white)](https://bsky.social)
 
 A minimalist, file-based web/log engine. Posts are plain JSON files, the
 site is a static build, and authoring happens through a CLI/wizard --
@@ -35,7 +36,8 @@ MIT licensed (see [LICENSE](LICENSE)).
 Most static-site generators solve the general case, then make you
 configure your way back to something specific. `blog.sh` runs the other
 direction: it started from one very specific workflow (write on a phone or
-a laptop, publish from a terminal, comments live on Mastodon, nothing
+a laptop, publish from a terminal, comments live on Mastodon or
+Bluesky, nothing
 ever calls out to a third-party JS SDK) and grew a CLI, a build, and a
 deploy step around exactly that. A few of the choices that came out of it:
 
@@ -45,11 +47,12 @@ deploy step around exactly that. A few of the choices that came out of it:
   image, video, link, divider) -- the same schema the historical
   Tumblr/Twitter imports also normalize into. The build never re-parses
   Markdown, and any future importer just has to target one schema.
-- **Comments without a comment system.** Every published post
-  auto-toots to Mastodon; replies to that toot *are* the comments. The
-  client fetches the thread from the public Mastodon API at render time --
-  no database of comments to moderate or migrate, and the "comment count"
-  next to a post is just the reply count on its toot.
+- **Comments without a comment system.** Every published post is
+  auto-announced on Mastodon *or* Bluesky (the site picks exactly one);
+  replies to that announcement *are* the comments. The client fetches
+  the thread from the network's public API at render time -- no database
+  of comments to moderate or migrate, and the "comment count" next to a
+  post is just the reply count on its announcement.
 - **Deploys default to paranoid.** `scripts/deploy-web.sh` diffs a SHA-256 +
   size + mtime manifest so it only ships what changed, and refuses to
   proceed if the file count swings too far in either direction versus the
@@ -76,15 +79,19 @@ deploy step around exactly that. A few of the choices that came out of it:
 
 **Authoring -- `blog.sh` (CLI and interactive wizard)**
 - `add` -- always starts as a draft; after saving, offers a preview and
-  a publish / keep-as-draft / back-to-editing prompt
+  a publish / schedule / keep-as-draft / back-to-editing prompt
 - `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
-- `unpublish <slug>` -- returns a post to draft, deletes its toot; gets a
-  fresh date on the next publish
+- `schedule <slug>` -- automatic publishing (toot included) by a cron step
+  when the post's date arrives; the [s] dialog choice asks for the date
+  directly, the standalone command takes it from a future-dated draft;
+  run again to cancel
+- `unpublish <slug>` -- returns a post to draft, deletes its announcement;
+  gets a fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
-- `toot <slug>` -- sends (or resends) the comment toot after the fact,
-  even for older posts that don't have one yet; never overwrites an
-  existing toot
+- `toot <slug>` / `bluesky <slug>` -- sends (or resends) the announcement
+  after the fact, even for older posts that don't have one yet; never
+  overwrites an existing one
 - `list [--type=] [--tag=] [--drafts]` -- filtered listing
 - `rebuild` -- build and deploy in one step
 - Run with no arguments for a numbered interactive menu
@@ -123,16 +130,22 @@ deploy step around exactly that. A few of the choices that came out of it:
 - Quoted phrases, `-word` exclusion, diacritic-insensitive
 
 **Sidebar widgets**
-- Latest toots, Pixelfed posts, commits -- fetched server-side on a cron
-  (`scripts/refresh-sidebar.sh`), never by the visitor's browser
-- Per-post stats (likes/boosts/replies) for tooted posts -- live for the
-  last 90 days, refreshed weekly beyond that
+- Latest toots, Bluesky posts, Pixelfed posts, commits, or any RSS/Atom
+  feed -- fetched server-side on a cron (`scripts/refresh-sidebar.sh`),
+  never by the visitor's browser
+- Per-post stats (likes/boosts/replies) for announced posts -- live for
+  the last 90 days, refreshed weekly beyond that
 
 **Comments**
-- No comment system of its own -- every published post auto-toots to
-  Mastodon, and replies to that toot are the comments
-- The client fetches the thread via the public Mastodon API; like/boost/
-  reply counts surface next to the post in listings too
+- No comment system of its own -- every published post is auto-announced
+  on Mastodon or Bluesky (exactly one per site, `mastodon:` or `bluesky:`
+  in config), and replies to that announcement are the comments
+- The client fetches the thread via the network's public API (Mastodon
+  context, Bluesky AppView `getPostThread` -- both unauthenticated);
+  like/boost/reply counts surface next to the post in listings too
+- On Bluesky the announcement fits the 300-grapheme limit with clickable
+  link and hashtags (facets); on Mastodon it uses the instance's limit
+  (`mastodon.toot_length`, default 500)
 
 **Security**
 - Content-Security-Policy via meta tag, self-hosted fonts (no third-party origins)
@@ -224,14 +237,15 @@ iCloud doesn't exist, it's just a name.
 - Optional, per integration: somewhere to deploy to (a
   [Cloudron Surfer](https://cloudron.io) app, any rsync/SSH host, a
   GitHub/GitLab/Codeberg Pages branch, an rclone remote, or just a local
-  directory served by your own web server), a Mastodon account for
-  comments/auto-toot, cron for the sidebar widgets
+  directory served by your own web server), a Mastodon or Bluesky
+  account for comments and the auto-announcement, cron for the sidebar
+  widgets
 
 ## Getting started
 
 1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
    site's title, description, social links, and (optionally) analytics,
-   sidebar widgets, and Mastodon integration.
+   sidebar widgets, and the comments network (Mastodon or Bluesky).
 2. Copy `env.sh.example` to `env.sh` and `chmod 600 env.sh`. An unedited
    copy is enough to try things out locally -- without the Surfer values,
    uploads are simply skipped (logged, not an error).
@@ -243,12 +257,13 @@ iCloud doesn't exist, it's just a name.
    `public.nosync/`, e.g. `ruby -run -e httpd public.nosync/ -p 8000`.
 
 Every integration beyond the core (analytics, each sidebar widget,
-Mastodon comments/auto-toot) is optional and activates only when its
+comments and the auto-announcement on Mastodon or Bluesky) is optional
+and activates only when its
 config section is present -- a minimal `site.yml` with just `site`,
 `banner`, `about` and `footer` is a complete, working site.
 
 That's the short path. The complete one -- server install, every deploy
-backend step by step, the phone workflow, Mastodon setup -- is
+backend step by step, the phone workflow, the comments-network setup -- is
 [docs/install.md](docs/install.md); day-to-day usage (publishing,
 cron, backup, troubleshooting) is
 [docs/operations.md](docs/operations.md).
@@ -260,10 +275,12 @@ cron, backup, troubleshooting) is
 ./blog.sh add                  # creates a draft, shows a preview, asks what's next
 ./blog.sh edit [<slug>]        # without a slug, offers the last 10 posts
 ./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
-./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its toot)
+./blog.sh schedule [<slug>]    # auto-publish a future-dated draft when its date arrives
+./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/
 ./blog.sh restore [<slug>]     # restores a post from trash
-./blog.sh toot [<slug>]        # (re-)sends the comment toot to Mastodon
+./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
+./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
 ./blog.sh rebuild              # rebuilds and deploys the whole site
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
 ./blog.sh help
@@ -323,15 +340,18 @@ Every 30 minutes is plenty -- the data it refreshes (recent toots,
 Pixelfed posts, commits, like/boost counts) doesn't move faster than
 that. Skip the cron entirely if no widgets are configured.
 
+A second, optional job powers `./blog.sh schedule` -- it publishes
+scheduled drafts whose date has arrived (and does nothing otherwise):
+
+```
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+```
+
 ## Roadmap
 
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Config** -- `config/site.yml` (public) and `env.sh` (secrets) are
-  already split by sensitivity; some settings used by individual
-  `lib/*_fetcher.rb` files could still be consolidated into `site.yml` for
-  a single source of truth.
 - **Imports** -- `migrate_tumblr.rb` and `migrate_twitter.rb` cover the two
   platforms this deployment actually migrated from. Instagram, WordPress,
   Threads and Bluesky importers should follow the same pattern: each
@@ -340,33 +360,38 @@ generalizing for anyone else to adopt this as-is:
   hotlinked. A generic RSS/Atom importer would cover much of the long tail
   (Ghost, Medium, Blogger, ...) -- and since WordPress's WXR export is
   essentially enriched RSS, the two could share a base.
-- **Comments backends** -- comments are Mastodon-only today
-  (`lib/mastodon_poster.rb` + `assets/js/comments.js`). The most promising
-  addition is **Bluesky**: its thread API (`getPostThread` on the public
-  AppView) needs no auth, so it could work exactly like Mastodon does --
-  fetched by the visitor's browser, with an auto-post counterpart to
-  `mastodon_poster.rb`. Twitter/X and Threads are worth investigating too,
-  same "replies to the announcement post are the comments" model, but the
-  API reality differs: X's API is paid and Threads' needs an app token, so
-  those threads would likely have to be fetched server-side on a cron (the
-  way `stats.json` already works), not by the visitor's browser.
-- **More sidebar widgets** -- today's three (Mastodon toots, Pixelfed,
-  GitHub commits) are each independently optional; recent posts from
-  Bluesky, Instagram, Threads or Twitter/X would follow the same fetcher
-  pattern (server-side, cron, same-origin JSON). Honest caveat: it's not
-  yet clear which of these are actually feasible -- Bluesky's public API
-  makes it straightforward, while Instagram, Threads and X all gate or
-  charge for read access, so some may only be possible with an app token,
-  or not at all.
-- **Scheduled publishing** -- a draft with a future date plus a cron step
-  that publishes it (toot included) when the time comes. The building
-  blocks (draft state, cron, `publish_draft`) all exist already.
-- **More built-in social icons** -- the "Find me on" footer section ships
-  with four (`SOCIAL_ICONS` in `build/build_blog.rb`: mastodon, pixelfed,
-  linkedin, github). Any other network already works via `icon_svg` in
-  `config/site.yml`, but common ones (Bluesky, Instagram, Threads,
-  YouTube, RSS, email, ...) deserve to be built in, so most sites never
-  need to paste an SVG into their config.
+- **More comments backends** -- Mastodon and Bluesky are in
+  (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
+  site). X and Threads were investigated (July 2026) and settled:
+  **X is rejected** -- since February 2026 its API bills per use (reads
+  $0.005 each, URL-bearing posts $0.20, no public access), so the
+  announcement plus continuously re-fetched comment threads would cost
+  real money forever on a personal blog. **Threads is feasible but
+  deferred:** its free API can publish and read replies to own posts
+  (`threads_content_publish` / `threads_read_replies`), but only
+  server-side -- a Meta developer app, an OAuth dance for the first
+  token, 60-day tokens needing an auto-refresh cron, and comments
+  cached by cron into same-origin JSON (~30min latency) instead of the
+  live threads Mastodon and Bluesky give the visitor's browser for
+  free. The design is sketched; implementation waits for real demand.
+  **Scraping Threads is rejected outright**: the web app's internals
+  shift constantly (a maintenance treadmill with no Nitter-style
+  community project to carry it), Meta blocks datacenter IPs and
+  forbids automated collection in its terms -- shipping that in a
+  community engine would hand every user something that breaks without
+  warning and risks their account. Paid scraping services fail the same
+  test three ways at once: per-request cost, data through a third
+  party, dependence on someone else's legal cat-and-mouse.
+- **More sidebar widgets** -- five ship today (Mastodon toots, Bluesky,
+  Pixelfed, GitHub commits, and a generic RSS/Atom feed), each
+  independently optional. The rest was investigated (July 2026):
+  **X** only works through a self-hosted Nitter instance -- point the
+  RSS widget at it; the official API bills per read and official embeds
+  are third-party JS, both non-starters here. **Threads** is feasible
+  via its free API (`/me/threads`) but carries the same friction as its
+  comments backend -- a Meta developer app and 60-day tokens with an
+  auto-refresh cron -- so it waits for real demand. **Instagram** has no
+  usable read API since the Basic Display API shutdown; no plan.
 
 ## Example deployment
 

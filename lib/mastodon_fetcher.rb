@@ -15,7 +15,13 @@ require_relative 'i18n'
 # limit). Now fetched server-side into public/toots.json -- same pattern as
 # Pixelfed.
 module MastodonFetcher
-  INSTANCE = SiteConfig.get('widgets', 'toots', 'instance')
+  # The widget's instance falls back to mastodon.instance -- the typical
+  # site shows its own toots, and configuring the same hostname twice
+  # meant the two could silently drift apart. An explicit
+  # widgets.toots.instance still wins (a widget showing a different
+  # account elsewhere remains possible).
+  INSTANCE = SiteConfig.get('widgets', 'toots', 'instance') ||
+             SiteConfig.get('mastodon', 'instance')
   ACCOUNT_ID = SiteConfig.get('widgets', 'toots', 'account_id')
   LIMIT = SiteConfig.get('widgets', 'toots', 'limit', default: 3)
 

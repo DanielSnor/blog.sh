@@ -44,6 +44,22 @@
       render: function (it) {
         return block(it.date, '<p><strong>' + esc(it.repo) + '</strong>: ' + esc(it.message) + '</p>', it.url);
       }
+    },
+    {
+      id: 'last-bluesky',
+      src: '/bluesky.json',
+      // Bluesky post text is plain text (not sanitized HTML like
+      // Mastodon's) -- escaped wholesale, newlines become <br>.
+      render: function (it) {
+        return block(it.date, '<p>' + esc(it.text).replace(/\n/g, '<br>') + '</p>', it.url);
+      }
+    },
+    {
+      id: 'last-rss',
+      src: '/rss.json',
+      render: function (it) {
+        return block(it.date, '<p>' + esc(it.title) + '</p>', it.url);
+      }
     }
   ];
 
