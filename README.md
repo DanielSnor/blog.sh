@@ -1,5 +1,7 @@
 # blog.sh — .sh → .rb → .html
 
+![sh → .rb → .html](assets/images/header.png)
+
 *minimalistic static web/log cms*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
