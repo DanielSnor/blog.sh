@@ -185,12 +185,12 @@ origins:
   except Mastodon's own sanitized status HTML is escaped via
   `Blog.escapeHtml`; Bluesky reply text is plain text and is escaped
   wholesale.
-- **Widgets** (`sidebar.js`) read same-origin JSON
-  (`toots.json`, `pixelfed.json`, `commits.json`, `stats.json`) that
+- **Widgets** (`sidebar.js`) read same-origin JSON (`toots.json`,
+  `bluesky.json`, `pixelfed.json`, `commits.json`, `stats.json`) that
   **cron** (`scripts/refresh_sidebar.rb`) fetched server-side -- the
-  visitor's browser never contacts GitHub or the Fediverse for them. A
-  failed cron fetch keeps the previous JSON rather than publishing an
-  empty widget.
+  visitor's browser never contacts GitHub, the Fediverse or Bluesky for
+  them. A failed cron fetch keeps the previous JSON rather than
+  publishing an empty widget.
 - **Search** (`search.js`) runs entirely client-side over the two
   index files, with the same diacritic folding the build used to create
   them.

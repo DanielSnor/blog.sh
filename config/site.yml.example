@@ -99,6 +99,12 @@ widgets:
     heading: "Recent commits"
     username: "yourname"
     limit: 3
+  bluesky:
+    heading: "Recent Bluesky posts"
+    # handle is optional -- it falls back to bluesky.handle above, so set
+    # it only when the widget shows an account other than the site's own.
+    # handle: "you.bsky.social"
+    limit: 3
 
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's

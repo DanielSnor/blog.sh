@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Regenerates the sidebar widget JSON files (pixelfed.json, toots.json,
-# commits.json) and tooted-post stats (stats.json), and uploads only those
-# to Surfer -- without rebuilding the whole site.
-# Meant for cron.
+# commits.json, bluesky.json) and announced-post stats (stats.json), and
+# uploads only those to the deploy target -- without rebuilding the
+# whole site. Meant for cron.
 #
 # Usage:
 #   ./scripts/refresh-sidebar.sh
@@ -19,4 +19,4 @@ set -a
 source env.sh
 set +a
 ruby scripts/refresh_sidebar.rb
-exec ./scripts/deploy-web.sh --only=pixelfed.json,toots.json,commits.json,stats.json
+exec ./scripts/deploy-web.sh --only=pixelfed.json,toots.json,commits.json,bluesky.json,stats.json

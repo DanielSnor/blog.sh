@@ -98,9 +98,9 @@ Things worth knowing:
 
 ## Cron (sidebar widgets and post stats)
 
-`scripts/refresh-sidebar.sh` refetches the widget JSON (toots, Pixelfed,
-commits) and per-post stats, then uploads **only those four files** --
-no site rebuild:
+`scripts/refresh-sidebar.sh` refetches the widget JSON (toots, Bluesky,
+Pixelfed, commits) and per-post stats, then uploads **only those
+files** -- no site rebuild:
 
 ```
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh

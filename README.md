@@ -128,8 +128,9 @@ deploy step around exactly that. A few of the choices that came out of it:
 - Quoted phrases, `-word` exclusion, diacritic-insensitive
 
 **Sidebar widgets**
-- Latest toots, Pixelfed posts, commits -- fetched server-side on a cron
-  (`scripts/refresh-sidebar.sh`), never by the visitor's browser
+- Latest toots, Bluesky posts, Pixelfed posts, commits -- fetched
+  server-side on a cron (`scripts/refresh-sidebar.sh`), never by the
+  visitor's browser
 - Per-post stats (likes/boosts/replies) for announced posts -- live for
   the last 90 days, refreshed weekly beyond that
 
