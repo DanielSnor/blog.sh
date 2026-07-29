@@ -10,7 +10,7 @@
 # isn't fetched by the visitor's browser, but server-side (see lib/sidebar.rb).
 
 require_relative '../lib/sidebar'
-require_relative '../lib/mastodon_stats'
+require_relative '../lib/post_stats'
 
 ROOT = File.expand_path('..', __dir__)
 PUBLIC_DIR = File.join(ROOT, 'public.nosync')
@@ -21,7 +21,7 @@ puts Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))
 
 # Stats for tooted posts are only fetched here, not on every build.
 #
-# Only posts from the last ~90 days (MastodonStats::RECENT_WINDOW_DAYS) are
+# Only posts from the last ~90 days (PostStats::RECENT_WINDOW_DAYS) are
 # live-refreshed on every cron run -- likes/boosts/comments barely change on
 # older ones, so a full refresh of every ever-tooted post only needs to
 # happen occasionally, via FULL_REFRESH_INTERVAL. The timestamp of the last
@@ -36,7 +36,7 @@ last_full_refresh = File.exist?(FULL_REFRESH_PATH) ? File.read(FULL_REFRESH_PATH
 full_refresh = (Time.now.to_f - last_full_refresh) >= FULL_REFRESH_INTERVAL
 
 previous = File.exist?(STATS_PATH) ? (JSON.parse(File.read(STATS_PATH)) rescue {}) : {}
-fetched = MastodonStats.fetch_all(recent_only: !full_refresh)
+fetched = PostStats.fetch_all(recent_only: !full_refresh)
 File.write(STATS_PATH, previous.merge(fetched).to_json)
 File.write(FULL_REFRESH_PATH, Time.now.to_f.to_s) if full_refresh
 

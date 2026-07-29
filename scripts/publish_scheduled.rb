@@ -15,7 +15,6 @@
 require 'json'
 require 'time'
 require_relative '../lib/publishing'
-require_relative '../lib/mastodon_poster'
 require_relative '../lib/i18n'
 
 due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
@@ -35,11 +34,8 @@ end
 
 due.each do |path, post, date|
   new_path, updated = Publishing.publish(path, post, date: date)
-  toot = Publishing.compose_toot(title: updated['title'], slug: updated['slug'],
-                                 year: date.year.to_s, blocks: updated['content'],
-                                 tags: updated['tags'] || [])
-  url = MastodonPoster.publish(toot)
-  File.write(new_path, JSON.pretty_generate(updated.merge('mastodon_url' => url))) if url
+  fields = Publishing.announce(updated, year: date.year.to_s)
+  File.write(new_path, JSON.pretty_generate(updated.merge(fields))) if fields
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
 end

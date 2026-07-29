@@ -4,6 +4,8 @@ require 'json'
 require 'fileutils'
 require 'time'
 require_relative 'site_config'
+require_relative 'mastodon_poster'
+require_relative 'bluesky_poster'
 require_relative 'i18n'
 
 # lib/publishing.rb -- the mechanics of making a draft public, shared by
@@ -23,6 +25,9 @@ module Publishing
   # so mastodon.toot_length in config/site.yml can too; the perex budget
   # scales with it.
   TOOT_LENGTH = SiteConfig.get('mastodon', 'toot_length', default: 500)
+  # Bluesky's limit is fixed by the AT Protocol and counted in GRAPHEMES,
+  # not characters -- hence the separate composition below.
+  BLUESKY_LENGTH = 300
 
   module_function
 
@@ -87,6 +92,56 @@ module Publishing
     budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
 
     [title, perex_for(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
+  end
+
+  def grapheme_length(text)
+    text.scan(/\X/).length
+  end
+
+  # Same word-boundary trimming as perex_for, but budgeted in graphemes --
+  # what Bluesky actually counts (an emoji or "ř" is one grapheme, not
+  # one-plus bytes or codepoints).
+  def perex_by_graphemes(blocks, max_graphemes)
+    limit = [max_graphemes, PEREX_LENGTH].min
+    plain = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'] }.join(' ').gsub(/\s+/, ' ').strip
+    return plain if grapheme_length(plain) <= limit
+    return '' if limit <= 0
+
+    "#{plain.scan(/\X/).first(limit).join.sub(/\s+\S*\z/, '')}…"
+  end
+
+  # The Bluesky counterpart of compose_toot: same never-truncate rule for
+  # title/url/hashtags, 300-grapheme budget. Links and hashtags become
+  # clickable via facets, which BlueskyPoster builds from this text.
+  def compose_bluesky_post(title:, slug:, year:, blocks:, tags:)
+    url = post_url(slug, year)
+    hashtags = hashtags_for(tags)
+    fixed = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
+    budget = BLUESKY_LENGTH - grapheme_length(fixed) - 2
+
+    [title, perex_by_graphemes(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
+  end
+
+  # Sends the announcement to whichever network the site configured and
+  # returns the post fields to store ('mastodon_url', or 'bluesky_url' +
+  # 'bluesky_uri'), or nil when nothing was sent. The caller decides
+  # WHETHER to announce (recency window, prompts); this decides only how.
+  def announce(post, year:)
+    title = post['title']
+    slug = post['slug']
+    blocks = post['content']
+    tags = post['tags'] || []
+
+    case SiteConfig.comment_network
+    when :mastodon
+      url = MastodonPoster.publish(compose_toot(title: title, slug: slug, year: year,
+                                                blocks: blocks, tags: tags))
+      url ? { 'mastodon_url' => url } : nil
+    when :bluesky
+      result = BlueskyPoster.publish(compose_bluesky_post(title: title, slug: slug, year: year,
+                                                          blocks: blocks, tags: tags))
+      result ? { 'bluesky_url' => result[:url], 'bluesky_uri' => result[:uri] } : nil
+    end
   end
 
   # Build and deploy as one step (--prune included: after a delete or a

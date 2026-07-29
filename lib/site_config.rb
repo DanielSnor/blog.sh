@@ -39,4 +39,22 @@ module SiteConfig
     value = keys.reduce(data) { |acc, key| acc.is_a?(Hash) ? acc[key] : nil }
     value.nil? ? default : value
   end
+
+  # The comments/announcement network: :mastodon, :bluesky, or nil when
+  # neither is configured. Deliberately exclusive -- a post's comments
+  # live on exactly one network, so configuring both sections at once is
+  # a config error, not a feature: two half-threads of discussion under
+  # every post would serve nobody.
+  def comment_network
+    mastodon = get('mastodon', 'instance')
+    bluesky = get('bluesky', 'handle')
+    if mastodon && bluesky
+      abort('❌ Both mastodon: and bluesky: are configured in config/site.yml -- pick one. ' \
+            'Comments and the announcement post live on exactly one network.')
+    end
+    return :mastodon if mastodon
+    return :bluesky if bluesky
+
+    nil
+  end
 end

@@ -100,15 +100,25 @@ widgets:
     username: "yourname"
     limit: 3
 
-# Optional. Omit this whole section for a site with no Mastodon integration
-# at all -- no auto-toot on publish, no Mastodon-based comments, no post
-# stats. The access token itself goes in env.sh (MASTODON_ACCESS_TOKEN), not
-# here, since it's a secret.
+# Optional. The comments/announcement network: every published post is
+# announced there, and replies to that announcement are the post's
+# comments. Configure EITHER mastodon: OR bluesky: -- never both; the
+# build refuses a config with two networks, since comments live in
+# exactly one place. Omit both sections for a site with no network
+# integration at all (no announcements, no comments, no post stats).
+#
+# The secrets go in env.sh, not here: MASTODON_ACCESS_TOKEN for
+# Mastodon, BLUESKY_APP_PASSWORD for Bluesky.
 mastodon:
   instance: "mastodon.social"
   # Optional: your instance's status character limit (default 500).
   # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
   # toot_length: 500
+
+# The Bluesky alternative (uncomment this and remove mastodon: above):
+# bluesky:
+#   handle: "you.bsky.social"
+#   # pds: "https://bsky.social"   # only for a self-hosted PDS
 
 # Optional. Omit this whole section (or any key inside it) to fall back to
 # blog.sh's own blue palette (build/build_blog.rb's DEFAULT_COLORS). Each

@@ -75,6 +75,7 @@ js:
   stats_boosted: "Boosted"
   stats_comments: "Comments"
   reply_on_mastodon: "Reply on Mastodon"
+  reply_on_bluesky: "Reply on Bluesky"
   results_one: "result"
   results_few: "results"
   results_many: "results"
@@ -142,10 +143,17 @@ cli:
   schedule_date_invalid: "That's not a date I can read -- expected e.g. 2026-08-15 09:00."
   schedule_date_not_future: "The publish date has to be in the future."
 
-  date_outside_window_prompt: "Date %{date} is outside the 24h window for an automatic toot. Toot anyway? [y/N] "
+  date_outside_window_prompt: "Date %{date} is outside the 24h window for an automatic announcement. Announce anyway? [y/N] "
   confirm_yes_char: "y"
-  base_url_missing_toot: "SITE_BASE_URL is not set, the toot for the post was not created."
-  backdated_no_toot: "Post date isn't current (a backdated post), the toot was not created."
+  base_url_missing_toot: "SITE_BASE_URL is not set, the announcement for the post was not sent."
+  use_bluesky_command: "This site announces on Bluesky -- use ./blog.sh bluesky instead of toot."
+  use_toot_command: "This site announces on Mastodon (or has no network configured) -- use ./blog.sh toot instead of bluesky."
+  already_has_bluesky: "The post already has a Bluesky announcement: %{url}"
+  bluesky_posted: "Announced on Bluesky: %{url}"
+  bluesky_failed: "The Bluesky announcement was not sent."
+  deleting_bluesky: "Deleting the Bluesky announcement: %{url}"
+  delete_bluesky_failed: "Deleting the Bluesky announcement failed -- delete it by hand."
+  backdated_no_toot: "Post date isn't current (a backdated post), the announcement was not sent."
   schedule_only_drafts: "Post '%{slug}' is already published -- only drafts can be scheduled."
   schedule_needs_future_date: "Post '%{slug}' needs a future date first -- set one via ./blog.sh edit %{slug}. (An untouched creation date would mean \"publish now\", and that's what publish is for.)"
   scheduled_label: "Scheduled: '%{slug}' publishes automatically at %{date}."
@@ -212,7 +220,8 @@ cli:
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
-      ./blog.sh toot [<slug>]        (re-)sends the comment toot; without a slug, offers the last %{recent_count} posts
+      ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
+      ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
       ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 shows this help
@@ -230,7 +239,8 @@ cli:
   wizard_menu_unpublish: "Move a published post back to draft"
   wizard_menu_delete: "Delete a post (moves it to trash)"
   wizard_menu_restore: "Restore a post from trash"
-  wizard_menu_toot: "(Re-)send the comment toot"
+  wizard_menu_toot: "(Re-)send the comment toot (Mastodon)"
+  wizard_menu_bluesky: "(Re-)send the Bluesky announcement"
   wizard_menu_list: "List of all posts (no editing, just browsing)"
   wizard_menu_rebuild: "Rebuild and deploy the site (not tied to a specific post)"
 

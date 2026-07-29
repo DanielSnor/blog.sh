@@ -14,6 +14,7 @@ require 'securerandom'
 require 'shellwords'
 require_relative '../lib/post_writer'
 require_relative '../lib/mastodon_poster'
+require_relative '../lib/bluesky_poster'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
@@ -167,14 +168,16 @@ end
 
 # --- Mastodon comments -----------------------------------------------------
 
-# Posts a "reply here to comment" toot for a freshly-written post and returns
-# its URL (or nil, e.g. if SITE_BASE_URL / MASTODON_ACCESS_TOKEN aren't set --
-# see lib/mastodon_poster.rb). Never raises: a failed toot must not block
-# writing the post itself. The toot text itself is composed in
-# lib/publishing.rb, shared with the scheduled-publish cron.
-TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old Mastodon thread) don't get an auto toot
+# Sends the "reply here to comment" announcement (a Mastodon toot or a
+# Bluesky post, whichever network the site configured -- see
+# SiteConfig.comment_network) and returns the post fields to store, or
+# nil (e.g. when SITE_BASE_URL or the network's token isn't set). Never
+# raises: a failed announcement must not block publishing the post
+# itself. Composition and dispatch live in lib/publishing.rb, shared
+# with the scheduled-publish cron.
+TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old thread) don't get an auto announcement
 
-def post_toot(title:, slug:, year:, blocks:, tags:, date:, force: false)
+def announce_post(post, year:, date:, force: false)
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_toot')
     return nil
@@ -185,9 +188,7 @@ def post_toot(title:, slug:, year:, blocks:, tags:, date:, force: false)
     return nil
   end
 
-  MastodonPoster.publish(
-    Publishing.compose_toot(title: title, slug: slug, year: year, blocks: blocks, tags: tags)
-  )
+  Publishing.announce(post, year: year)
 end
 
 # --- commands ------------------------------------------------------------
@@ -334,7 +335,7 @@ def schedule_from_dialog(path, post)
   true
 end
 
-def toot_on_publish(post, slug, year, date)
+def announce_on_publish(post, year, date)
   force = false
   if (date - Time.now).abs > TOOT_RECENCY_WINDOW
     print t('cli.date_outside_window_prompt', date: date.strftime(t('date_format')))
@@ -343,8 +344,7 @@ def toot_on_publish(post, slug, year, date)
     force = true
   end
 
-  post_toot(title: post['title'], slug: slug, year: year, blocks: post['content'],
-            tags: post['tags'] || [], date: date, force: force)
+  announce_post(post, year: year, date: date, force: force)
 end
 
 def publish_draft(slug)
@@ -370,9 +370,9 @@ def publish_draft(slug)
   new_year = date.year.to_s
   new_path, updated = Publishing.publish(path, post, date: date)
 
-  mastodon_url = toot_on_publish(updated, slug, new_year, date)
-  if mastodon_url
-    updated['mastodon_url'] = mastodon_url
+  fields = announce_on_publish(updated, new_year, date)
+  if fields
+    updated.merge!(fields)
     File.write(new_path, JSON.pretty_generate(updated))
   end
 
@@ -398,6 +398,12 @@ end
 # overwritten -- there's no reason for a second toot on the same post (see
 # unpublish, where the old one can be deleted).
 def cmd_toot(slug)
+  if SiteConfig.comment_network == :bluesky
+    puts t('cli.use_bluesky_command')
+    puts
+    return
+  end
+
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
@@ -416,15 +422,55 @@ def cmd_toot(slug)
 
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
-  mastodon_url = toot_on_publish(post, slug, year, date)
-  unless mastodon_url
+  fields = announce_on_publish(post, year, date)
+  unless fields
     warn t('cli.toot_failed')
     warn ''
     return
   end
 
-  File.write(path, JSON.pretty_generate(post.merge('mastodon_url' => mastodon_url)))
-  puts t('cli.tooted', url: mastodon_url)
+  File.write(path, JSON.pretty_generate(post.merge(fields)))
+  puts t('cli.tooted', url: fields['mastodon_url'])
+  puts
+end
+
+# The Bluesky counterpart of cmd_toot: a standalone (re-)send of the
+# announcement, for sites whose comment network is Bluesky. Same rules --
+# published posts only, an existing announcement is never overwritten.
+def cmd_bluesky(slug)
+  unless SiteConfig.comment_network == :bluesky
+    puts t('cli.use_toot_command')
+    puts
+    return
+  end
+
+  path = find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  if draft?(post)
+    warn t('cli.still_draft_toot', slug: slug)
+    warn ''
+    return
+  end
+
+  if post['bluesky_url']
+    puts t('cli.already_has_bluesky', url: post['bluesky_url'])
+    puts
+    return
+  end
+
+  year = File.basename(File.dirname(path))
+  date = Time.parse(post['date'])
+  fields = announce_on_publish(post, year, date)
+  unless fields
+    warn t('cli.bluesky_failed')
+    warn ''
+    return
+  end
+
+  File.write(path, JSON.pretty_generate(post.merge(fields)))
+  puts t('cli.bluesky_posted', url: fields['bluesky_url'])
   puts
 end
 
@@ -517,9 +563,15 @@ def cmd_unpublish(slug)
     puts t('cli.deleting_toot', url: post['mastodon_url'])
     warn t('cli.delete_toot_failed') unless MastodonPoster.delete(post['mastodon_url'])
   end
+  if post['bluesky_uri']
+    puts t('cli.deleting_bluesky', url: post['bluesky_url'])
+    warn t('cli.delete_bluesky_failed') unless BlueskyPoster.delete(post['bluesky_uri'])
+  end
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'])
   updated.delete('mastodon_url')
+  updated.delete('bluesky_url')
+  updated.delete('bluesky_uri')
   File.write(path, JSON.pretty_generate(updated))
   puts t('cli.reverted_to_draft', path: path)
 
@@ -611,6 +663,8 @@ def edit_post(slug)
   }
   updated['type'] = new_type if new_type
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
+  updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
+  updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']
   updated['created_at'] = post['created_at'] if post['created_at']
   updated['draft_token'] = post['draft_token'] if post['draft_token']
   updated['scheduled'] = true if post['scheduled']
@@ -896,6 +950,7 @@ WIZARD_MENU = [
   ['delete', t('cli.wizard_menu_delete')],
   ['restore', t('cli.wizard_menu_restore')],
   ['toot', t('cli.wizard_menu_toot')],
+  ['bluesky', t('cli.wizard_menu_bluesky')],
   ['list', t('cli.wizard_menu_list')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
 ].freeze
@@ -910,6 +965,7 @@ def run_wizard_choice(command)
   when 'delete' then cmd_delete(pick_slug_interactively)
   when 'restore' then cmd_restore(pick_trash_interactively)
   when 'toot' then cmd_toot(pick_slug_interactively)
+  when 'bluesky' then cmd_bluesky(pick_slug_interactively)
   when 'list' then cmd_list({})
   when 'rebuild' then cmd_rebuild
   end
@@ -979,6 +1035,9 @@ else
   when 'toot'
     slug = ARGV.shift || pick_slug_interactively
     cmd_toot(slug)
+  when 'bluesky'
+    slug = ARGV.shift || pick_slug_interactively
+    cmd_bluesky(slug)
   when 'rebuild'
     cmd_rebuild
   when 'list'

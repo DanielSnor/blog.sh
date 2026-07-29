@@ -88,6 +88,8 @@ SOCIAL = SiteConfig.get('social', default: [])
 # just gets an empty hash instead of an aborted build.
 WIDGETS = SiteConfig.get('widgets', default: {})
 MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
+# Also enforces the mastodon/bluesky exclusivity right at build time.
+COMMENT_NETWORK = SiteConfig.comment_network
 
 # Color palette. Only these 7-per-mode keys (config/site.yml's
 # `colors.light.*`/`colors.dark.*`) are real per-site choices -- everything
@@ -189,6 +191,7 @@ def client_i18n_json
     stats_boosted: t('js.stats_boosted'),
     stats_comments: t('js.stats_comments'),
     reply_on_mastodon: t('js.reply_on_mastodon'),
+    reply_on_bluesky: t('js.reply_on_bluesky'),
     results_one: t('js.results_one'),
     results_few: t('js.results_few'),
     results_many: t('js.results_many'),
@@ -224,9 +227,11 @@ def csp_content
   analytics_origin = ANALYTICS && ANALYTICS['src'] ? URI.parse(ANALYTICS['src']) : nil
   analytics_origin &&= "#{analytics_origin.scheme}://#{analytics_origin.host}"
   mastodon_origin = MASTODON_INSTANCE ? "https://#{MASTODON_INSTANCE}" : nil
+  # Bluesky threads are read from the public AppView, no auth involved.
+  bluesky_origin = COMMENT_NETWORK == :bluesky ? 'https://public.api.bsky.app' : nil
 
   script_src = ["'self'", CLIENT_I18N_SCRIPT_HASH, analytics_origin].compact.join(' ')
-  connect_src = ["'self'", analytics_origin, mastodon_origin].compact.join(' ')
+  connect_src = ["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact.join(' ')
 
   "default-src 'self'; script-src #{script_src}; style-src 'self' 'unsafe-inline'; " \
     "img-src 'self' https: data:; font-src 'self'; connect-src #{connect_src}; " \
@@ -613,6 +618,28 @@ def excerpt?(post)
   plain_text_length(post) > EXCERPT_TEXT_THRESHOLD || post['content'].count { |b| %w[image video link].include?(b['type']) } > 1
 end
 
+# The stats row and the comments container carry whichever network the
+# post was announced on -- comments.js reads the data attribute to know
+# where the thread lives. The attributes come from the post's own stored
+# fields, so posts announced before a network switch keep working.
+def post_stats_html(post)
+  if post['mastodon_url']
+    %(<div class="post-stats" data-toot-url="#{h(post['mastodon_url'])}"></div>)
+  elsif post['bluesky_uri']
+    %(<div class="post-stats" data-bluesky-uri="#{h(post['bluesky_uri'])}"></div>)
+  else
+    ''
+  end
+end
+
+def comments_attrs(post)
+  if post['mastodon_url']
+    %( data-toot-url="#{h(post['mastodon_url'])}")
+  elsif post['bluesky_uri']
+    %( data-bluesky-uri="#{h(post['bluesky_uri'])}" data-bluesky-url="#{h(post['bluesky_url'])}")
+  end
+end
+
 def render_list_item(post)
   LIST_ITEM_CACHE[post] ||= build_list_item(post)
 end
@@ -624,7 +651,7 @@ def build_list_item(post)
   content_class = excerpt ? 'content excerpt' : 'content'
   read_more = excerpt ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
   title = post['title'] ? %(<h2><a href="#{prefix}">#{h(post['title'])}</a></h2>) : ''
-  stats = post['mastodon_url'] ? %(<div class="post-stats" data-toot-url="#{h(post['mastodon_url'])}"></div>) : ''
+  stats = post_stats_html(post)
   <<~HTML
     <div class="card post-list-item">
       <div class="post-header">

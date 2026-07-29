@@ -199,7 +199,16 @@ variant:
    `docker exec` / the platform's terminal -- the engine itself doesn't
    care, it's just Ruby + bash in a directory.
 
-## 8. Mastodon integration (optional)
+## 8. Comments network (optional): Mastodon or Bluesky
+
+Every published post is announced on the configured network, and
+replies to that announcement are the post's comments. Configure
+**exactly one** of the two -- the build refuses a config with both,
+since a discussion split across two networks serves nobody. Without
+either section, everything else still works; publishing just skips the
+announcement (logged, not an error).
+
+**Mastodon:**
 
 1. In `config/site.yml`, set `mastodon.instance` -- this switches on
    comments, per-post stats and the auto-toot on publish.
@@ -209,9 +218,18 @@ variant:
 3. For the "recent toots" sidebar widget, `widgets.toots.account_id`
    wants the *numeric* account id, not the @handle -- find it at
    `https://<instance>/api/v1/accounts/lookup?acct=<username>`.
+   (The widget's instance falls back to `mastodon.instance`.)
 
-Without the token everything else still works -- publishing just skips
-the toot (logged, not an error).
+**Bluesky:**
+
+1. In `config/site.yml`, set `bluesky.handle` (e.g.
+   `you.bsky.social`); `bluesky.pds` only if you self-host a PDS.
+2. On Bluesky: Settings → App Passwords → create one, and put it into
+   env.sh as `BLUESKY_APP_PASSWORD` -- never the account password.
+3. Announcements fit Bluesky's 300-grapheme limit automatically (the
+   excerpt shrinks; title, link and hashtags never do), with the link
+   and hashtags clickable. Comments are read from Bluesky's public
+   AppView by the visitor's browser -- no token involved on the page.
 
 ## 9. Updating the engine
 
