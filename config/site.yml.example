@@ -57,7 +57,8 @@ footer:
   copyright: "All rights reserved &copy; 2026"
   social_heading: "Find me on"
 
-# icon = a name from the built-in set (mastodon, pixelfed, linkedin, github).
+# icon = a name from the built-in set: mastodon, pixelfed, linkedin,
+# github, bluesky, instagram, threads, youtube, rss, email.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 social:
   - name: "Mastodon"
