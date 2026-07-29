@@ -131,6 +131,11 @@ cli:
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nerozumím, zkus p / s / d / e."
   schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, prázdné = zrušit): "
+  menu_hint: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · psaní = slug · Esc zpět"
+  qr_hint: "Naskenuj telefonem a náhled se otevře."
+  announcing: "Oznamuji"
+  preview_serving: "Servíruji public.nosync na %{url} — Ctrl-C ukončí."
+  preview_missing_public: "public.nosync ještě neexistuje — nejdřív build (ruby build/build_blog.rb)."
   schedule_date_invalid: "Tohle datum neumím přečíst — čekám např. 2026-08-15 09:00."
   schedule_date_not_future: "Datum publikace musí být v budoucnosti."
 
@@ -214,6 +219,7 @@ cli:
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
       ./blog.sh rebuild              přebuilduje a nasadí celý web, bez vazby na konkrétní post
+      ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh                      spustí interaktivního průvodce

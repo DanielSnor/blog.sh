@@ -51,6 +51,19 @@ untouched creation-time date is refused -- that would just mean
 "publish now"). Running `schedule` again cancels; `list` shows such
 drafts as `[SCHEDULED]`.
 
+### In the terminal
+
+The CLI adapts to where it runs. In an interactive terminal you get
+arrow-key menus (digits still quick-select, typing a slug still works),
+single-keypress answers without Enter, colored state markers and a
+**QR code of the draft preview URL** -- point your phone's camera at
+the screen instead of retyping a token. Piped, scripted or cron runs
+get the plain line-based prompts unchanged, with no escape codes in
+the output. Colors honor `NO_COLOR` and `TERM=dumb`.
+
+`./blog.sh preview [<port>]` serves the built site locally (default
+port 8000) when you want to look at it without deploying.
+
 ## Writing from a phone
 
 The trick is that a bare filename in an image line resolves against the

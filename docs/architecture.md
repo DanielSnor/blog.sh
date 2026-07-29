@@ -151,6 +151,29 @@ page plus every listing, and would otherwise be rendered 4-6x. ERB
 partials (nav, aside, footer) are cached by name+locals since they
 don't depend on page content.
 
+## The terminal UI
+
+`lib/tui.rb` is the whole UI layer: colors, single-keypress choices, an
+inline arrow-key menu and a spinner -- pure stdlib (`io/console`), plain
+VT100 sequences, no terminfo and no gems. Three deliberate constraints:
+
+- **Everything degrades.** `Tui.interactive?` gates every enhancement,
+  so piped, scripted and cron runs keep the exact line-based behavior
+  (and escape-code-free output) they always had. Colors additionally
+  honor `NO_COLOR` and `TERM=dumb`.
+- **Raw mode per keystroke, never persistent.** `STDIN.getch` enters and
+  leaves raw mode around a single read, so no crash can leave the user's
+  shell broken -- the classic TUI failure mode.
+- **Inline, not fullscreen.** The menu repaints a few lines in place with
+  cursor-up; no alternate screen, so the dialog stays in the scrollback.
+  A lone Esc is told apart from an arrow key by a 50 ms wait for the
+  rest of the sequence.
+
+`lib/qr_code.rb` renders a draft's preview URL as a scannable QR code in
+half-block glyphs -- the smallest correct subset of the spec that the job
+needs (byte mode, EC level L, versions 1-5, fixed mask 0), verified
+module-for-module against a reference encoder.
+
 ## Deploy (`scripts/deploy_web.rb` + `lib/deploy_backend/`)
 
 The deploy script owns the *what*; backends own the *how*:

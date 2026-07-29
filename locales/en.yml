@@ -140,6 +140,11 @@ cli:
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Not understood, try p / s / d / e."
   schedule_date_prompt: "Publish at (YYYY-MM-DD HH:MM, empty = cancel): "
+  menu_hint: "↑↓ move · Enter select · 1-9 quick pick · type = slug · Esc back"
+  qr_hint: "Scan with your phone to open the preview."
+  announcing: "Announcing"
+  preview_serving: "Serving public.nosync at %{url} -- Ctrl-C stops it."
+  preview_missing_public: "public.nosync does not exist yet -- run a build first (ruby build/build_blog.rb)."
   schedule_date_invalid: "That's not a date I can read -- expected e.g. 2026-08-15 09:00."
   schedule_date_not_future: "The publish date has to be in the future."
 
@@ -223,6 +228,7 @@ cli:
       ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
       ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
       ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
+      ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 shows this help
       ./blog.sh                      launches the interactive wizard

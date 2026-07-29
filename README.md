@@ -94,7 +94,12 @@ deploy step around exactly that. A few of the choices that came out of it:
   overwrites an existing one
 - `list [--type=] [--tag=] [--drafts]` -- filtered listing
 - `rebuild` -- build and deploy in one step
-- Run with no arguments for a numbered interactive menu
+- Run with no arguments for an interactive menu: arrow keys and single
+  keypresses in a terminal (numbers and slugs still work), plain
+  line-based prompts when piped or scripted -- and a **QR code of the
+  draft's preview URL**, so a post written over SSH opens on your phone
+  by pointing the camera at the screen
+- `preview [<port>]` -- serves the build locally, no deploy needed
 - Writing from a phone: a bare filename in `![]()` resolves against
   `incoming/` (an SFTP staging directory), with a wait loop for the file
   to actually arrive before continuing
@@ -282,6 +287,7 @@ cron, backup, troubleshooting) is
 ./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
 ./blog.sh rebuild              # rebuilds and deploys the whole site
+./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
 ./blog.sh help
 ```
