@@ -44,6 +44,9 @@ BACKEND = DeployBackend.pick
 # target already has, so switching DEPLOY_BACKEND must never inherit
 # another target's state -- a fresh target starts from a full upload.
 MANIFEST_PATH = File.join(ROOT, ".deploy_manifest#{BACKEND.manifest_suffix}.json")
+# Orphans get deleted under --prune, or unconditionally on a snapshot
+# backend (git), whose every push mirrors the build exactly.
+PRUNES = PRUNE || (BACKEND.respond_to?(:always_prunes?) && BACKEND.always_prunes?)
 # The manifest is saved in batches, not after every file: on a large deploy
 # that meant thousands of rewrites of a growing JSON file (hundreds of KB x
 # thousands = gigabytes of writes). Periodic saving still has to happen
@@ -165,17 +168,17 @@ log('')
 log("Deploy web -> #{BACKEND.label}: #{BACKEND.target}#{DRY ? '  [DRY-RUN]' : ''}")
 log("  #{files.size} file(s) total, #{to_upload.size} new/changed, #{skipped} unchanged (skipped)")
 if orphans.any?
-  log(PRUNE ? "  #{orphans.size} orphan(s) to delete (--prune)" \
-            : "  ⚠️  #{orphans.size} orphaned file(s) on Surfer -- delete them with --prune")
+  log(PRUNES ? "  #{orphans.size} orphan(s) to delete#{PRUNE ? ' (--prune)' : ' (snapshot deploy)'}" \
+             : "  ⚠️  #{orphans.size} orphaned file(s) on the target -- delete them with --prune")
 end
 
 if DRY
   to_upload.each { |name| log("  [dry] #{name} (#{File.size(File.join(PUBLIC_DIR, name))} B)") }
-  orphans.each { |name| log("  [dry] #{PRUNE ? 'delete' : 'orphan'} #{name}") }
+  orphans.each { |name| log("  [dry] #{PRUNES ? 'delete' : 'orphan'} #{name}") }
   exit 0
 end
 
-log('') if to_upload.any? || (PRUNE && orphans.any?)
+log('') if to_upload.any? || (PRUNES && orphans.any?)
 
 ok = failed = deleted = 0
 begin
@@ -183,13 +186,13 @@ begin
     # Batch backend (rsync): one run covers everything, so the manifest is
     # updated wholesale on success -- and not at all on failure, since a
     # batch backend re-diffs against the target on the next run anyway.
-    if BACKEND.sync(public_dir: PUBLIC_DIR, only: ONLY, prune: PRUNE && orphans.any?,
+    if BACKEND.sync(public_dir: PUBLIC_DIR, only: ONLY, prune: PRUNES && orphans.any?,
                     force: FORCE, logger: method(:log))
       to_upload.each do |name|
         manifest[name] = { 'hash' => hashes[name], 'size' => stats[name]['size'], 'mtime' => stats[name]['mtime'] }
       end
       ok = to_upload.size
-      if PRUNE
+      if PRUNES
         orphans.each { |name| manifest.delete(name) }
         deleted = orphans.size
       end
@@ -210,7 +213,7 @@ begin
         end
       end
 
-      next unless PRUNE
+      next unless PRUNES
 
       orphans.each do |name|
         case session.delete(name, logger: method(:log))
