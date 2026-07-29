@@ -1,0 +1,246 @@
+---
+title: Markdown Cheat Sheet
+---
+This site is written in Markdown — in the editor that `./blog.sh add` opens. It isn't full Markdown, it's a subset tailored to this engine. This page shows everything it supports: for each group, first the source as you'd type it, and right below it, how it comes out.
+
+A link to this page is also in the in-editor help, so it's at hand while you write.
+
+- [Paragraphs](#paragraphs)
+- [Headings](#headings)
+- [Emphasis](#emphasis)
+- [Links](#links)
+- [Lists](#lists)
+- [Blockquotes](#blockquotes)
+- [Horizontal rule](#horizontal-rule)
+- [Code blocks](#code-blocks)
+- [Tables](#tables)
+- [Images](#images)
+- [Video](#video)
+- [Escaping](#escaping)
+- [Not supported yet](#not-supported-yet)
+
+## Paragraphs
+
+Paragraphs are separated by a blank line. A line break inside a paragraph collapses into a space when rendered — so if you want a new paragraph, leave an empty line between them.
+
+```
+First paragraph.
+
+Second paragraph.
+```
+
+First paragraph.
+
+Second paragraph.
+
+## Headings
+
+Hashes at the start of the line, one to six by level. A heading has to sit on its own line.
+
+```
+# Level one heading
+## Level two heading
+### Level three heading
+#### Level four heading
+##### Level five heading
+###### Level six heading
+```
+
+The first two levels are what this article uses for its own sections, so here's a sample from level three down:
+
+### Level three heading
+
+#### Level four heading
+
+##### Level five heading
+
+## Emphasis
+
+```
+**bold**, *italic*, ~~strikethrough~~ and `code inside a sentence`
+```
+
+**bold**, *italic*, ~~strikethrough~~ and `code inside a sentence`
+
+Emphasis can be combined and nested:
+
+```
+**bold text with *italics* inside**
+```
+
+**bold text with *italics* inside**
+
+## Links
+
+Text in square brackets, address in round ones. A title in quotes can follow the address — it shows up as a tooltip on hover.
+
+```
+[Example](https://example.com)
+[Example with a title](https://example.com "Tooltip on hover")
+```
+
+[Example](https://example.com) and [Example with a title](https://example.com "Tooltip on hover")
+
+An address written directly in a sentence turns into a link by itself, no markup needed:
+
+```
+I write about it at https://example.com regularly.
+```
+
+I write about it at https://example.com regularly.
+
+## Lists
+
+Bullets start with a dash or an asterisk, an ordered list with a number and a period. No blank line between items — that would end the list.
+
+```
+- first bullet
+- second bullet
+- third bullet
+```
+
+- first bullet
+- second bullet
+- third bullet
+
+```
+1. first item
+2. second item
+3. third item
+```
+
+1. first item
+2. second item
+3. third item
+
+The numbers don't matter, they're renumbered when rendered. A nested list is indented by two spaces:
+
+```
+- fruit
+  - apple
+  - pear
+- vegetables
+  1. carrot
+  2. parsley
+```
+
+- fruit
+  - apple
+  - pear
+- vegetables
+  1. carrot
+  2. parsley
+
+## Blockquotes
+
+Every line of a quote starts with `>`.
+
+```
+> Begin at the beginning, the King said gravely,
+> and go on till you come to the end: then stop.
+```
+
+> Begin at the beginning, the King said gravely,
+> and go on till you come to the end: then stop.
+
+## Horizontal rule
+
+A line of three or more dashes, on its own.
+
+```
+---
+```
+
+---
+
+## Code blocks
+
+Code is wrapped between lines of three backticks — \`\`\`. A language can follow the first triple; it's cosmetic only, it doesn't change the rendering. Nothing inside the block is formatted, asterisks and similar characters stay literal.
+
+```ruby
+def greet(name)
+  puts "Hello #{name}!"
+end
+```
+
+A wide block scrolls within itself instead of stretching the page:
+
+```
+rsync -avz --delete --rsync-path="sudo rsync" -e "ssh -p 202" ./ user@server:/some/long/path/deep/down/
+```
+
+## Tables
+
+The first line is the header, the second a dash separator, the rest is data. Colons in the separator set column alignment: `:---` left, `---:` right, `:---:` center.
+
+```
+| Column | Right | Center |
+| --- | ---: | :---: |
+| first row | 6228 | 1 |
+| second row | ~435 | **7 to 9** |
+```
+
+| Column | Right | Center |
+| --- | ---: | :---: |
+| first row | 6228 | 1 |
+| second row | ~435 | **7 to 9** |
+
+Regular formatting works inside cells, links included. A wide table scrolls within itself, same as a code block.
+
+## Images
+
+An exclamation mark, alt text in square brackets, path in round ones. A title in quotes can follow the path — it shows as a caption under the photo.
+
+```
+![Alt text for screen readers](/path/to/photo.jpg)
+![Alt text for screen readers](/path/to/photo.jpg "Caption under the photo")
+```
+
+An image has to sit on its own line, separated by blank lines. It can't be written mid-paragraph — saving stops and warns in that case.
+
+The path can point anywhere on disk, the file gets copied automatically. A bare filename with no path is looked up in the `incoming/` directory — handy when writing from a phone: upload the photo over SFTP and reference it by name alone.
+
+## Video
+
+Two exclamation marks, otherwise same as an image. Works for a local file and for YouTube. **The caption is mandatory for a video.**
+
+```
+!![Video caption](/path/to/video.mp4)
+!![Video caption](https://www.youtube.com/watch?v=jNQXAC9IVRw)
+```
+
+!![The very first video on YouTube](https://www.youtube.com/watch?v=jNQXAC9IVRw)
+
+A bare YouTube address on its own line does **not** turn into a player — it becomes an ordinary link. That's deliberate, so a video can also just be linked to.
+
+## Escaping
+
+To write a character that means something in Markdown, put a backslash in front of it.
+
+```
+\*not italics\*, the mask \*.mp4, \`backticks\` and \[square brackets\]
+```
+
+\*not italics\*, the mask \*.mp4, \`backticks\` and \[square brackets\]
+
+Seven characters that carry meaning in Markdown can be escaped:
+
+```
+*   `   ~   [   ]   !   \
+```
+
+Before any other character the backslash stays as it is — so the d8-\ emoticon needs no special treatment.
+
+## Not supported yet
+
+So nothing takes you by surprise when it stays the way you typed it:
+
+- underscore italics `_like this_` — use asterisks
+- hard line breaks (two trailing spaces)
+- task lists `- [ ]`
+- code blocks indented with spaces — use the three backticks
+- nested quotes `>>`
+- headings underlined with `===` below the text
+- reference links `[text][id]` and footnotes
+
+None of it mangles your text, it just renders exactly as written.

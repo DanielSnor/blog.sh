@@ -1,0 +1,721 @@
+/* Open Sans is self-hosted (assets/fonts/), not loaded from
+   fonts.googleapis.com -- the CDN version sent every visitor's IP to
+   Google on every page view (GDPR) and added two foreign origins (DNS+TLS)
+   to the critical rendering path. One file per subset (Google Fonts v44
+   serves Open Sans as a variable font, so "latin"/"latin-ext" cover weights
+   400/600/700 without a separate file for each). Only latin/latin-ext are
+   included here -- a site whose content needs another script (cyrillic,
+   greek, vietnamese, hebrew, etc.) should add the matching subset file. */
+@font-face {
+  font-family: "Open Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/assets/fonts/open-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Open Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/assets/fonts/open-sans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* JetBrains Mono, self-hosted for the same reason as Open Sans above --
+   used only for the two banner overlay lines (site name, claim), not body
+   text. Same variable-font/subset shape (400-700 in one file per subset). */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/assets/fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Color custom properties (--bg, --text, --accent, etc.) are NOT defined in
+   this file. They're generated at build time from config/site.yml's
+   `colors:` section (see build_colors_css in build/build_blog.rb) into
+   assets/css/colors.css, loaded via a <link> just before this file in
+   templates/layout.html.erb. That's the one thing to swap to reskin a
+   site -- everything below is layout/structure, shared by every site
+   built on this engine. */
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Open Sans", Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.wrap {
+  max-width: 940px;
+  margin: 30px auto;
+  border-top: 5px solid var(--nav-border);
+  border-bottom: 5px solid var(--nav-border);
+  border-radius: 6px;
+}
+
+nav {
+  background: var(--nav-bg);
+  padding: 0 1rem;
+  height: 60px;
+  box-sizing: content-box;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-top: 5px solid var(--nav-border);
+  border-bottom: 5px solid var(--nav-border);
+}
+
+nav ul { list-style: none; display: flex; margin: 0; padding: 0; }
+
+nav li {
+  float: left;
+  margin-left: 1.875rem;
+  text-transform: uppercase;
+  font-weight: 400;
+  font-size: 0.875rem;
+  line-height: 60px;
+  color: var(--nav-text);
+}
+
+nav li:first-child { margin-left: 0; }
+
+nav a {
+  height: 60px;
+  display: block;
+  color: var(--nav-text);
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  margin-top: -5px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transition: 0.3s ease-in-out;
+  box-sizing: content-box;
+}
+
+nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bottom-color: var(--accent); }
+
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--nav-text);
+  cursor: pointer;
+  padding: 0;
+}
+.nav-toggle:hover { color: var(--accent); }
+
+.search-form { position: relative; align-self: center; display: flex; }
+.search-form input[type="search"] {
+  width: 225px;
+  height: 30px;
+  background: var(--search-bg);
+  color: #3a3a3a;
+  border: none;
+  border-radius: 5px;
+  padding: 0 34px 0 10px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.search-form input[type="search"]::placeholder { color: #767676; }
+.search-form input[type="search"]::-webkit-search-cancel-button { display: none; }
+.search-form button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #3a3a3a;
+  cursor: pointer;
+  padding: 0;
+  transition: 0.3s ease-in-out;
+}
+.search-form button:hover { color: var(--accent); }
+
+.banner-wrap { position: relative; }
+.banner-link { display: block; }
+
+/* Darkens the top-left and bottom-right corners of the banner image so the
+   overlaid title/claim stay readable regardless of what the image itself
+   looks like -- same technique as fedik.online's hero, since the image
+   doesn't change with the light/dark toggle but the text needs to stay on
+   top of it either way. */
+.banner-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%),
+    linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
+}
+
+.banner-title,
+.banner-claim {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  /* Light default: the menu's own background color -- overridden to white
+     for dark mode below, since --nav-bg is a dark, low-contrast tone there. */
+  color: var(--nav-bg);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* Same light/dark override pattern as colors.css: light is the unqualified
+   default above, dark needs the explicit media+data-theme pair. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .banner-title,
+  :root:not([data-theme="light"]) .banner-claim {
+    color: #ffffff;
+  }
+}
+
+:root[data-theme="dark"] .banner-title,
+:root[data-theme="dark"] .banner-claim {
+  color: #ffffff;
+}
+
+.banner-title {
+  top: 20px;
+  left: 24px;
+  max-width: 60%;
+  font-size: 45px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.banner-claim {
+  right: 24px;
+  bottom: 20px;
+  max-width: 55%;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .banner-title { font-size: 30px; max-width: 65%; }
+  .banner-claim { font-size: 14px; max-width: 65%; }
+}
+
+#theme-toggle {
+  position: absolute;
+  z-index: 3;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #ffffff;
+  border-radius: 3px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+}
+#theme-toggle:hover { background: var(--hover-invert); border-color: var(--hover-invert); color: var(--badge-hover-text); }
+
+.banner { display: block; width: 100%; height: auto; }
+
+.layout, .layout main, .layout aside {
+  background: var(--card-bg);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  padding: 1.5rem 1rem;
+}
+
+@media (max-width: 700px) {
+  .wrap { margin-top: 0; margin-bottom: 0; }
+
+  /* minmax(0, 1fr), not 1fr: plain 1fr is shorthand for minmax(auto, 1fr),
+     and that "auto" stops the column from shrinking below its widest
+     unbreakable content. A code block doesn't wrap, so it stretched the
+     whole column -- and with it the whole page -- wide, instead of
+     scrolling within itself. The desktop rule above has always had a zero
+     here, which is why this only showed up on narrow (mobile) viewports. */
+  .layout { grid-template-columns: minmax(0, 1fr); }
+
+  .nav-toggle { display: flex; }
+
+  nav {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 60px;
+    padding: 0.5rem 1rem;
+  }
+
+  nav ul, .search-form { display: none; width: 100%; }
+  nav.nav-open ul { display: flex; flex-direction: column; margin-top: 0.5rem; }
+  nav.nav-open .search-form { display: flex; margin-top: 0.75rem; padding-bottom: 0.75rem; }
+
+  nav li { float: none; margin-left: 0; line-height: normal; }
+
+  nav a {
+    height: auto;
+    margin-top: 0;
+    padding: 0.6rem 0;
+    border-top: none;
+    border-bottom: 1px solid var(--border);
+  }
+  nav li:last-child a { border-bottom: none; }
+  nav a:hover { border-color: transparent; }
+
+  .search-form input[type="search"] { width: 100%; }
+}
+
+.card { background: var(--card-bg); padding: 1.5rem; border-radius: 4px; }
+
+aside > .card:first-child { margin-top: -1.5rem; }
+aside .card { margin-right: -1rem; }
+
+h1 { color: var(--accent); font-size: 1.6rem; margin-top: 0; }
+h2 { color: var(--accent); font-size: 1.75rem; font-weight: 600; line-height: 1.25; margin-top: 0; }
+h3 { color: var(--accent); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; }
+
+.post-body h1 { font-weight: 600; }
+.post-list-item h2 { font-weight: 600; font-size: 1.6rem; }
+.post-list-item h2 a { transition: 0.3s ease-in-out; }
+.post-list-item h2 a:hover { color: var(--hover-invert); }
+
+.content h1, .content h2 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.75rem;
+}
+.content h1 { font-size: 1.3rem; }
+.content h2 { font-size: 1.1rem; }
+/* h3 outside .content is a card heading (uppercase, small); inside an
+   article it should be a normal subheading -- hence overriding it here. */
+.content h3, .content h4, .content h5, .content h6 {
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.5rem;
+}
+.content h3 { font-size: 1rem; }
+.content h4, .content h5, .content h6 { font-size: 0.95rem; }
+
+/* A wide table scrolls within itself instead of stretching the page. */
+.table-wrap { overflow-x: auto; margin: 1rem 0; }
+.content table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+.content th, .content td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.content th { background: var(--nav-bg); font-weight: 600; }
+
+/* The icon lives once in a variable, not twice across the prefixed and
+   unprefixed declarations -- it's almost a kilobyte of data URI. */
+:root {
+  --apple-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512'%3E%3Cpath d='M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z'/%3E%3C/svg%3E");
+}
+
+.content a[href^="https://apps.apple.com"]::before,
+.content a[href^="https://testflight.apple.com"]::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.3em;
+  vertical-align: -0.1em;
+  background-color: currentColor;
+  -webkit-mask-image: var(--apple-icon);
+  mask-image: var(--apple-icon);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.meta { color: var(--meta-text); font-size: 0.85rem; }
+
+/* Preview of an unpublished post -- deliberately impossible to miss, so a
+   draft can't be mistaken for something that's actually live on the blog. */
+.draft-banner {
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.draft-banner strong { color: #ffffff; display: block; }
+/* The link needs to stay visible against the accent color, and a long
+   address must not overflow the page on a narrow screen. */
+.draft-banner a {
+  display: block;
+  color: #ffffff;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+figure { margin: 1rem 0; }
+img, video { max-width: 100%; height: auto; }
+
+figcaption {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--meta-text);
+  margin-top: 0.4rem;
+}
+
+.content figure img, .photo-grid img { cursor: zoom-in; }
+
+.lightbox-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.lightbox-overlay.visible { display: flex; }
+.lightbox-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 4px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+}
+.lightbox-close:hover { background: var(--accent); }
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+}
+.lightbox-nav:hover { background: var(--accent); }
+.lightbox-prev { left: 20px; }
+.lightbox-next { right: 20px; }
+
+a { color: var(--accent); transition: 0.3s ease-in-out; }
+a:hover { color: var(--hover-invert); }
+b, strong { color: var(--accent); }
+
+blockquote {
+  border-left: 3px solid var(--accent);
+  margin-left: 0;
+  padding-left: 1rem;
+  color: var(--text);
+}
+
+.content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+.content pre {
+  background: var(--nav-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.85rem 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+/* Inline `code` spans get a small pill look; .content pre code below
+   resets that for the fenced-block case so the two don't double up. */
+.content code {
+  background: var(--nav-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.content pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: pre;
+}
+
+.video-unavailable { color: var(--meta-text); font-style: italic; }
+
+.embed-responsive { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1rem 0; }
+.embed-responsive iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+
+.post-header { display: flex; gap: 1rem; align-items: flex-start; margin: -1.5rem -1.5rem 0 -1.5rem; }
+.post-body { flex: 1 1 auto; min-width: 0; padding-right: 1.5rem; }
+
+.date-badge {
+  flex: 0 0 auto;
+  width: 72px;
+  text-align: center;
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 0.6rem 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  transition: 0.3s ease-in-out;
+}
+.date-badge:hover { background: var(--hover-invert); color: var(--badge-hover-text); }
+.date-badge svg { display: block; width: 40px; height: 40px; margin: 0 auto 0.35rem; }
+.date-badge a { color: inherit; text-decoration: none; display: block; }
+
+.photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: 1rem 0; }
+.photo-grid figure { margin: 0; }
+.photo-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-grid .span-2 { grid-column: 1 / -1; }
+
+.tags { margin-top: 1rem; }
+.tag-pill {
+  display: inline-block;
+  background: var(--pill-bg);
+  color: var(--text);
+  text-decoration: none;
+  padding: 0.15rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  margin: 0 0.3rem 0.3rem 0;
+  transition: 0.3s ease-in-out;
+}
+.tag-pill:hover { background: var(--accent); color: #ffffff; }
+
+.tag-heading { font-size: 1.6rem; font-weight: 600; margin-bottom: 1.5rem; }
+
+.search-tagline { margin-bottom: 0.25rem; }
+.search-tip { color: var(--meta-text); font-size: 0.85rem; margin-bottom: 1.5rem; }
+.search-status { color: var(--meta-text); font-size: 0.9rem; }
+.search-archive-pending { font-style: italic; }
+
+main .post-list-item { margin-bottom: 1.5rem; }
+main .post-list-item:last-child { margin-bottom: 0; }
+
+.content.excerpt { max-height: 500px; overflow: hidden; position: relative; }
+.content.excerpt::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 70px;
+  background: linear-gradient(to bottom, transparent, var(--card-bg));
+}
+.read-more { display: inline-block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 400; }
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  box-sizing: border-box;
+  margin-top: 1.5rem;
+  color: var(--meta-text);
+  font-size: 0.85rem;
+}
+.pagination a {
+  color: var(--accent);
+  text-decoration: none;
+  height: auto;
+  margin: 0;
+  border: none;
+  box-sizing: border-box;
+  transition: 0.3s ease-in-out;
+}
+.pagination a:hover { color: var(--hover-invert); }
+
+aside .card { margin-bottom: 1.5rem; }
+
+.last {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 0;
+  font-size: 0.85rem;
+}
+.last:first-child { border-top: none; padding-top: 0; }
+.last-date { color: var(--meta-text); font-size: 0.75rem; }
+.last-content p { margin: 0.3rem 0; }
+.last-content a { word-break: break-word; }
+.pixelfed-thumb { width: 100%; height: auto; border-radius: 4px; margin-top: 0.3rem; }
+.last > a {
+  display: block;
+  margin-top: 0.3rem;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.comments { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+
+.comments-reply { margin: 0 0 1rem; }
+
+.comment {
+  display: flex;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding: 0.85rem 0;
+}
+.comment:first-of-type { border-top: none; padding-top: 0; }
+
+.comment-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.comment-body { min-width: 0; }
+.comment-meta { font-size: 0.85rem; margin-bottom: 0.25rem; }
+.comment-date { color: var(--meta-text); font-size: 0.78rem; }
+.comment-favs { color: var(--meta-text); font-size: 0.78rem; }
+
+.post-stats {
+  display: flex;
+  gap: 1.1rem;
+  margin: 0.5rem 0 1rem;
+  color: var(--meta-text);
+  font-size: 0.85rem;
+}
+.post-stat { display: inline-flex; align-items: center; gap: 0.3rem; }
+.post-stat svg { flex: none; }
+.comment-content p { margin: 0.3rem 0; }
+.comment-content a { word-break: break-word; }
+
+footer {
+  background: var(--card-bg);
+  border-radius: 4px;
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  footer { grid-template-columns: 1fr; }
+}
+
+footer ul { list-style: none; margin: 0; padding: 0; }
+footer li { margin-bottom: 0.5rem; }
+footer li::before { content: '\203a\00a0'; color: var(--accent); }
+footer p { color: var(--meta-text); font-size: 0.85rem; }
+footer .copyright { color: var(--text); }
+
+.social-icons { display: flex; gap: 0.6rem; }
+.social-icons a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--nav-bg);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: 0.3s ease-in-out;
+}
+.social-icons a:hover { background: var(--accent); color: #ffffff; }
+.social-icons svg { width: 20px; height: 20px; }
+
+#scroll-top {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  background: var(--pill-bg);
+  border: 1px solid var(--nav-border);
+  border-radius: 5px;
+  color: var(--nav-text);
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+  z-index: 10;
+}
+#scroll-top.visible { display: flex; }
+#scroll-top:hover { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+#scroll-top svg { width: 16px; height: 16px; }
+
+/* Placed last so it wins the cascade over the base .date-badge/h1 rules
+   above (equal specificity -- source order decides the tie). */
+@media (max-width: 700px) {
+  .date-badge {
+    width: 38px;
+    padding: 0.3rem 0.1rem;
+    font-size: 0.55rem;
+  }
+  .date-badge svg { width: 22px; height: 22px; margin-bottom: 0.2rem; }
+
+  .post-body h1 { font-size: 1.3rem; }
+  .post-list-item h2 { font-size: 1.3rem; }
+  .tag-heading { font-size: 1.3rem; }
+}

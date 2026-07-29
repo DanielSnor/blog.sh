@@ -1,0 +1,225 @@
+# locales/en.yml -- default/fallback locale. Every key here MUST exist,
+# since lib/i18n.rb falls back to this file for any key missing from the
+# site's selected locale. Other locales may be partial.
+
+# strftime formats for every server-rendered date (post date badges, the
+# search index, sidebar widget JSON, CLI messages). The client-side
+# counterpart is js.date_locale below -- keep the two consistent so
+# build-time and runtime dates read the same.
+date_format: "%b %-d, %Y"
+date_time_format: "%b %-d, %Y %H:%M"
+
+nav:
+  home: "Home"
+  text: "Text"
+  images: "Images"
+  video: "Video"
+  links: "Links"
+  rss: "RSS"
+  menu_label: "Menu"
+  search_label: "Search"
+  search_placeholder: "Search…"
+
+post:
+  comments_heading: "Comments"
+  back_to_list: "← back to list"
+  read_more: "Read more"
+  video_unavailable: "[video unavailable]"
+  draft_title_prefix: "[PREVIEW] "
+  draft_banner_heading: "Preview of an unpublished post!!!"
+  draft_banner_notice: "Not visible anywhere on the blog and can't be reached except through this URL:"
+
+pagination:
+  newer: "← Newer"
+  older: "Older →"
+  latest: "latest"
+  page: "page %{number}"
+
+tag:
+  heading: "Tag: %{name}"
+  title: "Tag: %{name} – %{short_name}"
+  description: "Posts tagged %{name} on %{author}'s personal site."
+
+type:
+  text: "Text"
+  image: "Images"
+  video: "Video"
+  link: "Links"
+  title: "%{label} – %{short_name}"
+  description: "Posts of type %{label} on %{author}'s personal site."
+
+index:
+  empty: "No posts of this type yet."
+
+search:
+  heading: "Search"
+  tagline: "Searches across all post types — accent-insensitive."
+  tip: "Tip: more than one word means all must match;<br>put an exact phrase in quotes (“…”);<br>exclude a word with a minus (-word)."
+  prompt: "Type a query."
+  page_title: "Search – %{site_title}"
+  page_description: "Full-text search across posts, accent-insensitive."
+
+markdown_page:
+  default_title: "Markdown"
+  description: "Guide to the syntax this blog uses for writing posts."
+
+ui:
+  scroll_top: "Up"
+
+# Consumed client-side via window.BLOG_I18N (see client_i18n_json in
+# build/build_blog.rb and templates/layout.html.erb) -- assets/js/*.js can't
+# read locales/*.yml directly since it runs in the browser, not at build time.
+js:
+  date_locale: "en-US"
+  stats_favourited: "Favorited"
+  stats_boosted: "Boosted"
+  stats_comments: "Comments"
+  reply_on_mastodon: "Reply on Mastodon"
+  results_one: "result"
+  results_few: "results"
+  results_many: "results"
+  no_results_pending: "No results yet,"
+  no_results_final: "No results."
+  try_other_words: " Try different or more general words."
+  searching_archive: " (also searching the older archive…)"
+  search_prefix: "Search: "
+  loading_index: "Loading index…"
+  index_unavailable: "Search index unavailable."
+  lightbox_close: "Close"
+  lightbox_prev: "Previous"
+  lightbox_next: "Next"
+
+# scripts/manage_post.rb (the ./blog.sh authoring CLI/wizard) and its
+# frontmatter-editor hint text. cancel_word is compared against user input
+# (downcased) -- if you translate it, users must type the translated word to
+# cancel a wait loop.
+cli:
+  cancel_word: "cancel"
+  missing_images_wait: "Missing %{count} image(s), waiting for you to upload them to incoming/:"
+  missing_images_prompt: "Press Enter once uploaded (or type \"%{cancel_word}\" to abort): "
+  cancelled_nothing_saved: "Cancelled, nothing was saved.\n\n"
+
+  double_frontmatter_error: |
+    ❌ There's a second frontmatter header in the text.
+
+    It looks like you pasted text that already had its own --- lines under
+    the header that was already there. Only the first one is processed, so
+    the post would end up without a title and get a slug derived from the
+    first few words of the text instead.
+
+    Keep only one header: either delete the empty one at the top, or remove
+    the --- lines from the pasted text and copy its values into the one above.
+
+  frontmatter_hint: |
+    <!--
+    GUIDE -- this block and lines starting with // are removed on save, they never end up in the post.
+    (So write your own notes with //, not # -- hashes are reserved for headings.)
+
+    FRONTMATTER (between --- and ---):
+      title  heading (optional)
+      tags   comma-separated tags, e.g: nature, hike, city
+      type   post type -- text / image / video / link (optional -- leave it
+             blank and the type is inferred from the post's content)
+      date   YYYY-MM-DD HH:MM -- can be in the past, the post is sorted chronologically
+
+    CONTENT goes under the second ---. For formatting syntax:
+
+      Markdown Cheat Sheet -- %{cheat_sheet_url}
+    -->
+
+  template_unchanged: "Template left unchanged (not saved?), no post was created."
+  empty_content: "Empty content, nothing was written."
+  wrote_draft: "Written as draft: %{path}"
+  generating_preview: "Generating preview"
+  draft_saved_preview_pending: "Draft is saved. The preview will show up after a successful deploy -- then run ./blog.sh edit %{slug}"
+
+  base_url_missing_preview: "SITE_BASE_URL is not set, can't build the preview URL."
+  preview_label: "Preview: %{url}"
+  what_next_prompt: "What next? [p] publish  [d] leave as draft  [e] back to editing: "
+  left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
+  unknown_choice_pde: "Not understood, try p / d / e."
+
+  date_outside_window_prompt: "Date %{date} is outside the 24h window for an automatic toot. Toot anyway? [y/N] "
+  confirm_yes_char: "y"
+  base_url_missing_toot: "SITE_BASE_URL is not set, the toot for the post was not created."
+  backdated_no_toot: "Post date isn't current (a backdated post), the toot was not created."
+
+  already_published: "Post '%{slug}' is already published: %{url}"
+  publish_date_now: "Publish date: %{date} (set to now)"
+  publish_date_kept: "Date kept from frontmatter: %{date}"
+  published_label: "Published: %{path}"
+  publishing: "Publishing"
+  done_label: "Done: %{url}"
+  backdated_note: "A backdated post doesn't appear on the homepage or in RSS -- it goes straight into the archive."
+
+  post_not_found: "Post '%{slug}' not found.\n\n"
+  still_draft_toot: "Post '%{slug}' is still a draft -- publish it first (./blog.sh publish %{slug}); only then does a toot have something to link to."
+  already_has_toot: "Post already has a toot, not sending a second one: %{url}"
+  toot_failed: "Failed to send the toot (see above)."
+  tooted: "Tooted: %{url}"
+
+  already_draft: "Post '%{slug}' is already a draft: %{url}"
+  confirm_unpublish: "Really move '%{slug}' back to draft? Type the slug to confirm: "
+  cancelled: "Cancelled."
+  deleting_toot: "Deleting the Mastodon toot: %{url}"
+  delete_toot_failed: "Deletion failed (see above) -- the toot stays, just pointing at a temporarily dead page for now."
+  reverted_to_draft: "Reverted to draft: %{path}"
+  updating_preview: "Updating preview"
+
+  no_changes: "No changes, nothing to save."
+  content_loss_warning: "Careful, saving this would lose: %{summary}."
+  confirm_continue_yes: "Really continue? Type \"yes\": "
+
+  edited_label: "Edited: %{path}"
+
+  confirm_delete: "Really delete '%{slug}'? Type the slug to confirm: "
+  deleted_label: "Deleted (in trash, restore with ./blog.sh restore %{slug}): %{path}"
+
+  nothing_in_trash: "Nothing in trash for '%{slug}'.\n\n"
+  post_already_exists: "Post '%{slug}' already exists (%{path}), restoring would overwrite it -- resolve this manually.\n\n"
+  restored_label: "Restored: %{path}"
+
+  post_count: "\n%{count} post(s)%{drafts_suffix}"
+  drafts_suffix: ", %{count} of which in progress"
+
+  enter_number_or_slug: "Enter a number or slug: "
+  cancelled_empty: "Cancelled.\n\n"
+  no_posts_to_pick: "No posts to choose from."
+  no_drafts_to_publish: "No draft ready to publish."
+  no_published_posts: "No published post available."
+  trash_empty: "Trash is empty."
+
+  default_rebuild_reason: "Rebuilding and deploying"
+  build_failed: "\n❌ Build failed -- not deploying. The post is saved; run ./scripts/deploy-web.sh once it's fixed"
+  deploy_failed: "\n❌ Deploy failed. The site was rebuilt; just run ./scripts/deploy-web.sh again."
+
+  rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
+
+  usage: |
+    usage:
+      ./blog.sh add                  creates a draft, shows a preview and asks what's next
+      ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
+      ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
+      ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
+      ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
+      ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
+      ./blog.sh toot [<slug>]        (re-)sends the comment toot; without a slug, offers the last %{recent_count} posts
+      ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh help                 shows this help
+      ./blog.sh                      launches the interactive wizard
+
+  wizard_greeting: "Hi, this is blog.sh."
+  wizard_prompt_action: "What do you want to do?"
+  wizard_exit_option: "0) Exit"
+  wizard_choice_prompt: "Choice: "
+  wizard_unknown_choice: "Unknown choice, try again."
+  wizard_menu_add: "New post"
+  wizard_menu_edit: "Edit a post"
+  wizard_menu_publish: "Publish a draft (shows a preview, asks what's next)"
+  wizard_menu_unpublish: "Move a published post back to draft"
+  wizard_menu_delete: "Delete a post (moves it to trash)"
+  wizard_menu_restore: "Restore a post from trash"
+  wizard_menu_toot: "(Re-)send the comment toot"
+  wizard_menu_list: "List of all posts (no editing, just browsing)"
+  wizard_menu_rebuild: "Rebuild and deploy the site (not tied to a specific post)"

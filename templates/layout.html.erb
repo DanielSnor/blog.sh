@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="<%= SITE_LANG %>">
+<head>
+  <meta charset="utf-8">
+  <!-- CSP as a meta tag, not an HTTP header -- some static hosts (e.g. Cloudron
+       Surfer) don't let you set custom response headers.
+       script-src has no 'unsafe-inline' -- the one inline <script> the layout
+       emits (window.BLOG_I18N below) is allowlisted by its exact content hash
+       instead (CLIENT_I18N_SCRIPT_HASH in build/build_blog.rb), so an actual
+       injected script still can't run just by getting itself onto the page.
+       style-src has 'unsafe-inline' for post text color (formatting: color) and
+       for inline styles carried over by imported embeds (e.g. an Instagram
+       blockquote from a migration).
+       frame-src allows both youtube.com and youtube-nocookie.com -- posts
+       imported with a raw embed_html may point at youtube.com, new videos use
+       the nocookie domain.
+       script-src/connect-src only add the analytics and Mastodon origins when
+       those integrations are actually configured (see csp_content in
+       build/build_blog.rb) -- a site with neither configured gets a tighter
+       policy for free. -->
+  <meta http-equiv="Content-Security-Policy" content="<%= csp_content %>">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= h(page_title) %></title>
+  <meta name="description" content="<%= h(page_description) %>">
+  <link rel="canonical" href="<%= h(page_url) %>">
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png">
+  <link rel="stylesheet" href="/assets/css/colors.css">
+  <link rel="stylesheet" href="/assets/css/site.css">
+  <link rel="alternate" type="application/rss+xml" title="<%= h(SITE_SHORT_NAME) %> RSS" href="/rss.xml">
+  <meta property="og:type" content="<%= og_type %>">
+  <meta property="og:site_name" content="<%= h(SITE_SHORT_NAME) %>">
+  <meta property="og:locale" content="<%= SITE_LOCALE %>">
+  <meta property="og:title" content="<%= h(page_title) %>">
+  <meta property="og:description" content="<%= h(page_description) %>">
+  <meta property="og:url" content="<%= h(page_url) %>">
+  <meta property="og:image" content="<%= h(og_image) %>">
+  <meta name="twitter:card" content="summary_large_image"><%= extra_head %>
+<% if ANALYTICS %>
+  <script defer src="<%= h(ANALYTICS['src']) %>" data-website-id="<%= h(ANALYTICS['website_id']) %>"></script>
+<% end %>
+</head>
+<body>
+  <div class="wrap">
+    <div class="banner-wrap">
+      <a href="/" class="banner-link"><img class="banner" src="<%= h(BANNER['src']) %>" alt="<%= h(BANNER['alt']) %>" width="<%= BANNER['width'] %>" height="<%= BANNER['height'] %>"></a>
+      <p class="banner-title"><%= h(SITE_SHORT_NAME) %></p>
+      <p class="banner-claim"><%= h(SITE_DESCRIPTION) %></p>
+      <button id="theme-toggle" type="button">☀︎/☾︎</button>
+    </div>
+    <%= partial('nav', search: true) %>
+
+    <div class="layout">
+      <main>
+<%= main_html %>
+      </main>
+
+      <%= partial('aside') %>
+    </div>
+
+    <%= partial('nav', search: false) %>
+
+    <%= partial('footer') %>
+  </div>
+
+  <button id="scroll-top" type="button" title="<%= h(t('ui.scroll_top')) %>">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 15l6-6 6 6"/></svg>
+  </button>
+
+  <script><%= CLIENT_I18N_SCRIPT %></script>
+  <script src="/assets/js/util.js"></script>
+  <script src="/assets/js/theme-toggle.js"></script>
+  <script src="/assets/js/nav-toggle.js"></script>
+  <script src="/assets/js/scroll-top.js"></script>
+  <script src="/assets/js/sidebar.js"></script>
+  <script src="/assets/js/comments.js"></script>
+  <script src="/assets/js/search.js"></script>
+  <script src="/assets/js/lightbox.js"></script>
+</body>
+</html>

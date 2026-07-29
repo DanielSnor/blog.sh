@@ -1,0 +1,121 @@
+# Site configuration. Versioned and synced to the server -- unlike env.sh,
+# which only holds secrets (API tokens). If these values lived in env.sh
+# instead, a local build would render a different site than production, and
+# changes would have no history.
+#
+# Copy this file to config/site.yml (gitignored -- see .gitignore) and fill
+# it in for your own site. After every edit, rebuild: ./blog.sh rebuild, or
+# directly ruby build/build_blog.rb && ./deploy-web.sh.
+
+site:
+  # The full title -- <title> on the homepage, and the basis for every other page's.
+  title: "Your Name - personal web/log"
+  # Short name, used for og:site_name, listing titles ("Tag: foo -- YOURSITE"),
+  # and as the banner overlay title (top-left, see .banner-title in site.css).
+  short_name: "YOURSITE"
+  # Also shown as the banner overlay claim (bottom-right, wraps to multiple
+  # lines if needed -- see .banner-claim in site.css).
+  description: "Personal web/log of Your Name"
+  author: "Your Name"
+  # Selects locales/<lang>.yml (see lib/i18n.rb). "en" and "cs" ship with the
+  # engine; add another locales/<code>.yml to support a different language --
+  # any key missing from it falls back to English.
+  lang: "en"
+  locale: "en_US"
+  # Overridden by the SITE_BASE_URL environment variable, if set.
+  base_url: "https://example.com"
+
+banner:
+  src: "/assets/images/banner.png"
+  alt: "Your Site"
+  # The file's actual dimensions -- reserves space before the image loads.
+  width: 940
+  height: 300
+
+# Optional. Omit this whole section for a site with no analytics script.
+analytics:
+  src: "https://analytics.example.com/script.js"
+  website_id: "00000000-0000-0000-0000-000000000000"
+
+about:
+  heading: "About"
+  # May contain HTML (links). Inserted inside a <p>.
+  html: >-
+    A short bio about yourself, with a <a href="https://example.com">link</a>
+    if you like.
+
+footer:
+  links_heading: "Links"
+  links:
+    - title: "Example"
+      url: "https://example.com"
+  note_heading: "Found something here?"
+  note_html: >-
+    If an article or photo here caught your eye and you'd like to use it
+    elsewhere, let me know -- happy to work something out. Please don't
+    just copy-paste my content elsewhere without asking!
+  copyright: "All rights reserved &copy; 2026"
+  social_heading: "Find me on"
+
+# icon = a name from the built-in set (mastodon, pixelfed, linkedin, github).
+# For another network, use icon_svg with your own <svg>...</svg> instead.
+social:
+  - name: "Mastodon"
+    url: "https://mastodon.social/@yourname"
+    icon: "mastodon"
+    rel: "me"
+  - name: "GitHub"
+    url: "https://github.com/yourname"
+    icon: "github"
+
+# Optional, and each entry independently so. Sidebar widget data is fetched
+# by the server (lib/sidebar.rb), not the visitor's browser, and refreshed
+# by cron via ./refresh-sidebar.sh. Omit any of toots/pixelfed/commits (or
+# the whole `widgets:` key) for a site with no sidebar widgets at all.
+widgets:
+  toots:
+    heading: "Recent toots"
+    instance: "mastodon.social"
+    account_id: "000000000000000000" # numeric Mastodon account id, not the @handle
+    limit: 3
+  pixelfed:
+    heading: "Recent Pixelfed posts"
+    feed_url: "https://pixelfed.social/users/yourname.atom"
+    limit: 3
+  commits:
+    heading: "Recent commits"
+    username: "yourname"
+    limit: 3
+
+# Optional. Omit this whole section for a site with no Mastodon integration
+# at all -- no auto-toot on publish, no Mastodon-based comments, no post
+# stats. The access token itself goes in env.sh (MASTODON_ACCESS_TOKEN), not
+# here, since it's a secret.
+mastodon:
+  instance: "mastodon.social"
+
+# Optional. Omit this whole section (or any key inside it) to fall back to
+# blog.sh's own blue palette (build/build_blog.rb's DEFAULT_COLORS). Each
+# mode only takes these 7 keys -- everything else the CSS needs (card
+# background, nav text/border, link/badge hover, search input background)
+# is derived from them at build time (see color_properties in
+# build/build_blog.rb), not separately configurable, since it's never
+# varied independently across any palette this engine has shipped.
+# Rebuild after changing any value here: ./blog.sh rebuild.
+colors:
+  light:
+    bg: "#f5f8fa"
+    text: "#444a5a"
+    meta_text: "#657784"
+    accent: "#1da1f2"
+    nav_bg: "#eaf5fd"
+    border: "#e1e8ed"
+    pill_bg: "#d6ecfc"
+  dark:
+    bg: "#111111"
+    text: "#ffffff"
+    meta_text: "#6a7f8c"
+    accent: "#4ab3f4"
+    nav_bg: "#192734"
+    border: "#263340"
+    pill_bg: "#16324a"

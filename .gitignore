@@ -1,0 +1,12 @@
+env.sh
+.DS_Store
+.nova/
+.deploy_manifest.json
+.stats_full_refresh_at
+config/site.yml
+incoming/
+trash/
+drafts/
+content.nosync/
+media.nosync/
+public.nosync/

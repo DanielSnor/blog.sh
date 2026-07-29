@@ -1,0 +1,7 @@
+        <% if heading %><h2 class="tag-heading"><%= h(heading) %></h2><% end %>
+        <% if list_html.strip.empty? %>
+          <p class="search-status"><%= h(t('index.empty')) %></p>
+        <% else %>
+          <%= list_html %>
+        <% end %>
+        <%= pagination %>

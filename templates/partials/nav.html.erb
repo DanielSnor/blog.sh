@@ -1,0 +1,21 @@
+<nav>
+      <button class="nav-toggle" type="button" aria-label="<%= h(t('nav.menu_label')) %>" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <ul>
+        <li><a href="/"><%= h(t('nav.home')) %></a></li>
+        <li><a href="/type/text/"><%= h(t('nav.text')) %></a></li>
+        <li><a href="/type/image/"><%= h(t('nav.images')) %></a></li>
+        <li><a href="/type/video/"><%= h(t('nav.video')) %></a></li>
+        <li><a href="/type/link/"><%= h(t('nav.links')) %></a></li>
+        <li><a href="/rss.xml"><%= h(t('nav.rss')) %></a></li>
+      </ul>
+<% if search %>
+      <form class="search-form" action="/search/" method="get" role="search">
+        <input type="search" name="q" id="search-q" placeholder="<%= h(t('nav.search_placeholder')) %>" autocomplete="off">
+        <button type="submit" aria-label="<%= h(t('nav.search_label')) %>">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+      </form>
+<% end %>
+    </nav>

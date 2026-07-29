@@ -1,0 +1,216 @@
+# locales/cs.yml -- Czech locale. Missing keys fall back to en.yml
+# (see lib/i18n.rb), so this file doesn't need to duplicate every key --
+# only the ones that should actually read in Czech.
+
+# strftime formáty pro všechna data renderovaná na serveru (datumové odznaky,
+# search index, JSON sidebar widgetů, hlášky CLI). Klientský protějšek je
+# js.date_locale níže — drž je konzistentní.
+date_format: "%-d. %-m. %Y"
+date_time_format: "%-d. %-m. %Y %H:%M"
+
+nav:
+  home: "Domů"
+  text: "Text"
+  images: "Obrázky"
+  video: "Video"
+  links: "Odkazy"
+  rss: "RSS"
+  menu_label: "Menu"
+  search_label: "Hledat"
+  search_placeholder: "Hledat…"
+
+post:
+  comments_heading: "Komentáře"
+  back_to_list: "← zpět na výpis"
+  read_more: "Číst dál"
+  video_unavailable: "[video nedostupné]"
+  draft_title_prefix: "[NÁHLED] "
+  draft_banner_heading: "Náhled nepublikovaného příspěvku!!!"
+  draft_banner_notice: "Není nikde na blogu vidět a jinak než přes toto URL jej nelze zobrazit:"
+
+pagination:
+  newer: "← Novější"
+  older: "Starší →"
+  latest: "nejnovější"
+  page: "strana %{number}"
+
+tag:
+  heading: "Štítek: %{name}"
+  title: "Štítek: %{name} – %{short_name}"
+  description: "Příspěvky se štítkem %{name} na osobním webu %{author}."
+
+type:
+  text: "Text"
+  image: "Obrázky"
+  video: "Video"
+  link: "Odkazy"
+  title: "%{label} – %{short_name}"
+  description: "Příspěvky typu %{label} na osobním webu %{author}."
+
+index:
+  empty: "Zatím žádné posty tohoto typu."
+
+search:
+  heading: "Vyhledávání"
+  tagline: "Prohledá všechny typy článků — bez ohledu na diakritiku."
+  tip: "Tip: víc slov = musí být všechna;<br>přesnou frázi dej do uvozovek („…“);<br>slovo vyloučíš mínusem (-slovo)."
+  prompt: "Zadej dotaz."
+  page_title: "Vyhledávání – %{site_title}"
+  page_description: "Fulltextové vyhledávání v příspěvcích, bez ohledu na diakritiku."
+
+markdown_page:
+  default_title: "Markdown"
+  description: "Návod na syntaxi, kterou tenhle blog používá pro psaní příspěvků."
+
+ui:
+  scroll_top: "Nahoru"
+
+js:
+  date_locale: "cs-CZ"
+  stats_favourited: "Oblíbeno"
+  stats_boosted: "Boostnuto"
+  stats_comments: "Komentářů"
+  reply_on_mastodon: "Reagovat na Mastodonu"
+  results_one: "výsledek"
+  results_few: "výsledky"
+  results_many: "výsledků"
+  no_results_pending: "Nic nenalezeno,"
+  no_results_final: "Nic nenalezeno."
+  try_other_words: " Zkus jiná / obecnější slova."
+  searching_archive: " (hledám i ve starším archivu…)"
+  search_prefix: "Vyhledávání: "
+  loading_index: "Načítám index…"
+  index_unavailable: "Vyhledávací index není k dispozici."
+  lightbox_close: "Zavřít"
+  lightbox_prev: "Předchozí"
+  lightbox_next: "Další"
+
+cli:
+  cancel_word: "zrušit"
+  missing_images_wait: "Chybí %{count} obrázek/obrázky, počkám, až je nahraješ do incoming/:"
+  missing_images_prompt: "Až budou nahrané, stiskni Enter (nebo napiš \"%{cancel_word}\" pro přerušení): "
+  cancelled_nothing_saved: "Zrušeno, nic se neuložilo.\n\n"
+
+  double_frontmatter_error: |
+    ❌ V textu je druhá hlavička.
+
+    Vypadá to, že jsi vložil text i s vlastními řádky mezi --- pod hlavičku,
+    která tu už byla. Zpracuje se jen ta první, takže by post zůstal bez
+    titulku a dostal by slug odvozený z prvních slov textu.
+
+    Nech jen jednu hlavičku: buď smaž tu prázdnou nahoře, nebo z vloženého
+    textu odeber řádky mezi --- a hodnoty přepiš do té horní.
+
+  frontmatter_hint: |
+    <!--
+    NÁVOD — tenhle blok i řádky začínající // se při uložení smažou, do postu se nedostanou.
+    (Poznámku si tedy piš přes //, ne přes # — mřížky jsou vyhrazené pro nadpisy.)
+
+    FRONTMATTER (mezi --- a ---):
+      title  nadpis (volitelný)
+      tags   tagy oddělené čárkou, např: příroda, procházka, praha
+      type   typ postu — text / image / video / link (volitelné — necháš-li
+             prázdné, typ se odvodí sám podle obsahu postu)
+      date   YYYY-MM-DD HH:MM — může být i v minulosti, post se zařadí chronologicky
+
+    OBSAH píšeš pod druhý ---. Jak na formátování:
+
+      Markdown Cheat Sheet — %{cheat_sheet_url}
+    -->
+
+  template_unchanged: "Šablona zůstala beze změny (neuloženo?), post nevznikl."
+  empty_content: "Prázdný obsah, nic se nezapsalo."
+  wrote_draft: "Zapsáno jako draft: %{path}"
+  generating_preview: "Generuji náhled"
+  draft_saved_preview_pending: "Draft je uložený. Náhled se ukáže po úspěšném nasazení — pak spusť ./blog.sh edit %{slug}"
+
+  base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
+  preview_label: "Náhled: %{url}"
+  what_next_prompt: "Co dál? [p] publikovat  [d] nechat draftem  [e] zpět do editace: "
+  left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
+  unknown_choice_pde: "Nerozumím, zkus p / d / e."
+
+  date_outside_window_prompt: "Datum %{date} je mimo 24h okno pro automatický toot. Otootovat přesto? [a/N] "
+  confirm_yes_char: "a"
+  base_url_missing_toot: "SITE_BASE_URL není nastavený, toot k postu se nevytvořil."
+  backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), toot se nevytvořil."
+
+  already_published: "Post '%{slug}' už je publikovaný: %{url}"
+  publish_date_now: "Datum publikace: %{date} (nastaveno na teď)"
+  publish_date_kept: "Datum ponecháno podle frontmatteru: %{date}"
+  published_label: "Publikováno: %{path}"
+  publishing: "Publikuji"
+  done_label: "Hotovo: %{url}"
+  backdated_note: "Zpětně datovaný post není na úvodní stránce ani v RSS — je rovnou v archivu."
+
+  post_not_found: "Post '%{slug}' nenalezen.\n\n"
+  still_draft_toot: "Post '%{slug}' je pořád draft -- nejdřív publikuj (./blog.sh publish %{slug}), teprve pak má toot na co odkazovat."
+  already_has_toot: "Post už toot má, neposílám druhý: %{url}"
+  toot_failed: "Toot se nepodařilo poslat (viz výš)."
+  tooted: "Otootováno: %{url}"
+
+  already_draft: "Post '%{slug}' je už draft: %{url}"
+  confirm_unpublish: "Opravdu vrátit '%{slug}' zpátky do draftu? Napiš slug pro potvrzení: "
+  cancelled: "Zrušeno."
+  deleting_toot: "Mažu toot na Mastodonu: %{url}"
+  delete_toot_failed: "Smazání selhalo (viz výš) -- toot zůstává, jen teď odkazuje na dočasně mrtvou stránku."
+  reverted_to_draft: "Vráceno do draftu: %{path}"
+  updating_preview: "Aktualizuji náhled"
+
+  no_changes: "Žádné změny, nic se neukládá."
+  content_loss_warning: "Pozor, tímhle uložením by se ztratilo: %{summary}."
+  confirm_continue_yes: "Opravdu pokračovat? Napiš \"ano\": "
+
+  edited_label: "Upraveno: %{path}"
+
+  confirm_delete: "Opravdu smazat '%{slug}'? Napiš slug pro potvrzení: "
+  deleted_label: "Smazáno (v koši, obnovíš přes ./blog.sh restore %{slug}): %{path}"
+
+  nothing_in_trash: "V koši nic pro '%{slug}' není.\n\n"
+  post_already_exists: "Post '%{slug}' už existuje (%{path}), obnovením bych ho přepsal -- vyřeš ručně.\n\n"
+  restored_label: "Obnoveno: %{path}"
+
+  post_count: "\n%{count} post(ů)%{drafts_suffix}"
+  drafts_suffix: ", z toho %{count} rozepsaných"
+
+  enter_number_or_slug: "Zadej číslo nebo slug: "
+  cancelled_empty: "Zrušeno.\n\n"
+  no_posts_to_pick: "Žádné posty k výběru."
+  no_drafts_to_publish: "Není připravený žádný draft, který bychom mohli publikovat."
+  no_published_posts: "Žádný publikovaný post k dispozici."
+  trash_empty: "Koš je prázdný."
+
+  default_rebuild_reason: "Přebuiluji a nasazuji"
+  build_failed: "\n❌ Build selhal — nenasazuji. Příspěvek je uložený, po opravě spusť ./scripts/deploy-web.sh"
+  deploy_failed: "\n❌ Nasazení selhalo. Web je přebuildovaný, stačí spustit ./scripts/deploy-web.sh znovu."
+
+  rebuild_prompt: "Přebuildovat a nasadit web teď? [Y/n] "
+
+  usage: |
+    usage:
+      ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
+      ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
+      ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
+      ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
+      ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
+      ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
+      ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot, bez slugu nabídne posledních %{recent_count} postů
+      ./blog.sh rebuild              přebuilduje a nasadí celý web, bez vazby na konkrétní post
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh help                 zobrazí tuhle nápovědu
+      ./blog.sh                      spustí interaktivního průvodce
+
+  wizard_greeting: "Ahoj, tady blog.sh."
+  wizard_prompt_action: "Co chceš dělat?"
+  wizard_exit_option: "0) Konec"
+  wizard_choice_prompt: "Volba: "
+  wizard_unknown_choice: "Neznámá volba, zkus znovu."
+  wizard_menu_add: "Nový příspěvek"
+  wizard_menu_edit: "Upravit příspěvek"
+  wizard_menu_publish: "Publikovat draft (ukáže náhled, zeptá se, co dál)"
+  wizard_menu_unpublish: "Vrátit publikovaný post zpátky do draftu"
+  wizard_menu_delete: "Smazat příspěvek (přesune do koše)"
+  wizard_menu_restore: "Obnovit příspěvek z koše"
+  wizard_menu_toot: "(Znovu) poslat komentářový toot"
+  wizard_menu_list: "Seznam všech postů (bez editace, jen pro rozkoukání)"
+  wizard_menu_rebuild: "Rebuild a nasadit web (bez vazby na konkrétní post)"

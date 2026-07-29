@@ -1,0 +1,24 @@
+<aside>
+        <div class="card">
+          <h3><%= h(ABOUT['heading']) %></h3>
+          <p><%= ABOUT['html'] %></p>
+        </div>
+<% if WIDGETS['toots'] %>
+        <div class="card">
+          <h3><%= h(WIDGETS['toots']['heading']) %></h3>
+          <div id="last-toots"></div>
+        </div>
+<% end %>
+<% if WIDGETS['pixelfed'] %>
+        <div class="card">
+          <h3><%= h(WIDGETS['pixelfed']['heading']) %></h3>
+          <div id="last-pixelfeds"></div>
+        </div>
+<% end %>
+<% if WIDGETS['commits'] %>
+        <div class="card">
+          <h3><%= h(WIDGETS['commits']['heading']) %></h3>
+          <div id="last-commits"></div>
+        </div>
+<% end %>
+      </aside>
