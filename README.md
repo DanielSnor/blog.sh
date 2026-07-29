@@ -18,9 +18,10 @@ MIT licensed (see [LICENSE](LICENSE)).
 
 > **Status:** a personal tool, built for and around a single deployment
 > ([sean.cz](https://sean.cz)). It's shared as a working reference and is
-> usable as-is if your setup matches the assumptions below (Cloudron
-> Surfer for deploy, single author) -- see [Roadmap](#roadmap) for what
-> would need to change to fit other setups.
+> usable as-is if your setup matches the assumptions below (single
+> author; deploys to Surfer, rsync, git-pages, rclone or a local
+> directory) -- see [Roadmap](#roadmap) for what would need to change to
+> fit other setups.
 
 | Light | Dark |
 | --- | --- |
@@ -141,8 +142,12 @@ deploy step around exactly that. A few of the choices that came out of it:
 - No third-party tracking scripts in post data
 
 **Deploy**
-- `scripts/deploy-web.sh` → Cloudron Surfer (Files API); a SHA-256 + size + mtime
-  manifest means only new/changed files are uploaded
+- `scripts/deploy-web.sh` → a pluggable backend (`DEPLOY_BACKEND` in
+  env.sh): Cloudron Surfer (Files API, the default), a local directory,
+  rsync over SSH, a git-pages snapshot push (GitHub/GitLab/Codeberg
+  Pages), any rclone remote (S3, R2, WebDAV, ...), or plain SFTP; a
+  SHA-256 + size + mtime manifest means only new/changed files are
+  uploaded
 - `--prune` (optional, the one destructive operation), `--dry-run`, `--only=`
 - Safety nets against both a sudden drop and a sudden spike in file count
   versus the previous deploy
@@ -178,7 +183,9 @@ deploy step around exactly that. A few of the choices that came out of it:
 - **i18n:** `locales/*.yml` + `lib/i18n.rb` -- ships with English (default)
   and Czech; add another `locales/<code>.yml` for a different language,
   missing keys fall back to English
-- **Deploy:** Cloudron Surfer (Files API), `scripts/deploy_web.rb`
+- **Deploy:** pluggable backends (`lib/deploy_backend/`) -- Cloudron
+  Surfer (Files API), a local directory, rsync, git-pages, rclone, or
+  SFTP; `scripts/deploy_web.rb`
 - **Sidebar widgets:** entirely optional, `lib/*_fetcher.rb` + `lib/sidebar.rb`
 
 ## Structure
@@ -196,7 +203,7 @@ templates/               ERB templates (layout, post, index, search, partials)
 assets/                  CSS/JS/fonts (drop your own images into assets/images/)
 config/site.yml.example  Documented config template -- copy to config/site.yml (gitignored) per deployment
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment
-docs/                    Screenshots for this README
+docs/                    Install & operations guides, plus this README's screenshots
 
 content.nosync/, media.nosync/, public.nosync/, incoming/, trash/, drafts/, env.sh, config/site.yml
                          Per-deployment/generated, not part of the engine -- see .gitignore
@@ -214,9 +221,11 @@ iCloud doesn't exist, it's just a name.
 
 - **Ruby 3.0+**, standard library only -- no gems, no Bundler, nothing to install
 - **bash** (the thin `blog.sh` / `deploy-web.sh` / `refresh-sidebar.sh` wrappers)
-- Optional, per integration: a [Cloudron Surfer](https://cloudron.io) app
-  to deploy to, a Mastodon account for comments/auto-toot, cron for the
-  sidebar widgets
+- Optional, per integration: somewhere to deploy to (a
+  [Cloudron Surfer](https://cloudron.io) app, any rsync/SSH host, a
+  GitHub/GitLab/Codeberg Pages branch, an rclone remote, or just a local
+  directory served by your own web server), a Mastodon account for
+  comments/auto-toot, cron for the sidebar widgets
 
 ## Getting started
 
@@ -237,6 +246,12 @@ Every integration beyond the core (analytics, each sidebar widget,
 Mastodon comments/auto-toot) is optional and activates only when its
 config section is present -- a minimal `site.yml` with just `site`,
 `banner`, `about` and `footer` is a complete, working site.
+
+That's the short path. The complete one -- server install, every deploy
+backend step by step, the phone workflow, Mastodon setup -- is
+[docs/install.md](docs/install.md); day-to-day usage (publishing,
+cron, backup, troubleshooting) is
+[docs/operations.md](docs/operations.md).
 
 ## `blog.sh` -- authoring
 
@@ -265,9 +280,15 @@ laptop for a local one.
 export SITE_BASE_URL=https://example.com
 export MASTODON_ACCESS_TOKEN=...   # comment toots (optional)
 export TUMBLR_API_KEY=...          # only for scripts/migrate_tumblr.rb
-export SURFER_URL=...              # deploy to Cloudron Surfer
+export DEPLOY_BACKEND=...          # surfer (default) | local | rsync | git | rclone | sftp
+export SURFER_URL=...              # surfer backend
 export SURFER_TOKEN=...
 export SURFER_REMOTE_DIR=...
+export DEPLOY_TARGET_DIR=...       # local backend
+export RSYNC_TARGET=...            # rsync backend (+ optional RSYNC_SSH)
+export GIT_PAGES_REMOTE=...        # git backend (+ optional GIT_PAGES_BRANCH/_CNAME)
+export RCLONE_TARGET=...           # rclone backend (+ optional RCLONE_ARGS)
+export SFTP_TARGET=...             # sftp backend (+ optional SFTP_REMOTE_DIR/SFTP_ARGS)
 ```
 
 ## Importing existing content
@@ -307,12 +328,6 @@ that. Skip the cron entirely if no widgets are configured.
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Deploy backend** -- `scripts/deploy_web.rb` and `lib/surfer.rb` talk
-  directly to Cloudron Surfer's Files API. An alternative (SFTP, rsync, or
-  plain local filesystem) would need a thin `upload`/`delete`/`list`
-  interface, with Surfer as one implementation among several. The
-  SHA256-manifest diff logic in `deploy_web.rb` is already independent of
-  where files end up, so it's a reasonable seam to split along.
 - **Config** -- `config/site.yml` (public) and `env.sh` (secrets) are
   already split by sensitivity; some settings used by individual
   `lib/*_fetcher.rb` files could still be consolidated into `site.yml` for
