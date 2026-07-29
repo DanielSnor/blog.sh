@@ -203,7 +203,7 @@ templates/               ERB templates (layout, post, index, search, partials)
 assets/                  CSS/JS/fonts (drop your own images into assets/images/)
 config/site.yml.example  Documented config template -- copy to config/site.yml (gitignored) per deployment
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment
-docs/                    Screenshots for this README
+docs/                    Install & operations guides, plus this README's screenshots
 
 content.nosync/, media.nosync/, public.nosync/, incoming/, trash/, drafts/, env.sh, config/site.yml
                          Per-deployment/generated, not part of the engine -- see .gitignore
@@ -246,6 +246,12 @@ Every integration beyond the core (analytics, each sidebar widget,
 Mastodon comments/auto-toot) is optional and activates only when its
 config section is present -- a minimal `site.yml` with just `site`,
 `banner`, `about` and `footer` is a complete, working site.
+
+That's the short path. The complete one -- server install, every deploy
+backend step by step, the phone workflow, Mastodon setup -- is
+[docs/install.md](docs/install.md); day-to-day usage (publishing,
+cron, backup, troubleshooting) is
+[docs/operations.md](docs/operations.md).
 
 ## `blog.sh` -- authoring
 
