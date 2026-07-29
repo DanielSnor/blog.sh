@@ -108,6 +108,28 @@ and URLs are attacker-controlled by definition (anyone can reply to a
 toot); only Mastodon's own sanitized status HTML is inserted as HTML,
 and that decision is documented where it happens.
 
+## Terminal UI
+
+**Interactive niceties, but the plain path stays authoritative.** Arrow
+menus, single-key answers and colors appear only on a real TTY;
+everything the CLI does must still work identically when piped, and no
+escape code may ever reach a log. *Cost:* two code paths in the
+dialogs -- worth it, since cron and scripts drive the same commands
+humans do.
+
+**No curses, no fullscreen, no dependencies.** `io/console` plus VT100
+sequences cover what a conversational CLI needs, and staying inline
+keeps the whole session in the scrollback where a user can scroll back
+through it. *Cost:* no complex layouts -- deliberately not the goal.
+
+**A QR encoder in the repo rather than a gem or a web service.** The
+draft-preview-on-a-phone workflow is the reason this engine looks the
+way it does, and a scannable code closes its last manual step. Sending
+the URL to an external QR service would leak an unlisted preview
+address; a gem would break "no gems". *Cost:* ~200 lines of spec
+implementation, kept honest by verifying every module against a
+reference encoder.
+
 ## Configuration
 
 **`config/site.yml` (identity, versioned) vs `env.sh` (secrets, mode

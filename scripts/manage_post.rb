@@ -22,6 +22,8 @@ require_relative '../lib/media_dimensions'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/publishing'
+require_relative '../lib/tui'
+require_relative '../lib/qr_code'
 require_relative '../lib/i18n'
 
 def t(key, **vars)
@@ -188,7 +190,7 @@ def announce_post(post, year:, date:, force: false)
     return nil
   end
 
-  Publishing.announce(post, year: year)
+  Tui.spinner(t('cli.announcing')) { Publishing.announce(post, year: year) }
 end
 
 # --- commands ------------------------------------------------------------
@@ -285,10 +287,14 @@ def draft_decision_loop(slug)
     # No extra `puts` before "Preview:" -- rebuild_and_deploy (called right
     # before this, whether from cmd_add or the 'e' branch below) already
     # ended with a blank line after "Done:", so another one would double up.
-    puts t('cli.preview_label', url: draft_url(post))
+    puts Tui.paint(t('cli.preview_label', url: draft_url(post)), :cyan)
+    if Tui.interactive? && (qr = QrCode.render(draft_url(post)))
+      puts
+      puts qr
+      puts Tui.paint(t('cli.qr_hint'), :dim)
+    end
     puts
-    print t('cli.what_next_prompt')
-    case $stdin.gets&.strip.to_s.downcase
+    case Tui.key_choice(t('cli.what_next_prompt'))
     when 'p' then return publish_draft(slug)
     when 's' then return if schedule_from_dialog(path, post)
     when 'e' then edit_post(slug)
@@ -329,7 +335,7 @@ def schedule_from_dialog(path, post)
 
   File.write(path, JSON.pretty_generate(post.merge('date' => date.iso8601, 'scheduled' => true)))
   rebuild_and_deploy(t('cli.updating_preview'))
-  puts t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format')))
+  puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   puts t('cli.schedule_cron_note')
   puts
   true
@@ -338,8 +344,8 @@ end
 def announce_on_publish(post, year, date)
   force = false
   if (date - Time.now).abs > TOOT_RECENCY_WINDOW
-    print t('cli.date_outside_window_prompt', date: date.strftime(t('date_format')))
-    return nil unless $stdin.gets&.strip.to_s.downcase.start_with?(t('cli.confirm_yes_char'))
+    answer = Tui.key_choice(t('cli.date_outside_window_prompt', date: date.strftime(t('date_format'))))
+    return nil unless answer.start_with?(t('cli.confirm_yes_char'))
 
     force = true
   end
@@ -381,7 +387,7 @@ def publish_draft(slug)
   # No extra `puts` before "Done:" -- rebuild_and_deploy ended with a blank
   # line after its own "Done: uploaded...", same doubling as
   # draft_decision_loop above.
-  puts t('cli.done_label', url: published_url(slug, new_year))
+  puts Tui.paint(t('cli.done_label', url: published_url(slug, new_year)), :green)
   puts t('cli.backdated_note') unless untouched
   puts
 end
@@ -786,10 +792,15 @@ def post_summary(file)
 end
 
 def state_marker(post)
-  return '  [SCHEDULED]' if post[:scheduled]
-  return '  [DRAFT]' if post[:state] == DRAFT
+  return "  #{Tui.paint('[SCHEDULED]', :cyan)}" if post[:scheduled]
+  return "  #{Tui.paint('[DRAFT]', :yellow)}" if post[:state] == DRAFT
 
   ''
+end
+
+def summary_row(post)
+  date = Time.parse(post[:date]).strftime('%Y-%m-%d')
+  "#{date}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
 end
 
 def load_posts_summary
@@ -806,10 +817,7 @@ def cmd_list(filters)
   end
   posts.sort_by! { |p| p[:date] }
   posts.reverse!
-  posts.each do |p|
-    date = Time.parse(p[:date]).strftime('%Y-%m-%d')
-    puts "#{date}  [#{p[:type]}]#{state_marker(p)}  #{p[:slug]}  #{p[:title]}"
-  end
+  posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
 end
@@ -830,9 +838,20 @@ end
 def pick_from_list(posts, empty_message)
   abort "#{empty_message}\n\n" if posts.empty?
 
+  # In a terminal: an arrow-key menu (digits still quick-select, typing
+  # letters falls back to entering a slug). Piped input keeps the
+  # numbered list exactly as before.
+  if Tui.interactive?
+    choice = Tui.menu(posts.map { |p| summary_row(p) },
+                      hint: t('cli.menu_hint'), allow_text: true,
+                      text_prompt: t('cli.enter_number_or_slug'))
+    abort t('cli.cancelled_empty') if choice.nil?
+    puts
+    return choice.is_a?(Integer) ? posts[choice][:slug] : choice
+  end
+
   posts.each_with_index do |p, i|
-    date = Time.parse(p[:date]).strftime('%Y-%m-%d')
-    puts "#{i + 1}) #{date}  [#{p[:type]}]#{state_marker(p)}  #{p[:slug]}  #{p[:title]}"
+    puts "#{i + 1}) #{summary_row(p)}"
   end
   puts
   print t('cli.enter_number_or_slug')
@@ -920,8 +939,7 @@ end
 
 def maybe_rebuild
   puts
-  print t('cli.rebuild_prompt')
-  return if $stdin.gets&.strip.to_s.downcase == 'n'
+  return if Tui.key_choice(t('cli.rebuild_prompt')) == 'n'
 
   rebuild_and_deploy
 end
@@ -979,7 +997,23 @@ rescue SystemExit
 end
 
 def run_wizard
-  puts t('cli.wizard_greeting')
+  puts Tui.paint(t('cli.wizard_greeting'), :bold)
+
+  # In a terminal the wizard is an arrow-key menu (digits still work as
+  # quick select, Esc exits). Piped input keeps the numbered prompt.
+  if Tui.interactive?
+    loop do
+      puts
+      puts t('cli.wizard_prompt_action')
+      puts
+      index = Tui.menu(WIZARD_MENU.map { |_, desc| desc }, hint: t('cli.menu_hint'))
+      break if index.nil?
+
+      puts
+      run_wizard_choice(WIZARD_MENU[index].first)
+    end
+    return
+  end
 
   loop do
     puts
@@ -1040,6 +1074,15 @@ else
     cmd_bluesky(slug)
   when 'rebuild'
     cmd_rebuild
+  when 'preview'
+    # A local static server over the build output -- the quickest way to
+    # look at the site before deploying anywhere.
+    unless Dir.exist?(File.join(ROOT, 'public.nosync'))
+      abort t('cli.preview_missing_public')
+    end
+    port = ARGV.shift || '8000'
+    puts t('cli.preview_serving', url: "http://localhost:#{port}/")
+    exec('ruby', '-run', '-e', 'httpd', File.join(ROOT, 'public.nosync'), '-p', port)
   when 'list'
     filters = {}
     ARGV.each do |arg|
