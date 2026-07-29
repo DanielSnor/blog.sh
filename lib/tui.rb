@@ -44,6 +44,27 @@ module Tui
     text.gsub(ANSI_RE, '')
   end
 
+  # $stdout.winsize is [0, 0] when the terminal never reported a size
+  # (some PTY setups, or a size query still in flight) -- 80 is the safe
+  # assumption in that case, same as most terminals' own default.
+  def term_width
+    width = interactive? ? $stdout.winsize[1] : 0
+    width.positive? ? width : 80
+  rescue IOError, Errno::ENOTTY
+    80
+  end
+
+  # Truncates rather than wraps -- `menu` below repaints by moving the
+  # cursor up exactly one line per item, so every item MUST render as
+  # exactly one physical terminal row. On a narrow terminal (an SSH
+  # client on a phone is the whole reason this matters) a wrapped line
+  # would silently break that math and corrupt the repaint.
+  def truncate_to_width(text, width)
+    return text if width <= 1 || text.length <= width
+
+    "#{text[0, width - 1]}…"
+  end
+
   # One keypress, normalized: :up/:down/:enter/:escape, or the character
   # itself. A lone Esc is distinguished from an escape sequence by
   # waiting a beat for the rest of the sequence -- the classic ambiguity
@@ -106,16 +127,14 @@ module Tui
 
     print "\e[?25l"
     loop do
+      avail = term_width - 2 # "› " / "  " prefix
       print "\e[#{lines}A" if painted_once
       items.each_with_index do |item, i|
-        line = if i == selected
-                 paint("› #{strip_ansi(item)}", :invert)
-               else
-                 "  #{item}"
-               end
+        plain = truncate_to_width(strip_ansi(item), avail)
+        line = i == selected ? paint("› #{plain}", :invert) : "  #{plain}"
         print "\e[2K#{line}\n"
       end
-      print "\e[2K#{paint(hint, :dim)}\n" if hint
+      print "\e[2K#{paint(truncate_to_width(hint, term_width), :dim)}\n" if hint
       painted_once = true
 
       case (key = read_key)
