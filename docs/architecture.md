@@ -31,6 +31,61 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
 - Media lives next to its post in `media.nosync/<year>/<slug>/`,
   referenced by bare filename; nothing is ever hotlinked.
 
+### Field reference
+
+The authoritative schema for anyone writing an importer -- new
+importers should produce exactly this and write it through
+`PostWriter.write` (which handles slug uniqueness and re-import
+dedup by `source`).
+
+**Post object:**
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `slug` | string, required | URL segment; `Slug.slugify` output |
+| `date` | string, required | ISO 8601 with offset |
+| `content` | array, required | blocks, see below |
+| `title` | string | posts without one are titled by their slug |
+| `tags` | array of strings | rendered as pills, slugified for tag URLs |
+| `state` | `"published"` \| `"draft"` | absent = published |
+| `draft_token` | string | drafts only -- the hidden preview URL segment |
+| `created_at` | string | drafts only -- publish-time "was the date edited?" check |
+| `type` | string | explicit dominant content type; absent = derived from blocks |
+| `source` | object | `platform` plus optionally `account`, `original_id` -- the re-import dedup key |
+| `mastodon_url` | string | the post's comment toot, set on publish/`toot` |
+
+**Blocks** (`content` array entries), by `type`:
+
+| `type` | Fields |
+| --- | --- |
+| `text` | `text`; `subtype` (`heading1`-`heading6`, `quote`; absent = paragraph); `formatting` |
+| `list` | `style` (`"ul"`/`"ol"`); `items` -- each `{text, formatting?, children?}` where `children` is a nested list block |
+| `table` | `align` (array of `left`/`center`/`right`); `header` (array of cells); `rows` (array of cell arrays); a cell is `{text, formatting?}` |
+| `code` | `text` (verbatim, blank lines preserved); `lang` (cosmetic) |
+| `hr` | no fields |
+| `image` | `media` (see below); `alt_text`; `caption` |
+| `video` | one of three shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
+| `link` | `url`; `title`; `description` -- rendered as a link card |
+
+An unrecognized `type` renders as its raw JSON in a `<pre>` -- loud,
+not silent.
+
+**`media`** is an array whose first entry is used: `{url, width,
+height}`. `url` is a bare filename inside the post's
+`media.nosync/<year>/<slug>/` directory; `width`/`height` reserve
+layout space and are effectively **required for images** -- an image
+whose dimensions are missing or <= 1 px is treated as degenerate and
+dropped from rendering (the CLI reads them from PNG/JPEG/MP4 headers;
+an importer must supply them too).
+
+**`formatting`** is a flat array of `{type, start, end}` spans over the
+block's plain `text` -- offsets are **Unicode codepoints** (Ruby string
+indexing), `end` exclusive; spans may nest and overlap, and shorter
+spans render innermost. Span types the authoring CLI produces: `bold`,
+`italic`, `strikethrough`, `code`, `link` (`url` + optional `title`).
+Additionally accepted from imports: `small`, `mention` (`blog.url`),
+`color` (`hex`).
+
 ## The markdown round-trip
 
 Markdown exists only at the editing boundary; storage and build never

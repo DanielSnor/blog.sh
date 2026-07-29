@@ -20,6 +20,7 @@ guides that go deeper:
 | Writing and publishing posts | [operations.md → Writing and publishing](operations.md#writing-and-publishing) |
 | Something failed | [operations.md → Troubleshooting](operations.md#troubleshooting) |
 | Understanding the internals | [architecture.md](architecture.md), then the source -- every `lib/` file opens with a design comment |
+| Writing an importer | [architecture.md → Field reference](architecture.md#field-reference) -- produce that schema via `PostWriter.write` |
 | Questioning a design choice | [decisions.md](decisions.md) first -- it may already argue both sides |
 
 The `screenshot-*.png` files here are the images embedded in the main
