@@ -45,6 +45,10 @@ banner:
   # banner image. Turn either off if the image is busy enough on its own.
   # show_title: true
   # show_claim: true
+  # Optional: overrides the claim text with raw HTML (e.g. a manual <br>
+  # line break) instead of the plain site.description. May contain HTML,
+  # same trust level as about.html/footer.note_html below.
+  # claim: "First line<br>Second line"
 
 about:
   heading: "About"

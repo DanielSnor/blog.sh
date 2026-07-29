@@ -290,6 +290,16 @@ def h(text)
   CGI.escapeHTML(text.to_s)
 end
 
+# banner.claim is an optional raw-HTML override for the banner overlay's
+# claim text -- same trust level as about.html/footer.note_html (site.yml
+# is edited only by the site owner), so a manual <br> can force a line
+# break the way CSS wrapping alone can't target. site.description itself
+# stays plain text, since it's also reused in <meta name="description">
+# and the RSS <description> -- those must never see raw markup.
+def banner_claim_html
+  BANNER['claim'] || h(SITE_DESCRIPTION)
+end
+
 def wrap_tag(chunk, format)
   case format['type']
   when 'bold' then "<b>#{chunk}</b>"

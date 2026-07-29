@@ -189,9 +189,11 @@ deploy step around exactly that. A few of the choices that came out of it:
   image in self-hosted JetBrains Mono, with a corner scrim for readability
   against any image -- see `.banner-title`/`.banner-claim` in `site.css`.
   Each independently optional: `banner.show_title`/`show_claim` (default
-  true) toggle whether they render at all, and `colors.<mode>.banner_title`/
+  true) toggle whether they render at all, `colors.<mode>.banner_title`/
   `banner_claim` override their color per light/dark mode (default: `nav_bg`
-  in light, white in dark -- same as before these keys existed)
+  in light, white in dark -- same as before these keys existed), and
+  `banner.claim` overrides the claim with raw HTML (e.g. a manual `<br>`)
+  instead of plain `site.description` -- same trust level as `about.html`
 
 **Migration** (historical, one-off)
 - `migrate_tumblr.rb`, `migrate_twitter.rb` -- import from four Tumblr
