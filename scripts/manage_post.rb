@@ -289,6 +289,7 @@ def draft_decision_loop(slug)
     print t('cli.what_next_prompt')
     case $stdin.gets&.strip.to_s.downcase
     when 'p' then return publish_draft(slug)
+    when 's' then return if schedule_from_dialog(path, post)
     when 'e' then edit_post(slug)
     when 'd', ''
       puts
@@ -298,6 +299,39 @@ def draft_decision_loop(slug)
     else puts t('cli.unknown_choice_pde')
     end
   end
+end
+
+# The [s] choice in draft_decision_loop: asks for a publish date right in
+# the dialog and schedules the draft under it -- unlike the standalone
+# `schedule` command, no prior `edit` is needed to set the date. Returns
+# true when scheduled (the dialog ends), false on cancel/invalid input
+# (the dialog comes around again). The preview is rebuilt because the
+# entered date becomes the post's date and shows on the draft page.
+def schedule_from_dialog(path, post)
+  print t('cli.schedule_date_prompt')
+  input = $stdin.gets&.strip.to_s
+  return false if input.empty?
+
+  date = begin
+    Time.parse(input)
+  rescue ArgumentError
+    nil
+  end
+  if date.nil?
+    puts t('cli.schedule_date_invalid')
+    return false
+  end
+  if date <= Time.now
+    puts t('cli.schedule_date_not_future')
+    return false
+  end
+
+  File.write(path, JSON.pretty_generate(post.merge('date' => date.iso8601, 'scheduled' => true)))
+  rebuild_and_deploy(t('cli.updating_preview'))
+  puts t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format')))
+  puts t('cli.schedule_cron_note')
+  puts
+  true
 end
 
 def toot_on_publish(post, slug, year, date)

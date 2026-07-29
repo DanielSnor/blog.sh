@@ -37,13 +37,15 @@ Publishing a **backdated** post (date edited to the past) skips the
 auto-toot unless you confirm it, and lands in the archive rather than on
 the homepage -- the CLI says so when it happens.
 
-**Scheduled publishing:** edit a draft's date to the future, then
-`./blog.sh schedule <slug>` -- the
-[publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) publishes
-it (toot included) once the date arrives, keeping the scheduled date.
-Running `schedule` again cancels; `list` shows such drafts as
-`[SCHEDULED]`. The date must be deliberately set: an untouched
-creation-time date is refused, since that would just mean "publish now".
+**Scheduled publishing:** in the post-save dialog, choose `[s]` and
+enter the publish date and time directly -- the
+[publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) then
+publishes the draft (toot included) once that date arrives, keeping it
+as the post's date. The standalone `./blog.sh schedule <slug>` does the
+same for a draft whose date was already edited to the future (an
+untouched creation-time date is refused -- that would just mean
+"publish now"). Running `schedule` again cancels; `list` shows such
+drafts as `[SCHEDULED]`.
 
 ## Writing from a phone
 

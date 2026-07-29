@@ -76,11 +76,13 @@ deploy step around exactly that. A few of the choices that came out of it:
 
 **Authoring -- `blog.sh` (CLI and interactive wizard)**
 - `add` -- always starts as a draft; after saving, offers a preview and
-  a publish / keep-as-draft / back-to-editing prompt
+  a publish / schedule / keep-as-draft / back-to-editing prompt
 - `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
-- `schedule <slug>` -- marks a future-dated draft for automatic publishing
-  (toot included) by a cron step when its date arrives; run again to cancel
+- `schedule <slug>` -- automatic publishing (toot included) by a cron step
+  when the post's date arrives; the [s] dialog choice asks for the date
+  directly, the standalone command takes it from a future-dated draft;
+  run again to cancel
 - `unpublish <slug>` -- returns a post to draft, deletes its toot; gets a
   fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back

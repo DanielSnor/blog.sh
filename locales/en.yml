@@ -135,9 +135,12 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL is not set, can't build the preview URL."
   preview_label: "Preview: %{url}"
-  what_next_prompt: "What next? [p] publish  [d] leave as draft  [e] back to editing: "
+  what_next_prompt: "What next? [p] publish  [s] schedule  [d] leave as draft  [e] back to editing: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
-  unknown_choice_pde: "Not understood, try p / d / e."
+  unknown_choice_pde: "Not understood, try p / s / d / e."
+  schedule_date_prompt: "Publish at (YYYY-MM-DD HH:MM, empty = cancel): "
+  schedule_date_invalid: "That's not a date I can read -- expected e.g. 2026-08-15 09:00."
+  schedule_date_not_future: "The publish date has to be in the future."
 
   date_outside_window_prompt: "Date %{date} is outside the 24h window for an automatic toot. Toot anyway? [y/N] "
   confirm_yes_char: "y"
