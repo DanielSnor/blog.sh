@@ -8,6 +8,8 @@ guides that go deeper:
 | --- | --- |
 | [install.md](install.md) | How do I get from zero to a deployed site -- locally, on a VPS, on Cloudron, on Pages? |
 | [operations.md](operations.md) | How do I run it day to day -- writing, deploying, cron, backup, troubleshooting? |
+| [architecture.md](architecture.md) | How does it work inside -- content model, build pipeline, deploy, client side? |
+| [decisions.md](decisions.md) | Why is it built this way -- the trade-offs, each with its admitted cost? |
 
 ## Where to start, by situation
 
@@ -17,12 +19,8 @@ guides that go deeper:
 | Setting up a site | [install.md](install.md), top to bottom |
 | Writing and publishing posts | [operations.md → Writing and publishing](operations.md#writing-and-publishing) |
 | Something failed | [operations.md → Troubleshooting](operations.md#troubleshooting) |
-| Understanding the internals | the main README's *Feature overview*, plus the source -- every `lib/` file opens with a design comment |
-
-Architecture and design-decision notes may grow into their own pages
-later; until then the main README's *Why this exists* section and the
-header comments across `lib/` and `build/` are the authoritative
-explanation of the internals.
+| Understanding the internals | [architecture.md](architecture.md), then the source -- every `lib/` file opens with a design comment |
+| Questioning a design choice | [decisions.md](decisions.md) first -- it may already argue both sides |
 
 The `screenshot-*.png` files here are the images embedded in the main
 README.
