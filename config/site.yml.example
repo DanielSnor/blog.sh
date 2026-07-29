@@ -65,9 +65,15 @@ social:
     url: "https://mastodon.social/@yourname"
     icon: "mastodon"
     rel: "me"
+  - name: "Bluesky"
+    url: "https://bsky.app/profile/yourname.bsky.social"
+    icon: "bluesky"
   - name: "GitHub"
     url: "https://github.com/yourname"
     icon: "github"
+  - name: "E-mail"
+    url: "mailto:you@example.com"
+    icon: "email"
 
 # Optional, and each entry independently so. Sidebar widget data is fetched
 # by the server (lib/sidebar.rb), not the visitor's browser, and refreshed
