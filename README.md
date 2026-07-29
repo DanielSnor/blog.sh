@@ -9,6 +9,7 @@
 [![HTML](https://img.shields.io/badge/HTML-ERB_templates-E34F26?logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![CSS](https://img.shields.io/badge/CSS-Handwritten-1572B6?logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
 [![Mastodon](https://img.shields.io/badge/Mastodon-Instance-6364FF?logo=mastodon&logoColor=white)](https://joinmastodon.org)
+[![Bluesky](https://img.shields.io/badge/Bluesky-Comments-0285FF?logo=bluesky&logoColor=white)](https://bsky.social)
 
 A minimalist, file-based web/log engine. Posts are plain JSON files, the
 site is a static build, and authoring happens through a CLI/wizard --
@@ -35,7 +36,8 @@ MIT licensed (see [LICENSE](LICENSE)).
 Most static-site generators solve the general case, then make you
 configure your way back to something specific. `blog.sh` runs the other
 direction: it started from one very specific workflow (write on a phone or
-a laptop, publish from a terminal, comments live on Mastodon, nothing
+a laptop, publish from a terminal, comments live on Mastodon or
+Bluesky, nothing
 ever calls out to a third-party JS SDK) and grew a CLI, a build, and a
 deploy step around exactly that. A few of the choices that came out of it:
 
@@ -243,7 +245,7 @@ iCloud doesn't exist, it's just a name.
 
 1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
    site's title, description, social links, and (optionally) analytics,
-   sidebar widgets, and Mastodon integration.
+   sidebar widgets, and the comments network (Mastodon or Bluesky).
 2. Copy `env.sh.example` to `env.sh` and `chmod 600 env.sh`. An unedited
    copy is enough to try things out locally -- without the Surfer values,
    uploads are simply skipped (logged, not an error).
@@ -255,12 +257,13 @@ iCloud doesn't exist, it's just a name.
    `public.nosync/`, e.g. `ruby -run -e httpd public.nosync/ -p 8000`.
 
 Every integration beyond the core (analytics, each sidebar widget,
-Mastodon comments/auto-toot) is optional and activates only when its
+comments and the auto-announcement on Mastodon or Bluesky) is optional
+and activates only when its
 config section is present -- a minimal `site.yml` with just `site`,
 `banner`, `about` and `footer` is a complete, working site.
 
 That's the short path. The complete one -- server install, every deploy
-backend step by step, the phone workflow, Mastodon setup -- is
+backend step by step, the phone workflow, the comments-network setup -- is
 [docs/install.md](docs/install.md); day-to-day usage (publishing,
 cron, backup, troubleshooting) is
 [docs/operations.md](docs/operations.md).
