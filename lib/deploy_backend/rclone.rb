@@ -37,7 +37,8 @@ module DeployBackend
     # prune: switches copy -> sync; never combined with only:, matching
     #        deploy_web.rb, which skips orphans under --only.
     # force: retransfers regardless of size/modtime (--ignore-times).
-    def sync(public_dir:, only: nil, prune: false, force: false, logger: nil)
+    # files:/orphans: unused -- rclone delta-diffs against the target itself.
+    def sync(public_dir:, files: nil, orphans: nil, only: nil, prune: false, force: false, logger: nil)
       args = ['rclone', prune && !only ? 'sync' : 'copy', "#{public_dir}/", target]
       args << '--ignore-times' if force
       args += Shellwords.split(ENV['RCLONE_ARGS'].to_s) unless ENV['RCLONE_ARGS'].to_s.empty?

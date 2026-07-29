@@ -59,9 +59,10 @@ module DeployBackend
     # build -- pushing just the listed files would delete everything else
     # from the branch. public_dir already contains the full site, so a
     # full snapshot gives --only callers (refresh-sidebar.sh) what they
-    # meant anyway. prune: is likewise moot (see always_prunes?), and
-    # force: has nothing to skip -- every push is a full snapshot.
-    def sync(public_dir:, only: nil, prune: false, force: false, logger: nil)
+    # meant anyway. prune: is likewise moot (see always_prunes?), force:
+    # has nothing to skip, and files:/orphans: go unused -- every push is
+    # a full snapshot regardless.
+    def sync(public_dir:, files: nil, orphans: nil, only: nil, prune: false, force: false, logger: nil)
       logger&.call('  (snapshot deploy: --only widens to the full build)') if only
 
       Dir.mktmpdir('blog-sh-git') do |tmp|

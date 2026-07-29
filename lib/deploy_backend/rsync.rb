@@ -36,7 +36,8 @@ module DeployBackend
     # prune: mirrors deletions (--delete); never combined with only:,
     #        matching deploy_web.rb, which skips orphans under --only.
     # force: retransfers regardless of size/mtime (-I).
-    def sync(public_dir:, only: nil, prune: false, force: false, logger: nil)
+    # files:/orphans: unused -- rsync delta-diffs against the target itself.
+    def sync(public_dir:, files: nil, orphans: nil, only: nil, prune: false, force: false, logger: nil)
       args = ['rsync', '-az']
       args << '-I' if force
       args << '--delete' if prune && !only

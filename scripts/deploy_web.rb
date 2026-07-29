@@ -186,7 +186,8 @@ begin
     # Batch backend (rsync): one run covers everything, so the manifest is
     # updated wholesale on success -- and not at all on failure, since a
     # batch backend re-diffs against the target on the next run anyway.
-    if BACKEND.sync(public_dir: PUBLIC_DIR, only: ONLY, prune: PRUNES && orphans.any?,
+    if BACKEND.sync(public_dir: PUBLIC_DIR, files: to_upload, orphans: orphans,
+                    only: ONLY, prune: PRUNES && orphans.any?,
                     force: FORCE, logger: method(:log))
       to_upload.each do |name|
         manifest[name] = { 'hash' => hashes[name], 'size' => stats[name]['size'], 'mtime' => stats[name]['mtime'] }

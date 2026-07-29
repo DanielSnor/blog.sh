@@ -5,12 +5,13 @@ require_relative 'deploy_backend/local'
 require_relative 'deploy_backend/rsync'
 require_relative 'deploy_backend/git'
 require_relative 'deploy_backend/rclone'
+require_relative 'deploy_backend/sftp'
 
 # lib/deploy_backend.rb -- picks where ./scripts/deploy-web.sh ships the
 # build. Selected by DEPLOY_BACKEND in env.sh (surfer | local | rsync |
-# git | rclone); unset falls back to Surfer, which was the only target
-# before backends existed -- an old env.sh with just the SURFER_* values
-# keeps working untouched.
+# git | rclone | sftp); unset falls back to Surfer, which was the only
+# target before backends existed -- an old env.sh with just the SURFER_*
+# values keeps working untouched.
 #
 # The contract every backend implements:
 #   label            human name for the deploy log
@@ -21,8 +22,10 @@ require_relative 'deploy_backend/rclone'
 # plus ONE of:
 #   session { |s| }  per-file: yields a handle whose upload/delete return
 #                    :ok/:failed/:missing/:skipped, like lib/surfer.rb
-#   sync(...)        batch: one run covers the whole build (e.g. rsync,
-#                    which does its own delta-diffing against the target)
+#   sync(...)        batch: one run covers the whole build -- either the
+#                    target diffs itself (rsync, rclone, git) or it
+#                    executes the manifest's precomputed files:/orphans:
+#                    lists verbatim (sftp)
 # and optionally:
 #   always_prunes?   true for snapshot backends (git) whose every deploy
 #                    mirrors the build exactly, deleting orphans with or
@@ -34,15 +37,14 @@ require_relative 'deploy_backend/rclone'
 # batch backend with its own diffing (rsync --delete would happily mirror
 # a broken build) stays behind the same guards.
 #
-# Roadmap: an SFTP backend (openssh's `sftp -b` batch mode) would fit the
-# same contract for hosts that offer neither rsync nor git.
 module DeployBackend
   BACKENDS = {
     'surfer' => Surfer,
     'local' => Local,
     'rsync' => Rsync,
     'git' => Git,
-    'rclone' => Rclone
+    'rclone' => Rclone,
+    'sftp' => Sftp
   }.freeze
 
   def self.pick

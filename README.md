@@ -145,8 +145,9 @@ deploy step around exactly that. A few of the choices that came out of it:
 - `scripts/deploy-web.sh` → a pluggable backend (`DEPLOY_BACKEND` in
   env.sh): Cloudron Surfer (Files API, the default), a local directory,
   rsync over SSH, a git-pages snapshot push (GitHub/GitLab/Codeberg
-  Pages), or any rclone remote (S3, R2, WebDAV, ...); a SHA-256 + size +
-  mtime manifest means only new/changed files are uploaded
+  Pages), any rclone remote (S3, R2, WebDAV, ...), or plain SFTP; a
+  SHA-256 + size + mtime manifest means only new/changed files are
+  uploaded
 - `--prune` (optional, the one destructive operation), `--dry-run`, `--only=`
 - Safety nets against both a sudden drop and a sudden spike in file count
   versus the previous deploy
@@ -183,8 +184,8 @@ deploy step around exactly that. A few of the choices that came out of it:
   and Czech; add another `locales/<code>.yml` for a different language,
   missing keys fall back to English
 - **Deploy:** pluggable backends (`lib/deploy_backend/`) -- Cloudron
-  Surfer (Files API), a local directory, rsync, git-pages, or rclone;
-  `scripts/deploy_web.rb`
+  Surfer (Files API), a local directory, rsync, git-pages, rclone, or
+  SFTP; `scripts/deploy_web.rb`
 - **Sidebar widgets:** entirely optional, `lib/*_fetcher.rb` + `lib/sidebar.rb`
 
 ## Structure
@@ -273,7 +274,7 @@ laptop for a local one.
 export SITE_BASE_URL=https://example.com
 export MASTODON_ACCESS_TOKEN=...   # comment toots (optional)
 export TUMBLR_API_KEY=...          # only for scripts/migrate_tumblr.rb
-export DEPLOY_BACKEND=...          # surfer (default) | local | rsync | git | rclone
+export DEPLOY_BACKEND=...          # surfer (default) | local | rsync | git | rclone | sftp
 export SURFER_URL=...              # surfer backend
 export SURFER_TOKEN=...
 export SURFER_REMOTE_DIR=...
@@ -281,6 +282,7 @@ export DEPLOY_TARGET_DIR=...       # local backend
 export RSYNC_TARGET=...            # rsync backend (+ optional RSYNC_SSH)
 export GIT_PAGES_REMOTE=...        # git backend (+ optional GIT_PAGES_BRANCH/_CNAME)
 export RCLONE_TARGET=...           # rclone backend (+ optional RCLONE_ARGS)
+export SFTP_TARGET=...             # sftp backend (+ optional SFTP_REMOTE_DIR/SFTP_ARGS)
 ```
 
 ## Importing existing content
@@ -320,12 +322,6 @@ that. Skip the cron entirely if no widgets are configured.
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **More deploy backends** -- `DEPLOY_BACKEND` switches between Cloudron
-  Surfer, a local directory, rsync, a git-pages snapshot push and rclone
-  (`lib/deploy_backend/`). Still conceivable: an SFTP backend (openssh's
-  `sftp -b` batch mode) for hosts that offer neither rsync nor git. Any
-  addition fits the documented backend contract and shells out to a
-  system binary, keeping the no-gems rule.
 - **Config** -- `config/site.yml` (public) and `env.sh` (secrets) are
   already split by sensitivity; some settings used by individual
   `lib/*_fetcher.rb` files could still be consolidated into `site.yml` for
