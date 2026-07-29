@@ -79,6 +79,8 @@ deploy step around exactly that. A few of the choices that came out of it:
   a publish / keep-as-draft / back-to-editing prompt
 - `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
+- `schedule <slug>` -- marks a future-dated draft for automatic publishing
+  (toot included) by a cron step when its date arrives; run again to cancel
 - `unpublish <slug>` -- returns a post to draft, deletes its toot; gets a
   fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
@@ -260,6 +262,7 @@ cron, backup, troubleshooting) is
 ./blog.sh add                  # creates a draft, shows a preview, asks what's next
 ./blog.sh edit [<slug>]        # without a slug, offers the last 10 posts
 ./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
+./blog.sh schedule [<slug>]    # auto-publish a future-dated draft when its date arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its toot)
 ./blog.sh delete [<slug>]      # deletes a post to trash/
 ./blog.sh restore [<slug>]     # restores a post from trash
@@ -323,6 +326,13 @@ Every 30 minutes is plenty -- the data it refreshes (recent toots,
 Pixelfed posts, commits, like/boost counts) doesn't move faster than
 that. Skip the cron entirely if no widgets are configured.
 
+A second, optional job powers `./blog.sh schedule` -- it publishes
+scheduled drafts whose date has arrived (and does nothing otherwise):
+
+```
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+```
+
 ## Roadmap
 
 Things that currently assume this exact deployment and would need
@@ -358,15 +368,6 @@ generalizing for anyone else to adopt this as-is:
   makes it straightforward, while Instagram, Threads and X all gate or
   charge for read access, so some may only be possible with an app token,
   or not at all.
-- **Scheduled publishing** -- a draft with a future date plus a cron step
-  that publishes it (toot included) when the time comes. The building
-  blocks (draft state, cron, `publish_draft`) all exist already.
-- **More built-in social icons** -- the "Find me on" footer section ships
-  with four (`SOCIAL_ICONS` in `build/build_blog.rb`: mastodon, pixelfed,
-  linkedin, github). Any other network already works via `icon_svg` in
-  `config/site.yml`, but common ones (Bluesky, Instagram, Threads,
-  YouTube, RSS, email, ...) deserve to be built in, so most sites never
-  need to paste an SVG into their config.
 
 ## Example deployment
 

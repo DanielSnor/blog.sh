@@ -143,6 +143,11 @@ cli:
   confirm_yes_char: "y"
   base_url_missing_toot: "SITE_BASE_URL is not set, the toot for the post was not created."
   backdated_no_toot: "Post date isn't current (a backdated post), the toot was not created."
+  schedule_only_drafts: "Post '%{slug}' is already published -- only drafts can be scheduled."
+  schedule_needs_future_date: "Post '%{slug}' needs a future date first -- set one via ./blog.sh edit %{slug}. (An untouched creation date would mean \"publish now\", and that's what publish is for.)"
+  scheduled_label: "Scheduled: '%{slug}' publishes automatically at %{date}."
+  schedule_cron_note: "Requires the publish-scheduled.sh cron to be installed -- see docs/operations.md. Run schedule again to cancel."
+  unscheduled_label: "Schedule cancelled: '%{slug}' stays a draft."
 
   already_published: "Post '%{slug}' is already published: %{url}"
   publish_date_now: "Publish date: %{date} (set to now)"
@@ -200,6 +205,7 @@ cli:
       ./blog.sh add                  creates a draft, shows a preview and asks what's next
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
+      ./blog.sh schedule [<slug>]    schedules a draft for automatic publishing at its (future) date; run again to cancel
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
@@ -217,9 +223,15 @@ cli:
   wizard_menu_add: "New post"
   wizard_menu_edit: "Edit a post"
   wizard_menu_publish: "Publish a draft (shows a preview, asks what's next)"
+  wizard_menu_schedule: "Schedule a draft (publishes automatically when its date arrives)"
   wizard_menu_unpublish: "Move a published post back to draft"
   wizard_menu_delete: "Delete a post (moves it to trash)"
   wizard_menu_restore: "Restore a post from trash"
   wizard_menu_toot: "(Re-)send the comment toot"
   wizard_menu_list: "List of all posts (no editing, just browsing)"
   wizard_menu_rebuild: "Rebuild and deploy the site (not tied to a specific post)"
+
+cron:
+  no_scheduled_due: "No scheduled post is due."
+  published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
+  publishing_scheduled: "Publishing %{count} scheduled post(s)"

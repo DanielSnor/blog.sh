@@ -20,6 +20,7 @@ require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
+require_relative '../lib/publishing'
 require_relative '../lib/i18n'
 
 def t(key, **vars)
@@ -169,33 +170,10 @@ end
 # Posts a "reply here to comment" toot for a freshly-written post and returns
 # its URL (or nil, e.g. if SITE_BASE_URL / MASTODON_ACCESS_TOKEN aren't set --
 # see lib/mastodon_poster.rb). Never raises: a failed toot must not block
-# writing the post itself.
-PEREX_LENGTH = 250
-TOOT_LENGTH = 500
+# writing the post itself. The toot text itself is composed in
+# lib/publishing.rb, shared with the scheduled-publish cron.
 TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old Mastodon thread) don't get an auto toot
 
-# Up to `max_length` chars of the post's plain text (capped at PEREX_LENGTH),
-# trimmed to a whole word and marked with an ellipsis if it got cut off.
-def perex_for(blocks, max_length = PEREX_LENGTH)
-  limit = [max_length, PEREX_LENGTH].min
-  # Soft line breaks the author typed inside a paragraph (just to make the
-  # source readable) are invisible once rendered as HTML, but Mastodon shows
-  # a toot as plain text -- so collapse all internal whitespace, including
-  # newlines, down to single spaces before excerpting.
-  plain = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'] }.join(' ').gsub(/\s+/, ' ').strip
-  return plain if plain.length <= limit
-  return '' if limit <= 0
-
-  "#{plain[0, limit].sub(/\s+\S*\z/, '')}…"
-end
-
-def hashtags_for(tags)
-  tags.map { |t| "##{t.to_s.gsub(/\s+/, '')}" }.join(' ')
-end
-
-# title/url/hashtags must never be truncated (a cut-off URL is a dead link,
-# a cut-off hashtag is a broken one) -- only the perex shrinks to make the
-# whole toot fit under Mastodon's TOOT_LENGTH limit.
 def post_toot(title:, slug:, year:, blocks:, tags:, date:, force: false)
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_toot')
@@ -207,13 +185,9 @@ def post_toot(title:, slug:, year:, blocks:, tags:, date:, force: false)
     return nil
   end
 
-  post_url = "#{SITE_BASE_URL.chomp('/')}/posts/#{year}/#{slug}/"
-  hashtags = hashtags_for(tags)
-  fixed_length = [title, post_url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length
-  budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
-
-  parts = [title, perex_for(blocks, budget), post_url, hashtags].reject { |p| p.to_s.strip.empty? }
-  MastodonPoster.publish(parts.join("\n\n"))
+  MastodonPoster.publish(
+    Publishing.compose_toot(title: title, slug: slug, year: year, blocks: blocks, tags: tags)
+  )
 end
 
 # --- commands ------------------------------------------------------------
@@ -359,20 +333,8 @@ def publish_draft(slug)
   puts(untouched ? t('cli.publish_date_now', date: date.strftime(t('date_time_format')))
                  : t('cli.publish_date_kept', date: date.strftime(t('date_time_format'))))
 
-  old_year = File.basename(File.dirname(path))
   new_year = date.year.to_s
-
-  updated = post.merge('state' => PUBLISHED, 'date' => date.iso8601)
-  updated.delete('draft_token')
-
-  new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
-  if new_year != old_year
-    FileUtils.mkdir_p(File.dirname(new_path))
-    old_media = File.join(MEDIA_DIR, old_year, slug)
-    FileUtils.mv(old_media, File.join(MEDIA_DIR, new_year, slug)) if Dir.exist?(old_media)
-    File.delete(path)
-  end
-  File.write(new_path, JSON.pretty_generate(updated))
+  new_path, updated = Publishing.publish(path, post, date: date)
 
   mastodon_url = toot_on_publish(updated, slug, new_year, date)
   if mastodon_url
@@ -448,6 +410,46 @@ def cmd_publish(slug)
   end
 
   draft_decision_loop(slug)
+end
+
+# Marks a draft for automatic publishing by cron
+# (scripts/publish-scheduled.sh) once its date arrives -- or cancels the
+# mark when run on an already scheduled post (a toggle). The date must be
+# deliberately set to the future via `edit` first: an untouched
+# creation-time date would mean "publish immediately", and for that
+# `publish` exists.
+def cmd_schedule(slug)
+  path = find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  unless draft?(post)
+    puts t('cli.schedule_only_drafts', slug: slug)
+    puts
+    return
+  end
+
+  if post['scheduled']
+    updated = post.dup
+    updated.delete('scheduled')
+    File.write(path, JSON.pretty_generate(updated))
+    puts t('cli.unscheduled_label', slug: slug)
+    puts
+    return
+  end
+
+  date = Time.parse(post['date'])
+  untouched = post['created_at'] && post['date'] == post['created_at']
+  if untouched || date <= Time.now
+    warn t('cli.schedule_needs_future_date', slug: slug)
+    warn ''
+    return
+  end
+
+  File.write(path, JSON.pretty_generate(post.merge('scheduled' => true)))
+  puts t('cli.scheduled_label', slug: slug, date: date.strftime(t('date_time_format')))
+  puts t('cli.schedule_cron_note')
+  puts
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -577,6 +579,7 @@ def edit_post(slug)
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['created_at'] = post['created_at'] if post['created_at']
   updated['draft_token'] = post['draft_token'] if post['draft_token']
+  updated['scheduled'] = true if post['scheduled']
 
   if new_dir != File.dirname(path)
     File.delete(path)
@@ -691,7 +694,14 @@ def post_summary(file)
   post = JSON.parse(File.read(file, encoding: 'utf-8'))
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
-    state: post['state'] || PUBLISHED }
+    state: post['state'] || PUBLISHED, scheduled: post['scheduled'] }
+end
+
+def state_marker(post)
+  return '  [SCHEDULED]' if post[:scheduled]
+  return '  [DRAFT]' if post[:state] == DRAFT
+
+  ''
 end
 
 def load_posts_summary
@@ -710,7 +720,7 @@ def cmd_list(filters)
   posts.reverse!
   posts.each do |p|
     date = Time.parse(p[:date]).strftime('%Y-%m-%d')
-    puts "#{date}  [#{p[:type]}]#{p[:state] == DRAFT ? '  [DRAFT]' : ''}  #{p[:slug]}  #{p[:title]}"
+    puts "#{date}  [#{p[:type]}]#{state_marker(p)}  #{p[:slug]}  #{p[:title]}"
   end
   drafts = posts.count { |p| p[:state] == DRAFT }
   puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
@@ -734,7 +744,7 @@ def pick_from_list(posts, empty_message)
 
   posts.each_with_index do |p, i|
     date = Time.parse(p[:date]).strftime('%Y-%m-%d')
-    puts "#{i + 1}) #{date}  [#{p[:type]}]#{p[:state] == DRAFT ? '  [DRAFT]' : ''}  #{p[:slug]}  #{p[:title]}"
+    puts "#{i + 1}) #{date}  [#{p[:type]}]#{state_marker(p)}  #{p[:slug]}  #{p[:title]}"
   end
   puts
   print t('cli.enter_number_or_slug')
@@ -813,29 +823,11 @@ def fill_image_dimensions(blocks, media_files, media_dir = nil)
   end
 end
 
-# Build and deploy as one question. It used to only ask about the build,
-# with deploy called separately -- understandable back when deploying meant
-# uploading thousands of files. Today one new post costs seven to nine
-# files, so there's no reason to split it into two steps and risk the
-# second one being forgotten.
-#
-# --prune is deliberately included: after `delete` (and after an edit that
-# changes the slug or the date's year), live pages remain on the deploy
-# target that the build no longer generates. Without prune, nothing would
-# ever clean them up.
+# Build and deploy as one step -- the mechanics (and the reasoning for
+# the built-in --prune) live in Publishing.rebuild_and_deploy, shared
+# with the scheduled-publish cron.
 def rebuild_and_deploy(reason = nil)
-  reason ||= t('cli.default_rebuild_reason')
-  puts
-  puts "#{reason}…"
-  unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
-    warn t('cli.build_failed')
-    return false
-  end
-
-  return true if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
-
-  warn t('cli.deploy_failed')
-  false
+  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'))
 end
 
 def maybe_rebuild
@@ -865,6 +857,7 @@ WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
   ['edit', t('cli.wizard_menu_edit')],
   ['publish', t('cli.wizard_menu_publish')],
+  ['schedule', t('cli.wizard_menu_schedule')],
   ['unpublish', t('cli.wizard_menu_unpublish')],
   ['delete', t('cli.wizard_menu_delete')],
   ['restore', t('cli.wizard_menu_restore')],
@@ -878,6 +871,7 @@ def run_wizard_choice(command)
   when 'add' then cmd_add
   when 'edit' then cmd_edit(pick_slug_interactively)
   when 'publish' then cmd_publish(pick_draft_interactively)
+  when 'schedule' then cmd_schedule(pick_draft_interactively)
   when 'unpublish' then cmd_unpublish(pick_published_interactively)
   when 'delete' then cmd_delete(pick_slug_interactively)
   when 'restore' then cmd_restore(pick_trash_interactively)
@@ -942,6 +936,9 @@ else
   when 'publish'
     slug = ARGV.shift || pick_draft_interactively
     cmd_publish(slug)
+  when 'schedule'
+    slug = ARGV.shift || pick_draft_interactively
+    cmd_schedule(slug)
   when 'unpublish'
     slug = ARGV.shift || pick_published_interactively
     cmd_unpublish(slug)

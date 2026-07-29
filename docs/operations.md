@@ -37,6 +37,14 @@ Publishing a **backdated** post (date edited to the past) skips the
 auto-toot unless you confirm it, and lands in the archive rather than on
 the homepage -- the CLI says so when it happens.
 
+**Scheduled publishing:** edit a draft's date to the future, then
+`./blog.sh schedule <slug>` -- the
+[publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) publishes
+it (toot included) once the date arrives, keeping the scheduled date.
+Running `schedule` again cancels; `list` shows such drafts as
+`[SCHEDULED]`. The date must be deliberately set: an untouched
+creation-time date is refused, since that would just mean "publish now".
+
 ## Writing from a phone
 
 The trick is that a bare filename in an image line resolves against the
@@ -99,6 +107,14 @@ known content** rather than publishing an empty widget -- a one-minute
 network hiccup never blanks the sidebar. Systems without cron: a
 systemd timer or launchd job invoking the same script does the same
 thing. No widgets configured = no cron needed.
+
+A second, optional job publishes scheduled drafts
+(`./blog.sh schedule`) once their date arrives -- it exits immediately
+when nothing is due, so a tight interval costs nothing:
+
+```
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+```
 
 ## Backup
 
