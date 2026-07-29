@@ -5,7 +5,12 @@
 #
 # Copy this file to config/site.yml (gitignored -- see .gitignore) and fill
 # it in for your own site. After every edit, rebuild: ./blog.sh rebuild, or
-# directly ruby build/build_blog.rb && ./deploy-web.sh.
+# directly ruby build/build_blog.rb && ./scripts/deploy-web.sh.
+#
+# Sections in reading order: identity (site, banner, about, footer,
+# social) -> the comments network (mastodon OR bluesky) -> optional
+# extras (widgets, analytics, colors). A minimal config with just site,
+# banner, about and footer is a complete, working site.
 
 site:
   # The full title -- <title> on the homepage, and the basis for every other page's.
@@ -35,11 +40,6 @@ banner:
   # The file's actual dimensions -- reserves space before the image loads.
   width: 940
   height: 300
-
-# Optional. Omit this whole section for a site with no analytics script.
-analytics:
-  src: "https://analytics.example.com/script.js"
-  website_id: "00000000-0000-0000-0000-000000000000"
 
 about:
   heading: "About"
@@ -79,10 +79,30 @@ social:
     url: "mailto:you@example.com"
     icon: "email"
 
+# Optional. The comments/announcement network: every published post is
+# announced there, and replies to that announcement are the post's
+# comments. Configure EITHER mastodon: OR bluesky: -- never both; the
+# build refuses a config with two networks, since comments live in
+# exactly one place. Omit both sections for a site with no network
+# integration at all (no announcements, no comments, no post stats).
+#
+# The secrets go in env.sh, not here: MASTODON_ACCESS_TOKEN for
+# Mastodon, BLUESKY_APP_PASSWORD for Bluesky.
+mastodon:
+  instance: "mastodon.social"
+  # Optional: your instance's status character limit (default 500).
+  # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
+  # toot_length: 500
+
+# The Bluesky alternative (uncomment this and remove mastodon: above):
+# bluesky:
+#   handle: "you.bsky.social"
+#   # pds: "https://bsky.social"   # only for a self-hosted PDS
+
 # Optional, and each entry independently so. Sidebar widget data is fetched
 # by the server (lib/sidebar.rb), not the visitor's browser, and refreshed
-# by cron via ./refresh-sidebar.sh. Omit any of toots/pixelfed/commits (or
-# the whole `widgets:` key) for a site with no sidebar widgets at all.
+# by cron via ./scripts/refresh-sidebar.sh. Omit any entry (or the whole
+# `widgets:` key) for a site with no sidebar widgets at all.
 widgets:
   toots:
     heading: "Recent toots"
@@ -112,25 +132,10 @@ widgets:
     feed_url: "https://example.com/feed.xml"
     limit: 3
 
-# Optional. The comments/announcement network: every published post is
-# announced there, and replies to that announcement are the post's
-# comments. Configure EITHER mastodon: OR bluesky: -- never both; the
-# build refuses a config with two networks, since comments live in
-# exactly one place. Omit both sections for a site with no network
-# integration at all (no announcements, no comments, no post stats).
-#
-# The secrets go in env.sh, not here: MASTODON_ACCESS_TOKEN for
-# Mastodon, BLUESKY_APP_PASSWORD for Bluesky.
-mastodon:
-  instance: "mastodon.social"
-  # Optional: your instance's status character limit (default 500).
-  # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
-  # toot_length: 500
-
-# The Bluesky alternative (uncomment this and remove mastodon: above):
-# bluesky:
-#   handle: "you.bsky.social"
-#   # pds: "https://bsky.social"   # only for a self-hosted PDS
+# Optional. Omit this whole section for a site with no analytics script.
+analytics:
+  src: "https://analytics.example.com/script.js"
+  website_id: "00000000-0000-0000-0000-000000000000"
 
 # Optional. Omit this whole section (or any key inside it) to fall back to
 # blog.sh's own blue palette (build/build_blog.rb's DEFAULT_COLORS). Each
