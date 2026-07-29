@@ -374,6 +374,14 @@ generalizing for anyone else to adopt this as-is:
   cached by cron into same-origin JSON (~30min latency) instead of the
   live threads Mastodon and Bluesky give the visitor's browser for
   free. The design is sketched; implementation waits for real demand.
+  **Scraping Threads is rejected outright**: the web app's internals
+  shift constantly (a maintenance treadmill with no Nitter-style
+  community project to carry it), Meta blocks datacenter IPs and
+  forbids automated collection in its terms -- shipping that in a
+  community engine would hand every user something that breaks without
+  warning and risks their account. Paid scraping services fail the same
+  test three ways at once: per-request cost, data through a third
+  party, dependence on someone else's legal cat-and-mouse.
 - **More sidebar widgets** -- five ship today (Mastodon toots, Bluesky,
   Pixelfed, GitHub commits, and a generic RSS/Atom feed), each
   independently optional. The rest was investigated (July 2026):
