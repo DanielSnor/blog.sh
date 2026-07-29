@@ -359,11 +359,18 @@ generalizing for anyone else to adopt this as-is:
   essentially enriched RSS, the two could share a base.
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
-  site). Twitter/X and Threads remain worth investigating -- same
-  "replies to the announcement post are the comments" model, but the API
-  reality differs: X's API is paid and Threads' needs an app token, so
-  those threads would likely have to be fetched server-side on a cron
-  (the way `stats.json` already works), not by the visitor's browser.
+  site). X and Threads were investigated (July 2026) and settled:
+  **X is rejected** -- since February 2026 its API bills per use (reads
+  $0.005 each, URL-bearing posts $0.20, no public access), so the
+  announcement plus continuously re-fetched comment threads would cost
+  real money forever on a personal blog. **Threads is feasible but
+  deferred:** its free API can publish and read replies to own posts
+  (`threads_content_publish` / `threads_read_replies`), but only
+  server-side -- a Meta developer app, an OAuth dance for the first
+  token, 60-day tokens needing an auto-refresh cron, and comments
+  cached by cron into same-origin JSON (~30min latency) instead of the
+  live threads Mastodon and Bluesky give the visitor's browser for
+  free. The design is sketched; implementation waits for real demand.
 - **More sidebar widgets** -- today's three (Mastodon toots, Pixelfed,
   GitHub commits) are each independently optional; recent posts from
   Bluesky, Instagram, Threads or Twitter/X would follow the same fetcher
