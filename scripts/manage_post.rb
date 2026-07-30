@@ -1048,12 +1048,16 @@ def wizard_header
 end
 
 def run_wizard
-  puts wizard_header
-
   # In a terminal the wizard is an arrow-key menu (digits still work as
   # quick select, Esc exits). Piped input keeps the numbered prompt.
   if Tui.interactive?
     loop do
+      # Reprinted every iteration, not just once at startup: each
+      # pause_and_clear wipes the screen, and without this the site
+      # identity (which blog am I even connected to?) would vanish
+      # from view after the very first action -- the whole point for
+      # anyone managing more than one site.
+      puts wizard_header
       puts
       puts t('cli.wizard_prompt_action')
       puts
@@ -1067,6 +1071,7 @@ def run_wizard
     return
   end
 
+  puts wizard_header
   loop do
     puts
     puts t('cli.wizard_prompt_action')
