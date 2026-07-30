@@ -6,10 +6,10 @@ require 'yaml'
 #
 # This is where everything that used to be hardcoded into templates and
 # scripts lives: the site name, "About" text, footer links, social networks,
-# sidebar widget settings. Deliberately not in env.sh -- that file isn't
-# synced and isn't in git, so a local build would render a different site
-# than production and changes would have no history. env.sh keeps only
-# secrets (API tokens).
+# sidebar widget settings, the timezone every timestamp is written in.
+# Deliberately not in env.sh -- that file isn't synced and isn't in git, so
+# a local build would render a different site than production and changes
+# would have no history. env.sh keeps only secrets (API tokens).
 module SiteConfig
   PATH = File.join(File.expand_path('..', __dir__), 'config', 'site.yml')
 
@@ -23,6 +23,46 @@ module SiteConfig
 
       YAML.load_file(PATH) || {}
     end
+  end
+
+  # Called once at startup by every entry point (each script under scripts/
+  # and build/), before anything reads the clock -- a Time built earlier
+  # would keep the machine's offset. Entry points call it unconditionally,
+  # including the few whose time handling is offset-independent today
+  # (comparing two absolute instants, or epoch floats), so that adding a
+  # Time.now to one of them later can't quietly reintroduce the bug this
+  # exists to fix.
+  #
+  # A site with no timezone: key keeps using the machine's own zone, which
+  # is what every install did before this existed.
+  def use_site_timezone!
+    apply_timezone(get('site', 'timezone'))
+  end
+
+  # Shape of an IANA zone name ("Europe/Prague", "America/Argentina/
+  # Buenos_Aires", "Etc/GMT+2", "UTC") -- checked before the name is joined
+  # onto a path, so a value like "../../something" can't be smuggled past
+  # the existence check in apply_timezone.
+  ZONE_NAME_RE = %r{\A[A-Za-z][A-Za-z0-9+_-]*(/[A-Za-z0-9+_-]+)*\z}
+
+  # Points the process at a timezone by setting TZ, which is all Ruby needs
+  # -- it reads the system zoneinfo database from there, DST transitions
+  # included. No gem, no timezone table of our own.
+  #
+  # An unknown zone name is a hard error rather than a warning: Ruby
+  # silently falls back to UTC for one, so a typo like "Europe/Praha"
+  # would quietly timestamp and publish everything two hours off, and the
+  # only symptom would be dates that look slightly wrong months later.
+  def apply_timezone(zone)
+    zone = zone.to_s.strip
+    return if zone.empty?
+
+    unless zone.match?(ZONE_NAME_RE) &&
+           (zone == 'UTC' || File.exist?(File.join('/usr/share/zoneinfo', zone)))
+      abort("❌ Unknown site.timezone #{zone.inspect} in #{PATH} -- expected an IANA zone name like \"Europe/Prague\" or \"America/New_York\" (see /usr/share/zoneinfo), or \"UTC\".")
+    end
+
+    ENV['TZ'] = zone
   end
 
   # Required value: a missing key is a configuration error, not something

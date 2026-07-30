@@ -11,6 +11,9 @@
 
 require_relative '../lib/sidebar'
 require_relative '../lib/post_stats'
+require_relative '../lib/site_config'
+
+SiteConfig.use_site_timezone!
 
 ROOT = File.expand_path('..', __dir__)
 PUBLIC_DIR = File.join(ROOT, 'public.nosync')

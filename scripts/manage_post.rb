@@ -27,6 +27,8 @@ require_relative '../lib/qr_code'
 require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
 
+SiteConfig.use_site_timezone!
+
 def t(key, **vars)
   I18n.t(key, **vars)
 end

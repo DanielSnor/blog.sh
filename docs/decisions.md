@@ -54,6 +54,19 @@ parser still honors a hand-typed `date:` (that's how imports keep their
 original dates). *Cost:* backdating is no longer discoverable from the
 editor; it's a documented escape hatch rather than a suggested field.
 
+**The site declares its timezone; `TZ` and the system zoneinfo do the
+work.** A server clock is usually UTC, which silently made "schedule
+10:30" mean 12:30 locally and could date a post written after midnight to
+the previous day. `site.timezone` belongs to the site the same way
+`site.lang` does, so it lives in `config/site.yml` rather than in the
+unversioned `env.sh`, and every entry point applies it at startup by
+setting `TZ` -- Ruby then reads the OS zone database, DST included, with
+no gem and no timezone table of ours. An unknown zone name aborts,
+because Ruby's own fallback for one is a silent UTC. *Cost:* it only
+governs timestamps written from now on -- existing posts keep the offset
+they were stored with, deliberately, so adopting this doesn't re-render
+years of archive.
+
 **Deleting is moving to `trash/`; two posts can never share a URL.**
 There's no database transaction log to lean on, so the engine refuses
 the two silent data-loss paths: `delete` is reversible via `restore`,

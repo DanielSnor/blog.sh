@@ -11,6 +11,9 @@ require 'time'
 require 'tmpdir'
 require_relative '../lib/post_writer'
 require_relative '../lib/slug'
+require_relative '../lib/site_config'
+
+SiteConfig.use_site_timezone!
 
 API_KEY = ENV.fetch('TUMBLR_API_KEY') { abort 'set TUMBLR_API_KEY (source env.sh first)' }
 BLOG = ARGV[0] || abort('usage: migrate_tumblr.rb <blog-name>.tumblr.com')

@@ -16,6 +16,8 @@ require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/i18n'
 
+SiteConfig.use_site_timezone!
+
 ROOT = File.expand_path('..', __dir__)
 # .nosync: on a Mac, both directories are just a local development copy
 # (downloadable again any time from wherever the site is actually deployed).

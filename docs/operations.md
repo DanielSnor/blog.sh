@@ -48,7 +48,10 @@ enter the publish date and time directly -- the
 [publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) then
 publishes the draft (toot included) once that date arrives, keeping it
 as the post's date. The standalone `./blog.sh schedule <slug>` asks the
-same question, so either route works. A past date is refused (that would
+same question, so either route works. The time you type is read in
+`site.timezone` ([install.md](install.md#2-configure-the-site----configsiteyml))
+-- worth setting before you schedule anything from a server, whose clock
+is usually UTC. A past date is refused (that would
 just mean "publish now", and `publish` is for that). Running `schedule`
 on an already scheduled draft cancels it; `list` shows scheduled drafts
 as `[SCHEDULED]`.

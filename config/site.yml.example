@@ -30,6 +30,17 @@ site:
   # any key missing from it falls back to English.
   lang: "en"
   locale: "en_US"
+  # The timezone every timestamp this engine writes is expressed in: publish
+  # times, "publish now", the date you type into `schedule`. An IANA zone
+  # name (see /usr/share/zoneinfo) -- DST is handled for you.
+  #
+  # Set this whenever the machine's clock isn't in the zone you think in:
+  # a server is very often UTC, so without it "schedule 10:30" means 10:30
+  # UTC, and a post written after midnight local time can even be dated to
+  # the previous day. Omit it to keep using the machine's own zone.
+  # Existing posts are unaffected -- each keeps the offset it was written
+  # with, so changing this doesn't rewrite history.
+  timezone: "Europe/Prague"
   # Overridden by the SITE_BASE_URL environment variable, if set.
   base_url: "https://example.com"
   # Optional: posts per listing page (default 10). Set it ONCE, before

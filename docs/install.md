@@ -67,6 +67,15 @@ The example is fully commented. The short version:
 `en` and `cs` ship with the engine; a partial third locale falls back to
 English per key.
 
+`site.timezone` (an IANA name like `Europe/Prague`) is the zone every
+timestamp the engine writes is expressed in. **Set it if you'll ever
+publish from a server**, because a server's clock is usually UTC: without
+it, `schedule` reads "10:30" as 10:30 UTC, and a post written after
+midnight local time can be dated to the previous day. Omit it to use the
+machine's own zone. A name the system doesn't know is refused at startup
+rather than silently treated as UTC. Existing posts keep the offset they
+were written with, so setting this later doesn't rewrite history.
+
 ## 3. Configure the environment -- `env.sh`
 
 ```bash
