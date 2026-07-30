@@ -279,7 +279,7 @@ import:
   skipped: "  %{count} skipped (%{reason})"
   media_failed: "%{count} media file(s) could not be downloaded — their posts were written without them:"
   nothing_to_import: "Nothing to import."
-  confirm_prompt: "Write these %{count} post(s)? [y/N] "
+  confirm_prompt: "Write these %{count} post(s)? Type %{count} to confirm (anything else cancels): "
   running: "Importing %{label} — downloading media, this can take a while…"
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
   rebuilding: "Rebuilding and deploying"

@@ -21,7 +21,9 @@ usage: ./import.sh
 
 Opens the import wizard: pick a source, see a dry-run preview of what would
 be written -- posts, media files, the first few slugs, and how many items
-were skipped and why -- then confirm before anything is written.
+were skipped and why -- then confirm before anything is written. Confirming
+means typing the number of posts, not pressing y: it's the one answer you
+can't give without having read the preview.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
 in env.sh), and four things you already have on disk -- a Twitter/X archive,

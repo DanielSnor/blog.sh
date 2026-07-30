@@ -270,7 +270,7 @@ import:
   skipped: "  %{count} přeskočeno (%{reason})"
   media_failed: "%{count} souborů médií se nepodařilo stáhnout — jejich posty se zapsaly bez nich:"
   nothing_to_import: "Není co importovat."
-  confirm_prompt: "Zapsat těchto %{count} postů? [y/N] "
+  confirm_prompt: "Zapsat těchto %{count} postů? Potvrď napsáním %{count} (cokoli jiného ruší): "
   running: "Importuji %{label} — stahuji média, může to chvíli trvat…"
   rebuild_prompt: "Přebuildovat a nasadit web? [Y/n] "
   rebuilding: "Přebuildovávám a nasazuji"

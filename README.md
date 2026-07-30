@@ -362,7 +362,10 @@ Imports land in the same content-block schema as hand-written posts, with
 all media downloaded locally -- an imported post is indistinguishable from
 one you typed. The wizard **always previews in dry-run first** and asks
 before writing: it reports how many posts and media files would be
-created, the first few slugs, and why anything was skipped. Re-running an
+created, the first few slugs, and why anything was skipped. Confirming means
+typing that number of posts back -- the same gate `delete` uses when it asks
+for a slug, since a bulk write deserves at least what deleting one post
+requires. Re-running an
 import is safe -- posts are matched on their source id and overwritten in
 place rather than duplicated.
 

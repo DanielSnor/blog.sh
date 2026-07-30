@@ -191,6 +191,19 @@ def scan_reporter
   end
 end
 
+# The count has to be typed out, not answered with a keypress. Deleting a
+# single post already makes you type its slug; writing two thousand of them
+# was one 'y', which had the bigger action behind the weaker gate. Typing
+# the number is also the one answer that can't be given without having read
+# the preview -- which is the whole reason the preview runs.
+#
+# Anything else cancels, including a mistyped number: the run is repeatable,
+# so a wrong cancel costs a re-read, while a wrong confirm costs an archive.
+def confirmed?(count)
+  print t('import.confirm_prompt', count: count)
+  $stdin.gets.to_s.strip == count.to_s
+end
+
 def run_import(adapter)
   puts
   puts t('import.dry_run_running', label: adapter.label)
@@ -206,7 +219,7 @@ def run_import(adapter)
   end
 
   puts
-  if Tui.key_choice(t('import.confirm_prompt', count: preview.written)) != 'y'
+  unless confirmed?(preview.written)
     puts
     puts t('import.cancelled')
     puts

@@ -84,7 +84,9 @@ authoring menu stays about authoring, and the irreversible thing needs its
 own door opened deliberately. Every import runs the adapter in dry-run first
 and reports what *would* be written -- counts, the first slugs, and why
 items were skipped -- because discovering afterwards that 2000 posts got the
-wrong slugs has no cheap fix. *Cost:* two entry points to learn, and one
+wrong slugs has no cheap fix. Confirming means typing the post count back,
+not pressing a key: deleting a single post already makes you type its slug,
+so a bulk write had the bigger consequence behind the weaker gate. *Cost:* two entry points to learn, and one
 shared `lib/site_header.rb` so their identity blocks can't drift.
 
 **A long import narrates itself.** Every phase that runs for more than a few
