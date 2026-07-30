@@ -19,10 +19,34 @@ API_KEY = ENV.fetch('TUMBLR_API_KEY') { abort 'set TUMBLR_API_KEY (source env.sh
 BLOG = ARGV[0] || abort('usage: migrate_tumblr.rb <blog-name>.tumblr.com')
 ACCOUNT = BLOG.split('.').first
 
+# Optional trial run: stop after this many posts. Worth having on the
+# platform whose import takes hours -- sampling twenty posts shows whether
+# the mapping does what you expect before committing to the whole archive.
+#
+# Validated rather than .to_i'd: a typo would otherwise become 0 and the
+# script would "succeed" having imported nothing at all.
+LIMIT =
+  case ENV['LIMIT']
+  when nil, '' then nil
+  when /\A[1-9]\d*\z/ then ENV['LIMIT'].to_i
+  else abort("LIMIT must be a positive integer (got #{ENV['LIMIT'].inspect})")
+  end
+
 def fetch_posts(blog, offset, retries = 3)
   uri = URI("https://api.tumblr.com/v2/blog/#{blog}/posts")
   uri.query = URI.encode_www_form(api_key: API_KEY, npf: true, limit: 20, offset: offset)
-  JSON.parse(Net::HTTP.get(uri))
+  data = JSON.parse(Net::HTTP.get(uri))
+
+  # A rejected key or a misspelled blog still returns valid JSON, with the
+  # reason in `meta` and an empty Array where `response` would be an object.
+  # Without this the first thing a new user sees is a TypeError from
+  # Hash#dig several frames away from the actual problem.
+  status = data.dig('meta', 'status')
+  unless status.nil? || status == 200
+    abort("❌ Tumblr API returned #{status} #{data.dig('meta', 'msg')} for #{blog} -- check TUMBLR_API_KEY and the blog name.")
+  end
+
+  data
 rescue StandardError => e
   raise if retries.zero?
 
@@ -153,7 +177,8 @@ loop do
   # every image of every post runs for hours, and knowing whether that's 40
   # posts or 4000 is the difference between waiting and killing it.
   if total.nil? && (total = data.dig('response', 'blog', 'total_posts'))
-    puts "#{total} post(s) on the blog. Media is downloaded as we go, so this can take a while."
+    puts "#{total} post(s) on the blog."
+    puts LIMIT ? "Importing the first #{LIMIT} as a trial run." : 'Media is downloaded as we go, so this can take a while.'
   end
   break if posts.empty?
 
@@ -196,9 +221,16 @@ loop do
 
       PostWriter.write(post, media_files: media_files)
       count += 1
-      puts "  #{count}#{total ? "/#{total}" : ''} #{slug} (#{media_files.size} media file(s))"
+      # Counted against whatever the run is actually aiming at, so a trial
+      # run shows "3/20" rather than "3/4000".
+      target = LIMIT || total
+      puts "  #{count}#{target ? "/#{target}" : ''} #{slug} (#{media_files.size} media file(s))"
     end
+
+    break if LIMIT && count >= LIMIT
   end
+
+  break if LIMIT && count >= LIMIT
 
   offset += posts.size
   break if total && offset >= total

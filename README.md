@@ -357,8 +357,9 @@ Available sources:
 
 Bluesky is driven by the wizard. The two older importers are still their
 own scripts -- `scripts/migrate_tumblr.rb <blog-name>.tumblr.com` and
-`scripts/migrate_twitter.rb <path-to-extracted-export>` (the latter takes
-`LIMIT=n` for a trial run) -- predating the shared layer they'll move onto.
+`scripts/migrate_twitter.rb <path-to-extracted-export>`, both taking
+`LIMIT=n` to import only the first *n* posts as a trial run -- predating the
+shared layer they'll move onto.
 They report progress as they go: the size of what they're about to read,
 how many items were found and filtered, then a `12/847` counter per post,
 because downloading every image of an archive runs for hours and a silent

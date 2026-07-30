@@ -19,6 +19,17 @@ require_relative '../lib/site_config'
 SiteConfig.use_site_timezone!
 
 EXPORT_DIR = ARGV[0] || abort('usage: migrate_twitter.rb <path-to-extracted-export>')
+
+# Optional trial run, same contract as migrate_tumblr.rb. Validated rather
+# than .to_i'd: a typo would otherwise become 0 and the script would
+# "succeed" having imported nothing.
+LIMIT =
+  case ENV['LIMIT']
+  when nil, '' then nil
+  when /\A[1-9]\d*\z/ then ENV['LIMIT'].to_i
+  else abort("LIMIT must be a positive integer (got #{ENV['LIMIT'].inspect})")
+  end
+
 DATA_DIR = File.join(EXPORT_DIR, 'data')
 MEDIA_SRC_DIR = File.join(DATA_DIR, 'tweets_media')
 ACCOUNT = JSON.parse(File.read(File.join(DATA_DIR, 'account.js'), encoding: 'utf-8').sub(/\A[^\[]*/, ''))
@@ -161,10 +172,10 @@ clean = tweets.select { |t| clean_tweet?(t) }
 # Counted before LIMIT truncates, or the final summary would report a
 # deliberate cap as though those tweets had been filtered out.
 filtered_out = tweets.size - clean.size
-clean = clean.first(ENV['LIMIT'].to_i) if ENV['LIMIT']
+clean = clean.first(LIMIT) if LIMIT
 
 puts "#{tweets.size} tweet(s) in the export, #{clean.size} to import " \
-     "(#{filtered_out} are replies, RTs or quote-tweets)."
+     "(#{filtered_out} are replies, RTs or quote-tweets)#{LIMIT ? ", capped at #{LIMIT} for a trial run" : ''}."
 
 count = 0
 clean.each do |tweet|

@@ -100,7 +100,10 @@ Two things to expect on a real archive:
 - **It is slow, and it says so.** Media is downloaded per post, so a few
   thousand posts run for hours. Every phase reports progress -- what it's
   reading, how many items it found, then a `12/847` counter -- so a quiet
-  terminal means something is wrong, not that it's working.
+  terminal means something is wrong, not that it's working. Sample before
+  committing to that: the Tumblr and Twitter scripts take `LIMIT=20` to
+  import only the first twenty, which is enough to see whether the mapping
+  does what you expect. A second full run then overwrites them in place.
 - **The deploy guard will stop you afterwards**, because a bulk import is
   exactly the "file count swung wildly" shape it watches for. That's
   working as intended: check the numbers, then re-run with `--force`.
