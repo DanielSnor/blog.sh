@@ -10,6 +10,7 @@ guides that go deeper:
 | [operations.md](operations.md) | How do I run it day to day -- writing, deploying, cron, backup, troubleshooting? |
 | [architecture.md](architecture.md) | How does it work inside -- content model, build pipeline, deploy, client side? |
 | [decisions.md](decisions.md) | Why is it built this way -- the trade-offs, each with its admitted cost? |
+| [localization.md](localization.md) | How do I translate the engine into my language? |
 
 ## Where to start, by situation
 
@@ -21,6 +22,7 @@ guides that go deeper:
 | Moving content in from elsewhere | [operations.md → Importing](operations.md#importing-from-another-platform), then `./import.sh` |
 | Something failed | [operations.md → Troubleshooting](operations.md#troubleshooting) |
 | Understanding the internals | [architecture.md](architecture.md), then the source -- every `lib/` file opens with a design comment |
+| Translating the engine | [localization.md](localization.md) -- a partial locale is useful from day one |
 | Writing an importer | [architecture.md → Importing](architecture.md#importing) for the adapter contract, [→ Field reference](architecture.md#field-reference) for the schema to produce |
 | Questioning a design choice | [decisions.md](decisions.md) first -- it may already argue both sides |
 

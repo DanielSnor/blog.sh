@@ -88,6 +88,7 @@ js:
 
 cli:
   cancel_word: "zrušit"
+  confirm_word: "ano"
   missing_images_wait: "Chybí %{count} obrázek/obrázky, počkám, až je nahraješ do incoming/:"
   missing_images_prompt: "Až budou nahrané, stiskni Enter (nebo napiš \"%{cancel_word}\" pro přerušení): "
   cancelled_nothing_saved: "Zrušeno, nic se neuložilo.\n\n"
@@ -182,7 +183,7 @@ cli:
 
   no_changes: "Žádné změny, nic se neukládá."
   content_loss_warning: "Pozor, tímhle uložením by se ztratilo: %{summary}."
-  confirm_continue_yes: "Opravdu pokračovat? Napiš \"ano\": "
+  confirm_continue_yes: "Opravdu pokračovat? Napiš \"%{word}\": "
 
   edited_label: "Upraveno: %{path}"
 
@@ -276,6 +277,13 @@ import:
   rebuilding: "Přebuildovávám a nasazuji"
   cancelled: "Zrušeno, nic se nezapsalo."
   interrupted: "Přerušeno. Dosud zapsané posty už jsou v content.nosync/ — opakovaný import je bezpečný, přepíše je na místě."
+  source:
+    bluesky: "Bluesky"
+    mastodon: "Mastodon (archiv účtu)"
+    pixelfed: "Pixelfed (export statusů)"
+    tumblr: "Tumblr"
+    twitter: "Twitter/X (rozbalený archiv)"
+    feed: "Export z WordPressu nebo RSS/Atom feed"
   reason:
     reply: "odpověď"
     repost: "repost"

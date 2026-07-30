@@ -666,8 +666,11 @@ def edit_post(slug)
   if lost.any?
     puts
     puts t('cli.content_loss_warning', summary: lost.map { |type, n| "#{n}x #{type}" }.join(', '))
-    print t('cli.confirm_continue_yes')
-    abort t('cli.cancelled_nothing_saved') unless $stdin.gets&.strip == 'yes'
+    # The word is compared against the locale's own confirm_word -- the
+    # Czech prompt says to type "ano", so comparing against a hardcoded
+    # 'yes' aborted exactly the users who followed the instruction.
+    print t('cli.confirm_continue_yes', word: t('cli.confirm_word'))
+    abort t('cli.cancelled_nothing_saved') unless $stdin.gets&.strip&.downcase == t('cli.confirm_word')
   end
 
   new_year = new_date.year.to_s

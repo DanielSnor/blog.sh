@@ -44,13 +44,20 @@ end
 # cron pipes a number today, but anyone who has scripted one should re-read
 # their script after a change here.
 SOURCES = [
-  ['bluesky', 'Bluesky', -> { build_bluesky }],
-  ['mastodon', 'Mastodon (account archive)', -> { build_mastodon }],
-  ['pixelfed', 'Pixelfed (statuses export)', -> { build_pixelfed }],
-  ['tumblr', 'Tumblr', -> { build_tumblr }],
-  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }],
-  ['feed', 'WordPress export or RSS/Atom feed', -> { build_feed }]
+  ['bluesky', -> { build_bluesky }],
+  ['mastodon', -> { build_mastodon }],
+  ['pixelfed', -> { build_pixelfed }],
+  ['tumblr', -> { build_tumblr }],
+  ['twitter', -> { build_twitter }],
+  ['feed', -> { build_feed }]
 ].freeze
+
+# Display names come from the locale (import.source.*) -- the service names
+# are proper nouns, but the parentheticals ("account archive") are prose
+# and read wrong left in English inside an otherwise translated menu.
+def source_name(key)
+  t("import.source.#{key}")
+end
 
 def ask(prompt_key)
   print t(prompt_key)
@@ -130,14 +137,14 @@ end
 def ask_source
   puts
   if Tui.interactive?
-    index = Tui.menu(SOURCES.map { |_, name, _| name }, hint: t('import.menu_hint'))
+    index = Tui.menu(SOURCES.map { |key, _| source_name(key) }, hint: t('import.menu_hint'))
     return nil if index.nil?
 
     puts
     return SOURCES[index]
   end
 
-  SOURCES.each_with_index { |(_, name, _), i| puts "#{i + 1}) #{name}" }
+  SOURCES.each_with_index { |(key, _), i| puts "#{i + 1}) #{source_name(key)}" }
   puts
   print t('import.enter_number')
   input = $stdin.gets.to_s.strip
@@ -261,7 +268,7 @@ if source.nil?
   exit 0
 end
 
-adapter = source[2].call
+adapter = source[1].call
 if adapter.nil?
   puts t('import.cancelled')
   puts
