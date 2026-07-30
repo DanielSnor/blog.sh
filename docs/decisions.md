@@ -62,10 +62,19 @@ the previous day. `site.timezone` belongs to the site the same way
 unversioned `env.sh`, and every entry point applies it at startup by
 setting `TZ` -- Ruby then reads the OS zone database, DST included, with
 no gem and no timezone table of ours. An unknown zone name aborts,
-because Ruby's own fallback for one is a silent UTC. *Cost:* it only
-governs timestamps written from now on -- existing posts keep the offset
-they were stored with, deliberately, so adopting this doesn't re-render
-years of archive.
+because Ruby's own fallback for one is a silent UTC.
+
+Dates a reader sees are rendered in that zone too, via `post_display_time`
+and a `getlocal` in each sidebar fetcher -- otherwise a post imported as
+UTC, or a toot posted late in the evening, shows the previous day.
+`post_time` itself deliberately stays on the stored offset, because
+`post_path` derives the year from it: shifting that would move a post
+published near midnight on December 31 into another year, changing a live
+URL. Feeds and the sitemap stay on it for the same reason in reverse --
+they carry absolute instants for machines, where the offset is noise.
+*Cost:* stored dates aren't rewritten, so a site adopting this re-renders
+only the posts whose local day actually differs (73 of sean.cz's 3281,
+none of them changing year).
 
 **Deleting is moving to `trash/`; two posts can never share a URL.**
 There's no database transaction log to lean on, so the engine refuses

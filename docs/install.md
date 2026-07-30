@@ -73,8 +73,11 @@ publish from a server**, because a server's clock is usually UTC: without
 it, `schedule` reads "10:30" as 10:30 UTC, and a post written after
 midnight local time can be dated to the previous day. Omit it to use the
 machine's own zone. A name the system doesn't know is refused at startup
-rather than silently treated as UTC. Existing posts keep the offset they
-were written with, so setting this later doesn't rewrite history.
+rather than silently treated as UTC. It also governs the dates readers see,
+including the sidebar widgets, whose sources report UTC. Existing posts keep
+the stored offset -- setting this later rewrites no history, it only changes
+the day shown for posts whose local day genuinely differs (and never a
+post's URL).
 
 ## 3. Configure the environment -- `env.sh`
 
