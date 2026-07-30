@@ -13,6 +13,37 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Before the clear below, or help would scroll away the moment it printed.
+case "${1:-}" in
+  help | --help | -h)
+    cat <<'USAGE'
+usage: ./import.sh
+
+Opens the import wizard: pick a source, see a dry-run preview of what would
+be written -- posts, media files, the first few slugs, and how many items
+were skipped and why -- then confirm before anything is written.
+
+Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
+in env.sh), Twitter/X (an extracted archive export).
+
+Each source is also a script, for cron or a scripted migration. These write
+immediately, with no preview pass:
+
+  ruby scripts/migrate_bluesky.rb <handle>
+  ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
+  ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+
+LIMIT=n works on all three and imports only the first n posts -- the way to
+sample a large archive before committing hours to it.
+
+Re-running any import is safe: posts are matched on their source id and
+overwritten in place, never duplicated. Nothing is deployed either way --
+the wizard offers a rebuild at the end, the scripts leave that to you.
+USAGE
+    exit 0
+    ;;
+esac
+
 [ -t 1 ] && clear
 echo "== blog.sh import =="
 echo

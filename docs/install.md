@@ -126,6 +126,13 @@ ruby build/build_blog.rb       # build into public.nosync/
 [operations.md](operations.md#writing-and-publishing) for the full
 authoring flow.
 
+**Replacing an existing blog?** Bring the old content in before you deploy,
+so the first published version of the site is already complete. `./import.sh`
+walks you through it -- Bluesky, Tumblr or a Twitter/X archive export -- and
+always previews what it would write before writing anything. See
+[operations.md → Importing](operations.md#importing-from-another-platform),
+and `./import.sh --help` for the scriptable equivalents.
+
 ## 6. Pick a deploy target
 
 Set `DEPLOY_BACKEND` in env.sh plus the values for your choice, then:

@@ -340,7 +340,7 @@ laptop for a local one.
 ```bash
 export SITE_BASE_URL=https://example.com
 export MASTODON_ACCESS_TOKEN=...   # comment toots (optional)
-export TUMBLR_API_KEY=...          # only for scripts/migrate_tumblr.rb
+export TUMBLR_API_KEY=...          # importing a Tumblr blog (wizard or script)
 export DEPLOY_BACKEND=...          # surfer (default) | local | rsync | git | rclone | sftp
 export SURFER_URL=...              # surfer backend
 export SURFER_TOKEN=...
