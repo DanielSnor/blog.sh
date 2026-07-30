@@ -28,6 +28,7 @@ require_relative '../lib/import/run'
 require_relative '../lib/import/bluesky'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
+require_relative '../lib/import/feed'
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -36,7 +37,8 @@ end
 SOURCES = [
   ['bluesky', 'Bluesky', -> { build_bluesky }],
   ['tumblr', 'Tumblr', -> { build_tumblr }],
-  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }]
+  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }],
+  ['feed', 'WordPress export or RSS/Atom feed', -> { build_feed }]
 ].freeze
 
 def ask(prompt_key)
@@ -62,6 +64,21 @@ def build_tumblr
 
   blog = ask('import.tumblr_blog_prompt')
   blog && Import::Tumblr.new(blog, api_key: api_key)
+end
+
+# One prompt for all three inputs it accepts: they are the same format --
+# a WXR export is RSS 2.0 with extra elements -- so asking which kind it is
+# would be asking the user something the file already says.
+def build_feed
+  source = ask('import.feed_source_prompt')
+  return nil unless source
+
+  local = File.expand_path(source)
+  return Import::Feed.new(local) if File.exist?(local)
+  return Import::Feed.new(source) if source.start_with?('http://', 'https://')
+
+  puts t('import.feed_source_invalid', source: source)
+  nil
 end
 
 def build_twitter
@@ -104,7 +121,7 @@ end
 # engine ships -- but a skip reason comes from an adapter, and a new adapter
 # inventing one must not take the wizard down mid-summary. Translated when
 # known, printed raw when not.
-TRANSLATED_REASONS = %w[reply repost quote empty].freeze
+TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed].freeze
 
 def reason_label(reason)
   TRANSLATED_REASONS.include?(reason.to_s) ? t("import.reason.#{reason}") : reason.to_s

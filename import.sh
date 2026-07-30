@@ -24,7 +24,9 @@ be written -- posts, media files, the first few slugs, and how many items
 were skipped and why -- then confirm before anything is written.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
-in env.sh), Twitter/X (an extracted archive export).
+in env.sh), Twitter/X (an extracted archive export), and WordPress or any
+RSS/Atom feed (one option -- a WXR export is RSS with extra elements, so the
+file itself says which it is).
 
 Each source is also a script, for cron or a scripted migration. These write
 immediately, with no preview pass:
@@ -32,8 +34,9 @@ immediately, with no preview pass:
   ruby scripts/migrate_bluesky.rb <handle>
   ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
   ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+  ruby scripts/migrate_feed.rb <export.xml | feed-url>
 
-LIMIT=n works on all three and imports only the first n posts -- the way to
+LIMIT=n works on all of them and imports only the first n posts -- the way to
 sample a large archive before committing hours to it.
 
 Re-running any import is safe: posts are matched on their source id and
