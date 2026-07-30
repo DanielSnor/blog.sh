@@ -91,13 +91,16 @@ The trick is that a bare filename in an image line resolves against the
 `./import.sh` opens its own wizard: pick a source, and it reads the whole
 thing in dry-run first and tells you what *would* be written -- how many
 posts and media files, the first few slugs, and how many items it skipped
-and why. Nothing is written until you confirm. Sources are Bluesky (no
-credentials, public API), Tumblr (`TUMBLR_API_KEY` in `env.sh`) and a
-Twitter/X archive export.
+and why. Nothing is written until you confirm, and confirming means typing the number of posts rather than pressing a key -- an answer you can't give without having read the preview. Sources are Bluesky and Tumblr over their
+APIs, and four exports you already have on disk: Twitter/X, Mastodon,
+Pixelfed, and WordPress or any RSS/Atom feed -- those last two are one
+option, since a WXR export is RSS with extra elements and the file says
+which it is.
 
 The same imports also run without the wizard, for cron or a scripted
 migration -- `scripts/migrate_bluesky.rb <handle>`,
-`scripts/migrate_tumblr.rb <blog>`, `scripts/migrate_twitter.rb <export-dir>`.
+`scripts/migrate_tumblr.rb <blog>`, `scripts/migrate_twitter.rb <export-dir>`,
+`scripts/migrate_feed.rb <export.xml | feed-url>`.
 Those skip the preview and write immediately; see
 [the README](../README.md#importing-existing-content).
 

@@ -3,6 +3,7 @@
 require 'net/http'
 require 'uri'
 require 'fileutils'
+require_relative '../media_dimensions'
 
 module Import
   # Collects one post's media on its way to PostWriter, which expects a
@@ -62,6 +63,23 @@ module Import
       File.binwrite(path, body)
       @files[path] = filename
       filename
+    end
+
+    # Pixel dimensions of something already registered, read straight from
+    # the downloaded file's header. For sources whose metadata carries no
+    # size -- a feed or a WordPress export hands over HTML, and an <img>
+    # rarely states width/height -- this is the only way to get them, and
+    # they are not optional: build_blog.rb's degenerate_image? tests
+    # `width.to_i <= 1`, so a dimensionless image block is dropped from the
+    # page exactly like a 1x1 pixel.
+    #
+    # nil in dry-run, where nothing was fetched. That's fine: dimensions
+    # don't affect a preview's counts, only the real write.
+    def dimensions(filename)
+      return nil if @dry_run
+
+      path = @files.key(filename)
+      path && MediaDimensions.image(path)
     end
 
     # Registers a file the export already contains. Same contract as

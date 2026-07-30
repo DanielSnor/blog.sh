@@ -6,12 +6,16 @@
 # before the file loads and never jumps. Extracted from manage_post.rb,
 # where ~90 lines of binary header parsing sat between CLI commands.
 #
-# Both readers return [width, height] or nil -- a nil simply means the
-# block carries no dimensions (and build_blog.rb's degenerate_image? filter
-# won't drop it: that only triggers on explicit <=1px values, not on
-# missing ones). Every parse error is deliberately swallowed into nil:
-# a file these readers can't understand is not an error, just a file
-# without known dimensions.
+# Both readers return [width, height] or nil. Every parse error is
+# deliberately swallowed into nil: a file these readers can't understand is
+# not an error, just a file without known dimensions.
+#
+# But a nil is not harmless downstream, so anything writing an image block
+# should try hard to get real numbers: `degenerate_image?` in
+# build_blog.rb tests `media['width'].to_i <= 1`, and `nil.to_i` is 0 --
+# so an image block with no dimensions is dropped from the rendered page
+# exactly like a 1x1 tracking pixel. (An earlier version of this comment
+# claimed the opposite; the code has always been the other way.)
 module MediaDimensions
   module_function
 

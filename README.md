@@ -364,7 +364,10 @@ Imports land in the same content-block schema as hand-written posts, with
 all media downloaded locally -- an imported post is indistinguishable from
 one you typed. The wizard **always previews in dry-run first** and asks
 before writing: it reports how many posts and media files would be
-created, the first few slugs, and why anything was skipped. Re-running an
+created, the first few slugs, and why anything was skipped. Confirming means
+typing that number of posts back -- the same gate `delete` uses when it asks
+for a slug, since a bulk write deserves at least what deleting one post
+requires. Re-running an
 import is safe -- posts are matched on their source id and overwritten in
 place rather than duplicated.
 
@@ -375,6 +378,10 @@ Available sources:
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
+| Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
+| Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
+| WordPress | a WXR export file | every post; pages, attachments and menu items are skipped |
+| RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 
 Every source is also reachable without the wizard, for a cron job or a
 scripted migration -- same mapping, no preview pass, writes immediately:
@@ -383,9 +390,12 @@ scripted migration -- same mapping, no preview pass, writes immediately:
 ruby scripts/migrate_bluesky.rb <handle>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
+ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
+ruby scripts/migrate_feed.rb <export.xml | feed-url>
 ```
 
-All three take `LIMIT=n` to import only the first *n* posts, which is the
+All of them take `LIMIT=n` to import only the first *n* posts, which is the
 way to sample a large archive before committing hours to it -- a later full
 run overwrites those posts in place rather than duplicating them.
 They report progress as they go: the size of what they're about to read,
@@ -435,18 +445,13 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Imports** -- Bluesky, Tumblr and a Twitter/X archive are covered. The
-  pattern for the rest is set by `lib/import/`: an adapter pages a source and
-  shapes one item, everything else (media, dedup, dry-run, reporting) is
-  already shared. Still missing: **WordPress** (its WXR export is the
-  richest source of the lot -- full HTML, dates, tags, status, attachments)
-  and a **generic RSS/Atom** importer for the long tail (Ghost, Medium,
-  Blogger, ...), though a feed usually carries only its last few dozen items,
-  so it's a weak archive source. Both need the same missing piece: **HTML →
-  content blocks**. That, not the platform APIs, is the real cost, since
-  staying gem-free means a tolerant HTML parser of our own rather than
-  reaching for Nokogiri. Instagram has no usable read API; Threads is
-  feasible but deferred (see below).
+- **Imports** -- Bluesky, Tumblr, a Twitter/X archive, WordPress and any
+  RSS/Atom feed are covered. WordPress and feeds share one adapter, because
+  they are one format: a WXR export *is* RSS 2.0, with `wp:` elements
+  layered on for what a feed has no room for. What a new source needs is an
+  adapter with three methods -- everything else (media, dedup, dry-run,
+  reporting, HTML → blocks) is already shared. Instagram has no usable read
+  API; Threads is feasible but deferred (see below).
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:

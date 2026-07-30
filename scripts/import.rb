@@ -28,6 +28,9 @@ require_relative '../lib/import/run'
 require_relative '../lib/import/bluesky'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
+require_relative '../lib/import/feed'
+require_relative '../lib/import/mastodon'
+require_relative '../lib/import/pixelfed'
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -36,7 +39,10 @@ end
 SOURCES = [
   ['bluesky', 'Bluesky', -> { build_bluesky }],
   ['tumblr', 'Tumblr', -> { build_tumblr }],
-  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }]
+  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }],
+  ['mastodon', 'Mastodon (account archive)', -> { build_mastodon }],
+  ['pixelfed', 'Pixelfed (statuses export)', -> { build_pixelfed }],
+  ['feed', 'WordPress export or RSS/Atom feed', -> { build_feed }]
 ].freeze
 
 def ask(prompt_key)
@@ -62,6 +68,43 @@ def build_tumblr
 
   blog = ask('import.tumblr_blog_prompt')
   blog && Import::Tumblr.new(blog, api_key: api_key)
+end
+
+# One prompt for all three inputs it accepts: they are the same format --
+# a WXR export is RSS 2.0 with extra elements -- so asking which kind it is
+# would be asking the user something the file already says.
+def build_mastodon
+  dir = ask('import.mastodon_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Mastodon.new(dir) if File.exist?(File.join(dir, 'outbox.json'))
+
+  puts t('import.mastodon_dir_invalid', dir: dir)
+  nil
+end
+
+def build_pixelfed
+  path = ask('import.pixelfed_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Pixelfed.new(path) if File.exist?(path)
+
+  puts t('import.pixelfed_path_invalid', path: path)
+  nil
+end
+
+def build_feed
+  source = ask('import.feed_source_prompt')
+  return nil unless source
+
+  local = File.expand_path(source)
+  return Import::Feed.new(local) if File.exist?(local)
+  return Import::Feed.new(source) if source.start_with?('http://', 'https://')
+
+  puts t('import.feed_source_invalid', source: source)
+  nil
 end
 
 def build_twitter
@@ -91,6 +134,12 @@ def ask_source
   puts
   print t('import.enter_number')
   input = $stdin.gets.to_s.strip
+  # Range-checked rather than indexed straight off to_i: "" and "abc" both
+  # become 0, and SOURCES[-1] is the *last* source -- so a piped run with no
+  # answer would silently start importing from whatever happens to be at the
+  # bottom of the list.
+  return nil unless input.match?(/\A[1-9]\d*\z/) && input.to_i <= SOURCES.size
+
   SOURCES[input.to_i - 1]
 end
 
@@ -98,7 +147,7 @@ end
 # engine ships -- but a skip reason comes from an adapter, and a new adapter
 # inventing one must not take the wizard down mid-summary. Translated when
 # known, printed raw when not.
-TRANSLATED_REASONS = %w[reply repost quote empty].freeze
+TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed boost reblog].freeze
 
 def reason_label(reason)
   TRANSLATED_REASONS.include?(reason.to_s) ? t("import.reason.#{reason}") : reason.to_s
@@ -142,6 +191,19 @@ def scan_reporter
   end
 end
 
+# The count has to be typed out, not answered with a keypress. Deleting a
+# single post already makes you type its slug; writing two thousand of them
+# was one 'y', which had the bigger action behind the weaker gate. Typing
+# the number is also the one answer that can't be given without having read
+# the preview -- which is the whole reason the preview runs.
+#
+# Anything else cancels, including a mistyped number: the run is repeatable,
+# so a wrong cancel costs a re-read, while a wrong confirm costs an archive.
+def confirmed?(count)
+  print t('import.confirm_prompt', count: count)
+  $stdin.gets.to_s.strip == count.to_s
+end
+
 def run_import(adapter)
   puts
   puts t('import.dry_run_running', label: adapter.label)
@@ -157,7 +219,7 @@ def run_import(adapter)
   end
 
   puts
-  if Tui.key_choice(t('import.confirm_prompt', count: preview.written)) != 'y'
+  unless confirmed?(preview.written)
     puts
     puts t('import.cancelled')
     puts

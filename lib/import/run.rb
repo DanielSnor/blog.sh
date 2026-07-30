@@ -64,6 +64,7 @@ module Import
             next
           end
 
+          tag_with_platform(post)
           media_count += media.count
           media_failures.concat(media.failures)
 
@@ -76,6 +77,35 @@ module Import
 
       Result.new(written: written, skipped: skipped, media: media_count,
                  media_failures: media_failures, samples: samples)
+    end
+
+    private
+
+    # Every imported post carries a tag naming where it came from, so an
+    # archive assembled from several platforms stays sortable by origin --
+    # `/tag/tumblr/` is the whole of one old blog. Applied here rather than
+    # in each adapter, which makes it a property of importing rather than
+    # four copies of the same line and a fifth one forgotten.
+    #
+    # Case-insensitive dedup, because a source's own tags may already
+    # include the platform's name and "Tumblr" plus "tumblr" would render
+    # as two pills pointing at one page.
+    def tag_with_platform(post)
+      # An adapter may name the tag itself when its platform makes a poor
+      # one: "feed" says nothing about where a post came from, where
+      # "medium.com" says all of it. source.platform stays what it is --
+      # the kind of source, and half the re-import dedup key.
+      platform = if @adapter.respond_to?(:platform_tag) && @adapter.platform_tag
+                   @adapter.platform_tag.to_s
+                 else
+                   post.dig('source', 'platform').to_s
+                 end
+      return if platform.empty?
+
+      tags = post['tags'] ||= []
+      return if tags.any? { |tag| tag.to_s.casecmp?(platform) }
+
+      tags << platform
     end
   end
 end

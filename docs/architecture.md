@@ -131,10 +131,27 @@ the first four's plumbing:
   optional hooks cover what sources differ on: `preamble` (a line to print
   before a slow read) and `total` (the source's size, often knowable only
   once the first page arrives).
+- **`Import::HtmlBlocks`** converts a post body that arrives as markup into
+  blocks, for the sources that hand over HTML rather than structured data.
+  A tolerant tokenizer and a stack-based tree (an XML parser refuses real
+  post HTML outright), then a conservative mapping: exactly what the schema
+  can represent, unknown wrappers walked through, and anything with no
+  representable shape dropped *and counted* rather than guessed at.
 - **`Import::Cli`** is the non-interactive front end the `scripts/migrate_*.rb`
   wrappers share, so each is a handful of lines. Every source is therefore
   reachable both ways -- wizard or script -- over one implementation of the
   mapping.
+
+`Import::Feed` covers WordPress and RSS/Atom in one adapter, because they
+are one format: a WXR export *is* RSS 2.0, with a `wp:` namespace layered on
+for what a feed has no room for (`post_type` to filter by -- in a stock
+export menu items, attachments and pages outnumber the posts -- `status` for
+drafts, `post_id` for dedup, `post_name` for the slug the site already
+published under). It takes the date from `pubDate` rather than
+`wp:post_date`, which carries no offset and would otherwise be read in
+site.timezone and shift by hours. Images referenced in the markup are
+downloaded and then *measured*: HTML rarely states dimensions, and a block
+without them is dropped at build time by `degenerate_image?`.
 
 An adapter judges items rather than pre-filtering them: `map` returns
 `:reply`/`:retweet`/`:quote`/`:empty` instead of the adapter quietly dropping
