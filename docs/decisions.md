@@ -46,6 +46,14 @@ publishing -- a localhost-only preview can't do either. *Cost:* the
 draft text physically exists on the host; the token (and staying out of
 every listing and index) is the fence.
 
+**The publish date comes from publishing, not from a field.** Publishing
+means "now", scheduling asks for a date -- so the frontmatter template
+offers no `date:` line, which would be a third path to the same decision
+and the only one whose effect isn't visible where you make it. The
+parser still honors a hand-typed `date:` (that's how imports keep their
+original dates). *Cost:* backdating is no longer discoverable from the
+editor; it's a documented escape hatch rather than a suggested field.
+
 **Deleting is moving to `trash/`; two posts can never share a URL.**
 There's no database transaction log to lean on, so the engine refuses
 the two silent data-loss paths: `delete` is reversible via `restore`,
@@ -135,6 +143,14 @@ humans do.
 sequences cover what a conversational CLI needs, and staying inline
 keeps the whole session in the scrollback where a user can scroll back
 through it. *Cost:* no complex layouts -- deliberately not the goal.
+
+**The menu scrolls; the lists aren't capped to fit a screen.** Pickers
+used to offer only the 10 most recent posts because the menu printed
+every item it was handed, so anything longer than the terminal broke its
+cursor-up repaint. Scrolling a window moves that limit into the UI where
+it belongs -- on a blog with thousands of posts, a cap that small is a
+functional restriction, not tidiness. *Cost:* window arithmetic (and
+digits selecting within the visible window, not the whole list).
 
 **A QR encoder in the repo rather than a gem or a web service.** The
 draft-preview-on-a-phone workflow is the reason this engine looks the
