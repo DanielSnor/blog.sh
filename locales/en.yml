@@ -261,6 +261,7 @@ import:
   menu_hint: "↑↓ move · Enter select · 1-9 quick pick · Esc back"
   enter_number: "Number of the source to import from: "
   bluesky_handle_prompt: "Bluesky handle (empty = cancel): "
+  scanned: "read %{count} item(s)…"
   dry_run_running: "Reading %{label} — nothing is written yet…"
   would_write: "Would write %{count} post(s) and %{media} media file(s)."
   written: "Wrote %{count} post(s) and %{media} media file(s)."

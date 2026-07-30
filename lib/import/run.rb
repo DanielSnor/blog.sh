@@ -23,7 +23,7 @@ module Import
   class Run
     Result = Struct.new(:written, :skipped, :media, :media_failures, :samples, keyword_init: true)
 
-    def initialize(adapter, dry_run: false, limit: nil, on_post: nil)
+    def initialize(adapter, dry_run: false, limit: nil, on_post: nil, on_scan: nil)
       @adapter = adapter
       @dry_run = dry_run
       @limit = limit
@@ -31,10 +31,16 @@ module Import
       # show progress on a run that takes an hour without this class
       # knowing anything about terminals.
       @on_post = on_post
+      # Called with (scanned, written) for every item seen, written or not.
+      # The reading pass is the part with nothing to show otherwise: paging
+      # through thousands of items over an API takes minutes during which a
+      # silent terminal is indistinguishable from a hung one.
+      @on_scan = on_scan
     end
 
     def call
       written = 0
+      scanned = 0
       skipped = Hash.new(0)
       media_count = 0
       media_failures = []
@@ -42,6 +48,9 @@ module Import
 
       @adapter.each_item do |item|
         break if @limit && written >= @limit
+
+        scanned += 1
+        @on_scan&.call(scanned, written)
 
         Dir.mktmpdir do |tmpdir|
           media = Media.new(tmpdir, dry_run: @dry_run)

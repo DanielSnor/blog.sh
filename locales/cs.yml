@@ -252,6 +252,7 @@ import:
   menu_hint: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · Esc zpět"
   enter_number: "Číslo zdroje, ze kterého importovat: "
   bluesky_handle_prompt: "Bluesky handle (prázdné = zrušit): "
+  scanned: "přečteno %{count} položek…"
   dry_run_running: "Čtu %{label} — zatím se nic nezapisuje…"
   would_write: "Zapsalo by se %{count} postů a %{media} souborů médií."
   written: "Zapsáno %{count} postů a %{media} souborů médií."

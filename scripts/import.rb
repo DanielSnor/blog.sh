@@ -92,10 +92,27 @@ def report(result, dry_run:)
   result.media_failures.first(3).each { |url| puts "  #{url}" }
 end
 
+# The reading pass has no per-post output to show -- it deliberately writes
+# nothing -- so it reports the count as it goes. A silent terminal during the
+# minutes it takes to page through a large archive is indistinguishable from
+# a hung one, and the honest answer to "is it still working?" is a number
+# that keeps moving. Rewritten in place on a TTY, one line per hundred when
+# piped, so a log doesn't fill up with progress.
+def scan_reporter
+  lambda do |scanned, _written|
+    if Tui.interactive?
+      print "\r\e[2K  #{Tui.paint(t('import.scanned', count: scanned), :dim)}"
+    elsif (scanned % 100).zero?
+      puts "  #{t('import.scanned', count: scanned)}"
+    end
+  end
+end
+
 def run_import(adapter)
   puts
   puts t('import.dry_run_running', label: adapter.label)
-  preview = Import::Run.new(adapter, dry_run: true).call
+  preview = Import::Run.new(adapter, dry_run: true, on_scan: scan_reporter).call
+  print "\r\e[2K" if Tui.interactive?
   report(preview, dry_run: true)
 
   if preview.written.zero?
