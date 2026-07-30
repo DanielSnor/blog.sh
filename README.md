@@ -195,9 +195,17 @@ deploy step around exactly that. A few of the choices that came out of it:
   a manual `<br>`) -- `site.description` itself stays plain text
   everywhere else (meta description, RSS), same trust level as `about.html`
 
-**Migration** (historical, one-off)
-- `migrate_tumblr.rb`, `migrate_twitter.rb` -- import from four Tumblr
-  blogs and a Twitter archive (2008-2022) into the same content-block schema
+**Importing -- `import.sh`**
+- Its own wizard, separate from authoring: pick a source, see a dry-run
+  preview (posts, media, skipped and why), confirm before anything is written
+- Bluesky via the public API; Tumblr and a Twitter/X archive export via
+  `migrate_tumblr.rb` / `migrate_twitter.rb`, kept from the original
+  migration of four Tumblr blogs and a Twitter archive (2008-2022)
+- `lib/import/` holds what every source shares -- media download or copy,
+  filename numbering, skip accounting -- so an adapter only has to page a
+  source and shape one item
+- Re-running an import overwrites in place (matched on source id), never
+  duplicates
 
 ## Stack
 
@@ -327,10 +335,39 @@ export SFTP_TARGET=...             # sftp backend (+ optional SFTP_REMOTE_DIR/SF
 
 ## Importing existing content
 
-`scripts/migrate_tumblr.rb <blog-name>.tumblr.com` and
-`scripts/migrate_twitter.rb <path-to-extracted-export>` import posts from
-Tumblr's API or a Twitter/X archive export into the same content-block
-schema as hand-written posts, downloading all media locally.
+```bash
+./import.sh                        # pick a source, preview, confirm
+```
+
+Imports land in the same content-block schema as hand-written posts, with
+all media downloaded locally -- an imported post is indistinguishable from
+one you typed. The wizard **always previews in dry-run first** and asks
+before writing: it reports how many posts and media files would be
+created, the first few slugs, and why anything was skipped. Re-running an
+import is safe -- posts are matched on their source id and overwritten in
+place rather than duplicated.
+
+Available sources:
+
+| Source | Needs | Scope |
+| --- | --- | --- |
+| Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
+| Tumblr | `TUMBLR_API_KEY` | every post on a blog, reblog content appended |
+| Twitter/X | an extracted archive export | standalone tweets only |
+
+Bluesky is driven by the wizard. The two older importers are still their
+own scripts -- `scripts/migrate_tumblr.rb <blog-name>.tumblr.com` and
+`scripts/migrate_twitter.rb <path-to-extracted-export>` (the latter takes
+`LIMIT=n` for a trial run) -- predating the shared layer they'll move onto.
+They report progress as they go: the size of what they're about to read,
+how many items were found and filtered, then a `12/847` counter per post,
+because downloading every image of an archive runs for hours and a silent
+terminal is indistinguishable from a stuck one.
+
+Two limits worth knowing before you start: only a Bluesky self-thread's
+opening post is imported (the continuations are replies), and Bluesky
+serves video as an HLS playlist rather than a file, so a video post is
+imported as its poster frame with the original linked from `source`.
 
 ## Deploy
 
@@ -369,14 +406,18 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Imports** -- `migrate_tumblr.rb` and `migrate_twitter.rb` cover the two
-  platforms this deployment actually migrated from. Instagram, WordPress,
-  Threads and Bluesky importers should follow the same pattern: each
-  platform's official export (or API) normalized into the shared
-  content-block schema via `PostWriter`, media downloaded locally, nothing
-  hotlinked. A generic RSS/Atom importer would cover much of the long tail
-  (Ghost, Medium, Blogger, ...) -- and since WordPress's WXR export is
-  essentially enriched RSS, the two could share a base.
+- **Imports** -- Bluesky, Tumblr and a Twitter/X archive are covered. The
+  pattern for the rest is set by `lib/import/`: an adapter pages a source and
+  shapes one item, everything else (media, dedup, dry-run, reporting) is
+  already shared. Still missing: **WordPress** (its WXR export is the
+  richest source of the lot -- full HTML, dates, tags, status, attachments)
+  and a **generic RSS/Atom** importer for the long tail (Ghost, Medium,
+  Blogger, ...), though a feed usually carries only its last few dozen items,
+  so it's a weak archive source. Both need the same missing piece: **HTML →
+  content blocks**. That, not the platform APIs, is the real cost, since
+  staying gem-free means a tolerant HTML parser of our own rather than
+  reaching for Nokogiri. Instagram has no usable read API; Threads is
+  feasible but deferred (see below).
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:

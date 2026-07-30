@@ -144,10 +144,17 @@ offset = 0
 total = nil
 count = 0
 
+puts "Reading #{BLOG}…"
+
 loop do
   data = fetch_posts(BLOG, offset)
   posts = data.dig('response', 'posts') || []
-  total ||= data.dig('response', 'blog', 'total_posts')
+  # Announced as soon as the first page reveals it: an import that downloads
+  # every image of every post runs for hours, and knowing whether that's 40
+  # posts or 4000 is the difference between waiting and killing it.
+  if total.nil? && (total = data.dig('response', 'blog', 'total_posts'))
+    puts "#{total} post(s) on the blog. Media is downloaded as we go, so this can take a while."
+  end
   break if posts.empty?
 
   posts.each do |p|
@@ -187,9 +194,9 @@ loop do
         }
       }
 
-      path = PostWriter.write(post, media_files: media_files)
+      PostWriter.write(post, media_files: media_files)
       count += 1
-      puts "wrote #{path} (#{media_files.size} media file(s))"
+      puts "  #{count}#{total ? "/#{total}" : ''} #{slug} (#{media_files.size} media file(s))"
     end
   end
 
@@ -197,4 +204,4 @@ loop do
   break if total && offset >= total
 end
 
-puts "Done. #{count} posts written."
+puts "Done. #{count} post(s) written."

@@ -149,10 +149,22 @@ def build_slug(tweet, text)
   slug
 end
 
-raw = File.read(File.join(DATA_DIR, 'tweets.js'), encoding: 'utf-8')
+# Say what's happening before the silent part: a full archive's tweets.js
+# runs to tens of megabytes, and reading plus parsing it takes long enough
+# that a bare prompt is indistinguishable from a hung script.
+tweets_path = File.join(DATA_DIR, 'tweets.js')
+puts "Reading #{tweets_path} (#{(File.size(tweets_path) / 1_048_576.0).round(1)} MB)…"
+
+raw = File.read(tweets_path, encoding: 'utf-8')
 tweets = JSON.parse(raw.sub(/\A[^\[]*/, '')).map { |t| t['tweet'] }
 clean = tweets.select { |t| clean_tweet?(t) }
+# Counted before LIMIT truncates, or the final summary would report a
+# deliberate cap as though those tweets had been filtered out.
+filtered_out = tweets.size - clean.size
 clean = clean.first(ENV['LIMIT'].to_i) if ENV['LIMIT']
+
+puts "#{tweets.size} tweet(s) in the export, #{clean.size} to import " \
+     "(#{filtered_out} are replies, RTs or quote-tweets)."
 
 count = 0
 clean.each do |tweet|
@@ -179,9 +191,11 @@ clean.each do |tweet|
     }
   }
 
-  path = PostWriter.write(post, media_files: media_files)
+  PostWriter.write(post, media_files: media_files)
   count += 1
-  puts "wrote #{path} (#{media_files.size} media file(s))"
+  # Counted against the known total: "12" alone doesn't say whether this
+  # finishes in a second or an hour.
+  puts "  #{count}/#{clean.size} #{post['slug']} (#{media_files.size} media file(s))"
 end
 
-puts "Done. #{count} posts written (#{tweets.size - clean.size} skipped as reply/RT/quote, #{clean.size - count} skipped as empty)."
+puts "Done. #{count} post(s) written (#{filtered_out} skipped as reply/RT/quote, #{clean.size - count} skipped as empty)."

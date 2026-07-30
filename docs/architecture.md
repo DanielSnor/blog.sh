@@ -103,9 +103,44 @@ see it:
   formatting spans may come out normalized. Content markdown can't
   express (imported embeds, link cards) is protected by a count-based
   loss check in the CLI before saving.
-- The migration scripts (`migrate_tumblr.rb`, `migrate_twitter.rb`)
-  write the same schema through the shared `lib/post_writer.rb`, so an
-  imported post and a hand-written one are indistinguishable downstream.
+- The importers write the same schema through the shared
+  `lib/post_writer.rb`, so an imported post and a hand-written one are
+  indistinguishable downstream.
+
+## Importing (`lib/import/` + `scripts/import.rb`)
+
+An import splits along the line between what every platform needs and what
+only one does, so that adding the fifth source doesn't mean a fifth copy of
+the first four's plumbing:
+
+- **`Import::Media`** collects one post's media for `PostWriter`, from
+  either a URL (download, following redirects, retrying transient failures)
+  or a path an export already contains. Filenames are numbered per post in
+  registration order, which is what makes a re-import land on the same names
+  so `PostWriter`'s "skip if it exists" copy is a no-op instead of a
+  duplicate. In dry-run it allocates and counts without fetching -- so
+  adapters must take image dimensions from platform metadata, never from the
+  downloaded bytes.
+- **`Import::Run`** drives: walk the source, hand each item to the adapter,
+  write it, count why items were skipped, report. Skips are Symbols, so the
+  summary can answer the question anyone reads a summary for -- why fewer
+  posts arrived than the source has. Two callbacks, `on_scan` and `on_post`,
+  let a wizard show progress without this layer knowing what a terminal is.
+- **An adapter** implements only `label`, `each_item` (paging the source)
+  and `map(item, media)`, returning a post hash or a skip reason.
+
+`Import::Bluesky` is the reference adapter. Two things it has to get right
+generalize to any API source: facet offsets are UTF-8 **byte** positions
+while the schema's formatting spans are **codepoints**, so every boundary is
+converted (skip that and spans land several characters off on any non-ASCII
+text), and video arrives as an HLS playlist rather than a file, so the
+poster frame is imported as an image -- a `video` block with no media would
+render as "video unavailable".
+
+`scripts/import.rb` is a second wizard rather than a menu entry in
+`blog.sh`, and always previews in dry-run before writing. `lib/site_header.rb`
+is shared by both wizards so the site-identity block can't drift between
+them.
 
 Supporting casts: `lib/slug.rb` (one folding/slugification used for
 post slugs, tag slugs, heading anchors and the search index -- and
