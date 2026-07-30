@@ -1025,8 +1025,8 @@ def run_wizard_choice(command)
   when 'unpublish' then cmd_unpublish(pick_published_interactively)
   when 'delete' then cmd_delete(pick_slug_interactively)
   when 'restore' then cmd_restore(pick_trash_interactively)
-  when 'toot' then cmd_toot(pick_slug_interactively)
-  when 'bluesky' then cmd_bluesky(pick_slug_interactively)
+  when 'toot' then cmd_toot(pick_published_interactively)
+  when 'bluesky' then cmd_bluesky(pick_published_interactively)
   when 'list' then cmd_list({})
   when 'rebuild' then cmd_rebuild
   end
@@ -1135,10 +1135,10 @@ else
     slug = ARGV.shift || pick_published_interactively
     cmd_unpublish(slug)
   when 'toot'
-    slug = ARGV.shift || pick_slug_interactively
+    slug = ARGV.shift || pick_published_interactively
     cmd_toot(slug)
   when 'bluesky'
-    slug = ARGV.shift || pick_slug_interactively
+    slug = ARGV.shift || pick_published_interactively
     cmd_bluesky(slug)
   when 'rebuild'
     cmd_rebuild
