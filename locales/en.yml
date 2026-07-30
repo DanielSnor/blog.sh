@@ -255,3 +255,27 @@ cron:
   no_scheduled_due: "No scheduled post is due."
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
   publishing_scheduled: "Publishing %{count} scheduled post(s)"
+
+# ./import.sh -- the import wizard (scripts/import.rb).
+import:
+  menu_hint: "↑↓ move · Enter select · 1-9 quick pick · Esc back"
+  enter_number: "Number of the source to import from: "
+  bluesky_handle_prompt: "Bluesky handle (empty = cancel): "
+  dry_run_running: "Reading %{label} — nothing is written yet…"
+  would_write: "Would write %{count} post(s) and %{media} media file(s)."
+  written: "Wrote %{count} post(s) and %{media} media file(s)."
+  sample_slugs: "First few slugs:"
+  skipped: "  %{count} skipped (%{reason})"
+  media_failed: "%{count} media file(s) could not be downloaded — their posts were written without them:"
+  nothing_to_import: "Nothing to import."
+  confirm_prompt: "Write these %{count} post(s)? [y/N] "
+  running: "Importing %{label} — downloading media, this can take a while…"
+  rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
+  rebuilding: "Rebuilding and deploying"
+  cancelled: "Cancelled, nothing was written."
+  interrupted: "Interrupted. Posts written so far are already in content.nosync/ — re-running the import is safe, it overwrites them in place."
+  reason:
+    reply: "reply"
+    repost: "repost"
+    quote: "quote post"
+    empty: "no usable content"
