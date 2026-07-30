@@ -55,23 +55,35 @@ module Import
         scanned += 1
         @on_scan&.call(scanned, written)
 
-        Dir.mktmpdir do |tmpdir|
-          media = Media.new(tmpdir, dry_run: @dry_run)
-          post = @adapter.map(item, media)
+        # One malformed item -- a date that won't parse, markup nothing
+        # anticipated -- must cost that item, not the run: dying on item
+        # 2000 of 6000 leaves a third of an archive imported and no report
+        # of what happened. Counted under :error and named on stderr, so
+        # the summary shows the loss instead of pretending completeness.
+        # An abort() (e.g. a rejected API key) is SystemExit, not
+        # StandardError, and still stops everything -- as it should.
+        begin
+          Dir.mktmpdir do |tmpdir|
+            media = Media.new(tmpdir, dry_run: @dry_run)
+            post = @adapter.map(item, media)
 
-          if post.is_a?(Symbol)
-            skipped[post] += 1
-            next
+            if post.is_a?(Symbol)
+              skipped[post] += 1
+              next
+            end
+
+            tag_with_platform(post)
+            media_count += media.count
+            media_failures.concat(media.failures)
+
+            PostWriter.write(post, media_files: media.files) unless @dry_run
+            written += 1
+            samples << post['slug'] if samples.size < 5
+            @on_post&.call(written, post, scanned)
           end
-
-          tag_with_platform(post)
-          media_count += media.count
-          media_failures.concat(media.failures)
-
-          PostWriter.write(post, media_files: media.files) unless @dry_run
-          written += 1
-          samples << post['slug'] if samples.size < 5
-          @on_post&.call(written, post, scanned)
+        rescue StandardError => e
+          skipped[:error] += 1
+          warn "  item #{scanned} failed: #{e.class}: #{e.message}"
         end
       end
 

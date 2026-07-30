@@ -296,3 +296,4 @@ import:
     trashed: "in the trash"
     boost: "boost"
     reblog: "reblog"
+    error: "failed to convert -- see the lines above"

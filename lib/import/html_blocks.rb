@@ -76,14 +76,30 @@ module Import
         whole = Regexp.last_match(0)
         token = Regexp.last_match(1)
         case token
-        when /\A#x(\h+)\z/i then [Regexp.last_match(1).hex].pack('U')
-        when /\A#(\d+)\z/ then [Regexp.last_match(1).to_i].pack('U')
+        when /\A#x(\h+)\z/i then codepoint(Regexp.last_match(1).hex, whole)
+        when /\A#(\d+)\z/ then codepoint(Regexp.last_match(1).to_i, whole)
         # Exact case first: &Eacute; and &eacute; are different letters, so
         # a blanket downcase would quietly swap É for é. The downcased
         # lookup is only a fallback for the case-insensitive basics.
         else ENTITIES[token] || ENTITIES[token.downcase] || whole
         end
       end
+    end
+
+    # A numeric reference decodes only when it names a real, printable
+    # character; otherwise the entity is left standing verbatim, same as an
+    # unknown name. Without the range check, one "&#99999999;" anywhere in
+    # a feed produced an invalid UTF-8 string and took the whole import
+    # down with an Encoding::CompatibilityError -- the opposite of what a
+    # tolerant parser is for. Controls (and NUL in particular) are refused
+    # too: they are never content, and NUL inside post text is a gift to
+    # every downstream consumer. Tab and newline pass, since &#10; in
+    # source markup is legitimate whitespace.
+    def codepoint(number, whole)
+      printable = number == 0x9 || number == 0xA || number == 0xD ||
+                  (number >= 0x20 && number <= 0xD7FF) ||
+                  (number >= 0xE000 && number <= 0x10FFFF)
+      printable ? [number].pack('U') : whole
     end
 
     # --- tokenizer ------------------------------------------------------

@@ -15,6 +15,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Help needs no environment, so it must not be gated on env.sh existing --
+# `./blog.sh help` is the first thing a fresh clone gets asked for, and
+# "Missing env.sh" is the wrong first impression. Before the clear too,
+# or the usage would scroll away. Same arrangement as import.sh.
+case "${1:-}" in
+  help | --help | -h)
+    exec ruby scripts/manage_post.rb help
+    ;;
+esac
+
 [ -t 1 ] && clear
 mode="${1:-}"
 echo "== blog.sh =="
