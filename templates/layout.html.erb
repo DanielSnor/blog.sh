@@ -24,6 +24,11 @@
   <meta name="description" content="<%= h(page_description) %>">
   <link rel="canonical" href="<%= h(page_url) %>">
   <link rel="icon" type="image/png" href="/assets/images/favicon.png">
+  <%# Same file: iOS scales it down, so adding a home-screen icon doesn't mean
+      maintaining a second image. Without this link iOS uses a screenshot of
+      the page instead. /favicon.ico needs no link -- the clients that want it
+      probe the root path blindly (see build_favicon_ico). %>
+  <link rel="apple-touch-icon" href="/assets/images/favicon.png">
   <link rel="stylesheet" href="/assets/css/colors.css">
   <link rel="stylesheet" href="/assets/css/site.css">
   <link rel="alternate" type="application/rss+xml" title="<%= h(SITE_SHORT_NAME) %> RSS" href="/rss.xml">
