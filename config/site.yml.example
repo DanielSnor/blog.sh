@@ -25,7 +25,7 @@ site:
   # listing-page descriptions, none of which should ever see raw HTML.
   description: "Personal web/log of Your Name"
   author: "Your Name"
-  # Selects locales/<lang>.yml (see lib/i18n.rb). "en" and "cs" ship with the
+  # Selects locales/<lang>.yml (see lib/i18n.rb). "en", "cs" and "de" ship with the
   # engine; add another locales/<code>.yml to support a different language --
   # any key missing from it falls back to English.
   lang: "en"

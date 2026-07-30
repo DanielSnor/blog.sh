@@ -96,6 +96,7 @@ js:
 # cancel a wait loop.
 cli:
   cancel_word: "cancel"
+  confirm_word: "yes"
   missing_images_wait: "Missing %{count} image(s), waiting for you to upload them to incoming/:"
   missing_images_prompt: "Press Enter once uploaded (or type \"%{cancel_word}\" to abort): "
   cancelled_nothing_saved: "Cancelled, nothing was saved.\n\n"
@@ -191,7 +192,7 @@ cli:
 
   no_changes: "No changes, nothing to save."
   content_loss_warning: "Careful, saving this would lose: %{summary}."
-  confirm_continue_yes: "Really continue? Type \"yes\": "
+  confirm_continue_yes: "Really continue? Type \"%{word}\": "
 
   edited_label: "Edited: %{path}"
 
@@ -285,6 +286,13 @@ import:
   rebuilding: "Rebuilding and deploying"
   cancelled: "Cancelled, nothing was written."
   interrupted: "Interrupted. Posts written so far are already in content.nosync/ — re-running the import is safe, it overwrites them in place."
+  source:
+    bluesky: "Bluesky"
+    mastodon: "Mastodon (account archive)"
+    pixelfed: "Pixelfed (statuses export)"
+    tumblr: "Tumblr"
+    twitter: "Twitter/X (archive export)"
+    feed: "WordPress export or RSS/Atom feed"
   reason:
     reply: "reply"
     repost: "repost"

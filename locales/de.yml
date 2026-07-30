@@ -1,0 +1,302 @@
+# locales/de.yml -- deutsche Übersetzung. Jeder hier fehlende Schlüssel
+# fällt automatisch auf locales/en.yml zurück (siehe lib/i18n.rb), eine
+# unvollständige Übersetzung bricht also nichts.
+#
+# Konventionen: durchgängig Du-Form (wie die tschechische Locale),
+# deutsche Anführungszeichen („…“), Datumsformat TT.MM.JJJJ -- passend zu
+# js.date_locale weiter unten, beide zusammen ändern.
+
+date_format: "%d.%m.%Y"
+date_time_format: "%d.%m.%Y %H:%M"
+
+nav:
+  home: "Start"
+  text: "Text"
+  images: "Bilder"
+  video: "Video"
+  links: "Links"
+  rss: "RSS"
+  menu_label: "Menü"
+  search_label: "Suche"
+  search_placeholder: "Suchen…"
+
+post:
+  comments_heading: "Kommentare"
+  back_to_list: "← zurück zur Übersicht"
+  read_more: "Weiterlesen"
+  video_unavailable: "[Video nicht verfügbar]"
+  draft_title_prefix: "[VORSCHAU] "
+  draft_banner_heading: "Vorschau eines unveröffentlichten Beitrags!!!"
+  draft_banner_notice: "Nirgendwo im Blog sichtbar und nur über diese URL erreichbar:"
+
+pagination:
+  newer: "← Neuere"
+  older: "Ältere →"
+  latest: "neueste"
+  page: "Seite %{number}"
+
+tag:
+  heading: "Schlagwort: %{name}"
+  title: "Schlagwort: %{name} – %{short_name}"
+  description: "Beiträge mit dem Schlagwort %{name} auf der persönlichen Seite von %{author}."
+
+type:
+  text: "Text"
+  image: "Bilder"
+  video: "Video"
+  link: "Links"
+  title: "%{label} – %{short_name}"
+  description: "Beiträge vom Typ %{label} auf der persönlichen Seite von %{author}."
+
+index:
+  empty: "Noch keine Beiträge dieses Typs."
+
+search:
+  heading: "Suche"
+  tagline: "Durchsucht alle Beitragstypen — unabhängig von Akzenten und Umlauten."
+  tip: "Tipp: bei mehreren Wörtern müssen alle vorkommen;<br>eine exakte Wendung in Anführungszeichen setzen („…“);<br>ein Wort mit Minus ausschließen (-wort)."
+  prompt: "Gib eine Suchanfrage ein."
+  page_title: "Suche – %{site_title}"
+  page_description: "Volltextsuche über alle Beiträge, unabhängig von Akzenten."
+
+markdown_page:
+  default_title: "Markdown"
+  description: "Leitfaden zur Syntax, mit der dieses Blog geschrieben wird."
+
+ui:
+  scroll_top: "Nach oben"
+
+js:
+  date_locale: "de-DE"
+  stats_favourited: "Favorisiert"
+  stats_boosted: "Geboostet"
+  stats_comments: "Kommentare"
+  reply_on_mastodon: "Auf Mastodon antworten"
+  reply_on_bluesky: "Auf Bluesky antworten"
+  results_one: "Treffer"
+  results_few: "Treffer"
+  results_many: "Treffer"
+  no_results_pending: "Noch keine Treffer,"
+  no_results_final: "Keine Treffer."
+  try_other_words: " Versuch es mit anderen oder allgemeineren Wörtern."
+  searching_archive: " (das ältere Archiv wird noch durchsucht…)"
+  search_prefix: "Suche: "
+  loading_index: "Index wird geladen…"
+  index_unavailable: "Suchindex nicht verfügbar."
+  lightbox_close: "Schließen"
+  lightbox_prev: "Zurück"
+  lightbox_next: "Weiter"
+
+cli:
+  cancel_word: "abbrechen"
+  confirm_word: "ja"
+  missing_images_wait: "Es fehlen %{count} Bild(er), warte auf den Upload nach incoming/:"
+  missing_images_prompt: "Drück Enter, sobald hochgeladen (oder tipp \"%{cancel_word}\" zum Abbrechen): "
+  cancelled_nothing_saved: "Abgebrochen, nichts gespeichert.\n\n"
+
+  double_frontmatter_error: |
+    ❌ Im Text steht ein zweiter Frontmatter-Kopf.
+
+    Sieht so aus, als hättest du Text eingefügt, der schon eigene ---
+    Zeilen mitbringt, unter den Kopf, der bereits da war. Verarbeitet wird
+    nur der erste -- der Beitrag bliebe also ohne Titel und bekäme einen
+    Slug aus den ersten Wörtern des Textes.
+
+    Behalte nur einen Kopf: lösch entweder den leeren oben, oder entferne
+    die --- Zeilen aus dem eingefügten Text und übertrag dessen Werte in
+    den oberen.
+
+  frontmatter_hint: |
+    <!--
+    HINWEIS -- dieser Block und Zeilen, die mit // beginnen, werden beim
+    Speichern entfernt und landen nie im Beitrag.
+    (Eigene Notizen also mit // schreiben, nicht mit # -- Rauten sind für
+    Überschriften reserviert.)
+
+    FRONTMATTER (zwischen --- und ---):
+      title  Überschrift (optional)
+      tags   Schlagwörter, kommagetrennt, z. B.: natur, wandern, stadt
+      type   Beitragstyp -- text / image / video / link (optional -- leer
+             lassen, dann wird der Typ aus dem Inhalt abgeleitet)
+
+    Das Veröffentlichungsdatum wird hier nicht gesetzt -- [p] nimmt den
+    Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit.
+
+    INHALT kommt unter das zweite ---. Zur Formatierungssyntax:
+
+      Markdown-Spickzettel -- %{cheat_sheet_url}
+    -->
+
+  template_unchanged: "Vorlage unverändert (nicht gespeichert?), es wurde kein Beitrag angelegt."
+  empty_content: "Leerer Inhalt, nichts geschrieben."
+  wrote_draft: "Als Entwurf gespeichert: %{path}"
+  generating_preview: "Erzeuge Vorschau"
+  draft_saved_preview_pending: "Der Entwurf ist gespeichert. Die Vorschau erscheint nach einem erfolgreichen Deploy -- dann ./blog.sh edit %{slug} ausführen"
+
+  base_url_missing_preview: "SITE_BASE_URL ist nicht gesetzt, die Vorschau-URL lässt sich nicht bilden."
+  preview_label: "Vorschau: %{url}"
+  what_next_prompt: "Wie weiter? [p] veröffentlichen  [e] bearbeiten  [s] planen  [d] Entwurf lassen  [x] löschen: "
+  left_as_draft: "Bleibt Entwurf. Später veröffentlichen: ./blog.sh publish %{slug}"
+  unknown_choice_pde: "Nicht verstanden, versuch p / e / s / d / x."
+  schedule_date_prompt: "Veröffentlichen am (JJJJ-MM-TT HH:MM, leer = abbrechen): "
+  menu_hint: "↑↓ bewegen · Enter wählen · 1-9 Schnellwahl · Tippen = Slug · Esc zurück"
+  wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"
+  qr_hint: "Mit dem Handy scannen, um die Vorschau zu öffnen."
+  announcing: "Kündige an"
+  preview_serving: "public.nosync läuft auf %{url} -- Ctrl-C beendet."
+  preview_missing_public: "public.nosync existiert noch nicht -- erst bauen (ruby build/build_blog.rb)."
+  schedule_date_invalid: "Das ist kein lesbares Datum -- erwartet z. B. 2026-08-15 09:00."
+  schedule_date_not_future: "Das Veröffentlichungsdatum muss in der Zukunft liegen."
+
+  date_outside_window_prompt: "Das Datum %{date} liegt außerhalb des 24h-Fensters für eine automatische Ankündigung. Trotzdem ankündigen? [j/N] "
+  confirm_yes_char: "j"
+  base_url_missing_toot: "SITE_BASE_URL ist nicht gesetzt, die Ankündigung wurde nicht verschickt."
+  use_bluesky_command: "Diese Seite kündigt auf Bluesky an -- nimm ./blog.sh bluesky statt toot."
+  use_toot_command: "Diese Seite kündigt auf Mastodon an (oder hat kein Netzwerk konfiguriert) -- nimm ./blog.sh toot statt bluesky."
+  already_has_bluesky: "Der Beitrag hat schon eine Bluesky-Ankündigung: %{url}"
+  bluesky_posted: "Auf Bluesky angekündigt: %{url}"
+  bluesky_failed: "Die Bluesky-Ankündigung wurde nicht verschickt."
+  deleting_bluesky: "Lösche die Bluesky-Ankündigung: %{url}"
+  delete_bluesky_failed: "Löschen der Bluesky-Ankündigung fehlgeschlagen -- lösch sie von Hand."
+  backdated_no_toot: "Das Beitragsdatum ist nicht aktuell (rückdatierter Beitrag), die Ankündigung wurde nicht verschickt."
+  schedule_only_drafts: "Beitrag '%{slug}' ist schon veröffentlicht -- planen lassen sich nur Entwürfe."
+  scheduled_label: "Geplant: '%{slug}' wird automatisch veröffentlicht am %{date}."
+  schedule_cron_note: "Setzt den installierten publish-scheduled.sh-Cron voraus -- siehe docs/operations.md. Nochmal schedule ausführen bricht den Plan ab."
+  unscheduled_label: "Planung aufgehoben: '%{slug}' bleibt ein Entwurf."
+
+  already_published: "Beitrag '%{slug}' ist schon veröffentlicht: %{url}"
+  publish_date_now: "Veröffentlichungsdatum: %{date} (auf jetzt gesetzt)"
+  publish_date_kept: "Datum aus dem Frontmatter übernommen: %{date}"
+  published_label: "Veröffentlicht: %{path}"
+  publishing: "Veröffentliche"
+  done_label: "Fertig: %{url}"
+  backdated_note: "Ein rückdatierter Beitrag erscheint weder auf der Startseite noch im RSS -- er wandert direkt ins Archiv."
+
+  post_not_found: "Beitrag '%{slug}' nicht gefunden.\n\n"
+  still_draft_toot: "Beitrag '%{slug}' ist noch ein Entwurf -- veröffentliche ihn zuerst (./blog.sh publish %{slug}); erst dann hat ein Toot etwas zu verlinken."
+  already_has_toot: "Der Beitrag hat schon einen Toot, es wird kein zweiter verschickt: %{url}"
+  toot_failed: "Der Toot ließ sich nicht verschicken (siehe oben)."
+  tooted: "Getrötet: %{url}"
+
+  already_draft: "Beitrag '%{slug}' ist schon ein Entwurf: %{url}"
+  confirm_unpublish: "'%{slug}' wirklich auf Entwurf zurücksetzen? Zur Bestätigung den Slug eintippen: "
+  cancelled: "Abgebrochen."
+  deleting_toot: "Lösche den Mastodon-Toot: %{url}"
+  delete_toot_failed: "Löschen fehlgeschlagen (siehe oben) -- der Toot bleibt und zeigt vorerst auf eine tote Seite."
+  reverted_to_draft: "Auf Entwurf zurückgesetzt: %{path}"
+  updating_preview: "Aktualisiere Vorschau"
+
+  no_changes: "Keine Änderungen, nichts zu speichern."
+  content_loss_warning: "Vorsicht, beim Speichern ginge verloren: %{summary}."
+  confirm_continue_yes: "Wirklich fortfahren? Tipp \"%{word}\": "
+
+  edited_label: "Bearbeitet: %{path}"
+
+  confirm_delete: "'%{slug}' wirklich löschen? Zur Bestätigung den Slug eintippen: "
+  deleted_label: "Gelöscht (im Papierkorb, zurückholen mit ./blog.sh restore %{slug}): %{path}"
+
+  nothing_in_trash: "Im Papierkorb liegt nichts für '%{slug}'.\n\n"
+  post_already_exists: "Beitrag '%{slug}' existiert bereits (%{path}), Wiederherstellen würde ihn überschreiben -- bitte von Hand auflösen.\n\n"
+  restored_label: "Wiederhergestellt: %{path}"
+
+  post_count: "\n%{count} Beitrag/Beiträge%{drafts_suffix}"
+  drafts_suffix: ", davon %{count} in Arbeit"
+
+  enter_number_or_slug: "Nummer oder Slug eingeben: "
+  cancelled_empty: "Abgebrochen.\n\n"
+  no_posts_to_pick: "Keine Beiträge zur Auswahl."
+  no_drafts_to_publish: "Kein Entwurf bereit zur Veröffentlichung."
+  no_published_posts: "Kein veröffentlichter Beitrag vorhanden."
+  trash_empty: "Der Papierkorb ist leer."
+
+  default_rebuild_reason: "Baue neu und deploye"
+  build_failed: "\n❌ Build fehlgeschlagen -- es wird nicht deployt. Der Beitrag ist gespeichert; nach der Korrektur ./scripts/deploy-web.sh ausführen"
+  deploy_failed: "\n❌ Deploy fehlgeschlagen. Die Seite wurde neu gebaut; einfach ./scripts/deploy-web.sh erneut ausführen."
+
+  rebuild_prompt: "Seite jetzt neu bauen und deployen? [J/n] "
+
+  usage: |
+    Verwendung:
+      ./blog.sh add                  legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht
+      ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+      ./blog.sh publish [<slug>]     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit)
+      ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
+      ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
+      ./blog.sh delete [<slug>]      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+      ./blog.sh restore [<slug>]     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt
+      ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
+      ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
+      ./blog.sh rebuild              baut und deployt die ganze Seite, unabhängig von einem Beitrag
+      ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh help                 zeigt diese Hilfe
+      ./blog.sh                      startet den interaktiven Assistenten
+
+  wizard_prompt_action: "Was möchtest du tun?"
+  wizard_exit_option: "0) Beenden"
+  wizard_choice_prompt: "Auswahl: "
+  wizard_unknown_choice: "Unbekannte Auswahl, versuch es nochmal."
+  wizard_menu_add: "Neuer Beitrag"
+  wizard_menu_edit: "Beitrag bearbeiten"
+  wizard_menu_publish: "Entwurf veröffentlichen (zeigt eine Vorschau, fragt wie weiter)"
+  wizard_menu_schedule: "Entwurf planen (wird automatisch veröffentlicht, wenn sein Datum erreicht ist)"
+  wizard_menu_unpublish: "Veröffentlichten Beitrag auf Entwurf zurücksetzen"
+  wizard_menu_delete: "Beitrag löschen (wandert in den Papierkorb)"
+  wizard_menu_restore: "Beitrag aus dem Papierkorb zurückholen"
+  wizard_menu_toot: "Kommentar-Toot (erneut) senden (Mastodon)"
+  wizard_menu_bluesky: "Bluesky-Ankündigung (erneut) senden"
+  wizard_menu_list: "Liste aller Beiträge (nur ansehen, kein Bearbeiten)"
+  wizard_menu_rebuild: "Seite neu bauen und deployen (unabhängig von einem Beitrag)"
+
+cron:
+  no_scheduled_due: "Kein geplanter Beitrag ist fällig."
+  published_scheduled: "Geplanten Beitrag '%{slug}' veröffentlicht (Datum %{date})."
+  publishing_scheduled: "Veröffentliche %{count} geplante(n) Beitrag/Beiträge"
+
+import:
+  menu_hint: "↑↓ bewegen · Enter wählen · 1-9 Schnellwahl · Esc zurück"
+  enter_number: "Nummer der Quelle, aus der importiert wird: "
+  tumblr_blog_prompt: "Tumblr-Blog (z. B. deinname.tumblr.com, leer = abbrechen): "
+  tumblr_key_missing: "TUMBLR_API_KEY ist nicht gesetzt -- trag ihn zuerst in env.sh ein (die Tumblr-API verlangt auch für öffentliche Blogs einen Schlüssel)."
+  mastodon_dir_prompt: "Pfad zum entpackten Mastodon-Archiv (leer = abbrechen): "
+  mastodon_dir_invalid: "Unter %{dir} liegt keine outbox.json -- gib das entpackte Archivverzeichnis an."
+  pixelfed_path_prompt: "Pfad zur Pixelfed-Status-JSON (leer = abbrechen): "
+  pixelfed_path_invalid: "%{path} existiert nicht."
+  feed_source_prompt: "Feed-URL oder Pfad zu einer WordPress-Exportdatei (leer = abbrechen): "
+  feed_source_invalid: "%{source} ist weder eine vorhandene Datei noch eine http(s)-Adresse."
+  twitter_dir_prompt: "Pfad zum entpackten Twitter/X-Export (leer = abbrechen): "
+  twitter_dir_invalid: "Unter %{dir} liegt keine data/tweets.js -- gib das entpackte Exportverzeichnis selbst an."
+  bluesky_handle_prompt: "Bluesky-Handle (leer = abbrechen): "
+  scanned: "%{count} Einträge gelesen…"
+  dry_run_running: "Lese %{label} — noch wird nichts geschrieben…"
+  would_write: "Würde %{count} Beitrag/Beiträge und %{media} Mediendatei(en) schreiben."
+  written: "%{count} Beitrag/Beiträge und %{media} Mediendatei(en) geschrieben."
+  sample_slugs: "Die ersten Slugs:"
+  skipped: "  %{count} übersprungen (%{reason})"
+  media_failed: "%{count} Mediendatei(en) ließen sich nicht herunterladen — ihre Beiträge wurden ohne sie geschrieben:"
+  nothing_to_import: "Nichts zu importieren."
+  confirm_prompt: "Diese %{count} Beiträge schreiben? Zur Bestätigung %{count} eintippen (alles andere bricht ab): "
+  running: "Importiere %{label} — Medien werden heruntergeladen, das kann dauern…"
+  rebuild_prompt: "Seite jetzt neu bauen und deployen? [J/n] "
+  rebuilding: "Baue neu und deploye"
+  cancelled: "Abgebrochen, nichts geschrieben."
+  interrupted: "Unterbrochen. Bereits geschriebene Beiträge liegen in content.nosync/ — den Import erneut auszuführen ist sicher, er überschreibt sie an Ort und Stelle."
+  source:
+    bluesky: "Bluesky"
+    mastodon: "Mastodon (Konto-Archiv)"
+    pixelfed: "Pixelfed (Status-Export)"
+    tumblr: "Tumblr"
+    twitter: "Twitter/X (entpackter Export)"
+    feed: "WordPress-Export oder RSS/Atom-Feed"
+  reason:
+    reply: "Antwort"
+    repost: "Repost"
+    quote: "Zitat-Post"
+    empty: "kein verwertbarer Inhalt"
+    attachment: "Anhang, kein Beitrag"
+    page: "Seite, kein Beitrag"
+    not_a_post: "kein Beitrag"
+    trashed: "im Papierkorb"
+    boost: "Boost"
+    reblog: "Reblog"
+    error: "Konvertierung fehlgeschlagen — siehe Zeilen oben"

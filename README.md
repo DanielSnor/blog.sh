@@ -114,7 +114,10 @@ deploy step around exactly that. A few of the choices that came out of it:
 - The full syntax reference at `/markdown/` is generated directly from
   this parser, so it can't drift out of sync with what's actually supported;
   its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the
-  same way as `locales/*.yml` -- picked by `site.lang`, English fallback
+  same way as `locales/*.yml` -- picked by `site.lang` (en, cs and de ship
+  with the engine), English fallback.
+  Adding a language is data, not code -- see
+  [docs/localization.md](docs/localization.md)
 
 **Build** (`build_blog.rb`)
 - Static HTML from JSON via ERB templates, no framework

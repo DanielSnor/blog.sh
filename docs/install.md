@@ -64,8 +64,9 @@ The example is fully commented. The short version:
   omitted keys fall back to the built-in blue palette).
 
 `site.lang` selects `locales/<lang>.yml` for every generated string --
-`en` and `cs` ship with the engine; a partial third locale falls back to
-English per key.
+`en`, `cs` and `de` ship with the engine; a partial locale falls back to
+English per key. Adding another language is data, not code -- see
+[localization.md](localization.md).
 
 `site.timezone` (an IANA name like `Europe/Prague`) is the zone every
 timestamp the engine writes is expressed in. **Set it if you'll ever
