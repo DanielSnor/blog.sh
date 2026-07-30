@@ -201,10 +201,23 @@ module MarkdownParser
     return nil unless lines.all? { |l| l.strip.empty? || BLOCKQUOTE_LINE_RE.match?(l.strip) }
     return nil unless lines.any? { |l| BLOCKQUOTE_LINE_RE.match?(l.strip) }
 
-    quoted = lines.map { |l| l.strip.empty? ? '' : BLOCKQUOTE_LINE_RE.match(l.strip)[1] }.join("\n")
-    text, formatting = parse_inline(quoted)
+    quoted_lines = lines.map { |l| l.strip.empty? ? '' : BLOCKQUOTE_LINE_RE.match(l.strip)[1] }
+
+    # A last line opening with an em dash (or "--") is the attribution --
+    # "> Quote\n> — Author", the Tumblr quote-post shape. Only when
+    # something precedes it: a one-line quote that merely starts with a
+    # dash is still a quote, not an empty quote with an author.
+    cite = nil
+    if quoted_lines.size > 1 && (m = /\A(?:—|--)\s+(.+)\z/.match(quoted_lines.last.strip))
+      cite = m[1].strip
+      quoted_lines.pop
+      quoted_lines.pop while quoted_lines.last.to_s.empty?
+    end
+
+    text, formatting = parse_inline(quoted_lines.join("\n"))
     block = { 'type' => 'text', 'subtype' => 'quote', 'text' => text }
     block['formatting'] = formatting unless formatting.empty?
+    block['cite'] = cite if cite
     block
   end
 
@@ -329,6 +342,29 @@ module MarkdownParser
   # interpretation inside source code). An unterminated fence (no closing ```
   # before the body ends) is still treated as code through to the end, rather
   # than silently reverting to prose.
+  # "Name: what they said" per line, Tumblr chat-post style. A line
+  # without a colon is a continuation of the previous line (kept with a
+  # newline -- rendered as a break); a leading continuation with nobody to
+  # attach to becomes a nameless line. Returns nil for an empty fence.
+  def parse_chat(text)
+    lines = []
+    text.split("\n").each do |raw|
+      line = raw.rstrip
+      next if line.strip.empty?
+
+      if (m = /\A([^:]{1,60}):\s+(.*)\z/.match(line))
+        lines << { 'name' => m[1].strip, 'text' => m[2] }
+      elsif lines.any?
+        lines.last['text'] = "#{lines.last['text']}\n#{line.strip}"
+      else
+        lines << { 'name' => nil, 'text' => line.strip }
+      end
+    end
+    return nil if lines.empty?
+
+    { 'type' => 'chat', 'lines' => lines }
+  end
+
   def split_code_fences(body)
     segments = []
     lines = body.split("\n")
@@ -433,6 +469,16 @@ module MarkdownParser
 
     split_code_fences(body).each do |segment|
       if segment[:type] == :code
+        # The chat fence rides the code-fence rails on purpose: a fence is
+        # verbatim, so speaker lines can hold colons, asterisks or anything
+        # else without inline parsing, and the round-trip is the fence
+        # itself. "Name: line" per line; a line without a colon continues
+        # the previous speaker's line.
+        if segment[:lang] == 'chat'
+          chat = parse_chat(segment[:text])
+          blocks << chat if chat
+          next
+        end
         block = { 'type' => 'code', 'text' => segment[:text] }
         block['lang'] = segment[:lang] unless segment[:lang].to_s.empty?
         blocks << block

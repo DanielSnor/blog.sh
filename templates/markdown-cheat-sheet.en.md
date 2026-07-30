@@ -11,6 +11,7 @@ A link to this page is also in the in-editor help, so it's at hand while you wri
 - [Links](#links)
 - [Lists](#lists)
 - [Blockquotes](#blockquotes)
+- [Chat](#chat)
 - [Horizontal rule](#horizontal-rule)
 - [Code blocks](#code-blocks)
 - [Tables](#tables)
@@ -161,6 +162,35 @@ Every line of a quote starts with `>`.
 
 > Begin at the beginning, the King said gravely,
 > and go on till you come to the end: then stop.
+
+A last line opening with an em dash (or `--`) becomes the attribution:
+
+```
+> Begin at the beginning, and go on
+> till you come to the end: then stop.
+> — Lewis Carroll
+```
+
+> Begin at the beginning, and go on
+> till you come to the end: then stop.
+> — Lewis Carroll
+
+## Chat
+
+A dialogue goes into a `chat` fence, one line per statement — the speaker's
+name before the colon. A line without a colon continues the previous one.
+
+```
+Watson: What does it mean?
+Holmes: Elementary.
+```
+
+Written as:
+
+    ```chat
+    Watson: What does it mean?
+    Holmes: Elementary.
+    ```
 
 ## Horizontal rule
 

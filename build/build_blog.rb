@@ -449,7 +449,11 @@ def render_block(block, media_prefix, seen = {})
           else 'p'
           end
     id = heading ? %( id="#{h(heading_id(block['text'].to_s, seen))}") : ''
-    "<#{tag}#{id}>#{with_breaks(apply_formatting(block['text'], block['formatting']))}</#{tag}>"
+    inner = with_breaks(apply_formatting(block['text'], block['formatting']))
+    # A quote's attribution renders inside the blockquote as a <cite> line,
+    # so the pairing survives copy-paste and reader modes.
+    inner += %(<cite>— #{h(block['cite'])}</cite>) if tag == 'blockquote' && block['cite']
+    "<#{tag}#{id}>#{inner}</#{tag}>"
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
@@ -492,6 +496,14 @@ def render_block(block, media_prefix, seen = {})
     return inner if caption.empty?
 
     %(<figure>#{inner}<figcaption>#{CGI.escapeHTML(caption)}</figcaption></figure>)
+  when 'chat'
+    # A dialogue as a definition list: speaker as <dt>, line as <dd> --
+    # semantic enough for reader modes, styled compactly by site.css.
+    rows = (block['lines'] || []).map do |line|
+      dt = line['name'] ? "<dt>#{CGI.escapeHTML(line['name'])}</dt>" : ''
+      "#{dt}<dd>#{with_breaks(CGI.escapeHTML(line['text'].to_s))}</dd>"
+    end.join
+    %(<dl class="chat">#{rows}</dl>)
   when 'link'
     title = CGI.escapeHTML((block['title'] || block['url']).to_s)
     description = CGI.escapeHTML(block['description'].to_s)

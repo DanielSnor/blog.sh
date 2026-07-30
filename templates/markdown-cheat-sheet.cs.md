@@ -11,6 +11,7 @@ Odkaz na tuhle stránku je i v nápovědě v editoru, takže ji máte při psan�
 - [Odkazy](#odkazy)
 - [Seznamy](#seznamy)
 - [Citace](#citace)
+- [Chat](#chat)
 - [Vodorovná čára](#vodorovna-cara)
 - [Blok kódu](#blok-kodu)
 - [Tabulky](#tabulky)
@@ -161,6 +162,35 @@ Každý řádek citace začíná znakem `>`.
 
 > Nad Tatrou sa blýska, hromy divo bijú.
 > Zastavme ich bratia, veď sa ony stratia, Slováci ožijú.
+
+Poslední řádek začínající dlouhou pomlčkou (nebo `--`) se stane atribucí:
+
+```
+> Začni na začátku a pokračuj,
+> dokud nedojdeš na konec: pak přestaň.
+> — Lewis Carroll
+```
+
+> Začni na začátku a pokračuj,
+> dokud nedojdeš na konec: pak přestaň.
+> — Lewis Carroll
+
+## Chat
+
+Dialog patří do ohrady `chat`, jedna replika na řádek — mluvčí před
+dvojtečkou. Řádek bez dvojtečky pokračuje v předchozí replice.
+
+```
+Watson: Co to znamená?
+Holmes: Elementární.
+```
+
+Zapsáno jako:
+
+    ```chat
+    Watson: Co to znamená?
+    Holmes: Elementární.
+    ```
 
 ## Vodorovná čára
 

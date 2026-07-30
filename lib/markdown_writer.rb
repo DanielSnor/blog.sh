@@ -36,7 +36,9 @@ module MarkdownWriter
         rendered = render_text_markdown(b['text'], b['formatting'])
         case b['subtype']
         when /\Aheading([1-6])\z/ then "#{'#' * Regexp.last_match(1).to_i} #{rendered}"
-        when 'quote' then rendered.split("\n").map { |l| l.empty? ? '>' : "> #{l}" }.join("\n")
+        when 'quote'
+          quoted = rendered.split("\n").map { |l| l.empty? ? '>' : "> #{l}" }.join("\n")
+          b['cite'] ? "#{quoted}\n> — #{b['cite']}" : quoted
         # A newline stored in a paragraph is a hard break and writes back as
         # the visible backslash marker -- without this, re-saving would
         # collapse it into a space via the parser's prose-wrapping rule.
@@ -48,6 +50,9 @@ module MarkdownWriter
         list_to_markdown(b)
       when 'hr'
         '---'
+      when 'chat'
+        body = (b['lines'] || []).map { |l| l['name'] ? "#{l['name']}: #{l['text']}" : l['text'].to_s }.join("\n")
+        "```chat\n#{body}\n```"
       when 'code'
         "```#{b['lang']}\n#{b['text']}\n```"
       when 'image'

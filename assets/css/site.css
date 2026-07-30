@@ -373,6 +373,17 @@ h3 { color: var(--accent); font-size: 1rem; text-transform: uppercase; letter-sp
 
 /* Preview of an unpublished post -- deliberately impossible to miss, so a
    draft can't be mistaken for something that's actually live on the blog. */
+/* Chat blocks: speaker bold on its own line, the line indented under it --
+   the classic chat-post shape. */
+dl.chat { margin: 1rem 0; }
+dl.chat dt { font-weight: 700; margin-top: 0.5em; }
+dl.chat dt:first-child { margin-top: 0; }
+dl.chat dd { margin: 0 0 0 1.25rem; }
+
+/* A quote's attribution: its own right-aligned line, visually detached
+   from the quoted text. */
+blockquote cite { display: block; margin-top: 0.5em; text-align: right; font-style: normal; color: var(--meta-text); }
+
 /* Task-list items: the checkbox replaces the bullet. Disabled on purpose --
    a reader can't toggle someone's published to-do. */
 li.task-item { list-style: none; margin-left: -1.1em; }

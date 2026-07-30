@@ -11,6 +11,7 @@ Ein Link auf diese Seite steht auch in der Editor-Hilfe, sie ist beim Schreiben 
 - [Links](#links)
 - [Listen](#listen)
 - [Zitate](#zitate)
+- [Chat](#chat)
 - [Trennlinie](#trennlinie)
 - [Codeblöcke](#codeblocke)
 - [Tabellen](#tabellen)
@@ -161,6 +162,36 @@ Jede Zeile eines Zitats beginnt mit `>`.
 
 > Fang am Anfang an, sagte der König ernst,
 > und lies, bis du ans Ende kommst: dann hör auf.
+
+Eine letzte Zeile, die mit einem Gedankenstrich (oder `--`) beginnt, wird
+zur Quellenangabe:
+
+```
+> Fang am Anfang an und lies,
+> bis du ans Ende kommst: dann hör auf.
+> — Lewis Carroll
+```
+
+> Fang am Anfang an und lies,
+> bis du ans Ende kommst: dann hör auf.
+> — Lewis Carroll
+
+## Chat
+
+Ein Dialog kommt in einen `chat`-Zaun, eine Zeile je Aussage — der Sprecher
+vor dem Doppelpunkt. Eine Zeile ohne Doppelpunkt setzt die vorige fort.
+
+```
+Watson: Was bedeutet das?
+Holmes: Elementar.
+```
+
+Geschrieben als:
+
+    ```chat
+    Watson: Was bedeutet das?
+    Holmes: Elementar.
+    ```
 
 ## Trennlinie
 

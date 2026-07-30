@@ -60,10 +60,11 @@ dedup by `source`).
 
 | `type` | Fields |
 | --- | --- |
-| `text` | `text`; `subtype` (`heading1`-`heading6`, `quote`; absent = paragraph); `formatting` |
+| `text` | `text`; `subtype` (`heading1`-`heading6`, `quote`; absent = paragraph); `formatting`; a quote may carry `cite` (attribution, rendered as a right-aligned line) |
 | `list` | `style` (`"ul"`/`"ol"`); `items` -- each `{text, formatting?, children?}` where `children` is a nested list block |
 | `table` | `align` (array of `left`/`center`/`right`); `header` (array of cells); `rows` (array of cell arrays); a cell is `{text, formatting?}` |
 | `code` | `text` (verbatim, blank lines preserved); `lang` (cosmetic) |
+| `chat` | `lines` -- array of `{name, text}`; `name` may be nil for a continuation line |
 | `hr` | no fields |
 | `image` | `media` (see below); `alt_text`; `caption` |
 | `video` | one of three shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
