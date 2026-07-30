@@ -234,7 +234,6 @@ cli:
       ./blog.sh help                 shows this help
       ./blog.sh                      launches the interactive wizard
 
-  wizard_greeting: "Hi, this is blog.sh."
   wizard_prompt_action: "What do you want to do?"
   wizard_exit_option: "0) Exit"
   wizard_choice_prompt: "Choice: "

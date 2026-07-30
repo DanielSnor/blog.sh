@@ -37,6 +37,11 @@ MEDIA_DIR = File.join(ROOT, 'media.nosync')
 INCOMING_DIR = File.join(ROOT, 'incoming')
 TRASH_DIR = File.join(ROOT, 'trash')
 SITE_BASE_URL = ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')
+# Optional (`get`, not `fetch`) so the wizard header degrades quietly
+# instead of aborting the whole CLI over a config field it only wants
+# to display, not require.
+SITE_SHORT_NAME = SiteConfig.get('site', 'short_name')
+SITE_DESCRIPTION = SiteConfig.get('site', 'description')
 
 DRAFT = 'draft'
 PUBLISHED = 'published'
@@ -1023,8 +1028,27 @@ rescue SystemExit
   nil
 end
 
+# Which engine, which site, which domain -- an accent bar rather than a
+# boxed panel so it never needs a bordered panel's width-matching
+# discipline (see the design discussion this came out of): each line
+# stands alone, so a long site name or claim just makes that one line
+# longer instead of risking mismatched corners on a narrow terminal.
+# Site fields are optional (SITE_SHORT_NAME/_DESCRIPTION/_BASE_URL can
+# all be blank on a barely-started install) -- absent ones are simply
+# skipped, never rendered as an empty line.
+def wizard_header
+  bar = Tui.paint('▍', :cyan)
+  claim = [SITE_SHORT_NAME, SITE_DESCRIPTION].compact.reject(&:empty?).join(' — ')
+  domain = SITE_BASE_URL.to_s.sub(%r{\Ahttps?://}, '').chomp('/')
+
+  lines = [Tui.paint('blog.sh', :bold)]
+  lines << claim unless claim.empty?
+  lines << Tui.paint(domain, :dim) unless domain.empty?
+  lines.map { |line| "#{bar}#{line}" }.join("\n")
+end
+
 def run_wizard
-  puts Tui.paint(t('cli.wizard_greeting'), :bold)
+  puts wizard_header
 
   # In a terminal the wizard is an arrow-key menu (digits still work as
   # quick select, Esc exits). Piped input keeps the numbered prompt.

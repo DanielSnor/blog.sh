@@ -225,7 +225,6 @@ cli:
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh                      spustí interaktivního průvodce
 
-  wizard_greeting: "Ahoj, tady blog.sh."
   wizard_prompt_action: "Co chceš dělat?"
   wizard_exit_option: "0) Konec"
   wizard_choice_prompt: "Volba: "
