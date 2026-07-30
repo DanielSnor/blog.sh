@@ -86,6 +86,44 @@ The trick is that a bare filename in an image line resolves against the
    its `incoming/` copy is removed -- an empty `incoming/` means nothing
    is pending.
 
+## Importing from another platform
+
+`./import.sh` opens its own wizard: pick a source, and it reads the whole
+thing in dry-run first and tells you what *would* be written -- how many
+posts and media files, the first few slugs, and how many items it skipped
+and why. Nothing is written until you confirm. Sources are Bluesky (no
+credentials, public API), Tumblr (`TUMBLR_API_KEY` in `env.sh`) and a
+Twitter/X archive export.
+
+The same imports also run without the wizard, for cron or a scripted
+migration -- `scripts/migrate_bluesky.rb <handle>`,
+`scripts/migrate_tumblr.rb <blog>`, `scripts/migrate_twitter.rb <export-dir>`.
+Those skip the preview and write immediately; see
+[the README](../README.md#importing-existing-content).
+
+Two things to expect on a real archive:
+
+- **It is slow, and it says so.** Media is downloaded per post, so a few
+  thousand posts run for hours. Every phase reports progress -- what it's
+  reading, how many items it found, then a `12/847` counter -- so a quiet
+  terminal means something is wrong, not that it's working. Sample before
+  committing to that: the Tumblr and Twitter scripts take `LIMIT=20` to
+  import only the first twenty, which is enough to see whether the mapping
+  does what you expect. A second full run then overwrites them in place.
+- **The deploy guard will stop you afterwards**, because a bulk import is
+  exactly the "file count swung wildly" shape it watches for. That's
+  working as intended: check the numbers, then re-run with `--force`.
+
+Re-running an import is safe. Posts are matched on
+`source.platform`/`account`/`original_id` and overwritten in place, so a
+second pass fixes a bad first one rather than doubling it. That same triple
+is the safe way to undo an import: select on it rather than on "everything
+except the posts I wrote".
+
+Back up `content.nosync/` before the first real import
+(`tar czf ../content-backup-$(date +%F).tar.gz content.nosync`) -- it isn't
+in git, and on a server there's nothing else to fall back on.
+
 ## Deploying
 
 `./blog.sh rebuild` = build + deploy with `--prune` in one step; the

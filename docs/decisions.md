@@ -76,6 +76,27 @@ they carry absolute instants for machines, where the offset is noise.
 only the posts whose local day actually differs (73 of sean.cz's 3281,
 none of them changing year).
 
+**Importing gets its own wizard, and always previews before it writes.**
+`./import.sh` is separate from `./blog.sh` because the two have opposite
+shapes: authoring is a daily loop over one post, importing is a rare bulk
+operation that drops thousands of files into `content.nosync/` at once. The
+authoring menu stays about authoring, and the irreversible thing needs its
+own door opened deliberately. Every import runs the adapter in dry-run first
+and reports what *would* be written -- counts, the first slugs, and why
+items were skipped -- because discovering afterwards that 2000 posts got the
+wrong slugs has no cheap fix. *Cost:* two entry points to learn, and one
+shared `lib/site_header.rb` so their identity blocks can't drift.
+
+**A long import narrates itself.** Every phase that runs for more than a few
+seconds prints progress: what is about to be read and how big it is, how
+many items were found and filtered, then a `12/847` counter per post.
+Silence during a multi-hour media download is indistinguishable from a hung
+process, which is the worst thing to hand someone waiting on a tool that
+writes into their archive. The counting lives in `lib/import/`, behind
+callbacks; the escape codes live in the wizard. *Cost:* importers print more
+than a script strictly needs, and a piped run throttles to one line per
+hundred items so logs stay readable.
+
 **Deleting is moving to `trash/`; two posts can never share a URL.**
 There's no database transaction log to lean on, so the engine refuses
 the two silent data-loss paths: `delete` is reversible via `restore`,
@@ -173,6 +194,17 @@ cursor-up repaint. Scrolling a window moves that limit into the UI where
 it belongs -- on a blog with thousands of posts, a cap that small is a
 functional restriction, not tidiness. *Cost:* window arithmetic (and
 digits selecting within the visible window, not the whole list).
+
+**Site icons come from one PNG.** Pages link `assets/images/favicon.png`
+directly, `apple-touch-icon` points at the same file (iOS scales it), and
+`/favicon.ico` is generated at build time by wrapping that PNG in an ICO
+container. One image to maintain instead of three, and the `.ico` exists only
+because a set of clients -- bots, feed readers, link-preview services, older
+browsers -- request the root path blindly and never read a `<link>`; without
+it each of those was a 404. Writing the 22-byte container ourselves keeps the
+no-gems rule intact, the same trade as the QR encoder below. *Cost:* an
+oversized source can't state its true size in ICO's one-byte dimension
+fields, so browsers report 256 -- invisible at the sizes a favicon renders.
 
 **A QR encoder in the repo rather than a gem or a web service.** The
 draft-preview-on-a-phone workflow is the reason this engine looks the

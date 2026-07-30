@@ -121,10 +121,16 @@ deploy step around exactly that. A few of the choices that came out of it:
 - Pagination anchored to the oldest post (page boundaries stay stable as
   new posts are added), plus tag and content-type archives
 - RSS, sitemap, `robots.txt`
+- `/favicon.ico` generated from `assets/images/favicon.png` by wrapping it
+  in an ICO container, for the clients that request the root path blindly
+  and never read the `<link>` (bots, feed readers, older browsers)
 - Search index split into recent (newest 500, loaded eagerly) and
   archive (the rest, loaded lazily on first search)
 - Separate generated pages for `/markdown/` (cheat sheet) and `/search/`,
   outside `content/posts/`
+- Dates a reader sees are rendered in `site.timezone`, so an imported post
+  stored in UTC shows the day it was actually written; URLs, feeds and the
+  sitemap keep the stored offset, since a post's year must never move
 - Render memoization -- per-post content/time/type computed once, not
   4-6x across every listing it appears in
 - Only changed files are written (`emit`); anything the build didn't
@@ -187,8 +193,10 @@ deploy step around exactly that. A few of the choices that came out of it:
   (`DEFAULT_COLORS`) if `colors:` is omitted
 - Banner overlay: `site.short_name` (top-left, ~30px) and `site.description`
   (bottom-right, ~20px, wraps to multiple lines) render on top of the banner
-  image in self-hosted JetBrains Mono, with a corner scrim for readability
-  against any image -- see `.banner-title`/`.banner-claim` in `site.css`.
+  image in self-hosted JetBrains Mono. Each overlay darkens the corner it
+  sits in so it stays readable against any image -- and only that corner,
+  so a banner with both overlays off is shown exactly as authored. See
+  `.banner-title`/`.banner-claim` in `site.css`.
   Each independently optional: `banner.show_title`/`show_claim` (default
   true) toggle whether they render at all, `colors.<mode>.banner_title`/
   `banner_claim` override their color per light/dark mode (default: `nav_bg`
@@ -197,9 +205,19 @@ deploy step around exactly that. A few of the choices that came out of it:
   a manual `<br>`) -- `site.description` itself stays plain text
   everywhere else (meta description, RSS), same trust level as `about.html`
 
-**Migration** (historical, one-off)
-- `migrate_tumblr.rb`, `migrate_twitter.rb` -- import from four Tumblr
-  blogs and a Twitter archive (2008-2022) into the same content-block schema
+**Importing -- `import.sh`**
+- Its own wizard, separate from authoring: pick a source, see a dry-run
+  preview (posts, media, skipped and why), confirm before anything is written
+- Sources: Bluesky and Tumblr via their APIs, Twitter/X from an archive
+  export -- the last two carried over from the original migration of four
+  Tumblr blogs and a Twitter archive (2008-2022)
+- `lib/import/` holds what every source shares -- media download or copy,
+  filename numbering, skip accounting, progress callbacks -- so an adapter
+  only has to page a source and shape one item
+- Each source is also a one-line script (`scripts/migrate_*.rb`) over the
+  same adapter, so an import can run from cron as well as from the wizard
+- Re-running an import overwrites in place (matched on source id), never
+  duplicates
 
 ## Stack
 
@@ -218,11 +236,14 @@ deploy step around exactly that. A few of the choices that came out of it:
 
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
+import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
                            deploy-web.sh      standalone deploy of public.nosync/ to Surfer (no rebuild)
                            refresh-sidebar.sh cron: refreshes only the sidebar widgets (no site rebuild)
+                           migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
+lib/import/              Import adapters plus the layer they share (media, run, CLI)
 locales/                 UI strings for the generated site and the CLI (en.yml, cs.yml)
 templates/               ERB templates (layout, post, index, search, partials)
                          + markdown-cheat-sheet.<lang>.md, the /markdown/ page's source
@@ -263,12 +284,18 @@ iCloud doesn't exist, it's just a name.
 
 1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
    site's title, description, social links, and (optionally) analytics,
-   sidebar widgets, and the comments network (Mastodon or Bluesky).
+   sidebar widgets, and the comments network (Mastodon or Bluesky). Set
+   `site.timezone` if you'll publish from a server -- a server clock is
+   usually UTC, and without it `schedule` reads times as UTC and a post
+   written after midnight can be dated to the previous day.
 2. Copy `env.sh.example` to `env.sh` and `chmod 600 env.sh`. An unedited
    copy is enough to try things out locally -- without the Surfer values,
    uploads are simply skipped (logged, not an error).
-3. Drop a banner image at the path set in `banner.src` (and a favicon at
-   `/assets/images/favicon.png`).
+3. Replace `assets/images/header.png` (the banner) and
+   `assets/images/favicon.png` with your own -- both ship with the engine, so
+   a fresh clone renders before you've drawn anything. Update `banner.width`/
+   `height` to your image's real size; that's what reserves layout space
+   before it loads.
 4. `./blog.sh add` to write your first post.
 5. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
 6. `./blog.sh preview` to look at it locally before deploying anywhere
@@ -315,7 +342,7 @@ laptop for a local one.
 ```bash
 export SITE_BASE_URL=https://example.com
 export MASTODON_ACCESS_TOKEN=...   # comment toots (optional)
-export TUMBLR_API_KEY=...          # only for scripts/migrate_tumblr.rb
+export TUMBLR_API_KEY=...          # importing a Tumblr blog (wizard or script)
 export DEPLOY_BACKEND=...          # surfer (default) | local | rsync | git | rclone | sftp
 export SURFER_URL=...              # surfer backend
 export SURFER_TOKEN=...
@@ -329,10 +356,47 @@ export SFTP_TARGET=...             # sftp backend (+ optional SFTP_REMOTE_DIR/SF
 
 ## Importing existing content
 
-`scripts/migrate_tumblr.rb <blog-name>.tumblr.com` and
-`scripts/migrate_twitter.rb <path-to-extracted-export>` import posts from
-Tumblr's API or a Twitter/X archive export into the same content-block
-schema as hand-written posts, downloading all media locally.
+```bash
+./import.sh                        # pick a source, preview, confirm
+```
+
+Imports land in the same content-block schema as hand-written posts, with
+all media downloaded locally -- an imported post is indistinguishable from
+one you typed. The wizard **always previews in dry-run first** and asks
+before writing: it reports how many posts and media files would be
+created, the first few slugs, and why anything was skipped. Re-running an
+import is safe -- posts are matched on their source id and overwritten in
+place rather than duplicated.
+
+Available sources:
+
+| Source | Needs | Scope |
+| --- | --- | --- |
+| Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
+| Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
+| Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
+
+Every source is also reachable without the wizard, for a cron job or a
+scripted migration -- same mapping, no preview pass, writes immediately:
+
+```bash
+ruby scripts/migrate_bluesky.rb <handle>
+TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
+ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+```
+
+All three take `LIMIT=n` to import only the first *n* posts, which is the
+way to sample a large archive before committing hours to it -- a later full
+run overwrites those posts in place rather than duplicating them.
+They report progress as they go: the size of what they're about to read,
+how many items were found and filtered, then a `12/847` counter per post,
+because downloading every image of an archive runs for hours and a silent
+terminal is indistinguishable from a stuck one.
+
+Two limits worth knowing before you start: only a Bluesky self-thread's
+opening post is imported (the continuations are replies), and Bluesky
+serves video as an HLS playlist rather than a file, so a video post is
+imported as its poster frame with the original linked from `source`.
 
 ## Deploy
 
@@ -371,14 +435,18 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Imports** -- `migrate_tumblr.rb` and `migrate_twitter.rb` cover the two
-  platforms this deployment actually migrated from. Instagram, WordPress,
-  Threads and Bluesky importers should follow the same pattern: each
-  platform's official export (or API) normalized into the shared
-  content-block schema via `PostWriter`, media downloaded locally, nothing
-  hotlinked. A generic RSS/Atom importer would cover much of the long tail
-  (Ghost, Medium, Blogger, ...) -- and since WordPress's WXR export is
-  essentially enriched RSS, the two could share a base.
+- **Imports** -- Bluesky, Tumblr and a Twitter/X archive are covered. The
+  pattern for the rest is set by `lib/import/`: an adapter pages a source and
+  shapes one item, everything else (media, dedup, dry-run, reporting) is
+  already shared. Still missing: **WordPress** (its WXR export is the
+  richest source of the lot -- full HTML, dates, tags, status, attachments)
+  and a **generic RSS/Atom** importer for the long tail (Ghost, Medium,
+  Blogger, ...), though a feed usually carries only its last few dozen items,
+  so it's a weak archive source. Both need the same missing piece: **HTML →
+  content blocks**. That, not the platform APIs, is the real cost, since
+  staying gem-free means a tolerant HTML parser of our own rather than
+  reaching for Nokogiri. Instagram has no usable read API; Threads is
+  feasible but deferred (see below).
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:

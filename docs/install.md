@@ -45,7 +45,7 @@ cd myblog
 
 One clone = one site. Everything personal (posts, media, config,
 secrets) is gitignored, so pulling engine updates later never touches
-your content -- see [Updating the engine](#7-updating-the-engine).
+your content -- see [Updating the engine](#9-updating-the-engine).
 
 ## 2. Configure the site -- `config/site.yml`
 
@@ -96,13 +96,23 @@ that posts, RSS, the sitemap and OG tags are built from.
 
 ## 4. Banner and favicon
 
-Drop your banner image at the path set in `banner.src` (default
-`/assets/images/banner.png` -> file at `assets/images/banner.png`) and a
-favicon at `assets/images/favicon.png`. Set `banner.width`/`height` to
-the file's real dimensions -- they reserve space before the image loads.
-The banner gets `site.short_name` and `site.description` rendered on
-top of it (see "Appearance" in the main README), so a calm image works
-best.
+Both ship with the engine -- `assets/images/header.png` (the path
+`banner.src` defaults to) and `assets/images/favicon.png` -- so a fresh
+clone renders before you've drawn anything. Replace them with your own and
+set `banner.width`/`height` to the real dimensions of your image: those
+attributes are what reserves space before it loads, and a mismatch makes
+the page jump.
+
+The favicon is used three ways from that one file: the `<link rel="icon">`,
+an `apple-touch-icon` (iOS scales it down for a home-screen bookmark), and
+a generated `/favicon.ico` for clients that request the root path without
+reading the link. A square PNG of 180 px or more covers all three.
+
+The banner gets `site.short_name` and `site.description` rendered on top of
+it (see "Appearance" in the main README), each darkening the corner it sits
+in so it stays readable -- so a calm image works best, though turning both
+overlays off with `banner.show_title`/`show_claim` leaves the image
+completely untouched.
 
 ## 5. First build and local preview
 
@@ -115,6 +125,13 @@ ruby build/build_blog.rb       # build into public.nosync/
 `add` always creates a draft and offers publishing interactively -- see
 [operations.md](operations.md#writing-and-publishing) for the full
 authoring flow.
+
+**Replacing an existing blog?** Bring the old content in before you deploy,
+so the first published version of the site is already complete. `./import.sh`
+walks you through it -- Bluesky, Tumblr or a Twitter/X archive export -- and
+always previews what it would write before writing anything. See
+[operations.md → Importing](operations.md#importing-from-another-platform),
+and `./import.sh --help` for the scriptable equivalents.
 
 ## 6. Pick a deploy target
 

@@ -103,9 +103,59 @@ see it:
   formatting spans may come out normalized. Content markdown can't
   express (imported embeds, link cards) is protected by a count-based
   loss check in the CLI before saving.
-- The migration scripts (`migrate_tumblr.rb`, `migrate_twitter.rb`)
-  write the same schema through the shared `lib/post_writer.rb`, so an
-  imported post and a hand-written one are indistinguishable downstream.
+- The importers write the same schema through the shared
+  `lib/post_writer.rb`, so an imported post and a hand-written one are
+  indistinguishable downstream.
+
+## Importing
+
+An import splits along the line between what every platform needs and what
+only one does, so that adding the fifth source doesn't mean a fifth copy of
+the first four's plumbing:
+
+- **`Import::Media`** collects one post's media for `PostWriter`, from
+  either a URL (download, following redirects, retrying transient failures)
+  or a path an export already contains. Filenames are numbered per post in
+  registration order, which is what makes a re-import land on the same names
+  so `PostWriter`'s "skip if it exists" copy is a no-op instead of a
+  duplicate. In dry-run it allocates and counts without fetching -- so
+  adapters must take image dimensions from platform metadata, never from the
+  downloaded bytes.
+- **`Import::Run`** drives: walk the source, hand each item to the adapter,
+  write it, count why items were skipped, report. Skips are Symbols, so the
+  summary can answer the question anyone reads a summary for -- why fewer
+  posts arrived than the source has. Two callbacks, `on_scan` and `on_post`,
+  let a wizard show progress without this layer knowing what a terminal is.
+- **An adapter** implements only `label`, `each_item` (paging the source)
+  and `map(item, media)`, returning a post hash or a skip reason. Two
+  optional hooks cover what sources differ on: `preamble` (a line to print
+  before a slow read) and `total` (the source's size, often knowable only
+  once the first page arrives).
+- **`Import::Cli`** is the non-interactive front end the `scripts/migrate_*.rb`
+  wrappers share, so each is a handful of lines. Every source is therefore
+  reachable both ways -- wizard or script -- over one implementation of the
+  mapping.
+
+An adapter judges items rather than pre-filtering them: `map` returns
+`:reply`/`:retweet`/`:quote`/`:empty` instead of the adapter quietly dropping
+them, so the run's summary can account for every item the source held. That
+also means a written-post counter is not a progress fraction -- a source that
+skips half its items never writes as many posts as it has -- so both counters
+are reported and the caller picks: against a `LIMIT` the goal is posts
+written, against a whole source it's position scanned.
+
+`Import::Bluesky` is the reference adapter. Two things it has to get right
+generalize to any API source: facet offsets are UTF-8 **byte** positions
+while the schema's formatting spans are **codepoints**, so every boundary is
+converted (skip that and spans land several characters off on any non-ASCII
+text), and video arrives as an HLS playlist rather than a file, so the
+poster frame is imported as an image -- a `video` block with no media would
+render as "video unavailable".
+
+`scripts/import.rb` is a second wizard rather than a menu entry in
+`blog.sh`, and always previews in dry-run before writing. `lib/site_header.rb`
+is shared by both wizards so the site-identity block can't drift between
+them.
 
 Supporting casts: `lib/slug.rb` (one folding/slugification used for
 post slugs, tag slugs, heading anchors and the search index -- and
@@ -137,9 +187,17 @@ A single linear pass, no framework:
    (newest 500, loaded eagerly) and archive (loaded on first query);
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
-6. **Colors.** `config/site.yml`'s 7-key palettes compile into
-   `assets/css/colors.css`; `site.css` itself contains zero color
-   values.
+6. **Colors and the root favicon.** `config/site.yml`'s 7-key palettes
+   compile into `assets/css/colors.css`; `site.css` itself contains zero
+   color values. `build_favicon_ico` wraps `assets/images/favicon.png` in
+   an ICO container (a 22-byte header, then the PNG verbatim) and emits
+   `/favicon.ico` -- pages link the PNG, so this exists purely for clients
+   that request the root path without reading the `<link>`. No image
+   library involved, the same "smallest correct slice of a format"
+   approach as `lib/qr_code.rb`; returns nil with no source PNG, so a site
+   without a favicon simply doesn't get the file. ICO's dimension fields
+   are one byte each and 0 means 256, so a larger source can't state its
+   size -- browsers load it and report 256, immaterial at favicon sizes.
 7. **Write & prune.** `emit` writes a file only when its bytes actually
    changed and records every generated path; whatever the build didn't
    produce this run is deleted afterward, deepest directories collapsing

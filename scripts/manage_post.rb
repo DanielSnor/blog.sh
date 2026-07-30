@@ -23,6 +23,7 @@ require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/publishing'
 require_relative '../lib/tui'
+require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
 require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
@@ -1043,23 +1044,10 @@ rescue SystemExit
   nil
 end
 
-# Which engine, which site, which domain -- an accent bar rather than a
-# boxed panel so it never needs a bordered panel's width-matching
-# discipline (see the design discussion this came out of): each line
-# stands alone, so a long site name or claim just makes that one line
-# longer instead of risking mismatched corners on a narrow terminal.
-# Site fields are optional (SITE_SHORT_NAME/_DESCRIPTION/_BASE_URL can
-# all be blank on a barely-started install) -- absent ones are simply
-# skipped, never rendered as an empty line.
+# Which engine, which site, which domain. Lives in lib/site_header.rb so
+# ./import.sh prints the identical block -- see the reasoning there.
 def wizard_header
-  bar = Tui.paint('▍', :cyan)
-  claim = [SITE_SHORT_NAME, SITE_DESCRIPTION].compact.reject(&:empty?).join(' — ')
-  domain = SITE_BASE_URL.to_s.sub(%r{\Ahttps?://}, '').chomp('/')
-
-  lines = [Tui.paint('blog.sh', :bold)]
-  lines << claim unless claim.empty?
-  lines << Tui.paint(domain, :dim) unless domain.empty?
-  lines.map { |line| "#{bar}#{line}" }.join("\n")
+  SiteHeader.render
 end
 
 def run_wizard
