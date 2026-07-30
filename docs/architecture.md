@@ -209,7 +209,12 @@ A single linear pass, no framework:
    (newest 500, loaded eagerly) and archive (loaded on first query);
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
-6. **Colors and the root favicon.** `config/site.yml`'s 7-key palettes
+6. **Assets, colors and the root favicon.** Before `assets/` is copied
+   into the build, any live name missing under `assets/images/` is seeded
+   from the tracked `assets/images/defaults/` -- the live banner and
+   favicon are per-install files outside git (see decisions.md), so a
+   fresh clone renders immediately while an owner's own artwork is never
+   overwritten; `defaults/` itself is not published. `config/site.yml`'s 7-key palettes
    compile into `assets/css/colors.css`; `site.css` itself contains zero
    color values. `build_favicon_ico` wraps `assets/images/favicon.png` in
    an ICO container (a 22-byte header, then the PNG verbatim) and emits

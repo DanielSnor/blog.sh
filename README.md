@@ -298,8 +298,10 @@ iCloud doesn't exist, it's just a name.
    copy is enough to try things out locally -- without the Surfer values,
    uploads are simply skipped (logged, not an error).
 3. Replace `assets/images/header.png` (the banner) and
-   `assets/images/favicon.png` with your own -- both ship with the engine, so
-   a fresh clone renders before you've drawn anything. Update `banner.width`/
+   `assets/images/favicon.png` with your own -- defaults ship with the engine
+   (`assets/images/defaults/`, copied to any missing live name at build time),
+   so a fresh clone renders before you've drawn anything, and the live names
+   are gitignored so your artwork survives `git pull`. Update `banner.width`/
    `height` to your image's real size; that's what reserves layout space
    before it loads.
 4. `./blog.sh add` to write your first post.

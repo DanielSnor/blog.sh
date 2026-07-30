@@ -231,6 +231,17 @@ no-gems rule intact, the same trade as the QR encoder below. *Cost:* an
 oversized source can't state its true size in ICO's one-byte dimension
 fields, so browsers report 256 -- invisible at the sizes a favicon renders.
 
+**Per-install graphics live outside git.** The banner and favicon are
+per-site artwork, like `config/site.yml` is per-site identity -- so their
+live names (`assets/images/header.png`, `favicon.png`) are gitignored and
+the repo tracks only `assets/images/defaults/`, which the build copies to
+any live name that's missing. Before this split, a deployment that pulled
+the repo had its own artwork sitting on tracked paths: every `git pull`
+either refused ("would be overwritten") or silently reverted the site's
+face to the project's. *Cost:* replacing the shipped default requires
+deleting the live file, not just committing a new default -- an existing
+live file always wins.
+
 **A QR encoder in the repo rather than a gem or a web service.** The
 draft-preview-on-a-phone workflow is the reason this engine looks the
 way it does, and a scannable code closes its last manual step. Sending
