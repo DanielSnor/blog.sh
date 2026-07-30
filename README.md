@@ -83,9 +83,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 - `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
 - `schedule <slug>` -- automatic publishing (toot included) by a cron step
-  when the post's date arrives; the [s] dialog choice asks for the date
-  directly, the standalone command takes it from a future-dated draft;
-  run again to cancel
+  when the post's date arrives; asks for that date, whether reached as the
+  [s] dialog choice or as its own command; run again to cancel
 - `unpublish <slug>` -- returns a post to draft, deletes its announcement;
   gets a fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
@@ -292,7 +291,7 @@ cron, backup, troubleshooting) is
 ./blog.sh add                  # creates a draft, shows a preview, asks what's next
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
 ./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
-./blog.sh schedule [<slug>]    # auto-publish a future-dated draft when its date arrives
+./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/
 ./blog.sh restore [<slug>]     # restores a post from trash

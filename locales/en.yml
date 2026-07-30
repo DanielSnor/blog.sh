@@ -163,7 +163,6 @@ cli:
   delete_bluesky_failed: "Deleting the Bluesky announcement failed -- delete it by hand."
   backdated_no_toot: "Post date isn't current (a backdated post), the announcement was not sent."
   schedule_only_drafts: "Post '%{slug}' is already published -- only drafts can be scheduled."
-  schedule_needs_future_date: "Post '%{slug}' needs a future date first -- set one via ./blog.sh edit %{slug}. (An untouched creation date would mean \"publish now\", and that's what publish is for.)"
   scheduled_label: "Scheduled: '%{slug}' publishes automatically at %{date}."
   schedule_cron_note: "Requires the publish-scheduled.sh cron to be installed -- see docs/operations.md. Run schedule again to cancel."
   unscheduled_label: "Schedule cancelled: '%{slug}' stays a draft."
@@ -224,7 +223,7 @@ cli:
       ./blog.sh add                  creates a draft, shows a preview and asks what's next
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
-      ./blog.sh schedule [<slug>]    schedules a draft for automatic publishing at its (future) date; run again to cancel
+      ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash

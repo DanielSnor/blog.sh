@@ -310,7 +310,9 @@ def draft_decision_loop(slug)
     case Tui.key_choice(t('cli.what_next_prompt'))
     when 'p' then return publish_draft(slug)
     when 'e' then edit_post(slug)
-    when 's' then return if schedule_from_dialog(path, post)
+    when 's'
+      puts
+      return if prompt_and_schedule(path, post)
     when 'd', ''
       puts
       puts t('cli.left_as_draft', slug: slug)
@@ -326,14 +328,20 @@ def draft_decision_loop(slug)
   end
 end
 
-# The [s] choice in draft_decision_loop: asks for a publish date right in
-# the dialog and schedules the draft under it -- unlike the standalone
-# `schedule` command, no prior `edit` is needed to set the date. Returns
-# true when scheduled (the dialog ends), false on cancel/invalid input
-# (the dialog comes around again). The preview is rebuilt because the
-# entered date becomes the post's date and shows on the draft page.
-def schedule_from_dialog(path, post)
-  puts
+# Asks for a publish date and schedules the draft under it. Shared by the
+# [s] dialog choice and the standalone `schedule` command -- both ask the
+# same question, and since the frontmatter no longer offers a date field,
+# asking is the only way either of them can get one. Returns true when
+# scheduled, false on cancel/invalid input: the dialog uses that to come
+# around again, the standalone command just ends. The preview is rebuilt
+# because the entered date becomes the post's date and shows on the draft
+# page.
+#
+# No leading blank line here: the two callers arrive with different things
+# above them. pick_from_list already ends with one, while the dialog's
+# key_choice leaves the cursor right under the echoed keypress -- so that
+# branch prints its own.
+def prompt_and_schedule(path, post)
   print t('cli.schedule_date_prompt')
   input = $stdin.gets&.strip.to_s
   return false if input.empty?
@@ -519,10 +527,10 @@ end
 
 # Marks a draft for automatic publishing by cron
 # (scripts/publish-scheduled.sh) once its date arrives -- or cancels the
-# mark when run on an already scheduled post (a toggle). The date must be
-# deliberately set to the future via `edit` first: an untouched
-# creation-time date would mean "publish immediately", and for that
-# `publish` exists.
+# mark when run on an already scheduled post (a toggle). Asks for the
+# date, exactly as the [s] dialog choice does: it used to require one set
+# to the future via `edit` beforehand, which stopped being a usable route
+# when the frontmatter template dropped its date field.
 def cmd_schedule(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
@@ -543,18 +551,7 @@ def cmd_schedule(slug)
     return
   end
 
-  date = Time.parse(post['date'])
-  untouched = post['created_at'] && post['date'] == post['created_at']
-  if untouched || date <= Time.now
-    warn t('cli.schedule_needs_future_date', slug: slug)
-    warn ''
-    return
-  end
-
-  File.write(path, JSON.pretty_generate(post.merge('scheduled' => true)))
-  puts t('cli.scheduled_label', slug: slug, date: date.strftime(t('date_time_format')))
-  puts t('cli.schedule_cron_note')
-  puts
+  prompt_and_schedule(path, post)
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also

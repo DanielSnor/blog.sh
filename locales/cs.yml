@@ -154,7 +154,6 @@ cli:
   delete_bluesky_failed: "Smazání oznámení na Bluesky selhalo — smaž ho ručně."
   backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), oznámení se neposlalo."
   schedule_only_drafts: "Post '%{slug}' už je publikovaný — plánovat jde jen drafty."
-  schedule_needs_future_date: "Post '%{slug}' potřebuje nejdřív budoucí datum — nastav ho přes ./blog.sh edit %{slug}. (Nedotčené datum vytvoření by znamenalo „publikovat hned“, a na to je publish.)"
   scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
   schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Opětovné schedule plán zruší."
   unscheduled_label: "Plán zrušen: '%{slug}' zůstává draftem."
@@ -215,7 +214,7 @@ cli:
       ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
       ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
-      ./blog.sh schedule [<slug>]    naplánuje draft k automatické publikaci v jeho (budoucím) datu; opětovné spuštění plán zruší
+      ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
       ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše

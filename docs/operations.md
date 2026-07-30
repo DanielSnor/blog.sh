@@ -47,12 +47,11 @@ than on the homepage -- the CLI says so when it happens.
 enter the publish date and time directly -- the
 [publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) then
 publishes the draft (toot included) once that date arrives, keeping it
-as the post's date. The standalone `./blog.sh schedule <slug>` doesn't
-ask -- it only flags a draft that already carries a future date (from a
-hand-typed `date:` line, or from a previous scheduling), and refuses one
-whose date is untouched or past, since that would just mean "publish
-now". Running `schedule` again cancels; `list` shows such drafts as
-`[SCHEDULED]`.
+as the post's date. The standalone `./blog.sh schedule <slug>` asks the
+same question, so either route works. A past date is refused (that would
+just mean "publish now", and `publish` is for that). Running `schedule`
+on an already scheduled draft cancels it; `list` shows scheduled drafts
+as `[SCHEDULED]`.
 
 ### In the terminal
 
