@@ -91,6 +91,12 @@ def ask_source
   puts
   print t('import.enter_number')
   input = $stdin.gets.to_s.strip
+  # Range-checked rather than indexed straight off to_i: "" and "abc" both
+  # become 0, and SOURCES[-1] is the *last* source -- so a piped run with no
+  # answer would silently start importing from whatever happens to be at the
+  # bottom of the list.
+  return nil unless input.match?(/\A[1-9]\d*\z/) && input.to_i <= SOURCES.size
+
   SOURCES[input.to_i - 1]
 end
 
