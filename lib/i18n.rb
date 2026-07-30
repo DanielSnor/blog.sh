@@ -32,7 +32,7 @@ module I18n
       abort("❌ Missing locale file #{path} -- add one, or set site.lang: #{DEFAULT_LANG} in config/site.yml")
     end
 
-    YAML.load_file(path) || {}
+    SiteConfig.load_yaml(path)
   end
 
   # Dotted key path, e.g. t('nav.home'). %{name}-style placeholders in the

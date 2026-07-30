@@ -52,6 +52,21 @@ USAGE
     ;;
 esac
 
+# Same prerequisite check as blog.sh -- see the comment there. Help above
+# needs no Ruby, so this sits after it.
+if ! command -v ruby >/dev/null 2>&1; then
+  echo "❌ Ruby not found -- blog.sh needs Ruby 2.7 or newer."
+  echo "   macOS:         brew install ruby   (then add it to PATH as brew instructs)"
+  echo "   Debian/Ubuntu: sudo apt install ruby-full"
+  echo "   Windows:       use WSL2 and follow the Debian/Ubuntu line"
+  exit 1
+fi
+if ! ruby -e 'exit((RUBY_VERSION.split(".").map(&:to_i) <=> [2, 7]) >= 0)'; then
+  echo "❌ Ruby $(ruby -e 'print RUBY_VERSION') is too old -- blog.sh needs Ruby 2.7 or newer."
+  echo "   macOS: the system /usr/bin/ruby stays at 2.6; brew install ruby and put it first in PATH."
+  exit 1
+fi
+
 [ -t 1 ] && clear
 echo "== blog.sh import =="
 echo

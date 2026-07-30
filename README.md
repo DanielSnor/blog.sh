@@ -1,6 +1,6 @@
 # blog.sh — .sh → .rb → .html
 
-![sh → .rb → .html](assets/images/header.png)
+![sh → .rb → .html](assets/images/defaults/header.png)
 
 *minimalistic static web/log cms*
 
@@ -272,7 +272,7 @@ iCloud doesn't exist, it's just a name.
 
 ## Requirements
 
-- **Ruby 3.0+**, standard library only -- no gems, no Bundler, nothing to
+- **Ruby 2.7+** (3.x recommended), standard library only -- no gems, no Bundler, nothing to
   install. One caveat: the optional Pixelfed/RSS sidebar widgets use
   `rexml`, a Ruby *default gem* (ships with a normal Ruby install, but
   some distro package splits leave it out -- see
@@ -287,6 +287,11 @@ iCloud doesn't exist, it's just a name.
   widgets
 
 ## Getting started
+
+Coming from zero on macOS, Linux or Windows? There's a complete
+copy-paste path per platform -- Ruby included -- in
+[docs/install.md → Quick start](docs/install.md#quick-start). The steps
+below assume Ruby 2.7+ is already on the machine:
 
 1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
    site's title, description, social links, and (optionally) analytics,

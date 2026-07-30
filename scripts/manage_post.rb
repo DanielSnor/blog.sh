@@ -150,7 +150,15 @@ def edit_in_editor(initial_content, hint_comment)
     path = File.join(dir, 'post.md')
     File.write(path, "#{hint_comment}#{initial_content}")
     editor = ENV['EDITOR'] || ENV['VISUAL'] || 'nano --breaklonglines --softwrap'
-    system(*Shellwords.split(editor), path) || abort("$EDITOR (#{editor}) failed")
+    ok = system(*Shellwords.split(editor), path)
+    # The default nano flags postdate the 2007-vintage nano Apple still
+    # ships -- when the *default* editor rejects them, retry bare nano
+    # before giving up. A user's own $EDITOR gets no second-guessing.
+    ok ||= ENV['EDITOR'].nil? && ENV['VISUAL'].nil? && system('nano', path)
+    unless ok
+      abort("$EDITOR (#{editor}) failed -- set the EDITOR environment variable " \
+            'to an editor that exists here (e.g. export EDITOR=vim) and rerun.')
+    end
     edited = File.read(path, encoding: 'utf-8')
     edited = edited.gsub(/^<!--.*?-->\n/m, '')
     edited.gsub(%r{^//.*\n?}, '')
@@ -1105,6 +1113,12 @@ end
 
 command = ARGV.shift
 
+# `help` is the one command a fresh clone must be able to answer before
+# any config exists (SiteConfig.get above degrades to defaults for it).
+# Everything else -- the wizard included -- still requires config/site.yml,
+# and asking for it here keeps the abort message as the first thing said.
+SiteConfig.data unless ['help', '--help', '-h'].include?(command)
+
 if command.nil?
   run_wizard
 else
@@ -1145,6 +1159,9 @@ else
     end
     port = (ARGV.shift || '8000').to_i
     puts t('cli.preview_serving', url: "http://localhost:#{port}/")
+    # The serve loop below blocks forever -- with stdout piped (not a TTY)
+    # the URL line would sit in the buffer the whole time, so push it out.
+    $stdout.flush
     PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
   when 'list'
     filters = {}

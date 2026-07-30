@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Uploads public.nosync/ to Surfer, using the environment from env.sh
-# (SURFER_URL, SURFER_TOKEN, SURFER_REMOTE_DIR).
-# Run this on the server (inside the Docker container that has Ruby).
+# Uploads public.nosync/ to the deploy backend configured in env.sh
+# (DEPLOY_BACKEND: surfer | local | rsync | git | rclone | sftp; unset
+# falls back to Surfer). Run wherever the build runs.
 #
 # Smart sync: uploads only new/changed files (by SHA256 in
 # .deploy_manifest.json), not the whole public.nosync/ every time.
@@ -22,7 +22,6 @@ case "$*" in
   *--force*)   echo "Mode: forced upload of everything (--force)." ;;
   *)           echo "Mode: smart sync -- uploading only new/changed files." ;;
 esac
-echo "Uploading to Surfer..."
 echo
 
 if [ ! -f env.sh ]; then

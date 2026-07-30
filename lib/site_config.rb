@@ -2,6 +2,24 @@
 
 require 'yaml'
 
+# Every entry point requires this file, so the two process-wide
+# prerequisites live here, next to the timezone handling below.
+#
+# Ruby 2.7 is the real floor (filter_map) -- checked up front so an old
+# interpreter fails as one sentence naming the fix, not as a NoMethodError
+# in the middle of writing the first post. macOS in particular still ships
+# Ruby 2.6 as /usr/bin/ruby on every current version.
+if (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 7]).negative?
+  abort("❌ Ruby #{RUBY_VERSION} is too old -- blog.sh needs Ruby 2.7 or newer. " \
+        'macOS: brew install ruby (and put it before /usr/bin in PATH). Debian/Ubuntu: apt install ruby-full.')
+end
+
+# Posts, config and locales are UTF-8 regardless of what the OS calls its
+# default -- on Windows Encoding.default_external is the ANSI codepage
+# (CP1250 on a Czech system), so a File.write without an explicit encoding
+# would store mojibake that every UTF-8 read then trips over.
+Encoding.default_external = Encoding::UTF_8
+
 # lib/site_config.rb -- loads config/site.yml.
 #
 # This is where everything that used to be hardcoded into templates and
@@ -21,8 +39,18 @@ module SiteConfig
         abort("❌ Missing #{PATH} -- nothing can be generated without a site config. Copy config/site.yml.example to config/site.yml and fill it in.")
       end
 
-      YAML.load_file(PATH) || {}
+      load_yaml(PATH)
     end
+  end
+
+  # Psych 4 (Ruby 3.1+) gave YAML.load_file safe_load semantics, where
+  # anchors/aliases (`<<: *defaults`) raise -- a config that merely uses a
+  # YAML feature shouldn't blow up, so allow them; older Psych doesn't know
+  # the keyword and allows them anyway.
+  def load_yaml(path)
+    YAML.load_file(path, aliases: true) || {}
+  rescue ArgumentError
+    YAML.load_file(path) || {}
   end
 
   # Called once at startup by every entry point (each script under scripts/
@@ -74,8 +102,14 @@ module SiteConfig
     abort("❌ Missing #{keys.join('.')} in #{PATH}")
   end
 
-  # Optional value with a default fallback.
+  # Optional value with a default fallback. Tolerates a missing config
+  # file outright (returns the default), so code paths that merely *want*
+  # a value -- `./blog.sh help`, the i18n locale pick -- work on a fresh
+  # clone. Anything that *requires* the config still aborts, via fetch or
+  # an explicit SiteConfig.data call.
   def get(*keys, default: nil)
+    return default unless File.exist?(PATH)
+
     value = keys.reduce(data) { |acc, key| acc.is_a?(Hash) ? acc[key] : nil }
     value.nil? ? default : value
   end

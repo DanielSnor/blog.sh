@@ -15,6 +15,23 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# The one real prerequisite, checked before anything else so a missing or
+# ancient Ruby fails as a sentence with the fix in it -- not as
+# "exec: ruby: not found" or a NoMethodError mid-post. macOS ships Ruby
+# 2.6 as /usr/bin/ruby on every current version, hence the brew hint.
+if ! command -v ruby >/dev/null 2>&1; then
+  echo "❌ Ruby not found -- blog.sh needs Ruby 2.7 or newer."
+  echo "   macOS:         brew install ruby   (then add it to PATH as brew instructs)"
+  echo "   Debian/Ubuntu: sudo apt install ruby-full"
+  echo "   Windows:       use WSL2 and follow the Debian/Ubuntu line"
+  exit 1
+fi
+if ! ruby -e 'exit((RUBY_VERSION.split(".").map(&:to_i) <=> [2, 7]) >= 0)'; then
+  echo "❌ Ruby $(ruby -e 'print RUBY_VERSION') is too old -- blog.sh needs Ruby 2.7 or newer."
+  echo "   macOS: the system /usr/bin/ruby stays at 2.6; brew install ruby and put it first in PATH."
+  exit 1
+fi
+
 # Help needs no environment, so it must not be gated on env.sh existing --
 # `./blog.sh help` is the first thing a fresh clone gets asked for, and
 # "Missing env.sh" is the wrong first impression. Before the clear too,
