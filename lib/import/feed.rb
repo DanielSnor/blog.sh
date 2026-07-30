@@ -196,9 +196,15 @@ module Import
 
     # WordPress already stores the slug it published under, so an import
     # keeps the URLs the old site had rather than inventing new ones.
+    # Capped, because a feed's <title> is not always a title: some sources
+    # put the whole post in it, and slugifying that produced 400-character
+    # URLs. A WordPress export's own post_name is trusted as-is -- that's
+    # the slug the site already published under.
     def item_slug(item)
       name = text_of(item, 'wp:post_name')
-      slug = Slug.slugify(name.empty? ? text_of(item, 'title') : name)
+      return Slug.slugify(name) unless name.empty?
+
+      slug = Slug.slugify(text_of(item, 'title').split(/\s+/).first(10).join(' '))
       return slug unless slug.empty?
 
       # A title-less feed entry still needs a stable slug, and the id is

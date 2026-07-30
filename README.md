@@ -373,6 +373,8 @@ Available sources:
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
+| Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
+| Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
 | WordPress | a WXR export file | every post; pages, attachments and menu items are skipped |
 | RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 
@@ -383,6 +385,8 @@ scripted migration -- same mapping, no preview pass, writes immediately:
 ruby scripts/migrate_bluesky.rb <handle>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
+ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
 ruby scripts/migrate_feed.rb <export.xml | feed-url>
 ```
 

@@ -29,6 +29,8 @@ require_relative '../lib/import/bluesky'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
 require_relative '../lib/import/feed'
+require_relative '../lib/import/mastodon'
+require_relative '../lib/import/pixelfed'
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -38,6 +40,8 @@ SOURCES = [
   ['bluesky', 'Bluesky', -> { build_bluesky }],
   ['tumblr', 'Tumblr', -> { build_tumblr }],
   ['twitter', 'Twitter/X (archive export)', -> { build_twitter }],
+  ['mastodon', 'Mastodon (account archive)', -> { build_mastodon }],
+  ['pixelfed', 'Pixelfed (statuses export)', -> { build_pixelfed }],
   ['feed', 'WordPress export or RSS/Atom feed', -> { build_feed }]
 ].freeze
 
@@ -69,6 +73,28 @@ end
 # One prompt for all three inputs it accepts: they are the same format --
 # a WXR export is RSS 2.0 with extra elements -- so asking which kind it is
 # would be asking the user something the file already says.
+def build_mastodon
+  dir = ask('import.mastodon_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Mastodon.new(dir) if File.exist?(File.join(dir, 'outbox.json'))
+
+  puts t('import.mastodon_dir_invalid', dir: dir)
+  nil
+end
+
+def build_pixelfed
+  path = ask('import.pixelfed_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Pixelfed.new(path) if File.exist?(path)
+
+  puts t('import.pixelfed_path_invalid', path: path)
+  nil
+end
+
 def build_feed
   source = ask('import.feed_source_prompt')
   return nil unless source
@@ -121,7 +147,7 @@ end
 # engine ships -- but a skip reason comes from an adapter, and a new adapter
 # inventing one must not take the wizard down mid-summary. Translated when
 # known, printed raw when not.
-TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed].freeze
+TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed boost reblog].freeze
 
 def reason_label(reason)
   TRANSLATED_REASONS.include?(reason.to_s) ? t("import.reason.#{reason}") : reason.to_s
