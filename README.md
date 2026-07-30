@@ -244,7 +244,12 @@ iCloud doesn't exist, it's just a name.
 
 ## Requirements
 
-- **Ruby 3.0+**, standard library only -- no gems, no Bundler, nothing to install
+- **Ruby 3.0+**, standard library only -- no gems, no Bundler, nothing to
+  install. One caveat: the optional Pixelfed/RSS sidebar widgets use
+  `rexml`, a Ruby *default gem* (ships with a normal Ruby install, but
+  some distro package splits leave it out -- see
+  [install.md](docs/install.md#what-you-need) if `gem install rexml`
+  is ever needed)
 - **bash** (the thin `blog.sh` / `deploy-web.sh` / `refresh-sidebar.sh` wrappers)
 - Optional, per integration: somewhere to deploy to (a
   [Cloudron Surfer](https://cloudron.io) app, any rsync/SSH host, a
@@ -265,8 +270,8 @@ iCloud doesn't exist, it's just a name.
    `/assets/images/favicon.png`).
 4. `./blog.sh add` to write your first post.
 5. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
-6. To preview locally before deploying, point any static file server at
-   `public.nosync/`, e.g. `ruby -run -e httpd public.nosync/ -p 8000`.
+6. `./blog.sh preview` to look at it locally before deploying anywhere
+   (serves `public.nosync/` at `http://localhost:8000`, Ctrl-C stops it).
 
 Every integration beyond the core (analytics, each sidebar widget,
 comments and the auto-announcement on Mastodon or Bluesky) is optional

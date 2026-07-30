@@ -174,6 +174,15 @@ half-block glyphs -- the smallest correct subset of the spec that the job
 needs (byte mode, EC level L, versions 1-5, fixed mask 0), verified
 module-for-module against a reference encoder.
 
+`lib/preview_server.rb` backs `./blog.sh preview`: a minimal
+`TCPServer`-based static file server (GET/HEAD, no keep-alive,
+thread-per-connection), in place of the obvious `ruby -run -e httpd`
+one-liner -- that depends on `webrick`, a default gem some distros
+split out of their minimal Ruby package (see [decisions.md](decisions.md)).
+Percent-decodes the request path itself and rejects anything that
+resolves outside the served root, the one security property a static
+file server actually needs.
+
 ## Deploy (`scripts/deploy_web.rb` + `lib/deploy_backend/`)
 
 The deploy script owns the *what*; backends own the *how*:

@@ -87,7 +87,21 @@ nothing can bit-rot in a dependency tree. Where stdlib can't reach
 (rsync, git, rclone, sftp, `$EDITOR`), the engine shells out to system
 binaries the user already understands. *Cost:* some things are
 hand-rolled that a gem would provide -- multipart uploads, JPEG/MP4
-header parsing, YAML-adjacent frontmatter.
+header parsing, YAML-adjacent frontmatter, and a static file server
+for `./blog.sh preview` (`lib/preview_server.rb`, plain `TCPServer`)
+instead of the `webrick`-dependent `ruby -run -e httpd` one-liner.
+
+**`rexml` is required lazily, inside the two fetchers that need it, not
+at load time.** `rexml` ships as a Ruby *default gem* -- present in a
+normal install, but some distros split their Ruby package and leave
+default gems out of the minimal one (Debian/Ubuntu's bare `ruby` vs.
+`ruby-full`). A build with no `widgets.pixelfed`/`widgets.rss`
+configured never touches `require 'rexml/document'` at all, so it
+can't fail over a dependency the site doesn't use; a `LoadError` when
+the widget *is* configured says exactly what to install rather than
+crashing the whole build. *Cost:* the require call moved from the top
+of two files to inside their `fetch_items`, a small deviation from
+every other file's load-time-requires convention.
 
 **No third-party requests from the visitor's browser.** Widgets are
 fetched server-side on cron into same-origin JSON: visitors' IPs leak

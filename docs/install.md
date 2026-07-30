@@ -13,11 +13,28 @@ Day-to-day usage lives in [operations.md](operations.md).
 - **A place to serve static files** -- any of the six deploy targets
   below, from a Cloudron Surfer app to a plain directory behind your own
   nginx/Caddy.
-- Optional: a **Mastodon account** (comments, auto-toot, sidebar
-  widgets) and **cron** (widget refresh).
+- Optional: a **Mastodon or Bluesky account** (comments, auto-announce,
+  sidebar widgets) and **cron** (widget refresh, scheduled publishing).
 
 The engine has no build-time network dependencies: a machine with Ruby
 and bash can build the whole site offline.
+
+**On "no gems" and default gems.** Everything in blog.sh is written
+against Ruby's core standard library -- nothing to `gem install`,
+ever, for the engine itself to run. The one nuance: the optional
+Pixelfed/RSS sidebar widgets parse XML with `rexml`, which Ruby ships
+as a *default gem* -- bundled with a normal `ruby` install, but some
+Linux distributions split their Ruby package and leave default gems
+out of the minimal one. If `widgets.pixelfed`/`widgets.rss` are unused,
+this never comes up; if you configure either and see a `LoadError`
+about `rexml`, either `gem install rexml` or install your distro's
+fuller Ruby package -- e.g. `ruby-full` instead of the bare `ruby` on
+Debian/Ubuntu (Arch's own `ruby` package already includes the full
+standard library, no separate install needed there). `./blog.sh
+preview`, by contrast, needed no such caveat to begin with: it's a
+small built-in static server (`lib/preview_server.rb`), not the
+`webrick`-dependent `ruby -run -e httpd` one-liner some other guides
+suggest.
 
 ## 1. Get the code
 
@@ -80,7 +97,7 @@ best.
 ```bash
 ./blog.sh add                  # write your first post (opens $EDITOR)
 ruby build/build_blog.rb       # build into public.nosync/
-ruby -run -e httpd public.nosync/ -p 8000   # preview at http://localhost:8000
+./blog.sh preview               # preview at http://localhost:8000 (Ctrl-C stops it)
 ```
 
 `add` always creates a draft and offers publishing interactively -- see

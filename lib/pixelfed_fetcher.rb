@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'rexml/document'
 require 'time'
 require_relative 'feed_http'
 require_relative 'site_config'
@@ -29,6 +28,19 @@ module PixelfedFetcher
 
   def self.fetch_items
     return [] unless configured?
+
+    # rexml is a default gem, not core stdlib -- present with a normal Ruby
+    # install, but some distros split it into a separate package (e.g.
+    # Debian/Ubuntu's `ruby-full` vs the bare `ruby`). Required here, not at
+    # load time, so a build with no `widgets.pixelfed` configured never
+    # needs it at all.
+    begin
+      require 'rexml/document'
+    rescue LoadError
+      warn "Pixelfed feed fetch failed: rexml isn't installed -- `gem install rexml` " \
+           '(or install your distro\'s full Ruby package, e.g. ruby-full on Debian/Ubuntu).'
+      return []
+    end
 
     doc = REXML::Document.new(FeedHttp.get(FEED_URL))
 

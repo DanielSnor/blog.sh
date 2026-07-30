@@ -24,6 +24,7 @@ require_relative '../lib/content_type'
 require_relative '../lib/publishing'
 require_relative '../lib/tui'
 require_relative '../lib/qr_code'
+require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
 
 def t(key, **vars)
@@ -1080,9 +1081,9 @@ else
     unless Dir.exist?(File.join(ROOT, 'public.nosync'))
       abort t('cli.preview_missing_public')
     end
-    port = ARGV.shift || '8000'
+    port = (ARGV.shift || '8000').to_i
     puts t('cli.preview_serving', url: "http://localhost:#{port}/")
-    exec('ruby', '-run', '-e', 'httpd', File.join(ROOT, 'public.nosync'), '-p', port)
+    PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
   when 'list'
     filters = {}
     ARGV.each do |arg|
