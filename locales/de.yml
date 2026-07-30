@@ -177,7 +177,7 @@ cli:
   published_label: "Veröffentlicht: %{path}"
   publishing: "Veröffentliche"
   done_label: "Fertig: %{url}"
-  backdated_note: "Ein rückdatierter Beitrag erscheint weder auf der Startseite noch im RSS -- er wandert direkt ins Archiv."
+  backdated_note: "Ein rückdatierter Beitrag wird nach seinem Datum einsortiert -- Startseite und RSS kann er dadurch überspringen und direkt im Archiv landen."
 
   post_not_found: "Beitrag '%{slug}' nicht gefunden.\n\n"
   still_draft_toot: "Beitrag '%{slug}' ist noch ein Entwurf -- veröffentliche ihn zuerst (./blog.sh publish %{slug}); erst dann hat ein Toot etwas zu verlinken."

@@ -172,7 +172,7 @@ cli:
   published_label: "Publikováno: %{path}"
   publishing: "Publikuji"
   done_label: "Hotovo: %{url}"
-  backdated_note: "Zpětně datovaný post není na úvodní stránce ani v RSS — je rovnou v archivu."
+  backdated_note: "Zpětně datovaný post se řadí podle svého data — úvodní stránku a RSS tak může minout a skončit rovnou v archivu."
 
   post_not_found: "Post '%{slug}' nenalezen.\n\n"
   still_draft_toot: "Post '%{slug}' je pořád draft -- nejdřív publikuj (./blog.sh publish %{slug}), teprve pak má toot na co odkazovat."

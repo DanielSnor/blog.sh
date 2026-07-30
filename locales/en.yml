@@ -181,7 +181,7 @@ cli:
   published_label: "Published: %{path}"
   publishing: "Publishing"
   done_label: "Done: %{url}"
-  backdated_note: "A backdated post doesn't appear on the homepage or in RSS -- it goes straight into the archive."
+  backdated_note: "A backdated post is ordered by its date -- it can skip the homepage and RSS and land straight in the archive."
 
   post_not_found: "Post '%{slug}' not found.\n\n"
   still_draft_toot: "Post '%{slug}' is still a draft -- publish it first (./blog.sh publish %{slug}); only then does a toot have something to link to."

@@ -41,10 +41,14 @@ one real step is a current Ruby via [Homebrew](https://brew.sh):
 
 ```bash
 brew install ruby
-echo 'export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"' >> ~/.zshrc
+echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >> ~/.zshrc
 exec zsh
 ruby -v    # 3.x now, not 2.6.10
 ```
+
+(That PATH line is for Apple Silicon; on an Intel Mac it's
+`/usr/local/opt/ruby/bin`. `brew install ruby` prints the exact line for
+your machine at the end of its output -- trust that one.)
 
 (No Homebrew yet? Install it first with the one command on
 [brew.sh](https://brew.sh). `git` is already there on any Mac with the
@@ -113,9 +117,10 @@ above), not `/mnt/c/...` -- file permissions (`chmod 600` on your
 tokens) and speed only work properly on the Linux side; and
 `http://localhost:8000/` works straight from your Windows browser, WSL2
 forwards it. Git Bash instead of WSL2 mostly runs too, but the
-interactive menus degrade (mintty isn't a TTY to a native Ruby) and
-`chmod` protects nothing on NTFS -- with real tokens in env.sh, WSL2 is
-the supported route.
+interactive menus degrade (mintty isn't a TTY to a native Ruby),
+non-ASCII output is garbled until the console is switched to UTF-8
+(`chcp 65001`), and `chmod` protects nothing on NTFS -- with real tokens
+in env.sh, WSL2 is the supported route.
 
 The engine has no build-time network dependencies: a machine with Ruby
 and bash can build the whole site offline.

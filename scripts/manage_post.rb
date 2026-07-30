@@ -218,10 +218,16 @@ end
 # --- commands ------------------------------------------------------------
 
 def cmd_add
-  # Kept aside for the same reason it always was: at publish time it's
-  # compared against post['date'] to tell whether a manually-typed
-  # date: line (still parsed below, just no longer suggested) overrode
-  # it -- see publish_draft.
+  # created_at == date is what marks a draft's date as auto-suggested
+  # (see publish_draft, and unpublish, which restores that equality on
+  # purpose). With no date: line typed, created_at is therefore written
+  # from the very same Time object as date below. When the author *does*
+  # type one, created_at keeps this pre-editor creation timestamp, the
+  # two fields differ, and publish_draft leaves the typed date alone.
+  # (Writing both from one object matters: this value is truncated to
+  # minutes and taken before the editor opens, so comparing it against a
+  # post-editor, seconds-precise date could never come out equal -- for a
+  # long time every draft published as if hand-dated because of that.)
   suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
   template = build_frontmatter(title: '', tags: '', type: '') +
              "First paragraph's text.\n"
@@ -268,7 +274,7 @@ def cmd_add
     'slug' => slug,
     'title' => title,
     'date' => date.iso8601,
-    'created_at' => suggested.iso8601,
+    'created_at' => (meta['date'].to_s.empty? ? date : suggested).iso8601,
     'state' => DRAFT,
     'draft_token' => SecureRandom.hex(8),
     'tags' => tags,
