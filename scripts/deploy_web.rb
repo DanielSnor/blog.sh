@@ -79,9 +79,16 @@ end
 
 abort('❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb).') unless Dir.exist?(PUBLIC_DIR)
 
+# An unconfigured target skips the upload rather than failing: install.md
+# promises that an unedited env.sh is enough to try everything locally,
+# and the authoring flow calls this after every save -- a fresh clone
+# would otherwise get a red ❌ on its very first post. Logged loudly so a
+# server whose env.sh lost its values doesn't look like a clean deploy.
 unless DRY || BACKEND.configured?
-  abort("❌ Deploy backend '#{BACKEND.label}' is not configured -- see env.sh.example " \
-        '(DEPLOY_BACKEND and the values it needs, e.g. SURFER_URL/SURFER_TOKEN for Surfer).')
+  puts "ℹ️  Deploy backend '#{BACKEND.label}' is not configured -- skipping the upload. " \
+       'The build in public.nosync/ is complete; view it with ./blog.sh preview. ' \
+       'To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example).'
+  exit 0
 end
 
 files = Dir.glob(File.join(PUBLIC_DIR, '**', '*'))

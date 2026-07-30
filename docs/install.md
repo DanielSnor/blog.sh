@@ -6,10 +6,27 @@ Day-to-day usage lives in [operations.md](operations.md).
 
 ## What you need
 
-- **Ruby 3.0+** -- standard library only, no gems, no Bundler. Check with
-  `ruby -v`.
+- **Ruby 2.7+** (3.x is what the real deployments run) -- standard
+  library only, no gems, no Bundler. Check with `ruby -v`; `blog.sh`
+  checks too and says exactly this if the interpreter is too old.
 - **bash** -- for the thin `blog.sh` / `deploy-web.sh` /
   `refresh-sidebar.sh` wrappers.
+
+Per OS, that means:
+
+- **Linux**: `sudo apt install ruby-full` (Debian/Ubuntu; `ruby-full`
+  rather than the bare `ruby` -- see the default-gems note below) or your
+  distro's equivalent.
+- **macOS**: `brew install ruby`, then put it in PATH the way brew's
+  install output says. The system `/usr/bin/ruby` is 2.6 on every current
+  macOS and Apple treats it as frozen -- `ruby -v` showing 2.6.10 means
+  you're still on it. The system nano is similarly ancient; if the editor
+  step complains, `export EDITOR=vim` (or anything you like) fixes it.
+- **Windows**: use **WSL2** and follow the Linux line inside it -- the
+  wrappers are bash, so there is no native cmd/PowerShell path. Git Bash
+  mostly works but degrades the interactive menus (mintty isn't a TTY to
+  a native Ruby), and `chmod 600 env.sh` protects nothing on NTFS -- with
+  real tokens in env.sh, WSL2 is the supported route.
 - **A place to serve static files** -- any of the six deploy targets
   below, from a Cloudron Surfer app to a plain directory behind your own
   nginx/Caddy.

@@ -272,7 +272,7 @@ iCloud doesn't exist, it's just a name.
 
 ## Requirements
 
-- **Ruby 3.0+**, standard library only -- no gems, no Bundler, nothing to
+- **Ruby 2.7+** (3.x recommended), standard library only -- no gems, no Bundler, nothing to
   install. One caveat: the optional Pixelfed/RSS sidebar widgets use
   `rexml`, a Ruby *default gem* (ships with a normal Ruby install, but
   some distro package splits leave it out -- see
