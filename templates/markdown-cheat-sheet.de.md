@@ -11,17 +11,27 @@ Ein Link auf diese Seite steht auch in der Editor-Hilfe, sie ist beim Schreiben 
 - [Links](#links)
 - [Listen](#listen)
 - [Zitate](#zitate)
+- [Chat](#chat)
 - [Trennlinie](#trennlinie)
 - [Codeblöcke](#codeblocke)
 - [Tabellen](#tabellen)
 - [Bilder](#bilder)
 - [Video](#video)
+- [Audio](#audio)
 - [Escaping](#escaping)
-- [Noch nicht unterstützt](#noch-nicht-unterstutzt)
+- [Bewusst nicht unterstützt](#bewusst-nicht-unterstutzt)
 
 ## Absätze
 
-Absätze trennt eine Leerzeile. Ein Zeilenumbruch innerhalb eines Absatzes wird beim Rendern zu einem Leerzeichen — für einen neuen Absatz also eine Leerzeile dazwischen lassen.
+Absätze trennt eine Leerzeile. Ein Zeilenumbruch innerhalb eines Absatzes wird beim Rendern zu einem Leerzeichen — für einen neuen Absatz also eine Leerzeile dazwischen lassen. Für einen harten Umbruch *innerhalb* eines Absatzes die Zeile mit einem Backslash beenden:
+
+```
+Erste Zeile \
+zweite direkt darunter.
+```
+
+Erste Zeile \
+zweite direkt darunter.
 
 ```
 Erster Absatz.
@@ -113,6 +123,16 @@ Aufzählungen beginnen mit Bindestrich oder Sternchen, eine nummerierte Liste mi
 2. zweiter Eintrag
 3. dritter Eintrag
 
+Eine Aufgabenliste markiert Einträge mit eckigen Klammern — gerendert als Checkboxen (nur lesbar; Besucher haken deine Aufgaben nicht ab):
+
+```
+- [x] Beitrag schreiben
+- [ ] veröffentlichen
+```
+
+- [x] Beitrag schreiben
+- [ ] veröffentlichen
+
 Die Zahlen sind egal, beim Rendern wird neu durchnummeriert. Eine verschachtelte Liste wird um zwei Leerzeichen eingerückt:
 
 ```
@@ -142,6 +162,36 @@ Jede Zeile eines Zitats beginnt mit `>`.
 
 > Fang am Anfang an, sagte der König ernst,
 > und lies, bis du ans Ende kommst: dann hör auf.
+
+Eine letzte Zeile, die mit einem Gedankenstrich (oder `--`) beginnt, wird
+zur Quellenangabe:
+
+```
+> Fang am Anfang an und lies,
+> bis du ans Ende kommst: dann hör auf.
+> — Lewis Carroll
+```
+
+> Fang am Anfang an und lies,
+> bis du ans Ende kommst: dann hör auf.
+> — Lewis Carroll
+
+## Chat
+
+Ein Dialog kommt in einen `chat`-Zaun, eine Zeile je Aussage — der Sprecher
+vor dem Doppelpunkt. Eine Zeile ohne Doppelpunkt setzt die vorige fort.
+
+```
+Watson: Was bedeutet das?
+Holmes: Elementar.
+```
+
+Geschrieben als:
+
+    ```chat
+    Watson: Was bedeutet das?
+    Holmes: Elementar.
+    ```
 
 ## Trennlinie
 
@@ -213,6 +263,16 @@ Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei und
 
 Eine bloße YouTube-Adresse auf eigener Zeile wird **nicht** zum Player — sie wird ein gewöhnlicher Link. Das ist Absicht, damit sich ein Video auch einfach nur verlinken lässt.
 
+## Audio
+
+Dieselben zwei Ausrufezeichen wie beim Video — unterschieden werden sie an
+der Dateiendung (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Die
+Unterschrift ist Pflicht**, gerendert wird ein nativer Player.
+
+```
+!![Unterschrift der Aufnahme](/pfad/zur/aufnahme.mp3)
+```
+
 ## Escaping
 
 Um ein Zeichen zu schreiben, das in Markdown etwas bedeutet, stell ihm einen Backslash voran.
@@ -231,16 +291,18 @@ Sieben Zeichen mit Bedeutung in Markdown lassen sich escapen:
 
 Vor jedem anderen Zeichen bleibt der Backslash stehen, wie er ist — das Emoticon d8-\ braucht also keine Sonderbehandlung.
 
-## Noch nicht unterstützt
+## Bewusst nicht unterstützt
 
-Damit dich nichts überrascht, wenn es so bleibt, wie du es getippt hast:
+Das fehlt nicht — jedes wurde abgewogen und abgelehnt, meist weil seine
+Kosten alle träfen, die es *nicht* benutzen:
 
-- Kursiv mit Unterstrichen `_so_` — nimm Sternchen
-- harte Zeilenumbrüche (zwei Leerzeichen am Zeilenende)
-- Aufgabenlisten `- [ ]`
-- mit Leerzeichen eingerückte Codeblöcke — nimm die drei Backticks
+- Kursiv mit Unterstrichen `_so_` — Unterstriche stecken in normalem Text
+  (datei_namen, snake_case); nimm Sternchen
+- mit Leerzeichen eingerückte Codeblöcke — kollidiert mit der Einrückung
+  verschachtelter Listen; nimm die drei Backticks
+- mit `===` unterstrichene Überschriften — eine Strichzeile bedeutet schon
+  Trennlinie und Frontmatter-Grenze
 - verschachtelte Zitate `>>`
-- mit `===` unterstrichene Überschriften
 - Referenzlinks `[text][id]` und Fußnoten
 
-Nichts davon zerlegt deinen Text, es wird nur genau so gerendert, wie geschrieben.
+Auch das wird genau so gerendert, wie geschrieben.

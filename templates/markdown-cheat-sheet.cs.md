@@ -11,17 +11,27 @@ Odkaz na tuhle stránku je i v nápovědě v editoru, takže ji máte při psan�
 - [Odkazy](#odkazy)
 - [Seznamy](#seznamy)
 - [Citace](#citace)
+- [Chat](#chat)
 - [Vodorovná čára](#vodorovna-cara)
 - [Blok kódu](#blok-kodu)
 - [Tabulky](#tabulky)
 - [Obrázky](#obrazky)
 - [Video](#video)
+- [Audio](#audio)
 - [Escapování](#escapovani)
-- [Co zatím nefunguje](#co-zatim-nefunguje)
+- [Záměrně nepodporované](#zamerne-nepodporovane)
 
 ## Odstavce
 
-Odstavce se oddělují prázdným řádkem. Zalomení uvnitř odstavce se při zobrazení slije do mezery — pokud tedy chcete nový odstavec, nechte mezi nimi volný řádek.
+Odstavce se oddělují prázdným řádkem. Zalomení uvnitř odstavce se při zobrazení slije do mezery — pokud tedy chcete nový odstavec, nechte mezi nimi volný řádek. Pro tvrdé zalomení *uvnitř* odstavce ukončete řádek zpětným lomítkem:
+
+```
+První řádek \
+druhý hned pod ním.
+```
+
+První řádek \
+druhý hned pod ním.
 
 ```
 První odstavec.
@@ -113,6 +123,16 @@ Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem 
 2. druhý bod
 3. třetí bod
 
+Zaškrtávací seznam značí položky hranatými závorkami — vykreslí se jako checkboxy (jen ke čtení; návštěvník vaše úkoly neodškrtá):
+
+```
+- [x] napsat post
+- [ ] publikovat ho
+```
+
+- [x] napsat post
+- [ ] publikovat ho
+
 Na číslech nezáleží, při zobrazení se přepočítají. Vnořený seznam se odsadí o dvě mezery:
 
 ```
@@ -142,6 +162,35 @@ Každý řádek citace začíná znakem `>`.
 
 > Nad Tatrou sa blýska, hromy divo bijú.
 > Zastavme ich bratia, veď sa ony stratia, Slováci ožijú.
+
+Poslední řádek začínající dlouhou pomlčkou (nebo `--`) se stane atribucí:
+
+```
+> Začni na začátku a pokračuj,
+> dokud nedojdeš na konec: pak přestaň.
+> — Lewis Carroll
+```
+
+> Začni na začátku a pokračuj,
+> dokud nedojdeš na konec: pak přestaň.
+> — Lewis Carroll
+
+## Chat
+
+Dialog patří do ohrady `chat`, jedna replika na řádek — mluvčí před
+dvojtečkou. Řádek bez dvojtečky pokračuje v předchozí replice.
+
+```
+Watson: Co to znamená?
+Holmes: Elementární.
+```
+
+Zapsáno jako:
+
+    ```chat
+    Watson: Co to znamená?
+    Holmes: Elementární.
+    ```
 
 ## Vodorovná čára
 
@@ -213,6 +262,16 @@ Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor i pro YouTube
 
 Samotná adresa na YouTube napsaná na řádku se na přehrávač **nezmění** — z ní bude obyčejný odkaz. To je schválně, aby šlo na video jen odkázat.
 
+## Audio
+
+Stejné dva vykřičníky jako u videa — rozlišuje je přípona souboru
+(.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Popisek je povinný**
+a soubor se vykreslí jako nativní přehrávač.
+
+```
+!![Popisek nahrávky](/cesta/k/nahravce.mp3)
+```
+
 ## Escapování
 
 Když chcete napsat znak, který má v markdownu význam, předsaďte mu zpětné lomítko.
@@ -231,16 +290,18 @@ Escapovat jde sedm znaků, které v markdownu něco znamenají:
 
 Před jiným znakem lomítko zůstane, jak je — takže smajlík d8-\ psát nijak zvlášť nemusíte.
 
-## Co zatím nefunguje
+## Záměrně nepodporované
 
-Ať nikoho nepřekvapí, že něco zůstane, jak to napsal:
+Tohle nechybí — každá položka byla zvážena a odmítnuta, většinou proto, že
+by její cena dopadla na všechny, kdo ji *nepoužívají*:
 
-- podtržítková kurzíva `_takhle_` — používejte hvězdičky
-- tvrdé zalomení řádku (dvě mezery na konci)
-- zaškrtávací seznamy `- [ ]`
-- blok kódu odsazený mezerami — používejte tři apostrofy
+- podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu
+  (názvy_souborů, snake_case); používejte hvězdičky
+- blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů;
+  používejte tři apostrofy
+- nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici
+  frontmatteru
 - vnořené citace `>>`
-- nadpis podtržený `===` pod textem
 - referenční odkazy `[text][id]` a poznámky pod čarou
 
-Nic z toho text nezkomolí, jen se to zobrazí tak, jak jste to napsali.
+I tohle se zobrazí přesně tak, jak jste to napsali.

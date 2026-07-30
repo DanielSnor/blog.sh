@@ -117,6 +117,9 @@ Two things to expect on a real archive:
   exactly the "file count swung wildly" shape it watches for. That's
   working as intended: check the numbers, then re-run with `--force`.
 
+Per-source walkthroughs -- where to get each export, what is kept and
+skipped, undo, troubleshooting -- live in [importing.md](importing.md).
+
 Re-running an import is safe. Posts are matched on
 `source.platform`/`account`/`original_id` and overwritten in place, so a
 second pass fixes a bad first one rather than doubling it. That same triple

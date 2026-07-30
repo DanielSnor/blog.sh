@@ -12,10 +12,12 @@ date_time_format: "%b %-d, %Y %H:%M"
 nav:
   home: "Home"
   text: "Text"
+  quotes: "Quotes"
+  chat: "Chat"
   images: "Images"
   video: "Video"
   links: "Links"
-  rss: "RSS"
+  audio: "Audio"
   menu_label: "Menu"
   search_label: "Search"
   search_placeholder: "Search…"
@@ -25,6 +27,7 @@ post:
   back_to_list: "← back to list"
   read_more: "Read more"
   video_unavailable: "[video unavailable]"
+  audio_unavailable: "[audio unavailable]"
   draft_title_prefix: "[PREVIEW] "
   draft_banner_heading: "Preview of an unpublished post!!!"
   draft_banner_notice: "Not visible anywhere on the blog and can't be reached except through this URL:"
@@ -42,8 +45,11 @@ tag:
 
 type:
   text: "Text"
+  quote: "Quotes"
+  chat: "Chat"
   image: "Images"
   video: "Video"
+  audio: "Audio"
   link: "Links"
   title: "%{label} – %{short_name}"
   description: "Posts of type %{label} on %{author}'s personal site."
@@ -120,8 +126,9 @@ cli:
     FRONTMATTER (between --- and ---):
       title  heading (optional)
       tags   comma-separated tags, e.g: nature, hike, city
-      type   post type -- text / image / video / link (optional -- leave it
-             blank and the type is inferred from the post's content)
+      type   post type -- text / quote / chat / image / video / audio / link
+             (optional -- leave it blank and the type is inferred from the
+             post's content)
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
     [s]chedule asks for a future date/time when you pick it.

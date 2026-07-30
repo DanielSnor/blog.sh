@@ -36,8 +36,13 @@ module MarkdownWriter
         rendered = render_text_markdown(b['text'], b['formatting'])
         case b['subtype']
         when /\Aheading([1-6])\z/ then "#{'#' * Regexp.last_match(1).to_i} #{rendered}"
-        when 'quote' then rendered.split("\n").map { |l| l.empty? ? '>' : "> #{l}" }.join("\n")
-        else rendered
+        when 'quote'
+          quoted = rendered.split("\n").map { |l| l.empty? ? '>' : "> #{l}" }.join("\n")
+          b['cite'] ? "#{quoted}\n> — #{b['cite']}" : quoted
+        # A newline stored in a paragraph is a hard break and writes back as
+        # the visible backslash marker -- without this, re-saving would
+        # collapse it into a space via the parser's prose-wrapping rule.
+        else rendered.gsub("\n", "\\\n")
         end
       when 'table'
         table_to_markdown(b)
@@ -45,6 +50,9 @@ module MarkdownWriter
         list_to_markdown(b)
       when 'hr'
         '---'
+      when 'chat'
+        body = (b['lines'] || []).map { |l| l['name'] ? "#{l['name']}: #{l['text']}" : l['text'].to_s }.join("\n")
+        "```chat\n#{body}\n```"
       when 'code'
         "```#{b['lang']}\n#{b['text']}\n```"
       when 'image'
@@ -52,6 +60,14 @@ module MarkdownWriter
         path = File.join(media_dir, media['url'].to_s)
         cap = b['caption'] ? %( "#{b['caption']}") : ''
         "![#{b['alt_text']}](#{path}#{cap})"
+      when 'audio'
+        # Mirrors the video branch: a local file writes back as !![](file);
+        # an imported embed-only audio (a Spotify iframe, say) has no
+        # markdown form and is dropped here -- the CLI's content-loss
+        # safeguard counts it before anything is saved.
+        media = (b['media'] || []).first
+        caption = b['caption'].to_s.strip
+        "!![#{caption.empty? ? 'Audio' : caption}](#{File.join(media_dir, media['url'].to_s)})" if media
       when 'video'
         # Without this, `edit` would silently drop the video -- filter_map
         # below throws out a nil. An empty caption would be rejected on save,
@@ -133,7 +149,8 @@ module MarkdownWriter
     marker_for = ->(idx) { list['style'] == 'ol' ? "#{idx + 1}." : '-' }
     pad = '  ' * indent
     (list['items'] || []).each_with_index.map do |it, idx|
-      line = "#{pad}#{marker_for.call(idx)} #{render_text_markdown(it['text'], it['formatting'])}"
+      task = it.key?('checked') ? (it['checked'] ? '[x] ' : '[ ] ') : ''
+      line = "#{pad}#{marker_for.call(idx)} #{task}#{render_text_markdown(it['text'], it['formatting'])}"
       it['children'] ? "#{line}\n#{list_to_markdown(it['children'], indent + 1)}" : line
     end.join("\n")
   end

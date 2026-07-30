@@ -122,10 +122,32 @@ module MarkdownParser
   BLOCKQUOTE_LINE_RE = /\A>[ \t]?(.*)\z/
   TABLE_SEPARATOR_RE = /\A\|?[\s:|-]*-[\s:|-]*\|?\z/
   VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
+  AUDIO_EXTENSIONS = %w[.mp3 .m4a .ogg .opus .aac .flac .wav].freeze
+
+  # A private-use character standing in for a hard break while the paragraph
+  # goes through parse_inline -- it's one codepoint, so swapping it back for
+  # a real newline afterwards leaves every formatting offset intact.
+  BREAK_SENTINEL = "\uE000"
+
+  # A backslash at the end of a line is a hard break (rendered <br>); any
+  # other newline inside a paragraph is prose wrapping and collapses to a
+  # space, exactly as the cheat sheet always promised. Escaped \\ stays a
+  # literal backslash. Storage-wise a break is simply a newline kept in the
+  # block's text -- the same shape multiline imports already have.
+  def collapse_soft_breaks(para)
+    # Spaces before the marker are eaten here, before parse_inline computes
+    # formatting offsets -- trimming them afterwards would shift every span
+    # that crosses the break.
+    para.gsub(/ *(?<!\\)\\\n/, BREAK_SENTINEL).tr("\n", ' ')
+  end
   YOUTUBE_RE = %r{\Ahttps?://(?:www\.)?(?:youtube\.com/watch\?(?:[^\s]*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})}
 
   def video_path?(path)
     VIDEO_EXTENSIONS.include?(File.extname(path.to_s).downcase)
+  end
+
+  def audio_path?(path)
+    AUDIO_EXTENSIONS.include?(File.extname(path.to_s).downcase)
   end
 
   # --- tables ---------------------------------------------------------------
@@ -179,10 +201,23 @@ module MarkdownParser
     return nil unless lines.all? { |l| l.strip.empty? || BLOCKQUOTE_LINE_RE.match?(l.strip) }
     return nil unless lines.any? { |l| BLOCKQUOTE_LINE_RE.match?(l.strip) }
 
-    quoted = lines.map { |l| l.strip.empty? ? '' : BLOCKQUOTE_LINE_RE.match(l.strip)[1] }.join("\n")
-    text, formatting = parse_inline(quoted)
+    quoted_lines = lines.map { |l| l.strip.empty? ? '' : BLOCKQUOTE_LINE_RE.match(l.strip)[1] }
+
+    # A last line opening with an em dash (or "--") is the attribution --
+    # "> Quote\n> — Author", the Tumblr quote-post shape. Only when
+    # something precedes it: a one-line quote that merely starts with a
+    # dash is still a quote, not an empty quote with an author.
+    cite = nil
+    if quoted_lines.size > 1 && (m = /\A(?:—|--)\s+(.+)\z/.match(quoted_lines.last.strip))
+      cite = m[1].strip
+      quoted_lines.pop
+      quoted_lines.pop while quoted_lines.last.to_s.empty?
+    end
+
+    text, formatting = parse_inline(quoted_lines.join("\n"))
     block = { 'type' => 'text', 'subtype' => 'quote', 'text' => text }
     block['formatting'] = formatting unless formatting.empty?
+    block['cite'] = cite if cite
     block
   end
 
@@ -226,9 +261,18 @@ module MarkdownParser
       m = item_re.match(line.strip)
       break unless m
 
-      text, formatting = parse_inline(m[1])
+      body = m[1]
+      # "- [ ] task" / "- [x] done" -- the marker is consumed here, so the
+      # stored text is just the task, and `checked` carries the state.
+      checked = nil
+      if (task = /\A\[([ xX])\]\s+(.*)\z/.match(body))
+        checked = task[1] != ' '
+        body = task[2]
+      end
+      text, formatting = parse_inline(body)
       item = { 'text' => text }
       item['formatting'] = formatting unless formatting.empty?
+      item['checked'] = checked unless checked.nil?
       items << item
       idx += 1
     end
@@ -298,6 +342,29 @@ module MarkdownParser
   # interpretation inside source code). An unterminated fence (no closing ```
   # before the body ends) is still treated as code through to the end, rather
   # than silently reverting to prose.
+  # "Name: what they said" per line, Tumblr chat-post style. A line
+  # without a colon is a continuation of the previous line (kept with a
+  # newline -- rendered as a break); a leading continuation with nobody to
+  # attach to becomes a nameless line. Returns nil for an empty fence.
+  def parse_chat(text)
+    lines = []
+    text.split("\n").each do |raw|
+      line = raw.rstrip
+      next if line.strip.empty?
+
+      if (m = /\A([^:]{1,60}):\s+(.*)\z/.match(line))
+        lines << { 'name' => m[1].strip, 'text' => m[2] }
+      elsif lines.any?
+        lines.last['text'] = "#{lines.last['text']}\n#{line.strip}"
+      else
+        lines << { 'name' => nil, 'text' => line.strip }
+      end
+    end
+    return nil if lines.empty?
+
+    { 'type' => 'chat', 'lines' => lines }
+  end
+
   def split_code_fences(body)
     segments = []
     lines = body.split("\n")
@@ -333,6 +400,17 @@ module MarkdownParser
     if (m = VIDEO_RE.match(para))
       caption, target = m[1].strip, m[2].strip
       abort "Video needs a caption: !![caption](#{target})" if caption.empty?
+
+      # Same !! marker, told apart by extension -- a third sigil would be one
+      # more thing to remember for what is the same gesture: "embed this
+      # media file with a caption".
+      if audio_path?(target)
+        counter += 1
+        filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
+        media_files[src] = filename if src
+        counter -= 1 unless src
+        return [{ 'type' => 'audio', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
+      end
 
       if (yt = YOUTUBE_RE.match(target))
         # Stores url + youtube_id, the renderer builds the iframe -- so no
@@ -377,8 +455,8 @@ module MarkdownParser
     elsif (list = parse_list(para))
       return [list, counter]
     else
-      text, formatting = parse_inline(para)
-      block = { 'type' => 'text', 'text' => text }
+      text, formatting = parse_inline(collapse_soft_breaks(para))
+      block = { 'type' => 'text', 'text' => text.gsub(BREAK_SENTINEL, "\n") }
       block['formatting'] = formatting unless formatting.empty?
       return [block, counter]
     end
@@ -391,6 +469,16 @@ module MarkdownParser
 
     split_code_fences(body).each do |segment|
       if segment[:type] == :code
+        # The chat fence rides the code-fence rails on purpose: a fence is
+        # verbatim, so speaker lines can hold colons, asterisks or anything
+        # else without inline parsing, and the round-trip is the fence
+        # itself. "Name: line" per line; a line without a colon continues
+        # the previous speaker's line.
+        if segment[:lang] == 'chat'
+          chat = parse_chat(segment[:text])
+          blocks << chat if chat
+          next
+        end
         block = { 'type' => 'code', 'text' => segment[:text] }
         block['lang'] = segment[:lang] unless segment[:lang].to_s.empty?
         blocks << block

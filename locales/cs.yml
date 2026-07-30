@@ -11,10 +11,12 @@ date_time_format: "%-d. %-m. %Y %H:%M"
 nav:
   home: "Domů"
   text: "Text"
+  quotes: "Citáty"
+  chat: "Chat"
   images: "Obrázky"
   video: "Video"
   links: "Odkazy"
-  rss: "RSS"
+  audio: "Audio"
   menu_label: "Menu"
   search_label: "Hledat"
   search_placeholder: "Hledat…"
@@ -24,6 +26,7 @@ post:
   back_to_list: "← zpět na výpis"
   read_more: "Číst dál"
   video_unavailable: "[video nedostupné]"
+  audio_unavailable: "[audio není k dispozici]"
   draft_title_prefix: "[NÁHLED] "
   draft_banner_heading: "Náhled nepublikovaného příspěvku!!!"
   draft_banner_notice: "Není nikde na blogu vidět a jinak než přes toto URL jej nelze zobrazit:"
@@ -41,8 +44,11 @@ tag:
 
 type:
   text: "Text"
+  quote: "Citáty"
+  chat: "Chat"
   image: "Obrázky"
   video: "Video"
+  audio: "Audio"
   link: "Odkazy"
   title: "%{label} – %{short_name}"
   description: "Příspěvky typu %{label} na osobním webu %{author}."
@@ -111,8 +117,9 @@ cli:
     FRONTMATTER (mezi --- a ---):
       title  nadpis (volitelný)
       tags   tagy oddělené čárkou, např: příroda, procházka, praha
-      type   typ postu — text / image / video / link (volitelné — necháš-li
-             prázdné, typ se odvodí sám podle obsahu postu)
+      type   typ postu — text / quote / chat / image / video / audio / link
+             (volitelné — necháš-li prázdné, typ se odvodí sám podle
+             obsahu postu)
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.

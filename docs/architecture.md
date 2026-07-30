@@ -22,8 +22,8 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
   optionally `mastodon_url` (its comment toot), `draft_token` and
   `created_at` (drafts), `type` (explicit content type override).
 - `content` is an array of **typed blocks**: `text` (with `subtype`
-  heading1-6/quote), `list`, `table`, `code`, `image`, `video`, `link`,
-  `hr`.
+  heading1-6/quote), `list`, `table`, `code`, `image`, `video`, `audio`,
+  `link`, `hr`.
 - Inline formatting (bold/italic/strikethrough/code/link) is stored as
   **codepoint offset ranges into plain text**, not nested HTML -- the
   same NPF-style shape Tumblr's API uses, which is what the importers
@@ -60,13 +60,15 @@ dedup by `source`).
 
 | `type` | Fields |
 | --- | --- |
-| `text` | `text`; `subtype` (`heading1`-`heading6`, `quote`; absent = paragraph); `formatting` |
+| `text` | `text`; `subtype` (`heading1`-`heading6`, `quote`; absent = paragraph); `formatting`; a quote may carry `cite` (attribution, rendered as a right-aligned line) |
 | `list` | `style` (`"ul"`/`"ol"`); `items` -- each `{text, formatting?, children?}` where `children` is a nested list block |
 | `table` | `align` (array of `left`/`center`/`right`); `header` (array of cells); `rows` (array of cell arrays); a cell is `{text, formatting?}` |
 | `code` | `text` (verbatim, blank lines preserved); `lang` (cosmetic) |
+| `chat` | `lines` -- array of `{name, text}`; `name` may be nil for a continuation line |
 | `hr` | no fields |
 | `image` | `media` (see below); `alt_text`; `caption` |
 | `video` | one of three shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
+| `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
 | `link` | `url`; `title`; `description` -- rendered as a link card |
 
 An unrecognized `type` renders as its raw JSON in a `<pre>` -- loud,
@@ -177,7 +179,10 @@ them.
 Supporting casts: `lib/slug.rb` (one folding/slugification used for
 post slugs, tag slugs, heading anchors and the search index -- and
 mirrored client-side by `fold()` in search.js), `lib/content_type.rb`
-(dominant type: video > image > link > text), `lib/media_dimensions.rb`
+(dominant type: video > audio > image > chat > quote > link > text, where
+"quote" means the post's first block is one, and media win only while the
+post's text stays caption-sized -- past 500 characters it's an article
+with illustrations, i.e. text), `lib/media_dimensions.rb`
 (width/height straight from PNG/JPEG/MP4 headers, so pages reserve
 space and never jump).
 

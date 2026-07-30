@@ -117,6 +117,7 @@ module Import
       when 'text' then text_block(block)
       when 'image' then image_block(block, media)
       when 'video' then video_block(block, media)
+      when 'audio' then audio_block(block, media)
       when 'link' then link_block(block, media)
       end
     end
@@ -156,6 +157,25 @@ module Import
         'embed_html' => embed_html_for(block),
         'media' => media_filename ? [{ 'url' => media_filename, 'width' => item['width'], 'height' => item['height'] }] : nil,
         'poster' => poster_filename ? [{ 'url' => poster_filename }] : nil
+      }.compact
+    end
+
+    # Self-hosted audio carries a downloadable file; SoundCloud/Spotify-style
+    # embeds only ever hand over an iframe, which stays external -- same
+    # split as video. Title and artist become the caption, since that's
+    # what a music post shows.
+    def audio_block(block, media)
+      item = block['media']
+      media_filename = item && media.from_url(item['url'])
+      caption = [block['title'], block['artist']].compact.reject(&:empty?).join(' — ')
+
+      {
+        'type' => 'audio',
+        'provider' => block['provider'],
+        'url' => block['url'],
+        'embed_html' => embed_html_for(block),
+        'media' => media_filename ? [{ 'url' => media_filename }] : nil,
+        'caption' => (caption unless caption.empty?)
       }.compact
     end
 

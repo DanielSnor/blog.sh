@@ -21,6 +21,29 @@ sanitize, and escaping stays entirely the renderer's job. *Cost:*
 overlapping-span rendering is genuinely fiddly (see `apply_formatting`
 and `render_markdown_range`).
 
+**A post's type is derived from its blocks; media claim it only
+caption-deep.** The `/type/` listings need every post filed exactly
+once, and asking the author to pick a type on every post would be one
+more prompt that's usually inferable -- so the type is derived, with an
+explicit `type:` in the frontmatter as the override for the post that
+disagrees. The rules, measured against a 3281-post archive before
+choosing: media (video > audio > image) win only while the post's text
+stays under 500 characters -- past that it's an article and the media
+are illustrations; a quote post is one that *opens* with a quote, so a
+quote cited mid-text doesn't reclassify an essay; any chat block makes
+a chat post, since a transcript is always a deliberate choice. The
+rejected alternatives misfiled real posts: first-block-wins turns a
+photo tweet into text (the text arrives first), a block-count majority
+turns a greeting card with two caption sentences into text. *Cost:*
+any heuristic misfiles some edge case -- that's what the explicit
+override is for.
+
+**The nav lists what a reader browses; the feed isn't that.** RSS left
+the menu: subscribers find the feed through the autodiscovery `<link>`
+every page carries (and the URL never changed), while a nav slot is
+paid for by every visitor on every page. With quote and chat arriving,
+seven items was the budget.
+
 **Media always lives next to its post; nothing is hotlinked.** Imported
 posts survive their source platform dying (the Twitter/Tumblr archives
 this engine was born from are full of dead CDN links). *Cost:* disk

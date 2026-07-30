@@ -375,6 +375,28 @@ def apply_formatting(text, formatting)
   end.join
 end
 
+# A newline stored in block text is a hard break. Applied after escaping and
+# span-wrapping, so the <br> can't collide with either; a chunk never
+# contains markup newlines of its own.
+def with_breaks(html)
+  html.gsub("\n", '<br>')
+end
+
+# Local files get the native player; an imported embed (Spotify and the
+# like) is passed through like an imported video embed. No dimensions
+# anywhere -- degenerate_image? is about images reserving layout space, an
+# <audio> element has a fixed height of its own.
+def render_audio(block, media_prefix)
+  local_media = (block['media'] || []).first
+  if local_media
+    %(<audio controls preload="metadata" src="#{media_prefix}#{local_media['url']}"></audio>)
+  elsif block['embed_html'] && !block['embed_html'].strip.empty?
+    block['embed_html']
+  else
+    "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
+  end
+end
+
 def render_video(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
@@ -427,12 +449,23 @@ def render_block(block, media_prefix, seen = {})
           else 'p'
           end
     id = heading ? %( id="#{h(heading_id(block['text'].to_s, seen))}") : ''
-    "<#{tag}#{id}>#{apply_formatting(block['text'], block['formatting'])}</#{tag}>"
+    inner = with_breaks(apply_formatting(block['text'], block['formatting']))
+    # A quote's attribution renders inside the blockquote as a <cite> line,
+    # so the pairing survives copy-paste and reader modes.
+    inner += %(<cite>— #{h(block['cite'])}</cite>) if tag == 'blockquote' && block['cite']
+    "<#{tag}#{id}>#{inner}</#{tag}>"
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
       nested = it['children'] ? render_block(it['children'], media_prefix, seen) : ''
-      "<li>#{apply_formatting(it['text'], it['formatting'])}#{nested}</li>"
+      # A task item gets a real (disabled) checkbox and drops the bullet via
+      # the class -- the checkbox is the bullet.
+      if it.key?('checked')
+        box = %(<input type="checkbox" disabled#{it['checked'] ? ' checked' : ''}>)
+        %(<li class="task-item">#{box} #{apply_formatting(it['text'], it['formatting'])}#{nested}</li>)
+      else
+        "<li>#{apply_formatting(it['text'], it['formatting'])}#{nested}</li>"
+      end
     end.join
     "<#{tag}>#{items}</#{tag}>"
   when 'table'
@@ -457,6 +490,20 @@ def render_block(block, media_prefix, seen = {})
     return inner if caption.empty?
 
     %(<figure>#{inner}<figcaption>#{CGI.escapeHTML(caption)}</figcaption></figure>)
+  when 'audio'
+    caption = block['caption'].to_s.strip
+    inner = render_audio(block, media_prefix)
+    return inner if caption.empty?
+
+    %(<figure>#{inner}<figcaption>#{CGI.escapeHTML(caption)}</figcaption></figure>)
+  when 'chat'
+    # A dialogue as a definition list: speaker as <dt>, line as <dd> --
+    # semantic enough for reader modes, styled compactly by site.css.
+    rows = (block['lines'] || []).map do |line|
+      dt = line['name'] ? "<dt>#{CGI.escapeHTML(line['name'])}</dt>" : ''
+      "#{dt}<dd>#{with_breaks(CGI.escapeHTML(line['text'].to_s))}</dd>"
+    end.join
+    %(<dl class="chat">#{rows}</dl>)
   when 'link'
     title = CGI.escapeHTML((block['title'] || block['url']).to_s)
     description = CGI.escapeHTML(block['description'].to_s)
@@ -519,7 +566,10 @@ CONTENT_ICONS = {
   'text' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>',
   'image' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></svg>',
   'video' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 9l4-2v10l-4-2"/></svg>',
-  'link' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/></svg>'
+  'link' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/></svg>',
+  'audio' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 6a8.5 8.5 0 010 12"/></svg>',
+  'quote' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/></svg>',
+  'chat' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
 }.freeze
 
 # Every post is rendered onto its own page, the index, its content-type
@@ -1083,11 +1133,14 @@ tags_map.each do |slug, data|
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
 end
 
-CONTENT_TYPES = %w[text image video link].freeze
+CONTENT_TYPES = %w[text quote chat image video audio link].freeze
 CONTENT_TYPE_LABELS = {
   'text' => t('type.text'),
+  'quote' => t('type.quote'),
+  'chat' => t('type.chat'),
   'image' => t('type.image'),
   'video' => t('type.video'),
+  'audio' => t('type.audio'),
   'link' => t('type.link')
 }.freeze
 

@@ -11,17 +11,27 @@ A link to this page is also in the in-editor help, so it's at hand while you wri
 - [Links](#links)
 - [Lists](#lists)
 - [Blockquotes](#blockquotes)
+- [Chat](#chat)
 - [Horizontal rule](#horizontal-rule)
 - [Code blocks](#code-blocks)
 - [Tables](#tables)
 - [Images](#images)
 - [Video](#video)
+- [Audio](#audio)
 - [Escaping](#escaping)
-- [Not supported yet](#not-supported-yet)
+- [Deliberately not supported](#deliberately-not-supported)
 
 ## Paragraphs
 
-Paragraphs are separated by a blank line. A line break inside a paragraph collapses into a space when rendered — so if you want a new paragraph, leave an empty line between them.
+Paragraphs are separated by a blank line. A line break inside a paragraph collapses into a space when rendered — so if you want a new paragraph, leave an empty line between them. For a hard line break *inside* a paragraph, end the line with a backslash:
+
+```
+First line \
+second line right under it.
+```
+
+First line \
+second line right under it.
 
 ```
 First paragraph.
@@ -113,6 +123,16 @@ Bullets start with a dash or an asterisk, an ordered list with a number and a pe
 2. second item
 3. third item
 
+A task list marks items with square brackets — rendered as checkboxes (read-only; a visitor can't tick your to-dos):
+
+```
+- [x] write the post
+- [ ] publish it
+```
+
+- [x] write the post
+- [ ] publish it
+
 The numbers don't matter, they're renumbered when rendered. A nested list is indented by two spaces:
 
 ```
@@ -142,6 +162,35 @@ Every line of a quote starts with `>`.
 
 > Begin at the beginning, the King said gravely,
 > and go on till you come to the end: then stop.
+
+A last line opening with an em dash (or `--`) becomes the attribution:
+
+```
+> Begin at the beginning, and go on
+> till you come to the end: then stop.
+> — Lewis Carroll
+```
+
+> Begin at the beginning, and go on
+> till you come to the end: then stop.
+> — Lewis Carroll
+
+## Chat
+
+A dialogue goes into a `chat` fence, one line per statement — the speaker's
+name before the colon. A line without a colon continues the previous one.
+
+```
+Watson: What does it mean?
+Holmes: Elementary.
+```
+
+Written as:
+
+    ```chat
+    Watson: What does it mean?
+    Holmes: Elementary.
+    ```
 
 ## Horizontal rule
 
@@ -213,6 +262,16 @@ Two exclamation marks, otherwise same as an image. Works for a local file and fo
 
 A bare YouTube address on its own line does **not** turn into a player — it becomes an ordinary link. That's deliberate, so a video can also just be linked to.
 
+## Audio
+
+Same two exclamation marks as a video — the file extension tells them apart
+(.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **The caption is mandatory**,
+and the file renders as a native player.
+
+```
+!![Audio caption](/path/to/recording.mp3)
+```
+
 ## Escaping
 
 To write a character that means something in Markdown, put a backslash in front of it.
@@ -231,16 +290,18 @@ Seven characters that carry meaning in Markdown can be escaped:
 
 Before any other character the backslash stays as it is — so the d8-\ emoticon needs no special treatment.
 
-## Not supported yet
+## Deliberately not supported
 
-So nothing takes you by surprise when it stays the way you typed it:
+These aren't missing — each was considered and turned down, mostly because
+its cost lands on everyone who *doesn't* use it:
 
-- underscore italics `_like this_` — use asterisks
-- hard line breaks (two trailing spaces)
-- task lists `- [ ]`
-- code blocks indented with spaces — use the three backticks
+- underscore italics `_like this_` — underscores live inside ordinary text
+  (file_names, snake_case); use asterisks
+- code blocks indented with spaces — collides with nested-list indentation;
+  use the three backticks
+- headings underlined with `===` — a line of dashes already means a
+  horizontal rule and the frontmatter delimiter
 - nested quotes `>>`
-- headings underlined with `===` below the text
 - reference links `[text][id]` and footnotes
 
-None of it mangles your text, it just renders exactly as written.
+These render exactly as written, too.
