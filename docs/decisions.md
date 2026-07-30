@@ -195,6 +195,17 @@ it belongs -- on a blog with thousands of posts, a cap that small is a
 functional restriction, not tidiness. *Cost:* window arithmetic (and
 digits selecting within the visible window, not the whole list).
 
+**Site icons come from one PNG.** Pages link `assets/images/favicon.png`
+directly, `apple-touch-icon` points at the same file (iOS scales it), and
+`/favicon.ico` is generated at build time by wrapping that PNG in an ICO
+container. One image to maintain instead of three, and the `.ico` exists only
+because a set of clients -- bots, feed readers, link-preview services, older
+browsers -- request the root path blindly and never read a `<link>`; without
+it each of those was a 404. Writing the 22-byte container ourselves keeps the
+no-gems rule intact, the same trade as the QR encoder below. *Cost:* an
+oversized source can't state its true size in ICO's one-byte dimension
+fields, so browsers report 256 -- invisible at the sizes a favicon renders.
+
 **A QR encoder in the repo rather than a gem or a web service.** The
 draft-preview-on-a-phone workflow is the reason this engine looks the
 way it does, and a scannable code closes its last manual step. Sending

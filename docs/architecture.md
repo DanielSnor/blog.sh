@@ -107,7 +107,7 @@ see it:
   `lib/post_writer.rb`, so an imported post and a hand-written one are
   indistinguishable downstream.
 
-## Importing (`lib/import/` + `scripts/import.rb`)
+## Importing
 
 An import splits along the line between what every platform needs and what
 only one does, so that adding the fifth source doesn't mean a fifth copy of
@@ -187,9 +187,17 @@ A single linear pass, no framework:
    (newest 500, loaded eagerly) and archive (loaded on first query);
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
-6. **Colors.** `config/site.yml`'s 7-key palettes compile into
-   `assets/css/colors.css`; `site.css` itself contains zero color
-   values.
+6. **Colors and the root favicon.** `config/site.yml`'s 7-key palettes
+   compile into `assets/css/colors.css`; `site.css` itself contains zero
+   color values. `build_favicon_ico` wraps `assets/images/favicon.png` in
+   an ICO container (a 22-byte header, then the PNG verbatim) and emits
+   `/favicon.ico` -- pages link the PNG, so this exists purely for clients
+   that request the root path without reading the `<link>`. No image
+   library involved, the same "smallest correct slice of a format"
+   approach as `lib/qr_code.rb`; returns nil with no source PNG, so a site
+   without a favicon simply doesn't get the file. ICO's dimension fields
+   are one byte each and 0 means 256, so a larger source can't state its
+   size -- browsers load it and report 256, immaterial at favicon sizes.
 7. **Write & prune.** `emit` writes a file only when its bytes actually
    changed and records every generated path; whatever the build didn't
    produce this run is deleted afterward, deepest directories collapsing

@@ -18,9 +18,10 @@ guides that go deeper:
 | Evaluating the engine | main README → the screenshots → *Why this exists* |
 | Setting up a site | [install.md](install.md), top to bottom |
 | Writing and publishing posts | [operations.md → Writing and publishing](operations.md#writing-and-publishing) |
+| Moving content in from elsewhere | [operations.md → Importing](operations.md#importing-from-another-platform), then `./import.sh` |
 | Something failed | [operations.md → Troubleshooting](operations.md#troubleshooting) |
 | Understanding the internals | [architecture.md](architecture.md), then the source -- every `lib/` file opens with a design comment |
-| Writing an importer | [architecture.md → Field reference](architecture.md#field-reference) -- produce that schema via `PostWriter.write` |
+| Writing an importer | [architecture.md → Importing](architecture.md#importing) for the adapter contract, [→ Field reference](architecture.md#field-reference) for the schema to produce |
 | Questioning a design choice | [decisions.md](decisions.md) first -- it may already argue both sides |
 
 The `screenshot-*.png` files here are the images embedded in the main

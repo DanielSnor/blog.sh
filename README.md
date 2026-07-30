@@ -119,10 +119,16 @@ deploy step around exactly that. A few of the choices that came out of it:
 - Pagination anchored to the oldest post (page boundaries stay stable as
   new posts are added), plus tag and content-type archives
 - RSS, sitemap, `robots.txt`
+- `/favicon.ico` generated from `assets/images/favicon.png` by wrapping it
+  in an ICO container, for the clients that request the root path blindly
+  and never read the `<link>` (bots, feed readers, older browsers)
 - Search index split into recent (newest 500, loaded eagerly) and
   archive (the rest, loaded lazily on first search)
 - Separate generated pages for `/markdown/` (cheat sheet) and `/search/`,
   outside `content/posts/`
+- Dates a reader sees are rendered in `site.timezone`, so an imported post
+  stored in UTC shows the day it was actually written; URLs, feeds and the
+  sitemap keep the stored offset, since a post's year must never move
 - Render memoization -- per-post content/time/type computed once, not
   4-6x across every listing it appears in
 - Only changed files are written (`emit`); anything the build didn't
@@ -185,8 +191,10 @@ deploy step around exactly that. A few of the choices that came out of it:
   (`DEFAULT_COLORS`) if `colors:` is omitted
 - Banner overlay: `site.short_name` (top-left, ~30px) and `site.description`
   (bottom-right, ~20px, wraps to multiple lines) render on top of the banner
-  image in self-hosted JetBrains Mono, with a corner scrim for readability
-  against any image -- see `.banner-title`/`.banner-claim` in `site.css`.
+  image in self-hosted JetBrains Mono. Each overlay darkens the corner it
+  sits in so it stays readable against any image -- and only that corner,
+  so a banner with both overlays off is shown exactly as authored. See
+  `.banner-title`/`.banner-claim` in `site.css`.
   Each independently optional: `banner.show_title`/`show_claim` (default
   true) toggle whether they render at all, `colors.<mode>.banner_title`/
   `banner_claim` override their color per light/dark mode (default: `nav_bg`
@@ -226,11 +234,14 @@ deploy step around exactly that. A few of the choices that came out of it:
 
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
+import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
                            deploy-web.sh      standalone deploy of public.nosync/ to Surfer (no rebuild)
                            refresh-sidebar.sh cron: refreshes only the sidebar widgets (no site rebuild)
+                           migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
+lib/import/              Import adapters plus the layer they share (media, run, CLI)
 locales/                 UI strings for the generated site and the CLI (en.yml, cs.yml)
 templates/               ERB templates (layout, post, index, search, partials)
                          + markdown-cheat-sheet.<lang>.md, the /markdown/ page's source
@@ -271,12 +282,18 @@ iCloud doesn't exist, it's just a name.
 
 1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
    site's title, description, social links, and (optionally) analytics,
-   sidebar widgets, and the comments network (Mastodon or Bluesky).
+   sidebar widgets, and the comments network (Mastodon or Bluesky). Set
+   `site.timezone` if you'll publish from a server -- a server clock is
+   usually UTC, and without it `schedule` reads times as UTC and a post
+   written after midnight can be dated to the previous day.
 2. Copy `env.sh.example` to `env.sh` and `chmod 600 env.sh`. An unedited
    copy is enough to try things out locally -- without the Surfer values,
    uploads are simply skipped (logged, not an error).
-3. Drop a banner image at the path set in `banner.src` (and a favicon at
-   `/assets/images/favicon.png`).
+3. Replace `assets/images/header.png` (the banner) and
+   `assets/images/favicon.png` with your own -- both ship with the engine, so
+   a fresh clone renders before you've drawn anything. Update `banner.width`/
+   `height` to your image's real size; that's what reserves layout space
+   before it loads.
 4. `./blog.sh add` to write your first post.
 5. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
 6. `./blog.sh preview` to look at it locally before deploying anywhere
