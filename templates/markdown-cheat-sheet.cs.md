@@ -16,8 +16,10 @@ Odkaz na tuhle stránku je i v nápovědě v editoru, takže ji máte při psan�
 - [Tabulky](#tabulky)
 - [Obrázky](#obrazky)
 - [Video](#video)
+- [Audio](#audio)
 - [Escapování](#escapovani)
 - [Co zatím nefunguje](#co-zatim-nefunguje)
+- [Záměrně nepodporované](#zamerne-nepodporovane)
 
 ## Odstavce
 
@@ -213,6 +215,16 @@ Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor i pro YouTube
 
 Samotná adresa na YouTube napsaná na řádku se na přehrávač **nezmění** — z ní bude obyčejný odkaz. To je schválně, aby šlo na video jen odkázat.
 
+## Audio
+
+Stejné dva vykřičníky jako u videa — rozlišuje je přípona souboru
+(.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Popisek je povinný**
+a soubor se vykreslí jako nativní přehrávač.
+
+```
+!![Popisek nahrávky](/cesta/k/nahravce.mp3)
+```
+
 ## Escapování
 
 Když chcete napsat znak, který má v markdownu význam, předsaďte mu zpětné lomítko.
@@ -235,12 +247,23 @@ Před jiným znakem lomítko zůstane, jak je — takže smajlík d8-\ psát nij
 
 Ať nikoho nepřekvapí, že něco zůstane, jak to napsal:
 
-- podtržítková kurzíva `_takhle_` — používejte hvězdičky
 - tvrdé zalomení řádku (dvě mezery na konci)
 - zaškrtávací seznamy `- [ ]`
-- blok kódu odsazený mezerami — používejte tři apostrofy
-- vnořené citace `>>`
-- nadpis podtržený `===` pod textem
-- referenční odkazy `[text][id]` a poznámky pod čarou
 
 Nic z toho text nezkomolí, jen se to zobrazí tak, jak jste to napsali.
+
+## Záměrně nepodporované
+
+Tohle nechybí — každá položka byla zvážena a odmítnuta, většinou proto, že
+by její cena dopadla na všechny, kdo ji *nepoužívají*:
+
+- podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu
+  (názvy_souborů, snake_case); používejte hvězdičky
+- blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů;
+  používejte tři apostrofy
+- nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici
+  frontmatteru
+- vnořené citace `>>`
+- referenční odkazy `[text][id]` a poznámky pod čarou
+
+I tohle se zobrazí přesně tak, jak jste to napsali.

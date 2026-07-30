@@ -122,10 +122,15 @@ module MarkdownParser
   BLOCKQUOTE_LINE_RE = /\A>[ \t]?(.*)\z/
   TABLE_SEPARATOR_RE = /\A\|?[\s:|-]*-[\s:|-]*\|?\z/
   VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
+  AUDIO_EXTENSIONS = %w[.mp3 .m4a .ogg .opus .aac .flac .wav].freeze
   YOUTUBE_RE = %r{\Ahttps?://(?:www\.)?(?:youtube\.com/watch\?(?:[^\s]*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})}
 
   def video_path?(path)
     VIDEO_EXTENSIONS.include?(File.extname(path.to_s).downcase)
+  end
+
+  def audio_path?(path)
+    AUDIO_EXTENSIONS.include?(File.extname(path.to_s).downcase)
   end
 
   # --- tables ---------------------------------------------------------------
@@ -333,6 +338,17 @@ module MarkdownParser
     if (m = VIDEO_RE.match(para))
       caption, target = m[1].strip, m[2].strip
       abort "Video needs a caption: !![caption](#{target})" if caption.empty?
+
+      # Same !! marker, told apart by extension -- a third sigil would be one
+      # more thing to remember for what is the same gesture: "embed this
+      # media file with a caption".
+      if audio_path?(target)
+        counter += 1
+        filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
+        media_files[src] = filename if src
+        counter -= 1 unless src
+        return [{ 'type' => 'audio', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
+      end
 
       if (yt = YOUTUBE_RE.match(target))
         # Stores url + youtube_id, the renderer builds the iframe -- so no

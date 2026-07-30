@@ -7,7 +7,9 @@
 # now both normalize the same way: an explicit, recognized `type` wins,
 # anything else falls back to scanning the post's blocks.
 module ContentType
-  PRIORITY = %w[video image link text].freeze
+  # audio outranks image: a song post usually carries cover art too, and the
+  # song is the point.
+  PRIORITY = %w[video audio image link text].freeze
 
   module_function
 

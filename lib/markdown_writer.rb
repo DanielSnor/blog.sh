@@ -52,6 +52,14 @@ module MarkdownWriter
         path = File.join(media_dir, media['url'].to_s)
         cap = b['caption'] ? %( "#{b['caption']}") : ''
         "![#{b['alt_text']}](#{path}#{cap})"
+      when 'audio'
+        # Mirrors the video branch: a local file writes back as !![](file);
+        # an imported embed-only audio (a Spotify iframe, say) has no
+        # markdown form and is dropped here -- the CLI's content-loss
+        # safeguard counts it before anything is saved.
+        media = (b['media'] || []).first
+        caption = b['caption'].to_s.strip
+        "!![#{caption.empty? ? 'Audio' : caption}](#{File.join(media_dir, media['url'].to_s)})" if media
       when 'video'
         # Without this, `edit` would silently drop the video -- filter_map
         # below throws out a nil. An empty caption would be rejected on save,

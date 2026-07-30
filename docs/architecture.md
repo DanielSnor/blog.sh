@@ -22,8 +22,8 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
   optionally `mastodon_url` (its comment toot), `draft_token` and
   `created_at` (drafts), `type` (explicit content type override).
 - `content` is an array of **typed blocks**: `text` (with `subtype`
-  heading1-6/quote), `list`, `table`, `code`, `image`, `video`, `link`,
-  `hr`.
+  heading1-6/quote), `list`, `table`, `code`, `image`, `video`, `audio`,
+  `link`, `hr`.
 - Inline formatting (bold/italic/strikethrough/code/link) is stored as
   **codepoint offset ranges into plain text**, not nested HTML -- the
   same NPF-style shape Tumblr's API uses, which is what the importers
@@ -67,6 +67,7 @@ dedup by `source`).
 | `hr` | no fields |
 | `image` | `media` (see below); `alt_text`; `caption` |
 | `video` | one of three shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
+| `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
 | `link` | `url`; `title`; `description` -- rendered as a link card |
 
 An unrecognized `type` renders as its raw JSON in a `<pre>` -- loud,
@@ -177,7 +178,7 @@ them.
 Supporting casts: `lib/slug.rb` (one folding/slugification used for
 post slugs, tag slugs, heading anchors and the search index -- and
 mirrored client-side by `fold()` in search.js), `lib/content_type.rb`
-(dominant type: video > image > link > text), `lib/media_dimensions.rb`
+(dominant type: video > audio > image > link > text), `lib/media_dimensions.rb`
 (width/height straight from PNG/JPEG/MP4 headers, so pages reserve
 space and never jump).
 

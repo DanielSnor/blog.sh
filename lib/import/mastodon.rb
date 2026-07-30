@@ -97,8 +97,12 @@ module Import
         entry = { 'url' => filename }
         entry['width'] = att['width'] if att['width']
         entry['height'] = att['height'] if att['height']
-        block = { 'type' => att['mediaType'].to_s.start_with?('video') ? 'video' : 'image',
-                  'media' => [entry] }
+        kind = case att['mediaType'].to_s.split('/').first
+               when 'video' then 'video'
+               when 'audio' then 'audio'
+               else 'image'
+               end
+        block = { 'type' => kind, 'media' => [entry] }
         alt = presence(att['name'])
         block['alt_text'] = alt if alt
         block

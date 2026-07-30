@@ -16,8 +16,10 @@ A link to this page is also in the in-editor help, so it's at hand while you wri
 - [Tables](#tables)
 - [Images](#images)
 - [Video](#video)
+- [Audio](#audio)
 - [Escaping](#escaping)
 - [Not supported yet](#not-supported-yet)
+- [Deliberately not supported](#deliberately-not-supported)
 
 ## Paragraphs
 
@@ -213,6 +215,16 @@ Two exclamation marks, otherwise same as an image. Works for a local file and fo
 
 A bare YouTube address on its own line does **not** turn into a player — it becomes an ordinary link. That's deliberate, so a video can also just be linked to.
 
+## Audio
+
+Same two exclamation marks as a video — the file extension tells them apart
+(.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **The caption is mandatory**,
+and the file renders as a native player.
+
+```
+!![Audio caption](/path/to/recording.mp3)
+```
+
 ## Escaping
 
 To write a character that means something in Markdown, put a backslash in front of it.
@@ -235,12 +247,23 @@ Before any other character the backslash stays as it is — so the d8-\ emoticon
 
 So nothing takes you by surprise when it stays the way you typed it:
 
-- underscore italics `_like this_` — use asterisks
 - hard line breaks (two trailing spaces)
 - task lists `- [ ]`
-- code blocks indented with spaces — use the three backticks
-- nested quotes `>>`
-- headings underlined with `===` below the text
-- reference links `[text][id]` and footnotes
 
 None of it mangles your text, it just renders exactly as written.
+
+## Deliberately not supported
+
+These aren't missing — each was considered and turned down, mostly because
+its cost lands on everyone who *doesn't* use it:
+
+- underscore italics `_like this_` — underscores live inside ordinary text
+  (file_names, snake_case); use asterisks
+- code blocks indented with spaces — collides with nested-list indentation;
+  use the three backticks
+- headings underlined with `===` — a line of dashes already means a
+  horizontal rule and the frontmatter delimiter
+- nested quotes `>>`
+- reference links `[text][id]` and footnotes
+
+These render exactly as written, too.

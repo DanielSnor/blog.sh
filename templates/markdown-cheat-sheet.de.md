@@ -16,8 +16,10 @@ Ein Link auf diese Seite steht auch in der Editor-Hilfe, sie ist beim Schreiben 
 - [Tabellen](#tabellen)
 - [Bilder](#bilder)
 - [Video](#video)
+- [Audio](#audio)
 - [Escaping](#escaping)
 - [Noch nicht unterstützt](#noch-nicht-unterstutzt)
+- [Bewusst nicht unterstützt](#bewusst-nicht-unterstutzt)
 
 ## Absätze
 
@@ -213,6 +215,16 @@ Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei und
 
 Eine bloße YouTube-Adresse auf eigener Zeile wird **nicht** zum Player — sie wird ein gewöhnlicher Link. Das ist Absicht, damit sich ein Video auch einfach nur verlinken lässt.
 
+## Audio
+
+Dieselben zwei Ausrufezeichen wie beim Video — unterschieden werden sie an
+der Dateiendung (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Die
+Unterschrift ist Pflicht**, gerendert wird ein nativer Player.
+
+```
+!![Unterschrift der Aufnahme](/pfad/zur/aufnahme.mp3)
+```
+
 ## Escaping
 
 Um ein Zeichen zu schreiben, das in Markdown etwas bedeutet, stell ihm einen Backslash voran.
@@ -235,12 +247,23 @@ Vor jedem anderen Zeichen bleibt der Backslash stehen, wie er ist — das Emotic
 
 Damit dich nichts überrascht, wenn es so bleibt, wie du es getippt hast:
 
-- Kursiv mit Unterstrichen `_so_` — nimm Sternchen
 - harte Zeilenumbrüche (zwei Leerzeichen am Zeilenende)
 - Aufgabenlisten `- [ ]`
-- mit Leerzeichen eingerückte Codeblöcke — nimm die drei Backticks
-- verschachtelte Zitate `>>`
-- mit `===` unterstrichene Überschriften
-- Referenzlinks `[text][id]` und Fußnoten
 
 Nichts davon zerlegt deinen Text, es wird nur genau so gerendert, wie geschrieben.
+
+## Bewusst nicht unterstützt
+
+Das fehlt nicht — jedes wurde abgewogen und abgelehnt, meist weil seine
+Kosten alle träfen, die es *nicht* benutzen:
+
+- Kursiv mit Unterstrichen `_so_` — Unterstriche stecken in normalem Text
+  (datei_namen, snake_case); nimm Sternchen
+- mit Leerzeichen eingerückte Codeblöcke — kollidiert mit der Einrückung
+  verschachtelter Listen; nimm die drei Backticks
+- mit `===` unterstrichene Überschriften — eine Strichzeile bedeutet schon
+  Trennlinie und Frontmatter-Grenze
+- verschachtelte Zitate `>>`
+- Referenzlinks `[text][id]` und Fußnoten
+
+Auch das wird genau so gerendert, wie geschrieben.

@@ -68,7 +68,7 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Content model**
 - One post = one JSON file (`content.nosync/posts/<year>/<slug>.json`), no database
 - Content is a list of typed blocks (text, heading, quote, list, table,
-  code, image, video, link, divider) -- the same block format used by the
+  code, image, video, audio, link, divider) -- the same block format used by the
   Tumblr/Twitter migration imports
 - Inline formatting (bold/italic/strikethrough/code/link) is stored as
   offsets into plain text, not nested HTML
@@ -107,8 +107,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 - Paragraphs, headings `#`–`######`, bold/italic/strikethrough/code,
   titled links, bare URLs auto-linked, ordered and nested lists,
   blockquotes, horizontal rules, fenced code blocks with a language hint,
-  GFM-style aligned tables, images and video (local file or YouTube) with
-  automatic sizing, backslash escaping
+  GFM-style aligned tables, images, video (local file or YouTube) with
+  automatic sizing, audio with a native player, backslash escaping
 - The full syntax reference at `/markdown/` is generated directly from
   this parser, so it can't drift out of sync with what's actually supported;
   its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the

@@ -82,7 +82,8 @@ files themselves*, so this import needs no network and no token, and it
 covers the whole account -- on a typical one, most items are skipped as
 replies and boosts (2984 and 1059 of 6591 in the archive this was built
 against). A content warning becomes the post's title. Attachment dimensions
-come from the archive's own metadata.
+come from the archive's own metadata, and audio attachments become audio
+blocks with a native player.
 
 ### Pixelfed
 
@@ -106,7 +107,8 @@ TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb yourname.tumblr.com
 Get a key at tumblr.com/oauth/apps (the API requires one even for public
 blogs) and keep it in `env.sh`. Every post on the blog is imported --
 drafts stay drafts, reblogged content from the trail is appended to your
-own. All media is downloaded; an import of a few thousand posts runs for
+own, and audio posts arrive as players (a self-hosted file is downloaded,
+a SoundCloud/Spotify embed stays an embed). All media is downloaded; an import of a few thousand posts runs for
 hours, so sample with `LIMIT` first. A wrong key or blog name aborts with
 the API's reason instead of a stack trace.
 

@@ -375,6 +375,21 @@ def apply_formatting(text, formatting)
   end.join
 end
 
+# Local files get the native player; an imported embed (Spotify and the
+# like) is passed through like an imported video embed. No dimensions
+# anywhere -- degenerate_image? is about images reserving layout space, an
+# <audio> element has a fixed height of its own.
+def render_audio(block, media_prefix)
+  local_media = (block['media'] || []).first
+  if local_media
+    %(<audio controls preload="metadata" src="#{media_prefix}#{local_media['url']}"></audio>)
+  elsif block['embed_html'] && !block['embed_html'].strip.empty?
+    block['embed_html']
+  else
+    "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
+  end
+end
+
 def render_video(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
@@ -457,6 +472,12 @@ def render_block(block, media_prefix, seen = {})
     return inner if caption.empty?
 
     %(<figure>#{inner}<figcaption>#{CGI.escapeHTML(caption)}</figcaption></figure>)
+  when 'audio'
+    caption = block['caption'].to_s.strip
+    inner = render_audio(block, media_prefix)
+    return inner if caption.empty?
+
+    %(<figure>#{inner}<figcaption>#{CGI.escapeHTML(caption)}</figcaption></figure>)
   when 'link'
     title = CGI.escapeHTML((block['title'] || block['url']).to_s)
     description = CGI.escapeHTML(block['description'].to_s)
@@ -519,7 +540,8 @@ CONTENT_ICONS = {
   'text' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>',
   'image' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></svg>',
   'video' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 9l4-2v10l-4-2"/></svg>',
-  'link' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/></svg>'
+  'link' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/></svg>',
+  'audio' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 6a8.5 8.5 0 010 12"/></svg>'
 }.freeze
 
 # Every post is rendered onto its own page, the index, its content-type
@@ -1083,11 +1105,12 @@ tags_map.each do |slug, data|
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
 end
 
-CONTENT_TYPES = %w[text image video link].freeze
+CONTENT_TYPES = %w[text image video audio link].freeze
 CONTENT_TYPE_LABELS = {
   'text' => t('type.text'),
   'image' => t('type.image'),
   'video' => t('type.video'),
+  'audio' => t('type.audio'),
   'link' => t('type.link')
 }.freeze
 
