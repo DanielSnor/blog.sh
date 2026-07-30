@@ -922,6 +922,43 @@ def emit(path, content)
   File.binwrite(path, bytes)
 end
 
+FAVICON_PNG = File.join(ROOT, 'assets', 'images', 'favicon.png')
+
+# The site's favicon PNG wrapped in an ICO container, for /favicon.ico.
+#
+# Pages link the PNG directly, which every browser prefers anyway -- this
+# exists for the clients that never read the link and just request
+# /favicon.ico from the root: bots, feed readers, link-preview services,
+# older browsers. Without it each of those is a 404 in the log.
+#
+# An ICO may carry a PNG payload verbatim (a 22-byte header, then the file),
+# so this needs no image library and no second source file to keep in sync --
+# in the spirit of lib/qr_code.rb, the smallest correct slice of a format
+# rather than a dependency. Returns nil when there's no PNG to wrap, so a
+# site without a favicon simply doesn't get the file.
+def build_favicon_ico
+  return nil unless File.exist?(FAVICON_PNG)
+
+  png = File.binread(FAVICON_PNG)
+  return nil unless png.start_with?("\x89PNG\r\n\x1a\n".b)
+
+  # IHDR is the first chunk of every PNG: width and height are big-endian
+  # 32-bit at offset 16. The ICO dimension fields are a single byte each and
+  # 0 means 256, so anything larger can't be stated exactly -- browsers load
+  # such a file fine but report it as 256, which for something drawn at
+  # 16-32px is a distinction without a difference.
+  width, height = png[16, 8].unpack('N2')
+  header = [0, 1, 1].pack('v3') # reserved, type 1 = icon, one image
+  entry = [
+    width >= 256 ? 0 : width, height >= 256 ? 0 : height,
+    0, 0,   # palette size (0 = not paletted), reserved
+    1, 32,  # colour planes, bits per pixel
+    png.bytesize, header.bytesize + 16
+  ].pack('C4v2V2')
+
+  header + entry + png
+end
+
 # Media is content-addressed by the migration/import step and never edited
 # in place, so existence plus size is enough -- hashing every media file on
 # every build would cost more than the copy it saves.
@@ -968,6 +1005,8 @@ Dir.glob(File.join(ROOT, 'assets', '**', '*')).each do |src|
   emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
 emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'), build_colors_css)
+ico = build_favicon_ico
+emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
 
 post_template = ERB.new(File.read(File.join(ROOT, 'templates', 'post.html.erb'), encoding: 'utf-8'))
 index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'), encoding: 'utf-8'))
