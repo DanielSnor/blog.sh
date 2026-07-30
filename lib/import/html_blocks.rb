@@ -149,6 +149,12 @@ module Import
       # a control), so they are dropped and named instead.
       DROPPED = %w[iframe video audio object embed canvas svg form input button select map].freeze
 
+      # What makes an element a wrapper rather than a paragraph -- see
+      # inline_only? below.
+      BLOCK_LEVEL = %w[p div h1 h2 h3 h4 h5 h6 blockquote ul ol li pre table thead tbody
+                       tr td th hr figure figcaption section article aside header footer
+                       nav main form dl dt dd].freeze
+
       def initialize
         @blocks = []
         @warnings = Hash.new(0)
@@ -173,8 +179,24 @@ module Import
         when 'figure' then emit_figure(node)
         when 'br' then nil
         when *DROPPED then @warnings[node.name] += 1
-        else walk(node)
+        else
+          # An unknown element holding nothing but inline content is a
+          # paragraph in all but name -- <div>Shoot with: <strong>x</strong>
+          # for iPhone</div> is what a decade of CMS output actually looks
+          # like. Walking its children one by one would shred that sentence
+          # into a block per fragment and drop the emphasis with it, so it
+          # is rendered as one paragraph instead. Anything with a
+          # block-level child is still just a wrapper, and gets walked.
+          inline_only?(node) ? emit_paragraph(node) : walk(node)
         end
+      end
+
+      # Only direct children are examined: a wrapper is identified by what
+      # it contains at its own level, and anything deeper is that child's
+      # problem to classify.
+      def inline_only?(node)
+        node.children.any? &&
+          node.children.none? { |c| !c.text? && BLOCK_LEVEL.include?(c.name) }
       end
 
       # Loose text between block elements still belongs to the post -- it
