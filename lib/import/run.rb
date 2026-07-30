@@ -91,7 +91,15 @@ module Import
     # include the platform's name and "Tumblr" plus "tumblr" would render
     # as two pills pointing at one page.
     def tag_with_platform(post)
-      platform = post.dig('source', 'platform').to_s
+      # An adapter may name the tag itself when its platform makes a poor
+      # one: "feed" says nothing about where a post came from, where
+      # "medium.com" says all of it. source.platform stays what it is --
+      # the kind of source, and half the re-import dedup key.
+      platform = if @adapter.respond_to?(:platform_tag) && @adapter.platform_tag
+                   @adapter.platform_tag.to_s
+                 else
+                   post.dig('source', 'platform').to_s
+                 end
       return if platform.empty?
 
       tags = post['tags'] ||= []

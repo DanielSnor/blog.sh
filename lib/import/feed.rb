@@ -46,6 +46,18 @@ module Import
       @total
     end
 
+    # What the imported posts get tagged with. "wordpress" for an export,
+    # but for a plain feed the platform name is "feed", which tells a reader
+    # nothing -- the site it came from is the useful label, so /tag/medium.com/
+    # collects everything imported from there. www. is dropped because
+    # nobody tags anything "www.example.com".
+    def platform_tag
+      return 'wordpress' if wordpress?
+
+      host = channel_host.to_s.sub(/\Awww\./, '')
+      host.empty? ? 'feed' : host
+    end
+
     def each_item(&block)
       items = entries
       @total = items.size
