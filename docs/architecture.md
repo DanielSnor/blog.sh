@@ -164,15 +164,27 @@ VT100 sequences, no terminfo and no gems. Three deliberate constraints:
 - **Raw mode per keystroke, never persistent.** `STDIN.getch` enters and
   leaves raw mode around a single read, so no crash can leave the user's
   shell broken -- the classic TUI failure mode.
-- **Inline, not fullscreen.** The menu repaints a few lines in place with
+- **Inline, not fullscreen.** The menu repaints its lines in place with
   cursor-up; no alternate screen, so the dialog stays in the scrollback.
-  A lone Esc is told apart from an arrow key by a 50 ms wait for the
-  rest of the sequence.
+  A list longer than the terminal is tall scrolls inside a window sized
+  once per call (a wrapped or overflowing line would break the
+  fixed cursor-up arithmetic, which is also why items are truncated
+  rather than wrapped). A lone Esc is told apart from an arrow key by a
+  50 ms wait for the rest of the sequence.
 
 `lib/qr_code.rb` renders a draft's preview URL as a scannable QR code in
 half-block glyphs -- the smallest correct subset of the spec that the job
 needs (byte mode, EC level L, versions 1-5, fixed mask 0), verified
 module-for-module against a reference encoder.
+
+`lib/preview_server.rb` backs `./blog.sh preview`: a minimal
+`TCPServer`-based static file server (GET/HEAD, no keep-alive,
+thread-per-connection), in place of the obvious `ruby -run -e httpd`
+one-liner -- that depends on `webrick`, a default gem some distros
+split out of their minimal Ruby package (see [decisions.md](decisions.md)).
+Percent-decodes the request path itself and rejects anything that
+resolves outside the served root, the one security property a static
+file server actually needs.
 
 ## Deploy (`scripts/deploy_web.rb` + `lib/deploy_backend/`)
 

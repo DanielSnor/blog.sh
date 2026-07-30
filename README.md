@@ -85,9 +85,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 - `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
 - `schedule <slug>` -- automatic publishing (toot included) by a cron step
-  when the post's date arrives; the [s] dialog choice asks for the date
-  directly, the standalone command takes it from a future-dated draft;
-  run again to cancel
+  when the post's date arrives; asks for that date, whether reached as the
+  [s] dialog choice or as its own command; run again to cancel
 - `unpublish <slug>` -- returns a post to draft, deletes its announcement;
   gets a fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
@@ -189,7 +188,14 @@ deploy step around exactly that. A few of the choices that came out of it:
 - Banner overlay: `site.short_name` (top-left, ~30px) and `site.description`
   (bottom-right, ~20px, wraps to multiple lines) render on top of the banner
   image in self-hosted JetBrains Mono, with a corner scrim for readability
-  against any image -- see `.banner-title`/`.banner-claim` in `site.css`
+  against any image -- see `.banner-title`/`.banner-claim` in `site.css`.
+  Each independently optional: `banner.show_title`/`show_claim` (default
+  true) toggle whether they render at all, `colors.<mode>.banner_title`/
+  `banner_claim` override their color per light/dark mode (default: `nav_bg`
+  in light, white in dark -- same as before these keys existed), and
+  `banner.claim` overrides *only* the overlay's claim with raw HTML (e.g.
+  a manual `<br>`) -- `site.description` itself stays plain text
+  everywhere else (meta description, RSS), same trust level as `about.html`
 
 **Migration** (historical, one-off)
 - `migrate_tumblr.rb`, `migrate_twitter.rb` -- import from four Tumblr
@@ -239,7 +245,12 @@ iCloud doesn't exist, it's just a name.
 
 ## Requirements
 
-- **Ruby 3.0+**, standard library only -- no gems, no Bundler, nothing to install
+- **Ruby 3.0+**, standard library only -- no gems, no Bundler, nothing to
+  install. One caveat: the optional Pixelfed/RSS sidebar widgets use
+  `rexml`, a Ruby *default gem* (ships with a normal Ruby install, but
+  some distro package splits leave it out -- see
+  [install.md](docs/install.md#what-you-need) if `gem install rexml`
+  is ever needed)
 - **bash** (the thin `blog.sh` / `deploy-web.sh` / `refresh-sidebar.sh` wrappers)
 - Optional, per integration: somewhere to deploy to (a
   [Cloudron Surfer](https://cloudron.io) app, any rsync/SSH host, a
@@ -260,8 +271,8 @@ iCloud doesn't exist, it's just a name.
    `/assets/images/favicon.png`).
 4. `./blog.sh add` to write your first post.
 5. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
-6. To preview locally before deploying, point any static file server at
-   `public.nosync/`, e.g. `ruby -run -e httpd public.nosync/ -p 8000`.
+6. `./blog.sh preview` to look at it locally before deploying anywhere
+   (serves `public.nosync/` at `http://localhost:8000`, Ctrl-C stops it).
 
 Every integration beyond the core (analytics, each sidebar widget,
 comments and the auto-announcement on Mastodon or Bluesky) is optional
@@ -280,9 +291,9 @@ cron, backup, troubleshooting) is
 ```bash
 ./blog.sh                      # interactive wizard (menu)
 ./blog.sh add                  # creates a draft, shows a preview, asks what's next
-./blog.sh edit [<slug>]        # without a slug, offers the last 10 posts
+./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
 ./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
-./blog.sh schedule [<slug>]    # auto-publish a future-dated draft when its date arrives
+./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/
 ./blog.sh restore [<slug>]     # restores a post from trash

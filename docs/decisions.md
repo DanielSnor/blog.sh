@@ -46,6 +46,36 @@ publishing -- a localhost-only preview can't do either. *Cost:* the
 draft text physically exists on the host; the token (and staying out of
 every listing and index) is the fence.
 
+**The publish date comes from publishing, not from a field.** Publishing
+means "now", scheduling asks for a date -- so the frontmatter template
+offers no `date:` line, which would be a third path to the same decision
+and the only one whose effect isn't visible where you make it. The
+parser still honors a hand-typed `date:` (that's how imports keep their
+original dates). *Cost:* backdating is no longer discoverable from the
+editor; it's a documented escape hatch rather than a suggested field.
+
+**The site declares its timezone; `TZ` and the system zoneinfo do the
+work.** A server clock is usually UTC, which silently made "schedule
+10:30" mean 12:30 locally and could date a post written after midnight to
+the previous day. `site.timezone` belongs to the site the same way
+`site.lang` does, so it lives in `config/site.yml` rather than in the
+unversioned `env.sh`, and every entry point applies it at startup by
+setting `TZ` -- Ruby then reads the OS zone database, DST included, with
+no gem and no timezone table of ours. An unknown zone name aborts,
+because Ruby's own fallback for one is a silent UTC.
+
+Dates a reader sees are rendered in that zone too, via `post_display_time`
+and a `getlocal` in each sidebar fetcher -- otherwise a post imported as
+UTC, or a toot posted late in the evening, shows the previous day.
+`post_time` itself deliberately stays on the stored offset, because
+`post_path` derives the year from it: shifting that would move a post
+published near midnight on December 31 into another year, changing a live
+URL. Feeds and the sitemap stay on it for the same reason in reverse --
+they carry absolute instants for machines, where the offset is noise.
+*Cost:* stored dates aren't rewritten, so a site adopting this re-renders
+only the posts whose local day actually differs (73 of sean.cz's 3281,
+none of them changing year).
+
 **Deleting is moving to `trash/`; two posts can never share a URL.**
 There's no database transaction log to lean on, so the engine refuses
 the two silent data-loss paths: `delete` is reversible via `restore`,
@@ -87,7 +117,21 @@ nothing can bit-rot in a dependency tree. Where stdlib can't reach
 (rsync, git, rclone, sftp, `$EDITOR`), the engine shells out to system
 binaries the user already understands. *Cost:* some things are
 hand-rolled that a gem would provide -- multipart uploads, JPEG/MP4
-header parsing, YAML-adjacent frontmatter.
+header parsing, YAML-adjacent frontmatter, and a static file server
+for `./blog.sh preview` (`lib/preview_server.rb`, plain `TCPServer`)
+instead of the `webrick`-dependent `ruby -run -e httpd` one-liner.
+
+**`rexml` is required lazily, inside the two fetchers that need it, not
+at load time.** `rexml` ships as a Ruby *default gem* -- present in a
+normal install, but some distros split their Ruby package and leave
+default gems out of the minimal one (Debian/Ubuntu's bare `ruby` vs.
+`ruby-full`). A build with no `widgets.pixelfed`/`widgets.rss`
+configured never touches `require 'rexml/document'` at all, so it
+can't fail over a dependency the site doesn't use; a `LoadError` when
+the widget *is* configured says exactly what to install rather than
+crashing the whole build. *Cost:* the require call moved from the top
+of two files to inside their `fetch_items`, a small deviation from
+every other file's load-time-requires convention.
 
 **No third-party requests from the visitor's browser.** Widgets are
 fetched server-side on cron into same-origin JSON: visitors' IPs leak
@@ -122,6 +166,14 @@ sequences cover what a conversational CLI needs, and staying inline
 keeps the whole session in the scrollback where a user can scroll back
 through it. *Cost:* no complex layouts -- deliberately not the goal.
 
+**The menu scrolls; the lists aren't capped to fit a screen.** Pickers
+used to offer only the 10 most recent posts because the menu printed
+every item it was handed, so anything longer than the terminal broke its
+cursor-up repaint. Scrolling a window moves that limit into the UI where
+it belongs -- on a blog with thousands of posts, a cap that small is a
+functional restriction, not tidiness. *Cost:* window arithmetic (and
+digits selecting within the visible window, not the whole list).
+
 **A QR encoder in the repo rather than a gem or a web service.** The
 draft-preview-on-a-phone workflow is the reason this engine looks the
 way it does, and a scannable code closes its last manual step. Sending
@@ -149,3 +201,15 @@ degrades into English word by word instead of breaking pages -- which
 is what makes shipping a community locale a low-stakes contribution.
 The `/markdown/` cheat sheet localizes the same way: per-language
 source files, English fallback.
+
+**`banner.claim` is a separate field from `site.description`, not the
+same value reused.** `site.description` feeds `<meta name="description">`
+and the RSS `<description>` too, so it has to stay plain text -- a
+literal `<br>` there would leak broken markup into a feed reader or a
+search result snippet. `banner.claim` exists purely so the banner
+overlay can have a manual line break (or any other markup) without
+touching those other, stricter consumers; it's optional and raw HTML,
+same trust level as `about.html`/`footer.note_html` (site.yml is
+owner-edited config, not visitor input). *Cost:* one more field to
+know about, and the two can drift out of sync if a site changes its
+description without updating the claim override to match.

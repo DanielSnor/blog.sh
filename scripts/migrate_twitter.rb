@@ -14,6 +14,9 @@ require 'time'
 require 'uri'
 require_relative '../lib/post_writer'
 require_relative '../lib/slug'
+require_relative '../lib/site_config'
+
+SiteConfig.use_site_timezone!
 
 EXPORT_DIR = ARGV[0] || abort('usage: migrate_twitter.rb <path-to-extracted-export>')
 DATA_DIR = File.join(EXPORT_DIR, 'data')

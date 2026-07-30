@@ -16,6 +16,9 @@ require 'json'
 require 'time'
 require_relative '../lib/publishing'
 require_relative '../lib/i18n'
+require_relative '../lib/site_config'
+
+SiteConfig.use_site_timezone!
 
 due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
   post = JSON.parse(File.read(path, encoding: 'utf-8'))

@@ -11,15 +11,15 @@ works directly (`./blog.sh add`, `edit`, `publish`, ...). The flow is
 built around drafts:
 
 1. **`add`** opens `$EDITOR` with a frontmatter template (title, tags,
-   type, date) -- the in-editor hint links to the `/markdown/` syntax
+   type) -- the in-editor hint links to the `/markdown/` syntax
    reference on your own site. Saving always creates a **draft**: it
    builds and deploys immediately, but only onto a hidden
    `/draft/<token>/<slug>/` address with `noindex` -- invisible in every
    listing, shareable by URL (that's the point: open the preview on a
    phone or send it to someone before publishing).
 2. The CLI then asks: **publish / schedule / keep as draft / back to
-   editing.** Publishing sets the date (now, unless you edited the date
-   field), moves the post to its real URL and -- with a comments
+   editing.** Publishing sets the date to that moment (scheduling asks
+   for one instead), moves the post to its real URL and -- with a comments
    network configured (Mastodon or Bluesky, see
    [install.md](install.md#8-comments-network-optional-mastodon-or-bluesky)) --
    sends the announcement post that replies-as-comments hang off.
@@ -37,19 +37,24 @@ built around drafts:
    typically an imported one that never had one. An existing
    announcement is never overwritten.
 
-Publishing a **backdated** post (date edited to the past) skips the
-auto-toot unless you confirm it, and lands in the archive rather than on
-the homepage -- the CLI says so when it happens.
+**Backdating** isn't part of that flow -- publishing means "now" -- but
+the frontmatter parser still honors a `date:` line you type in by hand,
+which is how an imported post keeps its original date. Such a post skips
+the auto-toot unless you confirm it, and lands in the archive rather
+than on the homepage -- the CLI says so when it happens.
 
 **Scheduled publishing:** in the post-save dialog, choose `[s]` and
 enter the publish date and time directly -- the
 [publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) then
 publishes the draft (toot included) once that date arrives, keeping it
-as the post's date. The standalone `./blog.sh schedule <slug>` does the
-same for a draft whose date was already edited to the future (an
-untouched creation-time date is refused -- that would just mean
-"publish now"). Running `schedule` again cancels; `list` shows such
-drafts as `[SCHEDULED]`.
+as the post's date. The standalone `./blog.sh schedule <slug>` asks the
+same question, so either route works. The time you type is read in
+`site.timezone` ([install.md](install.md#2-configure-the-site----configsiteyml))
+-- worth setting before you schedule anything from a server, whose clock
+is usually UTC. A past date is refused (that would
+just mean "publish now", and `publish` is for that). Running `schedule`
+on an already scheduled draft cancels it; `list` shows scheduled drafts
+as `[SCHEDULED]`.
 
 ### In the terminal
 
@@ -57,9 +62,11 @@ The CLI adapts to where it runs. In an interactive terminal you get
 arrow-key menus (digits still quick-select, typing a slug still works),
 single-keypress answers without Enter, colored state markers and a
 **QR code of the draft preview URL** -- point your phone's camera at
-the screen instead of retyping a token. Piped, scripted or cron runs
-get the plain line-based prompts unchanged, with no escape codes in
-the output. Colors honor `NO_COLOR` and `TERM=dumb`.
+the screen instead of retyping a token. A menu longer than the terminal
+is tall scrolls, showing your position in the list next to the hint.
+Piped, scripted or cron runs get the plain line-based prompts unchanged,
+with no escape codes in the output. Colors honor `NO_COLOR` and
+`TERM=dumb`.
 
 `./blog.sh preview [<port>]` serves the built site locally (default
 port 8000) when you want to look at it without deploying.
@@ -167,7 +174,7 @@ The same list is exactly what to move when changing machines.
 | Sidebar widget disappeared from the page | Its fetch returned nothing repeatedly (`refresh-sidebar` logs say which) -- the widget card hides when its JSON is empty/unreachable. Check the instance/feed URL in `config/site.yml`. |
 | `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues; the page just has a broken image until fixed. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
-| A published post shows the wrong date | Publishing uses "now" only when the frontmatter date was left untouched; an edited date is respected, including past dates (which skip the homepage -- by design). |
+| A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |
 | sftp deploy hangs | It's waiting for a password -- the sftp backend needs key-based auth (see [install.md](install.md#sftp-hosts-with-neither-rsync-nor-git)). |
 
 When in doubt: `ruby build/build_blog.rb` and

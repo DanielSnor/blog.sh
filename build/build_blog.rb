@@ -16,6 +16,8 @@ require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/i18n'
 
+SiteConfig.use_site_timezone!
+
 ROOT = File.expand_path('..', __dir__)
 # .nosync: on a Mac, both directories are just a local development copy
 # (downloadable again any time from wherever the site is actually deployed).
@@ -79,6 +81,12 @@ SITE_AUTHOR = SiteConfig.fetch('site', 'author')
 SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
 SITE_LOCALE = SiteConfig.get('site', 'locale', default: 'en_US')
 BANNER = SiteConfig.fetch('banner')
+# Independently optional -- a banner image busy enough on its own (or a
+# site that just doesn't want the overlay) can drop either line without
+# losing the other. Both default to true, so an existing site's banner
+# renders exactly as it did before these keys existed.
+BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
+BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
 ANALYTICS = SiteConfig.get('analytics')
 ABOUT = SiteConfig.fetch('about')
 FOOTER = SiteConfig.fetch('footer')
@@ -138,7 +146,15 @@ def color_properties(mode)
     'pill-bg' => color_for(mode, 'pill_bg'),
     'search-bg' => mode == 'dark' ? '#eeeeee' : '#ffffff',
     'hover-invert' => mode == 'dark' ? '#ffffff' : meta_text,
-    'badge-hover-text' => mode == 'dark' ? 'var(--accent)' : '#ffffff'
+    'badge-hover-text' => mode == 'dark' ? 'var(--accent)' : '#ffffff',
+    # Independently optional (config/site.yml's colors.<mode>.banner_title/
+    # banner_claim) since the banner overlay's title and claim can be shown
+    # or colored independently -- see BANNER_SHOW_TITLE/_CLAIM below. Same
+    # default either falls back to as before this pair existed: nav-bg in
+    # light mode (a readable tone against most banner images without being
+    # pure white), white in dark mode.
+    'banner-title-color' => color_for(mode, 'banner_title') || (mode == 'dark' ? '#ffffff' : nav_bg),
+    'banner-claim-color' => color_for(mode, 'banner_claim') || (mode == 'dark' ? '#ffffff' : nav_bg)
   }
 end
 
@@ -274,6 +290,16 @@ end
 
 def h(text)
   CGI.escapeHTML(text.to_s)
+end
+
+# banner.claim is an optional raw-HTML override for the banner overlay's
+# claim text -- same trust level as about.html/footer.note_html (site.yml
+# is edited only by the site owner), so a manual <br> can force a line
+# break the way CSS wrapping alone can't target. site.description itself
+# stays plain text, since it's also reused in <meta name="description">
+# and the RSS <description> -- those must never see raw markup.
+def banner_claim_html
+  BANNER['claim'] || h(SITE_DESCRIPTION)
 end
 
 def wrap_tag(chunk, format)
@@ -511,13 +537,27 @@ def post_time(post)
   TIME_CACHE[post] ||= Time.parse(post['date'])
 end
 
+# The same instant, expressed in site.timezone -- for dates a human reads.
+#
+# A stored date keeps the offset it was written with, which for imported
+# posts is usually UTC: a post written at 00:20 Prague arrives as 23:20 the
+# previous day, and rendering that verbatim shows the wrong day. This is
+# deliberately NOT folded into post_time, which also derives the year in
+# post_path -- shifting that would move a post published near midnight on
+# December 31 to a different year, changing a live URL and orphaning the
+# announcement pointing at it. Feeds and the sitemap keep post_time too:
+# they carry absolute instants for machines, where the offset is noise.
+def post_display_time(post)
+  post_time(post).getlocal
+end
+
 def dominant_content_type(post)
   TYPE_CACHE[post] ||= ContentType.dominant(post)
 end
 
 def date_badge(post, link: nil)
   icon = CONTENT_ICONS[dominant_content_type(post)]
-  date = post_time(post).strftime(t('date_format'))
+  date = post_display_time(post).strftime(t('date_format'))
   inner = "#{icon}<span>#{date}</span>"
   inner = %(<a href="#{link}">#{inner}</a>) if link
   %(<div class="date-badge">#{inner}</div>)
@@ -1026,7 +1066,7 @@ def search_index_entry(post)
   {
     url: post_path(post),
     title: post['title'],
-    date: post_time(post).strftime(t('date_format')),
+    date: post_display_time(post).strftime(t('date_format')),
     excerpt: truncate_excerpt(text),
     folded: fold([post['title'], text, (post['tags'] || []).join(' ')].compact.join(' '))
   }

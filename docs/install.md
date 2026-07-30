@@ -13,11 +13,28 @@ Day-to-day usage lives in [operations.md](operations.md).
 - **A place to serve static files** -- any of the six deploy targets
   below, from a Cloudron Surfer app to a plain directory behind your own
   nginx/Caddy.
-- Optional: a **Mastodon account** (comments, auto-toot, sidebar
-  widgets) and **cron** (widget refresh).
+- Optional: a **Mastodon or Bluesky account** (comments, auto-announce,
+  sidebar widgets) and **cron** (widget refresh, scheduled publishing).
 
 The engine has no build-time network dependencies: a machine with Ruby
 and bash can build the whole site offline.
+
+**On "no gems" and default gems.** Everything in blog.sh is written
+against Ruby's core standard library -- nothing to `gem install`,
+ever, for the engine itself to run. The one nuance: the optional
+Pixelfed/RSS sidebar widgets parse XML with `rexml`, which Ruby ships
+as a *default gem* -- bundled with a normal `ruby` install, but some
+Linux distributions split their Ruby package and leave default gems
+out of the minimal one. If `widgets.pixelfed`/`widgets.rss` are unused,
+this never comes up; if you configure either and see a `LoadError`
+about `rexml`, either `gem install rexml` or install your distro's
+fuller Ruby package -- e.g. `ruby-full` instead of the bare `ruby` on
+Debian/Ubuntu (Arch's own `ruby` package already includes the full
+standard library, no separate install needed there). `./blog.sh
+preview`, by contrast, needed no such caveat to begin with: it's a
+small built-in static server (`lib/preview_server.rb`), not the
+`webrick`-dependent `ruby -run -e httpd` one-liner some other guides
+suggest.
 
 ## 1. Get the code
 
@@ -50,6 +67,18 @@ The example is fully commented. The short version:
 `en` and `cs` ship with the engine; a partial third locale falls back to
 English per key.
 
+`site.timezone` (an IANA name like `Europe/Prague`) is the zone every
+timestamp the engine writes is expressed in. **Set it if you'll ever
+publish from a server**, because a server's clock is usually UTC: without
+it, `schedule` reads "10:30" as 10:30 UTC, and a post written after
+midnight local time can be dated to the previous day. Omit it to use the
+machine's own zone. A name the system doesn't know is refused at startup
+rather than silently treated as UTC. It also governs the dates readers see,
+including the sidebar widgets, whose sources report UTC. Existing posts keep
+the stored offset -- setting this later rewrites no history, it only changes
+the day shown for posts whose local day genuinely differs (and never a
+post's URL).
+
 ## 3. Configure the environment -- `env.sh`
 
 ```bash
@@ -80,7 +109,7 @@ best.
 ```bash
 ./blog.sh add                  # write your first post (opens $EDITOR)
 ruby build/build_blog.rb       # build into public.nosync/
-ruby -run -e httpd public.nosync/ -p 8000   # preview at http://localhost:8000
+./blog.sh preview               # preview at http://localhost:8000 (Ctrl-C stops it)
 ```
 
 `add` always creates a draft and offers publishing interactively -- see

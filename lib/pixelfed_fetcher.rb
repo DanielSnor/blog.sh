@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'rexml/document'
 require 'time'
 require_relative 'feed_http'
 require_relative 'site_config'
@@ -30,6 +29,19 @@ module PixelfedFetcher
   def self.fetch_items
     return [] unless configured?
 
+    # rexml is a default gem, not core stdlib -- present with a normal Ruby
+    # install, but some distros split it into a separate package (e.g.
+    # Debian/Ubuntu's `ruby-full` vs the bare `ruby`). Required here, not at
+    # load time, so a build with no `widgets.pixelfed` configured never
+    # needs it at all.
+    begin
+      require 'rexml/document'
+    rescue LoadError
+      warn "Pixelfed feed fetch failed: rexml isn't installed -- `gem install rexml` " \
+           '(or install your distro\'s full Ruby package, e.g. ruby-full on Debian/Ubuntu).'
+      return []
+    end
+
     doc = REXML::Document.new(FeedHttp.get(FEED_URL))
 
     doc.elements.to_a('feed/entry').first(LIMIT).map do |entry|
@@ -37,7 +49,9 @@ module PixelfedFetcher
       title = full_title.split("\n").first.to_s
       link = entry.elements["link[@rel='alternate']"]&.attribute('href')&.value ||
              entry.elements['id']&.text
-      date = Time.parse(entry.elements['updated'].text).strftime(I18n.t('date_format'))
+      # getlocal: see mastodon_fetcher -- feed timestamps carry the remote's
+      # offset, the date shown should be the reader's.
+      date = Time.parse(entry.elements['updated'].text).getlocal.strftime(I18n.t('date_format'))
       content_el = entry.elements['content']
       content = content_el ? content_el.texts.map(&:to_s).join : ''
       image = content[/src="([^"]+)"/, 1]

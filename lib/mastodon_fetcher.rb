@@ -41,7 +41,10 @@ module MastodonFetcher
       # (.../statuses/ID/activity), which isn't a human-usable link.
       source = status['reblog'] || status
       {
-        'date' => Time.parse(status['created_at']).strftime(I18n.t('date_format')),
+        # getlocal: the API reports UTC, so without it a toot posted late in
+        # the evening local time would be shown with the previous day's date.
+        # site.timezone decides what "local" means (see SiteConfig).
+        'date' => Time.parse(status['created_at']).getlocal.strftime(I18n.t('date_format')),
         'content' => source['content'].to_s,
         'url' => source['url'].to_s
       }

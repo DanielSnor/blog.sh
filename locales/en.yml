@@ -121,7 +121,9 @@ cli:
       tags   comma-separated tags, e.g: nature, hike, city
       type   post type -- text / image / video / link (optional -- leave it
              blank and the type is inferred from the post's content)
-      date   YYYY-MM-DD HH:MM -- can be in the past, the post is sorted chronologically
+
+    Publish date isn't set here -- [p]ublish uses the moment you publish,
+    [s]chedule asks for a future date/time when you pick it.
 
     CONTENT goes under the second ---. For formatting syntax:
 
@@ -136,11 +138,12 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL is not set, can't build the preview URL."
   preview_label: "Preview: %{url}"
-  what_next_prompt: "What next? [p] publish  [s] schedule  [d] leave as draft  [e] back to editing: "
+  what_next_prompt: "What next? [p] publish  [e] edit  [s] schedule  [d] keep as draft  [x] delete: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
-  unknown_choice_pde: "Not understood, try p / s / d / e."
+  unknown_choice_pde: "Not understood, try p / e / s / d / x."
   schedule_date_prompt: "Publish at (YYYY-MM-DD HH:MM, empty = cancel): "
   menu_hint: "↑↓ move · Enter select · 1-9 quick pick · type = slug · Esc back"
+  wizard_continue_prompt: "Press any key to continue…"
   qr_hint: "Scan with your phone to open the preview."
   announcing: "Announcing"
   preview_serving: "Serving public.nosync at %{url} -- Ctrl-C stops it."
@@ -160,7 +163,6 @@ cli:
   delete_bluesky_failed: "Deleting the Bluesky announcement failed -- delete it by hand."
   backdated_no_toot: "Post date isn't current (a backdated post), the announcement was not sent."
   schedule_only_drafts: "Post '%{slug}' is already published -- only drafts can be scheduled."
-  schedule_needs_future_date: "Post '%{slug}' needs a future date first -- set one via ./blog.sh edit %{slug}. (An untouched creation date would mean \"publish now\", and that's what publish is for.)"
   scheduled_label: "Scheduled: '%{slug}' publishes automatically at %{date}."
   schedule_cron_note: "Requires the publish-scheduled.sh cron to be installed -- see docs/operations.md. Run schedule again to cancel."
   unscheduled_label: "Schedule cancelled: '%{slug}' stays a draft."
@@ -221,7 +223,7 @@ cli:
       ./blog.sh add                  creates a draft, shows a preview and asks what's next
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
-      ./blog.sh schedule [<slug>]    schedules a draft for automatic publishing at its (future) date; run again to cancel
+      ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
@@ -233,7 +235,6 @@ cli:
       ./blog.sh help                 shows this help
       ./blog.sh                      launches the interactive wizard
 
-  wizard_greeting: "Hi, this is blog.sh."
   wizard_prompt_action: "What do you want to do?"
   wizard_exit_option: "0) Exit"
   wizard_choice_prompt: "Choice: "

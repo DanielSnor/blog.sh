@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require 'rexml/document'
 require 'time'
 require_relative 'feed_http'
 require_relative 'site_config'
@@ -28,6 +27,18 @@ module RssFetcher
 
   def fetch_items
     return [] unless configured?
+
+    # rexml is a default gem, not core stdlib -- present with a normal Ruby
+    # install, but some distros split it into a separate package (e.g.
+    # Debian/Ubuntu's `ruby-full` vs the bare `ruby`). Required here, not at
+    # load time, so a build with no `widgets.rss` configured never needs it.
+    begin
+      require 'rexml/document'
+    rescue LoadError
+      warn "RSS feed fetch failed: rexml isn't installed -- `gem install rexml` " \
+           '(or install your distro\'s full Ruby package, e.g. ruby-full on Debian/Ubuntu).'
+      return []
+    end
 
     parse(FeedHttp.get(FEED_URL))
   rescue StandardError => e
@@ -78,7 +89,10 @@ module RssFetcher
   def format_date(raw)
     return '' if raw.to_s.empty?
 
-    Time.parse(raw).strftime(I18n.t('date_format'))
+    # getlocal: a feed states its items' dates in whatever offset the
+    # publisher uses, so render in site.timezone to match the rest of the
+    # page -- see mastodon_fetcher for the same reasoning.
+    Time.parse(raw).getlocal.strftime(I18n.t('date_format'))
   rescue ArgumentError
     ''
   end

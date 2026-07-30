@@ -161,20 +161,33 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
 .banner-wrap { position: relative; }
 .banner-link { display: block; }
 
-/* Darkens the top-left and bottom-right corners of the banner image so the
-   overlaid title/claim stay readable regardless of what the image itself
-   looks like -- same technique as fedik.online's hero, since the image
-   doesn't change with the light/dark toggle but the text needs to stay on
-   top of it either way. */
-.banner-wrap::after {
+/* Darkens the corner an overlay line sits in, so the title/claim stay
+   readable regardless of what the image itself looks like -- same technique
+   as fedik.online's hero, since the image doesn't change with the light/dark
+   toggle but the text needs to stay on top of it either way.
+
+   Each corner is tied to its own overlay: a site with banner.show_title /
+   show_claim off gets that corner left alone, and with both off the image is
+   shown exactly as authored. Gating this in CSS via :has() rather than a
+   class the template emits is deliberate -- an overlay toggle then changes
+   one stylesheet instead of re-rendering every page in the archive. Where
+   :has() is unsupported the scrim simply isn't painted, which costs a little
+   contrast rather than breaking the header. */
+.banner-wrap:has(.banner-title)::before,
+.banner-wrap:has(.banner-claim)::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background:
-    linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%),
-    linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
+}
+
+.banner-wrap:has(.banner-title)::before {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
+}
+
+.banner-wrap:has(.banner-claim)::after {
+  background: linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
 }
 
 .banner-title,
@@ -183,27 +196,13 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
   z-index: 2;
   margin: 0;
   font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  /* Light default: the menu's own background color -- overridden to white
-     for dark mode below, since --nav-bg is a dark, low-contrast tone there. */
-  color: var(--nav-bg);
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
 
-/* Same light/dark override pattern as colors.css: light is the unqualified
-   default above, dark needs the explicit media+data-theme pair. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .banner-title,
-  :root:not([data-theme="light"]) .banner-claim {
-    color: #ffffff;
-  }
-}
-
-:root[data-theme="dark"] .banner-title,
-:root[data-theme="dark"] .banner-claim {
-  color: #ffffff;
-}
-
+/* Colors come from colors.css (config/site.yml's colors.<mode>.banner_title/
+   banner_claim, independently optional) -- no light/dark override pair
+   needed here, colors.css already carries both modes. */
 .banner-title {
   top: 20px;
   left: 24px;
@@ -211,6 +210,7 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
   font-size: 45px;
   font-weight: 700;
   line-height: 1.15;
+  color: var(--banner-title-color);
 }
 
 .banner-claim {
@@ -221,6 +221,7 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
   font-weight: 400;
   line-height: 1.35;
   text-align: right;
+  color: var(--banner-claim-color);
 }
 
 @media (max-width: 700px) {

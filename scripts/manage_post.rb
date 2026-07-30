@@ -24,7 +24,10 @@ require_relative '../lib/content_type'
 require_relative '../lib/publishing'
 require_relative '../lib/tui'
 require_relative '../lib/qr_code'
+require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
+
+SiteConfig.use_site_timezone!
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -36,6 +39,11 @@ MEDIA_DIR = File.join(ROOT, 'media.nosync')
 INCOMING_DIR = File.join(ROOT, 'incoming')
 TRASH_DIR = File.join(ROOT, 'trash')
 SITE_BASE_URL = ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')
+# Optional (`get`, not `fetch`) so the wizard header degrades quietly
+# instead of aborting the whole CLI over a config field it only wants
+# to display, not require.
+SITE_SHORT_NAME = SiteConfig.get('site', 'short_name')
+SITE_DESCRIPTION = SiteConfig.get('site', 'description')
 
 DRAFT = 'draft'
 PUBLISHED = 'published'
@@ -158,12 +166,17 @@ CHEAT_SHEET_URL = "#{SITE_BASE_URL.to_s.chomp('/')}/markdown/".freeze
 
 FRONTMATTER_HINT = t('cli.frontmatter_hint', cheat_sheet_url: CHEAT_SHEET_URL)
 
-def build_frontmatter(title:, tags:, type:, date:)
+# No `date:` line: publishing time now comes from exactly one of two
+# places -- "now" at the moment of publish, or the schedule dialog's own
+# date prompt -- so showing a third, editable date in the frontmatter
+# would just be a confusing extra path to the same decision. The parser
+# still honors a `date:` line if someone types one in by hand (backdating
+# an import, say); this only stops the template from suggesting it.
+def build_frontmatter(title:, tags:, type:)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
   lines << "type: #{type}" if type
-  lines << "date: #{date}"
   lines << '---'
   "#{lines.join("\n")}\n\n"
 end
@@ -196,10 +209,12 @@ end
 # --- commands ------------------------------------------------------------
 
 def cmd_add
-  # The date the template suggests is kept aside: at publish time it's used
-  # to tell whether the author touched the date field at all (see publish_draft).
+  # Kept aside for the same reason it always was: at publish time it's
+  # compared against post['date'] to tell whether a manually-typed
+  # date: line (still parsed below, just no longer suggested) overrode
+  # it -- see publish_draft.
   suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
-  template = build_frontmatter(title: '', tags: '', type: '', date: suggested.strftime('%Y-%m-%d %H:%M')) +
+  template = build_frontmatter(title: '', tags: '', type: '') +
              "First paragraph's text.\n"
   raw = edit_in_editor(template, FRONTMATTER_HINT)
 
@@ -296,25 +311,39 @@ def draft_decision_loop(slug)
     puts
     case Tui.key_choice(t('cli.what_next_prompt'))
     when 'p' then return publish_draft(slug)
-    when 's' then return if schedule_from_dialog(path, post)
     when 'e' then edit_post(slug)
+    when 's'
+      puts
+      return if prompt_and_schedule(path, post)
     when 'd', ''
       puts
       puts t('cli.left_as_draft', slug: slug)
       puts
+      return
+    when 'x'
+      next unless delete_post(slug)
+
+      rebuild_and_deploy(t('cli.updating_preview'))
       return
     else puts t('cli.unknown_choice_pde')
     end
   end
 end
 
-# The [s] choice in draft_decision_loop: asks for a publish date right in
-# the dialog and schedules the draft under it -- unlike the standalone
-# `schedule` command, no prior `edit` is needed to set the date. Returns
-# true when scheduled (the dialog ends), false on cancel/invalid input
-# (the dialog comes around again). The preview is rebuilt because the
-# entered date becomes the post's date and shows on the draft page.
-def schedule_from_dialog(path, post)
+# Asks for a publish date and schedules the draft under it. Shared by the
+# [s] dialog choice and the standalone `schedule` command -- both ask the
+# same question, and since the frontmatter no longer offers a date field,
+# asking is the only way either of them can get one. Returns true when
+# scheduled, false on cancel/invalid input: the dialog uses that to come
+# around again, the standalone command just ends. The preview is rebuilt
+# because the entered date becomes the post's date and shows on the draft
+# page.
+#
+# No leading blank line here: the two callers arrive with different things
+# above them. pick_from_list already ends with one, while the dialog's
+# key_choice leaves the cursor right under the echoed keypress -- so that
+# branch prints its own.
+def prompt_and_schedule(path, post)
   print t('cli.schedule_date_prompt')
   input = $stdin.gets&.strip.to_s
   return false if input.empty?
@@ -500,10 +529,10 @@ end
 
 # Marks a draft for automatic publishing by cron
 # (scripts/publish-scheduled.sh) once its date arrives -- or cancels the
-# mark when run on an already scheduled post (a toggle). The date must be
-# deliberately set to the future via `edit` first: an untouched
-# creation-time date would mean "publish immediately", and for that
-# `publish` exists.
+# mark when run on an already scheduled post (a toggle). Asks for the
+# date, exactly as the [s] dialog choice does: it used to require one set
+# to the future via `edit` beforehand, which stopped being a usable route
+# when the frontmatter template dropped its date field.
 def cmd_schedule(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
@@ -524,18 +553,7 @@ def cmd_schedule(slug)
     return
   end
 
-  date = Time.parse(post['date'])
-  untouched = post['created_at'] && post['date'] == post['created_at']
-  if untouched || date <= Time.now
-    warn t('cli.schedule_needs_future_date', slug: slug)
-    warn ''
-    return
-  end
-
-  File.write(path, JSON.pretty_generate(post.merge('scheduled' => true)))
-  puts t('cli.scheduled_label', slug: slug, date: date.strftime(t('date_time_format')))
-  puts t('cli.schedule_cron_note')
-  puts
+  prompt_and_schedule(path, post)
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -611,8 +629,7 @@ def edit_post(slug)
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
     tags: (post['tags'] || []).join(', '),
-    type: post['type'],
-    date: date.strftime('%Y-%m-%d %H:%M')
+    type: post['type']
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
@@ -710,7 +727,12 @@ def edit_post(slug)
   draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
 end
 
-def cmd_delete(slug)
+# Confirm-by-typing-slug + move to trash, shared by the standalone
+# `delete` command and the [x] choice in draft_decision_loop. Returns
+# true on an actual delete, false when the user cancelled -- callers
+# decide separately whether/how to rebuild (the two call sites want
+# different rebuild behavior, see cmd_delete vs draft_decision_loop).
+def delete_post(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
@@ -722,7 +744,7 @@ def cmd_delete(slug)
   unless confirmation == slug
     puts t('cli.cancelled')
     puts
-    return
+    return false
   end
 
   year = File.basename(File.dirname(path))
@@ -739,6 +761,12 @@ def cmd_delete(slug)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)
+  true
+end
+
+def cmd_delete(slug)
+  return unless delete_post(slug)
+
   maybe_rebuild
 end
 
@@ -820,9 +848,15 @@ def cmd_list(filters)
   posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
+  puts
 end
 
-RECENT_LIST_COUNT = 10
+# How many posts the pick_*_interactively menus offer. Was 10 back when
+# Tui.menu printed every item it was handed, so the list had to fit on
+# screen by construction; now that the menu scrolls, the only real cost
+# of a longer list is how far you might have to arrow through it -- and
+# typing a slug directly still short-circuits that entirely.
+RECENT_LIST_COUNT = 50
 
 def recent_posts(limit)
   posts = load_posts_summary
@@ -939,7 +973,10 @@ end
 
 def maybe_rebuild
   puts
-  return if Tui.key_choice(t('cli.rebuild_prompt')) == 'n'
+  if Tui.key_choice(t('cli.rebuild_prompt')) == 'n'
+    puts
+    return
+  end
 
   rebuild_and_deploy
 end
@@ -958,7 +995,18 @@ end
 
 # [internal name for dispatch, menu label] -- always without a slug; post
 # selection (if the activity needs it) happens in the matching
-# pick_*_interactively.
+# pick_*_interactively. `toot`/`bluesky` are mutually exclusive by
+# definition (SiteConfig.comment_network) -- showing the one that
+# doesn't apply to this site would just be a guaranteed no-op entry
+# ("use ./blog.sh toot instead"), so the menu only ever offers the one
+# that matches (or neither, on a site with no comment network at all).
+ANNOUNCE_MENU_ENTRY =
+  case SiteConfig.comment_network
+  when :mastodon then [['toot', t('cli.wizard_menu_toot')]]
+  when :bluesky then [['bluesky', t('cli.wizard_menu_bluesky')]]
+  else []
+  end
+
 WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
   ['edit', t('cli.wizard_menu_edit')],
@@ -967,8 +1015,7 @@ WIZARD_MENU = [
   ['unpublish', t('cli.wizard_menu_unpublish')],
   ['delete', t('cli.wizard_menu_delete')],
   ['restore', t('cli.wizard_menu_restore')],
-  ['toot', t('cli.wizard_menu_toot')],
-  ['bluesky', t('cli.wizard_menu_bluesky')],
+  *ANNOUNCE_MENU_ENTRY,
   ['list', t('cli.wizard_menu_list')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
 ].freeze
@@ -982,8 +1029,8 @@ def run_wizard_choice(command)
   when 'unpublish' then cmd_unpublish(pick_published_interactively)
   when 'delete' then cmd_delete(pick_slug_interactively)
   when 'restore' then cmd_restore(pick_trash_interactively)
-  when 'toot' then cmd_toot(pick_slug_interactively)
-  when 'bluesky' then cmd_bluesky(pick_slug_interactively)
+  when 'toot' then cmd_toot(pick_published_interactively)
+  when 'bluesky' then cmd_bluesky(pick_published_interactively)
   when 'list' then cmd_list({})
   when 'rebuild' then cmd_rebuild
   end
@@ -996,13 +1043,36 @@ rescue SystemExit
   nil
 end
 
-def run_wizard
-  puts Tui.paint(t('cli.wizard_greeting'), :bold)
+# Which engine, which site, which domain -- an accent bar rather than a
+# boxed panel so it never needs a bordered panel's width-matching
+# discipline (see the design discussion this came out of): each line
+# stands alone, so a long site name or claim just makes that one line
+# longer instead of risking mismatched corners on a narrow terminal.
+# Site fields are optional (SITE_SHORT_NAME/_DESCRIPTION/_BASE_URL can
+# all be blank on a barely-started install) -- absent ones are simply
+# skipped, never rendered as an empty line.
+def wizard_header
+  bar = Tui.paint('▍', :cyan)
+  claim = [SITE_SHORT_NAME, SITE_DESCRIPTION].compact.reject(&:empty?).join(' — ')
+  domain = SITE_BASE_URL.to_s.sub(%r{\Ahttps?://}, '').chomp('/')
 
+  lines = [Tui.paint('blog.sh', :bold)]
+  lines << claim unless claim.empty?
+  lines << Tui.paint(domain, :dim) unless domain.empty?
+  lines.map { |line| "#{bar}#{line}" }.join("\n")
+end
+
+def run_wizard
   # In a terminal the wizard is an arrow-key menu (digits still work as
   # quick select, Esc exits). Piped input keeps the numbered prompt.
   if Tui.interactive?
     loop do
+      # Reprinted every iteration, not just once at startup: each
+      # pause_and_clear wipes the screen, and without this the site
+      # identity (which blog am I even connected to?) would vanish
+      # from view after the very first action -- the whole point for
+      # anyone managing more than one site.
+      puts wizard_header
       puts
       puts t('cli.wizard_prompt_action')
       puts
@@ -1011,10 +1081,12 @@ def run_wizard
 
       puts
       run_wizard_choice(WIZARD_MENU[index].first)
+      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
     end
     return
   end
 
+  puts wizard_header
   loop do
     puts
     puts t('cli.wizard_prompt_action')
@@ -1067,10 +1139,10 @@ else
     slug = ARGV.shift || pick_published_interactively
     cmd_unpublish(slug)
   when 'toot'
-    slug = ARGV.shift || pick_slug_interactively
+    slug = ARGV.shift || pick_published_interactively
     cmd_toot(slug)
   when 'bluesky'
-    slug = ARGV.shift || pick_slug_interactively
+    slug = ARGV.shift || pick_published_interactively
     cmd_bluesky(slug)
   when 'rebuild'
     cmd_rebuild
@@ -1080,9 +1152,9 @@ else
     unless Dir.exist?(File.join(ROOT, 'public.nosync'))
       abort t('cli.preview_missing_public')
     end
-    port = ARGV.shift || '8000'
+    port = (ARGV.shift || '8000').to_i
     puts t('cli.preview_serving', url: "http://localhost:#{port}/")
-    exec('ruby', '-run', '-e', 'httpd', File.join(ROOT, 'public.nosync'), '-p', port)
+    PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
   when 'list'
     filters = {}
     ARGV.each do |arg|

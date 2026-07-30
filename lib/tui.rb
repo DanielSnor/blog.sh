@@ -54,6 +54,14 @@ module Tui
     80
   end
 
+  # Same idea as term_width, for the menu's scroll window below.
+  def term_height
+    height = interactive? ? $stdout.winsize[0] : 0
+    height.positive? ? height : 24
+  rescue IOError, Errno::ENOTTY
+    24
+  end
+
   # Truncates rather than wraps -- `menu` below repaints by moving the
   # cursor up exactly one line per item, so every item MUST render as
   # exactly one physical terminal row. On a narrow terminal (an SSH
@@ -115,36 +123,80 @@ module Tui
     end
   end
 
+  # Clamps a scrolling window of `window` items (out of `total`) so that
+  # `selected` stays inside it, moving the window by the minimum amount
+  # rather than re-centering it. Wraparound (selected jumping from the
+  # last item to the first, or vice versa) resolves correctly for free:
+  # e.g. selected=0 is always < any positive offset, so the window snaps
+  # back to the top without a special case.
+  def clamp_offset(selected, offset, window, total)
+    return 0 if total <= window
+    return selected if selected < offset
+    return selected - window + 1 if selected >= offset + window
+
+    offset
+  end
+
   # Inline arrow-key menu. Returns the selected Integer index, a String
   # when the user typed free text instead (allow_text -- picking a post
-  # by slug), or nil on Esc/q. Digits 1-9 select directly. Only called
-  # in interactive mode -- non-interactive callers keep their numbered
-  # lists.
+  # by slug), or nil on Esc/q. Digits 1-9 select directly, relative to
+  # the currently visible rows (not the full list -- see below). Only
+  # called in interactive mode -- non-interactive callers keep their
+  # numbered lists.
+  #
+  # Scrolls when there are more items than fit on screen -- a hardcoded
+  # RECENT_LIST_COUNT-style cap stops being the only way to keep a list
+  # usable once picking from thousands of posts (sean.cz-scale) is on
+  # the table. The window size is fixed for the life of one menu call
+  # (no SIGWINCH handling, same as term_width already assumes elsewhere
+  # in this file) so the cursor-up repaint math stays valid.
   def menu(items, hint: nil, allow_text: false, text_prompt: nil)
     selected = 0
-    lines = items.size + (hint ? 1 : 0)
+    offset = 0
+    # Leave a couple of rows above the menu for whatever's already on
+    # screen (the prompt that preceded it) plus the hint block, so the
+    # menu doesn't try to claim the entire terminal height for itself.
+    budget = term_height - 2 - (hint ? 2 : 0)
+    window = [items.size, [budget, 5].max].min
+    scrollable = items.size > window
+    # +2 for the hint, not +1: a blank separator line precedes it, and
+    # the cursor-up repaint math must count every physical line printed.
+    lines = window + (hint ? 2 : 0)
     painted_once = false
 
     print "\e[?25l"
     loop do
       avail = term_width - 2 # "› " / "  " prefix
       print "\e[#{lines}A" if painted_once
-      items.each_with_index do |item, i|
+      items[offset, window].each_with_index do |item, i|
         plain = truncate_to_width(strip_ansi(item), avail)
-        line = i == selected ? paint("› #{plain}", :invert) : "  #{plain}"
+        line = (offset + i) == selected ? paint("› #{plain}", :invert) : "  #{plain}"
         print "\e[2K#{line}\n"
       end
-      print "\e[2K#{paint(truncate_to_width(hint, term_width), :dim)}\n" if hint
+      if hint
+        print "\e[2K\n"
+        # Numeric rather than worded ("16-31 of 50") on purpose: this file
+        # deliberately depends on nothing but io/console -- no config, no
+        # locales -- and a bare range reads the same in every language.
+        text = scrollable ? "#{hint} · #{offset + 1}-#{offset + window}/#{items.size}" : hint
+        print "\e[2K#{paint(truncate_to_width(text, term_width), :dim)}\n"
+      end
       painted_once = true
 
       case (key = read_key)
-      when :up then selected = (selected - 1) % items.size
-      when :down then selected = (selected + 1) % items.size
+      when :up
+        selected = (selected - 1) % items.size
+        offset = clamp_offset(selected, offset, window, items.size)
+      when :down
+        selected = (selected + 1) % items.size
+        offset = clamp_offset(selected, offset, window, items.size)
       when :enter then return selected
       when :escape, 'q', '0' then return nil
       when String
-        if key =~ /\A[1-9]\z/ && key.to_i <= items.size
-          return key.to_i - 1
+        if key =~ /\A[1-9]\z/
+          relative = key.to_i - 1
+          index = offset + relative
+          return index if relative < window && index < items.size
         elsif allow_text && key =~ /\A[[:alnum:]]\z/
           print "\e[?25h#{text_prompt}#{key}"
           rest = $stdin.gets.to_s.strip
@@ -154,6 +206,26 @@ module Tui
     end
   ensure
     print "\e[?25h"
+  end
+
+  # Waits for a single keypress, then clears the visible screen -- \e[2J
+  # only clears the current viewport, not the terminal's scrollback (the
+  # same thing the `clear` shell command does), so this doesn't conflict
+  # with the "stay in scrollback" principle above. Used between wizard
+  # actions so each one's own result is read on a clean screen instead
+  # of piling up underneath every previous run's menu and output.
+  #
+  # Deliberately no leading blank line of its own: every wizard-reachable
+  # command already ends its output with exactly one trailing blank line
+  # (a convention that predates this method, from the original piped-only
+  # CLI -- see e.g. the comment above "Done:" in publish_draft). Adding
+  # another blank here would just double it up.
+  def pause_and_clear(message)
+    return unless interactive?
+
+    print paint(message, :dim)
+    read_key
+    print "\e[2J\e[H"
   end
 
   # A braille spinner around a slow block (network calls). Piped runs

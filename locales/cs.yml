@@ -112,7 +112,9 @@ cli:
       tags   tagy oddělené čárkou, např: příroda, procházka, praha
       type   typ postu — text / image / video / link (volitelné — necháš-li
              prázdné, typ se odvodí sám podle obsahu postu)
-      date   YYYY-MM-DD HH:MM — může být i v minulosti, post se zařadí chronologicky
+
+    Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
+    publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
 
     OBSAH píšeš pod druhý ---. Jak na formátování:
 
@@ -127,11 +129,12 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
   preview_label: "Náhled: %{url}"
-  what_next_prompt: "Co dál? [p] publikovat  [s] naplánovat  [d] nechat draftem  [e] zpět do editace: "
+  what_next_prompt: "Co dál? [p] publikovat  [e] upravit  [s] naplánovat  [d] nechat draftem  [x] smazat: "
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
-  unknown_choice_pde: "Nerozumím, zkus p / s / d / e."
+  unknown_choice_pde: "Nerozumím, zkus p / e / s / d / x."
   schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, prázdné = zrušit): "
   menu_hint: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · psaní = slug · Esc zpět"
+  wizard_continue_prompt: "Stiskni klávesu pro pokračování…"
   qr_hint: "Naskenuj telefonem a náhled se otevře."
   announcing: "Oznamuji"
   preview_serving: "Servíruji public.nosync na %{url} — Ctrl-C ukončí."
@@ -151,7 +154,6 @@ cli:
   delete_bluesky_failed: "Smazání oznámení na Bluesky selhalo — smaž ho ručně."
   backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), oznámení se neposlalo."
   schedule_only_drafts: "Post '%{slug}' už je publikovaný — plánovat jde jen drafty."
-  schedule_needs_future_date: "Post '%{slug}' potřebuje nejdřív budoucí datum — nastav ho přes ./blog.sh edit %{slug}. (Nedotčené datum vytvoření by znamenalo „publikovat hned“, a na to je publish.)"
   scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
   schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Opětovné schedule plán zruší."
   unscheduled_label: "Plán zrušen: '%{slug}' zůstává draftem."
@@ -212,7 +214,7 @@ cli:
       ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
       ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
-      ./blog.sh schedule [<slug>]    naplánuje draft k automatické publikaci v jeho (budoucím) datu; opětovné spuštění plán zruší
+      ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
       ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
@@ -224,7 +226,6 @@ cli:
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh                      spustí interaktivního průvodce
 
-  wizard_greeting: "Ahoj, tady blog.sh."
   wizard_prompt_action: "Co chceš dělat?"
   wizard_exit_option: "0) Konec"
   wizard_choice_prompt: "Volba: "
