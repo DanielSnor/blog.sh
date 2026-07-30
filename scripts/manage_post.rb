@@ -297,8 +297,8 @@ def draft_decision_loop(slug)
     puts
     case Tui.key_choice(t('cli.what_next_prompt'))
     when 'p' then return publish_draft(slug)
-    when 's' then return if schedule_from_dialog(path, post)
     when 'e' then edit_post(slug)
+    when 's' then return if schedule_from_dialog(path, post)
     when 'd', ''
       puts
       puts t('cli.left_as_draft', slug: slug)
@@ -975,7 +975,18 @@ end
 
 # [internal name for dispatch, menu label] -- always without a slug; post
 # selection (if the activity needs it) happens in the matching
-# pick_*_interactively.
+# pick_*_interactively. `toot`/`bluesky` are mutually exclusive by
+# definition (SiteConfig.comment_network) -- showing the one that
+# doesn't apply to this site would just be a guaranteed no-op entry
+# ("use ./blog.sh toot instead"), so the menu only ever offers the one
+# that matches (or neither, on a site with no comment network at all).
+ANNOUNCE_MENU_ENTRY =
+  case SiteConfig.comment_network
+  when :mastodon then [['toot', t('cli.wizard_menu_toot')]]
+  when :bluesky then [['bluesky', t('cli.wizard_menu_bluesky')]]
+  else []
+  end
+
 WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
   ['edit', t('cli.wizard_menu_edit')],
@@ -984,8 +995,7 @@ WIZARD_MENU = [
   ['unpublish', t('cli.wizard_menu_unpublish')],
   ['delete', t('cli.wizard_menu_delete')],
   ['restore', t('cli.wizard_menu_restore')],
-  ['toot', t('cli.wizard_menu_toot')],
-  ['bluesky', t('cli.wizard_menu_bluesky')],
+  *ANNOUNCE_MENU_ENTRY,
   ['list', t('cli.wizard_menu_list')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
 ].freeze
@@ -1028,6 +1038,7 @@ def run_wizard
 
       puts
       run_wizard_choice(WIZARD_MENU[index].first)
+      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
     end
     return
   end

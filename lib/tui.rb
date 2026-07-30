@@ -122,7 +122,9 @@ module Tui
   # lists.
   def menu(items, hint: nil, allow_text: false, text_prompt: nil)
     selected = 0
-    lines = items.size + (hint ? 1 : 0)
+    # +2 for the hint, not +1: a blank separator line precedes it, and
+    # the cursor-up repaint math must count every physical line printed.
+    lines = items.size + (hint ? 2 : 0)
     painted_once = false
 
     print "\e[?25l"
@@ -134,7 +136,10 @@ module Tui
         line = i == selected ? paint("› #{plain}", :invert) : "  #{plain}"
         print "\e[2K#{line}\n"
       end
-      print "\e[2K#{paint(truncate_to_width(hint, term_width), :dim)}\n" if hint
+      if hint
+        print "\e[2K\n"
+        print "\e[2K#{paint(truncate_to_width(hint, term_width), :dim)}\n"
+      end
       painted_once = true
 
       case (key = read_key)
@@ -154,6 +159,21 @@ module Tui
     end
   ensure
     print "\e[?25h"
+  end
+
+  # Waits for a single keypress, then clears the visible screen -- \e[2J
+  # only clears the current viewport, not the terminal's scrollback (the
+  # same thing the `clear` shell command does), so this doesn't conflict
+  # with the "stay in scrollback" principle above. Used between wizard
+  # actions so each one's own result is read on a clean screen instead
+  # of piling up underneath every previous run's menu and output.
+  def pause_and_clear(message)
+    return unless interactive?
+
+    puts
+    print paint(message, :dim)
+    read_key
+    print "\e[2J\e[H"
   end
 
   # A braille spinner around a slow block (network calls). Piped runs
