@@ -164,12 +164,17 @@ CHEAT_SHEET_URL = "#{SITE_BASE_URL.to_s.chomp('/')}/markdown/".freeze
 
 FRONTMATTER_HINT = t('cli.frontmatter_hint', cheat_sheet_url: CHEAT_SHEET_URL)
 
-def build_frontmatter(title:, tags:, type:, date:)
+# No `date:` line: publishing time now comes from exactly one of two
+# places -- "now" at the moment of publish, or the schedule dialog's own
+# date prompt -- so showing a third, editable date in the frontmatter
+# would just be a confusing extra path to the same decision. The parser
+# still honors a `date:` line if someone types one in by hand (backdating
+# an import, say); this only stops the template from suggesting it.
+def build_frontmatter(title:, tags:, type:)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
   lines << "type: #{type}" if type
-  lines << "date: #{date}"
   lines << '---'
   "#{lines.join("\n")}\n\n"
 end
@@ -202,10 +207,12 @@ end
 # --- commands ------------------------------------------------------------
 
 def cmd_add
-  # The date the template suggests is kept aside: at publish time it's used
-  # to tell whether the author touched the date field at all (see publish_draft).
+  # Kept aside for the same reason it always was: at publish time it's
+  # compared against post['date'] to tell whether a manually-typed
+  # date: line (still parsed below, just no longer suggested) overrode
+  # it -- see publish_draft.
   suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
-  template = build_frontmatter(title: '', tags: '', type: '', date: suggested.strftime('%Y-%m-%d %H:%M')) +
+  template = build_frontmatter(title: '', tags: '', type: '') +
              "First paragraph's text.\n"
   raw = edit_in_editor(template, FRONTMATTER_HINT)
 
@@ -326,6 +333,7 @@ end
 # (the dialog comes around again). The preview is rebuilt because the
 # entered date becomes the post's date and shows on the draft page.
 def schedule_from_dialog(path, post)
+  puts
   print t('cli.schedule_date_prompt')
   input = $stdin.gets&.strip.to_s
   return false if input.empty?
@@ -622,8 +630,7 @@ def edit_post(slug)
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
     tags: (post['tags'] || []).join(', '),
-    type: post['type'],
-    date: date.strftime('%Y-%m-%d %H:%M')
+    type: post['type']
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
@@ -842,6 +849,7 @@ def cmd_list(filters)
   posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
+  puts
 end
 
 RECENT_LIST_COUNT = 10
@@ -961,7 +969,10 @@ end
 
 def maybe_rebuild
   puts
-  return if Tui.key_choice(t('cli.rebuild_prompt')) == 'n'
+  if Tui.key_choice(t('cli.rebuild_prompt')) == 'n'
+    puts
+    return
+  end
 
   rebuild_and_deploy
 end

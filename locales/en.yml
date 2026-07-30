@@ -121,7 +121,9 @@ cli:
       tags   comma-separated tags, e.g: nature, hike, city
       type   post type -- text / image / video / link (optional -- leave it
              blank and the type is inferred from the post's content)
-      date   YYYY-MM-DD HH:MM -- can be in the past, the post is sorted chronologically
+
+    Publish date isn't set here -- [p]ublish uses the moment you publish,
+    [s]chedule asks for a future date/time when you pick it.
 
     CONTENT goes under the second ---. For formatting syntax:
 

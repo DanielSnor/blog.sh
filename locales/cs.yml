@@ -112,7 +112,9 @@ cli:
       tags   tagy oddělené čárkou, např: příroda, procházka, praha
       type   typ postu — text / image / video / link (volitelné — necháš-li
              prázdné, typ se odvodí sám podle obsahu postu)
-      date   YYYY-MM-DD HH:MM — může být i v minulosti, post se zařadí chronologicky
+
+    Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
+    publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
 
     OBSAH píšeš pod druhý ---. Jak na formátování:
 

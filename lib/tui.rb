@@ -167,10 +167,15 @@ module Tui
   # with the "stay in scrollback" principle above. Used between wizard
   # actions so each one's own result is read on a clean screen instead
   # of piling up underneath every previous run's menu and output.
+  #
+  # Deliberately no leading blank line of its own: every wizard-reachable
+  # command already ends its output with exactly one trailing blank line
+  # (a convention that predates this method, from the original piped-only
+  # CLI -- see e.g. the comment above "Done:" in publish_draft). Adding
+  # another blank here would just double it up.
   def pause_and_clear(message)
     return unless interactive?
 
-    puts
     print paint(message, :dim)
     read_key
     print "\e[2J\e[H"
