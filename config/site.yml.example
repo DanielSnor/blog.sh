@@ -49,7 +49,9 @@ site:
   # page_size: 10
 
 banner:
-  src: "/assets/images/banner.png"
+  # Ships with the engine, so a fresh install renders before you've drawn
+  # anything -- replace it with your own image and update the size below.
+  src: "/assets/images/header.png"
   alt: "Your Site"
   # The file's actual dimensions -- reserves space before the image loads.
   width: 940
