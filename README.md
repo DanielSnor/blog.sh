@@ -398,7 +398,9 @@ ruby scripts/migrate_feed.rb <export.xml | feed-url>
 
 All of them take `LIMIT=n` to import only the first *n* posts, which is the
 way to sample a large archive before committing hours to it -- a later full
-run overwrites those posts in place rather than duplicating them.
+run overwrites those posts in place rather than duplicating them. The full
+per-source guide, including undo and troubleshooting, is
+[docs/importing.md](docs/importing.md).
 They report progress as they go: the size of what they're about to read,
 how many items were found and filtered, then a `12/847` counter per post,
 because downloading every image of an archive runs for hours and a silent
