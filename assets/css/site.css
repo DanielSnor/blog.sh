@@ -161,20 +161,33 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
 .banner-wrap { position: relative; }
 .banner-link { display: block; }
 
-/* Darkens the top-left and bottom-right corners of the banner image so the
-   overlaid title/claim stay readable regardless of what the image itself
-   looks like -- same technique as fedik.online's hero, since the image
-   doesn't change with the light/dark toggle but the text needs to stay on
-   top of it either way. */
-.banner-wrap::after {
+/* Darkens the corner an overlay line sits in, so the title/claim stay
+   readable regardless of what the image itself looks like -- same technique
+   as fedik.online's hero, since the image doesn't change with the light/dark
+   toggle but the text needs to stay on top of it either way.
+
+   Each corner is tied to its own overlay: a site with banner.show_title /
+   show_claim off gets that corner left alone, and with both off the image is
+   shown exactly as authored. Gating this in CSS via :has() rather than a
+   class the template emits is deliberate -- an overlay toggle then changes
+   one stylesheet instead of re-rendering every page in the archive. Where
+   :has() is unsupported the scrim simply isn't painted, which costs a little
+   contrast rather than breaking the header. */
+.banner-wrap:has(.banner-title)::before,
+.banner-wrap:has(.banner-claim)::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background:
-    linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%),
-    linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
+}
+
+.banner-wrap:has(.banner-title)::before {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
+}
+
+.banner-wrap:has(.banner-claim)::after {
+  background: linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
 }
 
 .banner-title,
