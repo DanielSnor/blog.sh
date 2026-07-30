@@ -89,7 +89,10 @@ module RssFetcher
   def format_date(raw)
     return '' if raw.to_s.empty?
 
-    Time.parse(raw).strftime(I18n.t('date_format'))
+    # getlocal: a feed states its items' dates in whatever offset the
+    # publisher uses, so render in site.timezone to match the rest of the
+    # page -- see mastodon_fetcher for the same reasoning.
+    Time.parse(raw).getlocal.strftime(I18n.t('date_format'))
   rescue ArgumentError
     ''
   end

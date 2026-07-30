@@ -49,7 +49,9 @@ module PixelfedFetcher
       title = full_title.split("\n").first.to_s
       link = entry.elements["link[@rel='alternate']"]&.attribute('href')&.value ||
              entry.elements['id']&.text
-      date = Time.parse(entry.elements['updated'].text).strftime(I18n.t('date_format'))
+      # getlocal: see mastodon_fetcher -- feed timestamps carry the remote's
+      # offset, the date shown should be the reader's.
+      date = Time.parse(entry.elements['updated'].text).getlocal.strftime(I18n.t('date_format'))
       content_el = entry.elements['content']
       content = content_el ? content_el.texts.map(&:to_s).join : ''
       image = content[/src="([^"]+)"/, 1]

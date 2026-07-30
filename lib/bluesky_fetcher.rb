@@ -42,7 +42,9 @@ module BlueskyFetcher
       date = item.dig('reason', 'indexedAt') || post.dig('record', 'createdAt')
       rkey = post['uri'].to_s.split('/').last
       {
-        'date' => Time.parse(date).strftime(I18n.t('date_format')),
+        # getlocal for the same reason as in mastodon_fetcher: the remote
+        # timestamp is UTC, the reader thinks in site.timezone.
+        'date' => Time.parse(date).getlocal.strftime(I18n.t('date_format')),
         # Plain text, not sanitized HTML like Mastodon's -- stored as
         # 'text' so sidebar.js knows to escape it wholesale.
         'text' => post.dig('record', 'text').to_s,

@@ -537,13 +537,27 @@ def post_time(post)
   TIME_CACHE[post] ||= Time.parse(post['date'])
 end
 
+# The same instant, expressed in site.timezone -- for dates a human reads.
+#
+# A stored date keeps the offset it was written with, which for imported
+# posts is usually UTC: a post written at 00:20 Prague arrives as 23:20 the
+# previous day, and rendering that verbatim shows the wrong day. This is
+# deliberately NOT folded into post_time, which also derives the year in
+# post_path -- shifting that would move a post published near midnight on
+# December 31 to a different year, changing a live URL and orphaning the
+# announcement pointing at it. Feeds and the sitemap keep post_time too:
+# they carry absolute instants for machines, where the offset is noise.
+def post_display_time(post)
+  post_time(post).getlocal
+end
+
 def dominant_content_type(post)
   TYPE_CACHE[post] ||= ContentType.dominant(post)
 end
 
 def date_badge(post, link: nil)
   icon = CONTENT_ICONS[dominant_content_type(post)]
-  date = post_time(post).strftime(t('date_format'))
+  date = post_display_time(post).strftime(t('date_format'))
   inner = "#{icon}<span>#{date}</span>"
   inner = %(<a href="#{link}">#{inner}</a>) if link
   %(<div class="date-badge">#{inner}</div>)
@@ -1052,7 +1066,7 @@ def search_index_entry(post)
   {
     url: post_path(post),
     title: post['title'],
-    date: post_time(post).strftime(t('date_format')),
+    date: post_display_time(post).strftime(t('date_format')),
     excerpt: truncate_excerpt(text),
     folded: fold([post['title'], text, (post['tags'] || []).join(' ')].compact.join(' '))
   }

@@ -45,7 +45,10 @@ module GithubFetcher
   def self.commit(repo, sha)
     data = JSON.parse(FeedHttp.get("https://api.github.com/repos/#{repo}/commits/#{sha}"))
     {
-      'date' => Time.parse(data.dig('commit', 'author', 'date')).strftime(I18n.t('date_format')),
+      # getlocal: git records the author's own offset, which is whatever
+      # machine made the commit -- rendering it in site.timezone keeps the
+      # widget consistent with every other date on the page.
+      'date' => Time.parse(data.dig('commit', 'author', 'date')).getlocal.strftime(I18n.t('date_format')),
       'repo' => repo.split('/').last.to_s,
       'message' => data.dig('commit', 'message').to_s.split("\n").first.to_s,
       'url' => data['html_url'].to_s
