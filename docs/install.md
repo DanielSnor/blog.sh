@@ -4,34 +4,118 @@ From zero to a deployed site. The [main README](../README.md) is the
 quick tour; this is the complete path, including the server side.
 Day-to-day usage lives in [operations.md](operations.md).
 
+In a hurry? The [Quick start](#quick-start) below is a complete
+copy-paste path to a site running locally on your machine -- one block
+per platform. The numbered sections after it are the full reference,
+including [picking a deploy target](#6-pick-a-deploy-target) to put the
+site on the internet.
+
 ## What you need
 
 - **Ruby 2.7+** (3.x is what the real deployments run) -- standard
   library only, no gems, no Bundler. Check with `ruby -v`; `blog.sh`
   checks too and says exactly this if the interpreter is too old.
 - **bash** -- for the thin `blog.sh` / `deploy-web.sh` /
-  `refresh-sidebar.sh` wrappers.
-
-Per OS, that means:
-
-- **Linux**: `sudo apt install ruby-full` (Debian/Ubuntu; `ruby-full`
-  rather than the bare `ruby` -- see the default-gems note below) or your
-  distro's equivalent.
-- **macOS**: `brew install ruby`, then put it in PATH the way brew's
-  install output says. The system `/usr/bin/ruby` is 2.6 on every current
-  macOS and Apple treats it as frozen -- `ruby -v` showing 2.6.10 means
-  you're still on it. The system nano is similarly ancient; if the editor
-  step complains, `export EDITOR=vim` (or anything you like) fixes it.
-- **Windows**: use **WSL2** and follow the Linux line inside it -- the
-  wrappers are bash, so there is no native cmd/PowerShell path. Git Bash
-  mostly works but degrades the interactive menus (mintty isn't a TTY to
-  a native Ruby), and `chmod 600 env.sh` protects nothing on NTFS -- with
-  real tokens in env.sh, WSL2 is the supported route.
+  `refresh-sidebar.sh` wrappers. (On Windows that means WSL2 -- see the
+  quick start; there is no native cmd/PowerShell path.)
 - **A place to serve static files** -- any of the six deploy targets
   below, from a Cloudron Surfer app to a plain directory behind your own
   nginx/Caddy.
 - Optional: a **Mastodon or Bluesky account** (comments, auto-announce,
   sidebar widgets) and **cron** (widget refresh, scheduled publishing).
+
+## Quick start
+
+Each block below is the whole path for one platform: prerequisites,
+clone, config, first post, local preview. They end at the same place --
+a site you can see at `http://localhost:8000/` -- and from there,
+[section 6](#6-pick-a-deploy-target) takes it to the internet. The
+config example works as-is, so you can leave editing it for later;
+before deploying for real, fill in at least `site:` and `banner:`
+([section 2](#2-configure-the-site----configsiteyml)).
+
+### macOS
+
+The system Ruby is 2.6 from 2019 and Apple treats it as frozen, so the
+one real step is a current Ruby via [Homebrew](https://brew.sh):
+
+```bash
+brew install ruby
+echo 'export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"' >> ~/.zshrc
+exec zsh
+ruby -v    # 3.x now, not 2.6.10
+```
+
+(No Homebrew yet? Install it first with the one command on
+[brew.sh](https://brew.sh). `git` is already there on any Mac with the
+Xcode Command Line Tools -- macOS offers to install them the first time
+you type `git`.)
+
+Then:
+
+```bash
+git clone https://github.com/DanielSnor/blog.sh.git myblog
+cd myblog
+cp config/site.yml.example config/site.yml
+cp env.sh.example env.sh && chmod 600 env.sh
+./blog.sh add        # write the first post; publish or keep as draft
+./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
+```
+
+The system nano is as old as the system Ruby -- if the editor step
+complains about options, set your own: `export EDITOR=vim` (or `code -w`,
+or plain `nano`).
+
+### Linux (Debian/Ubuntu shown; any distro works)
+
+```bash
+sudo apt update && sudo apt install -y ruby-full git
+```
+
+(`ruby-full` rather than the bare `ruby` -- see the default-gems note
+below. On Fedora: `sudo dnf install ruby`; on Arch: `sudo pacman -S ruby` --
+both already complete.)
+
+```bash
+git clone https://github.com/DanielSnor/blog.sh.git myblog
+cd myblog
+cp config/site.yml.example config/site.yml
+cp env.sh.example env.sh && chmod 600 env.sh
+./blog.sh add        # write the first post; publish or keep as draft
+./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
+```
+
+### Windows
+
+blog.sh's wrappers are bash, so on Windows it runs inside **WSL2** --
+Microsoft's Linux environment, one command to set up. In PowerShell
+**as Administrator**:
+
+```powershell
+wsl --install
+```
+
+Reboot when asked; Ubuntu opens and asks you to pick a username. From
+that Ubuntu terminal, it's the Linux path verbatim:
+
+```bash
+sudo apt update && sudo apt install -y ruby-full git
+git clone https://github.com/DanielSnor/blog.sh.git myblog
+cd myblog
+cp config/site.yml.example config/site.yml
+cp env.sh.example env.sh && chmod 600 env.sh
+./blog.sh add        # write the first post; publish or keep as draft
+./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
+```
+
+Two Windows-specific notes: clone into the Linux home (`~/myblog`, as
+above), not `/mnt/c/...` -- file permissions (`chmod 600` on your
+tokens) and speed only work properly on the Linux side; and
+`http://localhost:8000/` works straight from your Windows browser, WSL2
+forwards it. Git Bash instead of WSL2 mostly runs too, but the
+interactive menus degrade (mintty isn't a TTY to a native Ruby) and
+`chmod` protects nothing on NTFS -- with real tokens in env.sh, WSL2 is
+the supported route.
 
 The engine has no build-time network dependencies: a machine with Ruby
 and bash can build the whole site offline.
@@ -76,9 +160,11 @@ The example is fully commented. The short version:
   locale, base_url), `banner`, `about`, `footer`. That alone is a
   complete, working site.
 - **Optional, each activates only when present:** `analytics`, `social`,
-  `widgets` (toots / pixelfed / commits, each independently), `mastodon`
-  (comments + auto-toot), `colors` (7 keys per light/dark mode --
-  omitted keys fall back to the built-in blue palette).
+  `widgets` (toots / pixelfed / commits / bluesky / rss, each
+  independently), `mastodon` **or** `bluesky` (comments + auto-announce
+  -- exactly one, see [step 8](#8-comments-network-optional-mastodon-or-bluesky)),
+  `colors` (7 keys per light/dark mode -- omitted keys fall back to the
+  built-in blue palette).
 
 `site.lang` selects `locales/<lang>.yml` for every generated string --
 `en`, `cs` and `de` ship with the engine; a partial locale falls back to
@@ -109,8 +195,12 @@ mode 600 because live credentials go in it. An **unedited copy is
 enough to try everything locally** -- with no deploy target configured,
 uploads are skipped (logged, not an error).
 
-The one value to set right away is `SITE_BASE_URL` -- the canonical URL
-that posts, RSS, the sitemap and OG tags are built from.
+The one value worth knowing about right away is `SITE_BASE_URL`: the
+canonical URL normally comes from `site.base_url` in `config/site.yml`
+(step 2), and this env.sh value **overrides** it when set -- it exists so
+a staging or local environment can point somewhere other than production
+while building from the same config. One site, one URL? Set
+`site.base_url` and leave this out.
 
 ## 4. Banner and favicon
 
@@ -148,7 +238,8 @@ authoring flow.
 
 **Replacing an existing blog?** Bring the old content in before you deploy,
 so the first published version of the site is already complete. `./import.sh`
-walks you through it -- Bluesky, Tumblr or a Twitter/X archive export -- and
+walks you through it -- Bluesky, Mastodon, Pixelfed, Tumblr, a Twitter/X
+archive export, or WordPress and any RSS/Atom feed -- and
 always previews what it would write before writing anything. See
 [operations.md → Importing](operations.md#importing-from-another-platform),
 and `./import.sh --help` for the scriptable equivalents.

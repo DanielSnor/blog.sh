@@ -288,6 +288,11 @@ iCloud doesn't exist, it's just a name.
 
 ## Getting started
 
+Coming from zero on macOS, Linux or Windows? There's a complete
+copy-paste path per platform -- Ruby included -- in
+[docs/install.md → Quick start](docs/install.md#quick-start). The steps
+below assume Ruby 2.7+ is already on the machine:
+
 1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
    site's title, description, social links, and (optionally) analytics,
    sidebar widgets, and the comments network (Mastodon or Bluesky). Set
