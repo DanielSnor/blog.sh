@@ -852,7 +852,12 @@ def cmd_list(filters)
   puts
 end
 
-RECENT_LIST_COUNT = 10
+# How many posts the pick_*_interactively menus offer. Was 10 back when
+# Tui.menu printed every item it was handed, so the list had to fit on
+# screen by construction; now that the menu scrolls, the only real cost
+# of a longer list is how far you might have to arrow through it -- and
+# typing a slug directly still short-circuits that entirely.
+RECENT_LIST_COUNT = 50
 
 def recent_posts(limit)
   posts = load_posts_summary

@@ -175,7 +175,10 @@ module Tui
       end
       if hint
         print "\e[2K\n"
-        text = scrollable ? "#{hint} · #{offset + 1}-#{offset + window} of #{items.size}" : hint
+        # Numeric rather than worded ("16-31 of 50") on purpose: this file
+        # deliberately depends on nothing but io/console -- no config, no
+        # locales -- and a bare range reads the same in every language.
+        text = scrollable ? "#{hint} · #{offset + 1}-#{offset + window}/#{items.size}" : hint
         print "\e[2K#{paint(truncate_to_width(text, term_width), :dim)}\n"
       end
       painted_once = true

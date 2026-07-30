@@ -290,7 +290,7 @@ cron, backup, troubleshooting) is
 ```bash
 ./blog.sh                      # interactive wizard (menu)
 ./blog.sh add                  # creates a draft, shows a preview, asks what's next
-./blog.sh edit [<slug>]        # without a slug, offers the last 10 posts
+./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
 ./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
 ./blog.sh schedule [<slug>]    # auto-publish a future-dated draft when its date arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
