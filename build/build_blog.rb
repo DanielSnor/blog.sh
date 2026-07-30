@@ -1049,8 +1049,21 @@ def prune_public
 end
 
 FileUtils.mkdir_p(PUBLIC_DIR)
+
+# Per-install graphics (banner, favicon) live outside git -- .gitignore
+# covers their live names so a site's own artwork survives `git pull`. The
+# tracked copies under defaults/ seed whatever is missing, so a fresh clone
+# still renders before the owner has drawn anything. An existing file is
+# the owner's and is never overwritten; defaults/ itself stays unpublished.
+DEFAULT_IMAGES_DIR = File.join(ROOT, 'assets', 'images', 'defaults')
+Dir.glob(File.join(DEFAULT_IMAGES_DIR, '*')).each do |src|
+  live = File.join(ROOT, 'assets', 'images', File.basename(src))
+  FileUtils.cp(src, live) unless File.exist?(live)
+end
+
 Dir.glob(File.join(ROOT, 'assets', '**', '*')).each do |src|
   next unless File.file?(src)
+  next if src.start_with?("#{DEFAULT_IMAGES_DIR}/")
 
   emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end

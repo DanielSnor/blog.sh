@@ -4,6 +4,8 @@ env.sh
 .deploy_manifest*.json
 .stats_full_refresh_at
 config/site.yml
+assets/images/header.png
+assets/images/favicon.png
 incoming/
 trash/
 drafts/
