@@ -35,10 +35,10 @@ Each source is also a script, for cron or a scripted migration. These write
 immediately, with no preview pass:
 
   ruby scripts/migrate_bluesky.rb <handle>
-  ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
-  ruby scripts/migrate_twitter.rb <path-to-extracted-export>
   ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
   ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
+  ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
+  ruby scripts/migrate_twitter.rb <path-to-extracted-export>
   ruby scripts/migrate_feed.rb <export.xml | feed-url>
 
 LIMIT=n works on all of them and imports only the first n posts -- the way to

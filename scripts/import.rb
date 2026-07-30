@@ -36,12 +36,19 @@ def t(key, **vars)
   I18n.t(key, **vars)
 end
 
+# Alphabetical by the name shown, so a growing list needs no judgement call
+# about where the next source belongs -- and so nobody has to hunt for one.
+#
+# Note that the non-interactive path selects by position, so reordering this
+# changes what `printf "4\n"` means. Nothing in the repo or the documented
+# cron pipes a number today, but anyone who has scripted one should re-read
+# their script after a change here.
 SOURCES = [
   ['bluesky', 'Bluesky', -> { build_bluesky }],
-  ['tumblr', 'Tumblr', -> { build_tumblr }],
-  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }],
   ['mastodon', 'Mastodon (account archive)', -> { build_mastodon }],
   ['pixelfed', 'Pixelfed (statuses export)', -> { build_pixelfed }],
+  ['tumblr', 'Tumblr', -> { build_tumblr }],
+  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }],
   ['feed', 'WordPress export or RSS/Atom feed', -> { build_feed }]
 ].freeze
 
