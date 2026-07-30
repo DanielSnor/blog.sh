@@ -127,9 +127,9 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
   preview_label: "Náhled: %{url}"
-  what_next_prompt: "Co dál? [p] publikovat  [s] naplánovat  [d] nechat draftem  [e] zpět do editace: "
+  what_next_prompt: "Co dál? [p] publikovat  [s] naplánovat  [d] nechat draftem  [e] zpět do editace  [x] smazat: "
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
-  unknown_choice_pde: "Nerozumím, zkus p / s / d / e."
+  unknown_choice_pde: "Nerozumím, zkus p / s / d / e / x."
   schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, prázdné = zrušit): "
   menu_hint: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · psaní = slug · Esc zpět"
   qr_hint: "Naskenuj telefonem a náhled se otevře."

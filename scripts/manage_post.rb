@@ -304,6 +304,11 @@ def draft_decision_loop(slug)
       puts t('cli.left_as_draft', slug: slug)
       puts
       return
+    when 'x'
+      next unless delete_post(slug)
+
+      rebuild_and_deploy(t('cli.updating_preview'))
+      return
     else puts t('cli.unknown_choice_pde')
     end
   end
@@ -711,7 +716,12 @@ def edit_post(slug)
   draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
 end
 
-def cmd_delete(slug)
+# Confirm-by-typing-slug + move to trash, shared by the standalone
+# `delete` command and the [x] choice in draft_decision_loop. Returns
+# true on an actual delete, false when the user cancelled -- callers
+# decide separately whether/how to rebuild (the two call sites want
+# different rebuild behavior, see cmd_delete vs draft_decision_loop).
+def delete_post(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
@@ -723,7 +733,7 @@ def cmd_delete(slug)
   unless confirmation == slug
     puts t('cli.cancelled')
     puts
-    return
+    return false
   end
 
   year = File.basename(File.dirname(path))
@@ -740,6 +750,12 @@ def cmd_delete(slug)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)
+  true
+end
+
+def cmd_delete(slug)
+  return unless delete_post(slug)
+
   maybe_rebuild
 end
 

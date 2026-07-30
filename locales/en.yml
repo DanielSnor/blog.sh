@@ -136,9 +136,9 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL is not set, can't build the preview URL."
   preview_label: "Preview: %{url}"
-  what_next_prompt: "What next? [p] publish  [s] schedule  [d] leave as draft  [e] back to editing: "
+  what_next_prompt: "What next? [p] publish  [s] schedule  [d] leave as draft  [e] back to editing  [x] delete: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
-  unknown_choice_pde: "Not understood, try p / s / d / e."
+  unknown_choice_pde: "Not understood, try p / s / d / e / x."
   schedule_date_prompt: "Publish at (YYYY-MM-DD HH:MM, empty = cancel): "
   menu_hint: "↑↓ move · Enter select · 1-9 quick pick · type = slug · Esc back"
   qr_hint: "Scan with your phone to open the preview."
