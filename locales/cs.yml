@@ -117,8 +117,9 @@ cli:
     FRONTMATTER (mezi --- a ---):
       title  nadpis (volitelný)
       tags   tagy oddělené čárkou, např: příroda, procházka, praha
-      type   typ postu — text / image / video / link (volitelné — necháš-li
-             prázdné, typ se odvodí sám podle obsahu postu)
+      type   typ postu — text / quote / chat / image / video / audio / link
+             (volitelné — necháš-li prázdné, typ se odvodí sám podle
+             obsahu postu)
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.

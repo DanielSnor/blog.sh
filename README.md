@@ -44,7 +44,7 @@ deploy step around exactly that. A few of the choices that came out of it:
 - **Posts are typed content blocks, not a Markdown blob rendered at
   request time.** You write Markdown; on save it's parsed once into a
   structured block format (paragraph, heading, quote, list, table, code,
-  image, video, link, divider) -- the same schema the historical
+  image, video, audio, chat, link, divider) -- the same schema the historical
   Tumblr/Twitter imports also normalize into. The build never re-parses
   Markdown, and any future importer just has to target one schema.
 - **Comments without a comment system.** Every published post is
@@ -104,11 +104,13 @@ deploy step around exactly that. A few of the choices that came out of it:
   to actually arrive before continuing
 
 **Markdown** (`lib/markdown_parser.rb`, shared by both the build and the authoring tool)
-- Paragraphs, headings `#`–`######`, bold/italic/strikethrough/code,
-  titled links, bare URLs auto-linked, ordered and nested lists,
-  blockquotes, horizontal rules, fenced code blocks with a language hint,
-  GFM-style aligned tables, images, video (local file or YouTube) with
-  automatic sizing, audio with a native player, backslash escaping
+- Paragraphs with hard line breaks, headings `#`–`######`,
+  bold/italic/strikethrough/code, titled links, bare URLs auto-linked,
+  ordered, nested and task lists, blockquotes with optional attribution,
+  chat transcripts (a ```chat fence), horizontal rules, fenced code blocks
+  with a language hint, GFM-style aligned tables, images, video (local
+  file or YouTube) with automatic sizing, audio with a native player,
+  backslash escaping
 - The full syntax reference at `/markdown/` is generated directly from
   this parser, so it can't drift out of sync with what's actually supported;
   its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the

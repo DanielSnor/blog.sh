@@ -126,8 +126,9 @@ cli:
     FRONTMATTER (between --- and ---):
       title  heading (optional)
       tags   comma-separated tags, e.g: nature, hike, city
-      type   post type -- text / image / video / link (optional -- leave it
-             blank and the type is inferred from the post's content)
+      type   post type -- text / quote / chat / image / video / audio / link
+             (optional -- leave it blank and the type is inferred from the
+             post's content)
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
     [s]chedule asks for a future date/time when you pick it.

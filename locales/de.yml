@@ -122,8 +122,9 @@ cli:
     FRONTMATTER (zwischen --- und ---):
       title  Überschrift (optional)
       tags   Schlagwörter, kommagetrennt, z. B.: natur, wandern, stadt
-      type   Beitragstyp -- text / image / video / link (optional -- leer
-             lassen, dann wird der Typ aus dem Inhalt abgeleitet)
+      type   Beitragstyp -- text / quote / chat / image / video / audio /
+             link (optional -- leer lassen, dann wird der Typ aus dem
+             Inhalt abgeleitet)
 
     Das Veröffentlichungsdatum wird hier nicht gesetzt -- [p] nimmt den
     Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit.
