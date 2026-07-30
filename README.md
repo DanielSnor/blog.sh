@@ -436,15 +436,21 @@ generalizing for anyone else to adopt this as-is:
 - **Imports** -- Bluesky, Tumblr and a Twitter/X archive are covered. The
   pattern for the rest is set by `lib/import/`: an adapter pages a source and
   shapes one item, everything else (media, dedup, dry-run, reporting) is
-  already shared. Still missing: **WordPress** (its WXR export is the
-  richest source of the lot -- full HTML, dates, tags, status, attachments)
-  and a **generic RSS/Atom** importer for the long tail (Ghost, Medium,
-  Blogger, ...), though a feed usually carries only its last few dozen items,
-  so it's a weak archive source. Both need the same missing piece: **HTML →
-  content blocks**. That, not the platform APIs, is the real cost, since
-  staying gem-free means a tolerant HTML parser of our own rather than
-  reaching for Nokogiri. Instagram has no usable read API; Threads is
-  feasible but deferred (see below).
+  already shared. What remains is **one importer, not two**: WordPress's WXR
+  export *is* RSS 2.0 -- same `<channel>`, same `<item>`, and the post body
+  in the same `content:encoded` a full-content feed uses -- with `wp:`
+  elements layered on top for what a feed has no room for (`post_type` to
+  filter by, `status` for drafts, `post_id` as the dedup key,
+  `attachment_url` for media). So the shape is a feed adapter that switches
+  on extras when it sees the `wp:` namespace, covering both WordPress and
+  the long tail (Ghost, Medium, Blogger, ...) -- with the caveat that a
+  public feed carries only its last few dozen items, making it a weak
+  archive source where a WXR file is a complete one. Dialect detection
+  already exists (`lib/rss_fetcher.rb` autodetects RSS 2.0 vs Atom by root
+  element). The genuinely missing piece is **HTML → content blocks**: that,
+  not the feed parsing, is the cost, since staying gem-free means a tolerant
+  HTML parser of our own rather than reaching for Nokogiri. Instagram has no
+  usable read API; Threads is feasible but deferred (see below).
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:
