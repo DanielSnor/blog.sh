@@ -27,9 +27,12 @@ module Import
       @adapter = adapter
       @dry_run = dry_run
       @limit = limit
-      # Called with (index, post) after each written post, so a wizard can
-      # show progress on a run that takes an hour without this class
-      # knowing anything about terminals.
+      # Called with (written, post, scanned) after each written post, so a
+      # wizard can show progress on a run that takes an hour without this
+      # class knowing anything about terminals. Both counters are passed
+      # because neither alone is the useful fraction: against a limit the
+      # goal is `written`, against a whole source it's `scanned` -- a source
+      # that skips items never writes as many posts as it has.
       @on_post = on_post
       # Called with (scanned, written) for every item seen, written or not.
       # The reading pass is the part with nothing to show otherwise: paging
@@ -67,7 +70,7 @@ module Import
           PostWriter.write(post, media_files: media.files) unless @dry_run
           written += 1
           samples << post['slug'] if samples.size < 5
-          @on_post&.call(written, post)
+          @on_post&.call(written, post, scanned)
         end
       end
 

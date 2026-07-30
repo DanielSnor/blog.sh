@@ -127,7 +127,22 @@ the first four's plumbing:
   posts arrived than the source has. Two callbacks, `on_scan` and `on_post`,
   let a wizard show progress without this layer knowing what a terminal is.
 - **An adapter** implements only `label`, `each_item` (paging the source)
-  and `map(item, media)`, returning a post hash or a skip reason.
+  and `map(item, media)`, returning a post hash or a skip reason. Two
+  optional hooks cover what sources differ on: `preamble` (a line to print
+  before a slow read) and `total` (the source's size, often knowable only
+  once the first page arrives).
+- **`Import::Cli`** is the non-interactive front end the `scripts/migrate_*.rb`
+  wrappers share, so each is a handful of lines. Every source is therefore
+  reachable both ways -- wizard or script -- over one implementation of the
+  mapping.
+
+An adapter judges items rather than pre-filtering them: `map` returns
+`:reply`/`:retweet`/`:quote`/`:empty` instead of the adapter quietly dropping
+them, so the run's summary can account for every item the source held. That
+also means a written-post counter is not a progress fraction -- a source that
+skips half its items never writes as many posts as it has -- so both counters
+are reported and the caller picks: against a `LIMIT` the goal is posts
+written, against a whole source it's position scanned.
 
 `Import::Bluesky` is the reference adapter. Two things it has to get right
 generalize to any API source: facet offsets are UTF-8 **byte** positions

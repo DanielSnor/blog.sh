@@ -91,9 +91,15 @@ The trick is that a bare filename in an image line resolves against the
 `./import.sh` opens its own wizard: pick a source, and it reads the whole
 thing in dry-run first and tells you what *would* be written -- how many
 posts and media files, the first few slugs, and how many items it skipped
-and why. Nothing is written until you confirm. Bluesky needs no credentials
-(public API); Tumblr and a Twitter/X archive export are still separate
-scripts, see [the README](../README.md#importing-existing-content).
+and why. Nothing is written until you confirm. Sources are Bluesky (no
+credentials, public API), Tumblr (`TUMBLR_API_KEY` in `env.sh`) and a
+Twitter/X archive export.
+
+The same imports also run without the wizard, for cron or a scripted
+migration -- `scripts/migrate_bluesky.rb <handle>`,
+`scripts/migrate_tumblr.rb <blog>`, `scripts/migrate_twitter.rb <export-dir>`.
+Those skip the preview and write immediately; see
+[the README](../README.md#importing-existing-content).
 
 Two things to expect on a real archive:
 

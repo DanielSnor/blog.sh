@@ -26,21 +26,55 @@ require_relative '../lib/i18n'
 require_relative '../lib/publishing'
 require_relative '../lib/import/run'
 require_relative '../lib/import/bluesky'
+require_relative '../lib/import/tumblr'
+require_relative '../lib/import/twitter'
 
 def t(key, **vars)
   I18n.t(key, **vars)
 end
 
 SOURCES = [
-  ['bluesky', 'Bluesky', -> { build_bluesky }]
+  ['bluesky', 'Bluesky', -> { build_bluesky }],
+  ['tumblr', 'Tumblr', -> { build_tumblr }],
+  ['twitter', 'Twitter/X (archive export)', -> { build_twitter }]
 ].freeze
 
-def build_bluesky
-  print t('import.bluesky_handle_prompt')
-  handle = $stdin.gets.to_s.strip
-  return nil if handle.empty?
+def ask(prompt_key)
+  print t(prompt_key)
+  value = $stdin.gets.to_s.strip
+  value.empty? ? nil : value
+end
 
-  Import::Bluesky.new(handle)
+def build_bluesky
+  handle = ask('import.bluesky_handle_prompt')
+  handle && Import::Bluesky.new(handle)
+end
+
+# The key is read from the environment rather than prompted for: it's a
+# credential, it belongs in env.sh next to the other tokens, and a prompt
+# would invite pasting it into shell history.
+def build_tumblr
+  api_key = ENV['TUMBLR_API_KEY']
+  if api_key.to_s.empty?
+    puts t('import.tumblr_key_missing')
+    return nil
+  end
+
+  blog = ask('import.tumblr_blog_prompt')
+  blog && Import::Tumblr.new(blog, api_key: api_key)
+end
+
+def build_twitter
+  dir = ask('import.twitter_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  unless File.exist?(File.join(dir, 'data', 'tweets.js'))
+    puts t('import.twitter_dir_invalid', dir: dir)
+    return nil
+  end
+
+  Import::Twitter.new(dir)
 end
 
 def ask_source
@@ -133,8 +167,11 @@ def run_import(adapter)
   puts
   puts t('import.running', label: adapter.label)
   # Media is downloaded for real this time, so an archive of any size takes
-  # a while -- a line per post is the progress report.
-  on_post = ->(n, post) { puts "  #{n}. #{post['slug']}" }
+  # a while -- a line per post is the progress report. The dry-run just
+  # counted exactly how many posts will be written, which makes it the one
+  # honest denominator available here.
+  target = preview.written
+  on_post = ->(written, post, _scanned) { puts "  #{written}/#{target} #{post['slug']}" }
   result = Import::Run.new(adapter, on_post: on_post).call
   report(result, dry_run: false)
 

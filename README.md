@@ -198,12 +198,14 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Bluesky via the public API; Tumblr and a Twitter/X archive export via
-  `migrate_tumblr.rb` / `migrate_twitter.rb`, kept from the original
-  migration of four Tumblr blogs and a Twitter archive (2008-2022)
+- Sources: Bluesky and Tumblr via their APIs, Twitter/X from an archive
+  export -- the last two carried over from the original migration of four
+  Tumblr blogs and a Twitter archive (2008-2022)
 - `lib/import/` holds what every source shares -- media download or copy,
-  filename numbering, skip accounting -- so an adapter only has to page a
-  source and shape one item
+  filename numbering, skip accounting, progress callbacks -- so an adapter
+  only has to page a source and shape one item
+- Each source is also a one-line script (`scripts/migrate_*.rb`) over the
+  same adapter, so an import can run from cron as well as from the wizard
 - Re-running an import overwrites in place (matched on source id), never
   duplicates
 
@@ -352,14 +354,21 @@ Available sources:
 | Source | Needs | Scope |
 | --- | --- | --- |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
-| Tumblr | `TUMBLR_API_KEY` | every post on a blog, reblog content appended |
-| Twitter/X | an extracted archive export | standalone tweets only |
+| Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
+| Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
 
-Bluesky is driven by the wizard. The two older importers are still their
-own scripts -- `scripts/migrate_tumblr.rb <blog-name>.tumblr.com` and
-`scripts/migrate_twitter.rb <path-to-extracted-export>`, both taking
-`LIMIT=n` to import only the first *n* posts as a trial run -- predating the
-shared layer they'll move onto.
+Every source is also reachable without the wizard, for a cron job or a
+scripted migration -- same mapping, no preview pass, writes immediately:
+
+```bash
+ruby scripts/migrate_bluesky.rb <handle>
+TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
+ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+```
+
+All three take `LIMIT=n` to import only the first *n* posts, which is the
+way to sample a large archive before committing hours to it -- a later full
+run overwrites those posts in place rather than duplicating them.
 They report progress as they go: the size of what they're about to read,
 how many items were found and filtered, then a `12/847` counter per post,
 because downloading every image of an archive runs for hours and a silent

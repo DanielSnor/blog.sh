@@ -251,6 +251,10 @@ cron:
 import:
   menu_hint: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · Esc zpět"
   enter_number: "Číslo zdroje, ze kterého importovat: "
+  tumblr_blog_prompt: "Tumblr blog (např. jmeno.tumblr.com, prázdné = zrušit): "
+  tumblr_key_missing: "TUMBLR_API_KEY není nastavený — doplň ho do env.sh (Tumblr API vyžaduje klíč i u veřejných blogů)."
+  twitter_dir_prompt: "Cesta k rozbalenému exportu z Twitteru/X (prázdné = zrušit): "
+  twitter_dir_invalid: "Pod %{dir} není data/tweets.js — nasměruj to na samotný rozbalený adresář exportu."
   bluesky_handle_prompt: "Bluesky handle (prázdné = zrušit): "
   scanned: "přečteno %{count} položek…"
   dry_run_running: "Čtu %{label} — zatím se nic nezapisuje…"
