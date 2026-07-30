@@ -37,7 +37,10 @@ module MarkdownWriter
         case b['subtype']
         when /\Aheading([1-6])\z/ then "#{'#' * Regexp.last_match(1).to_i} #{rendered}"
         when 'quote' then rendered.split("\n").map { |l| l.empty? ? '>' : "> #{l}" }.join("\n")
-        else rendered
+        # A newline stored in a paragraph is a hard break and writes back as
+        # the visible backslash marker -- without this, re-saving would
+        # collapse it into a space via the parser's prose-wrapping rule.
+        else rendered.gsub("\n", "\\\n")
         end
       when 'table'
         table_to_markdown(b)
@@ -141,7 +144,8 @@ module MarkdownWriter
     marker_for = ->(idx) { list['style'] == 'ol' ? "#{idx + 1}." : '-' }
     pad = '  ' * indent
     (list['items'] || []).each_with_index.map do |it, idx|
-      line = "#{pad}#{marker_for.call(idx)} #{render_text_markdown(it['text'], it['formatting'])}"
+      task = it.key?('checked') ? (it['checked'] ? '[x] ' : '[ ] ') : ''
+      line = "#{pad}#{marker_for.call(idx)} #{task}#{render_text_markdown(it['text'], it['formatting'])}"
       it['children'] ? "#{line}\n#{list_to_markdown(it['children'], indent + 1)}" : line
     end.join("\n")
   end

@@ -18,12 +18,19 @@ Ein Link auf diese Seite steht auch in der Editor-Hilfe, sie ist beim Schreiben 
 - [Video](#video)
 - [Audio](#audio)
 - [Escaping](#escaping)
-- [Noch nicht unterstützt](#noch-nicht-unterstutzt)
 - [Bewusst nicht unterstützt](#bewusst-nicht-unterstutzt)
 
 ## Absätze
 
-Absätze trennt eine Leerzeile. Ein Zeilenumbruch innerhalb eines Absatzes wird beim Rendern zu einem Leerzeichen — für einen neuen Absatz also eine Leerzeile dazwischen lassen.
+Absätze trennt eine Leerzeile. Ein Zeilenumbruch innerhalb eines Absatzes wird beim Rendern zu einem Leerzeichen — für einen neuen Absatz also eine Leerzeile dazwischen lassen. Für einen harten Umbruch *innerhalb* eines Absatzes die Zeile mit einem Backslash beenden:
+
+```
+Erste Zeile \
+zweite direkt darunter.
+```
+
+Erste Zeile \
+zweite direkt darunter.
 
 ```
 Erster Absatz.
@@ -114,6 +121,16 @@ Aufzählungen beginnen mit Bindestrich oder Sternchen, eine nummerierte Liste mi
 1. erster Eintrag
 2. zweiter Eintrag
 3. dritter Eintrag
+
+Eine Aufgabenliste markiert Einträge mit eckigen Klammern — gerendert als Checkboxen (nur lesbar; Besucher haken deine Aufgaben nicht ab):
+
+```
+- [x] Beitrag schreiben
+- [ ] veröffentlichen
+```
+
+- [x] Beitrag schreiben
+- [ ] veröffentlichen
 
 Die Zahlen sind egal, beim Rendern wird neu durchnummeriert. Eine verschachtelte Liste wird um zwei Leerzeichen eingerückt:
 
@@ -242,15 +259,6 @@ Sieben Zeichen mit Bedeutung in Markdown lassen sich escapen:
 ```
 
 Vor jedem anderen Zeichen bleibt der Backslash stehen, wie er ist — das Emoticon d8-\ braucht also keine Sonderbehandlung.
-
-## Noch nicht unterstützt
-
-Damit dich nichts überrascht, wenn es so bleibt, wie du es getippt hast:
-
-- harte Zeilenumbrüche (zwei Leerzeichen am Zeilenende)
-- Aufgabenlisten `- [ ]`
-
-Nichts davon zerlegt deinen Text, es wird nur genau so gerendert, wie geschrieben.
 
 ## Bewusst nicht unterstützt
 

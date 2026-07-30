@@ -373,6 +373,11 @@ h3 { color: var(--accent); font-size: 1rem; text-transform: uppercase; letter-sp
 
 /* Preview of an unpublished post -- deliberately impossible to miss, so a
    draft can't be mistaken for something that's actually live on the blog. */
+/* Task-list items: the checkbox replaces the bullet. Disabled on purpose --
+   a reader can't toggle someone's published to-do. */
+li.task-item { list-style: none; margin-left: -1.1em; }
+li.task-item input { margin-right: 0.45em; }
+
 .draft-banner {
   background: var(--accent);
   color: #ffffff;

@@ -18,12 +18,19 @@ Odkaz na tuhle stránku je i v nápovědě v editoru, takže ji máte při psan�
 - [Video](#video)
 - [Audio](#audio)
 - [Escapování](#escapovani)
-- [Co zatím nefunguje](#co-zatim-nefunguje)
 - [Záměrně nepodporované](#zamerne-nepodporovane)
 
 ## Odstavce
 
-Odstavce se oddělují prázdným řádkem. Zalomení uvnitř odstavce se při zobrazení slije do mezery — pokud tedy chcete nový odstavec, nechte mezi nimi volný řádek.
+Odstavce se oddělují prázdným řádkem. Zalomení uvnitř odstavce se při zobrazení slije do mezery — pokud tedy chcete nový odstavec, nechte mezi nimi volný řádek. Pro tvrdé zalomení *uvnitř* odstavce ukončete řádek zpětným lomítkem:
+
+```
+První řádek \
+druhý hned pod ním.
+```
+
+První řádek \
+druhý hned pod ním.
 
 ```
 První odstavec.
@@ -114,6 +121,16 @@ Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem 
 1. první bod
 2. druhý bod
 3. třetí bod
+
+Zaškrtávací seznam značí položky hranatými závorkami — vykreslí se jako checkboxy (jen ke čtení; návštěvník vaše úkoly neodškrtá):
+
+```
+- [x] napsat post
+- [ ] publikovat ho
+```
+
+- [x] napsat post
+- [ ] publikovat ho
 
 Na číslech nezáleží, při zobrazení se přepočítají. Vnořený seznam se odsadí o dvě mezery:
 
@@ -242,15 +259,6 @@ Escapovat jde sedm znaků, které v markdownu něco znamenají:
 ```
 
 Před jiným znakem lomítko zůstane, jak je — takže smajlík d8-\ psát nijak zvlášť nemusíte.
-
-## Co zatím nefunguje
-
-Ať nikoho nepřekvapí, že něco zůstane, jak to napsal:
-
-- tvrdé zalomení řádku (dvě mezery na konci)
-- zaškrtávací seznamy `- [ ]`
-
-Nic z toho text nezkomolí, jen se to zobrazí tak, jak jste to napsali.
 
 ## Záměrně nepodporované
 

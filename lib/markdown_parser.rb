@@ -123,6 +123,23 @@ module MarkdownParser
   TABLE_SEPARATOR_RE = /\A\|?[\s:|-]*-[\s:|-]*\|?\z/
   VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
   AUDIO_EXTENSIONS = %w[.mp3 .m4a .ogg .opus .aac .flac .wav].freeze
+
+  # A private-use character standing in for a hard break while the paragraph
+  # goes through parse_inline -- it's one codepoint, so swapping it back for
+  # a real newline afterwards leaves every formatting offset intact.
+  BREAK_SENTINEL = "\uE000"
+
+  # A backslash at the end of a line is a hard break (rendered <br>); any
+  # other newline inside a paragraph is prose wrapping and collapses to a
+  # space, exactly as the cheat sheet always promised. Escaped \\ stays a
+  # literal backslash. Storage-wise a break is simply a newline kept in the
+  # block's text -- the same shape multiline imports already have.
+  def collapse_soft_breaks(para)
+    # Spaces before the marker are eaten here, before parse_inline computes
+    # formatting offsets -- trimming them afterwards would shift every span
+    # that crosses the break.
+    para.gsub(/ *(?<!\\)\\\n/, BREAK_SENTINEL).tr("\n", ' ')
+  end
   YOUTUBE_RE = %r{\Ahttps?://(?:www\.)?(?:youtube\.com/watch\?(?:[^\s]*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})}
 
   def video_path?(path)
@@ -231,9 +248,18 @@ module MarkdownParser
       m = item_re.match(line.strip)
       break unless m
 
-      text, formatting = parse_inline(m[1])
+      body = m[1]
+      # "- [ ] task" / "- [x] done" -- the marker is consumed here, so the
+      # stored text is just the task, and `checked` carries the state.
+      checked = nil
+      if (task = /\A\[([ xX])\]\s+(.*)\z/.match(body))
+        checked = task[1] != ' '
+        body = task[2]
+      end
+      text, formatting = parse_inline(body)
       item = { 'text' => text }
       item['formatting'] = formatting unless formatting.empty?
+      item['checked'] = checked unless checked.nil?
       items << item
       idx += 1
     end
@@ -393,8 +419,8 @@ module MarkdownParser
     elsif (list = parse_list(para))
       return [list, counter]
     else
-      text, formatting = parse_inline(para)
-      block = { 'type' => 'text', 'text' => text }
+      text, formatting = parse_inline(collapse_soft_breaks(para))
+      block = { 'type' => 'text', 'text' => text.gsub(BREAK_SENTINEL, "\n") }
       block['formatting'] = formatting unless formatting.empty?
       return [block, counter]
     end

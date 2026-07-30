@@ -375,6 +375,13 @@ def apply_formatting(text, formatting)
   end.join
 end
 
+# A newline stored in block text is a hard break. Applied after escaping and
+# span-wrapping, so the <br> can't collide with either; a chunk never
+# contains markup newlines of its own.
+def with_breaks(html)
+  html.gsub("\n", '<br>')
+end
+
 # Local files get the native player; an imported embed (Spotify and the
 # like) is passed through like an imported video embed. No dimensions
 # anywhere -- degenerate_image? is about images reserving layout space, an
@@ -442,12 +449,19 @@ def render_block(block, media_prefix, seen = {})
           else 'p'
           end
     id = heading ? %( id="#{h(heading_id(block['text'].to_s, seen))}") : ''
-    "<#{tag}#{id}>#{apply_formatting(block['text'], block['formatting'])}</#{tag}>"
+    "<#{tag}#{id}>#{with_breaks(apply_formatting(block['text'], block['formatting']))}</#{tag}>"
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
       nested = it['children'] ? render_block(it['children'], media_prefix, seen) : ''
-      "<li>#{apply_formatting(it['text'], it['formatting'])}#{nested}</li>"
+      # A task item gets a real (disabled) checkbox and drops the bullet via
+      # the class -- the checkbox is the bullet.
+      if it.key?('checked')
+        box = %(<input type="checkbox" disabled#{it['checked'] ? ' checked' : ''}>)
+        %(<li class="task-item">#{box} #{apply_formatting(it['text'], it['formatting'])}#{nested}</li>)
+      else
+        "<li>#{apply_formatting(it['text'], it['formatting'])}#{nested}</li>"
+      end
     end.join
     "<#{tag}>#{items}</#{tag}>"
   when 'table'

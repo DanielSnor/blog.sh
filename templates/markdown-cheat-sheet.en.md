@@ -18,12 +18,19 @@ A link to this page is also in the in-editor help, so it's at hand while you wri
 - [Video](#video)
 - [Audio](#audio)
 - [Escaping](#escaping)
-- [Not supported yet](#not-supported-yet)
 - [Deliberately not supported](#deliberately-not-supported)
 
 ## Paragraphs
 
-Paragraphs are separated by a blank line. A line break inside a paragraph collapses into a space when rendered — so if you want a new paragraph, leave an empty line between them.
+Paragraphs are separated by a blank line. A line break inside a paragraph collapses into a space when rendered — so if you want a new paragraph, leave an empty line between them. For a hard line break *inside* a paragraph, end the line with a backslash:
+
+```
+First line \
+second line right under it.
+```
+
+First line \
+second line right under it.
 
 ```
 First paragraph.
@@ -114,6 +121,16 @@ Bullets start with a dash or an asterisk, an ordered list with a number and a pe
 1. first item
 2. second item
 3. third item
+
+A task list marks items with square brackets — rendered as checkboxes (read-only; a visitor can't tick your to-dos):
+
+```
+- [x] write the post
+- [ ] publish it
+```
+
+- [x] write the post
+- [ ] publish it
 
 The numbers don't matter, they're renumbered when rendered. A nested list is indented by two spaces:
 
@@ -242,15 +259,6 @@ Seven characters that carry meaning in Markdown can be escaped:
 ```
 
 Before any other character the backslash stays as it is — so the d8-\ emoticon needs no special treatment.
-
-## Not supported yet
-
-So nothing takes you by surprise when it stays the way you typed it:
-
-- hard line breaks (two trailing spaces)
-- task lists `- [ ]`
-
-None of it mangles your text, it just renders exactly as written.
 
 ## Deliberately not supported
 
