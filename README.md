@@ -192,8 +192,9 @@ deploy step around exactly that. A few of the choices that came out of it:
   true) toggle whether they render at all, `colors.<mode>.banner_title`/
   `banner_claim` override their color per light/dark mode (default: `nav_bg`
   in light, white in dark -- same as before these keys existed), and
-  `banner.claim` overrides the claim with raw HTML (e.g. a manual `<br>`)
-  instead of plain `site.description` -- same trust level as `about.html`
+  `banner.claim` overrides *only* the overlay's claim with raw HTML (e.g.
+  a manual `<br>`) -- `site.description` itself stays plain text
+  everywhere else (meta description, RSS), same trust level as `about.html`
 
 **Migration** (historical, one-off)
 - `migrate_tumblr.rb`, `migrate_twitter.rb` -- import from four Tumblr

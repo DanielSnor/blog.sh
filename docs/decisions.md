@@ -149,3 +149,15 @@ degrades into English word by word instead of breaking pages -- which
 is what makes shipping a community locale a low-stakes contribution.
 The `/markdown/` cheat sheet localizes the same way: per-language
 source files, English fallback.
+
+**`banner.claim` is a separate field from `site.description`, not the
+same value reused.** `site.description` feeds `<meta name="description">`
+and the RSS `<description>` too, so it has to stay plain text -- a
+literal `<br>` there would leak broken markup into a feed reader or a
+search result snippet. `banner.claim` exists purely so the banner
+overlay can have a manual line break (or any other markup) without
+touching those other, stricter consumers; it's optional and raw HTML,
+same trust level as `about.html`/`footer.note_html` (site.yml is
+owner-edited config, not visitor input). *Cost:* one more field to
+know about, and the two can drift out of sync if a site changes its
+description without updating the claim override to match.

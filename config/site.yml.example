@@ -19,7 +19,10 @@ site:
   # and as the banner overlay title (top-left, see .banner-title in site.css).
   short_name: "YOURSITE"
   # Also shown as the banner overlay claim (bottom-right, wraps to multiple
-  # lines if needed -- see .banner-claim in site.css).
+  # lines if needed -- see .banner-claim in site.css) UNLESS banner.claim
+  # below is set. This value stays plain text on purpose -- it's reused
+  # verbatim in <meta name="description">, the RSS <description> and
+  # listing-page descriptions, none of which should ever see raw HTML.
   description: "Personal web/log of Your Name"
   author: "Your Name"
   # Selects locales/<lang>.yml (see lib/i18n.rb). "en" and "cs" ship with the
@@ -45,9 +48,13 @@ banner:
   # banner image. Turn either off if the image is busy enough on its own.
   # show_title: true
   # show_claim: true
-  # Optional: overrides the claim text with raw HTML (e.g. a manual <br>
-  # line break) instead of the plain site.description. May contain HTML,
-  # same trust level as about.html/footer.note_html below.
+  # Optional: overrides ONLY the banner overlay's claim text -- everywhere
+  # else (meta description, RSS, listing pages) keeps using site.description
+  # unchanged. Exists because site.description must stay plain text (see
+  # above), so it can't carry a manual line break; this field can, since
+  # nothing but the banner overlay ever reads it. May contain HTML, same
+  # trust level as about.html/footer.note_html below (site.yml is
+  # owner-edited config, not visitor input).
   # claim: "First line<br>Second line"
 
 about:
