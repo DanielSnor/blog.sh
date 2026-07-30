@@ -103,11 +103,17 @@ module PreviewServer
     str.gsub(/%([0-9A-Fa-f]{2})/) { Regexp.last_match(1).hex.chr }.force_encoding('UTF-8')
   end
 
+  # no-store, because this server exists to look at a build that changes
+  # under the browser's feet: its whole audience is someone editing. A
+  # cached search-index.json or stylesheet quietly showing the previous
+  # build is indistinguishable from "my change didn't work" -- the most
+  # confusing failure a preview can produce.
   def respond(client, code, reason, content_type, body, size: nil)
     size ||= body&.bytesize || 0
     client.write "HTTP/1.1 #{code} #{reason}\r\n" \
                  "Content-Type: #{content_type}\r\n" \
                  "Content-Length: #{size}\r\n" \
+                 "Cache-Control: no-store\r\n" \
                  "Connection: close\r\n\r\n"
     client.write(body) if body
   end

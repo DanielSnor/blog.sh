@@ -2,8 +2,19 @@
   var escapeHtml = window.Blog.escapeHtml;
   var i18n = window.BLOG_I18N || {};
 
+  // The transliteration table and the whole pipeline mirror Slug.fold in
+  // lib/slug.rb -- the index was folded server-side, so any drift between
+  // the two silently breaks matching. Change them together.
+  var FOLD_MAP = {
+    'ß': 'ss', 'æ': 'ae', 'œ': 'oe', 'ø': 'o', 'đ': 'd',
+    'ð': 'd', 'þ': 'th', 'ł': 'l', 'ħ': 'h', 'ŧ': 't',
+    'ŋ': 'n', 'ı': 'i'
+  };
+
   function fold(s) {
-    return (s || '').normalize('NFKD').replace(/\p{Mn}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return (s || '').normalize('NFKD').replace(/\p{Mn}/gu, '').toLowerCase()
+      .replace(/[ßæœøđðþłħŧŋı]/g, function (ch) { return FOLD_MAP[ch]; })
+      .replace(/\s+/g, ' ').trim();
   }
 
   // Text in "quotes" (including typographic ones) = one phrase, otherwise a
