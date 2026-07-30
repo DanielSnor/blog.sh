@@ -1,6 +1,6 @@
 # blog.sh — .sh → .rb → .html
 
-![sh → .rb → .html](assets/images/header.png)
+![sh → .rb → .html](assets/images/defaults/header.png)
 
 *minimalistic static web/log cms*
 
