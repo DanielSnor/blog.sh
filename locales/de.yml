@@ -12,10 +12,11 @@ date_time_format: "%d.%m.%Y %H:%M"
 nav:
   home: "Start"
   text: "Text"
+  quotes: "Zitate"
+  chat: "Chat"
   images: "Bilder"
   video: "Video"
   links: "Links"
-  rss: "RSS"
   audio: "Audio"
   menu_label: "Menü"
   search_label: "Suche"
@@ -44,6 +45,8 @@ tag:
 
 type:
   text: "Text"
+  quote: "Zitate"
+  chat: "Chat"
   image: "Bilder"
   video: "Video"
   audio: "Audio"

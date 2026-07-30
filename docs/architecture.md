@@ -179,7 +179,8 @@ them.
 Supporting casts: `lib/slug.rb` (one folding/slugification used for
 post slugs, tag slugs, heading anchors and the search index -- and
 mirrored client-side by `fold()` in search.js), `lib/content_type.rb`
-(dominant type: video > audio > image > link > text), `lib/media_dimensions.rb`
+(dominant type: video > audio > image > chat > quote > link > text, where
+"quote" means the post's first block is one), `lib/media_dimensions.rb`
 (width/height straight from PNG/JPEG/MP4 headers, so pages reserve
 space and never jump).
 

@@ -5,11 +5,12 @@
       <ul>
         <li><a href="/"><%= h(t('nav.home')) %></a></li>
         <li><a href="/type/text/"><%= h(t('nav.text')) %></a></li>
+        <li><a href="/type/quote/"><%= h(t('nav.quotes')) %></a></li>
+        <li><a href="/type/chat/"><%= h(t('nav.chat')) %></a></li>
         <li><a href="/type/image/"><%= h(t('nav.images')) %></a></li>
         <li><a href="/type/video/"><%= h(t('nav.video')) %></a></li>
         <li><a href="/type/audio/"><%= h(t('nav.audio')) %></a></li>
         <li><a href="/type/link/"><%= h(t('nav.links')) %></a></li>
-        <li><a href="/rss.xml"><%= h(t('nav.rss')) %></a></li>
       </ul>
 <% if search %>
       <form class="search-form" action="/search/" method="get" role="search">

@@ -68,8 +68,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Content model**
 - One post = one JSON file (`content.nosync/posts/<year>/<slug>.json`), no database
 - Content is a list of typed blocks (text, heading, quote, list, table,
-  code, image, video, audio, link, divider) -- the same block format used by the
-  Tumblr/Twitter migration imports
+  code, image, video, audio, chat, link, divider) -- the same block format used
+  by the Tumblr/Twitter migration imports
 - Inline formatting (bold/italic/strikethrough/code/link) is stored as
   offsets into plain text, not nested HTML
 - Media (`media.nosync/<year>/<slug>/`) always lives locally next to its

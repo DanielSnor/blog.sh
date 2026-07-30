@@ -11,10 +11,11 @@ date_time_format: "%-d. %-m. %Y %H:%M"
 nav:
   home: "Domů"
   text: "Text"
+  quotes: "Citáty"
+  chat: "Chat"
   images: "Obrázky"
   video: "Video"
   links: "Odkazy"
-  rss: "RSS"
   audio: "Audio"
   menu_label: "Menu"
   search_label: "Hledat"
@@ -43,6 +44,8 @@ tag:
 
 type:
   text: "Text"
+  quote: "Citáty"
+  chat: "Chat"
   image: "Obrázky"
   video: "Video"
   audio: "Audio"
