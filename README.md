@@ -391,6 +391,7 @@ Available sources:
 | Source | Needs | Scope |
 | --- | --- | --- |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
+| Instagram | an unpacked HTML export | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
@@ -403,6 +404,7 @@ scripted migration -- same mapping, no preview pass, writes immediately:
 
 ```bash
 ruby scripts/migrate_bluesky.rb <handle>
+ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
 ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
 ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com

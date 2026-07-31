@@ -268,6 +268,8 @@ import:
   mastodon_dir_invalid: "Pod %{dir} není outbox.json — nasměruj to na rozbalený adresář archivu."
   pixelfed_path_prompt: "Cesta k JSON se statusy z Pixelfedu (prázdné = zrušit): "
   pixelfed_path_invalid: "%{path} neexistuje."
+  instagram_dir_prompt: "Cesta k rozbalenému exportu z Instagramu (prázdné = zrušit): "
+  instagram_dir_invalid: "Pod %{dir} není your_instagram_activity/content — nasměruj to na samotný rozbalený adresář exportu a export si vyžádej ve formátu HTML."
   feed_source_prompt: "URL feedu nebo cesta k exportu z WordPressu (prázdné = zrušit): "
   feed_source_invalid: "%{source} není ani existující soubor, ani http(s) adresa."
   twitter_dir_prompt: "Cesta k rozbalenému exportu z Twitteru/X (prázdné = zrušit): "
@@ -289,6 +291,7 @@ import:
   interrupted: "Přerušeno. Dosud zapsané posty už jsou v content.nosync/ — opakovaný import je bezpečný, přepíše je na místě."
   source:
     bluesky: "Bluesky"
+    instagram: "Instagram (export v HTML)"
     mastodon: "Mastodon (archiv účtu)"
     pixelfed: "Pixelfed (export statusů)"
     tumblr: "Tumblr"

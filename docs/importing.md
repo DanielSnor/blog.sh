@@ -70,6 +70,41 @@ become tags. A video arrives as an HLS playlist rather than a file, so the
 post gets its poster frame as an image -- better in an archive than a
 "video unavailable" placeholder.
 
+### Instagram
+
+```bash
+ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
+```
+
+In Instagram: **Accounts Centre → Your information and permissions →
+Download your information**, and ask for **HTML** -- that is the format
+this reads, and the one the app offers first. Unpack the zip and point the
+script at the directory itself (it must contain
+`your_instagram_activity/content`); the photos and videos are in there, so
+this needs no network and no token.
+
+Your grid and your IGTV videos are imported. Not imported, deliberately:
+**archived posts**, which you removed from your own profile once already
+and which an import would quietly put back; **profile photos**, which are
+avatar history; and stories, likes and comments, which aren't posts. A
+carousel becomes one image block per photo, which the build then renders as
+a photo grid.
+
+Captions lose their trailing hashtags -- the tail is already the post's
+tags, and as prose it would be a wall of one-word links under every photo.
+Two things the export simply doesn't contain, so neither does the import:
+**post URLs** (`source.post_url` stays unset; a guessed one would 404 while
+looking authoritative) and **alt text**. Nothing states pixel sizes either,
+so every file is measured on the way in; a file whose header can't be read
+is named on stderr, because an image block without dimensions is dropped
+from the rendered page. Re-import matching uses Instagram's own media id,
+which the export spells out in every filename.
+
+One caveat worth knowing before a big archive: the timestamps in an HTML
+export carry no timezone, so they are read in `site.timezone`. If that
+isn't the zone you were posting in, the dates land shifted by the
+difference.
+
 ### Mastodon
 
 ```bash
