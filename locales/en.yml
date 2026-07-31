@@ -131,7 +131,8 @@ cli:
              post's content)
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
-    [s]chedule asks for a future date/time when you pick it.
+    [s]chedule asks for a future date/time when you pick it. To backdate,
+    type a date: line into the header yourself -- publish will keep it.
 
     CONTENT goes under the second ---. For formatting syntax:
 

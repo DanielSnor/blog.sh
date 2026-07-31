@@ -123,6 +123,7 @@ cli:
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
+    Zpětné datum: dopiš si do hlavičky řádek date: — publish ho respektuje.
 
     OBSAH píšeš pod druhý ---. Jak na formátování:
 

@@ -32,16 +32,36 @@ built around drafts:
    **`delete <slug>`** moves the post and its media to `trash/` --
    **`restore <slug>`** brings it back. Trash keeps only the most
    recent deletion per slug.
+   The same slug can exist in several years (backdating makes that
+   easy); every slug-addressed command -- `edit`, `delete`, `toot`,
+   `publish`, ... -- then first lists the matching posts (date, type,
+   state, title) and asks which one you mean, so a delete can't
+   silently land on the older post. A number picks, anything else
+   cancels.
 5. **`toot <slug>`** (Mastodon sites) or **`bluesky <slug>`** (Bluesky
    sites) (re-)sends the announcement for an already published post --
    typically an imported one that never had one. An existing
    announcement is never overwritten.
 
 **Backdating** isn't part of that flow -- publishing means "now" -- but
-the frontmatter parser still honors a `date:` line you type in by hand,
-which is how an imported post keeps its original date. Such a post skips
-the auto-toot unless you confirm it, and lands in the archive rather
-than on the homepage -- the CLI says so when it happens.
+the frontmatter parser still honors a `date:` line you type in by hand
+(the template just doesn't offer one). To publish a draft into the
+past:
+
+```bash
+./blog.sh edit muj-post      # add a line between the --- markers:  date: 2019-11-17 10:00
+./blog.sh publish muj-post   # -> "Date kept from frontmatter: Nov 17, 2019 10:00"
+```
+
+The date takes any format `Time.parse` reads and is interpreted in
+`site.timezone`. The post's URL year follows the date -- the JSON and
+the media directory move into that year -- and the auto-announcement
+asks for confirmation first when the date is more than a day off. A
+backdated post is ordered by its date, so it can skip the homepage and
+RSS entirely and land straight in the archive; the CLI says so when it
+happens. If another post already owns that year/slug combination,
+publishing refuses rather than overwrite it. (`schedule` is the
+opposite direction on purpose: it refuses past dates.)
 
 **Scheduled publishing:** in the post-save dialog, choose `[s]` and
 enter the publish date and time directly -- the

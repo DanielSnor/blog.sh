@@ -127,7 +127,9 @@ cli:
              Inhalt abgeleitet)
 
     Das Veröffentlichungsdatum wird hier nicht gesetzt -- [p] nimmt den
-    Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit.
+    Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit. Zum
+    Rückdatieren eine date:-Zeile selbst in den Kopf schreiben -- die
+    Veröffentlichung übernimmt sie.
 
     INHALT kommt unter das zweite ---. Zur Formatierungssyntax:
 
