@@ -265,6 +265,18 @@ def cmd_add
   slug = Slug.slugify(slug_source.to_s.split(/\s+/).first(8).join(' '))
   slug = "post-#{date.to_i}" if slug.empty?
 
+  # An existing <year>/<slug>.json would be replaced wholesale by
+  # PostWriter.write -- same path, so the build's duplicate check never
+  # sees a second file. A new post whose title happens to match an old
+  # one gets a numeric suffix instead of eating it (and with it the
+  # media directory, which is keyed by year/slug too).
+  base_slug = slug
+  serial = 2
+  while File.exist?(File.join(CONTENT_DIR, date.year.to_s, "#{slug}.json"))
+    slug = "#{base_slug}-#{serial}"
+    serial += 1
+  end
+
   # `add` never publishes directly any more: it always creates a draft only
   # visible through a hidden preview address, and publishing is a separate,
   # deliberate decision (draft_decision_loop). The Mastodon toot is therefore
@@ -437,7 +449,38 @@ def publish_draft(slug)
 end
 
 def find_post_path(slug)
-  Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).first
+  matches = Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).sort
+  return matches.first if matches.size <= 1
+
+  pick_among_years(slug, matches)
+end
+
+# The same slug can legitimately live in several years (backdating makes
+# that easy), and glob order used to decide which post edit/delete/toot
+# acted on -- always the oldest, silently. Never guess between them: show
+# every match and make the author choose. A number picks that post;
+# anything else cancels, same contract as the other pickers.
+def pick_among_years(slug, paths)
+  rows = paths.map { |f| summary_row(post_summary(f)) }
+  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+
+  if Tui.interactive?
+    choice = Tui.menu(rows, hint: t('cli.menu_hint'))
+    abort t('cli.cancelled_empty') if choice.nil?
+    puts
+    return paths[choice]
+  end
+
+  rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
+  puts
+  print t('cli.enter_number')
+  input = $stdin.gets&.strip.to_s
+  puts
+  # "".to_i and "abc".to_i are both 0 and [-1] is the LAST element -- only
+  # a plain in-range number counts, anything else cancels (see the import
+  # menu incident this comment style comes from).
+  abort t('cli.cancelled_empty') unless input =~ /\A\d+\z/ && (1..paths.size).cover?(input.to_i)
+  paths[input.to_i - 1]
 end
 
 # A standalone (re-)send of the comment toot -- works for any published
@@ -692,6 +735,13 @@ def edit_post(slug)
   FileUtils.mkdir_p(new_dir)
   new_path = File.join(new_dir, "#{slug}.json")
   new_media_dir = File.join(MEDIA_DIR, new_year, slug)
+
+  # Same guard as Publishing.publish: a date edit that moves the post
+  # into a year where another post already owns this slug must not
+  # overwrite that post's JSON (and displace its media directory).
+  if new_dir != File.dirname(path) && File.exist?(new_path)
+    abort t('cli.post_already_exists', slug: slug, path: new_path)
+  end
 
   updated = {
     'slug' => slug,

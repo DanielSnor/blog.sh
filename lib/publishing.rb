@@ -55,6 +55,11 @@ module Publishing
 
     new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
     if new_year != old_year
+      # A different post can already own <new_year>/<slug> -- writing
+      # there would replace it wholesale, and the build's duplicate
+      # check never fires because only one file remains.
+      abort(I18n.t('cli.post_already_exists', slug: slug, path: new_path)) if File.exist?(new_path)
+
       FileUtils.mkdir_p(File.dirname(new_path))
       old_media = File.join(MEDIA_DIR, old_year, slug)
       FileUtils.mv(old_media, File.join(MEDIA_DIR, new_year, slug)) if Dir.exist?(old_media)

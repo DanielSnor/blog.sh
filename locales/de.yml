@@ -127,7 +127,9 @@ cli:
              Inhalt abgeleitet)
 
     Das Veröffentlichungsdatum wird hier nicht gesetzt -- [p] nimmt den
-    Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit.
+    Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit. Zum
+    Rückdatieren eine date:-Zeile selbst in den Kopf schreiben -- die
+    Veröffentlichung übernimmt sie.
 
     INHALT kommt unter das zweite ---. Zur Formatierungssyntax:
 
@@ -203,13 +205,15 @@ cli:
   deleted_label: "Gelöscht (im Papierkorb, zurückholen mit ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "Im Papierkorb liegt nichts für '%{slug}'.\n\n"
-  post_already_exists: "Beitrag '%{slug}' existiert bereits (%{path}), Wiederherstellen würde ihn überschreiben -- bitte von Hand auflösen.\n\n"
+  post_already_exists: "Beitrag '%{slug}' existiert bereits (%{path}), fortzufahren würde ihn überschreiben -- bitte von Hand auflösen.\n\n"
   restored_label: "Wiederhergestellt: %{path}"
 
   post_count: "\n%{count} Beitrag/Beiträge%{drafts_suffix}"
   drafts_suffix: ", davon %{count} in Arbeit"
 
   enter_number_or_slug: "Nummer oder Slug eingeben: "
+  ambiguous_slug: "Slug '%{slug}' existiert in %{count} verschiedenen Jahren -- welcher Beitrag ist gemeint?"
+  enter_number: "Nummer (alles andere bricht ab): "
   cancelled_empty: "Abgebrochen.\n\n"
   no_posts_to_pick: "Keine Beiträge zur Auswahl."
   no_drafts_to_publish: "Kein Entwurf bereit zur Veröffentlichung."

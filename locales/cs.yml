@@ -123,6 +123,7 @@ cli:
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
+    Zpětné datum: dopiš si do hlavičky řádek date: — publish ho respektuje.
 
     OBSAH píšeš pod druhý ---. Jak na formátování:
 
@@ -198,13 +199,15 @@ cli:
   deleted_label: "Smazáno (v koši, obnovíš přes ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "V koši nic pro '%{slug}' není.\n\n"
-  post_already_exists: "Post '%{slug}' už existuje (%{path}), obnovením bych ho přepsal -- vyřeš ručně.\n\n"
+  post_already_exists: "Post '%{slug}' už existuje (%{path}) a pokračováním bych ho přepsal -- vyřeš ručně.\n\n"
   restored_label: "Obnoveno: %{path}"
 
   post_count: "\n%{count} post(ů)%{drafts_suffix}"
   drafts_suffix: ", z toho %{count} rozepsaných"
 
   enter_number_or_slug: "Zadej číslo nebo slug: "
+  ambiguous_slug: "Slug '%{slug}' existuje ve %{count} různých letech — který post myslíš?"
+  enter_number: "Číslo (cokoliv jiného zruší): "
   cancelled_empty: "Zrušeno.\n\n"
   no_posts_to_pick: "Žádné posty k výběru."
   no_drafts_to_publish: "Není připravený žádný draft, který bychom mohli publikovat."

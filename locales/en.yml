@@ -131,7 +131,8 @@ cli:
              post's content)
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
-    [s]chedule asks for a future date/time when you pick it.
+    [s]chedule asks for a future date/time when you pick it. To backdate,
+    type a date: line into the header yourself -- publish will keep it.
 
     CONTENT goes under the second ---. For formatting syntax:
 
@@ -207,13 +208,15 @@ cli:
   deleted_label: "Deleted (in trash, restore with ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "Nothing in trash for '%{slug}'.\n\n"
-  post_already_exists: "Post '%{slug}' already exists (%{path}), restoring would overwrite it -- resolve this manually.\n\n"
+  post_already_exists: "Post '%{slug}' already exists (%{path}) and continuing would overwrite it -- resolve this manually.\n\n"
   restored_label: "Restored: %{path}"
 
   post_count: "\n%{count} post(s)%{drafts_suffix}"
   drafts_suffix: ", %{count} of which in progress"
 
   enter_number_or_slug: "Enter a number or slug: "
+  ambiguous_slug: "Slug '%{slug}' exists in %{count} different years -- which post do you mean?"
+  enter_number: "Number (anything else cancels): "
   cancelled_empty: "Cancelled.\n\n"
   no_posts_to_pick: "No posts to choose from."
   no_drafts_to_publish: "No draft ready to publish."
