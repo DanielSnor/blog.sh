@@ -411,6 +411,10 @@ li.task-item input { margin-right: 0.45em; }
 figure { margin: 1rem 0; }
 img, video { max-width: 100%; height: auto; }
 
+/* The native audio player is an inline element with a fixed size of its
+   own -- centred so it lines up with the figcaption underneath. */
+.content audio { display: block; margin: 0 auto; }
+
 figcaption {
   text-align: center;
   font-size: 0.85rem;
