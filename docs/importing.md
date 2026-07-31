@@ -70,6 +70,73 @@ become tags. A video arrives as an HLS playlist rather than a file, so the
 post gets its poster frame as an image -- better in an archive than a
 "video unavailable" placeholder.
 
+### Instagram
+
+```bash
+ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
+```
+
+In Instagram: **Accounts Centre → Your information and permissions →
+Download your information**. Ask for either format -- **HTML and JSON are
+both read**, and the export says which one it is, so there is nothing to
+choose here. Unpack the zip and point the script at the directory itself;
+the photos and videos are in there, so this needs no network and no token.
+
+The two are the same archive: on the account this was built against they
+produce 288 identical posts, down to the slug and the tag list. Prefer
+**JSON** if you are asked to pick, for one reason -- its timestamps are
+epochs, where the HTML export prints a wall clock in a zone it never names
+(see below). Importing one after the other is safe: they name their media
+files differently but agree on the ids, so the second run overwrites the
+first in place instead of doubling the archive.
+
+Your grid and your IGTV videos are imported. Not imported, deliberately:
+**archived posts**, which you removed from your own profile once already
+and which an import would quietly put back; **profile photos**, which are
+avatar history; and stories, likes and comments, which aren't posts. A
+carousel becomes one image block per photo, which the build then renders as
+a photo grid.
+
+Captions lose their trailing hashtags -- the tail is already the post's
+tags, and as prose it would be a wall of one-word links under every photo.
+Two things neither export contains, so neither does the import: **post
+URLs** (`source.post_url` stays unset; a guessed one would 404 while
+looking authoritative) and **alt text**. Neither states pixel sizes
+either, so every file is measured on the way in; a file whose header can't
+be read is named on stderr, because an image block without dimensions is
+dropped from the rendered page. Re-import matching uses Instagram's own
+media id, which both formats put at the end of every media filename.
+
+What the JSON export costs instead: its text arrives as UTF-8 escaped one
+byte at a time -- "Šťastné" as "Å¡Å¥astnÃ©" -- and is put back together on
+the way in. Every alphabet with accents is in that trap, and so is every
+emoji. It also ships a `posts.json` beside `posts_1.json`: the same grid
+with the archived posts mixed back in (307 entries against 286), which is
+why the import reads only the numbered files.
+
+Captions are also normalised to NFC on the way in, both formats alike:
+some of them were typed on a phone and arrive decomposed, with the accent
+as a separate character. Nothing downstream minds -- slugs and the search
+index fold through NFKD anyway -- but it means a caption that looks
+identical to another one is also the same string, which is what a `grep`
+over `content.nosync/` expects.
+
+**The HTML export's timestamps are Pacific standard time, all year.** It
+prints them without a zone and in Meta's own, so they are read as -08:00
+and stored in `site.timezone`. Taken at face value instead, an archive
+comes out shifted by most of a day: the export this was built against
+showed a six-hour hole across every afternoon and 106 of 286 posts between
+midnight and 6am, which after conversion became peaks at 10am and 8pm --
+someone posting after the morning and the evening walk.
+
+Note *standard* time, not the `America/Los_Angeles` zone, which is the
+obvious reading and is wrong: the export does not shift for daylight
+saving, so treating a July post as PDT puts it an hour early. That one was
+only findable by importing the same account both ways -- 173 of 288 posts,
+exactly those falling in Pacific daylight-saving months, disagreed by
+exactly an hour, and the JSON export's epochs settled which side was
+right. The JSON path has none of this: an epoch means what it says.
+
 ### Mastodon
 
 ```bash

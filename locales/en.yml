@@ -277,6 +277,8 @@ import:
   mastodon_dir_invalid: "No outbox.json under %{dir} -- point this at the unpacked archive directory."
   pixelfed_path_prompt: "Path to the Pixelfed statuses JSON (empty = cancel): "
   pixelfed_path_invalid: "%{path} does not exist."
+  instagram_dir_prompt: "Path to the unpacked Instagram export, HTML or JSON (empty = cancel): "
+  instagram_dir_invalid: "No posts found under %{dir} -- point this at the unpacked export directory itself, the one holding your_instagram_activity/."
   feed_source_prompt: "Feed URL or path to a WordPress export file (empty = cancel): "
   feed_source_invalid: "%{source} is neither a file that exists nor an http(s) URL."
   twitter_dir_prompt: "Path to the extracted Twitter/X export (empty = cancel): "
@@ -298,6 +300,7 @@ import:
   interrupted: "Interrupted. Posts written so far are already in content.nosync/ — re-running the import is safe, it overwrites them in place."
   source:
     bluesky: "Bluesky"
+    instagram: "Instagram (account export)"
     mastodon: "Mastodon (account archive)"
     pixelfed: "Pixelfed (statuses export)"
     tumblr: "Tumblr"
