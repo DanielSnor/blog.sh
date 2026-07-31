@@ -54,6 +54,21 @@ build; the deploy prunes its listing pages as orphans. *Cost:* an
 external link to a type's listing dies if the type empties -- it
 pointed at an empty page anyway.
 
+**The bar is a filter, so the first item says All and the current one
+shows.** Every item but the first narrows the listing to one content
+type; the first clears the filter, which is what "All" names and what
+"Home" did not -- in a row of filters it read as a destination that had
+wandered in. The item matching the page carries `aria-current="page"`
+and is filled with the accent colour, so a reader can see which listing
+they are in without reading the heading. Only listings light up: a post
+deliberately doesn't highlight its own type, since the menu filters
+listings and a video post is not the video listing. The banner still
+links home, as it always did. *Cost:* the label lives on every page, so
+changing it rewrites the whole archive -- which is why the rename
+happened before 1.0 rather than after, along with its locale key
+(`nav.home` -> `nav.all`), which would otherwise have broken every
+translation written in the meantime.
+
 **Media always lives next to its post; nothing is hotlinked.** Imported
 posts survive their source platform dying (the Twitter/Tumblr archives
 this engine was born from are full of dead CDN links). *Cost:* disk
