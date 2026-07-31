@@ -124,7 +124,9 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Build** (`build_blog.rb`)
 - Static HTML from JSON via ERB templates, no framework
 - Pagination anchored to the oldest post (page boundaries stay stable as
-  new posts are added), plus tag and content-type archives
+  new posts are added), plus tag and content-type archives -- the nav
+  menu and type archives exist only for types the site actually has, so
+  the menu grows with the content
 - RSS, sitemap, `robots.txt`
 - `/favicon.ico` generated from `assets/images/favicon.png` by wrapping it
   in an ICO container, for the clients that request the root path blindly

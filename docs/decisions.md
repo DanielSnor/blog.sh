@@ -44,6 +44,16 @@ every page carries (and the URL never changed), while a nav slot is
 paid for by every visitor on every page. With quote and chat arriving,
 seven items was the budget.
 
+**The menu lists only types the site actually has.** Nav items, `/type/`
+listings and their sitemap entries exist only for content types with at
+least one published post -- a young site's menu grows with its content
+instead of offering six links into empty listings, and a type the
+engine gains later stays invisible on every site until its first such
+post. A type emptied by unpublishing disappears again on the next
+build; the deploy prunes its listing pages as orphans. *Cost:* an
+external link to a type's listing dies if the type empties -- it
+pointed at an empty page anyway.
+
 **Media always lives next to its post; nothing is hotlinked.** Imported
 posts survive their source platform dying (the Twitter/Tumblr archives
 this engine was born from are full of dead CDN links). *Cost:* disk
