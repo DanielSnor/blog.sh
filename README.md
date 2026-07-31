@@ -215,10 +215,11 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Seven sources: Bluesky and Tumblr via their APIs; Mastodon, Pixelfed and
-  Twitter/X from their account exports; WordPress from a WXR file and any
-  RSS/Atom feed by URL -- Tumblr and Twitter carried over from the original
-  migration of four Tumblr blogs and a Twitter archive (2008-2022)
+- Eight sources: Bluesky and Tumblr via their APIs; Instagram, Mastodon,
+  Pixelfed and Twitter/X from their account exports; WordPress from a WXR
+  file and any RSS/Atom feed by URL -- Tumblr and Twitter carried over from
+  the original migration of four Tumblr blogs and a Twitter archive
+  (2008-2022)
 - `lib/import/` holds what every source shares -- media download or copy,
   filename numbering, skip accounting, progress callbacks -- so an adapter
   only has to page a source and shape one item
