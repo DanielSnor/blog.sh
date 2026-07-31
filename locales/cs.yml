@@ -205,6 +205,8 @@ cli:
   drafts_suffix: ", z toho %{count} rozepsaných"
 
   enter_number_or_slug: "Zadej číslo nebo slug: "
+  ambiguous_slug: "Slug '%{slug}' existuje ve %{count} různých letech — který post myslíš?"
+  enter_number: "Číslo (cokoliv jiného zruší): "
   cancelled_empty: "Zrušeno.\n\n"
   no_posts_to_pick: "Žádné posty k výběru."
   no_drafts_to_publish: "Není připravený žádný draft, který bychom mohli publikovat."

@@ -210,6 +210,8 @@ cli:
   drafts_suffix: ", davon %{count} in Arbeit"
 
   enter_number_or_slug: "Nummer oder Slug eingeben: "
+  ambiguous_slug: "Slug '%{slug}' existiert in %{count} verschiedenen Jahren -- welcher Beitrag ist gemeint?"
+  enter_number: "Nummer (alles andere bricht ab): "
   cancelled_empty: "Abgebrochen.\n\n"
   no_posts_to_pick: "Keine Beiträge zur Auswahl."
   no_drafts_to_publish: "Kein Entwurf bereit zur Veröffentlichung."

@@ -214,6 +214,8 @@ cli:
   drafts_suffix: ", %{count} of which in progress"
 
   enter_number_or_slug: "Enter a number or slug: "
+  ambiguous_slug: "Slug '%{slug}' exists in %{count} different years -- which post do you mean?"
+  enter_number: "Number (anything else cancels): "
   cancelled_empty: "Cancelled.\n\n"
   no_posts_to_pick: "No posts to choose from."
   no_drafts_to_publish: "No draft ready to publish."

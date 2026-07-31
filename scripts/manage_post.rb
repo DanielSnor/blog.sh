@@ -449,7 +449,38 @@ def publish_draft(slug)
 end
 
 def find_post_path(slug)
-  Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).first
+  matches = Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).sort
+  return matches.first if matches.size <= 1
+
+  pick_among_years(slug, matches)
+end
+
+# The same slug can legitimately live in several years (backdating makes
+# that easy), and glob order used to decide which post edit/delete/toot
+# acted on -- always the oldest, silently. Never guess between them: show
+# every match and make the author choose. A number picks that post;
+# anything else cancels, same contract as the other pickers.
+def pick_among_years(slug, paths)
+  rows = paths.map { |f| summary_row(post_summary(f)) }
+  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+
+  if Tui.interactive?
+    choice = Tui.menu(rows, hint: t('cli.menu_hint'))
+    abort t('cli.cancelled_empty') if choice.nil?
+    puts
+    return paths[choice]
+  end
+
+  rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
+  puts
+  print t('cli.enter_number')
+  input = $stdin.gets&.strip.to_s
+  puts
+  # "".to_i and "abc".to_i are both 0 and [-1] is the LAST element -- only
+  # a plain in-range number counts, anything else cancels (see the import
+  # menu incident this comment style comes from).
+  abort t('cli.cancelled_empty') unless input =~ /\A\d+\z/ && (1..paths.size).cover?(input.to_i)
+  paths[input.to_i - 1]
 end
 
 # A standalone (re-)send of the comment toot -- works for any published
