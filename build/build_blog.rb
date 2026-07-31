@@ -1101,6 +1101,31 @@ posts.reverse!
 # only get their own page at a hidden address.
 drafts, posts = posts.partition { |p| draft?(p) }
 
+CONTENT_TYPES = %w[text quote chat image video audio link].freeze
+CONTENT_TYPE_LABELS = {
+  'text' => t('type.text'),
+  'quote' => t('type.quote'),
+  'chat' => t('type.chat'),
+  'image' => t('type.image'),
+  'video' => t('type.video'),
+  'audio' => t('type.audio'),
+  'link' => t('type.link')
+}.freeze
+
+# Only content types with at least one published post get a nav item, a
+# /type/ listing and a sitemap entry. A young site's menu grows with its
+# content instead of offering six links into emptiness, and a type emptied
+# by unpublishing disappears again on the next build -- its listing pages
+# simply stop being generated, and the deploy prunes them like any other
+# no-longer-generated file. Defined here, before the first page renders,
+# because the nav partial reads NAV_TYPE_ITEMS.
+PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
+NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
+  key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
+          'video' => 'video', 'audio' => 'audio', 'link' => 'links' }.fetch(type)
+  ["/type/#{type}/", t("nav.#{key}")]
+end.freeze
+
 def referenced_media_filenames(post)
   post['content'].flat_map do |block|
     [(block['media'] || []).first, (block['poster'] || []).first].compact.map { |m| m['url'] }
@@ -1146,18 +1171,7 @@ tags_map.each do |slug, data|
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
 end
 
-CONTENT_TYPES = %w[text quote chat image video audio link].freeze
-CONTENT_TYPE_LABELS = {
-  'text' => t('type.text'),
-  'quote' => t('type.quote'),
-  'chat' => t('type.chat'),
-  'image' => t('type.image'),
-  'video' => t('type.video'),
-  'audio' => t('type.audio'),
-  'link' => t('type.link')
-}.freeze
-
-CONTENT_TYPES.each do |type|
+PRESENT_TYPES.each do |type|
   type_posts = posts.select { |post| dominant_content_type(post) == type }
   label = CONTENT_TYPE_LABELS[type]
   write_listing(type_posts, index_template, File.join(PUBLIC_DIR, 'type', type),
@@ -1221,7 +1235,7 @@ File.write(STATS_PATH, '{}') unless File.exist?(STATS_PATH)
 WRITTEN[STATS_PATH] = true
 
 emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
-emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts, tags_map, CONTENT_TYPES))
+emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts, tags_map, PRESENT_TYPES))
 emit(File.join(PUBLIC_DIR, 'robots.txt'), "User-agent: *\nAllow: /\nSitemap: #{SITE_BASE_URL}/sitemap.xml\n")
 
 removed = prune_public

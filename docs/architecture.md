@@ -200,7 +200,10 @@ A single linear pass, no framework:
    page at `/draft/<token>/<slug>/` with `noindex`, and appears in no
    listing, feed or index.
 4. **Render.** Per-post pages, then listings: homepage, per-tag,
-   per-content-type. Pagination is **anchored to the oldest post** --
+   per-content-type -- the last only for types with at least one
+   published post (`PRESENT_TYPES`); the nav menu and the sitemap
+   follow the same set, so an empty type has no pages, no menu item
+   and no sitemap entry. Pagination is **anchored to the oldest post** --
    page 1 is the oldest ten, the newest posts live on the landing page,
    which splits only after holding 2x the page size. Page boundaries
    therefore never shift, so adding a post rewrites a handful of files
