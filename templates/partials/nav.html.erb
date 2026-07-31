@@ -4,10 +4,13 @@
       </button>
       <ul>
         <li><a href="/"><%= h(t('nav.home')) %></a></li>
-<%# Only types that exist on the site right now -- see NAV_TYPE_ITEMS in
-    build_blog.rb. An empty site's menu is just HOME. %><% NAV_TYPE_ITEMS.each do |href, label| %>
-        <li><a href="<%= href %>"><%= h(label) %></a></li><% end %>
-      </ul>
+<%# Only types that exist on the site right now (NAV_TYPE_ITEMS in
+    build_blog.rb); an empty site's menu is just HOME. The odd tag layout
+    keeps the rendered bytes identical to the hardcoded list this replaced
+    -- partials compile without an ERB trim mode, so a tag's own line
+    breaks would otherwise leak into every page as extra blank lines.
+%><% NAV_TYPE_ITEMS.each do |href, label| %>        <li><a href="<%= href %>"><%= h(label) %></a></li>
+<% end %>      </ul>
 <% if search %>
       <form class="search-form" action="/search/" method="get" role="search">
         <input type="search" name="q" id="search-q" placeholder="<%= h(t('nav.search_placeholder')) %>" autocomplete="off">
