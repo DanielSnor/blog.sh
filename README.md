@@ -391,7 +391,7 @@ Available sources:
 | Source | Needs | Scope |
 | --- | --- | --- |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
-| Instagram | an unpacked HTML export | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
+| Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
@@ -464,13 +464,15 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Imports** -- Bluesky, Tumblr, a Twitter/X archive, WordPress and any
-  RSS/Atom feed are covered. WordPress and feeds share one adapter, because
-  they are one format: a WXR export *is* RSS 2.0, with `wp:` elements
-  layered on for what a feed has no room for. What a new source needs is an
-  adapter with three methods -- everything else (media, dedup, dry-run,
-  reporting, HTML → blocks) is already shared. Instagram has no usable read
-  API; Threads is feasible but deferred (see below).
+- **Imports** -- Bluesky, Tumblr, Mastodon, Pixelfed, Instagram, a
+  Twitter/X archive, WordPress and any RSS/Atom feed are covered. Two of
+  those are one adapter each covering two things: WordPress and feeds,
+  because they are one format (a WXR export *is* RSS 2.0, with `wp:`
+  elements layered on for what a feed has no room for), and Instagram's
+  HTML and JSON exports, because they are one archive serialised twice.
+  What a new source needs is an adapter with three methods -- everything
+  else (media, dedup, dry-run, reporting, HTML → blocks) is already
+  shared. Threads is feasible but deferred (see below).
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:
@@ -502,7 +504,9 @@ generalizing for anyone else to adopt this as-is:
   via its free API (`/me/threads`) but carries the same friction as its
   comments backend -- a Meta developer app and 60-day tokens with an
   auto-refresh cron -- so it waits for real demand. **Instagram** has no
-  usable read API since the Basic Display API shutdown; no plan.
+  usable read API since the Basic Display API shutdown; no plan. (That is
+  about widgets only -- importing an Instagram archive needs no API and is
+  covered above.)
 
 ## Example deployment
 

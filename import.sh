@@ -27,9 +27,10 @@ can't give without having read the preview.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
 in env.sh), and five things you already have on disk -- a Twitter/X archive,
-a Mastodon account archive, a Pixelfed statuses export, an Instagram HTML
-export, and WordPress or any RSS/Atom feed (one option, since a WXR export
-is RSS with extra elements and the file itself says which it is).
+a Mastodon account archive, a Pixelfed statuses export, an Instagram export
+(HTML or JSON, whichever you asked Instagram for), and WordPress or any
+RSS/Atom feed (one option, since a WXR export is RSS with extra elements
+and the file itself says which it is).
 
 Each source is also a script, for cron or a scripted migration. These write
 immediately, with no preview pass:

@@ -102,13 +102,15 @@ end
 
 # Pointed at the unpacked export as a whole rather than at the posts file:
 # the media lives outside your_instagram_activity/, and so does the profile
-# page the account name comes from.
+# page the account name comes from. One prompt for both formats the
+# download offers -- the export says which one it is, so asking would be
+# asking the user something their own directory already answers.
 def build_instagram
   dir = ask('import.instagram_dir_prompt')
   return nil unless dir
 
   dir = File.expand_path(dir)
-  return Import::Instagram.new(dir) if Dir.exist?(File.join(dir, 'your_instagram_activity', 'content'))
+  return Import::Instagram.new(dir) if Import::Instagram.format_of(dir)
 
   puts t('import.instagram_dir_invalid', dir: dir)
   nil

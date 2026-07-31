@@ -117,9 +117,10 @@ Pixelfed, Instagram, and WordPress or any RSS/Atom feed -- those last two
 are one option, since a WXR export is RSS with extra elements and the file
 says which it is.
 
-The same imports also run without the wizard, for cron or a scripted
-migration -- `scripts/migrate_bluesky.rb <handle>`,
-`scripts/migrate_tumblr.rb <blog>`, `scripts/migrate_twitter.rb <export-dir>`,
+Every source also runs without the wizard, for cron or a scripted
+migration -- one `scripts/migrate_<source>.rb` each, e.g.
+`scripts/migrate_bluesky.rb <handle>`, `scripts/migrate_instagram.rb <export-dir>`,
+`scripts/migrate_twitter.rb <export-dir>`,
 `scripts/migrate_feed.rb <export.xml | feed-url>`.
 Those skip the preview and write immediately; see
 [the README](../README.md#importing-existing-content).
