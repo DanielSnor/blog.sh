@@ -35,7 +35,7 @@ module I18n
     SiteConfig.load_yaml(path)
   end
 
-  # Dotted key path, e.g. t('nav.home'). %{name}-style placeholders in the
+  # Dotted key path, e.g. t('nav.all'). %{name}-style placeholders in the
   # string are substituted from **vars.
   def t(key, **vars)
     value = dig_key(data, key) || dig_key(default_data, key)
