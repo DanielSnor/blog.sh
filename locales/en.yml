@@ -10,7 +10,7 @@ date_format: "%b %-d, %Y"
 date_time_format: "%b %-d, %Y %H:%M"
 
 nav:
-  home: "Home"
+  all: "All"
   text: "Text"
   quotes: "Quotes"
   chat: "Chat"

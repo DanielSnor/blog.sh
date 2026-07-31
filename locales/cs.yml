@@ -9,7 +9,7 @@ date_format: "%-d. %-m. %Y"
 date_time_format: "%-d. %-m. %Y %H:%M"
 
 nav:
-  home: "Domů"
+  all: "Vše"
   text: "Text"
   quotes: "Citáty"
   chat: "Chat"
