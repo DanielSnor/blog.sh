@@ -198,7 +198,7 @@ cli:
   deleted_label: "Smazáno (v koši, obnovíš přes ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "V koši nic pro '%{slug}' není.\n\n"
-  post_already_exists: "Post '%{slug}' už existuje (%{path}), obnovením bych ho přepsal -- vyřeš ručně.\n\n"
+  post_already_exists: "Post '%{slug}' už existuje (%{path}) a pokračováním bych ho přepsal -- vyřeš ručně.\n\n"
   restored_label: "Obnoveno: %{path}"
 
   post_count: "\n%{count} post(ů)%{drafts_suffix}"

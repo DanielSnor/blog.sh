@@ -265,6 +265,18 @@ def cmd_add
   slug = Slug.slugify(slug_source.to_s.split(/\s+/).first(8).join(' '))
   slug = "post-#{date.to_i}" if slug.empty?
 
+  # An existing <year>/<slug>.json would be replaced wholesale by
+  # PostWriter.write -- same path, so the build's duplicate check never
+  # sees a second file. A new post whose title happens to match an old
+  # one gets a numeric suffix instead of eating it (and with it the
+  # media directory, which is keyed by year/slug too).
+  base_slug = slug
+  serial = 2
+  while File.exist?(File.join(CONTENT_DIR, date.year.to_s, "#{slug}.json"))
+    slug = "#{base_slug}-#{serial}"
+    serial += 1
+  end
+
   # `add` never publishes directly any more: it always creates a draft only
   # visible through a hidden preview address, and publishing is a separate,
   # deliberate decision (draft_decision_loop). The Mastodon toot is therefore
@@ -692,6 +704,13 @@ def edit_post(slug)
   FileUtils.mkdir_p(new_dir)
   new_path = File.join(new_dir, "#{slug}.json")
   new_media_dir = File.join(MEDIA_DIR, new_year, slug)
+
+  # Same guard as Publishing.publish: a date edit that moves the post
+  # into a year where another post already owns this slug must not
+  # overwrite that post's JSON (and displace its media directory).
+  if new_dir != File.dirname(path) && File.exist?(new_path)
+    abort t('cli.post_already_exists', slug: slug, path: new_path)
+  end
 
   updated = {
     'slug' => slug,

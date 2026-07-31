@@ -207,7 +207,7 @@ cli:
   deleted_label: "Deleted (in trash, restore with ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "Nothing in trash for '%{slug}'.\n\n"
-  post_already_exists: "Post '%{slug}' already exists (%{path}), restoring would overwrite it -- resolve this manually.\n\n"
+  post_already_exists: "Post '%{slug}' already exists (%{path}) and continuing would overwrite it -- resolve this manually.\n\n"
   restored_label: "Restored: %{path}"
 
   post_count: "\n%{count} post(s)%{drafts_suffix}"
