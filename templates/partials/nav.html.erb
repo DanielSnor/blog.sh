@@ -4,13 +4,9 @@
       </button>
       <ul>
         <li><a href="/"><%= h(t('nav.home')) %></a></li>
-        <li><a href="/type/text/"><%= h(t('nav.text')) %></a></li>
-        <li><a href="/type/quote/"><%= h(t('nav.quotes')) %></a></li>
-        <li><a href="/type/chat/"><%= h(t('nav.chat')) %></a></li>
-        <li><a href="/type/image/"><%= h(t('nav.images')) %></a></li>
-        <li><a href="/type/video/"><%= h(t('nav.video')) %></a></li>
-        <li><a href="/type/audio/"><%= h(t('nav.audio')) %></a></li>
-        <li><a href="/type/link/"><%= h(t('nav.links')) %></a></li>
+<%# Only types that exist on the site right now -- see NAV_TYPE_ITEMS in
+    build_blog.rb. An empty site's menu is just HOME. %><% NAV_TYPE_ITEMS.each do |href, label| %>
+        <li><a href="<%= href %>"><%= h(label) %></a></li><% end %>
       </ul>
 <% if search %>
       <form class="search-form" action="/search/" method="get" role="search">
