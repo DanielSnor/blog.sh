@@ -110,6 +110,35 @@ nav a {
 
 nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bottom-color: var(--accent); }
 
+/* The listing you're currently on, filled like a .date-badge (accent
+   ground, white text) so the menu reads as a filter with one option
+   taken. background-clip keeps the fill off the nav bar's own 5px
+   frame, which the transparent borders above would otherwise let it
+   paint over. The negative margins let the fill spill into the gap on
+   each side without widening the item -- without them every item after
+   the active one shifts sideways, so the whole bar jumps as you move
+   between listings. They match the nav's own 16px padding rather than
+   some smaller inset, so an active HOME (always the first item) sits
+   flush with the bar's edge instead of leaving a 4px sliver of
+   background beside it. Only ever one item is active, so a fill
+   reaching 16px into a 30px gap can't collide with a neighbour's. */
+nav a[aria-current="page"] {
+  background: var(--accent);
+  background-clip: padding-box;
+  color: #ffffff;
+  padding: 0 16px;
+  margin-left: -16px;
+  margin-right: -16px;
+}
+/* Without this the generic :hover above would paint the text --accent
+   on an --accent ground and the label would vanish. Inverts the way
+   .date-badge:hover does rather than inventing a third behaviour. */
+nav a[aria-current="page"]:hover {
+  background: var(--hover-invert);
+  color: var(--badge-hover-text);
+  border-color: transparent;
+}
+
 .nav-toggle {
   display: none;
   align-items: center;
@@ -293,6 +322,16 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
   }
   nav li:last-child a { border-bottom: none; }
   nav a:hover { border-color: transparent; }
+  /* Stacked rows, so the fill spans the whole row: 1rem of padding to
+     replace the nav's own, and matching negative margins so the label
+     still lines up with the items above and below it. The separator
+     under it would cut the fill in half, hence transparent. */
+  nav a[aria-current="page"] {
+    padding: 0.6rem 1rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-bottom-color: transparent;
+  }
 
   .search-form input[type="search"] { width: 100%; }
 }

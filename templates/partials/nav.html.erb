@@ -3,13 +3,19 @@
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <ul>
-        <li><a href="/"><%= h(t('nav.home')) %></a></li>
+        <li><a href="/"<%= nav_current('/', active) %>><%= h(t('nav.home')) %></a></li>
 <%# Only types that exist on the site right now (NAV_TYPE_ITEMS in
     build_blog.rb); an empty site's menu is just HOME. The odd tag layout
     keeps the rendered bytes identical to the hardcoded list this replaced
     -- partials compile without an ERB trim mode, so a tag's own line
     breaks would otherwise leak into every page as extra blank lines.
-%><% NAV_TYPE_ITEMS.each do |href, label| %>        <li><a href="<%= href %>"><%= h(label) %></a></li>
+    Same reason nav_current emits the whole aria-current attribute inline
+    rather than the obvious conditional block around it: a block tag's own
+    newlines would land on every page, and pages whose nav has no active
+    item must stay byte-identical to before. (Mind the delimiters in this
+    comment too -- an ERB opening tag inside it ends the comment early and
+    dumps the rest into every page. Which is how this note came to exist.)
+%><% NAV_TYPE_ITEMS.each do |href, label| %>        <li><a href="<%= href %>"<%= nav_current(href, active) %>><%= h(label) %></a></li>
 <% end %>      </ul>
 <% if search %>
       <form class="search-form" action="/search/" method="get" role="search">

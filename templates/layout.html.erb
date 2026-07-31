@@ -52,7 +52,7 @@
       <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= banner_claim_html %></p><% end %>
       <button id="theme-toggle" type="button">☀︎/☾︎</button>
     </div>
-    <%= partial('nav', search: true) %>
+    <%= partial('nav', search: true, active: nav_active) %>
 
     <div class="layout">
       <main>
@@ -62,7 +62,7 @@
       <%= partial('aside') %>
     </div>
 
-    <%= partial('nav', search: false) %>
+    <%= partial('nav', search: false, active: nav_active) %>
 
     <%= partial('footer') %>
   </div>

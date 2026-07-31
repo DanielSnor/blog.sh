@@ -923,12 +923,38 @@ def partial(name, **locals)
   end
 end
 
+# Which nav item the page being rendered belongs under, as the item's own
+# href ('/' or '/type/<type>/') so the partial can compare without knowing
+# anything about paths. Derived from the path layout() already receives, so
+# no call site has to say where it is.
+#
+# Only listing pages get an active item. A post page deliberately doesn't
+# light up its own type: the nav is a filter over the listings, and
+# highlighting VIDEO on a video post would claim you're in the video
+# listing when you aren't. Tag pages and the search page have no item to
+# point at at all.
+def nav_active_for(path)
+  return '/' if path == '/' || path.start_with?('/page/')
+
+  # Pagination lives under the type ('/type/video/page/2/'), so the item is
+  # the first two segments rather than the whole path.
+  type = path[%r{\A/type/([^/]+)/}, 1]
+  type ? "/type/#{type}/" : nil
+end
+
+# The entire attribute, or an empty string -- see the comment in
+# templates/partials/nav.html.erb for why this isn't an <% if %> block.
+def nav_current(href, active)
+  href == active ? ' aria-current="page"' : ''
+end
+
 def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website', extra_head: '')
   LAYOUT.result_with_hash(
     main_html: main_html,
     page_title: title,
     page_description: description,
     page_url: "#{SITE_BASE_URL}#{path}",
+    nav_active: nav_active_for(path),
     og_image: image,
     og_type: og_type,
     extra_head: extra_head
