@@ -31,18 +31,22 @@ DEPLOY_PENDING = File.join(Publishing::ROOT, '.deploy-pending')
 due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
   begin
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
-  rescue JSON::ParserError, SystemCallError => e
-    # One unreadable file used to abort the whole run on every tick, so no
+    raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
+
+    next unless post['state'] == 'draft' && post['scheduled']
+
+    date = Time.parse(post['date'])
+    next if date > Time.now
+
+    [path, post, date]
+  rescue StandardError => e
+    # Every failure this file can produce, not just an unparseable one: a
+    # post whose `date` is malformed or missing raises from Time.parse, and
+    # any of them used to abort the whole run on every tick -- so no
     # scheduled post could ever publish again.
-    warn I18n.t('cron.unreadable_post', path: path, error: e.message.lines.first.to_s.strip[0, 100])
+    warn I18n.t('cron.unreadable_post', path: path, error: "#{e.class}: #{e.message.lines.first.to_s.strip[0, 80]}")
     next
   end
-  next unless post['state'] == 'draft' && post['scheduled']
-
-  date = Time.parse(post['date'])
-  next if date > Time.now
-
-  [path, post, date]
 end
 
 if due.empty? && !File.exist?(DEPLOY_PENDING)

@@ -414,7 +414,7 @@ end
 def render_video(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
-    %(<video controls preload="metadata" width="#{local_media['width']}" height="#{local_media['height']}" src="#{media_prefix}#{local_media['url']}"></video>)
+    %(<video controls preload="metadata"#{size_attrs(local_media)} src="#{media_prefix}#{local_media['url']}"></video>)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
     # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
     # other providers (e.g. Instagram) ship their own responsive blockquote/script.
@@ -495,7 +495,10 @@ def render_block(block, media_prefix, seen = {})
     # Listing pages ship the full post and let CSS clip it at 500px, so most
     # images on them are never actually seen -- lazy loading is what keeps
     # them from being downloaded anyway.
-    %(<figure><img src="#{media_prefix}#{media['url']}" width="#{media['width']}" height="#{media['height']}" alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
+    # Omitted rather than empty when the size is unknown: width="" is not a
+    # valid HTML integer attribute, and an image that can't reserve space is
+    # better off saying nothing than saying nothing-shaped-like-a-number.
+    %(<figure><img src="#{media_prefix}#{media['url']}"#{size_attrs(media)} alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
   when 'video'
     # <figure> is only added when a caption exists, so imported videos
     # without one don't get an unwanted layout change.
@@ -555,6 +558,14 @@ end
 # made the image AND its caption disappear from every rendered page without
 # a word. Unknown dimensions now render -- the page can jump a little on
 # load, which is a far smaller problem than a photo silently missing.
+def size_attrs(media)
+  w = media['width']
+  h = media['height']
+  return '' unless w.is_a?(Integer) && h.is_a?(Integer) && w.positive? && h.positive?
+
+  %( width="#{w}" height="#{h}")
+end
+
 def degenerate_image?(block)
   return false unless block['type'] == 'image'
 
@@ -1139,7 +1150,13 @@ index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'
 # there was no way to find it from inside the tool.
 unreadable = []
 posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |f|
-  JSON.parse(File.read(f, encoding: 'utf-8'))
+  parsed = JSON.parse(File.read(f, encoding: 'utf-8'))
+  # Valid JSON of the wrong shape ("[1,2,3]", "null", a bare string) used to
+  # sail past this and die much later with a TypeError that named no file --
+  # same blindness as an unparseable file, different exception.
+  raise JSON::ParserError, "not a post object (#{parsed.class})" unless parsed.is_a?(Hash)
+
+  parsed
 rescue JSON::ParserError, SystemCallError => e
   unreadable << "  #{f}: #{e.message.lines.first.to_s.strip[0, 100]}"
   nil

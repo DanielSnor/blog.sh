@@ -864,6 +864,19 @@ def edit_post(slug)
   updated['draft_token'] = post['draft_token'] if post['draft_token']
   updated['scheduled'] = true if post['scheduled']
 
+  # Before ANY of the moving, copying and pruning below: if the file changed
+  # under the editor -- the scheduled-publish cron runs every 15 minutes --
+  # this save would overwrite whatever changed it. Refusing is the only safe
+  # answer; the two versions can't be merged without guessing which state
+  # and which mastodon_url is the real one. It has to happen here rather
+  # than next to the write, because by then media has already been copied
+  # and unreferenced files deleted, and "nothing was saved" would be a lie.
+  # The text isn't lost either way: the editor buffer holds it and the
+  # notice armed at edit time says where.
+  if !File.exist?(path) || File.read(path, encoding: 'utf-8') != original_raw
+    abort t('cli.post_changed_while_editing', slug: slug)
+  end
+
   # Media move first, replacement JSON second, old JSON last. The old
   # order deleted the post's only file and *then* moved its media -- so a
   # date edit into a year with no media.nosync/<year>/ yet (the mv raises
@@ -892,16 +905,6 @@ def edit_post(slug)
     Dir.children(new_media_dir).each do |f|
       File.delete(File.join(new_media_dir, f)) unless keep.include?(f)
     end
-  end
-
-  # Last check before anything is written: if the file changed under the
-  # editor, this save would overwrite whatever changed it (see original_raw
-  # above). Refusing is the only safe answer -- the two versions can't be
-  # merged without guessing which mastodon_url or state is the real one --
-  # and the text is not lost: the editor buffer still holds it, and the
-  # notice armed at edit time says where.
-  if !File.exist?(path) || File.read(path, encoding: 'utf-8') != original_raw
-    abort t('cli.post_changed_while_editing', slug: slug)
   end
 
   AtomicWrite.write_json(new_path, updated)
@@ -1009,6 +1012,10 @@ end
 # still refuses to run until it's dealt with.
 def post_summary(file)
   post = JSON.parse(File.read(file, encoding: 'utf-8'))
+  # Valid JSON of the wrong shape is as unusable as unparseable JSON, and
+  # left to itself it crashes further along with no file named.
+  raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)
+
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
     state: post['state'] || PUBLISHED, scheduled: post['scheduled'] }

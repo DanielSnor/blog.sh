@@ -219,7 +219,13 @@ log('') if to_upload.any? || (PRUNES && orphans.any?)
 
 ok = failed = deleted = 0
 completed = false
-File.write(INCOMPLETE_PATH, Time.now.to_s)
+# --only is not a deploy of the site, it's a deploy of a named file or two
+# (refresh-sidebar.sh does exactly that, from cron). Such a run neither
+# leaves an unfinished upload behind nor finishes one, so it must not touch
+# the marker at all -- clearing it there would drop the resume that an
+# interrupted full deploy is waiting for, and the guards would then refuse
+# every later deploy again.
+File.write(INCOMPLETE_PATH, Time.now.to_s) unless ONLY
 begin
   if BACKEND.respond_to?(:sync)
     # Batch backend (rsync): one run covers everything, so the manifest is
@@ -273,7 +279,7 @@ ensure
   # Cleared only by a run that got all the way through with nothing
   # failing -- an interruption (or a partial failure) leaves the marker so
   # the next run knows the manifest describes an unfinished upload.
-  File.delete(INCOMPLETE_PATH) if completed && failed.zero? && File.exist?(INCOMPLETE_PATH)
+  File.delete(INCOMPLETE_PATH) if completed && failed.zero? && !ONLY && File.exist?(INCOMPLETE_PATH)
 end
 
 log('')

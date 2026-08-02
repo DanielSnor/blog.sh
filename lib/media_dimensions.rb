@@ -34,13 +34,12 @@ module MediaDimensions
       return nil unless head
 
       if head.byteslice(0, 8) == "\x89PNG\r\n\x1a\n".b
-        w, h = head.byteslice(16, 8).unpack('N2')
-        return [w, h]
+        return sane(head.byteslice(16, 8).unpack('N2'))
       elsif head.byteslice(0, 3) == 'GIF'.b
         # Logical screen descriptor: width and height, 16-bit little-endian.
-        return head.byteslice(6, 4).unpack('v2')
+        return sane(head.byteslice(6, 4).unpack('v2'))
       elsif head.byteslice(0, 4) == 'RIFF'.b && head.byteslice(8, 4) == 'WEBP'.b
-        return webp(head)
+        return sane(webp(head))
       elsif head.byteslice(0, 3) == "\xFF\xD8\xFF".b
         f.rewind
         f.read(2)
@@ -54,8 +53,8 @@ module MediaDimensions
           code = marker.getbyte(1)
           if (0xC0..0xCF).cover?(code) && ![0xC4, 0xC8, 0xCC].include?(code)
             f.read(1)
-            h, w = f.read(4).unpack('n2')
-            return [w, h]
+            h, w = f.read(4).to_s.unpack('n2')
+            return sane([w, h])
           else
             f.seek(len - 2, IO::SEEK_CUR)
           end
@@ -67,11 +66,25 @@ module MediaDimensions
     nil
   end
 
+  # Every reader goes through here, because a truncated file makes unpack
+  # return nils and the arithmetic on top of them produces nonsense rather
+  # than an error: `nil & 0x3FFF` is `false` in Ruby, and a `"height": false`
+  # written into a post's JSON took the whole build down later, far from the
+  # file that caused it. Only a pair of positive integers is a size.
+  def sane(dims)
+    w, h = dims
+    return nil unless w.is_a?(Integer) && h.is_a?(Integer) && w.positive? && h.positive?
+
+    [w, h]
+  end
+
   # WebP has three container flavours and each keeps its size somewhere
   # else: lossy (VP8 ) after the sync code, lossless (VP8L) as two 14-bit
   # fields packed into four bytes, extended (VP8X) as a 24-bit canvas size.
   # All three sit within the first 30 bytes, so no extra read is needed.
   def webp(head)
+    return nil unless head.bytesize >= 30
+
     case head.byteslice(12, 4)
     when 'VP8 '.b
       return nil unless head.byteslice(23, 3) == "\x9D\x01\x2A".b

@@ -371,9 +371,15 @@ module Import
         # (map[chars.length] = the end, so exclusive span ends map too)
         map = Array.new(chars.length + 1, 0)
         out = +''
+        # NUL counts as collapsible here only because the String#strip this
+        # replaces removed it too -- and a stray NUL byte from a feed would
+        # otherwise survive into the text and make the generated RSS and
+        # sitemap invalid XML.
+        collapsible = ->(ch) { ch.match?(/\s/) || ch == "\0" }
+
         i = 0
         while i < chars.length
-          unless chars[i].match?(/\s/)
+          unless collapsible.call(chars[i])
             map[i] = out.length
             out << chars[i]
             i += 1
@@ -381,7 +387,7 @@ module Import
           end
 
           run_end = i
-          run_end += 1 while run_end < chars.length && chars[run_end].match?(/\s/)
+          run_end += 1 while run_end < chars.length && collapsible.call(chars[run_end])
           (i...run_end).each { |k| map[k] = out.length }
           # A leading or trailing run disappears entirely -- that's the .strip
           # half of the collapse.

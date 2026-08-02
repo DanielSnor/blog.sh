@@ -91,7 +91,12 @@ module Import
       # files than the real run could write, and the real run then dropped
       # the missing ones without naming them. A stat is not a fetch, so this
       # keeps the dry-run contract (nothing is read, written or downloaded).
-      return nil unless File.exist?(path)
+      # Recorded rather than just skipped: the count is then honest AND the
+      # summary still names what the archive is missing.
+      unless File.exist?(path)
+        @failures << path
+        return nil
+      end
 
       filename = allocate(File.extname(path))
       return filename if @dry_run
