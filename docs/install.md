@@ -214,7 +214,10 @@ copies whatever is missing to the live names `assets/images/header.png`
 (the path `banner.src` defaults to) and `assets/images/favicon.png`, so a
 fresh clone renders before you've drawn anything. The live names are
 gitignored: replace them with your own artwork and neither `git pull` nor
-a rebuild will touch it. Set `banner.width`/`height` to the real
+a rebuild will touch it. That also means nothing else keeps a copy -- put
+both files in your backup ([Backup](operations.md#backup)), or a restore
+brings the site back wearing the engine's default artwork. Set
+`banner.width`/`height` to the real
 dimensions of your image: those attributes are what reserves space before
 it loads, and a mismatch makes the page jump.
 

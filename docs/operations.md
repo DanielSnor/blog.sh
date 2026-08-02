@@ -221,6 +221,7 @@ everything generated is rebuildable:
 | `content.nosync/posts/` | the posts -- the one thing that's truly irreplaceable |
 | `media.nosync/` | their images and videos |
 | `config/site.yml` | site identity and integrations |
+| `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
 | `env.sh` | tokens (or re-create them; mind the file's 600 mode in backups too) |
 | `trash/` | optional -- deleted-but-recoverable posts |
 
