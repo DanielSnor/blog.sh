@@ -1,6 +1,7 @@
 require 'json'
 require 'fileutils'
 require 'time'
+require_relative 'atomic_write'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
@@ -28,7 +29,7 @@ module PostWriter
     end
 
     path = File.join(dir, "#{slug}.json")
-    File.write(path, JSON.pretty_generate(post))
+    AtomicWrite.write_json(path, post)
     path
   end
 

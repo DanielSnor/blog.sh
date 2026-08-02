@@ -32,6 +32,7 @@
 require 'digest'
 require 'json'
 require_relative '../lib/deploy_backend'
+require_relative '../lib/atomic_write'
 
 DRY = ARGV.include?('--dry-run')
 FORCE = ARGV.include?('--force')
@@ -52,6 +53,14 @@ PRUNES = PRUNE || (BACKEND.respond_to?(:always_prunes?) && BACKEND.always_prunes
 # thousands = gigabytes of writes). Periodic saving still has to happen
 # though -- so an interrupted deploy can resume.
 MANIFEST_SAVE_EVERY = 25
+# Marks a deploy as started and not yet finished. A run that dies halfway
+# (Ctrl-C, a dropped SSH session, the target going away) leaves a manifest
+# describing only part of the target -- and the two file-count guards below
+# then read the next, perfectly normal run as an explosion in size and
+# refuse it. That is a dead end for the flows ./blog.sh runs itself, which
+# have no way to pass --force. While this file exists, the guards stand
+# down for one run.
+INCOMPLETE_PATH = "#{MANIFEST_PATH}.incomplete"
 
 def log(msg)
   puts msg
@@ -62,12 +71,25 @@ def load_manifest
   return {} unless File.exist?(MANIFEST_PATH)
 
   JSON.parse(File.read(MANIFEST_PATH))
-rescue JSON::ParserError
+rescue JSON::ParserError => e
+  # Treating this as "nothing was ever uploaded" silently is how orphans
+  # become permanently unprunable: the target keeps files this side no
+  # longer knows about, and both guards below are disabled by the empty
+  # manifest without anyone noticing. Say it out loud, and treat the run
+  # as a resume so the guards stay off deliberately rather than by
+  # accident.
+  warn "⚠️  #{MANIFEST_PATH} is unreadable (#{e.message.lines.first.to_s.strip[0, 60]}) -- treating it as empty."
+  warn '   Everything will be re-uploaded. Files already on the target that this build no longer generates'
+  warn '   can no longer be found automatically; check the target if you have deleted posts recently.'
   {}
 end
 
+# Atomic, like every other write of state this engine depends on: the
+# previous manifest survives a write that dies halfway (a full disk, a
+# killed container), instead of being truncated into the unreadable file
+# the branch above has to apologise for.
 def save_manifest(manifest)
-  File.write(MANIFEST_PATH, JSON.pretty_generate(manifest))
+  AtomicWrite.write_json(MANIFEST_PATH, manifest)
 end
 
 # Older manifests (before this extension) have a bare hash string as the
@@ -108,7 +130,12 @@ end
 # re-uploading everything, but the list of previously uploaded files is
 # still needed to find orphans.
 stored = load_manifest
-manifest = FORCE ? {} : stored.dup
+# --force means "upload everything again", not "forget what the target
+# has": starting from an empty manifest dropped every orphan still
+# pending at that moment, and an orphan the manifest has forgotten can
+# never be pruned -- it stays live on the target for good. The forcing
+# happens in the upload selection below instead.
+manifest = stored.dup
 hashes = {}
 stats = {}
 files.each do |name|
@@ -133,7 +160,7 @@ files.each do |name|
   end
 end
 
-to_upload = ONLY ? files : files.select { |name| manifest_hash(manifest[name]) != hashes[name] }
+to_upload = ONLY || FORCE ? files : files.select { |name| manifest_hash(manifest[name]) != hashes[name] }
 skipped = files.size - to_upload.size
 
 # Orphans = uploaded at some point, but no longer in public.nosync/ (a
@@ -147,8 +174,10 @@ orphans = ONLY ? [] : (stored.keys - all_files).sort
 # would upload wreckage. A drop of more than a fifth is almost certainly a
 # bug, not intent -- and if you really are deleting hundreds of posts,
 # --force gets it through.
+RESUMING = File.exist?(INCOMPLETE_PATH)
+
 SHRINK_LIMIT = 0.2
-if !ONLY && !FORCE && !stored.empty? && all_files.size < stored.size * (1 - SHRINK_LIMIT)
+if !ONLY && !FORCE && !RESUMING && !stored.empty? && all_files.size < stored.size * (1 - SHRINK_LIMIT)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{all_files.size} files, but #{stored.size} were uploaded last time.
        That's a #{(100 - (all_files.size * 100.0 / stored.size)).round}% drop -- looks like a broken build.
@@ -163,7 +192,7 @@ end
 # an accidentally copied tree. Normal growth is a handful of files per
 # published post; a jump of more than a fifth doesn't happen in normal use.
 GROWTH_LIMIT = 0.2
-if !ONLY && !FORCE && !stored.empty? && all_files.size > stored.size * (1 + GROWTH_LIMIT)
+if !ONLY && !FORCE && !RESUMING && !stored.empty? && all_files.size > stored.size * (1 + GROWTH_LIMIT)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{all_files.size} files, only #{stored.size} were uploaded last time.
        That's a #{((all_files.size * 100.0 / stored.size) - 100).round}% increase -- looks like a duplicated or broken build.
@@ -173,6 +202,7 @@ end
 
 log('')
 log("Deploy web -> #{BACKEND.label}: #{BACKEND.target}#{DRY ? '  [DRY-RUN]' : ''}")
+log('  ℹ️  The last deploy did not finish -- resuming it, so the file-count guards are skipped this once.') if RESUMING
 log("  #{files.size} file(s) total, #{to_upload.size} new/changed, #{skipped} unchanged (skipped)")
 if orphans.any?
   log(PRUNES ? "  #{orphans.size} orphan(s) to delete#{PRUNE ? ' (--prune)' : ' (snapshot deploy)'}" \
@@ -188,6 +218,14 @@ end
 log('') if to_upload.any? || (PRUNES && orphans.any?)
 
 ok = failed = deleted = 0
+completed = false
+# --only is not a deploy of the site, it's a deploy of a named file or two
+# (refresh-sidebar.sh does exactly that, from cron). Such a run neither
+# leaves an unfinished upload behind nor finishes one, so it must not touch
+# the marker at all -- clearing it there would drop the resume that an
+# interrupted full deploy is waiting for, and the guards would then refuse
+# every later deploy again.
+File.write(INCOMPLETE_PATH, Time.now.to_s) unless ONLY
 begin
   if BACKEND.respond_to?(:sync)
     # Batch backend (rsync): one run covers everything, so the manifest is
@@ -235,8 +273,13 @@ begin
       end
     end
   end
+  completed = true
 ensure
   save_manifest(manifest)
+  # Cleared only by a run that got all the way through with nothing
+  # failing -- an interruption (or a partial failure) leaves the marker so
+  # the next run knows the manifest describes an unfinished upload.
+  File.delete(INCOMPLETE_PATH) if completed && failed.zero? && !ONLY && File.exist?(INCOMPLETE_PATH)
 end
 
 log('')

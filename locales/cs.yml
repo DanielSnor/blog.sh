@@ -97,7 +97,13 @@ cli:
   confirm_word: "ano"
   missing_images_wait: "Chybí %{count} obrázek/obrázky, počkám, až je nahraješ do incoming/:"
   missing_images_prompt: "Až budou nahrané, stiskni Enter (nebo napiš \"%{cancel_word}\" pro přerušení): "
+  missing_images_eof: "Není odkud číst odpověď (stdin je zavřený), chybějící soubory už nedorazí. Nic se neuložilo.\n\n"
   cancelled_nothing_saved: "Zrušeno, nic se neuložilo.\n\n"
+  unreadable_post: "⚠️  Přeskakuji nečitelný soubor postu %{path}: %{error}"
+  editor_buffer_kept: "Text se neztratil — je v %{path}. Ulož si ho jinam, další add/edit ten soubor přepíše."
+  image_dimensions_unknown: "⚠️  %{file}: rozměry obrázku nejde přečíst, takže mu stránka nemůže rezervovat místo a při načtení může poskočit. PNG, JPEG, GIF a WebP se čtou vždy."
+  image_heic_hint: "   HEIC zobrazí jen Safari — nejdřív ho převeď: sips -s format jpeg SOUBOR --out SOUBOR.jpg (macOS), heif-convert SOUBOR SOUBOR.jpg (Linux)."
+  post_changed_while_editing: "❌ '%{slug}' se během editace změnil na disku (cron publikuje naplánované posty sám). Nic se neuložilo, takže se z té změny nic neztratilo — otevři post znovu a udělej úpravu nad aktuální verzí."
 
   double_frontmatter_error: |
     ❌ V textu je druhá hlavička.
@@ -235,6 +241,7 @@ cli:
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 zobrazí tuhle nápovědu
+      ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
 
   wizard_prompt_action: "Co chceš dělat?"
@@ -257,6 +264,10 @@ cron:
   no_scheduled_due: "Žádný naplánovaný post není na řadě."
   published_scheduled: "Publikován naplánovaný post '%{slug}' (datum %{date})."
   publishing_scheduled: "Publikuji %{count} naplánovaný(é) post(y)"
+  publish_failed: "❌ '%{slug}' se nepodařilo publikovat: %{error}. Ostatních postů na řadě se to nedotklo; po opravě se publikuje v dalším běhu."
+  unreadable_post: "⚠️  Přeskakuji nečitelný soubor postu %{path}: %{error}"
+  retrying_deploy: "Opakuji deploy, který minule nedoběhl"
+  deploy_will_retry: "⚠️  Deploy selhal. Posty publikované v tomto běhu jsou oznámené, ale ještě nejsou na webu — další běh deploy zopakuje sám."
 
 # ./import.sh -- průvodce importem (scripts/import.rb).
 import:

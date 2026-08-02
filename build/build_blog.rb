@@ -360,6 +360,20 @@ end
 def apply_formatting(text, formatting)
   return autolink(text.to_s) if formatting.nil? || formatting.empty?
 
+  # A stored span can point past the end of its text: importers used to
+  # compute offsets against the raw HTML text and store the collapsed one
+  # (fixed in lib/import/html_blocks.rb, but posts written before that keep
+  # their numbers). Clamping costs nothing and stops one such post from
+  # aborting the whole build with a TypeError that names no post at all.
+  formatting = formatting.filter_map do |f|
+    s = f['start'].to_i.clamp(0, text.length)
+    e = f['end'].to_i.clamp(0, text.length)
+    next if s >= e
+
+    f.merge('start' => s, 'end' => e)
+  end
+  return autolink(text.to_s) if formatting.empty?
+
   boundaries = ([0, text.length] + formatting.flat_map { |f| [f['start'], f['end']] }).uniq.sort
 
   boundaries.each_cons(2).map do |s, e|
@@ -400,7 +414,7 @@ end
 def render_video(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
-    %(<video controls preload="metadata" width="#{local_media['width']}" height="#{local_media['height']}" src="#{media_prefix}#{local_media['url']}"></video>)
+    %(<video controls preload="metadata"#{size_attrs(local_media)} src="#{media_prefix}#{local_media['url']}"></video>)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
     # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
     # other providers (e.g. Instagram) ship their own responsive blockquote/script.
@@ -481,7 +495,10 @@ def render_block(block, media_prefix, seen = {})
     # Listing pages ship the full post and let CSS clip it at 500px, so most
     # images on them are never actually seen -- lazy loading is what keeps
     # them from being downloaded anyway.
-    %(<figure><img src="#{media_prefix}#{media['url']}" width="#{media['width']}" height="#{media['height']}" alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
+    # Omitted rather than empty when the size is unknown: width="" is not a
+    # valid HTML integer attribute, and an image that can't reserve space is
+    # better off saying nothing than saying nothing-shaped-like-a-number.
+    %(<figure><img src="#{media_prefix}#{media['url']}"#{size_attrs(media)} alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
   when 'video'
     # <figure> is only added when a caption exists, so imported videos
     # without one don't get an unwanted layout change.
@@ -534,10 +551,27 @@ def render_photo_grid(images, media_prefix, seen = {})
   %(<div class="photo-grid">#{items.join}</div>)
 end
 
+# A 1x1 image is a tracking pixel an import dragged in, not a photo, and it
+# gets dropped from the page. "Dimensions unknown" is a different thing
+# entirely and used to land in the same branch, because nil.to_i is 0: any
+# format MediaDimensions can't read (GIF and WebP until now, HEIC still)
+# made the image AND its caption disappear from every rendered page without
+# a word. Unknown dimensions now render -- the page can jump a little on
+# load, which is a far smaller problem than a photo silently missing.
+def size_attrs(media)
+  w = media['width']
+  h = media['height']
+  return '' unless w.is_a?(Integer) && h.is_a?(Integer) && w.positive? && h.positive?
+
+  %( width="#{w}" height="#{h}")
+end
+
 def degenerate_image?(block)
   return false unless block['type'] == 'image'
 
   media = (block['media'] || []).first || {}
+  return false if media['width'].nil? || media['height'].nil?
+
   media['width'].to_i <= 1 || media['height'].to_i <= 1
 end
 
@@ -628,7 +662,15 @@ end
 def tags_html(post)
   return '' if post['tags'].nil? || post['tags'].empty?
 
-  pills = post['tags'].map { |t| %(<a class="tag-pill" href="/tag/#{tag_slug(t)}/">#{CGI.escapeHTML(t)}</a>) }.join
+  # A tag with nothing left after folding (emoji-only, punctuation-only --
+  # Tumblr and Instagram hand those over verbatim) gets no listing page:
+  # the tag index skips exactly the same way. Rendering a pill for it
+  # anyway produced a visible link to /tag// on the post page and on every
+  # listing the post appeared in.
+  visible = post['tags'].reject { |t| tag_slug(t).empty? }
+  return '' if visible.empty?
+
+  pills = visible.map { |t| %(<a class="tag-pill" href="/tag/#{tag_slug(t)}/">#{CGI.escapeHTML(t)}</a>) }.join
   %(<div class="tags">#{pills}</div>)
 end
 
@@ -1100,7 +1142,28 @@ emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
 post_template = ERB.new(File.read(File.join(ROOT, 'templates', 'post.html.erb'), encoding: 'utf-8'))
 index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'), encoding: 'utf-8'))
 
-posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).map { |f| JSON.parse(File.read(f, encoding: 'utf-8')) }
+# Named, not anonymous: an unreadable post file (a write interrupted by a
+# full disk or a killed container leaves a 0-byte one) used to abort here
+# with a bare JSON::ParserError whose message is "unexpected token at ''"
+# and whose backtrace points at this line -- nothing said WHICH of several
+# thousand files it was, and every listing command failed the same way, so
+# there was no way to find it from inside the tool.
+unreadable = []
+posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |f|
+  parsed = JSON.parse(File.read(f, encoding: 'utf-8'))
+  # Valid JSON of the wrong shape ("[1,2,3]", "null", a bare string) used to
+  # sail past this and die much later with a TypeError that named no file --
+  # same blindness as an unparseable file, different exception.
+  raise JSON::ParserError, "not a post object (#{parsed.class})" unless parsed.is_a?(Hash)
+
+  parsed
+rescue JSON::ParserError, SystemCallError => e
+  unreadable << "  #{f}: #{e.message.lines.first.to_s.strip[0, 100]}"
+  nil
+end
+unless unreadable.empty?
+  abort("❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:\n#{unreadable.join("\n")}")
+end
 
 # Two posts sharing a year and slug would point at the same output path
 # (post_path, output_dir) and the same media/<year>/<slug>/ -- one would
@@ -1167,10 +1230,17 @@ end
   source_media_dir = File.join(MEDIA_DIR, year.to_s, post['slug'])
   referenced_media_filenames(post).each do |filename|
     src = File.join(source_media_dir, filename)
+    dest = File.join(dir, filename)
     if File.exist?(src)
-      emit_copy(src, File.join(dir, filename))
+      emit_copy(src, dest)
     else
       warn "MISSING media: #{post['slug']} -> #{filename}"
+      # The page still links this file, so a copy already in public.nosync
+      # has to survive prune_public -- otherwise a source that is missing
+      # for a moment (a media directory mid-move, a file being replaced)
+      # makes the build delete the last copy, and the --prune that every
+      # publish runs then deletes it from the live site as well.
+      WRITTEN[dest] = true if File.exist?(dest)
     end
   end
 

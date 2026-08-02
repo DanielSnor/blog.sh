@@ -327,7 +327,9 @@ That's the short path. The complete one -- server install, every deploy
 backend step by step, the phone workflow, the comments-network setup -- is
 [docs/install.md](docs/install.md); day-to-day usage (publishing,
 cron, backup, troubleshooting) is
-[docs/operations.md](docs/operations.md).
+[docs/operations.md](docs/operations.md). What changed between versions --
+and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
+`./blog.sh version` says what you are running.
 
 ## `blog.sh` -- authoring
 

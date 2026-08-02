@@ -2,6 +2,9 @@ env.sh
 .DS_Store
 .nova/
 .deploy_manifest*.json
+.deploy_manifest*.json.incomplete
+.deploy-pending
+.last-edit.md
 .stats_full_refresh_at
 config/site.yml
 assets/images/header.png

@@ -312,12 +312,28 @@ module MarkdownParser
       return [File.basename(expanded), nil]
     end
 
-    # A bare filename (no directory component) is assumed to live in
-    # incoming_dir -- lets a phone-typed markdown line stay short instead of a
-    # full path like /app/data/blog/incoming/foto.jpg every time. Without an
-    # incoming_dir (e.g. build-time pages outside content/posts/), a bare
-    # filename just resolves relative to the current directory instead.
-    expanded = File.expand_path(File.join(incoming_dir, path)) if incoming_dir && File.dirname(path) == '.'
+    # A bare filename (no directory component) is looked up in two places, in
+    # this order:
+    #
+    # 1. the post's own media directory -- on a second edit of a post whose
+    #    photos were staged this way, the file is already there from the
+    #    previous save (and its incoming/ copy was cleaned up), so it resolves
+    #    with no copy at all instead of waiting for an upload that will never
+    #    come;
+    # 2. incoming_dir -- the write-before-upload shorthand, which lets a
+    #    phone-typed markdown line stay short instead of spelling out a full
+    #    path like /app/data/blog/incoming/foto.jpg every time.
+    #
+    # A name in neither place still resolves to incoming_dir, so it's that
+    # path the author is told to upload to. Without an incoming_dir (e.g.
+    # build-time pages outside content/posts/), a bare filename just resolves
+    # relative to the current directory instead.
+    if File.dirname(path) == '.'
+      in_media = media_dir && File.expand_path(File.join(media_dir, path))
+      return [File.basename(in_media), nil] if in_media && File.exist?(in_media)
+
+      expanded = File.expand_path(File.join(incoming_dir, path)) if incoming_dir
+    end
 
     # If the post has already referenced this source once, reuse the same
     # filename. media_files is keyed by source path, so a second reference
@@ -329,7 +345,29 @@ module MarkdownParser
 
     ext = File.extname(expanded)
     ext = '.jpg' if ext.empty?
-    [format('%02d%s', counter, ext), expanded]
+    [free_media_name(counter, ext, media_dir, media_files.values), expanded]
+  end
+
+  # Picks the first NN<ext> name nothing else is using: not one this parse has
+  # already handed out, and not a number the post's media directory already
+  # holds under any extension.
+  #
+  # The numbering only ever counted files being *copied*, so an image the post
+  # keeps from a previous save didn't consume its number -- an edit that kept
+  # 01.png and added another PNG named the new file 01.png as well, the copy
+  # overwrote the kept one, and both blocks ended up showing the new image.
+  # Skipping numbers that are already on disk fixes that in both directions
+  # (the kept image can appear in any block, before or after the new one).
+  # A brand-new post has no media directory yet, so nothing is skipped there
+  # and its images stay numbered 01, 02, 03...
+  def free_media_name(counter, ext, media_dir, taken)
+    used = taken.dup
+    used.concat(Dir.children(media_dir)) if media_dir && Dir.exist?(media_dir)
+    stems = used.map { |name| File.basename(name.to_s, '.*') }
+
+    number = counter
+    number += 1 while stems.include?(format('%02d', number))
+    format('%02d%s', number, ext)
   end
 
   CODE_FENCE_LINE_RE = /\A```(\S*)\z/

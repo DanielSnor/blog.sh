@@ -105,6 +105,10 @@ The trick is that a bare filename in an image line resolves against the
 4. On save the photo is copied into `media.nosync/<year>/<slug>/` and
    its `incoming/` copy is removed -- an empty `incoming/` means nothing
    is pending.
+5. Editing that post later doesn't need the photo again: a bare filename
+   is looked for in the post's own `media.nosync/<year>/<slug>/` first and
+   in `incoming/` only after that, so a file that's already been saved
+   resolves without any upload (and without being copied again).
 
 ## Importing from another platform
 
@@ -217,6 +221,7 @@ everything generated is rebuildable:
 | `content.nosync/posts/` | the posts -- the one thing that's truly irreplaceable |
 | `media.nosync/` | their images and videos |
 | `config/site.yml` | site identity and integrations |
+| `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
 | `env.sh` | tokens (or re-create them; mind the file's 600 mode in backups too) |
 | `trash/` | optional -- deleted-but-recoverable posts |
 
