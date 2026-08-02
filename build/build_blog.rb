@@ -558,10 +558,17 @@ end
 # made the image AND its caption disappear from every rendered page without
 # a word. Unknown dimensions now render -- the page can jump a little on
 # load, which is a far smaller problem than a photo silently missing.
+# Both attributes or neither, and only when the stored size is a number at
+# all. `Integer(…, exception: false)` rather than `is_a?(Integer)` on
+# purpose: imports from before dimensions were normalised stored them as
+# strings ("640"), and 126 media blocks on the reference archive still do --
+# an Integer-only test silently stripped width/height off every one of them.
+# And rather than plain `.to_i`, because that raises on the `false` a broken
+# header reader could once produce.
 def size_attrs(media)
-  w = media['width']
-  h = media['height']
-  return '' unless w.is_a?(Integer) && h.is_a?(Integer) && w.positive? && h.positive?
+  w = Integer(media['width'], exception: false)
+  h = Integer(media['height'], exception: false)
+  return '' unless w&.positive? && h&.positive?
 
   %( width="#{w}" height="#{h}")
 end
@@ -570,9 +577,13 @@ def degenerate_image?(block)
   return false unless block['type'] == 'image'
 
   media = (block['media'] || []).first || {}
-  return false if media['width'].nil? || media['height'].nil?
+  w = Integer(media['width'], exception: false)
+  h = Integer(media['height'], exception: false)
+  # Unknown size (including a value that is not a number) renders; only a
+  # real 1x1 is the tracking pixel this is here to drop.
+  return false if w.nil? || h.nil?
 
-  media['width'].to_i <= 1 || media['height'].to_i <= 1
+  w <= 1 || h <= 1
 end
 
 def render_content(blocks, media_prefix)
