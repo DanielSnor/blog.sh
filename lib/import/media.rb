@@ -86,7 +86,12 @@ module Import
     # from_url, minus the network.
     def from_file(path)
       return nil if path.to_s.empty?
-      return nil unless @dry_run || File.exist?(path)
+      # The existence check used to be skipped in dry-run, so a preview of an
+      # archive whose media tree is incomplete promised more posts and more
+      # files than the real run could write, and the real run then dropped
+      # the missing ones without naming them. A stat is not a fetch, so this
+      # keeps the dry-run contract (nothing is read, written or downloaded).
+      return nil unless File.exist?(path)
 
       filename = allocate(File.extname(path))
       return filename if @dry_run

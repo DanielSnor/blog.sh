@@ -201,8 +201,14 @@ module Import
     # URLs. A WordPress export's own post_name is trusted as-is -- that's
     # the slug the site already published under.
     def item_slug(item)
-      name = text_of(item, 'wp:post_name')
-      return Slug.slugify(name) unless name.empty?
+      # Guarded like the two fallbacks below it: a post_name that folds to
+      # nothing (raw non-ASCII or punctuation only -- WordPress itself
+      # percent-encodes, but a hand-edited or third-party WXR does not)
+      # produced an empty slug, and PostWriter then wrote <year>/.json --
+      # an invisible dotfile that every glob in the engine skips, with its
+      # media dumped loose in the year directory.
+      name = Slug.slugify(text_of(item, 'wp:post_name'))
+      return name unless name.empty?
 
       slug = Slug.slugify(text_of(item, 'title').split(/\s+/).first(10).join(' '))
       return slug unless slug.empty?
