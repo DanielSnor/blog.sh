@@ -40,6 +40,12 @@ case "${1:-}" in
   help | --help | -h)
     exec ruby scripts/manage_post.rb help
     ;;
+  # Same reasoning as help, plus one of its own: "which version is this
+  # install running?" is a question asked of a machine that is already
+  # misbehaving -- it must not depend on env.sh or config being right.
+  version | --version | -v)
+    exec ruby scripts/manage_post.rb version
+    ;;
 esac
 
 [ -t 1 ] && clear

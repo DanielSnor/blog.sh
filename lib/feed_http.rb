@@ -4,6 +4,7 @@ require 'net/http'
 require 'timeout'
 require 'uri'
 require_relative 'site_config'
+require_relative 'version'
 
 # lib/feed_http.rb -- one GET implementation shared by every sidebar fetcher.
 #
@@ -12,7 +13,7 @@ require_relative 'site_config'
 # User-Agent (api.github.com returns 403 without one), and redirect
 # following.
 module FeedHttp
-  USER_AGENT = "blog-sh/1.0 (+#{SiteConfig.get('site', 'base_url', default: 'https://github.com/')})"
+  USER_AGENT = "#{BlogSh.user_agent} (+#{SiteConfig.get('site', 'base_url', default: 'https://github.com/')})"
   OPEN_TIMEOUT = 10
   READ_TIMEOUT = 15
   # The per-read timeout only bounds the gap BETWEEN chunks: a host that

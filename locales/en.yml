@@ -250,6 +250,7 @@ cli:
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 shows this help
+      ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
 
   wizard_prompt_action: "What do you want to do?"

@@ -241,6 +241,7 @@ cli:
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 zobrazí tuhle nápovědu
+      ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
 
   wizard_prompt_action: "Co chceš dělat?"

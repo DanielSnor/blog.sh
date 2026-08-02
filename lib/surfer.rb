@@ -2,6 +2,7 @@
 
 require 'net/http'
 require 'uri'
+require_relative 'version'
 
 # lib/surfer.rb -- uploads files to Surfer (Cloudron's Files API).
 #
@@ -15,7 +16,7 @@ require 'uri'
 # behavior) meant thousands of TLS handshakes on a large deploy, i.e. tens
 # of minutes of pure waiting.
 module Surfer
-  USER_AGENT = 'blog-sh-upload/1.0'
+  USER_AGENT = BlogSh.user_agent('upload')
 
   module_function
 

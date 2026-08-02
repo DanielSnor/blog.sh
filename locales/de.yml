@@ -247,6 +247,7 @@ cli:
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh help                 zeigt diese Hilfe
+      ./blog.sh version              gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
 
   wizard_prompt_action: "Was möchtest du tun?"

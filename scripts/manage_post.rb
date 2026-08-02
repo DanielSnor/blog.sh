@@ -28,6 +28,7 @@ require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
 require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
+require_relative '../lib/version'
 
 SiteConfig.use_site_timezone!
 
@@ -1320,11 +1321,13 @@ end
 
 command = ARGV.shift
 
-# `help` is the one command a fresh clone must be able to answer before
-# any config exists (SiteConfig.get above degrades to defaults for it).
-# Everything else -- the wizard included -- still requires config/site.yml,
-# and asking for it here keeps the abort message as the first thing said.
-SiteConfig.data unless ['help', '--help', '-h'].include?(command)
+# `help` and `version` are the two commands a fresh (or broken) install
+# must be able to answer before any config exists -- SiteConfig.get above
+# degrades to defaults for them, and "which version is this?" is asked
+# precisely when something else is already wrong. Everything else -- the
+# wizard included -- still requires config/site.yml, and asking for it here
+# keeps the abort message as the first thing said.
+SiteConfig.data unless ['help', '--help', '-h', 'version', '--version', '-v'].include?(command)
 
 if command.nil?
   run_wizard
@@ -1380,6 +1383,8 @@ else
     cmd_list(filters)
   when 'help'
     print_usage
+  when 'version', '--version', '-v'
+    puts "blog.sh #{BlogSh::VERSION}"
   else
     print_usage
     exit 1
