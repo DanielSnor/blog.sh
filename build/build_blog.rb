@@ -642,7 +642,15 @@ end
 def tags_html(post)
   return '' if post['tags'].nil? || post['tags'].empty?
 
-  pills = post['tags'].map { |t| %(<a class="tag-pill" href="/tag/#{tag_slug(t)}/">#{CGI.escapeHTML(t)}</a>) }.join
+  # A tag with nothing left after folding (emoji-only, punctuation-only --
+  # Tumblr and Instagram hand those over verbatim) gets no listing page:
+  # the tag index skips exactly the same way. Rendering a pill for it
+  # anyway produced a visible link to /tag// on the post page and on every
+  # listing the post appeared in.
+  visible = post['tags'].reject { |t| tag_slug(t).empty? }
+  return '' if visible.empty?
+
+  pills = visible.map { |t| %(<a class="tag-pill" href="/tag/#{tag_slug(t)}/">#{CGI.escapeHTML(t)}</a>) }.join
   %(<div class="tags">#{pills}</div>)
 end
 
@@ -1196,10 +1204,17 @@ end
   source_media_dir = File.join(MEDIA_DIR, year.to_s, post['slug'])
   referenced_media_filenames(post).each do |filename|
     src = File.join(source_media_dir, filename)
+    dest = File.join(dir, filename)
     if File.exist?(src)
-      emit_copy(src, File.join(dir, filename))
+      emit_copy(src, dest)
     else
       warn "MISSING media: #{post['slug']} -> #{filename}"
+      # The page still links this file, so a copy already in public.nosync
+      # has to survive prune_public -- otherwise a source that is missing
+      # for a moment (a media directory mid-move, a file being replaced)
+      # makes the build delete the last copy, and the --prune that every
+      # publish runs then deletes it from the live site as well.
+      WRITTEN[dest] = true if File.exist?(dest)
     end
   end
 
