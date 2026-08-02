@@ -174,7 +174,12 @@ Things worth knowing:
   grew by more than ~20% versus the last deploy. That almost always
   means a broken or duplicated build, not intent -- check the build
   output first. If the change is genuinely intended (bulk import, mass
-  deletion), rerun with `--force`.
+  deletion), rerun with `--force`. A deploy that was interrupted is the
+  one exception: it leaves a `.deploy_manifest*.json.incomplete` marker,
+  and the run that resumes it skips both guards once (it says so) --
+  otherwise the half-written manifest would look like an explosion in
+  size and lock out every later deploy, including the ones `./blog.sh`
+  runs for you, which cannot pass `--force`.
 - **`--prune` is the only destructive flag.** Without it, files the
   build stopped generating stay live on the target (the deploy log
   counts these "orphans"). With the `git` backend every deploy is a
@@ -211,6 +216,14 @@ when nothing is due, so a tight interval costs nothing:
 */15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
 ```
 
+A post is announced before the site is rebuilt, so the toot and the page
+it links to come from the same build. If the deploy then fails, the job
+leaves a `.deploy-pending` marker and the next run retries the deploy on
+its own, even with nothing due -- so an announcement never keeps pointing
+at a page that was never uploaded. A post that cannot be published (a slug
+the target year already owns, a malformed date) is reported by name and
+skipped; the rest of the batch still publishes.
+
 ## Backup
 
 Back up the per-deployment data -- the engine itself is a git clone and
@@ -226,7 +239,11 @@ everything generated is rebuildable:
 | `trash/` | optional -- deleted-but-recoverable posts |
 
 Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
-(self-heals with one full re-upload), `incoming/` (transient staging).
+(self-heals with one full re-upload), `incoming/` (transient staging), and
+the working files next to them -- `.last-edit.md` (the text from the last
+editor session), `.deploy-pending` and `.deploy_manifest*.json.incomplete`
+(markers that say a deploy still owes the target something; see
+[Deploying](#deploying)).
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
 
@@ -234,6 +251,8 @@ The same list is exactly what to move when changing machines.
 
 | Symptom | Cause and fix |
 | --- | --- |
+| Anything at all, and you need to know what you're running | `./blog.sh version` -- it needs neither `env.sh` nor a config, on purpose. |
+| A save aborted and took your text with it | It didn't: the editor's text is in `.last-edit.md` in the project root until the next `add`/`edit` overwrites it. The abort message says so too. |
 | `Missing env.sh` | Copy the template: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
 | `Missing config/site.yml` | Same idea: `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
 | `Duplicate year/slug ... build stopped` | Two posts resolve to the same URL and media directory. Rename one slug; the build aborts rather than silently overwriting one with the other. |
@@ -242,7 +261,9 @@ The same list is exactly what to move when changing machines.
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
 | `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
 | Sidebar widget disappeared from the page | Its fetch returned nothing repeatedly (`refresh-sidebar` logs say which) -- the widget card hides when its JSON is empty/unreachable. Check the instance/feed URL in `config/site.yml`. |
-| `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues; the page just has a broken image until fixed. |
+| `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues, and a copy already uploaded stays on the site rather than being pruned, so the page keeps working until you fix it. |
+| `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |
+| `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. HEIC (the iPhone default) additionally displays only in Safari -- convert it, or set the phone to "Most Compatible". |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |
 | sftp deploy hangs | It's waiting for a password -- the sftp backend needs key-based auth (see [install.md](install.md#sftp-hosts-with-neither-rsync-nor-git)). |

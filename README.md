@@ -347,6 +347,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh rebuild              # rebuilds and deploys the whole site
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```
 
