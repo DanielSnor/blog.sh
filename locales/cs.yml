@@ -97,6 +97,7 @@ cli:
   confirm_word: "ano"
   missing_images_wait: "Chybí %{count} obrázek/obrázky, počkám, až je nahraješ do incoming/:"
   missing_images_prompt: "Až budou nahrané, stiskni Enter (nebo napiš \"%{cancel_word}\" pro přerušení): "
+  missing_images_eof: "Není odkud číst odpověď (stdin je zavřený), chybějící soubory už nedorazí. Nic se neuložilo.\n\n"
   cancelled_nothing_saved: "Zrušeno, nic se neuložilo.\n\n"
 
   double_frontmatter_error: |

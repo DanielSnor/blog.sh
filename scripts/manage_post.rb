@@ -121,8 +121,14 @@ def wait_for_missing_images(missing)
     puts t('cli.missing_images_wait', count: pending.size)
     pending.each { |src| puts "  - #{src}" }
     print t('cli.missing_images_prompt', cancel_word: t('cli.cancel_word'))
-    input = $stdin.gets&.strip
-    abort t('cli.cancelled_nothing_saved') if input&.downcase == t('cli.cancel_word')
+    input = $stdin.gets
+    # nil is EOF, not an empty answer: a closed stdin (a piped run whose
+    # input ran out, an SSH session that timed out) can never deliver the
+    # files, and re-checking it in a tight loop only burns a CPU core until
+    # someone kills the process. Give up instead.
+    abort t('cli.missing_images_eof') if input.nil?
+
+    abort t('cli.cancelled_nothing_saved') if input.strip.downcase == t('cli.cancel_word')
   end
 end
 

@@ -98,6 +98,7 @@ cli:
   confirm_word: "ja"
   missing_images_wait: "Es fehlen %{count} Bild(er), warte auf den Upload nach incoming/:"
   missing_images_prompt: "Drück Enter, sobald hochgeladen (oder tipp \"%{cancel_word}\" zum Abbrechen): "
+  missing_images_eof: "Es gibt keine Eingabe mehr (stdin ist geschlossen), die fehlenden Dateien können nicht mehr ankommen. Nichts gespeichert.\n\n"
   cancelled_nothing_saved: "Abgebrochen, nichts gespeichert.\n\n"
 
   double_frontmatter_error: |

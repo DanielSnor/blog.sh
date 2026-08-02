@@ -312,12 +312,28 @@ module MarkdownParser
       return [File.basename(expanded), nil]
     end
 
-    # A bare filename (no directory component) is assumed to live in
-    # incoming_dir -- lets a phone-typed markdown line stay short instead of a
-    # full path like /app/data/blog/incoming/foto.jpg every time. Without an
-    # incoming_dir (e.g. build-time pages outside content/posts/), a bare
-    # filename just resolves relative to the current directory instead.
-    expanded = File.expand_path(File.join(incoming_dir, path)) if incoming_dir && File.dirname(path) == '.'
+    # A bare filename (no directory component) is looked up in two places, in
+    # this order:
+    #
+    # 1. the post's own media directory -- on a second edit of a post whose
+    #    photos were staged this way, the file is already there from the
+    #    previous save (and its incoming/ copy was cleaned up), so it resolves
+    #    with no copy at all instead of waiting for an upload that will never
+    #    come;
+    # 2. incoming_dir -- the write-before-upload shorthand, which lets a
+    #    phone-typed markdown line stay short instead of spelling out a full
+    #    path like /app/data/blog/incoming/foto.jpg every time.
+    #
+    # A name in neither place still resolves to incoming_dir, so it's that
+    # path the author is told to upload to. Without an incoming_dir (e.g.
+    # build-time pages outside content/posts/), a bare filename just resolves
+    # relative to the current directory instead.
+    if File.dirname(path) == '.'
+      in_media = media_dir && File.expand_path(File.join(media_dir, path))
+      return [File.basename(in_media), nil] if in_media && File.exist?(in_media)
+
+      expanded = File.expand_path(File.join(incoming_dir, path)) if incoming_dir
+    end
 
     # If the post has already referenced this source once, reuse the same
     # filename. media_files is keyed by source path, so a second reference

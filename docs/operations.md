@@ -105,6 +105,10 @@ The trick is that a bare filename in an image line resolves against the
 4. On save the photo is copied into `media.nosync/<year>/<slug>/` and
    its `incoming/` copy is removed -- an empty `incoming/` means nothing
    is pending.
+5. Editing that post later doesn't need the photo again: a bare filename
+   is looked for in the post's own `media.nosync/<year>/<slug>/` first and
+   in `incoming/` only after that, so a file that's already been saved
+   resolves without any upload (and without being copied again).
 
 ## Importing from another platform
 

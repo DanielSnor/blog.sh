@@ -105,6 +105,7 @@ cli:
   confirm_word: "yes"
   missing_images_wait: "Missing %{count} image(s), waiting for you to upload them to incoming/:"
   missing_images_prompt: "Press Enter once uploaded (or type \"%{cancel_word}\" to abort): "
+  missing_images_eof: "No input left to read (stdin is closed), so the missing files can't arrive. Nothing was saved.\n\n"
   cancelled_nothing_saved: "Cancelled, nothing was saved.\n\n"
 
   double_frontmatter_error: |
