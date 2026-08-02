@@ -13,6 +13,7 @@ require 'set'
 require 'securerandom'
 require 'shellwords'
 require_relative '../lib/post_writer'
+require_relative '../lib/atomic_write'
 require_relative '../lib/mastodon_poster'
 require_relative '../lib/bluesky_poster'
 require_relative '../lib/site_config'
@@ -461,10 +462,10 @@ def prompt_and_schedule(path, post)
 
     FileUtils.mkdir_p(File.dirname(new_path))
     Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
-    File.write(new_path, JSON.pretty_generate(updated))
+    AtomicWrite.write_json(new_path, updated)
     File.delete(path)
   else
-    File.write(new_path, JSON.pretty_generate(updated))
+    AtomicWrite.write_json(new_path, updated)
   end
   rebuild_and_deploy(t('cli.updating_preview'))
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
@@ -511,7 +512,7 @@ def publish_draft(slug)
   fields = announce_on_publish(updated, new_year, date)
   if fields
     updated.merge!(fields)
-    File.write(new_path, JSON.pretty_generate(updated))
+    AtomicWrite.write_json(new_path, updated)
   end
 
   puts t('cli.published_label', path: new_path)
@@ -604,7 +605,7 @@ def cmd_toot(slug)
     return
   end
 
-  File.write(path, JSON.pretty_generate(post.merge(fields)))
+  AtomicWrite.write_json(path, post.merge(fields))
   puts t('cli.tooted', url: fields['mastodon_url'])
   puts
 end
@@ -644,7 +645,7 @@ def cmd_bluesky(slug)
     return
   end
 
-  File.write(path, JSON.pretty_generate(post.merge(fields)))
+  AtomicWrite.write_json(path, post.merge(fields))
   puts t('cli.bluesky_posted', url: fields['bluesky_url'])
   puts
 end
@@ -687,7 +688,7 @@ def cmd_schedule(slug)
   if post['scheduled']
     updated = post.dup
     updated.delete('scheduled')
-    File.write(path, JSON.pretty_generate(updated))
+    AtomicWrite.write_json(path, updated)
     puts t('cli.unscheduled_label', slug: slug)
     puts
     return
@@ -736,7 +737,7 @@ def cmd_unpublish(slug)
   updated.delete('mastodon_url')
   updated.delete('bluesky_url')
   updated.delete('bluesky_uri')
-  File.write(path, JSON.pretty_generate(updated))
+  AtomicWrite.write_json(path, updated)
   puts t('cli.reverted_to_draft', path: path)
 
   final_slug = File.basename(path, '.json')
@@ -873,7 +874,7 @@ def edit_post(slug)
     end
   end
 
-  File.write(new_path, JSON.pretty_generate(updated))
+  AtomicWrite.write_json(new_path, updated)
   discard_editor_buffer
   File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
   # Housekeeping only, and it runs last on purpose: an incoming/ the CLI

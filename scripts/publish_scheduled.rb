@@ -15,6 +15,7 @@
 require 'json'
 require 'time'
 require_relative '../lib/publishing'
+require_relative '../lib/atomic_write'
 require_relative '../lib/i18n'
 require_relative '../lib/site_config'
 
@@ -56,7 +57,7 @@ due.each do |path, post, date|
   # noticed, with their announcements already public).
   new_path, updated = Publishing.publish(path, post, date: date)
   fields = Publishing.announce(updated, year: date.year.to_s)
-  File.write(new_path, JSON.pretty_generate(updated.merge(fields))) if fields
+  AtomicWrite.write_json(new_path, updated.merge(fields)) if fields
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
 # SystemExit as well as StandardError: the likeliest per-post failure is

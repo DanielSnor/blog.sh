@@ -4,6 +4,7 @@ require 'json'
 require 'fileutils'
 require 'time'
 require_relative 'site_config'
+require_relative 'atomic_write'
 require_relative 'mastodon_poster'
 require_relative 'bluesky_poster'
 require_relative 'i18n'
@@ -83,7 +84,7 @@ module Publishing
     # Write first, delete second. A failure in between leaves the post
     # twice (recoverable: delete the copy in the year it left), where the
     # other order left no copy of it at all.
-    File.write(new_path, JSON.pretty_generate(updated))
+    AtomicWrite.write_json(new_path, updated)
     File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
     [new_path, updated]
   end
