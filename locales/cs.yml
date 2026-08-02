@@ -101,6 +101,9 @@ cli:
   cancelled_nothing_saved: "Zrušeno, nic se neuložilo.\n\n"
   unreadable_post: "⚠️  Přeskakuji nečitelný soubor postu %{path}: %{error}"
   editor_buffer_kept: "Text se neztratil — je v %{path}. Ulož si ho jinam, další add/edit ten soubor přepíše."
+  image_dimensions_unknown: "⚠️  %{file}: rozměry obrázku nejde přečíst, takže mu stránka nemůže rezervovat místo a při načtení může poskočit. PNG, JPEG, GIF a WebP se čtou vždy."
+  image_heic_hint: "   HEIC zobrazí jen Safari — nejdřív ho převeď: sips -s format jpeg SOUBOR --out SOUBOR.jpg (macOS), heif-convert SOUBOR SOUBOR.jpg (Linux)."
+  post_changed_while_editing: "❌ '%{slug}' se během editace změnil na disku (cron publikuje naplánované posty sám). Nic se neuložilo, takže se z té změny nic neztratilo — otevři post znovu a udělej úpravu nad aktuální verzí."
 
   double_frontmatter_error: |
     ❌ V textu je druhá hlavička.

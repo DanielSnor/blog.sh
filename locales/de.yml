@@ -102,6 +102,9 @@ cli:
   cancelled_nothing_saved: "Abgebrochen, nichts gespeichert.\n\n"
   unreadable_post: "⚠️  Überspringe unlesbare Beitragsdatei %{path}: %{error}"
   editor_buffer_kept: "Dein Text ist nicht verloren -- er liegt in %{path}. Sichere ihn, bevor das nächste add/edit die Datei überschreibt."
+  image_dimensions_unknown: "⚠️  %{file}: Die Bildgröße ist nicht lesbar, die Seite kann keinen Platz dafür reservieren und springt beim Laden möglicherweise. PNG, JPEG, GIF und WebP werden immer gelesen."
+  image_heic_hint: "   HEIC zeigt nur Safari an -- wandle es zuerst um: sips -s format jpeg DATEI --out DATEI.jpg (macOS), heif-convert DATEI DATEI.jpg (Linux)."
+  post_changed_while_editing: "❌ '%{slug}' wurde während des Bearbeitens auf der Festplatte geändert (der Cron veröffentlicht geplante Beiträge selbst). Es wurde nichts gespeichert, also ging von dieser Änderung nichts verloren -- öffne den Beitrag erneut und wende deine Änderung auf die aktuelle Fassung an."
 
   double_frontmatter_error: |
     ❌ Im Text steht ein zweiter Frontmatter-Kopf.

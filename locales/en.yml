@@ -109,6 +109,9 @@ cli:
   cancelled_nothing_saved: "Cancelled, nothing was saved.\n\n"
   unreadable_post: "⚠️  Skipping unreadable post file %{path}: %{error}"
   editor_buffer_kept: "Your text was not lost -- it is in %{path}. Move it somewhere safe before the next add/edit, which overwrites that file."
+  image_dimensions_unknown: "⚠️  %{file}: the image size could not be read, so the page cannot reserve space for it and may jump while loading. PNG, JPEG, GIF and WebP are always read."
+  image_heic_hint: "   HEIC displays only in Safari -- convert it first: sips -s format jpeg FILE --out FILE.jpg (macOS), heif-convert FILE FILE.jpg (Linux)."
+  post_changed_while_editing: "❌ '%{slug}' changed on disk while you were editing it (the scheduled-publish cron publishes on its own). Nothing was saved, so nothing of that change was lost -- reopen the post and redo your edit on the current version."
 
   double_frontmatter_error: |
     ❌ There's a second frontmatter header in the text.

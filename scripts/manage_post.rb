@@ -525,11 +525,24 @@ def publish_draft(slug)
   puts
 end
 
+# The answer sticks for the rest of the run. publish/edit/delete resolve
+# the slug again at every internal step (draft_decision_loop, publish_draft,
+# delete_post each take a slug, not a path), so one command asked the same
+# "which year?" question two or three times -- and answering differently
+# silently retargeted it mid-flow, up to and including trashing the post
+# the author had not picked. Re-resolved automatically when the chosen file
+# moves (a year-changing edit) or goes away (a delete), so a stale answer
+# can't outlive its post.
+RESOLVED_PATHS = {}
+
 def find_post_path(slug)
+  chosen = RESOLVED_PATHS[slug]
+  return chosen if chosen && File.exist?(chosen)
+
   matches = Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).sort
   return matches.first if matches.size <= 1
 
-  pick_among_years(slug, matches)
+  RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
 end
 
 # The same slug can legitimately live in several years (backdating makes
@@ -762,7 +775,14 @@ def edit_post(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
-  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  # Kept to compare against just before the save: an editor session is
+  # open-ended, and the scheduled-publish cron runs every 15 minutes. The
+  # post below was read BEFORE the editor opened, so writing it back after
+  # the cron published the post would revert it to a scheduled draft, drop
+  # the announcement URL it just stored, and let the next cron run publish
+  # -- and announce -- the same post a second time.
+  original_raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(original_raw)
   year = File.basename(File.dirname(path))
   media_dir = File.join(MEDIA_DIR, year, slug)
 
@@ -872,6 +892,16 @@ def edit_post(slug)
     Dir.children(new_media_dir).each do |f|
       File.delete(File.join(new_media_dir, f)) unless keep.include?(f)
     end
+  end
+
+  # Last check before anything is written: if the file changed under the
+  # editor, this save would overwrite whatever changed it (see original_raw
+  # above). Refusing is the only safe answer -- the two versions can't be
+  # merged without guessing which mastodon_url or state is the real one --
+  # and the text is not lost: the editor buffer still holds it, and the
+  # notice armed at edit time says where.
+  if !File.exist?(path) || File.read(path, encoding: 'utf-8') != original_raw
+    abort t('cli.post_changed_while_editing', slug: slug)
   end
 
   AtomicWrite.write_json(new_path, updated)
@@ -1106,6 +1136,19 @@ def pick_trash_interactively
   pick_from_list(trashed.first(RECENT_LIST_COUNT), t('cli.trash_empty'))
 end
 
+# Said out loud at the moment it happens. The post is saved and the file
+# is copied either way -- since the build stopped treating "size unknown"
+# as a tracking pixel, the image renders instead of vanishing -- but the
+# page can't reserve space for it, and a HEIC won't display anywhere
+# except Safari. (Whether to block or convert those is a per-installation
+# choice: media.convert_heic, on the roadmap.)
+def warn_unreadable_image(file)
+  return unless file
+
+  warn t('cli.image_dimensions_unknown', file: File.basename(file.to_s))
+  warn t('cli.image_heic_hint') if File.extname(file.to_s).downcase.match?(/\A\.hei[cf]\z/)
+end
+
 def fill_image_dimensions(blocks, media_files, media_dir = nil)
   reverse = media_files.invert
   blocks.each do |b|
@@ -1128,6 +1171,7 @@ def fill_image_dimensions(blocks, media_files, media_dir = nil)
     else
       media.delete('width')
       media.delete('height')
+      warn_unreadable_image(src || media['url'])
     end
   end
 end
