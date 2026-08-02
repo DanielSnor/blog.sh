@@ -548,10 +548,19 @@ def render_photo_grid(images, media_prefix, seen = {})
   %(<div class="photo-grid">#{items.join}</div>)
 end
 
+# A 1x1 image is a tracking pixel an import dragged in, not a photo, and it
+# gets dropped from the page. "Dimensions unknown" is a different thing
+# entirely and used to land in the same branch, because nil.to_i is 0: any
+# format MediaDimensions can't read (GIF and WebP until now, HEIC still)
+# made the image AND its caption disappear from every rendered page without
+# a word. Unknown dimensions now render -- the page can jump a little on
+# load, which is a far smaller problem than a photo silently missing.
 def degenerate_image?(block)
   return false unless block['type'] == 'image'
 
   media = (block['media'] || []).first || {}
+  return false if media['width'].nil? || media['height'].nil?
+
   media['width'].to_i <= 1 || media['height'].to_i <= 1
 end
 
