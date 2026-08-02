@@ -32,6 +32,7 @@
 require 'digest'
 require 'json'
 require_relative '../lib/deploy_backend'
+require_relative '../lib/atomic_write'
 
 DRY = ARGV.include?('--dry-run')
 FORCE = ARGV.include?('--force')
@@ -70,12 +71,25 @@ def load_manifest
   return {} unless File.exist?(MANIFEST_PATH)
 
   JSON.parse(File.read(MANIFEST_PATH))
-rescue JSON::ParserError
+rescue JSON::ParserError => e
+  # Treating this as "nothing was ever uploaded" silently is how orphans
+  # become permanently unprunable: the target keeps files this side no
+  # longer knows about, and both guards below are disabled by the empty
+  # manifest without anyone noticing. Say it out loud, and treat the run
+  # as a resume so the guards stay off deliberately rather than by
+  # accident.
+  warn "⚠️  #{MANIFEST_PATH} is unreadable (#{e.message.lines.first.to_s.strip[0, 60]}) -- treating it as empty."
+  warn '   Everything will be re-uploaded. Files already on the target that this build no longer generates'
+  warn '   can no longer be found automatically; check the target if you have deleted posts recently.'
   {}
 end
 
+# Atomic, like every other write of state this engine depends on: the
+# previous manifest survives a write that dies halfway (a full disk, a
+# killed container), instead of being truncated into the unreadable file
+# the branch above has to apologise for.
 def save_manifest(manifest)
-  File.write(MANIFEST_PATH, JSON.pretty_generate(manifest))
+  AtomicWrite.write_json(MANIFEST_PATH, manifest)
 end
 
 # Older manifests (before this extension) have a bare hash string as the
@@ -116,7 +130,12 @@ end
 # re-uploading everything, but the list of previously uploaded files is
 # still needed to find orphans.
 stored = load_manifest
-manifest = FORCE ? {} : stored.dup
+# --force means "upload everything again", not "forget what the target
+# has": starting from an empty manifest dropped every orphan still
+# pending at that moment, and an orphan the manifest has forgotten can
+# never be pruned -- it stays live on the target for good. The forcing
+# happens in the upload selection below instead.
+manifest = stored.dup
 hashes = {}
 stats = {}
 files.each do |name|
@@ -141,7 +160,7 @@ files.each do |name|
   end
 end
 
-to_upload = ONLY ? files : files.select { |name| manifest_hash(manifest[name]) != hashes[name] }
+to_upload = ONLY || FORCE ? files : files.select { |name| manifest_hash(manifest[name]) != hashes[name] }
 skipped = files.size - to_upload.size
 
 # Orphans = uploaded at some point, but no longer in public.nosync/ (a
