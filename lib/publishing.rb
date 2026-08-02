@@ -39,6 +39,22 @@ module Publishing
     "#{base_url}/posts/#{year}/#{slug}/"
   end
 
+  # Moves a post's media directory into another year. The year folder
+  # under media.nosync/ is only ever created by a write that has media in
+  # it, so the first post with a photo to reach a given year finds no
+  # parent directory -- and an mv into a missing parent raises ENOENT,
+  # which used to kill the whole scheduled-publish batch (and with it the
+  # rebuild+deploy for the posts that had already gone out).
+  def relocate_media(slug, from_year, to_year)
+    return if from_year == to_year
+
+    old_media = File.join(MEDIA_DIR, from_year, slug)
+    return unless Dir.exist?(old_media)
+
+    FileUtils.mkdir_p(File.join(MEDIA_DIR, to_year))
+    FileUtils.mv(old_media, File.join(MEDIA_DIR, to_year, slug))
+  end
+
   # Rewrites a draft as published under `date`: drops the draft-only
   # fields (draft_token, the scheduled flag), moves the JSON -- and the
   # post's media directory -- into the right year when the date changed
@@ -61,11 +77,14 @@ module Publishing
       abort(I18n.t('cli.post_already_exists', slug: slug, path: new_path)) if File.exist?(new_path)
 
       FileUtils.mkdir_p(File.dirname(new_path))
-      old_media = File.join(MEDIA_DIR, old_year, slug)
-      FileUtils.mv(old_media, File.join(MEDIA_DIR, new_year, slug)) if Dir.exist?(old_media)
-      File.delete(path)
+      relocate_media(slug, old_year, new_year)
     end
+
+    # Write first, delete second. A failure in between leaves the post
+    # twice (recoverable: delete the copy in the year it left), where the
+    # other order left no copy of it at all.
     File.write(new_path, JSON.pretty_generate(updated))
+    File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
     [new_path, updated]
   end
 

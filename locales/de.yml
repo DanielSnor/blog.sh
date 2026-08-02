@@ -100,6 +100,8 @@ cli:
   missing_images_prompt: "Drück Enter, sobald hochgeladen (oder tipp \"%{cancel_word}\" zum Abbrechen): "
   missing_images_eof: "Es gibt keine Eingabe mehr (stdin ist geschlossen), die fehlenden Dateien können nicht mehr ankommen. Nichts gespeichert.\n\n"
   cancelled_nothing_saved: "Abgebrochen, nichts gespeichert.\n\n"
+  unreadable_post: "⚠️  Überspringe unlesbare Beitragsdatei %{path}: %{error}"
+  editor_buffer_kept: "Dein Text ist nicht verloren -- er liegt in %{path}. Sichere ihn, bevor das nächste add/edit die Datei überschreibt."
 
   double_frontmatter_error: |
     ❌ Im Text steht ein zweiter Frontmatter-Kopf.
@@ -264,6 +266,10 @@ cron:
   no_scheduled_due: "Kein geplanter Beitrag ist fällig."
   published_scheduled: "Geplanten Beitrag '%{slug}' veröffentlicht (Datum %{date})."
   publishing_scheduled: "Veröffentliche %{count} geplante(n) Beitrag/Beiträge"
+  publish_failed: "❌ '%{slug}' konnte nicht veröffentlicht werden: %{error}. Die übrigen fälligen Beiträge sind nicht betroffen; nach der Korrektur erscheint dieser im nächsten Lauf."
+  unreadable_post: "⚠️  Überspringe unlesbare Beitragsdatei %{path}: %{error}"
+  retrying_deploy: "Wiederhole das Deployment, das zuletzt nicht durchlief"
+  deploy_will_retry: "⚠️  Das Deployment ist fehlgeschlagen. In diesem Lauf veröffentlichte Beiträge sind angekündigt, aber noch nicht auf der Website -- der nächste Lauf wiederholt das Deployment von selbst."
 
 import:
   menu_hint: "↑↓ bewegen · Enter wählen · 1-9 Schnellwahl · Esc zurück"

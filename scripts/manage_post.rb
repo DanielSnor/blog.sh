@@ -151,7 +151,48 @@ end
 
 # --- editor round-trip -------------------------------------------------
 
+# Where the text from the last editor session waits until the post it
+# belongs to is safely on disk. The temp directory the editor works in is
+# gone the moment edit_in_editor returns, but every check on what was
+# typed -- a second frontmatter header, an image line without its blank
+# lines, an unparseable date, a content-loss confirmation -- runs after
+# that and aborts. Without this copy those aborts threw the article away.
+EDITOR_BUFFER_PATH = File.join(ROOT, '.last-edit.md')
+
+def keep_editor_buffer(text)
+  File.write(EDITOR_BUFFER_PATH, text)
+  File.chmod(0o600, EDITOR_BUFFER_PATH)
+rescue SystemCallError
+  nil # a buffer we can't write is not a reason to refuse the save
+end
+
+def discard_editor_buffer
+  File.delete(EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
+rescue SystemCallError
+  nil
+end
+
+# Says where the text is if the process ends with the buffer still there.
+# Every successful save discards it first, so this only speaks up when the
+# post did not make it to disk -- whichever of the many aborts (or a
+# Ctrl-C) got in the way, without each of them having to know about it.
+def arm_editor_buffer_notice
+  return if @editor_buffer_notice_armed
+
+  @editor_buffer_notice_armed = true
+  at_exit do
+    warn t('cli.editor_buffer_kept', path: EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
+  end
+end
+
 def edit_in_editor(initial_content, hint_comment)
+  text = editor_round_trip(initial_content, hint_comment)
+  keep_editor_buffer(text)
+  arm_editor_buffer_notice
+  text
+end
+
+def editor_round_trip(initial_content, hint_comment)
   Dir.mktmpdir do |dir|
     path = File.join(dir, 'post.md')
     File.write(path, "#{hint_comment}#{initial_content}")
@@ -244,6 +285,7 @@ def cmd_add
   # no rebuild question. (This is how an accidental empty-template post once
   # made it all the way to a published Mastodon toot.)
   if raw == template
+    discard_editor_buffer
     warn t('cli.template_unchanged')
     warn ''
     return
@@ -253,6 +295,7 @@ def cmd_add
   abort_on_double_frontmatter(body)
 
   if body.strip.empty?
+    discard_editor_buffer
     warn t('cli.empty_content')
     warn ''
     return
@@ -276,9 +319,17 @@ def cmd_add
   # sees a second file. A new post whose title happens to match an old
   # one gets a numeric suffix instead of eating it (and with it the
   # media directory, which is keyed by year/slug too).
+  #
+  # The media directory counts as taken too, even with no post owning it:
+  # a leftover media.nosync/<year>/<slug>/ (a post deleted by hand, or an
+  # earlier save that died mid-way) would otherwise take this post's
+  # photos -- PostWriter skips a copy whose destination name already
+  # exists, while the source in incoming/ is cleaned up regardless, so the
+  # new photo ended up nowhere and the post showed the old one.
   base_slug = slug
   serial = 2
-  while File.exist?(File.join(CONTENT_DIR, date.year.to_s, "#{slug}.json"))
+  while File.exist?(File.join(CONTENT_DIR, date.year.to_s, "#{slug}.json")) ||
+        Dir.exist?(File.join(MEDIA_DIR, date.year.to_s, slug))
     slug = "#{base_slug}-#{serial}"
     serial += 1
   end
@@ -302,6 +353,7 @@ def cmd_add
   post['type'] = type if type
 
   path = PostWriter.write(post, media_files: media_files)
+  discard_editor_buffer
   cleanup_incoming(media_files)
   puts t('cli.wrote_draft', path: path)
 
@@ -395,7 +447,25 @@ def prompt_and_schedule(path, post)
     return false
   end
 
-  File.write(path, JSON.pretty_generate(post.merge('date' => date.iso8601, 'scheduled' => true)))
+  updated = post.merge('date' => date.iso8601, 'scheduled' => true)
+
+  # A date in another year moves the post, JSON and media together. Left
+  # in the old year's folder the two disagree: the build derives both the
+  # URL and the media lookup from the date, so the draft preview loses
+  # every image -- and publishing it later hits the same missing media
+  # year that used to abort the cron.
+  new_year = date.year.to_s
+  new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
+  if File.expand_path(new_path) != File.expand_path(path)
+    abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
+
+    FileUtils.mkdir_p(File.dirname(new_path))
+    Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
+    File.write(new_path, JSON.pretty_generate(updated))
+    File.delete(path)
+  else
+    File.write(new_path, JSON.pretty_generate(updated))
+  end
   rebuild_and_deploy(t('cli.updating_preview'))
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   puts t('cli.schedule_cron_note')
@@ -467,7 +537,13 @@ end
 # every match and make the author choose. A number picks that post;
 # anything else cancels, same contract as the other pickers.
 def pick_among_years(slug, paths)
-  rows = paths.map { |f| summary_row(post_summary(f)) }
+  # An unreadable file is dropped rather than shown: post_summary has
+  # already named it, and a row and its path must stay index-aligned.
+  readable = paths.filter_map { |f| (summary = post_summary(f)) && [f, summary] }
+  abort t('cli.post_not_found', slug: slug) if readable.empty?
+
+  paths = readable.map(&:first)
+  rows = readable.map { |(_, summary)| summary_row(summary) }
   puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
@@ -702,6 +778,7 @@ def edit_post(slug)
   # Same no-op guard as cmd_add: editor closed without saving (or saved
   # untouched) means nothing to do -- skip the save and the rebuild question.
   if raw == frontmatter + body
+    discard_editor_buffer
     puts t('cli.no_changes')
     puts
     return
@@ -766,16 +843,17 @@ def edit_post(slug)
   updated['draft_token'] = post['draft_token'] if post['draft_token']
   updated['scheduled'] = true if post['scheduled']
 
-  if new_dir != File.dirname(path)
-    File.delete(path)
-    FileUtils.mv(media_dir, new_media_dir) if Dir.exist?(media_dir)
-  end
+  # Media move first, replacement JSON second, old JSON last. The old
+  # order deleted the post's only file and *then* moved its media -- so a
+  # date edit into a year with no media.nosync/<year>/ yet (the mv raises
+  # ENOENT there) destroyed the post: nothing in trash, nothing in the
+  # editor's temp file, nothing to restore.
+  Publishing.relocate_media(slug, year, new_year) if new_dir != File.dirname(path)
 
   FileUtils.mkdir_p(new_media_dir) if media_files.any?
   media_files.each do |src, filename|
     FileUtils.cp(src, File.join(new_media_dir, filename))
   end
-  cleanup_incoming(media_files)
 
   # Not just images: a video's file lives in the same directory, and some
   # imported blocks additionally carry a poster for it. If those weren't
@@ -796,6 +874,12 @@ def edit_post(slug)
   end
 
   File.write(new_path, JSON.pretty_generate(updated))
+  discard_editor_buffer
+  File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
+  # Housekeeping only, and it runs last on purpose: an incoming/ the CLI
+  # user can't unlink in must not be able to abort a save that already
+  # succeeded.
+  cleanup_incoming(media_files)
   puts
   puts t('cli.edited_label', path: new_path)
   draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
@@ -886,11 +970,20 @@ end
 # One post file -> the summary row that `list` and the pick_*_interactively
 # menus work with. Shared by the content and trash listings -- the two only
 # differ in where they glob.
+# Returns nil for a file that can't be read as a post, after naming it.
+# One truncated JSON used to make every listing and every picker die with
+# a JSON::ParserError that named no file -- so the commands you would
+# reach for to find the bad post were exactly the ones that stopped
+# working. Skipping it keeps the rest of the archive usable; the build
+# still refuses to run until it's dealt with.
 def post_summary(file)
   post = JSON.parse(File.read(file, encoding: 'utf-8'))
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
     state: post['state'] || PUBLISHED, scheduled: post['scheduled'] }
+rescue JSON::ParserError, SystemCallError => e
+  warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
+  nil
 end
 
 def state_marker(post)
@@ -906,7 +999,7 @@ def summary_row(post)
 end
 
 def load_posts_summary
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).map { |f| post_summary(f) }
+  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map { |f| post_summary(f) }
 end
 
 def cmd_list(filters)
@@ -1000,7 +1093,7 @@ def pick_published_interactively
 end
 
 def trash_summary
-  Dir.glob(File.join(TRASH_DIR, '*', 'post.json')).map { |f| post_summary(f) }
+  Dir.glob(File.join(TRASH_DIR, '*', 'post.json')).filter_map { |f| post_summary(f) }
 end
 
 # Lets `restore` be called with no slug: offers the trash's contents, same

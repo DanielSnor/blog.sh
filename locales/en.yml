@@ -107,6 +107,8 @@ cli:
   missing_images_prompt: "Press Enter once uploaded (or type \"%{cancel_word}\" to abort): "
   missing_images_eof: "No input left to read (stdin is closed), so the missing files can't arrive. Nothing was saved.\n\n"
   cancelled_nothing_saved: "Cancelled, nothing was saved.\n\n"
+  unreadable_post: "⚠️  Skipping unreadable post file %{path}: %{error}"
+  editor_buffer_kept: "Your text was not lost -- it is in %{path}. Move it somewhere safe before the next add/edit, which overwrites that file."
 
   double_frontmatter_error: |
     ❌ There's a second frontmatter header in the text.
@@ -267,6 +269,10 @@ cron:
   no_scheduled_due: "No scheduled post is due."
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
   publishing_scheduled: "Publishing %{count} scheduled post(s)"
+  publish_failed: "❌ '%{slug}' could not be published: %{error}. The other due posts were not affected; fix this one and it will publish on the next run."
+  unreadable_post: "⚠️  Skipping unreadable post file %{path}: %{error}"
+  retrying_deploy: "Retrying the deploy that did not finish last time"
+  deploy_will_retry: "⚠️  The deploy failed. Posts published in this run are announced but not on the site yet -- the next run retries the deploy on its own."
 
 # ./import.sh -- the import wizard (scripts/import.rb).
 import:
