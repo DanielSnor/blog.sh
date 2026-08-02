@@ -52,6 +52,14 @@ PRUNES = PRUNE || (BACKEND.respond_to?(:always_prunes?) && BACKEND.always_prunes
 # thousands = gigabytes of writes). Periodic saving still has to happen
 # though -- so an interrupted deploy can resume.
 MANIFEST_SAVE_EVERY = 25
+# Marks a deploy as started and not yet finished. A run that dies halfway
+# (Ctrl-C, a dropped SSH session, the target going away) leaves a manifest
+# describing only part of the target -- and the two file-count guards below
+# then read the next, perfectly normal run as an explosion in size and
+# refuse it. That is a dead end for the flows ./blog.sh runs itself, which
+# have no way to pass --force. While this file exists, the guards stand
+# down for one run.
+INCOMPLETE_PATH = "#{MANIFEST_PATH}.incomplete"
 
 def log(msg)
   puts msg
@@ -147,8 +155,10 @@ orphans = ONLY ? [] : (stored.keys - all_files).sort
 # would upload wreckage. A drop of more than a fifth is almost certainly a
 # bug, not intent -- and if you really are deleting hundreds of posts,
 # --force gets it through.
+RESUMING = File.exist?(INCOMPLETE_PATH)
+
 SHRINK_LIMIT = 0.2
-if !ONLY && !FORCE && !stored.empty? && all_files.size < stored.size * (1 - SHRINK_LIMIT)
+if !ONLY && !FORCE && !RESUMING && !stored.empty? && all_files.size < stored.size * (1 - SHRINK_LIMIT)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{all_files.size} files, but #{stored.size} were uploaded last time.
        That's a #{(100 - (all_files.size * 100.0 / stored.size)).round}% drop -- looks like a broken build.
@@ -163,7 +173,7 @@ end
 # an accidentally copied tree. Normal growth is a handful of files per
 # published post; a jump of more than a fifth doesn't happen in normal use.
 GROWTH_LIMIT = 0.2
-if !ONLY && !FORCE && !stored.empty? && all_files.size > stored.size * (1 + GROWTH_LIMIT)
+if !ONLY && !FORCE && !RESUMING && !stored.empty? && all_files.size > stored.size * (1 + GROWTH_LIMIT)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{all_files.size} files, only #{stored.size} were uploaded last time.
        That's a #{((all_files.size * 100.0 / stored.size) - 100).round}% increase -- looks like a duplicated or broken build.
@@ -173,6 +183,7 @@ end
 
 log('')
 log("Deploy web -> #{BACKEND.label}: #{BACKEND.target}#{DRY ? '  [DRY-RUN]' : ''}")
+log('  ℹ️  The last deploy did not finish -- resuming it, so the file-count guards are skipped this once.') if RESUMING
 log("  #{files.size} file(s) total, #{to_upload.size} new/changed, #{skipped} unchanged (skipped)")
 if orphans.any?
   log(PRUNES ? "  #{orphans.size} orphan(s) to delete#{PRUNE ? ' (--prune)' : ' (snapshot deploy)'}" \
@@ -188,6 +199,8 @@ end
 log('') if to_upload.any? || (PRUNES && orphans.any?)
 
 ok = failed = deleted = 0
+completed = false
+File.write(INCOMPLETE_PATH, Time.now.to_s)
 begin
   if BACKEND.respond_to?(:sync)
     # Batch backend (rsync): one run covers everything, so the manifest is
@@ -235,8 +248,13 @@ begin
       end
     end
   end
+  completed = true
 ensure
   save_manifest(manifest)
+  # Cleared only by a run that got all the way through with nothing
+  # failing -- an interruption (or a partial failure) leaves the marker so
+  # the next run knows the manifest describes an unfinished upload.
+  File.delete(INCOMPLETE_PATH) if completed && failed.zero? && File.exist?(INCOMPLETE_PATH)
 end
 
 log('')

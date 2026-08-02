@@ -25,5 +25,20 @@ ruby scripts/refresh_sidebar.rb
 # deploy-web.sh abort on any site using a subset of them ("not found in
 # public.nosync/"). stats.json always exists; refresh_sidebar.rb just
 # wrote it.
-only=$(cd public.nosync && ls pixelfed.json toots.json commits.json bluesky.json rss.json stats.json 2>/dev/null | paste -sd, -)
+#
+# Built with a loop rather than `ls <names>`: ls exits non-zero when ANY
+# name is missing, and under `set -euo pipefail` that killed the script
+# right here -- so every site configuring fewer than all five widgets
+# regenerated its JSONs and then silently never uploaded them.
+only=""
+for f in pixelfed.json toots.json commits.json bluesky.json rss.json stats.json; do
+  [ -f "public.nosync/$f" ] || continue
+  only="${only:+$only,}$f"
+done
+
+if [ -z "$only" ]; then
+  echo "No sidebar files to upload (no widgets configured?) -- nothing to do."
+  exit 0
+fi
+
 exec ./scripts/deploy-web.sh "--only=$only"
