@@ -276,7 +276,7 @@ def run_import(adapter)
 end
 
 if Tui.interactive?
-  puts SiteHeader.render(tool: 'blog.sh import')
+  puts SiteHeader.render(tool: './import.sh')
 end
 
 source = ask_source
