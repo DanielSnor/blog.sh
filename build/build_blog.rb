@@ -360,6 +360,20 @@ end
 def apply_formatting(text, formatting)
   return autolink(text.to_s) if formatting.nil? || formatting.empty?
 
+  # A stored span can point past the end of its text: importers used to
+  # compute offsets against the raw HTML text and store the collapsed one
+  # (fixed in lib/import/html_blocks.rb, but posts written before that keep
+  # their numbers). Clamping costs nothing and stops one such post from
+  # aborting the whole build with a TypeError that names no post at all.
+  formatting = formatting.filter_map do |f|
+    s = f['start'].to_i.clamp(0, text.length)
+    e = f['end'].to_i.clamp(0, text.length)
+    next if s >= e
+
+    f.merge('start' => s, 'end' => e)
+  end
+  return autolink(text.to_s) if formatting.empty?
+
   boundaries = ([0, text.length] + formatting.flat_map { |f| [f['start'], f['end']] }).uniq.sort
 
   boundaries.each_cons(2).map do |s, e|
@@ -1100,7 +1114,22 @@ emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
 post_template = ERB.new(File.read(File.join(ROOT, 'templates', 'post.html.erb'), encoding: 'utf-8'))
 index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'), encoding: 'utf-8'))
 
-posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).map { |f| JSON.parse(File.read(f, encoding: 'utf-8')) }
+# Named, not anonymous: an unreadable post file (a write interrupted by a
+# full disk or a killed container leaves a 0-byte one) used to abort here
+# with a bare JSON::ParserError whose message is "unexpected token at ''"
+# and whose backtrace points at this line -- nothing said WHICH of several
+# thousand files it was, and every listing command failed the same way, so
+# there was no way to find it from inside the tool.
+unreadable = []
+posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |f|
+  JSON.parse(File.read(f, encoding: 'utf-8'))
+rescue JSON::ParserError, SystemCallError => e
+  unreadable << "  #{f}: #{e.message.lines.first.to_s.strip[0, 100]}"
+  nil
+end
+unless unreadable.empty?
+  abort("❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:\n#{unreadable.join("\n")}")
+end
 
 # Two posts sharing a year and slug would point at the same output path
 # (post_path, output_dir) and the same media/<year>/<slug>/ -- one would

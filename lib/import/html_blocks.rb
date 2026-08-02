@@ -275,7 +275,8 @@ module Import
         text, formatting = Inline.render(li, skip: %w[ul ol])
         return nil if text.strip.empty? && nested.nil?
 
-        item = { 'text' => normalize(text) }
+        text, formatting = normalize_with_spans(text, formatting)
+        item = { 'text' => text }
         item['formatting'] = formatting unless formatting.empty?
         if nested
           children = nested.children.select { |c| c.name == 'li' }.filter_map { |c| list_item(c) }
@@ -301,8 +302,8 @@ module Import
       def emit_table(node)
         rows = collect(node, 'tr').map do |tr|
           tr.children.select { |c| %w[td th].include?(c.name) }.map do |cell|
-            text, formatting = Inline.render(cell)
-            out = { 'text' => normalize(text) }
+            text, formatting = normalize_with_spans(*Inline.render(cell))
+            out = { 'text' => text }
             out['formatting'] = formatting unless formatting.empty?
             out
           end
@@ -342,7 +343,8 @@ module Import
       end
 
       def text_block(text, formatting)
-        block = { 'type' => 'text', 'text' => normalize(text) }
+        text, formatting = normalize_with_spans(text, formatting)
+        block = { 'type' => 'text', 'text' => text }
         block['formatting'] = formatting unless formatting.empty?
         block
       end
@@ -352,6 +354,50 @@ module Import
       # markup shows up as a gap.
       def normalize(text)
         text.gsub(/\s+/, ' ').strip
+      end
+
+      # The same collapse, but carrying the inline spans with it.
+      #
+      # Inline.collect counts offsets against the raw text as it accumulates,
+      # so collapsing the text afterwards without moving the offsets left every
+      # span pointing at the wrong characters. With ordinary pretty-printed
+      # source markup (a newline and an indent between <p> and <a>) the shift
+      # is large enough to push a span past the end of the stored text, and the
+      # build then died on that post with a TypeError that named no post at
+      # all -- one imported item could stop the whole site from rebuilding.
+      def normalize_with_spans(text, formatting)
+        chars = text.chars
+        # map[i] = where raw character i ends up in the collapsed text
+        # (map[chars.length] = the end, so exclusive span ends map too)
+        map = Array.new(chars.length + 1, 0)
+        out = +''
+        i = 0
+        while i < chars.length
+          unless chars[i].match?(/\s/)
+            map[i] = out.length
+            out << chars[i]
+            i += 1
+            next
+          end
+
+          run_end = i
+          run_end += 1 while run_end < chars.length && chars[run_end].match?(/\s/)
+          (i...run_end).each { |k| map[k] = out.length }
+          # A leading or trailing run disappears entirely -- that's the .strip
+          # half of the collapse.
+          out << ' ' unless out.empty? || run_end >= chars.length
+          i = run_end
+        end
+        map[chars.length] = out.length
+
+        spans = formatting.filter_map do |span|
+          s = map[span['start'].to_i.clamp(0, chars.length)]
+          e = map[span['end'].to_i.clamp(0, chars.length)]
+          next if s >= e
+
+          span.merge('start' => s, 'end' => e)
+        end
+        [out, spans]
       end
 
       def raw_text(node)

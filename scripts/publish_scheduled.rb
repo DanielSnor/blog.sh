@@ -20,8 +20,22 @@ require_relative '../lib/site_config'
 
 SiteConfig.use_site_timezone!
 
+# A post is announced before the site is rebuilt (so the toot's URL and the
+# comment thread exist in the same build), which means a failed deploy would
+# otherwise leave a live announcement pointing at a page that was never
+# uploaded -- and nothing would retry, because the post is no longer
+# scheduled and the next run has nothing due. This marker is that retry.
+DEPLOY_PENDING = File.join(Publishing::ROOT, '.deploy-pending')
+
 due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
-  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  begin
+    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  rescue JSON::ParserError, SystemCallError => e
+    # One unreadable file used to abort the whole run on every tick, so no
+    # scheduled post could ever publish again.
+    warn I18n.t('cron.unreadable_post', path: path, error: e.message.lines.first.to_s.strip[0, 100])
+    next
+  end
   next unless post['state'] == 'draft' && post['scheduled']
 
   date = Time.parse(post['date'])
@@ -30,17 +44,43 @@ due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do 
   [path, post, date]
 end
 
-if due.empty?
+if due.empty? && !File.exist?(DEPLOY_PENDING)
   puts I18n.t('cron.no_scheduled_due')
   exit 0
 end
 
+failures = 0
 due.each do |path, post, date|
+  # Per post, so one bad post can't strand the ones already published and
+  # announced in this same run (they would stay off the site until a human
+  # noticed, with their announcements already public).
   new_path, updated = Publishing.publish(path, post, date: date)
   fields = Publishing.announce(updated, year: date.year.to_s)
   File.write(new_path, JSON.pretty_generate(updated.merge(fields))) if fields
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
+# SystemExit as well as StandardError: the likeliest per-post failure is
+# Publishing.publish's own `abort` when the target year already has a post
+# with this slug, and an abort in a loop over due posts must not take the
+# other posts -- or the final rebuild+deploy -- down with it.
+rescue StandardError, SystemExit => e
+  failures += 1
+  # Collapsed to one line: an abort's message carries its own newlines, and
+  # this ends up in cron mail where the slug and the reason want to be on
+  # the same line.
+  detail = e.message.to_s.gsub(/\s+/, ' ').strip
+  detail = e.class.to_s if detail.empty?
+  warn I18n.t('cron.publish_failed', slug: post['slug'], error: detail[0, 200])
 end
 
-exit(Publishing.rebuild_and_deploy(I18n.t('cron.publishing_scheduled', count: due.size)) ? 0 : 1)
+reason = due.empty? ? I18n.t('cron.retrying_deploy') : I18n.t('cron.publishing_scheduled', count: due.size)
+deployed = Publishing.rebuild_and_deploy(reason)
+
+if deployed
+  File.delete(DEPLOY_PENDING) if File.exist?(DEPLOY_PENDING)
+else
+  File.write(DEPLOY_PENDING, Time.now.iso8601)
+  warn I18n.t('cron.deploy_will_retry')
+end
+
+exit(deployed && failures.zero? ? 0 : 1)
