@@ -788,10 +788,14 @@ footer .copyright { color: var(--text); }
 
 /* The pinned post's copy at the top of the first listing page. The mark
    rides the badge's corner rather than replacing the type icon, so the
-   badge still says what kind of post it is; its ground is the palette's
-   text colour, which keeps contrast against any accent without a
-   per-palette rule. Only this copy carries it -- the post's ordinary
-   chronological entry further down looks like every other post. */
+   badge still says what kind of post it is; its ground is the same pair
+   .date-badge:hover already uses (a genuine neutral, not a shade of the
+   accent -- see that rule's own comment), just applied to the resting
+   state instead of on hover. Hovering the badge then swaps the mark to
+   the inverse of that pair -- without it, the mark would land on the
+   exact same colour the badge's own background just became and vanish
+   into it. Only this copy carries it -- the post's ordinary chronological
+   entry further down looks like every other post. */
 .date-badge { position: relative; }
 .date-badge .pin-mark {
   position: absolute;
@@ -800,12 +804,13 @@ footer .copyright { color: var(--text); }
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--text);
-  color: var(--card-bg);
+  background: var(--hover-invert);
+  color: var(--badge-hover-text);
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.date-badge:hover .pin-mark { background: var(--badge-hover-text); color: var(--hover-invert); }
 .date-badge .pin-mark svg { width: 13px; height: 13px; display: block; margin: 0; }
 
 /* Attachment cards (type "document" and any post carrying a file block).
