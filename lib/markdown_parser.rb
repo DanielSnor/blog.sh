@@ -139,7 +139,11 @@ module MarkdownParser
   # always just a link -- the engine can only publish files it is given.
   # Same shape as IMAGE_RE, including the optional quoted title: a target
   # may contain spaces, because `edit` round-trips the block as a full
-  # path -- and a repo can live under "Mobile Documents".
+  # path -- and a repo can live under "Mobile Documents". A link that
+  # HAS a title stays a link, though (see the file branch): a title is a
+  # link's affordance, an attachment has nowhere to put it, and turning
+  # one into an upload would both discard the title and demand a file
+  # the author never meant to publish.
   LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"([^"]*)")?\)\z/
 
   # A private-use character standing in for a hard break while the paragraph
@@ -508,7 +512,7 @@ module MarkdownParser
       media_files[src] = filename if src
       counter -= 1 unless src
       return [{ 'type' => 'image', 'media' => [{ 'url' => filename }], 'alt_text' => (alt.empty? ? nil : alt), 'caption' => caption }.compact, counter]
-    elsif (m = LINK_LINE_RE.match(para)) && file_line?(m[2], media_dir)
+    elsif (m = LINK_LINE_RE.match(para)) && m[3].nil? && file_line?(m[2], media_dir)
       # A whole line that is just [label](file.pdf) with a bare filename:
       # the file travels with the post like a photo does, and the block
       # carries its size so the page can say what a click costs. The label
@@ -520,10 +524,15 @@ module MarkdownParser
       media_files[src] = filename if src
       counter -= 1 unless src
       file = { 'url' => filename }
-      # media_files.key finds the source when this same file was already
-      # registered by an earlier block -- without it a post referencing
-      # one attachment twice priced only the first card.
-      source = src || media_files.key(filename)
+      # Three places the bytes can be, in order: the file being copied in
+      # now, a source an earlier block in this same post already
+      # registered (a post referencing one attachment twice priced only
+      # the first card without this), and finally the post's own media
+      # directory -- which is where a round-tripped edit finds it, and
+      # without which every edit silently dropped the size from the card
+      # for good, since nothing else ever writes it back.
+      source = src || media_files.key(filename) ||
+               (media_dir && File.join(media_dir, filename))
       size = (File.size(source) if source && File.exist?(source)) rescue nil
       file['size'] = size if size&.positive?
       return [{ 'type' => 'file', 'media' => [file],

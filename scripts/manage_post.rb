@@ -551,7 +551,10 @@ def queue_position(time, entries)
 end
 
 def prompt_and_schedule(path, post)
-  entries = PublishSlots.configured? ? scheduled_entries(except_slug: post['slug']) : []
+  # Read once when slots are configured (the offer needs it); a site
+  # without slots pays nothing here and reads the archive only after it
+  # has actually scheduled something, for the queue line.
+  entries = PublishSlots.configured? ? scheduled_entries(except_slug: post['slug']) : nil
   slot = next_publish_slot(post['slug'], entries)
   if slot
     # The offer changes what an empty line means (it used to cancel), so
@@ -612,7 +615,7 @@ def prompt_and_schedule(path, post)
   end
   rebuild_and_deploy(t('cli.updating_preview'))
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
-  position = queue_position(date, entries)
+  position = queue_position(date, entries || scheduled_entries(except_slug: post['slug']))
   if position
     puts t('cli.schedule_queue_position', count: position[:count], slug: position[:slug],
                                           date: position[:date].strftime(t('date_time_format')))

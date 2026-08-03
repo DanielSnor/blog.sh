@@ -32,7 +32,14 @@ module PublishSlots
 
   # [[weekday_index or nil for daily, hour, minute], ...]
   def slots
-    @slots ||= Array(SiteConfig.get('publishing', 'slots')).filter_map { |spec| parse(spec) }
+    @slots ||= Array(SiteConfig.get('publishing', 'slots')).filter_map do |spec|
+      parsed = parse(spec)
+      # A spec that doesn't parse is dropped -- but silently dropping it
+      # is how "monday 09:30" turned the whole feature off while looking
+      # configured. Day names are the three-letter abbreviations.
+      warn "⚠️  Ignoring unreadable publishing slot #{spec.inspect} -- expected e.g. \"mon 09:30\" or \"daily 09:00\"." unless parsed
+      parsed
+    end
   end
 
   def parse(spec)
