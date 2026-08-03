@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'date'
+require 'set'
 require 'time'
 require_relative 'site_config'
 
@@ -43,7 +45,9 @@ module PublishSlots
     return nil unless hour.between?(0, 23) && minute.between?(0, 59)
     return [nil, hour, minute] if day == 'daily'
 
-    index = DAYS.index(day[0, 3])
+    # Exact three-letter abbreviation: "monkey 09:30" matching mon was a
+    # typo silently becoming a schedule.
+    index = DAYS.index(day)
     index ? [index, hour, minute] : nil
   end
 
@@ -56,29 +60,32 @@ module PublishSlots
     return nil unless configured?
 
     occupied = taken.compact.map { |time| time.to_i / 60 }.to_set
-    day = Time.new(from.year, from.month, from.day, 0, 0, 0, from.utc_offset)
+    # Calendar days via Date, each candidate built with Time.local so the
+    # site's zone decides its own offset. Both halves matter across a DST
+    # boundary: advancing by 86400 seconds sticks on the 25-hour day, and
+    # freezing the offset taken from `from` produced an instant an hour
+    # off the wall clock the author was shown -- which also made the
+    # "is this slot taken?" comparison miss, so the queue could
+    # double-book a Monday with two posts an hour apart.
+    date = Date.new(from.year, from.month, from.day)
 
     HORIZON_DAYS.times do
-      times_on(day).sort.each do |candidate|
+      times_on(date).sort.each do |candidate|
         next if candidate <= from
         next if occupied.include?(candidate.to_i / 60)
 
         return candidate
       end
-      day += 24 * 60 * 60
-      # Re-anchor to midnight: adding a day of seconds drifts by an hour
-      # across a DST boundary, which would silently move every slot after
-      # the change.
-      day = Time.new(day.year, day.month, day.day, 0, 0, 0, day.utc_offset)
+      date += 1
     end
     nil
   end
 
-  def times_on(day)
+  def times_on(date)
     slots.filter_map do |weekday, hour, minute|
-      next if weekday && weekday != day.wday
+      next if weekday && weekday != date.wday
 
-      Time.new(day.year, day.month, day.day, hour, minute, 0, day.utc_offset)
+      Time.local(date.year, date.month, date.day, hour, minute, 0)
     end
   end
 end

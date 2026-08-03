@@ -439,6 +439,7 @@ def cmd_add
     'source' => { 'platform' => 'manual' }
   }
   post['type'] = type if type
+  post['pinned'] = true if truthy_frontmatter?(meta['pinned'])
 
   path = PostWriter.write(post, media_files: media_files)
   discard_editor_buffer
@@ -520,38 +521,38 @@ end
 # branch prints its own.
 # Times already claimed by scheduled drafts, so the next offer skips
 # them -- that is what turns a set of slots into a queue.
-def scheduled_times(except_slug: nil)
+def scheduled_entries(except_slug: nil)
   Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
     post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
     next unless post.is_a?(Hash) && post['scheduled'] && post['slug'] != except_slug
 
-    Time.parse(post['date']) rescue nil
+    time = Time.parse(post['date']) rescue next
+    [time, post['slug']]
   end
 end
 
-def next_publish_slot(slug = nil)
-  PublishSlots.next_free(taken: scheduled_times(except_slug: slug))
+# The configured? check comes FIRST and the archive is walked at most
+# once: this runs on every redraw of the draft dialog, and on a
+# 3000-post archive each pass costs a third of a second -- a site with no
+# slots configured was paying it for nothing.
+def next_publish_slot(slug = nil, entries = nil)
+  return nil unless PublishSlots.configured?
+
+  PublishSlots.next_free(taken: (entries || scheduled_entries(except_slug: slug)).map(&:first))
 end
 
 # Position in the queue, for the confirmation line: which scheduled post
 # (if any) goes out immediately before this one.
-def queue_position(time, slug)
-  earlier = scheduled_times(except_slug: slug).select { |t| t <= time }.sort
+def queue_position(time, entries)
+  earlier = entries.select { |entry| entry.first <= time }.sort_by(&:first)
   return nil if earlier.empty?
 
-  previous = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
-    post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
-    next unless post.is_a?(Hash) && post['scheduled'] && post['slug'] != slug
-    parsed = Time.parse(post['date']) rescue next
-    [parsed, post['slug']] if parsed == earlier.last
-  end.first
-  return nil unless previous
-
-  { count: earlier.size + 1, slug: previous[1], date: previous[0] }
+  { count: earlier.size + 1, slug: earlier.last[1], date: earlier.last[0] }
 end
 
 def prompt_and_schedule(path, post)
-  slot = next_publish_slot(post['slug'])
+  entries = PublishSlots.configured? ? scheduled_entries(except_slug: post['slug']) : []
+  slot = next_publish_slot(post['slug'], entries)
   if slot
     # The offer changes what an empty line means (it used to cancel), so
     # the prompt spells out both the accepting key and the cancel word
@@ -562,7 +563,13 @@ def prompt_and_schedule(path, post)
   else
     print t('cli.schedule_date_prompt')
   end
-  input = $stdin.gets&.strip.to_s
+  raw = $stdin.gets
+  # EOF is not Enter. With an offer on screen an empty line accepts, and
+  # Ctrl-D (or a piped run whose input ran out) would otherwise schedule,
+  # rebuild and deploy a post nobody confirmed.
+  return false if raw.nil?
+
+  input = raw.strip
   return false if input.empty? && slot.nil?
   return false if input.downcase == t('cli.cancel_word')
 
@@ -605,7 +612,7 @@ def prompt_and_schedule(path, post)
   end
   rebuild_and_deploy(t('cli.updating_preview'))
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
-  position = queue_position(date, post['slug'])
+  position = queue_position(date, entries)
   if position
     puts t('cli.schedule_queue_position', count: position[:count], slug: position[:slug],
                                           date: position[:date].strftime(t('date_time_format')))
@@ -935,7 +942,11 @@ def edit_post(slug)
     # Shown with its current value so the author can see the state, not
     # just set it -- and only for a published post: pinning a draft that
     # nothing links to yet would have nowhere to show.
-    pinned: draft?(post) ? nil : truthy_frontmatter?(post['pinned'] || 'false')
+    # A draft is offered the key only if it already carries a pin --
+    # otherwise pinning something nobody can see yet has nowhere to show.
+    # Offering it when set matters: without the line in the header, saving
+    # would drop a pin the post had (unpublish keeps it).
+    pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false')
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 

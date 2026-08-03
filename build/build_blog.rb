@@ -1065,14 +1065,17 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
   pages, fixed = anchored_pages(posts)
   pages.each do |number, page_posts|
-    list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
-    # The pinned post is prepended to the FIRST page only, and only when
-    # it isn't already on it -- on the homepage it is either the copy at
-    # the top or its own chronological entry, never both. Anchored
-    # pagination is unaffected: page 1 is the only flexible page, so an
-    # extra item here never shifts a /page/N/ boundary.
-    if pinned && number > fixed && !page_posts.include?(pinned)
-      list_html = "#{render_list_item(pinned, pinned: true)}\n#{list_html}"
+    # The landing page shows the pinned post ONCE, at the top: when it
+    # would otherwise appear further down that same page, it is lifted out
+    # rather than duplicated. Anchored pagination is unaffected either
+    # way -- the landing page is the only flexible one, and lifting keeps
+    # its item count identical, so no /page/N/ boundary moves.
+    if pinned && number > fixed
+      rest = page_posts.reject { |post| post.equal?(pinned) }
+      list_html = ([render_list_item(pinned, pinned: true)] +
+                   rest.map { |post| render_list_item(post) }).join("\n")
+    else
+      list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
     end
     pagination = pagination_html(number, fixed, base_path)
     out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
@@ -1315,8 +1318,11 @@ end
 # Only the homepage takes a pinned post; type and tag listings stay
 # strictly chronological, and the feeds ignore it entirely -- a pin is a
 # statement about the front page, not about the archive.
-pinned_post = posts.find { |p| p['pinned'] }
-if posts.count { |p| p['pinned'] } > 1
+# Same truth test the CLI writes with, so a hand-edited "false" or 0
+# doesn't pin a post the author believes is unpinned.
+pinned = ->(post) { %w[true yes 1].include?(post['pinned'].to_s.strip.downcase) }
+pinned_post = posts.find(&pinned)
+if posts.count(&pinned) > 1
   warn "⚠️  More than one post is pinned; using the newest (#{pinned_post['slug']})."
 end
 page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_post)

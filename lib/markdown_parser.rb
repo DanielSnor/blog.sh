@@ -129,12 +129,18 @@ module MarkdownParser
   # an extension the site actually publishes should silently turn into an
   # uploaded file. Office formats can join later; nothing here needs the
   # engine to understand the format, only to carry it.
-  FILE_EXTENSIONS = %w[.pdf .zip .gz .tgz .epub .txt .md .ics .gpx .csv].freeze
+  # No .gz: File.extname sees only the last suffix, so a .tar.gz would be
+  # stored and served as NN.gz and unpack to a name without its .tar. .tgz
+  # says the same thing in one extension and survives the round trip.
+  FILE_EXTENSIONS = %w[.pdf .zip .tgz .epub .txt .md .ics .gpx .csv].freeze
 
   # A link line whose target is a bare filename with a known extension is
   # an attachment, exactly like a bare filename in an image line. A URL is
   # always just a link -- the engine can only publish files it is given.
-  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)\s"]+)\)\z/
+  # Same shape as IMAGE_RE, including the optional quoted title: a target
+  # may contain spaces, because `edit` round-trips the block as a full
+  # path -- and a repo can live under "Mobile Documents".
+  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"([^"]*)")?\)\z/
 
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
@@ -162,12 +168,20 @@ module MarkdownParser
     AUDIO_EXTENSIONS.include?(File.extname(path.to_s).downcase)
   end
 
-  def file_path?(path)
-    return false if path.to_s.match?(%r{\A[a-z][a-z0-9+.-]*://}i)
-
+  # An attachment is a bare filename (the incoming/ shorthand) or a path
+  # inside the post's own media directory (what `edit` writes back). A
+  # relative path to anywhere else stays a link: an existing post whose
+  # paragraph happens to be `[Data](stats/2025.csv)` must not turn itself
+  # into an upload on re-save. Any URL -- including the protocol-relative
+  # //host/x.pdf -- is a link too; the engine can only publish files it
+  # was handed.
+  def file_line?(path, media_dir = nil)
     name = path.to_s
-    FILE_EXTENSIONS.include?(File.extname(name).downcase) ||
-      name.downcase.end_with?('.tar.gz')
+    return false if name.match?(%r{\A(?:[a-z][a-z0-9+.-]*:)?//}i)
+    return false unless FILE_EXTENSIONS.include?(File.extname(name).downcase)
+    return true if File.dirname(name) == '.'
+
+    media_dir && File.expand_path(name).start_with?("#{File.expand_path(media_dir)}/")
   end
 
   # --- tables ---------------------------------------------------------------
@@ -494,7 +508,7 @@ module MarkdownParser
       media_files[src] = filename if src
       counter -= 1 unless src
       return [{ 'type' => 'image', 'media' => [{ 'url' => filename }], 'alt_text' => (alt.empty? ? nil : alt), 'caption' => caption }.compact, counter]
-    elsif (m = LINK_LINE_RE.match(para)) && file_path?(m[2])
+    elsif (m = LINK_LINE_RE.match(para)) && file_line?(m[2], media_dir)
       # A whole line that is just [label](file.pdf) with a bare filename:
       # the file travels with the post like a photo does, and the block
       # carries its size so the page can say what a click costs. The label
@@ -506,7 +520,11 @@ module MarkdownParser
       media_files[src] = filename if src
       counter -= 1 unless src
       file = { 'url' => filename }
-      size = File.size(src || File.join(media_dir.to_s, filename)) rescue nil
+      # media_files.key finds the source when this same file was already
+      # registered by an earlier block -- without it a post referencing
+      # one attachment twice priced only the first card.
+      source = src || media_files.key(filename)
+      size = (File.size(source) if source && File.exist?(source)) rescue nil
       file['size'] = size if size&.positive?
       return [{ 'type' => 'file', 'media' => [file],
                 'label' => (label.empty? ? File.basename(target) : label) }, counter]
