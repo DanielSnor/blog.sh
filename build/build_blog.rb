@@ -650,12 +650,23 @@ def dominant_content_type(post)
   TYPE_CACHE[post] ||= ContentType.dominant(post)
 end
 
-def date_badge(post, link: nil)
+PIN_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' \
+            'stroke-linejoin="round" stroke-linecap="round"><path d="M12 17v5"/>' \
+            '<path d="M9 4h6v3l2 4H7l2-4z"/></svg>'
+
+# `pinned:` marks the copy held at the top of the first listing page, not
+# the post itself -- the same post appears again further down in its
+# chronological place, and there the badge is a plain one. The mark
+# explains why this copy is first; on page 3 it would read as a sorting
+# bug. Its colour comes from the palette's text colour, so it keeps its
+# contrast on any accent without per-palette tuning.
+def date_badge(post, link: nil, pinned: false)
   icon = CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
+  pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
   inner = "#{icon}<span>#{date}</span>"
   inner = %(<a href="#{link}">#{inner}</a>) if link
-  %(<div class="date-badge">#{inner}</div>)
+  %(<div class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</div>)
 end
 
 # Folding/slugification lives in lib/slug.rb, shared with the CLI and both
@@ -783,11 +794,17 @@ def comments_attrs(post)
   end
 end
 
-def render_list_item(post)
+def render_list_item(post, pinned: false)
+  # The pinned copy is rendered separately and NOT cached under the same
+  # key: it differs from the post's ordinary appearance by exactly the
+  # badge mark, and caching one over the other would leak the mark into
+  # the chronological copy (or lose it from the pinned one).
+  return build_list_item(post, pinned: true) if pinned
+
   LIST_ITEM_CACHE[post] ||= build_list_item(post)
 end
 
-def build_list_item(post)
+def build_list_item(post, pinned: false)
   prefix = post_path(post)
   content = post_content_html(post)
   excerpt = excerpt?(post)
@@ -798,7 +815,7 @@ def build_list_item(post)
   <<~HTML
     <div class="card post-list-item">
       <div class="post-header">
-        #{date_badge(post, link: prefix)}
+        #{date_badge(post, link: prefix, pinned: pinned)}
         <div class="post-body">
           #{title}
           #{stats}
@@ -1018,10 +1035,18 @@ end
 # the same source for every one of what can be thousands of listing pages is
 # pure waste).
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
-                  title: SITE_TITLE, description: SITE_DESCRIPTION)
+                  title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
   pages, fixed = anchored_pages(posts)
   pages.each do |number, page_posts|
     list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
+    # The pinned post is prepended to the FIRST page only, and only when
+    # it isn't already on it -- on the homepage it is either the copy at
+    # the top or its own chronological entry, never both. Anchored
+    # pagination is unaffected: page 1 is the only flexible page, so an
+    # extra item here never shifts a /page/N/ boundary.
+    if pinned && number > fixed && !page_posts.include?(pinned)
+      list_html = "#{render_list_item(pinned, pinned: true)}\n#{list_html}"
+    end
     pagination = pagination_html(number, fixed, base_path)
     out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
     # Without this distinction, every listing page would share one identical <title>.
@@ -1258,7 +1283,14 @@ end
   emit(File.join(dir, 'index.html'), render_post_html(post, post_template))
 end
 
-page_count = write_listing(posts, index_template, PUBLIC_DIR)
+# Only the homepage takes a pinned post; type and tag listings stay
+# strictly chronological, and the feeds ignore it entirely -- a pin is a
+# statement about the front page, not about the archive.
+pinned_post = posts.find { |p| p['pinned'] }
+if posts.count { |p| p['pinned'] } > 1
+  warn "⚠️  More than one post is pinned; using the newest (#{pinned_post['slug']})."
+end
+page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_post)
 
 tags_map = {}
 posts.each do |post|

@@ -75,7 +75,24 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned].freeze
+
+# A key the parser doesn't know is silently dropped -- `pined: true` would
+# do nothing at all and never say so. Every key the author typed is checked
+# against the list above, and an unknown one stops the save while the text
+# is still recoverable (the editor buffer holds it).
+def abort_on_unknown_frontmatter(meta)
+  unknown = meta.keys.reject { |k| FRONTMATTER_KEYS.include?(k.to_s) }
+  return if unknown.empty?
+
+  abort t('cli.unknown_frontmatter_key', keys: unknown.join(', '), known: FRONTMATTER_KEYS.join(', '))
+end
+
+# "true"/"yes"/"1" are all true, everything else false -- a frontmatter
+# value is text the author typed, not a YAML boolean.
+def truthy_frontmatter?(value)
+  %w[true yes 1].include?(value.to_s.strip.downcase)
+end
 
 # Text pasted into the editor along with its own header hides underneath
 # the one already prepared: parse_frontmatter treats the first (empty)
@@ -292,11 +309,15 @@ FRONTMATTER_HINT = t('cli.frontmatter_hint', cheat_sheet_url: CHEAT_SHEET_URL)
 # would just be a confusing extra path to the same decision. The parser
 # still honors a `date:` line if someone types one in by hand (backdating
 # an import, say); this only stops the template from suggesting it.
-def build_frontmatter(title:, tags:, type:)
+def build_frontmatter(title:, tags:, type:, pinned: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
   lines << "type: #{type}" if type
+  # Only shown when the post already carries it: a key that appears on
+  # every new post would suggest pinning is part of writing one, when it
+  # is a decision about an existing post.
+  lines << "pinned: #{pinned}" unless pinned.nil?
   lines << '---'
   "#{lines.join("\n")}\n\n"
 end
@@ -357,6 +378,7 @@ def cmd_add
 
   meta, body = MarkdownParser.parse_frontmatter(raw)
   abort_on_double_frontmatter(body)
+  abort_on_unknown_frontmatter(meta)
 
   if body.strip.empty?
     discard_editor_buffer
@@ -854,7 +876,11 @@ def edit_post(slug)
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
     tags: (post['tags'] || []).join(', '),
-    type: post['type']
+    type: post['type'],
+    # Shown with its current value so the author can see the state, not
+    # just set it -- and only for a published post: pinning a draft that
+    # nothing links to yet would have nowhere to show.
+    pinned: draft?(post) ? nil : truthy_frontmatter?(post['pinned'] || 'false')
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
@@ -871,6 +897,7 @@ def edit_post(slug)
 
   meta, new_body = MarkdownParser.parse_frontmatter(raw)
   abort_on_double_frontmatter(new_body)
+  abort_on_unknown_frontmatter(meta)
 
   new_date = meta['date'].to_s.empty? ? date : Time.parse(meta['date'])
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
@@ -922,6 +949,7 @@ def edit_post(slug)
     'source' => post['source'] || { 'platform' => 'manual' }
   }
   updated['type'] = new_type if new_type
+  updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
   updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']

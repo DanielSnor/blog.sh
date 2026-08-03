@@ -785,3 +785,25 @@ footer .copyright { color: var(--text); }
   .post-list-item h2 { font-size: 1.3rem; }
   .tag-heading { font-size: 1.3rem; }
 }
+
+/* The pinned post's copy at the top of the first listing page. The mark
+   rides the badge's corner rather than replacing the type icon, so the
+   badge still says what kind of post it is; its ground is the palette's
+   text colour, which keeps contrast against any accent without a
+   per-palette rule. Only this copy carries it -- the post's ordinary
+   chronological entry further down looks like every other post. */
+.date-badge { position: relative; }
+.date-badge .pin-mark {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--card-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.date-badge .pin-mark svg { width: 13px; height: 13px; display: block; margin: 0; }
