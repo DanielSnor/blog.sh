@@ -20,6 +20,7 @@ require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
+require_relative '../lib/heic_converter'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/publishing'
@@ -140,14 +141,75 @@ end
 # (keeping incoming/ empty makes it obvious which uploads are still pending).
 # Sources outside incoming/ (e.g. a normal Mac path) are the author's own
 # files and are never touched.
-def cleanup_incoming(media_files)
-  media_files.each_key do |src|
+#
+# extra_sources: originals a HEIC conversion consumed. Their converted
+# stand-ins are what media_files points at (a temp path, never touched
+# here), but the staged .heic was used up exactly like a directly-copied
+# photo -- in converted form -- so the same "empty incoming/ means nothing
+# pending" rule applies to it.
+def cleanup_incoming(media_files, extra_sources = [])
+  (media_files.keys + extra_sources).each do |src|
     next unless src
 
     expanded = File.expand_path(src)
     next unless expanded.start_with?("#{File.expand_path(INCOMING_DIR)}/")
 
     File.delete(expanded) if File.exist?(expanded)
+  end
+end
+
+# Converts -- or refuses -- HEIC photos among the freshly attached media,
+# by media.convert_heic in config/site.yml. Runs after
+# wait_for_missing_images (the files provably exist) and before
+# fill_image_dimensions, so a converted photo is measured as the JPEG the
+# page will actually serve and reserves layout space like any other image.
+# Detection is by content, so a HEIC smuggled in as .jpg is caught too.
+#
+# Refusal is the default and aborts BEFORE anything is copied or deleted:
+# a HEIC on the page would show as a broken image everywhere but Safari,
+# and the author's text survives the abort in the editor buffer. Returns
+# the original files a successful conversion consumed, for
+# cleanup_incoming.
+def convert_heic_attachments(blocks, media_files)
+  heic = media_files.keys.select { |src| src && HeicConverter.heic?(src) }
+  return [] if heic.empty?
+
+  names = heic.map { |src| File.basename(src) }.join(', ')
+  command = HeicConverter.suggested_command(heic.first)
+  unless SiteConfig.get('media', 'convert_heic', default: false) == true
+    abort t('cli.heic_refused', files: names, command: command)
+  end
+
+  tool = HeicConverter.tool
+  abort t('cli.heic_no_tool', files: names, command: command) unless tool
+
+  # One temp dir per process, removed at exit: the converted files must
+  # outlive this pass (PostWriter copies them much later in the save).
+  @heic_tmpdir ||= begin
+    dir = Dir.mktmpdir('blog-sh-heic')
+    at_exit { FileUtils.remove_entry(dir) if Dir.exist?(dir) }
+    dir
+  end
+
+  heic.map do |src|
+    filename = media_files[src]
+    target = "#{File.basename(filename, '.*')}.jpg"
+    dest = File.join(@heic_tmpdir, target)
+    unless HeicConverter.convert(src, dest)
+      abort t('cli.heic_convert_failed', file: File.basename(src), tool: tool[0],
+                                         command: HeicConverter.suggested_command(src))
+    end
+
+    media_files.delete(src)
+    media_files[dest] = target
+    # The blocks already reference the pre-conversion filename (NN.heic);
+    # the number is kept, only the extension follows the real bytes.
+    blocks.each do |b|
+      media = (b['media'] || []).first
+      media['url'] = target if media && media['url'] == filename
+    end
+    puts t('cli.heic_converted', file: File.basename(src), target: target, tool: tool[0])
+    src
   end
 end
 
@@ -310,6 +372,7 @@ def cmd_add
 
   blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
+  heic_consumed = convert_heic_attachments(blocks, media_files)
   fill_image_dimensions(blocks, media_files)
 
   slug_source = title || (blocks.find { |b| b['type'] == 'text' } || {})['text']
@@ -356,7 +419,7 @@ def cmd_add
 
   path = PostWriter.write(post, media_files: media_files)
   discard_editor_buffer
-  cleanup_incoming(media_files)
+  cleanup_incoming(media_files, heic_consumed)
   puts t('cli.wrote_draft', path: path)
 
   final_slug = File.basename(path, '.json')
@@ -816,6 +879,7 @@ def edit_post(slug)
 
   blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
+  heic_consumed = convert_heic_attachments(blocks, media_files)
   fill_image_dimensions(blocks, media_files, media_dir)
 
   # Checks for a drop in every block type, not just images: markdown can't
@@ -914,7 +978,7 @@ def edit_post(slug)
   # Housekeeping only, and it runs last on purpose: an incoming/ the CLI
   # user can't unlink in must not be able to abort a save that already
   # succeeded.
-  cleanup_incoming(media_files)
+  cleanup_incoming(media_files, heic_consumed)
   puts
   puts t('cli.edited_label', path: new_path)
   draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild

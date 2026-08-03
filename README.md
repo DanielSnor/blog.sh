@@ -287,7 +287,11 @@ iCloud doesn't exist, it's just a name.
   GitHub/GitLab/Codeberg Pages branch, an rclone remote, or just a local
   directory served by your own web server), a Mastodon or Bluesky
   account for comments and the auto-announcement, cron for the sidebar
-  widgets
+  widgets -- and, only if you turn on `media.convert_heic` (converting
+  iPhone HEIC photos to JPEG on save), an image tool the machine
+  typically already has: `sips` (built into macOS), `heif-convert`,
+  ImageMagick or vips. Off by default; without a tool the engine refuses
+  the file with instructions instead of breaking
 
 ## Getting started
 

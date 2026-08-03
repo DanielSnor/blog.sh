@@ -110,6 +110,14 @@ The trick is that a bare filename in an image line resolves against the
    in `incoming/` only after that, so a file that's already been saved
    resolves without any upload (and without being copied again).
 
+iPhones photograph in HEIC by default, which only Safari can display.
+Attaching one stops the save with the exact conversion command -- or, with
+`media.convert_heic: true` in `config/site.yml`, the engine converts it to
+JPEG itself during the save (detected by content, so a HEIC named `.jpg`
+is caught too; AVIF, which browsers do display, is left alone). The
+simplest fix is on the phone itself: Settings → Camera → Formats →
+Most Compatible.
+
 ## Importing from another platform
 
 `./import.sh` opens its own wizard: pick a source, and it reads the whole
@@ -263,7 +271,8 @@ The same list is exactly what to move when changing machines.
 | Sidebar widget disappeared from the page | Its fetch returned nothing repeatedly (`refresh-sidebar` logs say which) -- the widget card hides when its JSON is empty/unreachable. Check the instance/feed URL in `config/site.yml`. |
 | `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues, and a copy already uploaded stays on the site rather than being pruned, so the page keeps working until you fix it. |
 | `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |
-| `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. HEIC (the iPhone default) additionally displays only in Safari -- convert it, or set the phone to "Most Compatible". |
+| `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. |
+| `HEIC displays only in Safari` when attaching a photo | The iPhone default format. Convert it with the command the message prints, set `media.convert_heic: true` to have the engine do it, or set the phone to Settings → Camera → Formats → Most Compatible. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |
 | sftp deploy hangs | It's waiting for a password -- the sftp backend needs key-based auth (see [install.md](install.md#sftp-hosts-with-neither-rsync-nor-git)). |
