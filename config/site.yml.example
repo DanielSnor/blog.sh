@@ -108,6 +108,19 @@ social:
     url: "mailto:you@example.com"
     icon: "email"
 
+# Optional. The times posts usually go out. With this set, [s] in the
+# draft dialog offers the next FREE slot instead of an empty prompt, so
+# three drafts written in one evening go out on three consecutive slots
+# rather than all at once. Typing a date always overrides the offer, and
+# a slot never moves a post that is already scheduled. Format is
+# "<day> HH:MM" (mon/tue/.../sun, or daily); omit the key entirely and
+# scheduling behaves exactly as before.
+# publishing:
+#   slots:
+#     - "mon 09:30"
+#     - "wed 09:30"
+#     - "fri 09:30"
+
 # Optional. HEIC photos (the iPhone default) display only in Safari --
 # every other browser shows a broken image. Off (the default), attaching
 # one stops the save and prints the exact conversion command; nothing is

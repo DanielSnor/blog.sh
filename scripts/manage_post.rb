@@ -24,6 +24,7 @@ require_relative '../lib/heic_converter'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/publishing'
+require_relative '../lib/publish_slots'
 require_relative '../lib/tui'
 require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
@@ -481,7 +482,9 @@ def draft_decision_loop(slug)
       puts Tui.paint(t('cli.qr_hint'), :dim)
     end
     puts
-    case Tui.key_choice(t('cli.what_next_prompt'))
+    slot = next_publish_slot(slug)
+    prompt = slot ? t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format'))) : t('cli.what_next_prompt')
+    case Tui.key_choice(prompt)
     when 'p' then return publish_draft(slug)
     when 'e' then edit_post(slug)
     when 's'
@@ -515,16 +518,63 @@ end
 # above them. pick_from_list already ends with one, while the dialog's
 # key_choice leaves the cursor right under the echoed keypress -- so that
 # branch prints its own.
-def prompt_and_schedule(path, post)
-  print t('cli.schedule_date_prompt')
-  input = $stdin.gets&.strip.to_s
-  return false if input.empty?
+# Times already claimed by scheduled drafts, so the next offer skips
+# them -- that is what turns a set of slots into a queue.
+def scheduled_times(except_slug: nil)
+  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
+    next unless post.is_a?(Hash) && post['scheduled'] && post['slug'] != except_slug
 
-  date = begin
-    Time.parse(input)
-  rescue ArgumentError
-    nil
+    Time.parse(post['date']) rescue nil
   end
+end
+
+def next_publish_slot(slug = nil)
+  PublishSlots.next_free(taken: scheduled_times(except_slug: slug))
+end
+
+# Position in the queue, for the confirmation line: which scheduled post
+# (if any) goes out immediately before this one.
+def queue_position(time, slug)
+  earlier = scheduled_times(except_slug: slug).select { |t| t <= time }.sort
+  return nil if earlier.empty?
+
+  previous = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
+    next unless post.is_a?(Hash) && post['scheduled'] && post['slug'] != slug
+    parsed = Time.parse(post['date']) rescue next
+    [parsed, post['slug']] if parsed == earlier.last
+  end.first
+  return nil unless previous
+
+  { count: earlier.size + 1, slug: previous[1], date: previous[0] }
+end
+
+def prompt_and_schedule(path, post)
+  slot = next_publish_slot(post['slug'])
+  if slot
+    # The offer changes what an empty line means (it used to cancel), so
+    # the prompt spells out both the accepting key and the cancel word
+    # rather than letting the change happen silently.
+    puts t('cli.schedule_slot_offer', slot: slot.strftime(t('date_time_format')))
+    puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
+    print '> '
+  else
+    print t('cli.schedule_date_prompt')
+  end
+  input = $stdin.gets&.strip.to_s
+  return false if input.empty? && slot.nil?
+  return false if input.downcase == t('cli.cancel_word')
+
+  date = if input.empty?
+           slot
+         else
+           begin
+             Time.parse(input)
+           rescue ArgumentError
+             nil
+           end
+         end
   if date.nil?
     puts t('cli.schedule_date_invalid')
     return false
@@ -555,6 +605,11 @@ def prompt_and_schedule(path, post)
   end
   rebuild_and_deploy(t('cli.updating_preview'))
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
+  position = queue_position(date, post['slug'])
+  if position
+    puts t('cli.schedule_queue_position', count: position[:count], slug: position[:slug],
+                                          date: position[:date].strftime(t('date_time_format')))
+  end
   puts t('cli.schedule_cron_note')
   puts
   true
