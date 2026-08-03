@@ -124,6 +124,18 @@ module MarkdownParser
   VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
   AUDIO_EXTENSIONS = %w[.mp3 .m4a .ogg .opus .aac .flac .wav].freeze
 
+  # Attachments a post can hand over for download. A whitelist rather than
+  # "anything with a dot": a link line is overwhelmingly a link, and only
+  # an extension the site actually publishes should silently turn into an
+  # uploaded file. Office formats can join later; nothing here needs the
+  # engine to understand the format, only to carry it.
+  FILE_EXTENSIONS = %w[.pdf .zip .gz .tgz .epub .txt .md .ics .gpx .csv].freeze
+
+  # A link line whose target is a bare filename with a known extension is
+  # an attachment, exactly like a bare filename in an image line. A URL is
+  # always just a link -- the engine can only publish files it is given.
+  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)\s"]+)\)\z/
+
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
   # a real newline afterwards leaves every formatting offset intact.
@@ -148,6 +160,14 @@ module MarkdownParser
 
   def audio_path?(path)
     AUDIO_EXTENSIONS.include?(File.extname(path.to_s).downcase)
+  end
+
+  def file_path?(path)
+    return false if path.to_s.match?(%r{\A[a-z][a-z0-9+.-]*://}i)
+
+    name = path.to_s
+    FILE_EXTENSIONS.include?(File.extname(name).downcase) ||
+      name.downcase.end_with?('.tar.gz')
   end
 
   # --- tables ---------------------------------------------------------------
@@ -474,6 +494,22 @@ module MarkdownParser
       media_files[src] = filename if src
       counter -= 1 unless src
       return [{ 'type' => 'image', 'media' => [{ 'url' => filename }], 'alt_text' => (alt.empty? ? nil : alt), 'caption' => caption }.compact, counter]
+    elsif (m = LINK_LINE_RE.match(para)) && file_path?(m[2])
+      # A whole line that is just [label](file.pdf) with a bare filename:
+      # the file travels with the post like a photo does, and the block
+      # carries its size so the page can say what a click costs. The label
+      # falls back to the filename -- an attachment with no words is still
+      # better than a link reading "download".
+      counter += 1
+      label, target = m[1].strip, m[2].strip
+      filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
+      media_files[src] = filename if src
+      counter -= 1 unless src
+      file = { 'url' => filename }
+      size = File.size(src || File.join(media_dir.to_s, filename)) rescue nil
+      file['size'] = size if size&.positive?
+      return [{ 'type' => 'file', 'media' => [file],
+                'label' => (label.empty? ? File.basename(target) : label) }, counter]
     elsif para.match?(/(?<!\\)!\[[^\]]*\]\([^)]+\)/)
       # An image in the middle of a paragraph can't be rendered -- the
       # schema only knows image blocks. This used to silently turn into a

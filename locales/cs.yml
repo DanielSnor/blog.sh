@@ -17,6 +17,7 @@ nav:
   video: "Video"
   links: "Odkazy"
   audio: "Audio"
+  documents: "Dokumenty"
   menu_label: "Menu"
   search_label: "Hledat"
   search_placeholder: "Hledat…"
@@ -50,6 +51,7 @@ type:
   video: "Video"
   audio: "Audio"
   link: "Odkazy"
+  document: "Dokumenty"
   title: "%{label} – %{short_name}"
   description: "Příspěvky typu %{label} na osobním webu %{author}."
 

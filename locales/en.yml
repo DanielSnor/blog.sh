@@ -18,6 +18,7 @@ nav:
   video: "Video"
   links: "Links"
   audio: "Audio"
+  documents: "Documents"
   menu_label: "Menu"
   search_label: "Search"
   search_placeholder: "Search…"
@@ -51,6 +52,7 @@ type:
   video: "Video"
   audio: "Audio"
   link: "Links"
+  document: "Documents"
   title: "%{label} – %{short_name}"
   description: "Posts of type %{label} on %{author}'s personal site."
 

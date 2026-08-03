@@ -489,6 +489,20 @@ def render_block(block, media_prefix, seen = {})
   when 'code'
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
     %(<pre><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
+  when 'file'
+    file = (block['media'] || []).first || {}
+    label = block['label'].to_s.empty? ? file['url'].to_s : block['label']
+    ext = File.extname(file['url'].to_s).delete('.').upcase
+    ext = 'FILE' if ext.empty?
+    size = human_size(file['size'])
+    sub = [ext, size].compact.reject(&:empty?).join(' · ')
+    %(<a class="file-card" href="#{media_prefix}#{file['url']}" download>) +
+      %(<span class="file-icon">#{h(ext[0, 4])}</span>) +
+      %(<span class="file-meta"><span class="file-label">#{h(label)}</span>) +
+      %(<span class="file-sub">#{h(sub)}</span></span>) +
+      '<svg class="file-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' \
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M6 12l6 6 6-6"/>' \
+      '<path d="M5 21h14"/></svg></a>'
   when 'image'
     media = (block['media'] || []).first || {}
     caption = block['caption'] ? "<figcaption>#{CGI.escapeHTML(block['caption'])}</figcaption>" : ''
@@ -565,6 +579,18 @@ end
 # an Integer-only test silently stripped width/height off every one of them.
 # And rather than plain `.to_i`, because that raises on the `false` a broken
 # header reader could once produce.
+# Bytes as something a reader can weigh a click against. Binary units
+# would be more correct and less useful: nobody downloading a PDF cares
+# about the difference between MB and MiB.
+def human_size(bytes)
+  value = bytes.to_i
+  return nil unless value.positive?
+  return "#{value} B" if value < 1000
+  return "#{(value / 1000.0).round} kB" if value < 1_000_000
+
+  format('%.1f MB', value / 1_000_000.0).sub('.0 ', ' ')
+end
+
 def size_attrs(media)
   w = Integer(media['width'], exception: false)
   h = Integer(media['height'], exception: false)
@@ -614,6 +640,7 @@ CONTENT_ICONS = {
   'link' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/></svg>',
   'audio' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 6a8.5 8.5 0 010 12"/></svg>',
   'quote' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/></svg>',
+  'document' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>',
   'chat' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
 }.freeze
 
@@ -1226,7 +1253,7 @@ posts.reverse!
 # only get their own page at a hidden address.
 drafts, posts = posts.partition { |p| draft?(p) }
 
-CONTENT_TYPES = %w[text quote chat image video audio link].freeze
+CONTENT_TYPES = %w[text quote chat image video audio link document].freeze
 CONTENT_TYPE_LABELS = {
   'text' => t('type.text'),
   'quote' => t('type.quote'),
@@ -1234,7 +1261,8 @@ CONTENT_TYPE_LABELS = {
   'image' => t('type.image'),
   'video' => t('type.video'),
   'audio' => t('type.audio'),
-  'link' => t('type.link')
+  'link' => t('type.link'),
+  'document' => t('type.document')
 }.freeze
 
 # Only content types with at least one published post get a nav item, a
@@ -1247,7 +1275,8 @@ CONTENT_TYPE_LABELS = {
 PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
 NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
-          'video' => 'video', 'audio' => 'audio', 'link' => 'links' }.fetch(type)
+          'video' => 'video', 'audio' => 'audio', 'link' => 'links',
+          'document' => 'documents' }.fetch(type)
   ["/type/#{type}/", t("nav.#{key}")]
 end.freeze
 

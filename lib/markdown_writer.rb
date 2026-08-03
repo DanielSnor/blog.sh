@@ -60,6 +60,12 @@ module MarkdownWriter
         path = File.join(media_dir, media['url'].to_s)
         cap = b['caption'] ? %( "#{b['caption']}") : ''
         "![#{b['alt_text']}](#{path}#{cap})"
+      when 'file'
+        file = (b['media'] || []).first
+        # Round-trips as the link line it came from: a bare filename, so
+        # re-saving an edited post keeps the attachment instead of
+        # turning it into a dead link to a name that isn't a URL.
+        "[#{b['label']}](#{File.join(media_dir, file['url'].to_s)})" if file
       when 'audio'
         # Mirrors the video branch: a local file writes back as !![](file);
         # an imported embed-only audio (a Spotify iframe, say) has no
