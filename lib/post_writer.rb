@@ -77,6 +77,19 @@ module PostWriter
     new_path = File.join(new_dir, "#{slug}.json")
 
     if File.expand_path(new_path) != File.expand_path(existing_path)
+      # The same guard Publishing.publish and edit_post have, for the same
+      # reason: a DIFFERENT post can already own <new_year>/<slug> -- the
+      # real archive has the same slug in two years today -- and writing
+      # there would replace it wholesale while this post's old file gets
+      # deleted, so the build's duplicate check never fires. Raised as a
+      # StandardError on purpose: inside an import the per-item rescue
+      # counts it and names it, and the rest of the run continues; nothing
+      # here has been moved or deleted yet.
+      if File.exist?(new_path)
+        raise "cannot move '#{slug}' into #{year}: a different post already owns " \
+              "#{new_path} -- resolve the slug clash by hand"
+      end
+
       FileUtils.mkdir_p(new_dir)
       move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
     end
@@ -125,13 +138,22 @@ module PostWriter
     end
   end
 
+  # An identity is only an identity when ALL THREE parts exist. Without the
+  # account requirement, two different feeds that happen to share bare item
+  # ids -- and whose channel carries no readable link, so account came out
+  # nil -- collapsed onto the same key and silently overwrote each other,
+  # across different slugs. An item without a full identity simply doesn't
+  # participate in matching: a re-import may then duplicate it, which is
+  # recoverable, where a wrong match destroys a post, which is not.
   def self.source_key(source)
     return nil unless source.is_a?(Hash)
 
     id = source['original_id']
+    account = source['account']
     return nil if id.nil? || id.to_s.empty?
+    return nil if account.nil? || account.to_s.empty?
 
-    [source['platform'], source['account'], id.to_s]
+    [source['platform'], account.to_s, id.to_s]
   end
 
   def self.find_by_source(source)

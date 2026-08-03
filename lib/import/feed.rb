@@ -145,13 +145,27 @@ module Import
 
     def channel_host
       link = if atom?
-               document.elements["feed/link[@rel='alternate']"]&.attribute('href')&.value
+               # A rel-less <link> IS an alternate link per the Atom spec --
+               # requiring an explicit rel="alternate" left account (and
+               # item post_url) empty on perfectly valid feeds, and an
+               # empty account is what let two different feeds' items
+               # cross-match on bare ids.
+               atom_alternate(document.elements['feed'])
              else
                document.elements['rss/channel/link']&.text
              end
       URI.parse(link.to_s).host
     rescue URI::InvalidURIError
       nil
+    end
+
+    def atom_alternate(parent)
+      return nil unless parent
+
+      links = parent.get_elements('link')
+      picked = links.find { |l| l.attribute('rel')&.value == 'alternate' } ||
+               links.find { |l| l.attribute('rel').nil? }
+      picked&.attribute('href')&.value
     end
 
     # --- per-item -------------------------------------------------------
@@ -244,7 +258,7 @@ module Import
     end
 
     def item_link(item)
-      return item.elements["link[@rel='alternate']"]&.attribute('href')&.value.to_s if atom?
+      return atom_alternate(item).to_s if atom?
 
       text_of(item, 'link')
     end
