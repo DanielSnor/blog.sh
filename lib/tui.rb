@@ -191,16 +191,30 @@ module Tui
         selected = (selected + 1) % items.size
         offset = clamp_offset(selected, offset, window, items.size)
       when :enter then return selected
-      when :escape, 'q', '0' then return nil
+      when :escape then return nil
       when String
-        if key =~ /\A[1-9]\z/
+        # Without allow_text, single keys keep their shortcuts: q/0 cancel,
+        # 1-9 pick a visible row directly. With allow_text those characters
+        # have to be typeable -- slugs beginning with a digit (or q) were
+        # impossible to enter, and the first keypress silently retargeted
+        # to a visible row instead -- so every alphanumeric key starts a
+        # typed line, and Enter resolves it: a plain in-range number picks
+        # that row (the quick pick, one keystroke later), an empty line
+        # cancels, anything else is the slug. Same contract as the piped,
+        # non-interactive picker.
+        if !allow_text && %w[q 0].include?(key)
+          return nil
+        elsif !allow_text && key =~ /\A[1-9]\z/
           relative = key.to_i - 1
           index = offset + relative
           return index if relative < window && index < items.size
         elsif allow_text && key =~ /\A[[:alnum:]]\z/
           print "\e[?25h#{text_prompt}#{key}"
           rest = $stdin.gets.to_s.strip
-          return "#{key}#{rest}"
+          line = "#{key}#{rest}"
+          return line.to_i - 1 if line =~ /\A\d+\z/ && (1..items.size).cover?(line.to_i)
+
+          return line
         end
       end
     end

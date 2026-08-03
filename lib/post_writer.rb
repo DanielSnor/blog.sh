@@ -1,5 +1,6 @@
 require 'json'
 require 'fileutils'
+require 'securerandom'
 require 'time'
 require_relative 'atomic_write'
 
@@ -34,6 +35,7 @@ module PostWriter
     FileUtils.mkdir_p(dir)
     slug = unique_slug(post.fetch('slug'), dir, post['source'])
     post = post.merge('slug' => slug)
+    post = ensure_draft_token(post)
 
     copy_media(media_files, year, slug)
     path = File.join(dir, "#{slug}.json")
@@ -72,6 +74,11 @@ module PostWriter
     %w[mastodon_url bluesky_url bluesky_uri].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
+    # A re-imported draft keeps its preview URL: the token is engine-side
+    # state like the announcement URLs above, and minting a fresh one per
+    # re-import would break every shared preview link.
+    post['draft_token'] = old['draft_token'] if old && old['draft_token'] && post['state'] == 'draft' && !post['draft_token']
+    post = ensure_draft_token(post)
 
     new_dir = File.join(CONTENT_DIR, year)
     new_path = File.join(new_dir, "#{slug}.json")
@@ -102,6 +109,18 @@ module PostWriter
     File.delete(existing_path) if File.expand_path(new_path) != File.expand_path(existing_path)
     index[source_key(post['source'])] = new_path if source_key(post['source'])
     new_path
+  end
+
+  # Every draft carries a token, no matter which path wrote it. The
+  # authoring CLI always set one, but the importers never did -- so a
+  # WordPress draft/pending/private post landed on the live site at
+  # /draft//<slug>/, an address anyone could derive from the slug. The
+  # whole point of the token is that a preview URL can't be guessed.
+  def self.ensure_draft_token(post)
+    return post unless post['state'] == 'draft'
+    return post unless post['draft_token'].to_s.empty?
+
+    post.merge('draft_token' => SecureRandom.hex(8))
   end
 
   # mv with two cautions FileUtils.mv alone doesn't have: the target year

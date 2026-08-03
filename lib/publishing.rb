@@ -5,6 +5,7 @@ require 'fileutils'
 require 'time'
 require_relative 'site_config'
 require_relative 'atomic_write'
+require_relative 'post_writer'
 require_relative 'mastodon_poster'
 require_relative 'bluesky_poster'
 require_relative 'i18n'
@@ -40,20 +41,18 @@ module Publishing
     "#{base_url}/posts/#{year}/#{slug}/"
   end
 
-  # Moves a post's media directory into another year. The year folder
-  # under media.nosync/ is only ever created by a write that has media in
-  # it, so the first post with a photo to reach a given year finds no
-  # parent directory -- and an mv into a missing parent raises ENOENT,
-  # which used to kill the whole scheduled-publish batch (and with it the
-  # rebuild+deploy for the posts that had already gone out).
+  # Moves a post's media directory into another year. Delegates to
+  # PostWriter.move_media_dir for the two cautions a bare mv lacks: the
+  # year folder under media.nosync/ may not exist yet (mkdir_p, or the mv
+  # raises ENOENT -- that one used to kill the whole scheduled-publish
+  # batch), and the target slug directory may already exist as an orphan,
+  # where mv would NEST the source inside it and the page would silently
+  # lose its files. One implementation, both call paths.
   def relocate_media(slug, from_year, to_year)
     return if from_year == to_year
 
-    old_media = File.join(MEDIA_DIR, from_year, slug)
-    return unless Dir.exist?(old_media)
-
-    FileUtils.mkdir_p(File.join(MEDIA_DIR, to_year))
-    FileUtils.mv(old_media, File.join(MEDIA_DIR, to_year, slug))
+    PostWriter.move_media_dir(File.join(MEDIA_DIR, from_year, slug),
+                              File.join(MEDIA_DIR, to_year, slug))
   end
 
   # Rewrites a draft as published under `date`: drops the draft-only

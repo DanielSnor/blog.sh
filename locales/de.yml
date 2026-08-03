@@ -158,7 +158,7 @@ cli:
   left_as_draft: "Bleibt Entwurf. Später veröffentlichen: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nicht verstanden, versuch p / e / s / d / x."
   schedule_date_prompt: "Veröffentlichen am (JJJJ-MM-TT HH:MM, leer = abbrechen): "
-  menu_hint: "↑↓ bewegen · Enter wählen · 1-9 Schnellwahl · Tippen = Slug · Esc zurück"
+  menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
   wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"
   qr_hint: "Mit dem Handy scannen, um die Vorschau zu öffnen."
   announcing: "Kündige an"

@@ -161,7 +161,7 @@ cli:
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Not understood, try p / e / s / d / x."
   schedule_date_prompt: "Publish at (YYYY-MM-DD HH:MM, empty = cancel): "
-  menu_hint: "↑↓ move · Enter select · 1-9 quick pick · type = slug · Esc back"
+  menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
   wizard_continue_prompt: "Press any key to continue…"
   qr_hint: "Scan with your phone to open the preview."
   announcing: "Announcing"

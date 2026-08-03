@@ -239,8 +239,14 @@ begin
       end
       ok = to_upload.size
       if PRUNES
-        orphans.each { |name| manifest.delete(name) }
-        deleted = orphans.size
+        # A backend that can tell WHICH deletes failed (sftp) keeps those
+        # in the manifest, so the prune is retried next run instead of the
+        # file staying live on the target with nothing left knowing it.
+        kept = BACKEND.respond_to?(:failed_orphans) ? BACKEND.failed_orphans : []
+        orphans.each { |name| manifest.delete(name) unless kept.include?(name) }
+        deleted = orphans.size - kept.size
+        failed += kept.size
+        kept.each { |name| log("  ❌ delete failed, kept in manifest: #{name}") }
       end
     else
       failed = 1

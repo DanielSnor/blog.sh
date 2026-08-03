@@ -109,7 +109,15 @@ module Import
           abort('❌ This import needs rexml, which your Ruby install is missing -- `gem install rexml` ' \
                 'or install your distribution\'s fuller Ruby package.')
         end
-        REXML::Document.new(read_source)
+        begin
+          REXML::Document.new(read_source)
+        rescue REXML::ParseException => e
+          # label() parses the document before the run even starts, so a
+          # malformed file used to take the wizard down with a raw REXML
+          # backtrace pages long. One line naming the source and the
+          # actual problem is what the author can act on.
+          abort("❌ #{@source} is not readable as XML: #{e.message.lines.find { |l| !l.strip.empty? }.to_s.strip[0, 120]}")
+        end
       end
     end
 

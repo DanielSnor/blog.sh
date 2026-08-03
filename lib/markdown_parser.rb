@@ -322,7 +322,7 @@ module MarkdownParser
     #    come;
     # 2. incoming_dir -- the write-before-upload shorthand, which lets a
     #    phone-typed markdown line stay short instead of spelling out a full
-    #    path like /app/data/blog/incoming/foto.jpg every time.
+    #    path like <repo>/incoming/foto.jpg every time.
     #
     # A name in neither place still resolves to incoming_dir, so it's that
     # path the author is told to upload to. Without an incoming_dir (e.g.

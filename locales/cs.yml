@@ -152,7 +152,7 @@ cli:
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nerozumím, zkus p / e / s / d / x."
   schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, prázdné = zrušit): "
-  menu_hint: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · psaní = slug · Esc zpět"
+  menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
   wizard_continue_prompt: "Stiskni klávesu pro pokračování…"
   qr_hint: "Naskenuj telefonem a náhled se otevře."
   announcing: "Oznamuji"
