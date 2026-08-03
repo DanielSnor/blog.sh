@@ -189,6 +189,12 @@ end
 # second is directly comparable to the first -- the point of showing both.
 def report(result, dry_run:)
   puts
+  # Said before the counts, so the counts read as what they are -- a
+  # partial tally, not the whole source. The dry-run case matters just as
+  # much: the "type the number of posts" confirmation below quotes this
+  # run's count, and confirming a partial preview should be a decision,
+  # not an accident.
+  puts Tui.paint(t('import.source_died', count: result.scanned, error: result.interrupted), :yellow) if result.interrupted
   puts Tui.paint(t(dry_run ? 'import.would_write' : 'import.written',
                    count: result.written, media: result.media), dry_run ? :cyan : :green)
 

@@ -309,6 +309,7 @@ import:
   rebuilding: "Rebuilding and deploying"
   cancelled: "Cancelled, nothing was written."
   interrupted: "Interrupted. Posts written so far are already in content.nosync/ — re-running the import is safe, it overwrites them in place."
+  source_died: "⚠️  The source stopped answering after %{count} item(s): %{error}. The counts below are a partial tally, not the whole source. Posts already written are saved — re-running is safe, they are matched on their source id and never duplicated."
   source:
     bluesky: "Bluesky"
     instagram: "Instagram (account export)"

@@ -300,6 +300,7 @@ import:
   rebuilding: "Přebuildovávám a nasazuji"
   cancelled: "Zrušeno, nic se nezapsalo."
   interrupted: "Přerušeno. Dosud zapsané posty už jsou v content.nosync/ — opakovaný import je bezpečný, přepíše je na místě."
+  source_died: "⚠️  Zdroj přestal odpovídat po %{count} položkách: %{error}. Čísla níže jsou částečný součet, ne celý zdroj. Už zapsané posty jsou uložené — opakované spuštění je bezpečné, párují se přes source id a nikdy se nezduplikují."
   source:
     bluesky: "Bluesky"
     instagram: "Instagram (export účtu)"

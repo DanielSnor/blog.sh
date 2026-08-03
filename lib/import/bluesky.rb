@@ -79,12 +79,21 @@ module Import
 
     private
 
-    def fetch_page(cursor)
+    # Retried like Tumblr's fetch_page: an account over PAGE_SIZE posts
+    # pages, and a single transient 5xx/429 from the AppView used to kill
+    # the whole run mid-import -- the one adapter that pages over a public
+    # API was also the one without a retry.
+    def fetch_page(cursor, retries = 3)
       url = +"#{APPVIEW}/xrpc/app.bsky.feed.getAuthorFeed" \
              "?actor=#{URI.encode_www_form_component(@handle)}" \
              "&limit=#{PAGE_SIZE}&filter=posts_no_replies"
       url << "&cursor=#{URI.encode_www_form_component(cursor)}" if cursor
       JSON.parse(FeedHttp.get(url))
+    rescue StandardError
+      raise if retries.zero?
+
+      sleep 1
+      fetch_page(cursor, retries - 1)
     end
 
     def quote?(embed)

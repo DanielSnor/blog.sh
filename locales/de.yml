@@ -305,6 +305,7 @@ import:
   rebuilding: "Baue neu und deploye"
   cancelled: "Abgebrochen, nichts geschrieben."
   interrupted: "Unterbrochen. Bereits geschriebene Beiträge liegen in content.nosync/ — den Import erneut auszuführen ist sicher, er überschreibt sie an Ort und Stelle."
+  source_died: "⚠️  Die Quelle hat nach %{count} Einträgen aufgehört zu antworten: %{error}. Die Zahlen unten sind eine Teilsumme, nicht die ganze Quelle. Bereits geschriebene Beiträge sind gespeichert — ein erneuter Lauf ist sicher, sie werden über ihre Source-ID zugeordnet und nie dupliziert."
   source:
     bluesky: "Bluesky"
     instagram: "Instagram (Konto-Export)"
