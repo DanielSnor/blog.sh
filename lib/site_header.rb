@@ -26,15 +26,27 @@ module SiteHeader
   def render(tool: './blog.sh')
     bar = Tui.paint('▍', :cyan)
     short_name = SiteConfig.get('site', 'short_name')
-    description = SiteConfig.get('site', 'description')
     base_url = ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')
 
-    claim = [short_name, description].compact.reject(&:empty?).join(' — ')
-    domain = base_url.to_s.sub(%r{\Ahttps?://}, '').chomp('/')
+    # The same precedence the site's banner overlay uses: banner.claim
+    # when set (the key exists precisely because site.description must
+    # stay plain text), site.description otherwise -- so the identity
+    # block here reads like the identity block on the site. The claim may
+    # carry <br> line breaks; on one terminal line they become a
+    # separator, and any other markup is dropped.
+    claim_text = SiteConfig.get('banner', 'claim') || SiteConfig.get('site', 'description')
+    claim_text = claim_text.to_s.gsub(%r{<br\s*/?>}i, ' · ').gsub(/<[^>]+>/, '').strip
+    claim = [short_name, claim_text].compact.reject(&:empty?).join(' — ')
+
+    # The full URL, protocol included, not a bare domain: terminals
+    # linkify what they see, and a bare domain got mangled into a
+    # punycode guess (https://xn--...) -- with the protocol present the
+    # link is exactly the site's address.
+    url = base_url.to_s.chomp('/')
 
     lines = ["#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}"]
     lines << claim unless claim.empty?
-    lines << Tui.paint(domain, :dim) unless domain.empty?
+    lines << Tui.paint(url, :dim) unless url.empty?
     lines.map { |line| "#{bar}#{line}" }.join("\n")
   end
 end
