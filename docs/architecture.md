@@ -23,6 +23,7 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
   `created_at` (drafts), `type` (explicit content type override).
 - `content` is an array of **typed blocks**: `text` (with `subtype`
   heading1-6/quote), `list`, `table`, `code`, `image`, `video`, `audio`,
+  `file`,
   `link`, `hr`.
 - Inline formatting (bold/italic/strikethrough/code/link) is stored as
   **codepoint offset ranges into plain text**, not nested HTML -- the
@@ -67,6 +68,7 @@ dedup by `source`).
 | `chat` | `lines` -- array of `{name, text}`; `name` may be nil for a continuation line |
 | `hr` | no fields |
 | `image` | `media` (see below); `alt_text`; `caption` |
+| `file` | `media` (`url`, `size` in bytes); `label` -- an attachment offered for download; the post's type becomes `document` when its text is caption-short |
 | `video` | one of three shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
 | `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
 | `link` | `url`; `title`; `description` -- rendered as a link card |

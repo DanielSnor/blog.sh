@@ -118,6 +118,65 @@ is caught too; AVIF, which browsers do display, is left alone). The
 simplest fix is on the phone itself: Settings → Camera → Formats →
 Most Compatible.
 
+## Pinning a post to the front page
+
+`pinned: true` in a published post's header (`./blog.sh edit <slug>`)
+holds it at the top of the front page, marked with a pin in the corner
+of its date badge. It appears there once: while it is still on the front
+page anyway it is lifted to the top rather than shown twice, and once it
+has aged onto `/page/2/` the front page keeps the copy at the top while
+page 2 lists it in its normal place, unmarked.
+
+Only the front page. Type and tag listings, the RSS feed, the sitemap
+and the search index stay strictly chronological -- a pin is a statement
+about the front page, not about the archive. Toggling it costs one or
+two files in a deploy, because pagination is anchored and the front page
+is the only flexible one. Pin a second post and the newest of them wins,
+with a warning in the build output.
+
+## Publishing slots
+
+Set the times posts usually go out and `[s]` stops asking for a date:
+
+```yaml
+publishing:
+  slots:
+    - "mon 09:30"
+    - "wed 09:30"
+    - "fri 09:30"
+    # or a single "daily 09:00"
+```
+
+The draft dialog then names the next FREE slot in the `[s]` choice
+itself, and the prompt offers it: Enter accepts, typing a date overrides
+it, the cancel word backs out. Free means no other scheduled post is
+aimed at that exact time, so three drafts written in one evening queue
+onto three consecutive slots instead of publishing together, and the
+confirmation says which post goes out before this one.
+
+Slots only ever suggest. A post scheduled by hand for 14:17 occupies no
+slot and blocks nobody, nothing moves a post that already has a time,
+and without the key in `config/site.yml` the prompt is the plain one it
+always was. Times follow `site.timezone`, daylight saving included --
+"mon 09:30" is 09:30 on the wall clock on both sides of the change. The
+cron still runs every 15 minutes, so a slot publishes within that window
+of its time.
+
+## Attachments and the document type
+
+A line that is nothing but `[label](handbook.pdf)` -- a bare filename,
+whitelisted extension -- makes the file part of the post: it is picked
+up from `incoming/` exactly like a photo, stored in
+`media.nosync/<year>/<slug>/`, and rendered as a download card showing
+the label, the extension and the file's size. A link to an address stays
+a link; the engine can only publish files it was handed.
+
+Whitelisted: `.pdf .zip .tgz .epub .txt .md .ics .gpx .csv` (`.tar.gz`
+is not, because only the last suffix survives the rename -- use `.tgz`).
+A post whose text is a short line plus attachments is filed under
+DOCUMENTS, which appears in the nav once the first such post exists; a
+longer article that attaches its data stays an article with a file on it.
+
 ## Importing from another platform
 
 `./import.sh` opens its own wizard: pick a source, and it reads the whole

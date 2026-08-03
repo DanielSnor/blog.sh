@@ -78,6 +78,11 @@ deploy step around exactly that. A few of the choices that came out of it:
   post -- no hotlinking to external hosts
 - Post states are `published` / `draft`, with a per-post `draft_token`
   for private preview links
+- A published post can be pinned (`pinned: true`) to the top of the front
+  page -- once, marked in its date badge, and nowhere else in the archive
+- A post can carry files: a lone `[label](handbook.pdf)` line becomes a
+  download card with the file's size, and a short post built around one
+  is filed as a `document`
 
 **Authoring -- `blog.sh` (CLI and interactive wizard)**
 - `add` -- always starts as a draft; after saving, offers a preview and
@@ -86,7 +91,10 @@ deploy step around exactly that. A few of the choices that came out of it:
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
 - `schedule <slug>` -- automatic publishing (toot included) by a cron step
   when the post's date arrives; asks for that date, whether reached as the
-  [s] dialog choice or as its own command; run again to cancel
+  [s] dialog choice or as its own command; run again to cancel. With
+  `publishing.slots` configured it offers the next free slot instead, so
+  several drafts queue onto consecutive slots rather than publishing
+  together
 - `unpublish <slug>` -- returns a post to draft, deletes its announcement;
   gets a fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
@@ -112,7 +120,7 @@ deploy step around exactly that. A few of the choices that came out of it:
   chat transcripts (a ```chat fence), horizontal rules, fenced code blocks
   with a language hint, GFM-style aligned tables, images, video (local
   file or YouTube) with automatic sizing, audio with a native player,
-  backslash escaping
+  file attachments as download cards, backslash escaping
 - The full syntax reference at `/markdown/` is generated directly from
   this parser, so it can't drift out of sync with what's actually supported;
   its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the
@@ -227,6 +235,13 @@ deploy step around exactly that. A few of the choices that came out of it:
   same adapter, so an import can run from cron as well as from the wizard
 - Re-running an import overwrites in place (matched on source id), never
   duplicates
+- A post can be pinned to the top of the front page, and a post can carry
+  files: a lone `[label](handbook.pdf)` line becomes a download card with
+  the file's size, and a short post built around one is filed as a
+  document
+- Optional publishing slots (`mon 09:30`, …) turn `[s]` into a queue:
+  drafts written in one sitting go out on consecutive slots instead of
+  together
 
 ## Stack
 
