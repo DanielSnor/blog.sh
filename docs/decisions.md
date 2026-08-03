@@ -192,6 +192,28 @@ header parsing, YAML-adjacent frontmatter, and a static file server
 for `./blog.sh preview` (`lib/preview_server.rb`, plain `TCPServer`)
 instead of the `webrick`-dependent `ruby -run -e httpd` one-liner.
 
+**HEIC is refused with instructions by default; converting it is an
+opt-in (`media.convert_heic`), never automatic.** The iPhone's default
+photo format displays only in Safari, so silently attaching one puts a
+broken image in front of most readers -- but converting silently would
+mean the site serves a different file than the author handed over, and
+would make an image tool a de-facto dependency of the engine. So the
+default is the same honesty the engine uses elsewhere: stop before
+anything is copied or deleted, name the file, print the exact command.
+The opt-in conversion shells out to whatever the machine already has
+(sips is part of macOS; heif-convert, ImageMagick and vips are probed
+for an actual HEIC delegate first), and a missing or failing tool
+degrades back to the refusal. Detection is by content -- the ftyp box
+-- not extension, so a HEIC named `.jpg` is caught, and AVIF, which
+shares the container but which browsers render natively, is recognized
+and deliberately left alone. A converted staging file in `incoming/`
+counts as consumed by a successful save, exactly like a directly copied
+photo. Pure-Ruby conversion was not an option to reject politely: HEIC
+decoding is HEVC decompression, and a native gem for it would break the
+no-gems promise for real. *Cost:* one more config key, and the
+conversion quality (JPEG, fixed 90) is not configurable -- a knob
+nobody asked for would outlive the question.
+
 **`rexml` is required lazily, inside the two fetchers that need it, not
 at load time.** `rexml` ships as a Ruby *default gem* -- present in a
 normal install, but some distros split their Ruby package and leave

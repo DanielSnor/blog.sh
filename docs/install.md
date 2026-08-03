@@ -23,6 +23,12 @@ site on the internet.
   nginx/Caddy.
 - Optional: a **Mastodon or Bluesky account** (comments, auto-announce,
   sidebar widgets) and **cron** (widget refresh, scheduled publishing).
+- Optional, only with `media.convert_heic: true` (converting iPhone HEIC
+  photos to JPEG on save): an image tool the machine typically already
+  has -- `sips` is part of macOS; on Linux any of `heif-convert`
+  (libheif-examples), ImageMagick with the HEIF delegate, or vips.
+  Without one, the engine refuses the file with instructions instead of
+  breaking; off by default.
 
 ## Quick start
 
