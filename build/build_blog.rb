@@ -1311,6 +1311,61 @@ end
   emit(File.join(dir, 'index.html'), render_post_html(post, post_template))
 end
 
+# A tiny self-contained page, deliberately not layout(): a reader spends a
+# fraction of a second here, and a stub carrying the full nav, CSS and
+# widgets would be a second copy of the site chrome to keep in sync for a
+# page whose entire job is to leave. noindex keeps it out of search
+# results in favour of the canonical target.
+def redirect_stub_html(post)
+  url = "#{SITE_BASE_URL}#{post_path(post)}"
+  <<~HTML
+    <!doctype html>
+    <html lang="#{SITE_LANG}">
+    <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0; url=#{url}">
+    <link rel="canonical" href="#{url}">
+    <meta name="robots" content="noindex">
+    <title>#{h(post['title'] || post['slug'])}</title>
+    </head>
+    <body>
+    <p>#{h(t('redirect.moved'))} <a href="#{url}">#{h(url)}</a></p>
+    </body>
+    </html>
+  HTML
+end
+
+# A renamed post keeps answering at every address it ever had: each entry
+# in former_slugs ("year/slug", frozen at rename time) becomes a one-page
+# stub redirecting to the post's current URL. Emitted after the real
+# pages so a stub can never overwrite one -- if a NEW post has since
+# taken an old address, the live page wins and the skip is said out loud,
+# because a silent stub there would hijack it. Drafts emit nothing: an
+# unpublished post is off the site, old addresses included, and the stubs
+# come back when it does. Stubs stay out of listings, feeds, the sitemap
+# and the search index by construction -- they are not posts.
+posts.each do |post|
+  Array(post['former_slugs']).each do |former|
+    parts = former.to_s.split('/').reject(&:empty?)
+    # "." and ".." can only arrive via a hand-edited JSON (slugify never
+    # emits them), but hand-edited JSON is exactly where this list lives
+    # -- and a ".." here would write the stub outside posts/, up to and
+    # including over the homepage or above public.nosync entirely.
+    unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' }
+      warn "⚠️  #{post['slug']}: unusable former_slugs entry #{former.inspect} -- expected \"year/slug\"."
+      next
+    end
+
+    dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
+    if WRITTEN[dest]
+      warn "⚠️  #{post['slug']}: redirect for #{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
+      next
+    end
+
+    emit(dest, redirect_stub_html(post))
+  end
+end
+
 # Only the homepage takes a pinned post; type and tag listings stay
 # strictly chronological, and the feeds ignore it entirely -- a pin is a
 # statement about the front page, not about the archive.

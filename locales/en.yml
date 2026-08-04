@@ -192,7 +192,7 @@ cli:
   backdated_no_toot: "Post date isn't current (a backdated post), the announcement was not sent."
   schedule_only_drafts: "Post '%{slug}' is already published -- only drafts can be scheduled."
   scheduled_label: "Scheduled: '%{slug}' publishes automatically at %{date}."
-  schedule_cron_note: "Requires the publish-scheduled.sh cron to be installed -- see docs/operations.md. Run schedule again to cancel."
+  schedule_cron_note: "Requires the publish-scheduled.sh cron to be installed -- see docs/operations.md. To cancel: run schedule again, or [n] in the post's properties."
   unscheduled_label: "Schedule cancelled: '%{slug}' stays a draft."
 
   already_published: "Post '%{slug}' is already published: %{url}"
@@ -252,6 +252,7 @@ cli:
     usage:
       ./blog.sh add                  creates a draft, shows a preview and asks what's next
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
+      ./blog.sh props [<slug>]       shows a post's state and its actions (publish, unpublish, rename the slug, delete...)
       ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
@@ -271,16 +272,45 @@ cli:
   wizard_choice_prompt: "Choice: "
   wizard_unknown_choice: "Unknown choice, try again."
   wizard_menu_add: "New post"
-  wizard_menu_edit: "Edit a post"
-  wizard_menu_publish: "Publish a draft (shows a preview, asks what's next)"
-  wizard_menu_schedule: "Schedule a draft (publishes automatically when its date arrives)"
-  wizard_menu_unpublish: "Move a published post back to draft"
-  wizard_menu_delete: "Delete a post (moves it to trash)"
+  wizard_menu_post: "A post -- edit the text, or its properties and actions (publish, rename, delete...)"
   wizard_menu_restore: "Restore a post from trash"
-  wizard_menu_toot: "(Re-)send the comment toot (Mastodon)"
-  wizard_menu_bluesky: "(Re-)send the Bluesky announcement"
   wizard_menu_list: "List of all posts (no editing, just browsing)"
   wizard_menu_rebuild: "Rebuild and deploy the site (not tied to a specific post)"
+  edit_what_prompt: "Edit what? [Enter] the text  [v] properties and actions  [anything else] back: "
+  props_label_state: "state"
+  props_label_scheduled: "scheduled"
+  props_label_type: "type"
+  props_label_tags: "tags"
+  props_label_pinned: "pinned"
+  props_label_announced: "announced"
+  props_draft_banner: "draft -- not on the site, preview only"
+  props_state_published: "published, %{date}"
+  props_pinned_yes: "yes -- held at the top of the front page"
+  props_announces_on_publish: "not yet -- goes out when the post publishes"
+  props_not_announced: "not announced"
+  props_attributes_hint: "Type, tags and the pin are edited in the header when you edit the text."
+  props_actions_draft: "[p] publish  [s] schedule  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_scheduled: "[p] publish now  [s] reschedule  [n] cancel the schedule  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_published: "[u] unpublish  [t] announce (%{network})  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_published_plain: "[u] unpublish  [r] rename slug  [x] delete  [Enter] back: "
+  props_unknown_draft: "Not understood, try p / s / r / x."
+  props_unknown_scheduled: "Not understood, try p / s / n / r / x."
+  props_unknown_published: "Not understood, try u / t / r / x."
+  props_unknown_published_plain: "Not understood, try u / r / x."
+  rename_taken: "Slug '%{slug}' already belongs to another post -- pick a different one."
+  rename_prompt: "New slug (empty = cancel): "
+  rename_unusable: "Nothing usable is left of \"%{input}\" after slugification -- nothing renamed."
+  rename_same: "That is already the post's slug -- nothing to do."
+  rename_confirm: "%{old_url}\n  -> %{new_url}\n  The old address keeps working: it will permanently redirect to the new one."
+  rename_confirm_draft: "%{old} -> %{new} -- the draft's preview address changes with it (share the new link)."
+  rename_go: "Rename? [y/N] "
+  renamed_label: "✅ Renamed: %{slug}"
+
+# The one line on a renamed post's redirect stub -- the page a reader sees
+# for a fraction of a second (or with meta-refresh disabled) at an old
+# address.
+redirect:
+  moved: "This post has moved:"
 
 cron:
   no_scheduled_due: "No scheduled post is due."

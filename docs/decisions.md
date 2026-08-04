@@ -168,6 +168,24 @@ the oldest makes old pages immutable; the landing page absorbs new
 posts and splits only when full. Same reason there's no "page X of Y"
 label: the total would put a changing byte on every page.
 
+**Attributes live in the frontmatter, actions live in a dialog.** A
+post's type, tags and pin are edited where the text is -- prefilled in
+the header of `edit`, so the current state is visible before it's
+changed. Operations with consequences (publish, unpublish, rename,
+delete, the announcement) each get a guarded prompt in the `props`
+dialog instead. The wizard menu then lists activities, not operations:
+five entries, with everything post-shaped reached through the post. The
+CLI commands all remain -- scripts don't navigate menus.
+
+**A slug rename is an action with a permanent redirect, not an
+attribute.** A published slug is an address other people hold; editing it
+like a tag would break every copy of that address silently. So renaming
+is a guarded action that records the old address in the post
+(`former_slugs`) and the build keeps a one-page redirect standing there
+-- for as long as the post itself is published. The address book lives in
+the post's own JSON rather than a separate registry, so it moves,
+backs up and restores with the post and can never orphan.
+
 **Deploys are paranoid by default.** A large swing in file count or total
 bytes aborts (a broken build must never be mirrored), deletion is opt-in
 (`--prune`), manifests are per-backend so switching targets can't inherit

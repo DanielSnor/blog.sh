@@ -183,7 +183,7 @@ cli:
   backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), oznámení se neposlalo."
   schedule_only_drafts: "Post '%{slug}' už je publikovaný — plánovat jde jen drafty."
   scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
-  schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Opětovné schedule plán zruší."
+  schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Zrušení: opětovné schedule, nebo [n] ve vlastnostech postu."
   unscheduled_label: "Plán zrušen: '%{slug}' zůstává draftem."
 
   already_published: "Post '%{slug}' už je publikovaný: %{url}"
@@ -243,6 +243,7 @@ cli:
     usage:
       ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
+      ./blog.sh props [<slug>]       ukáže stav postu a jeho akce (publikovat, stáhnout z webu, přejmenovat slug, smazat…)
       ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
       ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
@@ -262,16 +263,42 @@ cli:
   wizard_choice_prompt: "Volba: "
   wizard_unknown_choice: "Neznámá volba, zkus znovu."
   wizard_menu_add: "Nový příspěvek"
-  wizard_menu_edit: "Upravit příspěvek"
-  wizard_menu_publish: "Publikovat draft (ukáže náhled, zeptá se, co dál)"
-  wizard_menu_schedule: "Naplánovat draft (publikuje se automaticky, až přijde jeho datum)"
-  wizard_menu_unpublish: "Vrátit publikovaný post zpátky do draftu"
-  wizard_menu_delete: "Smazat příspěvek (přesune do koše)"
+  wizard_menu_post: "Příspěvek — upravit text, nebo jeho vlastnosti a akce (publikovat, přejmenovat, smazat…)"
   wizard_menu_restore: "Obnovit příspěvek z koše"
-  wizard_menu_toot: "(Znovu) poslat komentářový toot (Mastodon)"
-  wizard_menu_bluesky: "(Znovu) poslat oznámení na Bluesky"
   wizard_menu_list: "Seznam všech postů (bez editace, jen pro rozkoukání)"
   wizard_menu_rebuild: "Rebuild a nasadit web (bez vazby na konkrétní post)"
+  edit_what_prompt: "Co upravit? [Enter] text  [v] vlastnosti a akce  [cokoliv jiného] zpět: "
+  props_label_state: "stav"
+  props_label_scheduled: "naplánováno"
+  props_label_type: "typ"
+  props_label_tags: "štítky"
+  props_label_pinned: "připnutí"
+  props_label_announced: "oznámení"
+  props_draft_banner: "draft — není na webu, jen náhled"
+  props_state_published: "publikováno, %{date}"
+  props_pinned_yes: "ano — drží se nahoře na úvodní stránce"
+  props_announces_on_publish: "zatím ne — odejde s publikací"
+  props_not_announced: "bez oznámení"
+  props_attributes_hint: "Typ, štítky a připnutí se upravují v hlavičce při editaci textu."
+  props_actions_draft: "[p] publikovat  [s] naplánovat  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_actions_scheduled: "[p] publikovat hned  [s] přeplánovat  [n] zrušit plán  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_actions_published: "[u] stáhnout z webu  [t] oznámit (%{network})  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_actions_published_plain: "[u] stáhnout z webu  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_unknown_draft: "Nerozumím, zkus p / s / r / x."
+  props_unknown_scheduled: "Nerozumím, zkus p / s / n / r / x."
+  props_unknown_published: "Nerozumím, zkus u / t / r / x."
+  props_unknown_published_plain: "Nerozumím, zkus u / r / x."
+  rename_taken: "Slug „%{slug}\" už patří jinému postu — zvol jiný."
+  rename_prompt: "Nový slug (prázdné = zrušit): "
+  rename_unusable: "Ze „%{input}\" po slugifikaci nic použitelného nezbylo — nic se nepřejmenovalo."
+  rename_same: "To už je slug tohohle postu — není co měnit."
+  rename_confirm: "%{old_url}\n  -> %{new_url}\n  Stará adresa funguje dál: bude trvale přesměrovávat na novou."
+  rename_confirm_draft: "%{old} -> %{new} — s tím se změní i adresa náhledu (pošli si nový odkaz)."
+  rename_go: "Přejmenovat? [a/N] "
+  renamed_label: "✅ Přejmenováno: %{slug}"
+
+redirect:
+  moved: "Tenhle příspěvek se přestěhoval:"
 
 cron:
   no_scheduled_due: "Žádný naplánovaný post není na řadě."

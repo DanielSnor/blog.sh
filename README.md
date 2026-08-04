@@ -90,6 +90,10 @@ deploy step around exactly that. A few of the choices that came out of it:
 - `add` -- always starts as a draft; after saving, offers a preview and
   a publish / schedule / keep-as-draft / back-to-editing prompt
 - `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
+- `props <slug>` -- one post's state and its guarded actions in one
+  place: publish, unpublish, (re-)announce, delete, and **renaming the
+  slug without breaking a link** -- the old address stays on the site as
+  a permanent redirect to the new one
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
 - `schedule <slug>` -- automatic publishing (toot included) by a cron step
   when the post's date arrives; asks for that date, whether reached as the
@@ -361,6 +365,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh                      # interactive wizard (menu)
 ./blog.sh add                  # creates a draft, shows a preview, asks what's next
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
+./blog.sh props [<slug>]       # a post's state + actions (publish, rename the slug, delete...)
 ./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
 ./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)

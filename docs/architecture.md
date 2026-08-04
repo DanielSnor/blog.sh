@@ -56,6 +56,8 @@ dedup by `source`).
 | `mastodon_url` | string | the post's comment toot (Mastodon sites), set on publish/`toot` |
 | `bluesky_url` | string | the announcement's human link (Bluesky sites), set on publish/`bluesky` |
 | `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
+| `former_slugs` | array of strings | every address the post used to have, as `"year/slug"` frozen at rename time; the build emits a redirect stub for each (see `props` → rename). Engine-side history like the announcement URLs: edits and re-imports carry it over untouched |
+| `unpublished_from` | string | drafts only -- the `"year/slug"` address the post vacated when it was unpublished. Publishing consumes it: back under a different slug it becomes a `former_slugs` redirect, back under the same one it just disappears |
 
 **Blocks** (`content` array entries), by `type`:
 

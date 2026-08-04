@@ -688,8 +688,12 @@ def publish_draft(slug)
   # If the date is still whatever the template suggested at creation time,
   # the author never touched it, so it publishes with the current time.
   # If they overwrote it, that's a deliberate decision left alone -- so
-  # publishing into the past works too.
-  untouched = post['created_at'] && post['date'] == post['created_at']
+  # publishing into the past works too. A SCHEDULED date is neither: it
+  # is an instruction to the cron, not a hand-picked publication date,
+  # and publishing by hand overtakes that plan -- so it publishes as now
+  # rather than putting a post on the site under a date days in the
+  # future (which is what "publish now" on a scheduled draft used to do).
+  untouched = post['scheduled'] || (post['created_at'] && post['date'] == post['created_at'])
   date = untouched ? Time.now : Time.parse(post['date'])
   puts(untouched ? t('cli.publish_date_now', date: date.strftime(t('date_time_format')))
                  : t('cli.publish_date_kept', date: date.strftime(t('date_time_format'))))
@@ -887,15 +891,22 @@ def cmd_schedule(slug)
   end
 
   if post['scheduled']
-    updated = post.dup
-    updated.delete('scheduled')
-    AtomicWrite.write_json(path, updated)
-    puts t('cli.unscheduled_label', slug: slug)
-    puts
+    unschedule_post(path, post, slug)
     return
   end
 
   prompt_and_schedule(path, post)
+end
+
+# Shared by the CLI toggle above and the [n] action in the properties
+# dialog -- the wizard lost the standalone `schedule` menu item, so
+# without this the dialog could plan a post but never change its mind.
+def unschedule_post(path, post, slug)
+  updated = post.dup
+  updated.delete('scheduled')
+  AtomicWrite.write_json(path, updated)
+  puts t('cli.unscheduled_label', slug: slug)
+  puts
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -934,7 +945,13 @@ def cmd_unpublish(slug)
     warn t('cli.delete_bluesky_failed') unless BlueskyPoster.delete(post['bluesky_uri'])
   end
 
-  updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'])
+  updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
+                       # The address this post just vacated. If it publishes again under a
+                       # different slug (renamed while a draft), Publishing.publish turns
+                       # this into a former_slugs redirect -- otherwise the old public URL
+                       # would 404 with no trace, exactly what renames promise not to do.
+                       # Publishing back under the same address just consumes the marker.
+                       'unpublished_from' => "#{File.basename(File.dirname(path))}/#{slug}")
   updated.delete('mastodon_url')
   updated.delete('bluesky_url')
   updated.delete('bluesky_uri')
@@ -949,6 +966,188 @@ def cmd_unpublish(slug)
   end
 
   draft_decision_loop(final_slug)
+end
+
+# --- properties and actions ------------------------------------------
+#
+# One place that answers "what is the state of this post, and what can be
+# done TO it" -- as opposed to editing its text. Attributes (type, tags,
+# the pin) are shown but deliberately not edited here: they live in the
+# frontmatter of `edit`, prefilled with their current values, one
+# keystroke away from the text they describe. The actions are the guarded
+# operations that each used to be its own wizard menu item -- gathering
+# them under the post is what let the menu shrink to activities.
+
+def props_line(key, value)
+  puts format('  %-12s %s', t("cli.props_label_#{key}"), value) unless value.to_s.empty?
+end
+
+def props_title(post)
+  post['title'] || post['content'].find { |b| b['type'] == 'text' }&.fetch('text', '')&.slice(0, 60) || post['slug']
+end
+
+def cmd_props(slug)
+  network = SiteConfig.comment_network
+  network_label = { mastodon: 'Mastodon', bluesky: 'Bluesky' }[network]
+
+  loop do
+    path = find_post_path(slug)
+    abort t('cli.post_not_found', slug: slug) unless path
+
+    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    year = File.basename(File.dirname(path))
+
+    puts
+    puts "  #{Tui.paint(props_title(post), :bold)}"
+    puts "  #{draft?(post) ? t('cli.props_draft_banner') : "posts/#{year}/#{post['slug']}/"}"
+    puts
+    if draft?(post)
+      # No created/date line for a plain draft, on purpose: a draft has no
+      # time -- its date is set by publishing or scheduling, and showing
+      # anything earlier would suggest it means something.
+      props_line('scheduled', post['scheduled'] ? Time.parse(post['date']).getlocal.strftime(t('date_time_format')) : nil)
+    else
+      props_line('state', t('cli.props_state_published', date: Time.parse(post['date']).getlocal.strftime(t('date_time_format'))))
+    end
+    props_line('type', ContentType.dominant(post))
+    props_line('tags', (post['tags'] || []).join(', '))
+    props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
+    announced = post['mastodon_url'] || post['bluesky_url']
+    props_line('announced', if announced then announced
+                            elsif draft?(post) then t('cli.props_announces_on_publish')
+                            else t('cli.props_not_announced')
+                            end)
+    puts
+    puts Tui.paint(t('cli.props_attributes_hint'), :dim)
+    puts
+
+    if draft?(post)
+      case Tui.key_choice(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'))
+      when 'p' then return publish_draft(slug)
+      when 's'
+        puts
+        prompt_and_schedule(path, post)
+      when 'n'
+        unless post['scheduled']
+          puts t('cli.props_unknown_draft')
+          next
+        end
+        unschedule_post(path, post, slug)
+      when 'r' then slug = rename_post(path, post)
+      when 'x'
+        # Same shape as the [x] branch of draft_decision_loop: a deleted
+        # draft only changes the preview, so the rebuild needs no asking.
+        next unless delete_post(slug)
+
+        rebuild_and_deploy(t('cli.updating_preview'))
+        return
+      when '' then return
+      else puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft')
+      end
+    else
+      case Tui.key_choice(network_label ? t('cli.props_actions_published', network: network_label) : t('cli.props_actions_published_plain'))
+      when 'u'
+        cmd_unpublish(slug)
+        # A cancelled confirmation leaves the post published -- come back
+        # to the dialog rather than ending it. After a real unpublish the
+        # draft decision loop has already offered everything there is.
+        p2 = find_post_path(slug)
+        return if p2.nil? || draft?(JSON.parse(File.read(p2, encoding: 'utf-8')))
+      when 't'
+        unless network_label
+          puts t('cli.props_unknown_published_plain')
+          next
+        end
+        puts
+        network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
+      when 'r' then slug = rename_post(path, post)
+      when 'x'
+        cmd_delete(slug)
+        # Cancelled (the post still exists) -> stay in the dialog.
+        return unless find_post_path(slug)
+      when '' then return
+      else puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain')
+      end
+    end
+  end
+end
+
+# Renaming is an ACTION with a guard, not an attribute: a published slug
+# is a public address, so the old one has to keep answering. The post
+# records every address it ever had (former_slugs, as "year/slug" frozen
+# at rename time), and the build turns each into a one-page redirect stub
+# -- the cost of a rename is one extra page, not a broken link. A draft
+# has no public address yet, so its rename records nothing; only its
+# preview URL changes, which is why that path redeploys the preview.
+#
+# Returns the slug the caller should continue with: the new one after a
+# rename, the old one after any kind of cancel.
+def rename_post(path, post)
+  old_slug = post['slug']
+  year = File.basename(File.dirname(path))
+
+  puts
+  print t('cli.rename_prompt')
+  input = $stdin.gets&.strip.to_s
+  if input.empty?
+    puts t('cli.cancelled')
+    return old_slug
+  end
+
+  new_slug = Slug.slugify(input)
+  if new_slug.empty?
+    puts t('cli.rename_unusable', input: input)
+    return old_slug
+  end
+  if new_slug == old_slug
+    puts t('cli.rename_same')
+    return old_slug
+  end
+
+  # Same guard as edit and publish: the address and the media directory
+  # are both keyed by year/slug, and neither may land on another post's.
+  new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
+  new_media_dir = File.join(MEDIA_DIR, year, new_slug)
+  if File.exist?(new_path) || Dir.exist?(new_media_dir)
+    # Not the shared post_already_exists text: that one says "continuing
+    # would overwrite it -- resolve manually", and a refused rename
+    # neither continues nor needs resolving. Picking another slug does.
+    puts t('cli.rename_taken', slug: new_slug)
+    return old_slug
+  end
+
+  if draft?(post)
+    puts t('cli.rename_confirm_draft', old: old_slug, new: new_slug)
+  else
+    puts t('cli.rename_confirm', old_url: published_url(old_slug, year), new_url: published_url(new_slug, year))
+  end
+  unless Tui.key_choice(t('cli.rename_go')) == t('cli.confirm_yes_char')
+    puts t('cli.cancelled')
+    return old_slug
+  end
+
+  updated = post.merge('slug' => new_slug)
+  unless draft?(post)
+    former = Array(post['former_slugs']).map(&:to_s) + ["#{year}/#{old_slug}"]
+    # A rename back to an earlier slug must not leave that address
+    # redirecting to itself.
+    updated['former_slugs'] = (former.uniq - ["#{year}/#{new_slug}"])
+  end
+
+  # Media first, replacement JSON second, old JSON last -- the same order
+  # edit_post uses, for the same reason: no step may remove the only copy
+  # of anything before its replacement exists.
+  PostWriter.move_media_dir(File.join(MEDIA_DIR, year, old_slug), new_media_dir)
+  AtomicWrite.write_json(new_path, updated)
+  File.delete(path)
+
+  puts Tui.paint(t('cli.renamed_label', slug: new_slug), :green)
+  if draft?(post)
+    rebuild_and_deploy(t('cli.updating_preview'))
+  else
+    maybe_rebuild
+  end
+  new_slug
 end
 
 def cmd_edit(slug)
@@ -1057,6 +1256,13 @@ def edit_post(slug)
   }
   updated['type'] = new_type if new_type
   updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
+  # Same survival rule as the announcement URLs below: former_slugs is not
+  # representable in the frontmatter, so a save that forgot to carry it
+  # over would silently break every redirect the post has accumulated --
+  # and dropping unpublished_from would lose the redirect an unpublished
+  # post's old address is still owed.
+  updated['former_slugs'] = post['former_slugs'] if post['former_slugs']
+  updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
   updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']
@@ -1414,44 +1620,49 @@ end
 
 # --- interactive wizard ---------------------------------------------
 
-# [internal name for dispatch, menu label] -- always without a slug; post
-# selection (if the activity needs it) happens in the matching
-# pick_*_interactively. `toot`/`bluesky` are mutually exclusive by
-# definition (SiteConfig.comment_network) -- showing the one that
-# doesn't apply to this site would just be a guaranteed no-op entry
-# ("use ./blog.sh toot instead"), so the menu only ever offers the one
-# that matches (or neither, on a site with no comment network at all).
-ANNOUNCE_MENU_ENTRY =
-  case SiteConfig.comment_network
-  when :mastodon then [['toot', t('cli.wizard_menu_toot')]]
-  when :bluesky then [['bluesky', t('cli.wizard_menu_bluesky')]]
-  else []
-  end
-
+# [internal name for dispatch, menu label]. The menu lists ACTIVITIES,
+# not every operation the engine has: publish, schedule, unpublish,
+# delete and the announcement all happen to one post the author already
+# has in hand, so they live in that post's properties dialog (and the
+# draft dialog) rather than as five more entries here. The CLI commands
+# for each still exist unchanged -- only the menu stopped listing them.
+# `restore` stays: a post in trash is not reachable through the picker,
+# so it genuinely needs its own way in.
 WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
-  ['edit', t('cli.wizard_menu_edit')],
-  ['publish', t('cli.wizard_menu_publish')],
-  ['schedule', t('cli.wizard_menu_schedule')],
-  ['unpublish', t('cli.wizard_menu_unpublish')],
-  ['delete', t('cli.wizard_menu_delete')],
-  ['restore', t('cli.wizard_menu_restore')],
-  *ANNOUNCE_MENU_ENTRY,
+  ['post', t('cli.wizard_menu_post')],
   ['list', t('cli.wizard_menu_list')],
+  ['restore', t('cli.wizard_menu_restore')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
 ].freeze
+
+# The wizard's one post-shaped entry: pick a post, then choose between
+# its text and its properties. Enter goes straight to the editor, so the
+# common path costs a single extra keypress; the CLI pays nothing --
+# `./blog.sh edit` skips this crossroads entirely and `props` is its own
+# command.
+def wizard_post_entry
+  slug = pick_slug_interactively
+  path = find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  summary = post_summary(path)
+  puts summary_row(summary) if summary
+  puts
+  case Tui.key_choice(t('cli.edit_what_prompt'))
+  when '', 'e' then cmd_edit(slug)
+  when 'v' then cmd_props(slug)
+  else
+    puts t('cli.cancelled')
+    puts
+  end
+end
 
 def run_wizard_choice(command)
   case command
   when 'add' then cmd_add
-  when 'edit' then cmd_edit(pick_slug_interactively)
-  when 'publish' then cmd_publish(pick_draft_interactively)
-  when 'schedule' then cmd_schedule(pick_draft_interactively)
-  when 'unpublish' then cmd_unpublish(pick_published_interactively)
-  when 'delete' then cmd_delete(pick_slug_interactively)
+  when 'post' then wizard_post_entry
   when 'restore' then cmd_restore(pick_trash_interactively)
-  when 'toot' then cmd_toot(pick_published_interactively)
-  when 'bluesky' then cmd_bluesky(pick_published_interactively)
   when 'list' then cmd_list({})
   when 'rebuild' then cmd_rebuild
   end
@@ -1539,6 +1750,9 @@ else
   when 'edit'
     slug = ARGV.shift || pick_slug_interactively
     cmd_edit(slug)
+  when 'props'
+    slug = ARGV.shift || pick_slug_interactively
+    cmd_props(slug)
   when 'delete'
     slug = ARGV.shift || pick_slug_interactively
     cmd_delete(slug)

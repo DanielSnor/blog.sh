@@ -44,6 +44,20 @@ Two changes are worth knowing about before you upgrade, both at the bottom.
   costs first. A URL stays a link, and only whitelisted extensions count.
   A short line plus a file makes a *document* post, and DOCUMENTS appears
   in the nav once the first one exists.
+- **One dialog for a post's properties and actions.** `./blog.sh props
+  <slug>` (in the wizard: pick a post, then `v`) shows a post's state,
+  type, tags, pin and announcement in one place, and offers the guarded
+  actions -- publish or schedule for a draft; unpublish, (re-)announce and
+  delete for a published post. Attributes stay editable where they always
+  were, in the frontmatter of `edit`, prefilled with their current values.
+  The wizard menu shrank to five activities as a result: publish,
+  schedule, unpublish, delete and the announcement are reached through
+  the post now instead of being menu items of their own.
+- **A slug can be renamed without breaking a link.** Renaming (the `[r]`
+  action in that dialog) records every old address in the post itself and
+  the build keeps a one-page redirect standing at each -- so the URL in
+  an old toot keeps resolving. The redirects live and die with the post:
+  unpublishing takes them off the site, republishing brings them back.
 - **HEIC photos are refused with instructions, or converted on request.**
   The iPhone default renders in Safari and nowhere else, so attaching one
   now stops the save and prints the exact conversion command for the
@@ -111,6 +125,11 @@ Two changes are worth knowing about before you upgrade, both at the bottom.
 
 ### Worth knowing before upgrading
 
+- **The wizard menu was renumbered.** It lists five activities now, so a
+  scripted `printf "4\n" | ./blog.sh` picks a different entry than it did
+  in 1.0. The CLI commands are the stable interface and none of them
+  changed -- pipe `./blog.sh unpublish <slug>` instead of navigating the
+  menu by position.
 - **A single file over 100 MB is now refused** -- when a post is saved, so
   you can still do something about it, and again before a deploy sends it.
   One limit for every backend, deliberately, so the site stays portable:

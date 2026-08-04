@@ -189,7 +189,7 @@ cli:
   backdated_no_toot: "Das Beitragsdatum ist nicht aktuell (rückdatierter Beitrag), die Ankündigung wurde nicht verschickt."
   schedule_only_drafts: "Beitrag '%{slug}' ist schon veröffentlicht -- planen lassen sich nur Entwürfe."
   scheduled_label: "Geplant: '%{slug}' wird automatisch veröffentlicht am %{date}."
-  schedule_cron_note: "Setzt den installierten publish-scheduled.sh-Cron voraus -- siehe docs/operations.md. Nochmal schedule ausführen bricht den Plan ab."
+  schedule_cron_note: "Setzt den installierten publish-scheduled.sh-Cron voraus -- siehe docs/operations.md. Abbrechen: nochmal schedule ausführen, oder [n] in den Eigenschaften des Beitrags."
   unscheduled_label: "Planung aufgehoben: '%{slug}' bleibt ein Entwurf."
 
   already_published: "Beitrag '%{slug}' ist schon veröffentlicht: %{url}"
@@ -249,6 +249,7 @@ cli:
     Verwendung:
       ./blog.sh add                  legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+      ./blog.sh props [<slug>]       zeigt Status und Aktionen eines Beitrags (veröffentlichen, zurückziehen, Slug umbenennen, löschen...)
       ./blog.sh publish [<slug>]     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit)
       ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
@@ -268,16 +269,42 @@ cli:
   wizard_choice_prompt: "Auswahl: "
   wizard_unknown_choice: "Unbekannte Auswahl, versuch es nochmal."
   wizard_menu_add: "Neuer Beitrag"
-  wizard_menu_edit: "Beitrag bearbeiten"
-  wizard_menu_publish: "Entwurf veröffentlichen (zeigt eine Vorschau, fragt wie weiter)"
-  wizard_menu_schedule: "Entwurf planen (wird automatisch veröffentlicht, wenn sein Datum erreicht ist)"
-  wizard_menu_unpublish: "Veröffentlichten Beitrag auf Entwurf zurücksetzen"
-  wizard_menu_delete: "Beitrag löschen (wandert in den Papierkorb)"
+  wizard_menu_post: "Ein Beitrag -- den Text bearbeiten, oder seine Eigenschaften und Aktionen (veröffentlichen, umbenennen, löschen...)"
   wizard_menu_restore: "Beitrag aus dem Papierkorb zurückholen"
-  wizard_menu_toot: "Kommentar-Toot (erneut) senden (Mastodon)"
-  wizard_menu_bluesky: "Bluesky-Ankündigung (erneut) senden"
   wizard_menu_list: "Liste aller Beiträge (nur ansehen, kein Bearbeiten)"
   wizard_menu_rebuild: "Seite neu bauen und deployen (unabhängig von einem Beitrag)"
+  edit_what_prompt: "Was bearbeiten? [Enter] den Text  [v] Eigenschaften und Aktionen  [alles andere] zurück: "
+  props_label_state: "Status"
+  props_label_scheduled: "geplant"
+  props_label_type: "Typ"
+  props_label_tags: "Tags"
+  props_label_pinned: "angepinnt"
+  props_label_announced: "Ankündigung"
+  props_draft_banner: "Entwurf -- nicht auf der Website, nur Vorschau"
+  props_state_published: "veröffentlicht, %{date}"
+  props_pinned_yes: "ja -- bleibt oben auf der Startseite"
+  props_announces_on_publish: "noch nicht -- geht mit der Veröffentlichung raus"
+  props_not_announced: "nicht angekündigt"
+  props_attributes_hint: "Typ, Tags und das Anpinnen werden im Kopf bearbeitet, wenn du den Text bearbeitest."
+  props_actions_draft: "[p] veröffentlichen  [s] planen  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_actions_scheduled: "[p] sofort veröffentlichen  [s] umplanen  [n] Plan aufheben  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_actions_published: "[u] zurück auf Entwurf  [t] ankündigen (%{network})  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_actions_published_plain: "[u] zurück auf Entwurf  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_unknown_draft: "Nicht verstanden, versuch p / s / r / x."
+  props_unknown_scheduled: "Nicht verstanden, versuch p / s / n / r / x."
+  props_unknown_published: "Nicht verstanden, versuch u / t / r / x."
+  props_unknown_published_plain: "Nicht verstanden, versuch u / r / x."
+  rename_taken: "Der Slug '%{slug}' gehört bereits einem anderen Beitrag -- wähle einen anderen."
+  rename_prompt: "Neuer Slug (leer = abbrechen): "
+  rename_unusable: "Von \"%{input}\" bleibt nach der Slugifizierung nichts Brauchbares -- nichts umbenannt."
+  rename_same: "Das ist bereits der Slug dieses Beitrags -- nichts zu tun."
+  rename_confirm: "%{old_url}\n  -> %{new_url}\n  Die alte Adresse funktioniert weiter: sie leitet dauerhaft auf die neue um."
+  rename_confirm_draft: "%{old} -> %{new} -- die Vorschau-Adresse des Entwurfs ändert sich mit (teile den neuen Link)."
+  rename_go: "Umbenennen? [j/N] "
+  renamed_label: "✅ Umbenannt: %{slug}"
+
+redirect:
+  moved: "Dieser Beitrag ist umgezogen:"
 
 cron:
   no_scheduled_due: "Kein geplanter Beitrag ist fällig."

@@ -68,6 +68,16 @@ module Publishing
     updated = post.merge('state' => 'published', 'date' => date.iso8601)
     updated.delete('draft_token')
     updated.delete('scheduled')
+    # A post that was unpublished and renamed while a draft comes back
+    # under a new address; the marker cmd_unpublish left behind becomes a
+    # redirect from the old one. Coming back under the SAME address just
+    # consumes the marker -- and the current address is also dropped from
+    # former_slugs, so a rename back to an earlier slug can never leave
+    # an address redirecting to itself (or a build warning that never
+    # goes away).
+    vacated = updated.delete('unpublished_from')
+    former = (Array(updated['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
+    former.empty? ? updated.delete('former_slugs') : updated['former_slugs'] = former
 
     new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
     if new_year != old_year

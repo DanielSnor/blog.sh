@@ -71,7 +71,10 @@ module PostWriter
     # over: what the source says about published/draft wins on re-import,
     # same as it always has.
     old = JSON.parse(File.read(existing_path, encoding: 'utf-8')) rescue nil
-    %w[mastodon_url bluesky_url bluesky_uri].each do |key|
+    # former_slugs is in the list for the same reason as the announcement
+    # URLs: a rename is engine-side history the source can never know
+    # about, and dropping it would break every redirect the post carries.
+    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
     # A re-imported draft keeps its preview URL: the token is engine-side

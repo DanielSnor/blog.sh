@@ -91,6 +91,40 @@ with no escape codes in the output. Colors honor `NO_COLOR` and
 `./blog.sh preview [<port>]` serves the built site locally (default
 port 8000) when you want to look at it without deploying.
 
+### Properties and actions
+
+`./blog.sh props <slug>` (in the wizard: pick a post, then `v`) shows
+everything about one post in one place -- state, type, tags, the pin,
+the announcement -- and offers the guarded actions:
+
+- **published**: unpublish, (re-)announce, rename the slug, delete;
+- **draft**: publish, schedule (or reschedule), rename the slug, delete.
+
+Attributes are shown here but *edited* in the frontmatter of `edit`,
+prefilled with their current values -- one keystroke away from the text
+they describe. The dialog is for the operations that deserve a guard.
+A plain draft shows no time on purpose: a draft has none until
+publishing or scheduling gives it one.
+
+**Renaming a slug** never breaks a link. The old address stays on the
+site as a one-page redirect to the new one, recorded in the post itself
+(`former_slugs`), so it survives edits, re-imports and full rebuilds. A
+rename costs one extra page per old address -- not a 404. Two things to
+know: unpublishing takes the redirects off the site along with the post
+(they return when it does), and deleting the post deletes its old
+addresses' redirects with it. Renaming a draft is free -- nothing is
+published yet -- but its preview URL changes, so share the new link.
+One consequence the redirect can't cover: feed readers identify posts by
+their URL, so a renamed post may appear once more as a new item in
+subscribers' readers. The redirect keeps every clicked link working;
+what a reader app shows is its own business.
+
+The wizard menu lists five activities, not every command: publish,
+schedule, unpublish, delete and the announcement live in this dialog
+(and the draft dialog) instead of being menu items. Every CLI command
+still exists unchanged -- `./blog.sh unpublish <slug>` works exactly as
+before; only the menu stopped listing it.
+
 ## Writing from a phone
 
 The trick is that a bare filename in an image line resolves against the
