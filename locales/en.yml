@@ -119,6 +119,8 @@ cli:
   heic_no_tool: "❌ %{files}: media.convert_heic is on, but no converter was found (tried sips, heif-convert, heif-dec, magick/convert, vips). Nothing was saved. Convert by hand: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC converted via %{tool})."
   heic_convert_failed: "❌ %{file}: HEIC conversion via %{tool} failed -- nothing was saved and the file stays where it is. Convert by hand: %{command}"
+  media_too_large: "❌ %{files}: over the %{limit} per-file limit, which the strictest deploy target refuses -- nothing was saved and the file stays where it is. Shrink it, or leave it out of the post and link to it instead."
+  media_large: "⚠️  %{files}: close to the %{limit} per-file limit. Saved -- but every reader pays for those bytes, so consider shrinking it."
 
   double_frontmatter_error: |
     ❌ There's a second frontmatter header in the text.

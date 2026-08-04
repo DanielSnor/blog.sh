@@ -316,6 +316,56 @@ end
 ref_source = BASE ? "the last accepted build (#{BASE['at']})" : 'the manifest (no accepted build recorded yet)'
 notices = []
 
+# --- per-file size, before the guards -----------------------------------
+#
+# Deliberately ahead of the swing guards: "this file is 152 MB" is
+# something the author can act on, "the file count moved 23%" is not, so
+# the specific message wins when both would fire. Ahead of the baseline
+# write too, so a build the target can never accept never becomes the
+# reference other runs are measured against.
+#
+# Scoped to what this run actually puts on the wire. A snapshot backend
+# copies and force-pushes the whole build every time regardless of what it
+# was handed (see deploy_backend/git.rb), so there an oversized file
+# anywhere in the build really does bring the push down; a per-file backend
+# must not refuse to run over a file it never sends.
+shipped = SNAPSHOT ? all_files : to_upload
+sized = ->(list) { list.map { |name| [name, stats.dig(name, 'size').to_i] } }
+described = ->(list) { list.map { |(name, bytes)| "#{name} (#{FileSize.human(bytes)})" } }
+
+too_large = sized.call(shipped).select { |(_, bytes)| FileSize.classify(bytes) == :hard }
+if too_large.any?
+  abort(<<~MSG)
+    ❌ Stopped: #{too_large.size} file(s) are over the #{FileSize.human(FileSize::HARD_LIMIT)} per-file limit.
+    #{described.call(too_large).map { |line| "     #{line}" }.join("\n")}
+       One limit applies to every backend, so the site stays portable between them -- the strictest
+       supported target (git pages) refuses anything larger, and --force does not lift this: the
+       target would refuse the file on every run. Shrink it, or take it out of the post.
+  MSG
+end
+
+# Already on the target: refusing now would strand a site that accepted such
+# a file before this limit existed, so it is named rather than fatal. The
+# portability it costs is the actual news.
+stale_large = sized.call(all_files - shipped).select { |(_, bytes)| FileSize.classify(bytes) == :hard }
+if stale_large.any?
+  notices << "⚠️  #{described.call(stale_large).join(', ')} already on the target, over the " \
+             "#{FileSize.human(FileSize::HARD_LIMIT)} per-file limit -- this site can no longer be moved " \
+             'to a target that enforces it.'
+end
+
+# Suppressed under --only so a 60 MB video doesn't post the same line into
+# cron mail every half hour from refresh-sidebar.sh.
+unless ONLY
+  soft_large = sized.call(shipped).select { |(_, bytes)| FileSize.classify(bytes) == :soft }
+  if soft_large.any?
+    shown = described.call(soft_large.first(5)).join(', ')
+    more = soft_large.size > 5 ? " and #{soft_large.size - 5} more" : ''
+    notices << "⚠️  Large file(s): #{shown}#{more} -- under the " \
+               "#{FileSize.human(FileSize::HARD_LIMIT)} limit, but every reader pays for those bytes."
+  end
+end
+
 SHRINK_LIMIT = 0.2
 GROWTH_LIMIT = 0.2
 # Bytes swing far more freely than file counts -- one photo is worth a

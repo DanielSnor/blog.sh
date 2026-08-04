@@ -21,6 +21,7 @@ require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/heic_converter'
+require_relative '../lib/file_size'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/publishing'
@@ -231,6 +232,41 @@ def convert_heic_attachments(blocks, media_files)
   end
 end
 
+# Refuses a file the deploy could never place, at the one moment the author
+# can still do something about it. Runs right after the HEIC pass, so the
+# bytes measured are the bytes the page will carry, and -- like that pass --
+# before anything is copied: the abort leaves the source where it is and the
+# text in the editor buffer.
+#
+# Saving with a warning and refusing at deploy time would be the worse pair
+# of halves: the post is on the site's list, the announcement for a
+# scheduled one is already public, and the fix is only available to whoever
+# is watching the deploy. One limit for every backend, so this is the same
+# answer wherever the site is hosted -- see lib/file_size.rb.
+#
+# Only what this save brings in. A file already sitting in the post's media
+# directory was accepted once; re-refusing it would lock an old post out of
+# editing, and the deploy names it there instead.
+def check_attachment_sizes(media_files)
+  # The SOURCE name, like the HEIC refusal uses: media_files maps to the
+  # stored name (01.pdf), which the author has never seen and cannot act on.
+  sized = media_files.filter_map do |src, _filename|
+    next unless src && File.exist?(src)
+
+    [File.basename(src), File.size(src)]
+  end
+  return if sized.empty?
+
+  limit = ->(bytes) { FileSize.human(bytes) }
+  describe = ->(list) { list.map { |(name, bytes)| "#{name} (#{limit.call(bytes)})" }.join(', ') }
+
+  hard = sized.select { |(_, bytes)| FileSize.classify(bytes) == :hard }
+  abort t('cli.media_too_large', files: describe.call(hard), limit: limit.call(FileSize::HARD_LIMIT)) if hard.any?
+
+  soft = sized.select { |(_, bytes)| FileSize.classify(bytes) == :soft }
+  puts t('cli.media_large', files: describe.call(soft), limit: limit.call(FileSize::HARD_LIMIT)) if soft.any?
+end
+
 # --- editor round-trip -------------------------------------------------
 
 # Where the text from the last editor session waits until the post it
@@ -396,6 +432,7 @@ def cmd_add
   blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
   heic_consumed = convert_heic_attachments(blocks, media_files)
+  check_attachment_sizes(media_files)
   fill_image_dimensions(blocks, media_files)
 
   slug_source = title || (blocks.find { |b| b['type'] == 'text' } || {})['text']
@@ -976,6 +1013,7 @@ def edit_post(slug)
   blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
   heic_consumed = convert_heic_attachments(blocks, media_files)
+  check_attachment_sizes(media_files)
   fill_image_dimensions(blocks, media_files, media_dir)
 
   # Checks for a drop in every block type, not just images: markdown can't

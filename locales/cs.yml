@@ -111,6 +111,8 @@ cli:
   heic_no_tool: "❌ %{files}: media.convert_heic je zapnuté, ale žádný převodník se nenašel (zkoušeno sips, heif-convert, heif-dec, magick/convert, vips). Nic se neuložilo. Převeď ručně: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC převeden přes %{tool})."
   heic_convert_failed: "❌ %{file}: převod HEIC přes %{tool} selhal — nic se neuložilo a soubor zůstává, kde je. Převeď ručně: %{command}"
+  media_too_large: "❌ %{files}: nad limitem %{limit} na soubor, který nejstriktnější cíl nasazení odmítne — nic se neuložilo a soubor zůstává, kde je. Zmenši ho, nebo ho z postu vynech a odkaž na něj."
+  media_large: "⚠️  %{files}: blízko limitu %{limit} na soubor. Uloženo — ale ty bajty zaplatí každý čtenář, zvaž zmenšení."
 
   double_frontmatter_error: |
     ❌ V textu je druhá hlavička.
