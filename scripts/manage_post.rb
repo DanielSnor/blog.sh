@@ -688,12 +688,17 @@ def publish_draft(slug)
   # If the date is still whatever the template suggested at creation time,
   # the author never touched it, so it publishes with the current time.
   # If they overwrote it, that's a deliberate decision left alone -- so
-  # publishing into the past works too. A SCHEDULED date is neither: it
-  # is an instruction to the cron, not a hand-picked publication date,
-  # and publishing by hand overtakes that plan -- so it publishes as now
-  # rather than putting a post on the site under a date days in the
-  # future (which is what "publish now" on a scheduled draft used to do).
-  untouched = post['scheduled'] || (post['created_at'] && post['date'] == post['created_at'])
+  # publishing into the past works too.
+  #
+  # A date in the FUTURE is neither, and never a hand-picked publication
+  # date: `schedule` is the only thing that sets one, as an instruction to
+  # the cron. Publishing by hand overtakes that plan, so it means now --
+  # otherwise the post lands on the site dated days ahead, and the CLI
+  # calls it "backdated" while doing it. Covers both the still-scheduled
+  # draft and one whose schedule was just cancelled with [n], which keeps
+  # the date the schedule gave it.
+  future = Time.parse(post['date']) > Time.now
+  untouched = future || (post['created_at'] && post['date'] == post['created_at'])
   date = untouched ? Time.now : Time.parse(post['date'])
   puts(untouched ? t('cli.publish_date_now', date: date.strftime(t('date_time_format')))
                  : t('cli.publish_date_kept', date: date.strftime(t('date_time_format'))))
