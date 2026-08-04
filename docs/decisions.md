@@ -168,11 +168,37 @@ the oldest makes old pages immutable; the landing page absorbs new
 posts and splits only when full. Same reason there's no "page X of Y"
 label: the total would put a changing byte on every page.
 
-**Deploys are paranoid by default.** A >20% swing in file count against
-the last deploy aborts (a broken build must never be mirrored),
-deletion is opt-in (`--prune`), manifests are per-backend so switching
-targets can't inherit foreign state, and every manifest is disposable --
-deleting one costs one full re-upload, never correctness.
+**Deploys are paranoid by default.** A large swing in file count or total
+bytes aborts (a broken build must never be mirrored), deletion is opt-in
+(`--prune`), manifests are per-backend so switching targets can't inherit
+foreign state, and every manifest is disposable -- deleting one costs one
+full re-upload, never correctness.
+
+**The guards measure the build against the build.** They used to compare
+it against the manifest, which is the state of the *target* -- so any
+failed upload knocked their reference out of true, and the patch for that
+was a marker that stood them down until a clean run came along. When the
+failure was permanent, that was never. The reference is now the shape of
+the last build the guards themselves accepted, written before the first
+byte moves, so there is nothing left to switch off. The manifest is still
+allowed to serve as a *floor* for the drop direction, because a partial
+manifest can only ever understate the site: as a floor it can hide a
+drop, never invent one. It is never a reference for growth, which is
+precisely the reading that caused the original defect. Percentages carry
+absolute floors as well, asymmetric on purpose -- a missed increase costs
+transferred bytes that the next `--prune` reclaims, a missed drop deletes
+live pages.
+
+**One file-size limit for every backend, and no key to loosen it.** The
+hosts differ wildly -- GitHub Pages refuses a single file over 100 MiB, a
+plain rsync target refuses nothing -- but a per-backend limit would mean a
+post that saves today becomes undeployable the day the site moves. The
+strictest supported target therefore sets the rule for all of them, and
+the number is decimal (100 MB, ~4.7% under GitHub's limit) so the engine
+refuses before the host does. Refusal happens at save time, where the
+author can still act, as well as at deploy time; a config key would only
+restate the question every installation would then answer differently,
+the same reasoning as the fixed JPEG quality in the HEIC converter.
 
 **Six deploy backends behind one small contract.** The manifest logic
 is target-independent; backends only move bytes. Self-diffing targets

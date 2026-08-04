@@ -14,6 +14,7 @@ require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
+require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 
 SiteConfig.use_site_timezone!
@@ -579,16 +580,11 @@ end
 # an Integer-only test silently stripped width/height off every one of them.
 # And rather than plain `.to_i`, because that raises on the `false` a broken
 # header reader could once produce.
-# Bytes as something a reader can weigh a click against. Binary units
-# would be more correct and less useful: nobody downloading a PDF cares
-# about the difference between MB and MiB.
+# Bytes as something a reader can weigh a click against. Shared with the
+# deploy script and the size limit it enforces, so a size reads the same
+# on an attachment card and in the message that refuses one.
 def human_size(bytes)
-  value = bytes.to_i
-  return nil unless value.positive?
-  return "#{value} B" if value < 1000
-  return "#{(value / 1000.0).round} kB" if value < 1_000_000
-
-  format('%.1f MB', value / 1_000_000.0).sub('.0 ', ' ')
+  FileSize.human(bytes)
 end
 
 def size_attrs(media)

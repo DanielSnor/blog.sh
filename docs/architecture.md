@@ -284,10 +284,25 @@ The deploy script owns the *what*; backends own the *how*:
   records hash+size+mtime of everything the target has. Unchanged
   size+mtime skips even reading the file; everything else is hashed to
   decide. From that fall out `to_upload` and `orphans`.
-- **Safeguards** run before any backend: a >20% drop or growth in file
-  count versus the last deploy aborts (a broken build must not be
-  mirrored), `--prune` is the only deleting flag, `--force` the only
-  override.
+- A **baseline** (`.deploy_baseline.json`, one for *all* backends) records
+  the file count and total bytes of the last build the guards accepted,
+  plus the previous run's outcome. It is the manifest's opposite number:
+  the manifest is the state of the target, the baseline is the shape of
+  the build -- which is why it carries no per-backend suffix.
+- **Safeguards** run before any backend, and measure the build against
+  that baseline rather than against the manifest: an upload failure must
+  not be able to move the yardstick. Four of them -- file count and total
+  bytes, each in both directions -- with percentages plus absolute floors,
+  since 20% of a small build is a couple of files. A drop stops the
+  deploy, as does a jump in file count; a jump in bytes only prints a
+  notice, because attaching media is authoring. A drop may also measure
+  against the manifest when that is larger (every entry in it is a file
+  that really uploaded, so it can only understate the site); growth never
+  does, because the manifest legitimately lags the build. Alongside them a
+  **per-file limit** (`lib/file_size.rb`) refuses a single file over
+  100 MB, both when a post is saved and before a deploy sends it.
+  `--prune` is the only deleting flag, `--force` the only override -- and
+  it does not override the per-file limit, which no target would accept.
 - **Backends** implement one of two shapes: per-file
   `session`/`upload`/`delete` (Surfer's HTTP API, local copies) or a
   single batch `sync` (rsync, rclone and git diff against the target

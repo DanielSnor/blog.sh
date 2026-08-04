@@ -237,25 +237,89 @@ publish/edit flows run it for you. The deploy script alone:
 
 Things worth knowing:
 
-- **The safety guards.** A deploy stops when the file count dropped or
-  grew by more than ~20% versus the last deploy. That almost always
-  means a broken or duplicated build, not intent -- check the build
-  output first. If the change is genuinely intended (bulk import, mass
-  deletion), rerun with `--force`. A deploy that was interrupted is the
-  one exception: it leaves a `.deploy_manifest*.json.incomplete` marker,
-  and the run that resumes it skips both guards once (it says so) --
-  otherwise the half-written manifest would look like an explosion in
-  size and lock out every later deploy, including the ones `./blog.sh`
-  runs for you, which cannot pass `--force`.
+- **The safety guards.** Four of them, all measuring this build against
+  the last build a deploy *accepted* -- recorded in
+  `.deploy_baseline.json` before the first byte goes out, so no upload
+  failure can move it:
+
+  | Guard | Trips at | What it does |
+  | --- | --- | --- |
+  | File count dropped | >20%, at least 8 files | stops |
+  | Total bytes dropped | >50%, at least 25 MB | stops |
+  | File count grew | >20%, at least 25 files | stops |
+  | Total bytes grew | >50% | says so, continues |
+
+  A drop almost always means a broken build; the byte version catches
+  what counts cannot -- the same pages, each nearly empty. Growth in
+  bytes is only a notice, because adding a video is authoring, not a
+  malfunction; a single file too big to host is caught separately and by
+  name (below). If a swing is genuinely intended (bulk import, mass
+  deletion), rerun with `--force`. An empty build is always refused.
+
+  The percentages need those absolute floors to be usable on a small
+  site: 20% of a 32-file build is six files, so two posts published at
+  once would otherwise read as an explosion -- and abort a flow that
+  `./blog.sh` runs for you, which cannot pass `--force`.
+
+  A drop also measures against the manifest when that is larger, since
+  every entry in it is a file that really did upload. Growth never does:
+  the manifest legitimately lags the build after a failed upload or on a
+  fresh target, and reading that lag as growth is exactly what used to
+  disable these guards.
+- **One file-size limit, everywhere.** A single file over 100 MB is
+  refused -- when the post is saved (so you can still shrink it) and
+  again before a deploy sends it. The same limit applies to every
+  backend so the site stays portable: the strictest supported target
+  (git pages) refuses anything larger. `--force` does not lift it, since
+  the target would refuse the file on every run. Files between 50 MB and
+  100 MB are named but allowed. A file already on the target from before
+  this limit existed is reported, not refused.
 - **`--prune` is the only destructive flag.** Without it, files the
   build stopped generating stay live on the target (the deploy log
   counts these "orphans"). With the `git` backend every deploy is a
   snapshot and prunes implicitly -- the log says "(snapshot deploy)".
+- **The previous run's outcome is reported, not acted on.** A deploy that
+  failed or was interrupted says so at the top of the next one, and after
+  three unfinished runs in a row it says that too -- something is being
+  refused every time. Deliberately a warning however high that count
+  goes: stopping after N attempts would be its own dead end.
 - **Manifests are disposable.** `.deploy_manifest*.json` (one per
   backend) records what the target already has. Deleting one is always
-  safe -- the next deploy re-uploads everything once and rebuilds it.
+  safe -- the next deploy re-uploads everything once and rebuilds it. The
+  guards are unaffected, because their reference lives elsewhere.
 - **Switching backends** starts from a fresh manifest on purpose; the
-  first deploy to a new target uploads the whole site.
+  first deploy to a new target uploads the whole site. The baseline is
+  *shared* across backends -- it describes the build, which is the same
+  wherever it goes -- so switching targets no longer leaves the guards
+  with nothing to compare against.
+
+### Checking the guards by hand
+
+`--dry-run` needs no target and writes nothing, which makes it the way to
+prove the guards still behave before trusting a release. Copy a build to a
+scratch directory, point `DEPLOY_TARGET_DIR` at a throwaway path with
+`DEPLOY_BACKEND=local`, and work through the cases that are easy to get
+wrong:
+
+| Set up | `--dry-run` must |
+| --- | --- |
+| Delete one post from a small site | pass -- the absolute floor covers it |
+| Delete most of the build | stop, naming the accepted build it compared against |
+| Publish two posts at once on a small site | pass |
+| Duplicate the build | stop |
+| Baseline intact, manifest truncated, build complete | pass -- this is recovery after a failed upload, and it is the case a naive fix breaks |
+| Same, but the build is also broken | stop |
+| Same file count, contents emptied past 25 MB | stop on bytes |
+| Add one 60 MB file | pass, with a notice |
+| Add one 120 MB file | stop, naming the file |
+| Empty `public.nosync/` | stop |
+| Delete `.deploy_baseline.json` | pass, saying the growth guard stands down once |
+| Any of the above | leave `.deploy_baseline.json` untouched -- a dry run is read-only |
+
+Two things make this easier to reason about: the failure state is anything
+that leaves `last_run.outcome` in `.deploy_baseline.json` set to something
+other than `ok`, and a run under `--only` must never change that file at
+all (that is how the sidebar cron stays out of the way).
 
 ## Cron (sidebar widgets and post stats)
 
@@ -306,11 +370,12 @@ everything generated is rebuildable:
 | `trash/` | optional -- deleted-but-recoverable posts |
 
 Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
-(self-heals with one full re-upload), `incoming/` (transient staging), and
+(self-heals with one full re-upload), `.deploy_baseline.json` (the guards'
+reference; losing it costs one deploy with the growth guard standing down,
+and it is rewritten by that same run), `incoming/` (transient staging), and
 the working files next to them -- `.last-edit.md` (the text from the last
-editor session), `.deploy-pending` and `.deploy_manifest*.json.incomplete`
-(markers that say a deploy still owes the target something; see
-[Deploying](#deploying)).
+editor session) and `.deploy-pending` (a marker that says a scheduled
+publish still owes the target a deploy; see [Deploying](#deploying)).
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
 
@@ -323,7 +388,9 @@ The same list is exactly what to move when changing machines.
 | `Missing env.sh` | Copy the template: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
 | `Missing config/site.yml` | Same idea: `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
 | `Duplicate year/slug ... build stopped` | Two posts resolve to the same URL and media directory. Rename one slug; the build aborts rather than silently overwriting one with the other. |
-| Deploy stopped with a "% drop/increase" message | The shrink/growth guard -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. |
+| Deploy stopped with a "% drop/increase" message | One of the four guards -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. The message names what it compared against, and when. |
+| Deploy or save stopped naming a file over 100 MB | One limit for every backend, so the site stays portable ([Deploying](#deploying)). Shrink the file, or take it out of the post and link to it instead. `--force` does not lift this -- the target would refuse it every run. |
+| `N deploys in a row have not finished` | Something is refused every time: an oversized file, expired credentials, a target that is gone. The guards are still on; the failures listed under that line say which. |
 | `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer UI and update `SURFER_TOKEN`. |
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
 | `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |

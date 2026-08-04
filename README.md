@@ -57,8 +57,10 @@ deploy step around exactly that. A few of the choices that came out of it:
   post is just the reply count on its announcement.
 - **Deploys default to paranoid.** `scripts/deploy-web.sh` diffs a SHA-256 +
   size + mtime manifest so it only ships what changed, and refuses to
-  proceed if the file count swings too far in either direction versus the
-  last deploy -- a bad `--prune` run can't silently empty your site.
+  proceed if the file count or the total bytes swing too far versus the last
+  build it accepted -- a bad `--prune` run can't silently empty your site.
+  A single file too large for the strictest supported target is refused when
+  the post is saved, not discovered at deploy time.
 - **Nothing renders that wasn't asked for.** Sidebar widgets (toots,
   Pixelfed posts, commits, per-post stats) are fetched server-side on a
   cron, never by the visitor's browser -- so there's no client-side call
@@ -189,8 +191,11 @@ deploy step around exactly that. A few of the choices that came out of it:
   SHA-256 + size + mtime manifest means only new/changed files are
   uploaded
 - `--prune` (optional, the one destructive operation), `--dry-run`, `--only=`
-- Safety nets against both a sudden drop and a sudden spike in file count
-  versus the previous deploy
+- Safety nets against a sudden drop or spike in file count *and* in total
+  bytes, measured against the last build a deploy accepted, so a failed
+  upload can't disarm them
+- One file-size limit across every backend (refused at 100 MB, flagged at
+  50 MB), enforced when a post is saved as well as before it ships
 
 **Appearance / UX**
 - Light/dark theme via CSS custom properties and `prefers-color-scheme`, with a manual toggle

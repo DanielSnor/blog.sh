@@ -10,12 +10,16 @@
 # deliberately swallowed into nil: a file these readers can't understand is
 # not an error, just a file without known dimensions.
 #
-# But a nil is not harmless downstream, so anything writing an image block
-# should try hard to get real numbers: `degenerate_image?` in
-# build_blog.rb tests `media['width'].to_i <= 1`, and `nil.to_i` is 0 --
-# so an image block with no dimensions is dropped from the rendered page
-# exactly like a 1x1 tracking pixel. (An earlier version of this comment
-# claimed the opposite; the code has always been the other way.)
+# A nil costs the page its reserved space, not the image: `degenerate_image?`
+# in build_blog.rb returns false when either dimension is unknown, so the
+# block renders and the layout merely jumps once while it loads. Only a real
+# 1x1 -- dimensions present and <= 1 -- is dropped as a tracking pixel. Still
+# worth trying hard for real numbers, but nothing disappears without them.
+#
+# Earlier revisions of this comment said the opposite, in both directions,
+# and the wrong version outlived the behaviour it described long enough to
+# mislead a later change. Check `degenerate_image?` itself before trusting
+# this paragraph.
 module MediaDimensions
   module_function
 
@@ -26,8 +30,8 @@ module MediaDimensions
   # HEIC is deliberately absent: Chrome and Firefox don't render it at all,
   # so knowing its dimensions would only produce a page that works in
   # Safari and shows a broken image to everyone else. Converting it is a
-  # separate, opt-in decision (see media.convert_heic in the roadmap), not
-  # something a dimension reader can paper over.
+  # separate, opt-in decision (`media.convert_heic`, in lib/heic_converter.rb),
+  # not something a dimension reader can paper over.
   def image(path)
     File.open(path, 'rb') do |f|
       head = f.read(30)

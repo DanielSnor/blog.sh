@@ -1347,8 +1347,10 @@ end
 # is copied either way -- since the build stopped treating "size unknown"
 # as a tracking pixel, the image renders instead of vanishing -- but the
 # page can't reserve space for it, and a HEIC won't display anywhere
-# except Safari. (Whether to block or convert those is a per-installation
-# choice: media.convert_heic, on the roadmap.)
+# except Safari. (Whether to refuse or convert those is a per-installation
+# choice: media.convert_heic, handled in convert_heic_attachments above --
+# so by the time this runs, a HEIC only reaches here on an install that
+# left the conversion off.)
 def warn_unreadable_image(file)
   return unless file
 

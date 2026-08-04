@@ -269,7 +269,15 @@ Set `DEPLOY_BACKEND` in env.sh plus the values for your choice, then:
 
 Every later deploy uploads only new/changed files -- a SHA-256 manifest
 (`.deploy_manifest*.json`, one per backend) tracks what the target
-already has.
+already has, while `.deploy_baseline.json` records the shape of the last
+build the safety guards accepted. Both are gitignored and both are
+disposable.
+
+One thing to know before you write your first post with a big attachment:
+a single file over 100 MB is refused, at save time and again at deploy
+time. The limit is the same for every backend so the site stays portable
+between them -- the strictest supported target refuses anything larger.
+See [Deploying](operations.md#deploying) for the rest of the guards.
 
 ### surfer (Cloudron Surfer -- the default)
 

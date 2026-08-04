@@ -10,6 +10,120 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.1 -- unreleased
+
+Four things a site can now do that it couldn't, and one class of defect
+removed from the deploy. Nothing to migrate: `git pull`, rebuild, deploy.
+Two changes are worth knowing about before you upgrade, both at the bottom.
+
+### New
+
+- **A post can be pinned to the front page.** `pinned: true` in a
+  published post's header holds a copy at the top of the first listing
+  page -- only there, because a pin is a statement about the front page,
+  not about the archive: type and tag listings, the feeds and the sitemap
+  stay chronological. Once the post has aged onto page 2 it appears both
+  at the top of page 1 and in its own place on page 2; while it is still
+  on page 1 it appears exactly once. Anchored pagination is untouched, so
+  toggling a pin costs one or two files in a deploy. The pinned copy
+  carries a small mark in the corner of its date badge, using the same
+  neutral colour pair the badge already inverts to on hover.
+- **Publishing slots turn `[s]` into a queue.** `publishing.slots: ["mon
+  09:30", "wed 09:30", "fri 09:30"]` (or a single `"daily 09:00"`) says
+  when posts usually go out, and scheduling then offers the next slot no
+  other scheduled post occupies -- three drafts written in one evening go
+  out on three consecutive slots instead of together. It only ever
+  suggests: typing a date overrides it, a post hand-scheduled for 14:17
+  blocks nobody, and nothing ever moves a post that already has a time.
+  Without the key, the prompt is the one that was there before.
+- **Posts can carry files.** A line that is nothing but
+  `[label](handbook.pdf)` with a bare filename is an attachment, the same
+  way a bare filename in an image line is a photo -- staged through
+  `incoming/`, stored with the post, rendered as a card with the label,
+  the extension and the size, because a download deserves to say what it
+  costs first. A URL stays a link, and only whitelisted extensions count.
+  A short line plus a file makes a *document* post, and DOCUMENTS appears
+  in the nav once the first one exists.
+- **HEIC photos are refused with instructions, or converted on request.**
+  The iPhone default renders in Safari and nowhere else, so attaching one
+  now stops the save and prints the exact conversion command for the
+  machine you are on, leaving the file where it is. Set
+  `media.convert_heic: true` and the engine converts it instead, using
+  whatever it finds (sips, heif-convert, magick, vips) and falling back to
+  the refusal when it finds nothing. Detection is by content, so a HEIC
+  smuggled in as `.jpg` is caught too.
+
+### Deploy safety
+
+- **The guards could be switched off permanently, silently.** They
+  compared the build against the manifest -- the state of the *target* --
+  so every failed upload knocked their reference out of true, and the
+  patch for that was a marker that stood them down until a clean run came
+  along. When the failure was permanent (a file the host refuses, expired
+  credentials, a target that is gone) no clean run ever came, and both
+  guards stayed off for good: a build collapsing from 7500 files to a
+  handful would have been mirrored, `--prune` included. They now measure
+  the build against the last build they accepted, recorded before the
+  first byte moves, so there is nothing left to switch off.
+- **They also fired when they shouldn't.** 20% of a 32-file build is six
+  files, so publishing two posts at once aborted a flow that `./blog.sh`
+  runs for you and which cannot pass `--force`. The percentages carry
+  absolute floors now.
+- **Total bytes are guarded too**, in both directions -- the same file
+  count with every page nearly empty was invisible before. A byte drop
+  stops the deploy; a byte increase only says so, because attaching media
+  is authoring.
+- **An empty build is refused.** With an empty manifest as well, it used
+  to pass every check.
+- **A failing deploy explains itself.** The previous run's outcome is
+  reported at the top of the next one, and three unfinished runs in a row
+  say so explicitly.
+
+### Fixes
+
+- A re-import minted a **duplicate post** whenever the text behind the
+  slug changed at the source -- a fixed typo in an RSS title was enough.
+  Matching is on the source id across the whole archive now, updating in
+  place and keeping the published slug. Two follow-on holes from that same
+  change: a matched post moving across a year boundary could **overwrite a
+  different post** that already owned the path, and two feeds with no
+  readable channel link could collapse onto one identity and overwrite
+  each other.
+- An import whose **source died mid-paging** crashed with a raw backtrace
+  and no summary, so there was no way to know what had already been
+  written.
+- **Imported drafts** landed on the live site at a guessable
+  `/draft//<slug>/` address, without the token that exists to prevent
+  exactly that.
+- The interactive picker **could not be given a slug that starts with a
+  digit**, and the first keypress silently acted on a different post.
+- The pin, the slots and the document type each shipped with a defect
+  found by attacking them rather than testing them: a pin did nothing on
+  any site with fewer than twenty posts, slots could **double-book across
+  a DST change**, and an attachment was **lost on edit** when the repo
+  path contained a space. A second pass then found four more that those
+  fixes had introduced -- among them an attachment losing its size on the
+  first edit and permanently, and `[Handbook](file.pdf "title")` being
+  turned into an upload.
+- The wizard banner showed the site's description where its own header
+  shows a claim, and a bare domain that terminals turned into a punycode
+  guess.
+
+### Worth knowing before upgrading
+
+- **A single file over 100 MB is now refused** -- when a post is saved, so
+  you can still do something about it, and again before a deploy sends it.
+  One limit for every backend, deliberately, so the site stays portable:
+  the strictest supported target (git pages) refuses anything larger, and
+  a post that saves today shouldn't become undeployable the day the site
+  moves. `--force` does not lift it. Files between 50 MB and 100 MB are
+  named but allowed, and one already on the target from before the limit
+  is reported rather than refused.
+- **A new state file, `.deploy_baseline.json`**, holds what the guards
+  measure against. It is gitignored, needs no backup, and losing it costs
+  one deploy with the growth guard standing down. A leftover
+  `.deploy_manifest*.json.incomplete` from 1.0.1 is read once and removed.
+
 ## 1.0.1 -- 2026-08-02
 
 A bug-fix release, from a systematic audit of every flow: authoring,
