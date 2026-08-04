@@ -35,7 +35,11 @@ Two changes are worth knowing about before you upgrade, both at the bottom.
   out on three consecutive slots instead of together. It only ever
   suggests: typing a date overrides it, a post hand-scheduled for 14:17
   blocks nobody, and nothing ever moves a post that already has a time.
-  Without the key, the prompt is the one that was there before.
+  Without the key, the prompt is the one that was there before. The offer
+  names the slots it walked past and who holds them, and a scheduled
+  draft's properties print the whole queue -- an offer of Sunday on a site
+  with a Saturday slot otherwise reads as a queue that skips Saturdays,
+  when the truth is that Saturday was taken.
 - **Posts can carry files.** A line that is nothing but
   `[label](handbook.pdf)` with a bare filename is an attachment, the same
   way a bare filename in an image line is a photo -- staged through

@@ -195,6 +195,21 @@ aimed at that exact time, so three drafts written in one evening queue
 onto three consecutive slots instead of publishing together, and the
 confirmation says which post goes out before this one.
 
+The offer also names the slots it had to walk past, and the post sitting
+in each:
+
+```
+Publish when?
+  Next free slot: Aug 9, 2026 17:30
+  Earlier slots are taken: Aug 6, 2026 17:30 → 'a-post', Aug 8, 2026 08:30 → 'another'
+```
+
+Without that line an offer of Sunday evening on a site whose slots
+include Saturday morning reads as a queue that skips Saturdays -- the
+answer being that Saturday was already taken. The properties dialog of a
+scheduled draft prints the whole queue for the same reason, with an arrow
+on the post you are looking at.
+
 Slots only ever suggest. A post scheduled by hand for 14:17 occupies no
 slot and blocks nobody, nothing moves a post that already has a time,
 and without the key in `config/site.yml` the prompt is the plain one it

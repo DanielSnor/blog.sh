@@ -170,6 +170,8 @@ cli:
   schedule_slot_offer: "Publish when?\n  Next free slot: %{slot}"
   schedule_slot_keys: "  [Enter] accept  ·  your own date (YYYY-MM-DD HH:MM)  ·  \"%{cancel_word}\" = back"
   schedule_queue_position: "  Post %{count} in the queue (previous: '%{slug}', %{date})."
+  schedule_slots_taken: "  Earlier slots are taken: %{list}"
+  props_queue_heading: "The queue (%{count} scheduled):"
   menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
   wizard_continue_prompt: "Press any key to continue…"
   qr_hint: "Scan with your phone to open the preview."

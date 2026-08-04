@@ -578,6 +578,33 @@ def next_publish_slot(slug = nil, entries = nil)
   PublishSlots.next_free(taken: (entries || scheduled_entries(except_slug: slug)).map(&:first))
 end
 
+# The occupied slots the offer had to walk past, in order, with the post
+# sitting in each.
+#
+# Without this the offer states a result and hides its reasoning: a site
+# with Saturday morning in its slots, whose Saturday is already taken, is
+# offered Sunday evening and reads as a feature that skips Saturdays. That
+# is the worst failure mode available -- correct behaviour that looks
+# broken -- and it cost a real "scheduling seems broken" report against a
+# queue that was working exactly as designed.
+#
+# Walks the calendar the same way next_free does (each step asks for the
+# slot after the previous one), so the two can never disagree about what
+# the slots are.
+def slots_passed_over(slot, entries)
+  return [] if slot.nil? || entries.nil? || entries.empty?
+
+  by_minute = entries.each_with_object({}) { |(time, slug), acc| acc[time.to_i / 60] = slug }
+  passed = []
+  cursor = Time.now
+  while (candidate = PublishSlots.next_free(taken: [], from: cursor)) && candidate < slot
+    slug = by_minute[candidate.to_i / 60]
+    passed << [candidate, slug] if slug
+    cursor = candidate
+  end
+  passed
+end
+
 # Position in the queue, for the confirmation line: which scheduled post
 # (if any) goes out immediately before this one.
 def queue_position(time, entries)
@@ -598,6 +625,14 @@ def prompt_and_schedule(path, post)
     # the prompt spells out both the accepting key and the cancel word
     # rather than letting the change happen silently.
     puts t('cli.schedule_slot_offer', slot: slot.strftime(t('date_time_format')))
+    # Why this slot and not an earlier one. Said before the prompt, not in
+    # the confirmation afterwards, because that is when the author is
+    # deciding whether the offer looks right.
+    passed = slots_passed_over(slot, entries)
+    if passed.any?
+      puts t('cli.schedule_slots_taken',
+             list: passed.map { |time, slug| "#{time.strftime(t('date_time_format'))} → '#{slug}'" }.join(', '))
+    end
     puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
     print '> '
   else
@@ -1022,6 +1057,19 @@ def cmd_props(slug)
                             elsif draft?(post) then t('cli.props_announces_on_publish')
                             else t('cli.props_not_announced')
                             end)
+    # The whole queue, after the property list rather than inside it: it is
+    # a block, not a field, and until now the only way to see what goes out
+    # when was opening every draft in turn -- which is also how an offered
+    # slot could look like the wrong one.
+    if post['scheduled'] && (queue = scheduled_entries.sort_by(&:first)).size > 1
+      puts
+      puts Tui.paint(t('cli.props_queue_heading', count: queue.size), :dim)
+      queue.each do |time, queued_slug|
+        mark = queued_slug == post['slug'] ? '→' : ' '
+        puts "  #{mark} #{time.getlocal.strftime(t('date_time_format'))}  #{queued_slug}"
+      end
+    end
+
     puts
     puts Tui.paint(t('cli.props_attributes_hint'), :dim)
     puts
