@@ -161,7 +161,7 @@ cli:
   schedule_slot_offer: "Publikovat kdy?\n  Nejbližší volný slot: %{slot}"
   schedule_slot_keys: "  [Enter] přijmout  ·  vlastní datum (YYYY-MM-DD HH:MM)  ·  „%{cancel_word}\" = zpět"
   schedule_queue_position: "  %{count}. post ve frontě (předchozí: '%{slug}', %{date})."
-  schedule_slots_taken: "  Dřívější sloty jsou obsazené: %{list}"
+  schedule_slots_taken: "  Dřívější sloty jsou obsazené:"
   props_queue_heading: "Fronta (%{count} naplánovaných):"
   menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
   wizard_continue_prompt: "Stiskni klávesu pro pokračování…"

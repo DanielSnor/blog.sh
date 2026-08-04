@@ -630,8 +630,13 @@ def prompt_and_schedule(path, post)
     # deciding whether the offer looks right.
     passed = slots_passed_over(slot, entries)
     if passed.any?
-      puts t('cli.schedule_slots_taken',
-             list: passed.map { |time, slug| "#{time.strftime(t('date_time_format'))} → '#{slug}'" }.join(', '))
+      # One slot per line, like the queue block in the properties dialog:
+      # joined into a sentence, two of them already ran past the width of a
+      # terminal and read as prose to be skimmed rather than a list to be
+      # checked against.
+      puts t('cli.schedule_slots_taken')
+      passed.each { |time, slug| puts "     #{time.strftime(t('date_time_format'))} → '#{slug}'" }
+      puts
     end
     puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
     print '> '

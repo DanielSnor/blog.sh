@@ -167,7 +167,7 @@ cli:
   schedule_slot_offer: "Veröffentlichen wann?\n  Nächster freier Slot: %{slot}"
   schedule_slot_keys: "  [Enter] übernehmen  ·  eigenes Datum (JJJJ-MM-TT HH:MM)  ·  „%{cancel_word}\" = zurück"
   schedule_queue_position: "  %{count}. Beitrag in der Warteschlange (davor: '%{slug}', %{date})."
-  schedule_slots_taken: "  Frühere Slots sind belegt: %{list}"
+  schedule_slots_taken: "  Frühere Slots sind belegt:"
   props_queue_heading: "Die Warteschlange (%{count} geplant):"
   menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
   wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"

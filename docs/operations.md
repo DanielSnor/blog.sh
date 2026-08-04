@@ -201,7 +201,9 @@ in each:
 ```
 Publish when?
   Next free slot: Aug 9, 2026 17:30
-  Earlier slots are taken: Aug 6, 2026 17:30 → 'a-post', Aug 8, 2026 08:30 → 'another'
+  Earlier slots are taken:
+     Aug 6, 2026 17:30 → 'a-post'
+     Aug 8, 2026 08:30 → 'another'
 ```
 
 Without that line an offer of Sunday evening on a site whose slots
