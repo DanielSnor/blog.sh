@@ -1060,6 +1060,7 @@ def cmd_props(slug)
         end
         puts
         network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
+      when 'c' then toggle_pin(path, post, slug)
       when 'r' then slug = rename_post(path, post)
       when 'x'
         cmd_delete(slug)
@@ -1070,6 +1071,31 @@ def cmd_props(slug)
       end
     end
   end
+end
+
+# The pin is the one boolean attribute, and flipping a boolean through a
+# whole editor session was exactly the friction the dialog exists to
+# remove -- so after its first real use it graduated to an action. The
+# header still carries `pinned:` and still works; this is the short way.
+# Unpinning deletes the key rather than writing false, so an unpinned
+# post looks like every other unpinned post.
+def toggle_pin(path, post, slug)
+  if truthy_frontmatter?(post['pinned'])
+    updated = post.dup
+    updated.delete('pinned')
+    AtomicWrite.write_json(path, updated)
+    puts Tui.paint(t('cli.pin_off', slug: slug), :green)
+  else
+    # Only one pin ever shows (the build takes the newest and warns), so
+    # a second one deserves a heads-up naming the first -- not a refusal:
+    # pinning the newer post is almost always the intent, and unpinning
+    # the other one is one [c] away.
+    other = load_posts_summary.find { |p| p[:pinned] && p[:slug] != slug }
+    AtomicWrite.write_json(path, post.merge('pinned' => true))
+    puts Tui.paint(t('cli.pin_on', slug: slug), :green)
+    puts t('cli.pin_other', slug: other[:slug]) if other
+  end
+  maybe_rebuild
 end
 
 # Renaming is an ACTION with a guard, not an attribute: a published slug
@@ -1424,17 +1450,26 @@ def post_summary(file)
 
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
-    state: post['state'] || PUBLISHED, scheduled: post['scheduled'] }
+    state: post['state'] || PUBLISHED, scheduled: post['scheduled'],
+    pinned: truthy_frontmatter?(post['pinned']) }
 rescue JSON::ParserError, SystemCallError => e
   warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
   nil
 end
 
 def state_marker(post)
-  return "  #{Tui.paint('[SCHEDULED]', :cyan)}" if post[:scheduled]
-  return "  #{Tui.paint('[DRAFT]', :yellow)}" if post[:state] == DRAFT
-
-  ''
+  # Pin rides alongside the state, not instead of it: a pinned draft
+  # (the pin survives unpublish) has to show both, or the list would be
+  # the one place that can't answer "which post is pinned?" -- the exact
+  # question that sends someone here.
+  marks = []
+  if post[:scheduled]
+    marks << Tui.paint('[SCHEDULED]', :cyan)
+  elsif post[:state] == DRAFT
+    marks << Tui.paint('[DRAFT]', :yellow)
+  end
+  marks << Tui.paint('[PINNED]', :green) if post[:pinned]
+  marks.empty? ? '' : "  #{marks.join(' ')}"
 end
 
 def summary_row(post)

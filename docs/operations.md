@@ -97,14 +97,19 @@ port 8000) when you want to look at it without deploying.
 everything about one post in one place -- state, type, tags, the pin,
 the announcement -- and offers the guarded actions:
 
-- **published**: unpublish, (re-)announce, rename the slug, delete;
-- **draft**: publish, schedule (or reschedule), rename the slug, delete.
+- **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
+  delete;
+- **draft**: publish, schedule (or reschedule, or cancel the schedule),
+  rename the slug, delete.
 
-Attributes are shown here but *edited* in the frontmatter of `edit`,
+Type and tags are shown here but *edited* in the frontmatter of `edit`,
 prefilled with their current values -- one keystroke away from the text
-they describe. The dialog is for the operations that deserve a guard.
-A plain draft shows no time on purpose: a draft has none until
-publishing or scheduling gives it one.
+they describe. The pin is the exception: it is a switch, not a value,
+so `[c]` flips it right here (the `pinned:` header line keeps working
+too). The pinned post is also marked `[PINNED]` in every list and
+picker, so it can be found without remembering it. A plain draft shows
+no time on purpose: a draft has none until publishing or scheduling
+gives it one.
 
 **Renaming a slug** never breaks a link. The old address stays on the
 site as a one-page redirect to the new one, recorded in the post itself
@@ -154,9 +159,11 @@ Most Compatible.
 
 ## Pinning a post to the front page
 
-`pinned: true` in a published post's header (`./blog.sh edit <slug>`)
-holds it at the top of the front page, marked with a pin in the corner
-of its date badge. It appears there once: while it is still on the front
+The `[c]` action in `./blog.sh props <slug>` pins a published post --
+or unpins it again; `pinned: true` in the post's header
+(`./blog.sh edit <slug>`) does the same thing the long way round. A
+pinned post is held at the top of the front page, marked with a pin in
+the corner of its date badge. It appears there once: while it is still on the front
 page anyway it is lifted to the top rather than shown twice, and once it
 has aged onto `/page/2/` the front page keeps the copy at the top while
 page 2 lists it in its normal place, unmarked.

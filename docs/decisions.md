@@ -169,13 +169,23 @@ posts and splits only when full. Same reason there's no "page X of Y"
 label: the total would put a changing byte on every page.
 
 **Attributes live in the frontmatter, actions live in a dialog.** A
-post's type, tags and pin are edited where the text is -- prefilled in
-the header of `edit`, so the current state is visible before it's
-changed. Operations with consequences (publish, unpublish, rename,
-delete, the announcement) each get a guarded prompt in the `props`
-dialog instead. The wizard menu then lists activities, not operations:
-five entries, with everything post-shaped reached through the post. The
-CLI commands all remain -- scripts don't navigate menus.
+post's type and tags are edited where the text is -- prefilled in the
+header of `edit`, so the current state is visible before it's changed.
+Operations with consequences (publish, unpublish, rename, delete, the
+announcement) each get a guarded prompt in the `props` dialog instead.
+The wizard menu then lists activities, not operations: five entries,
+with everything post-shaped reached through the post. The CLI commands
+all remain -- scripts don't navigate menus.
+
+The pin is the deliberate exception, and it moved on first contact with
+reality: it started as an attribute, and the very first person to unpin
+a post read "pinned: yes" in the dialog and found no way to act on it --
+the dialog sent them into an editor session to flip one boolean. Type
+and tags are *values you write*; the pin is a *switch*, its consequence
+lives on the front page, and a switch behind an editor round-trip is
+exactly the friction the dialog exists to remove. So `[c]` toggles it in
+place, and the frontmatter keeps accepting `pinned:` as before -- two
+doors, one state.
 
 **A slug rename is an action with a permanent redirect, not an
 attribute.** A published slug is an address other people hold; editing it

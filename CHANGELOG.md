@@ -47,12 +47,15 @@ Two changes are worth knowing about before you upgrade, both at the bottom.
 - **One dialog for a post's properties and actions.** `./blog.sh props
   <slug>` (in the wizard: pick a post, then `v`) shows a post's state,
   type, tags, pin and announcement in one place, and offers the guarded
-  actions -- publish or schedule for a draft; unpublish, (re-)announce and
-  delete for a published post. Attributes stay editable where they always
-  were, in the frontmatter of `edit`, prefilled with their current values.
-  The wizard menu shrank to five activities as a result: publish,
-  schedule, unpublish, delete and the announcement are reached through
-  the post now instead of being menu items of their own.
+  actions -- publish or schedule for a draft; unpublish, (re-)announce,
+  pin/unpin and delete for a published post. Type and tags stay editable
+  where they always were, in the frontmatter of `edit`, prefilled with
+  their current values; the pin, being a switch rather than a value,
+  toggles right in the dialog with `[c]` (the header line keeps working
+  too), and the pinned post is marked `[PINNED]` in every list and
+  picker. The wizard menu shrank to five activities as a result:
+  publish, schedule, unpublish, delete and the announcement are reached
+  through the post now instead of being menu items of their own.
 - **A slug can be renamed without breaking a link.** Renaming (the `[r]`
   action in that dialog) records every old address in the post itself and
   the build keeps a one-page redirect standing at each -- so the URL in
