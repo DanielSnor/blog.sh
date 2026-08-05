@@ -21,6 +21,7 @@ require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/heic_converter'
+require_relative '../lib/video_probe'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
@@ -267,6 +268,57 @@ def check_attachment_sizes(media_files)
   puts t('cli.media_large', files: describe.call(soft), limit: limit.call(FileSize::HARD_LIMIT)) if soft.any?
 end
 
+# Two things about a video decide whether a reader sees it, and neither is
+# visible to the person attaching it: the codec inside, and the container
+# around it. A phone records HEVC in a QuickTime .mov by default, so this
+# is the ordinary case, not an exotic one.
+#
+# Said out loud, never refused. HEVC is not HEIC: a HEIC photo displays in
+# Safari and nowhere else, while HEVC plays in the large majority of
+# browsers -- refusing it would take away a video most readers could
+# watch. The size limit already stops the genuinely undeployable files,
+# and on real phone footage the two overlap almost completely (the one
+# HEVC clip in the sample this was measured on was also the only one over
+# 100 MB). What was missing was a sentence while the author can still act.
+#
+# One message per file, not two: an HEVC .mov is both, and the transcode
+# below lands in .mp4 anyway, so saying "repack it" next to "re-encode it"
+# would only offer a command that keeps the codec.
+def check_video_playback(media_files)
+  hevc = []
+  quicktime = []
+  media_files.each_key do |src|
+    next unless src && File.exist?(src) && MarkdownParser.video_path?(src)
+
+    if VideoProbe.hevc?(src)
+      hevc << File.basename(src)
+    elsif File.extname(src).downcase == '.mov'
+      quicktime << File.basename(src)
+    end
+  end
+  hevc.uniq!
+  quicktime.uniq!
+
+  # The command names a real file, the way the HEIC refusal does -- a
+  # placeholder is one more thing to get wrong at the moment someone is
+  # already annoyed. ffmpeg is not on a Mac by default (unlike sips), so
+  # the message says where to get it.
+  puts t('cli.video_hevc', files: hevc.join(', '), command: transcode_command(hevc.first)) if hevc.any?
+  puts t('cli.video_quicktime', files: quicktime.join(', '), command: remux_command(quicktime.first)) if quicktime.any?
+end
+
+def transcode_command(name)
+  "ffmpeg -i #{name.to_s.shellescape} -c:v libx264 -crf 23 -c:a copy #{mp4_name(name).shellescape}"
+end
+
+def remux_command(name)
+  "ffmpeg -i #{name.to_s.shellescape} -c copy #{mp4_name(name).shellescape}"
+end
+
+def mp4_name(name)
+  "#{File.basename(name.to_s, File.extname(name.to_s))}.mp4"
+end
+
 # --- editor round-trip -------------------------------------------------
 
 # Where the text from the last editor session waits until the post it
@@ -433,6 +485,7 @@ def cmd_add
   wait_for_missing_images(missing)
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
+  check_video_playback(media_files)
   fill_image_dimensions(blocks, media_files)
 
   slug_source = title || (blocks.find { |b| b['type'] == 'text' } || {})['text']
@@ -1575,6 +1628,7 @@ def edit_post(slug)
   wait_for_missing_images(missing)
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
+  check_video_playback(media_files)
   fill_image_dimensions(blocks, media_files, media_dir)
   restore_posters(blocks, post['content'])
 

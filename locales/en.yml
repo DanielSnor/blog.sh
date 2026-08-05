@@ -121,6 +121,8 @@ cli:
   heic_convert_failed: "❌ %{file}: HEIC conversion via %{tool} failed -- nothing was saved and the file stays where it is. Convert by hand: %{command}"
   media_too_large: "❌ %{files}: over the %{limit} per-file limit, which the strictest deploy target refuses -- nothing was saved and the file stays where it is. Shrink it, or leave it out of the post and link to it instead."
   media_large: "⚠️  %{files}: close to the %{limit} per-file limit. Saved -- but every reader pays for those bytes, so consider shrinking it."
+  video_hevc: "⚠️  %{files}: recorded as HEVC, which most browsers play but not all -- readers on the rest get an empty player instead of the video. Saved either way. Re-encoding it plays everywhere (needs ffmpeg -- `brew install ffmpeg` on a Mac):\n     %{command}"
+  video_quicktime: "⚠️  %{files}: a QuickTime .mov container. The video inside is fine, but not every browser accepts the container; .mp4 is the one they all take. Saved either way. Repacking copies the video across untouched, no re-encoding (needs ffmpeg):\n     %{command}"
 
   double_frontmatter_error: |
     ❌ There's a second frontmatter header in the text.

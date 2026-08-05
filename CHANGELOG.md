@@ -34,6 +34,16 @@ prints what an installation is running.
 
 ### New
 
+- **A phone video says what it is.** Saving a post with a video now reads
+  the codec out of the file itself and says one line when it matters: an
+  HEVC clip plays in most browsers but not all, and a QuickTime `.mov`
+  carries a container not every browser accepts even when the video
+  inside is ordinary H.264. Both messages come with the `ffmpeg` command
+  that fixes them, naming the actual file. Neither refuses the save --
+  HEVC is not HEIC, and taking away a video most readers could watch
+  would cost more than it saves; the per-file size limit remains the only
+  hard stop. Reading the codec costs about a third of a millisecond on a
+  240 MB file and needs no external tool.
 - **Old addresses can be given up.** `[a]` in `./blog.sh props <slug>`
   lists every address that redirects to the post and drops the one you
   pick. It exists for a state that had no cure: when a new post takes an

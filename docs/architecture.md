@@ -193,8 +193,10 @@ mirrored client-side by `fold()` in search.js), `lib/content_type.rb`
 "quote" means the post's first block is one, and media win only while the
 post's text stays caption-sized -- past 500 characters it's an article
 with illustrations, i.e. text), `lib/media_dimensions.rb`
-(width/height straight from PNG/JPEG/MP4 headers, so pages reserve
-space and never jump).
+(width/height straight from PNG/JPEG/MP4 headers -- EXIF orientation
+included, so a photo taken sideways reserves the space it is shown at),
+`lib/video_probe.rb` (the video track's codec from the same box walk, two
+levels further down at `stsd`, so a save can say that a clip is HEVC).
 
 ## Build pipeline (`build/build_blog.rb`)
 

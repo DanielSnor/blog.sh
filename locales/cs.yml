@@ -113,6 +113,8 @@ cli:
   heic_convert_failed: "❌ %{file}: převod HEIC přes %{tool} selhal — nic se neuložilo a soubor zůstává, kde je. Převeď ručně: %{command}"
   media_too_large: "❌ %{files}: nad limitem %{limit} na soubor, který nejstriktnější cíl nasazení odmítne — nic se neuložilo a soubor zůstává, kde je. Zmenši ho, nebo ho z postu vynech a odkaž na něj."
   media_large: "⚠️  %{files}: blízko limitu %{limit} na soubor. Uloženo — ale ty bajty zaplatí každý čtenář, zvaž zmenšení."
+  video_hevc: "⚠️  %{files}: natočeno v HEVC, což většina prohlížečů přehraje, ale ne všechny — zbytek čtenářů uvidí místo videa prázdný přehrávač. Uloženo tak jako tak. Překódování přehraje všude (potřebuje ffmpeg — na Macu `brew install ffmpeg`):\n     %{command}"
+  video_quicktime: "⚠️  %{files}: kontejner QuickTime .mov. Video uvnitř je v pořádku, ale kontejner nebere každý prohlížeč; .mp4 berou všechny. Uloženo tak jako tak. Přebalení video jen přenese, nic se nepřekódovává (potřebuje ffmpeg):\n     %{command}"
 
   double_frontmatter_error: |
     ❌ V textu je druhá hlavička.

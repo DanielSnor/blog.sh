@@ -268,6 +268,25 @@ no-gems promise for real. *Cost:* one more config key, and the
 conversion quality (JPEG, fixed 90) is not configurable -- a knob
 nobody asked for would outlive the question.
 
+**A phone video is mentioned, not refused -- the opposite of HEIC, and
+for a measurable reason.** A HEIC photo displays in Safari and nowhere
+else; HEVC video plays in the large majority of browsers, so refusing it
+would take away a video most readers could watch. The genuinely
+undeployable files are already stopped by the per-file size limit, and on
+real footage the two almost coincide: of twelve clips straight off a
+phone, exactly one was HEVC -- and it was also the only one over 100 MB.
+What was missing was a sentence at the moment the author can still act,
+so `lib/video_probe.rb` reads the video track's codec out of the file's
+own boxes (no ffprobe, the same box walk `MediaDimensions` already does)
+and the save says one line about it. The `.mov` container gets the same
+treatment for a different reason: the video inside is usually ordinary
+H.264, but not every browser accepts the container, and repacking it to
+`.mp4` copies the video across untouched. Neither message blocks the
+save, and the suggested command names the real file -- ffmpeg is not
+installed on a Mac by default, so the message says where to get it.
+*Cost:* the engine now knows about codecs, which it did not before; a
+new codec that browsers disagree about would need a line here.
+
 **`rexml` is required lazily, inside the two fetchers that need it, not
 at load time.** `rexml` ships as a Ruby *default gem* -- present in a
 normal install, but some distros split their Ruby package and leave

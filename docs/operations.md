@@ -170,6 +170,16 @@ is caught too; AVIF, which browsers do display, is left alone). The
 simplest fix is on the phone itself: Settings → Camera → Formats →
 Most Compatible.
 
+**Video from the same phone is mentioned, not refused.** The same
+setting decides the codec, and the save says one line when it matters:
+that a clip is HEVC (most browsers play it, the rest show an empty
+player), or that it is a QuickTime `.mov` (the video inside is usually
+ordinary H.264, but not every browser accepts the container). Both come
+with the `ffmpeg` command that fixes them -- re-encoding for the codec,
+repacking for the container, which copies the video across untouched.
+The post is saved either way; the only hard stop for a video is the
+per-file size limit, and a long 4K clip reaches that on its own.
+
 ## Pinning a post to the front page
 
 The `[c]` action in `./blog.sh props <slug>` pins a published post --

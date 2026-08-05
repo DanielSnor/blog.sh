@@ -114,6 +114,8 @@ cli:
   heic_convert_failed: "❌ %{file}: HEIC-Umwandlung via %{tool} fehlgeschlagen -- es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Wandle von Hand um: %{command}"
   media_too_large: "❌ %{files}: über dem Limit von %{limit} pro Datei, das das strengste Deploy-Ziel ablehnt -- es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Verkleinere sie, oder lass sie aus dem Beitrag heraus und verlinke sie."
   media_large: "⚠️  %{files}: nahe am Limit von %{limit} pro Datei. Gespeichert -- aber jeder Leser zahlt diese Bytes, überlege eine Verkleinerung."
+  video_hevc: "⚠️  %{files}: als HEVC aufgenommen -- die meisten Browser spielen das ab, aber nicht alle; die übrigen Leser bekommen statt des Videos einen leeren Player. Gespeichert wird es trotzdem. Neu kodiert läuft es überall (braucht ffmpeg -- auf dem Mac `brew install ffmpeg`):\n     %{command}"
+  video_quicktime: "⚠️  %{files}: ein QuickTime-.mov-Container. Das Video darin ist in Ordnung, aber den Container akzeptiert nicht jeder Browser; .mp4 nehmen alle. Gespeichert wird es trotzdem. Das Umpacken kopiert das Video unverändert, ohne neu zu kodieren (braucht ffmpeg):\n     %{command}"
 
   double_frontmatter_error: |
     ❌ Im Text steht ein zweiter Frontmatter-Kopf.
