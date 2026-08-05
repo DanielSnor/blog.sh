@@ -230,8 +230,12 @@ A single linear pass, no framework:
    favicon are per-install files outside git (see decisions.md), so a
    fresh clone renders immediately while an owner's own artwork is never
    overwritten; `defaults/` itself is not published. `config/site.yml`'s 7-key palettes
-   compile into `assets/css/colors.css`; `site.css` itself contains zero
-   color values. `build_favicon_ico` wraps `assets/images/favicon.png` in
+   compile into `assets/css/colors.css`, together with the header's font
+   stacks and sizes and any `@font-face` a site declared for its own files
+   in `assets/fonts/`; `site.css` itself contains zero color values and no
+   site-specific typography. One generated stylesheet rather than two on
+   purpose: it is already linked from the layout, so adding fonts to it
+   changes two files on a deploy instead of every page in the archive. `build_favicon_ico` wraps `assets/images/favicon.png` in
    an ICO container (a 22-byte header, then the PNG verbatim) and emits
    `/favicon.ico` -- pages link the PNG, so this exists purely for clients
    that request the root path without reading the `<link>`. No image

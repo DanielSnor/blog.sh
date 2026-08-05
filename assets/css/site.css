@@ -224,19 +224,23 @@ nav a[aria-current="page"]:hover {
   position: absolute;
   z-index: 2;
   margin: 0;
-  font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
 
-/* Colors come from colors.css (config/site.yml's colors.<mode>.banner_title/
-   banner_claim, independently optional) -- no light/dark override pair
-   needed here, colors.css already carries both modes. */
+/* Colors and fonts both come from colors.css (config/site.yml's
+   colors.<mode>.banner_title/banner_claim and fonts.banner_title/
+   banner_claim, all independently optional) -- no light/dark override pair
+   needed here, colors.css already carries both modes. The font stacks
+   repeat the engine's default as the var() fallback, so a page served with
+   a stylesheet older than this rule still gets a monospace header rather
+   than the browser's default serif. */
 .banner-title {
   top: 20px;
   left: 24px;
   max-width: 60%;
-  font-size: 45px;
+  font-family: var(--banner-title-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
+  font-size: var(--banner-title-size, 45px);
   font-weight: 700;
   line-height: 1.15;
   color: var(--banner-title-color);
@@ -246,16 +250,22 @@ nav a[aria-current="page"]:hover {
   right: 24px;
   bottom: 20px;
   max-width: 55%;
-  font-size: 20px;
+  font-family: var(--banner-claim-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
+  font-size: var(--banner-claim-size, 20px);
   font-weight: 400;
   line-height: 1.35;
   text-align: right;
   color: var(--banner-claim-color);
 }
 
+/* The narrow-screen sizes are scaled from the configured ones rather than
+   written out, so a site that sets its own size keeps the step down on a
+   phone instead of overflowing the banner with it. The factors are the
+   ratios the fixed values always had (30/45, 14/20), and calc() means the
+   configured value can be in any unit -- px, rem, even a clamp(). */
 @media (max-width: 700px) {
-  .banner-title { font-size: 30px; max-width: 65%; }
-  .banner-claim { font-size: 14px; max-width: 65%; }
+  .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); max-width: 65%; }
+  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 65%; }
 }
 
 #theme-toggle {

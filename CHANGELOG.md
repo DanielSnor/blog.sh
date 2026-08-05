@@ -34,6 +34,18 @@ prints what an installation is running.
 
 ### New
 
+- **The header's type comes from the config, like its colours do.**
+  `fonts.banner_title` and `fonts.banner_claim` take a CSS font stack,
+  `fonts.banner_title_size` and `fonts.banner_claim_size` any CSS length,
+  and a site's own web font is one `.woff2` in `assets/fonts/` plus an
+  entry under `fonts.faces` away -- the build writes the `@font-face` and
+  the custom properties into the same generated stylesheet the palette
+  already uses. Say nothing and nothing changes: self-hosted JetBrains
+  Mono at 45px/20px, exactly as before. Narrow screens scale from
+  whatever size is set rather than from a second pair of keys, so a
+  bigger title still steps down on a phone. A declared font file that
+  isn't in `assets/fonts/` is named in the build output instead of
+  silently rendering in the fallback.
 - **A phone video says what it is.** Saving a post with a video now reads
   the codec out of the file itself and says one line when it matters: an
   HEVC clip plays in most browsers but not all, and a QuickTime `.mov`

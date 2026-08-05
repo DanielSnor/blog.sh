@@ -238,3 +238,39 @@ colors:
     pill_bg: "#16324a"
     # banner_title: "#ffffff"
     # banner_claim: "#ffffff"
+
+# Optional, and the typographic half of the section above: the two lines
+# painted over the banner -- the site's name and its claim -- take their
+# font AND size from here. Omit the section (or any key in it) and they
+# stay in the engine's own monospace at 45px/20px, exactly as before these
+# keys existed. The rest of the site's typography is not configurable;
+# this is the header, not a theming system.
+# Rebuild after changing anything here: ./blog.sh rebuild.
+#
+# The *_size keys matter as much as the families: a serif set at the
+# monospace default's 45px fills the banner quite differently, so the pair
+# belongs together. Any CSS length works (px, rem, even clamp()), and the
+# narrow-screen sizes follow automatically -- site.css scales them from
+# these, so a phone still steps down instead of overflowing.
+#
+# Each family key is a CSS font stack, used as written, so system families
+# need nothing else: banner_title: '"Iowan Old Style", Palatino, Georgia,
+# serif' is a complete answer. Title and claim are independent -- a serif
+# name above a sans-serif claim is one line each.
+#
+# To use your OWN font, drop the file into assets/fonts/ and declare it
+# under `faces` first; then name it in the stack. Only the file name is
+# used (no paths), the format follows the extension (.woff2, .woff, .ttf,
+# .otf), `weight` and `style` are optional ("400 700" and normal). A file
+# declared here but missing from assets/fonts/ is named in the build
+# output and skipped -- the site would otherwise render in the fallback
+# and look like the config simply didn't work.
+# fonts:
+#   faces:
+#     - family: "Playfair Display"
+#       file: "playfair-display.woff2"
+#       weight: "400 700"
+#   banner_title: '"Playfair Display", Georgia, serif'
+#   banner_title_size: "52px"
+#   banner_claim: '"Open Sans", Arial, Helvetica, sans-serif'
+#   banner_claim_size: "20px"

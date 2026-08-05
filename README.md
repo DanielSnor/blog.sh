@@ -218,12 +218,20 @@ deploy step around exactly that. A few of the choices that came out of it:
   badge hover, search input background) is derived from those 7, not
   separately configurable. Defaults to blog.sh's own blue palette
   (`DEFAULT_COLORS`) if `colors:` is omitted
-- Banner overlay: `site.short_name` (top-left, ~30px) and `site.description`
-  (bottom-right, ~20px, wraps to multiple lines) render on top of the banner
-  image in self-hosted JetBrains Mono. Each overlay darkens the corner it
-  sits in so it stays readable against any image -- and only that corner,
-  so a banner with both overlays off is shown exactly as authored. See
+- Banner overlay: `site.short_name` (top-left) and `site.description`
+  (bottom-right, wraps to multiple lines) render on top of the banner
+  image. Each overlay darkens the corner it sits in so it stays readable
+  against any image -- and only that corner, so a banner with both
+  overlays off is shown exactly as authored. See
   `.banner-title`/`.banner-claim` in `site.css`.
+- Header typography is config-driven too: `fonts.banner_title` /
+  `fonts.banner_claim` (a CSS font stack each) and
+  `fonts.banner_title_size` / `fonts.banner_claim_size` (any CSS length)
+  compile into the same generated stylesheet as the palette. Drop a
+  `.woff2` into `assets/fonts/`, declare it under `fonts.faces`, and the
+  header is in your own type; say nothing and it stays self-hosted
+  JetBrains Mono at 45px/20px. Narrow screens scale from whatever size is
+  configured, so there is no second pair of keys to keep in sync
   Each independently optional: `banner.show_title`/`show_claim` (default
   true) toggle whether they render at all, `colors.<mode>.banner_title`/
   `banner_claim` override their color per light/dark mode (default: `nav_bg`

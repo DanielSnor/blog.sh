@@ -175,7 +175,9 @@ The example is fully commented. The short version:
   independently), `mastodon` **or** `bluesky` (comments + auto-announce
   -- exactly one, see [step 8](#8-comments-network-optional-mastodon-or-bluesky)),
   `colors` (7 keys per light/dark mode -- omitted keys fall back to the
-  built-in blue palette).
+  built-in blue palette), `fonts` (the banner title's and claim's font
+  stack and size, plus any `.woff2` you put in `assets/fonts/` -- omitted
+  keys fall back to the built-in JetBrains Mono at 45px/20px).
 
 `social` is the row of icons in the footer. Each entry takes `name`,
 `url` and either `icon` (a name from the built-in set) or `icon_svg`
