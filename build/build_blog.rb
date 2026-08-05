@@ -1606,6 +1606,53 @@ emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
 emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts, tags_map, PRESENT_TYPES))
 emit(File.join(PUBLIC_DIR, 'robots.txt'), "User-agent: *\nAllow: /\nSitemap: #{SITE_BASE_URL}/sitemap.xml\n")
 
+# An imported post keeps answering at the addresses its previous platform
+# gave it: redirect_from is a list of site-root paths ("/bitwarden/",
+# "/2020/01/some-post/") an importer writes when the new site lives on the
+# old site's domain. Same stub as former_slugs, different history: that
+# list is machine-managed rename history inside THIS site, this one is
+# where the post lived before it arrived -- the two never mix. The paths
+# are arbitrary, so unlike the former_slugs loop this one runs after
+# EVERYTHING real -- posts, listings, search, feeds, root files -- and a
+# stub yields to whatever the build already produced, out loud.
+REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
+posts.each do |post|
+  Array(post['redirect_from']).each do |origin|
+    parts = origin.to_s.split('/').reject(&:empty?)
+    if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
+      warn "⚠️  #{post['slug']}: unusable redirect_from entry #{origin.inspect} -- expected a site-root path like \"/old-post/\"."
+      next
+    end
+    if REDIRECT_FROM_RESERVED.include?(parts.first)
+      warn "⚠️  #{post['slug']}: redirect_from #{origin.inspect} skipped -- /#{parts.first}/ belongs to the site itself."
+      next
+    end
+
+    # "/2009/05/some-post.html" was a FILE on Blogger, TypePad and
+    # LiveJournal, and a static host answers that request with the literal
+    # path -- a some-post.html/index.html directory would depend on the
+    # server's index fallback for a URL that never had a trailing slash.
+    # Anything else gets the directory-with-index shape former_slugs uses.
+    dest = if parts.last.match?(/\.html?\z/i)
+             File.join(PUBLIC_DIR, *parts)
+           else
+             File.join(PUBLIC_DIR, *parts, 'index.html')
+           end
+
+    # Two lookups, two different collisions: the destination itself, and a
+    # ROOT FILE sitting where the path needs a directory (a stub at
+    # "/rss.xml/whatever/" would need rss.xml to be one). Both end in the
+    # same loud skip -- the build's own output always wins over a stub.
+    prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| WRITTEN[p] }
+    if WRITTEN[dest] || prefix_file
+      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
+      next
+    end
+
+    emit(dest, redirect_stub_html(post))
+  end
+end
+
 removed = prune_public
 
 puts

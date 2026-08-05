@@ -46,6 +46,11 @@ immediately, with no preview pass:
 LIMIT=n works on all of them and imports only the first n posts -- the way to
 sample a large archive before committing hours to it.
 
+When the new site keeps the old blog's domain, imports from sources that
+know their original URLs (WordPress or a feed, Tumblr) can keep the old
+addresses alive: the wizard asks, the scripts take KEEP_PERMALINKS=1, and
+every published post then redirects from the path it used to live at.
+
 Re-running any import is safe: posts are matched on their source id and
 overwritten in place, never duplicated. Nothing is deployed either way --
 the wizard offers a rebuild at the end, the scripts leave that to you.

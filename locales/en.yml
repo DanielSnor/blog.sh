@@ -384,6 +384,7 @@ import:
   bluesky_handle_prompt: "Bluesky handle (empty = cancel): "
   scanned: "read %{count} item(s)…"
   dry_run_running: "Reading %{label} — nothing is written yet…"
+  keep_permalinks_prompt: "Will this site answer on the SAME domain the old blog did? If so, every post keeps its old address as a redirect. [y/N] "
   would_write: "Would write %{count} post(s) and %{media} media file(s)."
   written: "Wrote %{count} post(s) and %{media} media file(s)."
   sample_slugs: "First few slugs:"

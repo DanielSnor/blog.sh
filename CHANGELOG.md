@@ -12,6 +12,25 @@ prints what an installation is running.
 
 ## 1.2 -- unreleased
 
+### New
+
+- **A migrated blog can keep its old addresses.** Posts have a new
+  `redirect_from` key -- a list of site-root paths the post answered at on
+  its previous platform -- and the build serves a redirect at each one,
+  the same stubs a rename has always produced. Importers that know their
+  posts' original URLs write it on request: the wizard asks "will this
+  site answer on the same domain?", the `migrate_feed.rb` and
+  `migrate_tumblr.rb` scripts take `KEEP_PERMALINKS=1`. Old Blogger-style
+  `.html` addresses come out as real files, so those URLs work without any
+  server configuration. WordPress "plain" `?p=123` permalinks cannot be
+  kept (the identity lives in the query string, invisible to a static
+  file) and are counted in the import summary instead. For archives
+  imported before this existed, `scripts/backfill_redirects.rb
+  <old-domain>` writes the same entries from what those imports already
+  stored -- preview by default, `WRITE=1` to apply. Addresses the site
+  itself owns (`/posts/`, `/tag/`, ...) are refused out loud, and a live
+  page always wins over a redirect.
+
 ### Changed
 
 - The "what next?" menu after a save reads in flow order --

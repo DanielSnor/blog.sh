@@ -52,6 +52,19 @@ duplicated.
 - **Progress is narrated** -- what's being read and how big it is, then a
   running counter. A silent minute means something is wrong, not that it's
   working.
+- **Old addresses can survive the move.** When the new site answers on the
+  same domain the old blog did, sources that know their original URLs
+  (WordPress/feed and Tumblr today) can record each published post's old
+  path as `redirect_from` -- the build then serves a redirect at every one
+  of them, so nothing anyone ever linked goes dark. The wizard asks; the
+  scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
+  other, the old paths were never yours to answer. Posts with no usable
+  path (WordPress "plain" `?p=123` permalinks live in the query string,
+  which a static file can never see) are counted in the summary and
+  imported without a redirect. For an archive imported before this
+  existed, `scripts/backfill_redirects.rb <old-domain>` adds the same
+  entries from what the import already stored -- preview by default,
+  `WRITE=1` to apply.
 - **Nothing deploys by itself.** The wizard offers a rebuild at the end; the
   scripts leave both to you.
 

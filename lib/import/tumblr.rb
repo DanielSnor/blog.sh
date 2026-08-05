@@ -5,6 +5,7 @@ require 'net/http'
 require 'time'
 require 'uri'
 require_relative '../slug'
+require_relative 'permalinks'
 
 module Import
   # Imports a Tumblr blog through the API in NPF format. Every post on the
@@ -16,10 +17,16 @@ module Import
   class Tumblr
     PAGE_SIZE = 20
 
-    def initialize(blog, api_key:)
+    # Same writer-not-option shape as Feed, for the same reason: the
+    # wizard asks about permalinks after the adapter exists.
+    attr_accessor :keep_permalinks
+
+    def initialize(blog, api_key:, keep_permalinks: false)
       @blog = blog
       @api_key = api_key
       @account = blog.split('.').first
+      @keep_permalinks = keep_permalinks
+      @unmapped_permalinks = 0
     end
 
     def label
@@ -63,11 +70,12 @@ module Import
       title, blocks = extract_title(blocks)
       return :empty if blocks.empty? && title.nil?
 
-      {
+      state = item['state'] == 'published' ? 'published' : 'draft'
+      post = {
         'slug' => build_slug(item),
         'title' => title,
         'date' => Time.parse(item['date']).iso8601,
-        'state' => item['state'] == 'published' ? 'published' : 'draft',
+        'state' => state,
         'tags' => item['tags'] || [],
         'content' => blocks,
         'source' => {
@@ -77,6 +85,19 @@ module Import
           'original_id' => item['id']
         }
       }
+      # post_url carries whatever domain the blog answers at -- the custom
+      # domain if it has one, which is the only case the wizard says yes in.
+      if @keep_permalinks && state == 'published'
+        path = Permalinks.local_path(item['post_url'])
+        path ? post['redirect_from'] = [path] : @unmapped_permalinks += 1
+      end
+      post
+    end
+
+    def postscript
+      return nil if @unmapped_permalinks.zero?
+
+      "#{@unmapped_permalinks} post(s) had no usable original address -- imported without a redirect."
     end
 
     private

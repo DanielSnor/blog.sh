@@ -9,6 +9,13 @@
 #   ruby scripts/migrate_feed.rb <path-to-wordpress-export.xml>
 #   ruby scripts/migrate_feed.rb https://example.com/feed/
 #   LIMIT=20 ruby scripts/migrate_feed.rb <source>          # trial run
+#   KEEP_PERMALINKS=1 ruby scripts/migrate_feed.rb <source> # same-domain move
+#
+# KEEP_PERMALINKS=1 records each published post's original path (from the
+# feed's own <link>) as a redirect_from entry, so the address keeps working
+# after the move. Only say it when the new site will answer on the SAME
+# domain the old one did -- on any other domain the old paths were never
+# yours to answer.
 #
 # One command for both because they are one format: a WordPress WXR export
 # is RSS 2.0 with a wp: namespace layered on, so the file itself says which
@@ -31,4 +38,5 @@ require_relative '../lib/import/feed'
 
 source = ARGV[0] || abort('usage: migrate_feed.rb <export.xml | feed-url>')
 
-Import::Cli.run(Import::Feed.new(source), limit: Import::Cli.limit_from_env)
+Import::Cli.run(Import::Feed.new(source, keep_permalinks: Import::Cli.keep_permalinks_from_env),
+                limit: Import::Cli.limit_from_env)

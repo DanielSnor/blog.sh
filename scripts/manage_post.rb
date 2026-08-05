@@ -1858,6 +1858,7 @@ def edit_post(slug)
   former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
   updated['former_slugs'] = former unless former.empty?
   updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
+  updated['redirect_from'] = post['redirect_from'] if post['redirect_from']
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
   updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']

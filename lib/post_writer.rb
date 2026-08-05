@@ -82,7 +82,11 @@ module PostWriter
     # importer that legitimately provides one still wins. `type` stays out:
     # absent, the build re-derives it from the (re-imported) blocks, so it
     # comes back on its own.
-    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at].each do |key|
+    # redirect_from rides along too: the importer that understands the
+    # source platform writes it once, and a later re-import from an export
+    # that carries no URL history (or a different importer entirely) must
+    # not silently drop the addresses the post still answers for.
+    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at redirect_from].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
     # A re-imported draft keeps its preview URL: the token is engine-side

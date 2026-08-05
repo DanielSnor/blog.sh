@@ -5,6 +5,7 @@ require 'uri'
 require_relative '../feed_http'
 require_relative '../slug'
 require_relative 'html_blocks'
+require_relative 'permalinks'
 
 module Import
   # One adapter for three inputs, because they are one format wearing two
@@ -24,8 +25,15 @@ module Import
     POST_STATES = { 'publish' => 'published', 'draft' => 'draft', 'pending' => 'draft',
                     'private' => 'draft', 'future' => 'draft' }.freeze
 
-    def initialize(source)
+    # keep_permalinks is a writer, not just an option, because the wizard
+    # only learns the answer after the adapter exists: the question is
+    # asked once the source is chosen, right before the dry-run.
+    attr_accessor :keep_permalinks
+
+    def initialize(source, keep_permalinks: false)
       @source = source
+      @keep_permalinks = keep_permalinks
+      @unmapped_permalinks = 0
     end
 
     def label
@@ -77,11 +85,12 @@ module Import
       return :empty if blocks.empty?
 
       date = item_date(item)
-      {
+      state = item_state(item)
+      post = {
         'slug' => item_slug(item),
         'title' => text_of(item, 'title'),
         'date' => date.iso8601,
-        'state' => item_state(item),
+        'state' => state,
         'tags' => item_tags(item),
         'content' => blocks,
         'source' => {
@@ -91,6 +100,22 @@ module Import
           'original_id' => item_id(item)
         }.compact
       }
+      # The WXR <link> is the post's real published address whatever the
+      # site's permalink structure was -- better data than WordPress's own
+      # importer reads. Drafts never had a public address, and a plain
+      # "?p=123" permalink has its identity in the query string, which a
+      # static stub can never answer -- those are counted, not guessed at.
+      if @keep_permalinks && state == 'published'
+        path = Permalinks.local_path(item_link(item))
+        path ? post['redirect_from'] = [path] : @unmapped_permalinks += 1
+      end
+      post
+    end
+
+    def postscript
+      return nil if @unmapped_permalinks.zero?
+
+      "#{@unmapped_permalinks} post(s) had no usable original address (plain \"?p=123\" permalinks have their identity in the query string) -- imported without a redirect."
     end
 
     private

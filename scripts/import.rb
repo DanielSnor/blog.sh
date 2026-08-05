@@ -243,6 +243,16 @@ def confirmed?(count)
 end
 
 def run_import(adapter)
+  # Asked per adapter capability, not per platform list, so any future
+  # importer that stores original addresses gets the question for free.
+  # The default is no: a wrong yes writes redirects to addresses that were
+  # never this domain's to answer, a wrong no just loses a convenience the
+  # re-import (source-id matched, so safe) can add back later.
+  if adapter.respond_to?(:keep_permalinks=)
+    puts
+    adapter.keep_permalinks = Tui.key_choice(t('import.keep_permalinks_prompt')) == t('cli.confirm_yes_char')
+  end
+
   puts
   puts t('import.dry_run_running', label: adapter.label)
   preview = Import::Run.new(adapter, dry_run: true, on_scan: scan_reporter).call
