@@ -12,6 +12,13 @@ prints what an installation is running.
 
 ## 1.2 -- unreleased
 
+### Changed
+
+- The "what next?" menu after a save reads in flow order --
+  `[d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete` --
+  the states a post moves through, rather than most-frequent-first. The
+  keys are unchanged.
+
 ### New
 
 - **The queue got its own screen.** `./blog.sh queue` (and a matching
