@@ -34,6 +34,21 @@ prints what an installation is running.
 
 ### New
 
+- **An interrupted post is offered back instead of just kept.** The text
+  from an editor session has always survived an aborted save in
+  `.last-edit.md`, but recovering it meant copying the file out by hand
+  before the next `add`/`edit` overwrote it. Now the next `add`/`edit`
+  finds it, says what it is and when it was written, and asks: `[r]`
+  opens the editor on it, `[d]` discards it, `[c]` continues without it.
+  No blank-Enter default anywhere in that prompt -- a stray return can
+  neither restore old text into a new post nor throw away the only copy.
+  A new `.last-edit.meta` records which command wrote the buffer, so text
+  from an interrupted `edit <slug>` is only ever restored into that same
+  post: offering it to `add` would quietly produce a second post instead
+  of continuing the first, and the prompt names the command that does
+  continue it. Closing an editor without typing anything no longer
+  overwrites the buffer either -- that is how a recovered post used to
+  disappear a second time.
 - **The header's type comes from the config, like its colours do.**
   `fonts.banner_title` and `fonts.banner_claim` take a CSS font stack,
   `fonts.banner_title_size` and `fonts.banner_claim_size` any CSS length,

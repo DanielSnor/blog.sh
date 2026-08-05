@@ -329,17 +329,129 @@ end
 # that and aborts. Without this copy those aborts threw the article away.
 EDITOR_BUFFER_PATH = File.join(ROOT, '.last-edit.md')
 
-def keep_editor_buffer(text)
+# What the buffer was written by, next to the buffer itself rather than
+# inside it. A marker line in the .md would travel with the text into the
+# post if someone recovered the file by hand, and this file has to survive
+# being read by a human with an editor.
+#
+# It is what makes recovery safe rather than merely possible: text from an
+# interrupted `edit <slug>` restored into an `add` would silently create a
+# SECOND post instead of continuing the first, and nothing afterwards could
+# tell the two apart.
+EDITOR_BUFFER_META_PATH = File.join(ROOT, '.last-edit.meta')
+
+def keep_editor_buffer(text, origin = nil)
   File.write(EDITOR_BUFFER_PATH, text)
   File.chmod(0o600, EDITOR_BUFFER_PATH)
+  return unless origin
+
+  File.write(EDITOR_BUFFER_META_PATH, JSON.generate(origin.merge('saved_at' => Time.now.iso8601)))
+  File.chmod(0o600, EDITOR_BUFFER_META_PATH)
 rescue SystemCallError
   nil # a buffer we can't write is not a reason to refuse the save
 end
 
 def discard_editor_buffer
-  File.delete(EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
+  [EDITOR_BUFFER_PATH, EDITOR_BUFFER_META_PATH].each { |path| File.delete(path) if File.exist?(path) }
 rescue SystemCallError
   nil
+end
+
+def editor_buffer_origin
+  return nil unless File.exist?(EDITOR_BUFFER_META_PATH)
+
+  JSON.parse(File.read(EDITOR_BUFFER_META_PATH, encoding: 'utf-8'))
+rescue StandardError
+  nil # an unreadable marker means "unknown origin", not a broken CLI
+end
+
+# Asked at the start of `add`/`edit`, before this session's editor can
+# overwrite the buffer. Returns the text to open the editor with, or nil
+# for "start from the usual template".
+#
+# The buffer has been written since the very first version of this file --
+# what was missing was anyone ever offering it back. The engine said "your
+# text is in .last-edit.md", and the author then had to copy it out by
+# hand before the next add/edit overwrote it. Real use found that friction
+# the hard way: a save aborted on a missing attachment, and a whole post
+# had to be reassembled from a file the CLI was about to overwrite.
+#
+# No blank-Enter default anywhere here: every branch is an explicit key, so
+# a stray return can neither restore old text into a new post nor throw
+# away the only copy of something.
+def offer_editor_buffer(kind, slug = nil)
+  text = read_editor_buffer
+  return nil unless text
+
+  origin = editor_buffer_origin
+  matches = origin && origin['kind'] == kind && origin['slug'].to_s == slug.to_s
+
+  puts
+  puts describe_editor_buffer(text, origin)
+  # A buffer from a different operation is NOT offered for restoring: this
+  # is the whole reason the marker file exists. Naming the command that
+  # would restore it turns a refusal into directions.
+  puts t('cli.buffer_belongs_elsewhere', command: buffer_command(origin)) unless matches
+
+  loop do
+    key = Tui.key_choice(t(matches ? 'cli.buffer_prompt' : 'cli.buffer_prompt_foreign'))
+    case key
+    when 'r'
+      next puts(t('cli.buffer_belongs_elsewhere', command: buffer_command(origin))) unless matches
+
+      puts t('cli.buffer_restored')
+      return text
+    when 'd'
+      discard_editor_buffer
+      puts t('cli.buffer_discarded')
+      return nil
+    when 'c'
+      puts t('cli.buffer_kept_for_now', path: EDITOR_BUFFER_PATH)
+      return nil
+    else
+      # A piped run has nothing more to say: continue rather than loop on
+      # an empty stdin forever, and say what that means for the buffer.
+      unless Tui.interactive?
+        puts t('cli.buffer_kept_for_now', path: EDITOR_BUFFER_PATH)
+        return nil
+      end
+    end
+  end
+end
+
+def read_editor_buffer
+  return nil unless File.exist?(EDITOR_BUFFER_PATH)
+
+  text = File.read(EDITOR_BUFFER_PATH, encoding: 'utf-8')
+  text.strip.empty? ? nil : text
+rescue SystemCallError
+  nil
+end
+
+# The first line that isn't frontmatter, so the author recognises the text
+# without having to open the file -- a buffer is identified by what it says,
+# not by its size.
+def describe_editor_buffer(text, origin)
+  lines = text.lines.map(&:chomp)
+  preview = lines.find { |line| !line.strip.empty? && line.strip != '---' && !line.match?(/\A\w+:/) }
+  when_saved = begin
+    Time.parse(origin['saved_at']).getlocal.strftime(t('date_time_format'))
+  rescue StandardError
+    nil
+  end
+  t('cli.buffer_found',
+    what: buffer_command(origin),
+    when: when_saved ? t('cli.buffer_found_when', time: when_saved) : '',
+    lines: lines.size,
+    preview: preview.to_s.strip[0, 60])
+end
+
+def buffer_command(origin)
+  case origin && origin['kind']
+  when 'add' then './blog.sh add'
+  when 'edit' then "./blog.sh edit #{origin['slug']}"
+  else t('cli.buffer_unknown_origin')
+  end
 end
 
 # Says where the text is if the process ends with the buffer still there.
@@ -355,10 +467,16 @@ def arm_editor_buffer_notice
   end
 end
 
-def edit_in_editor(initial_content, hint_comment)
+def edit_in_editor(initial_content, hint_comment, origin = nil)
   text = editor_round_trip(initial_content, hint_comment)
-  keep_editor_buffer(text)
-  arm_editor_buffer_notice
+  # An editor closed on an untouched template has nothing worth keeping --
+  # and writing it anyway would overwrite a buffer the author had just been
+  # told was still there. Opening `add` to look at something, changing your
+  # mind and quitting must not be how an interrupted post gets lost.
+  if text != initial_content
+    keep_editor_buffer(text, origin)
+    arm_editor_buffer_notice
+  end
   text
 end
 
@@ -450,16 +568,27 @@ def cmd_add
   # post-editor, seconds-precise date could never come out equal -- for a
   # long time every draft published as if hand-dated because of that.)
   suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
-  template = build_frontmatter(title: '', tags: '', type: '') +
-             "First paragraph's text.\n"
-  raw = edit_in_editor(template, FRONTMATTER_HINT)
+  # Offered before the template is built, because restoring means opening
+  # the editor on the recovered text INSTEAD of the template.
+  restored = offer_editor_buffer('add')
+  template = restored || build_frontmatter(title: '', tags: '', type: '') + "First paragraph's text.\n"
+  raw = edit_in_editor(template, FRONTMATTER_HINT, { 'kind' => 'add' })
 
   # Editor closed without saving (or saved untouched) leaves the template
   # byte-identical -- treat that as "nothing happened": no post, no toot,
   # no rebuild question. (This is how an accidental empty-template post once
   # made it all the way to a published Mastodon toot.)
+  #
+  # After a restore the comparison is against the RESTORED text, which is
+  # the honest no-op test for that case: someone who recovers a draft and
+  # closes the editor untouched has changed nothing this session either.
   if raw == template
-    discard_editor_buffer
+    # Nothing is discarded here. An untouched editor wrote no buffer (see
+    # edit_in_editor), so the only thing that could be deleted is text from
+    # an EARLIER session -- recovered a moment ago, or left alone with [c].
+    # Throwing that away would turn the action meant to protect it into the
+    # one that loses it.
+    warn t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
     warn t('cli.template_unchanged')
     warn ''
     return
@@ -1604,12 +1733,20 @@ def edit_post(slug)
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
-  raw = edit_in_editor(frontmatter + body, FRONTMATTER_HINT)
+  # Recovery is offered per post, not per command: text left over from
+  # `edit <this slug>` continues here, text from anything else is named
+  # rather than restored (see offer_editor_buffer).
+  restored = offer_editor_buffer('edit', slug)
+  opened_with = restored || frontmatter + body
+  raw = edit_in_editor(opened_with, FRONTMATTER_HINT, { 'kind' => 'edit', 'slug' => slug })
 
   # Same no-op guard as cmd_add: editor closed without saving (or saved
   # untouched) means nothing to do -- skip the save and the rebuild question.
-  if raw == frontmatter + body
-    discard_editor_buffer
+  if raw == opened_with
+    # Same as cmd_add: an untouched editor wrote no buffer, so there is
+    # nothing of this session's to clean up and possibly something of an
+    # earlier one's to protect.
+    puts t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
     puts t('cli.no_changes')
     puts
     return

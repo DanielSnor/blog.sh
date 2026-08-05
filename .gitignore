@@ -6,6 +6,7 @@ env.sh
 .deploy_baseline.json
 .deploy-pending
 .last-edit.md
+.last-edit.meta
 .stats_full_refresh_at
 config/site.yml
 assets/images/header.png

@@ -479,8 +479,9 @@ Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
 reference; losing it costs one deploy with the growth guard standing down,
 and it is rewritten by that same run), `incoming/` (transient staging), and
 the working files next to them -- `.last-edit.md` (the text from the last
-editor session) and `.deploy-pending` (a marker that says a scheduled
-publish still owes the target a deploy; see [Deploying](#deploying)).
+editor session, with `.last-edit.meta` recording which command it came
+from) and `.deploy-pending` (a marker that says a scheduled publish still
+owes the target a deploy; see [Deploying](#deploying)).
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
 
@@ -489,7 +490,7 @@ The same list is exactly what to move when changing machines.
 | Symptom | Cause and fix |
 | --- | --- |
 | Anything at all, and you need to know what you're running | `./blog.sh version` -- it needs neither `env.sh` nor a config, on purpose. |
-| A save aborted and took your text with it | It didn't: the editor's text is in `.last-edit.md` in the project root until the next `add`/`edit` overwrites it. The abort message says so too. |
+| A save aborted and took your text with it | It didn't: the text is in `.last-edit.md`, and the next `add`/`edit` offers it back -- `[r]` opens the editor on it, `[d]` throws it away, `[c]` leaves it alone. Text from an interrupted `edit <slug>` is only offered to that same post: restoring it into an `add` would make a second post out of it, so the offer names the command that does continue it. |
 | `Missing env.sh` | Copy the template: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
 | `Missing config/site.yml` | Same idea: `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
 | `Duplicate year/slug ... build stopped` | Two posts resolve to the same URL and media directory. Rename one slug; the build aborts rather than silently overwriting one with the other. |
