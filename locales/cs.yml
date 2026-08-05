@@ -249,7 +249,7 @@ cli:
 
   default_rebuild_reason: "Přebuiluji a nasazuji"
   build_failed: "\n❌ Build selhal — nenasazuji. Příspěvek je uložený, po opravě spusť ./scripts/deploy-web.sh"
-  deploy_failed: "\n❌ Nasazení selhalo. Web je přebuildovaný, stačí spustit ./scripts/deploy-web.sh znovu."
+  deploy_failed: "\n❌ Nasazení selhalo. Web je přebuildovaný; důvod je výš. Přerušený přenos stačí spustit znovu (./scripts/deploy-web.sh) — pojistka, která nahrávání zastavila, ho zastaví stejně znovu, dokud neuděláš, co říká."
 
   rebuild_prompt: "Přebuildovat a nasadit web teď? [Y/n] "
 

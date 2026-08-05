@@ -109,6 +109,12 @@ see it:
   formatting spans may come out normalized. Content markdown can't
   express (imported embeds, link cards) is protected by a count-based
   loss check in the CLI before saving.
+- The count-based check compares block types, so it sees a block that
+  disappeared but not an attribute that did. Where an attribute has no
+  markdown form and cannot be re-typed by the author -- a video's imported
+  `poster` -- the CLI carries it over from the stored post instead,
+  matching on the video's file or URL. Anything added to a block that
+  markdown cannot write down needs the same treatment.
 - The importers write the same schema through the shared
   `lib/post_writer.rb`, so an imported post and a hand-written one are
   indistinguishable downstream.

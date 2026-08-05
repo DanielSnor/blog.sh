@@ -32,6 +32,28 @@ prints what an installation is running.
   step one slot forward into the gap. The preview rebuilds once, on the
   way out, not after every move.
 
+### Fixes
+
+- **Editing a post no longer drops a video's poster image.** Markdown has
+  no way to write one down, so re-parsing an edited post handed back a
+  video block without it, and the safeguard that catches content loss
+  didn't notice: it counts block types, and a video that stays a video
+  looks untouched. The poster is now carried over from the post as it was,
+  matched on the one thing the markdown still names -- the video's file, or
+  its URL for an embedded one. Nothing renders a poster today, so no page
+  changed; what changed is that the reference is still in the JSON when
+  something does. (52 imported videos on sean.cz carry one.)
+- **A size is never rounded up into the limit it is under.** 99,999,999
+  bytes printed as "100 MB", so an allowed file and a refused one read
+  identically, and the warning contradicted itself out loud: "(100 MB) --
+  under the 100 MB limit". Sizes now round down, which also means a
+  printed size is never larger than the file.
+- **The "deploy failed" line no longer advises a retry that cannot work.**
+  It said to just run the deploy again -- but when a guard stopped the
+  upload, an unchanged re-run stops the same way, every time. It now says
+  to read the reason above first, and distinguishes a transfer that broke
+  off from a guard waiting to be answered.
+
 ## 1.1 -- 2026-08-05
 
 Six things a site can now do that it couldn't, and one class of defect

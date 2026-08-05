@@ -1486,6 +1486,7 @@ def edit_post(slug)
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
   fill_image_dimensions(blocks, media_files, media_dir)
+  restore_posters(blocks, post['content'])
 
   # Checks for a drop in every block type, not just images: markdown can't
   # express a link card or a foreign embed (Instagram), so saving would
@@ -1581,11 +1582,13 @@ def edit_post(slug)
   # counted here, cleanup would delete them after editing and the page
   # would be left with a link to a nonexistent file.
   #
-  # The poster is also taken from the ORIGINAL post: it can't be written in
-  # markdown, so the round-trip can't carry it over, and it would always
-  # come out orphaned based on the new blocks alone. This affects 52
-  # imported videos, and the author can't remove that file, so cleanup must
-  # not remove it on their behalf.
+  # The ORIGINAL post's posters are read as well as the new blocks'. Since
+  # restore_posters the two normally agree, but not always: a video whose
+  # block has no markdown form at all (an import with no youtube_id and an
+  # empty embed_html) is dropped by the round-trip, and its poster with it.
+  # Keeping the file in that case is deliberate -- the author confirmed
+  # losing the block, not deleting a file they can't name in markdown, and
+  # a restore from trash would otherwise come back without its image.
   keep = (blocks.flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
           post['content'].map { |b| b.dig('poster', 0, 'url') }).compact.to_set
   if Dir.exist?(new_media_dir)
@@ -1852,6 +1855,38 @@ def warn_unreadable_image(file)
 
   warn t('cli.image_dimensions_unknown', file: File.basename(file.to_s))
   warn t('cli.image_heic_hint') if File.extname(file.to_s).downcase.match?(/\A\.hei[cf]\z/)
+end
+
+# Markdown has no way to write a video's poster image, so re-parsing an
+# edited post hands back a video block without one -- and the content-loss
+# safeguard doesn't notice, because it counts block TYPES and a video that
+# stays a video looks untouched. The file itself was never at risk (the
+# cleanup list reads the original blocks too, for exactly this reason), but
+# the JSON quietly lost the reference to it: 52 imported videos on sean.cz
+# carry a poster, and no editor of a post could have put it back.
+#
+# Nothing renders a poster today, which is why this was a slow leak rather
+# than a visible bug -- and why it had to be fixed before a renderer starts
+# using the field, not after.
+#
+# The key is whatever the markdown could still name: a local video's file,
+# or the video's own URL for an embedded one. Those are the only parts of
+# the block that survive the round-trip, so they're the only honest way to
+# recognise the same video coming back.
+def restore_posters(blocks, original_blocks)
+  posters = {}
+  Array(original_blocks).each do |b|
+    key = b.dig('media', 0, 'url') || b['url']
+    posters[key] ||= b['poster'] if key && b['poster']
+  end
+  return if posters.empty?
+
+  blocks.each do |b|
+    next if b['poster']
+
+    poster = posters[b.dig('media', 0, 'url') || b['url']]
+    b['poster'] = poster if poster
+  end
 end
 
 def fill_image_dimensions(blocks, media_files, media_dir = nil)

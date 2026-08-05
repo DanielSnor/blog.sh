@@ -255,7 +255,7 @@ cli:
 
   default_rebuild_reason: "Baue neu und deploye"
   build_failed: "\n❌ Build fehlgeschlagen -- es wird nicht deployt. Der Beitrag ist gespeichert; nach der Korrektur ./scripts/deploy-web.sh ausführen"
-  deploy_failed: "\n❌ Deploy fehlgeschlagen. Die Seite wurde neu gebaut; einfach ./scripts/deploy-web.sh erneut ausführen."
+  deploy_failed: "\n❌ Deploy fehlgeschlagen. Die Seite wurde neu gebaut; der Grund steht oben. Ein abgebrochener Transfer braucht nur ./scripts/deploy-web.sh erneut -- eine Sicherung, die den Upload gestoppt hat, stoppt ihn genauso wieder, bis du tust, was sie verlangt."
 
   rebuild_prompt: "Seite jetzt neu bauen und deployen? [J/n] "
 

@@ -258,7 +258,7 @@ cli:
 
   default_rebuild_reason: "Rebuilding and deploying"
   build_failed: "\n❌ Build failed -- not deploying. The post is saved; run ./scripts/deploy-web.sh once it's fixed"
-  deploy_failed: "\n❌ Deploy failed. The site was rebuilt; just run ./scripts/deploy-web.sh again."
+  deploy_failed: "\n❌ Deploy failed. The site was rebuilt; the reason is above. A transfer that broke off only needs ./scripts/deploy-web.sh again -- a guard that stopped the upload will stop it the same way until you do what it asks."
 
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
 
