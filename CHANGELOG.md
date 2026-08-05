@@ -31,9 +31,14 @@ prints what an installation is running.
   now, or removed), the screen offers -- never forces -- to let the rest
   step one slot forward into the gap. The preview rebuilds once, on the
   way out, not after every move.
-
-### New
-
+- **Funkwhale and Bandcamp play too, by asking once.** Their page address
+  doesn't contain the player's, so saving a post that embeds one asks the
+  service where its player is -- the only moment writing a post touches the
+  network -- and stores the answer, so editing never asks again and the
+  build stays offline. What is stored is an address, not the HTML the
+  service returned: a post still carries no third party's markup. If the
+  lookup fails, the post saves anyway with a link where the player would
+  be, and saving again retries.
 - **Six more platforms play in a post, from their address alone.** A
   `!![caption](url)` line now recognises Vimeo, PeerTube and archive.org
   as video, and Spotify, SoundCloud and Mixcloud as audio -- the same

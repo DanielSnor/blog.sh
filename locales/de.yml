@@ -126,6 +126,8 @@ cli:
   media_large: "⚠️  %{files}: nahe am Limit von %{limit} pro Datei. Gespeichert -- aber jeder Leser zahlt diese Bytes, überlege eine Verkleinerung."
   video_hevc: "⚠️  %{files}: als HEVC aufgenommen -- die meisten Browser spielen das ab, aber nicht alle; die übrigen Leser bekommen statt des Videos einen leeren Player. Gespeichert wird es trotzdem. Neu kodiert läuft es überall (braucht ffmpeg -- auf dem Mac `brew install ffmpeg`):\n     %{command}"
   video_quicktime: "⚠️  %{files}: ein QuickTime-.mov-Container. Das Video darin ist in Ordnung, aber den Container akzeptiert nicht jeder Browser; .mp4 nehmen alle. Gespeichert wird es trotzdem. Das Umpacken kopiert das Video unverändert, ohne neu zu kodieren (braucht ffmpeg):\n     %{command}"
+  embed_lookup_working: "🔎 %{url}: frage den Dienst nach seinem Player…"
+  embed_lookup_failed: "⚠️  %{url}: kein Player gefunden -- der Dienst hat nicht geantwortet oder bietet für diese Adresse keinen. Gespeichert wurde stattdessen der Link; erneutes Bearbeiten und Speichern versucht es noch einmal."
 
   double_frontmatter_error: |
     ❌ Im Text steht ein zweiter Frontmatter-Kopf.

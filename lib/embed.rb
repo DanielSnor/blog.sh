@@ -54,13 +54,29 @@ module Embed
   PEERTUBE_ID_RE = /\A(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{22})\z/
   PEERTUBE_PATH_RE = %r{\A/(?:w|videos/watch)/([^/]+)/?\z}
 
+  # Funkwhale is federated like PeerTube, so again the path is the signal.
+  # Unlike PeerTube, its address cannot be turned into a player by string
+  # surgery -- see lib/embed_lookup.rb for why that was tried first and
+  # abandoned -- so these two are resolved once, when the post is written.
+  FUNKWHALE_PATH_RE = %r{\A/library/(?:tracks|albums|artists|playlists)/(\d+)/?\z}
+  BANDCAMP_RE = %r{\Ahttps?://([a-z0-9-]+\.bandcamp\.com)/(?:album|track)/[\w-]+}i
+
   VIDEO_PROVIDERS = %w[vimeo peertube archive_org].freeze
-  AUDIO_PROVIDERS = %w[spotify soundcloud mixcloud].freeze
+  AUDIO_PROVIDERS = %w[spotify soundcloud mixcloud funkwhale bandcamp].freeze
+
+  # The two whose player address is only knowable by asking. Everything
+  # else in this file is a pure string transform.
+  LOOKUP_PROVIDERS = %w[funkwhale bandcamp].freeze
 
   # Height in CSS pixels for the audio players, which are a fixed-height
   # strip rather than a 16:9 picture -- Spotify's compact player, and what
   # SoundCloud's and Mixcloud's widgets are drawn for.
-  AUDIO_HEIGHTS = { 'spotify' => 152, 'soundcloud' => 166, 'mixcloud' => 120 }.freeze
+  # Bandcamp is the tall one: what its page offers as a player is the card
+  # player, which is drawn with the cover art above the controls.
+  AUDIO_HEIGHTS = {
+    'spotify' => 152, 'soundcloud' => 166, 'mixcloud' => 120,
+    'funkwhale' => 150, 'bandcamp' => 400
+  }.freeze
 
   module_function
 
@@ -83,9 +99,22 @@ module Embed
       { 'provider' => 'mixcloud', 'embed_id' => m[1] }
     elsif (m = ARCHIVE_RE.match(text))
       { 'provider' => 'archive_org', 'embed_id' => m[1] }
+    elsif BANDCAMP_RE.match?(text)
+      # No id anywhere in the address: Bandcamp's URL is a slug, and its
+      # official embed needs a numeric id that only the page itself knows.
+      { 'provider' => 'bandcamp' }
     else
-      peertube(text)
+      peertube(text) || funkwhale(text)
     end
+  end
+
+  # Same host validation as PeerTube -- a federated instance's origin ends
+  # up in the page's CSP, so it is parsed rather than pattern-matched.
+  def funkwhale(text)
+    uri = safe_uri(text)
+    return nil unless uri && FUNKWHALE_PATH_RE.match?(uri.path.to_s)
+
+    { 'provider' => 'funkwhale', 'embed_origin' => origin_of(uri) }
   end
 
   # PeerTube's host ends up in the page's CSP, so it is parsed rather than
@@ -94,8 +123,20 @@ module Embed
   # browser. URI.parse plus an explicit hostname shape is the version that
   # cannot disagree with what the browser will do.
   def peertube(text)
+    uri = safe_uri(text)
+    return nil unless uri
+
+    m = PEERTUBE_PATH_RE.match(uri.path.to_s)
+    return nil unless m && PEERTUBE_ID_RE.match?(m[1])
+
+    { 'provider' => 'peertube', 'embed_id' => m[1], 'embed_origin' => origin_of(uri) }
+  end
+
+  # A URL that can safely have its host used as an origin: http(s), no
+  # userinfo, and a hostname that looks like one.
+  def safe_uri(text)
     uri = begin
-      URI.parse(text)
+      URI.parse(text.to_s)
     rescue URI::InvalidURIError
       return nil
     end
@@ -103,11 +144,12 @@ module Embed
     return nil if uri.userinfo
     return nil unless uri.host.to_s.match?(/\A(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\z/i)
 
-    m = PEERTUBE_PATH_RE.match(uri.path.to_s)
-    return nil unless m && PEERTUBE_ID_RE.match?(m[1])
+    uri
+  end
 
+  def origin_of(uri)
     port = uri.port && ![80, 443].include?(uri.port) ? ":#{uri.port}" : ''
-    { 'provider' => 'peertube', 'embed_id' => m[1], 'embed_origin' => "https://#{uri.host}#{port}" }
+    "https://#{uri.host}#{port}"
   end
 
   def video?(block)
@@ -153,6 +195,26 @@ module Embed
       return nil if id.empty? || !origin.match?(%r{\Ahttps://[a-z0-9.-]+(?::\d+)?\z}i)
 
       "#{origin}/videos/embed/#{id}"
+    when 'funkwhale', 'bandcamp'
+      # Looked up once when the post was written (lib/embed_lookup.rb) and
+      # stored as a plain address -- so the build is still a pure function
+      # of the post, and a post written offline simply has no player yet
+      # rather than a half-fetched one.
+      resolved_src(block)
+    end
+  end
+
+  # The stored player address, re-checked at render time against where it
+  # is allowed to point: whatever the lookup returned, only an https URL on
+  # the expected host may end up in an iframe.
+  def resolved_src(block)
+    src = block['embed_src'].to_s
+    uri = safe_uri(src)
+    return nil unless uri && uri.is_a?(URI::HTTPS)
+
+    case block['provider'].to_s
+    when 'funkwhale' then origin_of(uri) == block['embed_origin'].to_s ? src : nil
+    when 'bandcamp' then uri.host.to_s.match?(/\A(?:[a-z0-9-]+\.)?bandcamp\.com\z/i) ? src : nil
     end
   end
 
@@ -167,9 +229,17 @@ module Embed
     when 'soundcloud' then ['https://w.soundcloud.com']
     when 'mixcloud' then ['https://www.mixcloud.com', 'https://player-widget.mixcloud.com']
     when 'archive_org' then ['https://archive.org']
-    when 'peertube' then src(block) ? [block['embed_origin'].to_s] : []
+    when 'peertube', 'funkwhale' then src(block) ? [block['embed_origin'].to_s] : []
+    when 'bandcamp' then src(block) ? ['https://bandcamp.com'] : []
     else []
     end
+  end
+
+  # A block that is waiting for its one network lookup. Everything else
+  # answers this with false, which is what keeps the lookup out of the
+  # build and out of every re-save.
+  def needs_lookup?(block)
+    LOOKUP_PROVIDERS.include?(block['provider'].to_s) && resolved_src(block).nil?
   end
 
   # Every origin a page carrying these blocks needs -- computed per page

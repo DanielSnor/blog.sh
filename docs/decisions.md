@@ -286,6 +286,24 @@ to the widget (which is also how a private track's secret_token gets
 through), and Mixcloud's widget redirects to a second hostname that the
 page's CSP has to allow as well.
 
+**Two platforms are asked once, when the post is saved -- the only network
+call in the authoring path.** Funkwhale and Bandcamp cannot be handled by
+the string transform the other platforms use, and both were established
+against the live services rather than their docs: Funkwhale's obvious embed
+path builds a player that looks right and stays a permanently black
+rectangle on a current instance, while its oEmbed endpoint answers
+correctly; Bandcamp's page address contains no id at all, only a slug, and
+it has no oEmbed endpoint to ask, so the id comes from the page's own
+twitter:player metadata. The answer is stored in the post as an address, so
+an edit never asks again and the build stays offline -- and it is an
+address, not the HTML those services returned, because "a post carries no
+third party's markup" does not stop applying because a lookup was involved.
+A failed lookup (offline, a timeout, a service with no player for that
+address) is a sentence and a saved post with a link in it, never a refused
+save: writing on a train has to end with a written post. *Cost:* saving a
+post can now block on a slow service for as long as the shared HTTP
+deadline allows, and the CLI says which address it is waiting on.
+
 **A page's frame-src is computed from the players it actually carries.**
 PeerTube is federated, so the host is a property of the post rather than of
 the engine: a fixed policy could not name it in advance, and widening

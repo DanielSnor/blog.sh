@@ -267,8 +267,10 @@ Samotná adresa na YouTube napsaná na řádku se na přehrávač **nezmění** 
 Stejné dva vykřičníky jako u videa — rozlišuje je přípona souboru
 (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Popisek je povinný**
 a soubor se vykreslí jako nativní přehrávač. Na tentýž řádek jde napsat
-i adresu ze Spotify, SoundCloudu nebo Mixcloudu — udělá se z ní přehrávač
-té platformy.
+i adresu ze Spotify, SoundCloudu, Mixcloudu, Funkwhale nebo Bandcampu —
+udělá se z ní přehrávač té platformy. (U posledních dvou samotná adresa
+nestačí, takže se uložení postu jednou zeptá služby, kde má přehrávač —
+jediná chvíle, kdy psaní postu potřebuje síť.)
 
 ```
 !![Popisek nahrávky](/cesta/k/nahravce.mp3)

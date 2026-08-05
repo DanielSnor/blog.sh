@@ -125,6 +125,8 @@ cli:
   media_large: "⚠️  %{files}: blízko limitu %{limit} na soubor. Uloženo — ale ty bajty zaplatí každý čtenář, zvaž zmenšení."
   video_hevc: "⚠️  %{files}: natočeno v HEVC, což většina prohlížečů přehraje, ale ne všechny — zbytek čtenářů uvidí místo videa prázdný přehrávač. Uloženo tak jako tak. Překódování přehraje všude (potřebuje ffmpeg — na Macu `brew install ffmpeg`):\n     %{command}"
   video_quicktime: "⚠️  %{files}: kontejner QuickTime .mov. Video uvnitř je v pořádku, ale kontejner nebere každý prohlížeč; .mp4 berou všechny. Uloženo tak jako tak. Přebalení video jen přenese, nic se nepřekódovává (potřebuje ffmpeg):\n     %{command}"
+  embed_lookup_working: "🔎 %{url}: ptám se služby, kde má přehrávač…"
+  embed_lookup_failed: "⚠️  %{url}: přehrávač se nenašel — služba neodpověděla, nebo pro tuhle adresu žádný nemá. Uloženo aspoň s odkazem; další editace a uložení to zkusí znovu."
 
   double_frontmatter_error: |
     ❌ V textu je druhá hlavička.

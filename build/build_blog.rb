@@ -519,6 +519,12 @@ def render_audio(block, media_prefix)
     embed_iframe(src, block)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
     block['embed_html']
+  elsif block['url']
+    # A player that could not be looked up (offline at save time, or a
+    # service with none for that address) still leaves the address, and a
+    # link to it beats a dead end -- the same courtesy the video branch has
+    # always shown.
+    %(<p class="audio-unavailable">#{h(t('post.audio_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
   else
     "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
   end

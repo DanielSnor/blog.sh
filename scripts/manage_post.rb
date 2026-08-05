@@ -22,6 +22,7 @@ require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/heic_converter'
 require_relative '../lib/video_probe'
+require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
@@ -305,6 +306,29 @@ def check_video_playback(media_files)
   # the message says where to get it.
   puts t('cli.video_hevc', files: hevc.join(', '), command: transcode_command(hevc.first)) if hevc.any?
   puts t('cli.video_quicktime', files: quicktime.join(', '), command: remux_command(quicktime.first)) if quicktime.any?
+end
+
+# The one thing writing a post does over the network, and it is asked once
+# per embed: Funkwhale and Bandcamp are the two platforms whose player
+# address their page address does not contain (see lib/embed_lookup.rb).
+# The answer is stored in the post, so an edit never asks again and the
+# build stays offline.
+#
+# A failure is a sentence, not an abort. Writing a post on a train has to
+# end with a saved post: what is missing is a player, and the block still
+# carries the address, so the page links it and re-saving retries.
+def resolve_embed_lookups(blocks)
+  pending = blocks.select { |block| Embed.needs_lookup?(block) }
+  return if pending.empty?
+
+  pending.each do |block|
+    # Said before the call, not after: it can take seconds against a slow
+    # instance, and silence would be indistinguishable from a hang.
+    puts t('cli.embed_lookup_working', url: block['url'])
+    next if EmbedLookup.resolve(block)
+
+    puts t('cli.embed_lookup_failed', url: block['url'])
+  end
 end
 
 def transcode_command(name)
@@ -615,6 +639,7 @@ def cmd_add
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
   check_video_playback(media_files)
+  resolve_embed_lookups(blocks)
   fill_image_dimensions(blocks, media_files)
 
   slug_source = title || (blocks.find { |b| b['type'] == 'text' } || {})['text']
@@ -1766,6 +1791,7 @@ def edit_post(slug)
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
   check_video_playback(media_files)
+  resolve_embed_lookups(blocks)
   fill_image_dimensions(blocks, media_files, media_dir)
   restore_posters(blocks, post['content'])
 

@@ -269,8 +269,10 @@ A bare YouTube address on its own line does **not** turn into a player — it be
 Same two exclamation marks as a video — the file extension tells them apart
 (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **The caption is mandatory**,
 and the file renders as a native player. The same line also takes a
-Spotify, SoundCloud or Mixcloud address and turns it into that platform's
-player.
+Spotify, SoundCloud, Mixcloud, Funkwhale or Bandcamp address and turns it
+into that platform's player. (For the last two the address alone isn't
+enough, so saving the post asks the service once where its player is --
+the only moment writing a post needs the network.)
 
 ```
 !![Audio caption](/path/to/recording.mp3)

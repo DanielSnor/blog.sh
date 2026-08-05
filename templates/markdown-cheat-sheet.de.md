@@ -268,8 +268,11 @@ Eine bloße YouTube-Adresse auf eigener Zeile wird **nicht** zum Player — sie 
 Dieselben zwei Ausrufezeichen wie beim Video — unterschieden werden sie an
 der Dateiendung (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Die
 Unterschrift ist Pflicht**, gerendert wird ein nativer Player. Dieselbe
-Zeile nimmt auch eine Adresse von Spotify, SoundCloud oder Mixcloud und
-macht daraus den Player der jeweiligen Plattform.
+Zeile nimmt auch eine Adresse von Spotify, SoundCloud, Mixcloud, Funkwhale
+oder Bandcamp und macht daraus den Player der jeweiligen Plattform. (Bei
+den letzten beiden genügt die Adresse allein nicht, das Speichern fragt
+den Dienst einmal nach seinem Player -- der einzige Moment, in dem das
+Schreiben eines Beitrags das Netz braucht.)
 
 ```
 !![Unterschrift der Aufnahme](/pfad/zur/aufnahme.mp3)
