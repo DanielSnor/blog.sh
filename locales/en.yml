@@ -319,6 +319,7 @@ cli:
   rename_taken: "Slug '%{slug}' already belongs to another post -- pick a different one."
   rename_prompt: "New slug (empty = cancel): "
   rename_unusable: "Nothing usable is left of \"%{input}\" after slugification -- nothing renamed."
+  rename_too_long: "That slug is too long to be a filename -- shorten it and try again. Nothing renamed."
   rename_same: "That is already the post's slug -- nothing to do."
   rename_confirm: "%{old_url}\n  -> %{new_url}\n  The old address keeps working: it will permanently redirect to the new one."
   rename_confirm_draft: "%{old} -> %{new} -- the draft's preview address changes with it (share the new link)."

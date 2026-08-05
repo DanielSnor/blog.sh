@@ -74,7 +74,15 @@ module PostWriter
     # former_slugs is in the list for the same reason as the announcement
     # URLs: a rename is engine-side history the source can never know
     # about, and dropping it would break every redirect the post carries.
-    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from].each do |key|
+    # pinned and created_at joined it in 1.1 -- the pin is engine-side
+    # state (the source has no notion of a front page) and created_at is
+    # the draft-era timestamp the publish "was the date edited?" check
+    # reads; both were silently dropped on re-import until named here. The
+    # guard below only carries a key the importer did not set itself, so an
+    # importer that legitimately provides one still wins. `type` stays out:
+    # absent, the build re-derives it from the (re-imported) blocks, so it
+    # comes back on its own.
+    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
     # A re-imported draft keeps its preview URL: the token is engine-side
