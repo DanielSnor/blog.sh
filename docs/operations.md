@@ -220,6 +220,30 @@ always was. Times follow `site.timezone`, daylight saving included --
 cron still runs every 15 minutes, so a slot publishes within that window
 of its time.
 
+### Working the queue
+
+`./blog.sh queue` (also a wizard menu entry) shows every scheduled post
+in publish order and acts on the one you pick:
+
+- `[u]` / `[d]` move it a slot earlier or later. Moving exchanges times
+  with the neighbouring post -- the set of occupied times never changes,
+  only which post sits in which. A hand-scheduled 14:17 stays a 14:17.
+- `[p]` publishes it right now, the same flow as publishing a draft by
+  hand (announcement included).
+- `[s]` asks for a different time, same prompt as scheduling.
+- `[n]` returns it to the drafts; the post keeps its text, loses only
+  the plan.
+
+When a post leaves the queue -- published now, or removed -- its time is
+free again, and the screen offers to let the posts behind it each step
+forward into the gap, every one taking over its predecessor's time. It
+only offers: a hand-picked date further down may be deliberate, and
+nothing moves a post's time except you. A post whose time already passed
+is waiting for the cron and can't be reordered.
+
+The preview rebuilds once, when you leave the screen, not after every
+move.
+
 ## Attachments and the document type
 
 A line that is nothing but `[label](handbook.pdf)` -- a bare filename,

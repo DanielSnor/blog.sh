@@ -101,6 +101,9 @@ deploy step around exactly that. A few of the choices that came out of it:
   `publishing.slots` configured it offers the next free slot instead, so
   several drafts queue onto consecutive slots rather than publishing
   together
+- `queue` -- the scheduled posts as one screen: move a post a slot
+  earlier or later (times swap, slots never move), publish it right now,
+  give it another time, or return it to the drafts
 - `unpublish <slug>` -- returns a post to draft, deletes its announcement;
   gets a fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
@@ -250,7 +253,8 @@ deploy step around exactly that. A few of the choices that came out of it:
   document
 - Optional publishing slots (`mon 09:30`, …) turn `[s]` into a queue:
   drafts written in one sitting go out on consecutive slots instead of
-  together
+  together, and `./blog.sh queue` works the queue as one screen --
+  reorder, publish now, remove
 
 ## Stack
 

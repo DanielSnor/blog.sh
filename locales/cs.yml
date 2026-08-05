@@ -163,6 +163,18 @@ cli:
   schedule_queue_position: "  %{count}. post ve frontě (předchozí: '%{slug}', %{date})."
   schedule_slots_taken: "  Dřívější sloty jsou obsazené:"
   props_queue_heading: "Fronta (%{count} naplánovaných):"
+  queue_empty: "Fronta je prázdná — draft naplánuješ přes [s] v jeho náhledu, nebo ./blog.sh schedule."
+  queue_overdue: "(čeká na cron)"
+  queue_menu_hint: "↑↓ pohyb · Enter akce s postem · Esc zpět"
+  queue_pick_prompt: "Číslo postu (prázdné = konec): "
+  queue_actions: "'%{slug}': [u] o slot dříve  [d] o slot později  [p] publikovat hned  [s] jiný čas  [n] vyřadit z fronty  [Enter] zpět: "
+  queue_unknown: "Nerozumím, zkus u / d / p / s / n."
+  queue_already_first: "Post už je první ve frontě."
+  queue_already_last: "Post už je poslední ve frontě."
+  queue_swap_overdue: "S postem, jehož čas už prošel, nejde měnit pořadí — počkej, až ho cron publikuje."
+  queue_swapped: "Přesunuto: '%{slug}' se publikuje %{date}."
+  queue_compact_prompt: "Posunout zbytek fronty (%{count}) o slot dopředu? [a/N] "
+  queue_compacted: "Fronta posunuta: každý následující post převzal dřívější slot."
   menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
   wizard_continue_prompt: "Stiskni klávesu pro pokračování…"
   qr_hint: "Naskenuj telefonem a náhled se otevře."
@@ -248,6 +260,7 @@ cli:
       ./blog.sh props [<slug>]       ukáže stav postu a jeho akce (publikovat, stáhnout z webu, přejmenovat slug, smazat…)
       ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
       ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
+      ./blog.sh queue                fronta naplánovaných postů — pořadí, publikace hned, vyřazení zpět do draftů
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
       ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
@@ -266,6 +279,7 @@ cli:
   wizard_unknown_choice: "Neznámá volba, zkus znovu."
   wizard_menu_add: "Nový příspěvek"
   wizard_menu_post: "Příspěvek — upravit text, nebo jeho vlastnosti a akce (publikovat, přejmenovat, smazat…)"
+  wizard_menu_queue: "Fronta naplánovaných postů — pořadí, publikovat hned, vyřadit"
   wizard_menu_restore: "Obnovit příspěvek z koše"
   wizard_menu_list: "Seznam všech postů (bez editace, jen pro rozkoukání)"
   wizard_menu_rebuild: "Rebuild a nasadit web (bez vazby na konkrétní post)"

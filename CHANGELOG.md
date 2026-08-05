@@ -10,6 +10,21 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.2 -- unreleased
+
+### New
+
+- **The queue got its own screen.** `./blog.sh queue` (and a matching
+  wizard menu entry) lists every scheduled post in publish order and
+  acts on the one you pick: move it a slot earlier or later, publish it
+  right now, give it a different time, or return it to the drafts.
+  Moving means exchanging times with the neighbouring post, so the set
+  of occupied slots never changes -- a hand-picked 14:17 stays a 14:17,
+  it just gets a different post. When a post leaves the queue (published
+  now, or removed), the screen offers -- never forces -- to let the rest
+  step one slot forward into the gap. The preview rebuilds once, on the
+  way out, not after every move.
+
 ## 1.1 -- unreleased
 
 Four things a site can now do that it couldn't, and one class of defect

@@ -172,6 +172,18 @@ cli:
   schedule_queue_position: "  Post %{count} in the queue (previous: '%{slug}', %{date})."
   schedule_slots_taken: "  Earlier slots are taken:"
   props_queue_heading: "The queue (%{count} scheduled):"
+  queue_empty: "The queue is empty -- a draft is scheduled via [s] in its preview, or ./blog.sh schedule."
+  queue_overdue: "(waiting for the cron)"
+  queue_menu_hint: "↑↓ move · Enter act on post · Esc back"
+  queue_pick_prompt: "Post number (empty = quit): "
+  queue_actions: "'%{slug}': [u] a slot earlier  [d] a slot later  [p] publish now  [s] different time  [n] remove from queue  [Enter] back: "
+  queue_unknown: "Not understood, try u / d / p / s / n."
+  queue_already_first: "The post is already first in the queue."
+  queue_already_last: "The post is already last in the queue."
+  queue_swap_overdue: "A post whose time has passed can't be reordered -- wait for the cron to publish it."
+  queue_swapped: "Moved: '%{slug}' publishes %{date}."
+  queue_compact_prompt: "Shift the rest of the queue (%{count}) a slot earlier? [y/N] "
+  queue_compacted: "Queue shifted: every following post took over the earlier slot."
   menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
   wizard_continue_prompt: "Press any key to continue…"
   qr_hint: "Scan with your phone to open the preview."
@@ -257,6 +269,7 @@ cli:
       ./blog.sh props [<slug>]       shows a post's state and its actions (publish, unpublish, rename the slug, delete...)
       ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
+      ./blog.sh queue                the scheduled-post queue -- reorder, publish now, return a post to the drafts
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
@@ -275,6 +288,7 @@ cli:
   wizard_unknown_choice: "Unknown choice, try again."
   wizard_menu_add: "New post"
   wizard_menu_post: "A post -- edit the text, or its properties and actions (publish, rename, delete...)"
+  wizard_menu_queue: "The scheduled-post queue -- reorder, publish now, remove"
   wizard_menu_restore: "Restore a post from trash"
   wizard_menu_list: "List of all posts (no editing, just browsing)"
   wizard_menu_rebuild: "Rebuild and deploy the site (not tied to a specific post)"

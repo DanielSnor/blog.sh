@@ -614,7 +614,7 @@ def queue_position(time, entries)
   { count: earlier.size + 1, slug: earlier.last[1], date: earlier.last[0] }
 end
 
-def prompt_and_schedule(path, post)
+def prompt_and_schedule(path, post, rebuild: true)
   # Read once when slots are configured (the offer needs it); a site
   # without slots pays nothing here and reads the archive only after it
   # has actually scheduled something, for the queue line.
@@ -671,26 +671,8 @@ def prompt_and_schedule(path, post)
     return false
   end
 
-  updated = post.merge('date' => date.iso8601, 'scheduled' => true)
-
-  # A date in another year moves the post, JSON and media together. Left
-  # in the old year's folder the two disagree: the build derives both the
-  # URL and the media lookup from the date, so the draft preview loses
-  # every image -- and publishing it later hits the same missing media
-  # year that used to abort the cron.
-  new_year = date.year.to_s
-  new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
-  if File.expand_path(new_path) != File.expand_path(path)
-    abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
-
-    FileUtils.mkdir_p(File.dirname(new_path))
-    Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
-    AtomicWrite.write_json(new_path, updated)
-    File.delete(path)
-  else
-    AtomicWrite.write_json(new_path, updated)
-  end
-  rebuild_and_deploy(t('cli.updating_preview'))
+  write_scheduled_date(path, post, date)
+  rebuild_and_deploy(t('cli.updating_preview')) if rebuild
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   position = queue_position(date, entries || scheduled_entries(except_slug: post['slug']))
   if position
@@ -952,6 +934,176 @@ def unschedule_post(path, post, slug)
   AtomicWrite.write_json(path, updated)
   puts t('cli.unscheduled_label', slug: slug)
   puts
+end
+
+# Writes `date` into a draft as its scheduled publish time. A date in
+# another year moves the post, JSON and media together. Left in the old
+# year's folder the two disagree: the build derives both the URL and the
+# media lookup from the date, so the draft preview loses every image --
+# and publishing it later hits the same missing media year that used to
+# abort the cron. Shared by prompt_and_schedule and the queue screen,
+# which rewrites times too. Returns the (possibly moved) path.
+def write_scheduled_date(path, post, date)
+  updated = post.merge('date' => date.iso8601, 'scheduled' => true)
+  new_year = date.year.to_s
+  new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
+  if File.expand_path(new_path) != File.expand_path(path)
+    abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
+
+    FileUtils.mkdir_p(File.dirname(new_path))
+    Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
+    AtomicWrite.write_json(new_path, updated)
+    File.delete(path)
+  else
+    AtomicWrite.write_json(new_path, updated)
+  end
+  new_path
+end
+
+# --- the queue screen -------------------------------------------------
+
+# Every scheduled draft in publish order, with everything an action needs
+# in hand. Re-collected before every redraw on purpose: the scheduled-
+# publish cron runs every 15 minutes, and a post it published mid-session
+# must drop out of the list rather than get swapped around as a stale
+# copy.
+def queue_entries
+  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
+    next unless post.is_a?(Hash) && post['scheduled']
+
+    time = Time.parse(post['date']) rescue next
+    { time: time, slug: post['slug'], path: file, post: post }
+  end.sort_by { |entry| entry[:time] }
+end
+
+def queue_row(entry, index)
+  time = entry[:time].getlocal.strftime(t('date_time_format'))
+  overdue = entry[:time] <= Time.now ? "  #{t('cli.queue_overdue')}" : ''
+  format('%2d.  %s  %s%s', index + 1, time, entry[:slug], overdue)
+end
+
+# Row selection, in both faces the pickers already have: the arrow-key
+# menu in a terminal, a numbered list plus a read line when piped -- so
+# the queue stays scriptable the same way everything else is.
+def queue_pick(entries)
+  rows = entries.each_with_index.map { |entry, i| queue_row(entry, i) }
+  return Tui.menu(rows, hint: t('cli.queue_menu_hint')) if Tui.interactive?
+
+  rows.each { |row| puts "  #{row}" }
+  puts
+  print t('cli.queue_pick_prompt')
+  line = $stdin.gets&.strip.to_s
+  puts
+  index = line.to_i - 1
+  line =~ /\A\d+\z/ && (0...entries.size).cover?(index) ? index : nil
+end
+
+# The whole queue as one screen: pick a post, act on it, come back to
+# the list. Everything here changes only content JSON; the preview
+# rebuild happens once, on the way out, not after every move -- with a
+# multi-post reshuffle the intermediate states aren't worth a deploy
+# each.
+def cmd_queue
+  dirty = false
+  loop do
+    entries = queue_entries
+    if entries.empty?
+      puts t('cli.queue_empty')
+      puts
+      break
+    end
+
+    puts Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold)
+    puts
+    index = queue_pick(entries)
+    if index.nil?
+      puts
+      break
+    end
+
+    puts
+    dirty = true if queue_act(entries, index)
+  end
+
+  rebuild_and_deploy(t('cli.updating_preview')) if dirty
+end
+
+# Returns true when something changed that the closing rebuild must pick
+# up. "Publish now" rebuilds inside publish_draft as always; only the
+# compaction it may be followed by still needs the closing one.
+def queue_act(entries, index)
+  entry = entries[index]
+  case Tui.key_choice(t('cli.queue_actions', slug: entry[:slug]))
+  when 'u' then queue_swap(entries, index, index - 1)
+  when 'd' then queue_swap(entries, index, index + 1)
+  when 'p'
+    freed = entry[:time]
+    publish_draft(entry[:slug])
+    queue_offer_compact(freed, entries[(index + 1)..])
+  when 's'
+    puts
+    prompt_and_schedule(entry[:path], entry[:post], rebuild: false)
+  when 'n'
+    unschedule_post(entry[:path], entry[:post], entry[:slug])
+    queue_offer_compact(entry[:time], entries[(index + 1)..])
+  when '' then false
+  else
+    puts t('cli.queue_unknown')
+    puts
+    false
+  end
+end
+
+# Moving a post earlier or later means exchanging times with its
+# neighbour: the set of occupied slots never changes, only which post
+# sits in which -- so a hand-picked 14:17 stays a 14:17, it just gets a
+# different post. A neighbour whose time already passed is off limits:
+# giving another post that time would schedule it into the past, and the
+# cron owns it now anyway.
+def queue_swap(entries, index, other_index)
+  unless (0...entries.size).cover?(other_index)
+    puts t(other_index.negative? ? 'cli.queue_already_first' : 'cli.queue_already_last')
+    puts
+    return false
+  end
+
+  entry, other = entries[index], entries[other_index]
+  if entry[:time] <= Time.now || other[:time] <= Time.now
+    puts t('cli.queue_swap_overdue')
+    puts
+    return false
+  end
+
+  write_scheduled_date(entry[:path], entry[:post], other[:time])
+  write_scheduled_date(other[:path], other[:post], entry[:time])
+  puts Tui.paint(t('cli.queue_swapped', slug: entry[:slug],
+                                        date: other[:time].getlocal.strftime(t('date_time_format'))), :green)
+  puts
+  true
+end
+
+# After a post leaves the queue its time is free again, and the posts
+# behind it can each step forward into the gap -- every one takes over
+# its predecessor's time, so again no slot appears or disappears. Asked,
+# never automatic: a hand-picked date further down may be deliberate (an
+# anniversary post), and moving it unasked would break the scheduler's
+# one promise -- nothing moves a post's time except the author. A gap in
+# the past offers nothing: stepping into it would publish immediately.
+def queue_offer_compact(freed_time, rest)
+  rest = Array(rest)
+  return false if rest.empty? || freed_time <= Time.now
+
+  answer = Tui.key_choice(t('cli.queue_compact_prompt', count: rest.size))
+  return false unless answer.start_with?(t('cli.confirm_yes_char'))
+
+  times = [freed_time] + rest.map { |entry| entry[:time] }
+  rest.each_with_index do |entry, i|
+    entry[:path] = write_scheduled_date(entry[:path], entry[:post], times[i])
+  end
+  puts Tui.paint(t('cli.queue_compacted'), :green)
+  puts
+  true
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -1724,6 +1876,7 @@ end
 WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
   ['post', t('cli.wizard_menu_post')],
+  ['queue', t('cli.wizard_menu_queue')],
   ['list', t('cli.wizard_menu_list')],
   ['restore', t('cli.wizard_menu_restore')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
@@ -1755,6 +1908,7 @@ def run_wizard_choice(command)
   case command
   when 'add' then cmd_add
   when 'post' then wizard_post_entry
+  when 'queue' then cmd_queue
   when 'restore' then cmd_restore(pick_trash_interactively)
   when 'list' then cmd_list({})
   when 'rebuild' then cmd_rebuild
@@ -1865,6 +2019,8 @@ else
   when 'schedule'
     slug = ARGV.shift || pick_draft_interactively
     cmd_schedule(slug)
+  when 'queue'
+    cmd_queue
   when 'unpublish'
     slug = ARGV.shift || pick_published_interactively
     cmd_unpublish(slug)

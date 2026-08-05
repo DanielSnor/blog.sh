@@ -169,6 +169,18 @@ cli:
   schedule_queue_position: "  %{count}. Beitrag in der Warteschlange (davor: '%{slug}', %{date})."
   schedule_slots_taken: "  Frühere Slots sind belegt:"
   props_queue_heading: "Die Warteschlange (%{count} geplant):"
+  queue_empty: "Die Warteschlange ist leer -- ein Entwurf wird über [s] in seiner Vorschau geplant, oder ./blog.sh schedule."
+  queue_overdue: "(wartet auf den Cron)"
+  queue_menu_hint: "↑↓ bewegen · Enter Aktion · Esc zurück"
+  queue_pick_prompt: "Postnummer (leer = Ende): "
+  queue_actions: "'%{slug}': [u] einen Slot früher  [d] einen Slot später  [p] sofort veröffentlichen  [s] andere Zeit  [n] aus der Warteschlange nehmen  [Enter] zurück: "
+  queue_unknown: "Nicht verstanden, versuch u / d / p / s / n."
+  queue_already_first: "Der Post ist bereits der erste in der Warteschlange."
+  queue_already_last: "Der Post ist bereits der letzte in der Warteschlange."
+  queue_swap_overdue: "Ein Post, dessen Zeit bereits verstrichen ist, lässt sich nicht umsortieren -- warte, bis der Cron ihn veröffentlicht."
+  queue_swapped: "Verschoben: '%{slug}' erscheint %{date}."
+  queue_compact_prompt: "Den Rest der Warteschlange (%{count}) einen Slot nach vorn rücken? [j/N] "
+  queue_compacted: "Warteschlange gerückt: jeder folgende Post übernahm den früheren Slot."
   menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
   wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"
   qr_hint: "Mit dem Handy scannen, um die Vorschau zu öffnen."
@@ -254,6 +266,7 @@ cli:
       ./blog.sh props [<slug>]       zeigt Status und Aktionen eines Beitrags (veröffentlichen, zurückziehen, Slug umbenennen, löschen...)
       ./blog.sh publish [<slug>]     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit)
       ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
+      ./blog.sh queue                die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
       ./blog.sh delete [<slug>]      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh restore [<slug>]     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt
@@ -272,6 +285,7 @@ cli:
   wizard_unknown_choice: "Unbekannte Auswahl, versuch es nochmal."
   wizard_menu_add: "Neuer Beitrag"
   wizard_menu_post: "Ein Beitrag -- den Text bearbeiten, oder seine Eigenschaften und Aktionen (veröffentlichen, umbenennen, löschen...)"
+  wizard_menu_queue: "Die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, entfernen"
   wizard_menu_restore: "Beitrag aus dem Papierkorb zurückholen"
   wizard_menu_list: "Liste aller Beiträge (nur ansehen, kein Bearbeiten)"
   wizard_menu_rebuild: "Seite neu bauen und deployen (unabhängig von einem Beitrag)"
