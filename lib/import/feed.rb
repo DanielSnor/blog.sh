@@ -109,7 +109,7 @@ module Import
           abort('❌ This import needs rexml, which your Ruby install is missing -- `gem install rexml` ' \
                 'or install your distribution\'s fuller Ruby package.')
         end
-        begin
+        doc = begin
           REXML::Document.new(read_source)
         rescue REXML::ParseException => e
           # label() parses the document before the run even starts, so a
@@ -118,13 +118,35 @@ module Import
           # actual problem is what the author can act on.
           abort("❌ #{@source} is not readable as XML: #{e.message.lines.find { |l| !l.strip.empty? }.to_s.strip[0, 120]}")
         end
+
+        # XML that parses but isn't a feed used to end as "Done. 0 post(s)"
+        # and exit 0 -- the same output as a feed that really is empty, so
+        # an author who pasted a page URL instead of its feed URL was told
+        # their import worked. The root element is the whole diagnosis:
+        # <html> means the wrong URL, <rdf:RDF> means RSS 1.0, which this
+        # adapter does not read.
+        root = doc.root&.expanded_name
+        unless %w[rss feed].include?(root)
+          abort("❌ #{@source} is valid XML, but not an RSS/Atom feed or a WordPress export " \
+                "(its root element is <#{root || 'nothing'}>).")
+        end
+
+        doc
       end
     end
 
     def read_source
       return File.read(@source, encoding: 'utf-8') if File.exist?(@source.to_s)
 
-      FeedHttp.get(@source)
+      begin
+        FeedHttp.get(@source)
+      rescue StandardError => e
+        # A feed URL that 404s, times out or resolves nowhere raised through
+        # to the wizard as a raw backtrace: the same defect the malformed-XML
+        # abort below already fixed for files, just on the network path. The
+        # message from FeedHttp already names the status and the URL.
+        abort("❌ #{@source} could not be fetched: #{e.message}")
+      end
     end
 
     def atom?

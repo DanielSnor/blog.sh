@@ -34,8 +34,17 @@ module SiteHeader
     # block here reads like the identity block on the site. The claim may
     # carry <br> line breaks; on one terminal line they become a
     # separator, and any other markup is dropped.
+    #
+    # Built from the pieces between the breaks rather than by replacing the
+    # breaks in place: a claim that is only markup ("<br>", or a stray tag)
+    # left the separator behind with nothing on either side of it, and the
+    # site header greeted the author with a lone middle dot.
     claim_text = SiteConfig.get('banner', 'claim') || SiteConfig.get('site', 'description')
-    claim_text = claim_text.to_s.gsub(%r{<br\s*/?>}i, ' · ').gsub(/<[^>]+>/, '').strip
+    claim_text = claim_text.to_s
+                           .split(%r{<br\s*/?>}i)
+                           .map { |part| part.gsub(/<[^>]+>/, '').strip }
+                           .reject(&:empty?)
+                           .join(' · ')
     claim = [short_name, claim_text].compact.reject(&:empty?).join(' — ')
 
     # The full URL, protocol included, not a bare domain: terminals

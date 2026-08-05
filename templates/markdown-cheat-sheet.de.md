@@ -252,7 +252,7 @@ Der Pfad darf irgendwohin auf der Platte zeigen, die Datei wird automatisch kopi
 
 ## Video
 
-Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei und für YouTube. **Bei einem Video ist die Unterschrift Pflicht.**
+Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei (.mp4, .mov, .m4v) und für YouTube. **Bei einem Video ist die Unterschrift Pflicht.**
 
 ```
 !![Videounterschrift](/pfad/zum/video.mp4)

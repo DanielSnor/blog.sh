@@ -98,7 +98,7 @@ everything about one post in one place -- state, type, tags, the pin,
 the announcement -- and offers the guarded actions:
 
 - **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
-  delete;
+  review the old addresses that redirect here, delete;
 - **draft**: publish, schedule (or reschedule, or cancel the schedule),
   rename the slug, delete.
 
@@ -123,6 +123,19 @@ One consequence the redirect can't cover: feed readers identify posts by
 their URL, so a renamed post may appear once more as a new item in
 subscribers' readers. The redirect keeps every clicked link working;
 what a reader app shows is its own business.
+
+**Moving a post to another year** -- editing its date across a New Year
+-- moves its public address the same way a rename does, and records the
+old one the same way. The link from before the edit keeps working.
+
+**Old addresses can also be given up**, with `[a]` in the same dialog:
+it lists every address that redirects here and drops the one you pick.
+There is one situation where that is the only cure rather than a
+preference: if a NEW post has since taken an old address, the build
+refuses to overwrite a live page with a redirect stub -- correctly -- and
+says so on every build. The entry can never do anything again, and `[a]`
+marks exactly that entry as "taken by another post". Dropping any other
+one is a decision, not a repair: that link stops working for good.
 
 The wizard menu lists five activities, not every command: publish,
 schedule, unpublish, delete and the announcement live in this dialog

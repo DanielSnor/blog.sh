@@ -32,8 +32,57 @@ prints what an installation is running.
   step one slot forward into the gap. The preview rebuilds once, on the
   way out, not after every move.
 
+### New
+
+- **Old addresses can be given up.** `[a]` in `./blog.sh props <slug>`
+  lists every address that redirects to the post and drops the one you
+  pick. It exists for a state that had no cure: when a new post takes an
+  address an older post still redirects from, the build refuses to
+  overwrite a live page with a redirect stub and says so on every build,
+  forever -- and nothing short of hand-editing the post's JSON could
+  remove the entry. Those entries are marked "taken by another post".
+
 ### Fixes
 
+- **A post moved to another year keeps its old link working.** Editing a
+  post's date across a New Year moves its address from
+  `/posts/2019/slug/` to `/posts/2020/slug/`; the redirect a rename would
+  have left behind was never recorded, so the old link simply died. It is
+  recorded now, and the redirect stub the build already knew how to emit
+  appears at the old address.
+- **The preview server answers byte ranges.** It replied 200 to a Range
+  request, which Safari treats as "this server cannot stream" -- it
+  refuses to play the media element at all -- and which breaks seeking in
+  a video or audio post everywhere else. It now answers 206 (and 416 past
+  the end of the file), and streams instead of reading whole files into
+  memory.
+- **The preview server knows every file type a post can carry.** Audio,
+  `.m4v` and all nine attachment extensions were served as
+  `application/octet-stream`, so a browser downloaded what the deployed
+  site plays or displays -- the preview disagreed with the real site
+  about what the page does.
+- **A video is no longer mistaken for a photo.** The HEIC detector
+  matched brands that mean an HEVC image *sequence*, which a video file
+  can carry in its header too -- and the converter would have answered
+  with a single frame and called it the file. Detection now looks for the
+  box that decides it: a movie box means a movie, whatever the brand says.
+- **Photos taken sideways get the size they are shown at.** Dimensions
+  came from the frame header and ignored the EXIF orientation every
+  browser obeys, so a portrait phone photo reserved a landscape box and
+  the page jumped exactly where the reservation was meant to stop it.
+- **A feed URL that 404s says so.** It came out as a raw backtrace; only
+  malformed XML had been given a one-line message.
+- **XML that isn't a feed says so too**, instead of "Done. 0 post(s)" and
+  exit 0 -- which is what an author saw after pasting a page URL instead
+  of its feed URL, and reads as success.
+- **A plain draft shows no date in listings and pickers**, the rule the
+  properties dialog already follows: a draft's time is set by publishing
+  or scheduling, so the timestamp in its file describes bookkeeping, not
+  the post.
+- **A `banner.claim` that is only markup no longer greets you with a lone
+  middle dot** in the CLI header.
+- The markdown cheat sheet names the video extensions (.mp4, .mov, .m4v),
+  as the audio and attachment sections already did.
 - **Editing a post no longer drops a video's poster image.** Markdown has
   no way to write one down, so re-parsing an edited post handed back a
   video block without it, and the safeguard that catches content loss

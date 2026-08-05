@@ -282,7 +282,13 @@ one-liner -- that depends on `webrick`, a default gem some distros
 split out of their minimal Ruby package (see [decisions.md](decisions.md)).
 Percent-decodes the request path itself and rejects anything that
 resolves outside the served root, the one security property a static
-file server actually needs.
+file server actually needs. It answers byte ranges (206, and 416 for a
+range past the end) and streams the file rather than reading it whole:
+without ranges Safari refuses to play a media element at all, and
+seeking in a video or audio post is broken everywhere else -- a preview
+that cannot show what the deployed site does is not a preview. Every
+extension the engine can attach to a post has a MIME type here, for the
+same reason.
 
 ## Deploy (`scripts/deploy_web.rb` + `lib/deploy_backend/`)
 

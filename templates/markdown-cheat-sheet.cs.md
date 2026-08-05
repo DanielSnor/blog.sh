@@ -251,7 +251,7 @@ Cesta může vést kamkoliv na disku, soubor se zkopíruje sám. Holé jméno so
 
 ## Video
 
-Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor i pro YouTube. **Popisek je u videa povinný.**
+Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor (.mp4, .mov, .m4v) i pro YouTube. **Popisek je u videa povinný.**
 
 ```
 !![Popisek videa](/cesta/k/videu.mp4)

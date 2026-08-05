@@ -251,7 +251,7 @@ The path can point anywhere on disk, the file gets copied automatically. A bare 
 
 ## Video
 
-Two exclamation marks, otherwise same as an image. Works for a local file and for YouTube. **The caption is mandatory for a video.**
+Two exclamation marks, otherwise same as an image. Works for a local file (.mp4, .mov, .m4v) and for YouTube. **The caption is mandatory for a video.**
 
 ```
 !![Video caption](/path/to/video.mp4)

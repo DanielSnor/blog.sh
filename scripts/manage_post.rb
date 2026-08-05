@@ -1233,6 +1233,11 @@ def cmd_props(slug)
                             elsif draft?(post) then t('cli.props_announces_on_publish')
                             else t('cli.props_not_announced')
                             end)
+    # Old addresses are counted, not listed: a post renamed a few times
+    # would push everything else off the screen, and the list is one
+    # keypress away in [a].
+    addresses = Array(post['former_slugs']).size
+    props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
     # The whole queue, after the property list rather than inside it: it is
     # a block, not a field, and until now the only way to see what goes out
     # when was opening every draft in turn -- which is also how an offered
@@ -1299,6 +1304,8 @@ def cmd_props(slug)
       when 'r'
         abort_if_post_changed(path, original_raw, slug)
         slug = rename_post(path, post)
+      when 'a'
+        props_addresses(path, slug)
       when 'x'
         cmd_delete(slug)
         # Cancelled (the post still exists) -> stay in the dialog.
@@ -1343,6 +1350,89 @@ end
 # has no public address yet, so its rename records nothing; only its
 # preview URL changes, which is why that path redeploys the preview.
 #
+# The addresses a post used to answer at, and the one way to drop one.
+#
+# A former_slugs entry normally needs no attention: it is a redirect, it
+# costs one stub page, and it keeps an old link alive. But an entry can go
+# stale -- a NEW post takes that address, the build refuses to overwrite a
+# live page with a stub (rightly) and says so on every single build. That
+# warning had no cure: nothing in the CLI could remove the entry, and the
+# only remaining option was hand-editing the post's JSON, which is exactly
+# what this dialog exists to avoid.
+#
+# Taken addresses are marked as such, because that is the whole reason
+# someone would come here: the marked one is the entry to drop.
+def props_addresses(path, slug)
+  loop do
+    # Re-read at the top of every pass rather than trusting the copy the
+    # dialog is holding: this screen writes the post back, and the window
+    # between reading it and writing it is however long someone spends at
+    # the picker -- with the scheduled-publish cron running every 15
+    # minutes. The write below refuses if anything moved in between.
+    raw = File.read(path, encoding: 'utf-8')
+    post = JSON.parse(raw)
+    entries = Array(post['former_slugs']).map(&:to_s)
+    if entries.empty?
+      puts t('cli.addresses_none')
+      return
+    end
+
+    current = "#{File.basename(File.dirname(path))}/#{slug}"
+    rows = entries.each_with_index.map { |former, i| address_row(former, current, i) }
+    puts
+    puts Tui.paint(t('cli.addresses_heading', count: entries.size), :dim)
+    index = address_pick(rows)
+    return if index.nil?
+
+    former = entries[index]
+    print t('cli.addresses_drop_confirm', address: former)
+    next unless Tui.key_choice('') == t('cli.confirm_yes_char')
+
+    abort_if_post_changed(path, raw, slug)
+    remaining = entries - [former]
+    updated = post.dup
+    remaining.empty? ? updated.delete('former_slugs') : updated['former_slugs'] = remaining
+    AtomicWrite.write_json(path, updated)
+    puts Tui.paint(t('cli.addresses_dropped', address: former), :green)
+    maybe_rebuild
+  end
+end
+
+# "2019/old-title  — taken by another post" for the stale ones. Taken
+# means: a post other than this one owns that year/slug today, so the
+# build will never emit the stub and the warning repeats forever.
+#
+# The comparison is against the post's whole current address, not its
+# slug: a post that moved between years keeps its slug, and the address it
+# vacated is precisely the one another post can take.
+def address_row(former, current, index)
+  parts = former.split('/').reject(&:empty?)
+  taken = parts.size == 2 && former != current &&
+          File.exist?(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"))
+  note = if parts.size != 2
+           "  #{t('cli.addresses_unusable')}"
+         elsif taken
+           "  #{t('cli.addresses_taken')}"
+         else
+           ''
+         end
+  format('%2d.  %s%s', index + 1, former, note)
+end
+
+# Same two faces as every other picker here: arrow keys in a terminal, a
+# numbered list and a read line when piped.
+def address_pick(rows)
+  return Tui.menu(rows, hint: t('cli.addresses_menu_hint')) if Tui.interactive?
+
+  rows.each { |row| puts "  #{row}" }
+  puts
+  print t('cli.addresses_pick_prompt')
+  line = $stdin.gets&.strip.to_s
+  puts
+  index = line.to_i - 1
+  line =~ /\A\d+\z/ && (0...rows.size).cover?(index) ? index : nil
+end
+
 # Returns the slug the caller should continue with: the new one after a
 # rename, the old one after any kind of cancel.
 def rename_post(path, post)
@@ -1540,10 +1630,16 @@ def edit_post(slug)
   # the same slug, so "new_year/slug" would otherwise sit in its own
   # former_slugs and the build would try to redirect the live page to
   # itself -- a warning that fires on every build and no later edit clears.
-  if post['former_slugs']
-    former = Array(post['former_slugs']).map(&:to_s) - ["#{new_year}/#{slug}"]
-    updated['former_slugs'] = former unless former.empty?
-  end
+  #
+  # A date edit that moves a PUBLISHED post into another year also vacates
+  # its old public address -- /posts/2019/slug/ stops being generated the
+  # moment the post becomes /posts/2020/slug/. That is the same debt a
+  # rename creates, and the stub mechanism has always been able to pay it;
+  # nothing was writing the entry, so the old link just died. A draft
+  # vacates nothing, exactly as in rename_post.
+  vacated = new_year != year && !draft?(post) ? "#{year}/#{slug}" : nil
+  former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
+  updated['former_slugs'] = former unless former.empty?
   updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
@@ -1731,7 +1827,17 @@ def state_marker(post)
 end
 
 def summary_row(post)
-  date = Time.parse(post[:date]).strftime('%Y-%m-%d')
+  # A plain draft shows no date, the same rule the properties dialog
+  # follows: a draft's time is set by publishing or scheduling, so the
+  # timestamp in its JSON is bookkeeping, not a fact about the post. Dashes
+  # rather than blanks, so the column still lines up and reads as
+  # deliberately empty. A scheduled draft does have a time -- schedule gave
+  # it one -- and keeps showing it.
+  date = if post[:state] == DRAFT && !post[:scheduled]
+           '----------'
+         else
+           Time.parse(post[:date]).strftime('%Y-%m-%d')
+         end
   "#{date}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
 end
 
