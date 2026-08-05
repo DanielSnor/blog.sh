@@ -296,6 +296,7 @@ cli:
   rename_taken: "Slug „%{slug}\" už patří jinému postu — zvol jiný."
   rename_prompt: "Nový slug (prázdné = zrušit): "
   rename_unusable: "Ze „%{input}\" po slugifikaci nic použitelného nezbylo — nic se nepřejmenovalo."
+  rename_too_long: "Ten slug je příliš dlouhý na název souboru — zkrať ho a zkus znovu. Nic se nepřejmenovalo."
   rename_same: "To už je slug tohohle postu — není co měnit."
   rename_confirm: "%{old_url}\n  -> %{new_url}\n  Stará adresa funguje dál: bude trvale přesměrovávat na novou."
   rename_confirm_draft: "%{old} -> %{new} — s tím se změní i adresa náhledu (pošli si nový odkaz)."

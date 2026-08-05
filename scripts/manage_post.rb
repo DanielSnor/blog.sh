@@ -1031,6 +1031,17 @@ def props_title(post)
   post['title'] || post['content'].find { |b| b['type'] == 'text' }&.fetch('text', '')&.slice(0, 60) || post['slug']
 end
 
+# The props actions that write the captured post back ([s]/[n]/[r]/[c])
+# each run this first: if the file changed since the dialog read it, the
+# capture is stale and writing it would clobber whatever changed it (the
+# cron, another session). Refusing is the only safe answer -- the two
+# versions can't be merged -- and it's the same guard edit_post uses.
+def abort_if_post_changed(path, original_raw, slug)
+  return if File.exist?(path) && File.read(path, encoding: 'utf-8') == original_raw
+
+  abort t('cli.post_changed_while_editing', slug: slug)
+end
+
 def cmd_props(slug)
   network = SiteConfig.comment_network
   network_label = { mastodon: 'Mastodon', bluesky: 'Bluesky' }[network]
@@ -1039,7 +1050,15 @@ def cmd_props(slug)
     path = find_post_path(slug)
     abort t('cli.post_not_found', slug: slug) unless path
 
-    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    # Read once per redraw, and kept to compare against just before any
+    # action writes it back. The dialog can sit at its prompt for minutes
+    # while the scheduled-publish cron runs every 15 -- so a captured post
+    # can be stale by the time [s]/[n]/[r]/[c] act on it, and writing it
+    # back would revert a post the cron just published, drop the
+    # announcement URL it stored, and (via [s]) announce it a second time.
+    # Same hazard edit_post guards against, same guard.
+    original_raw = File.read(path, encoding: 'utf-8')
+    post = JSON.parse(original_raw)
     year = File.basename(File.dirname(path))
 
     puts
@@ -1083,6 +1102,7 @@ def cmd_props(slug)
       case Tui.key_choice(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'))
       when 'p' then return publish_draft(slug)
       when 's'
+        abort_if_post_changed(path, original_raw, slug)
         puts
         prompt_and_schedule(path, post)
       when 'n'
@@ -1090,8 +1110,11 @@ def cmd_props(slug)
           puts t('cli.props_unknown_draft')
           next
         end
+        abort_if_post_changed(path, original_raw, slug)
         unschedule_post(path, post, slug)
-      when 'r' then slug = rename_post(path, post)
+      when 'r'
+        abort_if_post_changed(path, original_raw, slug)
+        slug = rename_post(path, post)
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.
@@ -1118,8 +1141,12 @@ def cmd_props(slug)
         end
         puts
         network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
-      when 'c' then toggle_pin(path, post, slug)
-      when 'r' then slug = rename_post(path, post)
+      when 'c'
+        abort_if_post_changed(path, original_raw, slug)
+        toggle_pin(path, post, slug)
+      when 'r'
+        abort_if_post_changed(path, original_raw, slug)
+        slug = rename_post(path, post)
       when 'x'
         cmd_delete(slug)
         # Cancelled (the post still exists) -> stay in the dialog.
@@ -1181,6 +1208,15 @@ def rename_post(path, post)
   new_slug = Slug.slugify(input)
   if new_slug.empty?
     puts t('cli.rename_unusable', input: input)
+    return old_slug
+  end
+  # A slug is a filename (<slug>.json) and a URL segment; slugify keeps it
+  # to safe characters but not to a safe length, so a pasted paragraph
+  # reaches the write as a filename the filesystem rejects with a raw
+  # ENAMETOOLONG. cmd_add caps its slug at eight words for readability;
+  # this caps by bytes for correctness, well under any filesystem's limit.
+  if new_slug.bytesize > 200
+    puts t('cli.rename_too_long')
     return old_slug
   end
   if new_slug == old_slug
@@ -1345,7 +1381,16 @@ def edit_post(slug)
   # over would silently break every redirect the post has accumulated --
   # and dropping unpublished_from would lose the redirect an unpublished
   # post's old address is still owed.
-  updated['former_slugs'] = post['former_slugs'] if post['former_slugs']
+  #
+  # The post's CURRENT address is subtracted, exactly as Publishing.publish
+  # and rename_post do: a date edit that moves the post across a year keeps
+  # the same slug, so "new_year/slug" would otherwise sit in its own
+  # former_slugs and the build would try to redirect the live page to
+  # itself -- a warning that fires on every build and no later edit clears.
+  if post['former_slugs']
+    former = Array(post['former_slugs']).map(&:to_s) - ["#{new_year}/#{slug}"]
+    updated['former_slugs'] = former unless former.empty?
+  end
   updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']

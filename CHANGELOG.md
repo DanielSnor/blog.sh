@@ -129,6 +129,21 @@ Two changes are worth knowing about before you upgrade, both at the bottom.
 - The wizard banner showed the site's description where its own header
   shows a claim, and a bare domain that terminals turned into a punycode
   guess.
+- A final review pass, attacking the finished features rather than
+  testing them, found a handful more before the release: the properties
+  dialog could **revert a post the cron had just published** -- it acted
+  on the post it read when the dialog opened, and a scheduled publish in
+  between would be undone, its announcement URL dropped, on the next
+  keypress (the same guard `edit` already had, now on the dialog's four
+  actions too); a re-import **dropped a post's pin and its created_at**,
+  which the source has no notion of; a date edit across a year boundary
+  left the post's own new address in its redirect list, producing a
+  **build warning on every build**; a deploy read a manifest that was
+  valid JSON of the wrong shape and **crashed with a raw backtrace**
+  instead of the promised "treat it as empty", and a corrupted baseline
+  of the wrong shape was swallowed in silence; and a rename to an
+  enormous slug failed with a filesystem error rather than a plain
+  "too long".
 
 ### Worth knowing before upgrading
 

@@ -87,7 +87,15 @@ end
 def load_manifest
   return {} unless File.exist?(MANIFEST_PATH)
 
-  JSON.parse(File.read(MANIFEST_PATH))
+  data = JSON.parse(File.read(MANIFEST_PATH))
+  # Valid JSON of the wrong shape (a bare array, a number) is as unusable
+  # as unparseable text, and left alone it crashes much later on
+  # `stored[name]` with a bare TypeError -- exactly the place "deleting a
+  # manifest is always safe" promises can't happen. Same shape check the
+  # baseline already does; fall through to the loud-and-empty branch.
+  return data if data.is_a?(Hash)
+
+  raise JSON::ParserError, "not an object (#{data.class})"
 rescue JSON::ParserError => e
   # Treating this as "nothing was ever uploaded" silently is how orphans
   # become permanently unprunable: the target keeps files this side no
@@ -113,7 +121,13 @@ def load_state
   return {} unless File.exist?(BASELINE_PATH)
 
   data = JSON.parse(File.read(BASELINE_PATH))
-  data.is_a?(Hash) ? data : {}
+  # Wrong-shape (array, number) is corruption, not absence, and must be
+  # said rather than absorbed -- an empty {} here is indistinguishable
+  # from "no baseline yet", so silently returning it would hide a
+  # corrupted reference exactly like the branch below refuses to.
+  return data if data.is_a?(Hash)
+
+  raise JSON::ParserError, "not an object (#{data.class})"
 rescue JSON::ParserError, SystemCallError => e
   # Same tone as an unreadable manifest, and the same refusal to pretend:
   # losing this file means losing the growth guard's only reference, so it

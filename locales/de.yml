@@ -302,6 +302,7 @@ cli:
   rename_taken: "Der Slug '%{slug}' gehört bereits einem anderen Beitrag -- wähle einen anderen."
   rename_prompt: "Neuer Slug (leer = abbrechen): "
   rename_unusable: "Von \"%{input}\" bleibt nach der Slugifizierung nichts Brauchbares -- nichts umbenannt."
+  rename_too_long: "Dieser Slug ist zu lang für einen Dateinamen -- kürze ihn und versuch es erneut. Nichts umbenannt."
   rename_same: "Das ist bereits der Slug dieses Beitrags -- nichts zu tun."
   rename_confirm: "%{old_url}\n  -> %{new_url}\n  Die alte Adresse funktioniert weiter: sie leitet dauerhaft auf die neue um."
   rename_confirm_draft: "%{old} -> %{new} -- die Vorschau-Adresse des Entwurfs ändert sich mit (teile den neuen Link)."
