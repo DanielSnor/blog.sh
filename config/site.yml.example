@@ -93,6 +93,15 @@ footer:
 # icon = a name from the built-in set: mastodon, pixelfed, linkedin,
 # github, bluesky, instagram, threads, youtube, rss, email.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
+#
+# rel = an optional rel attribute for the rendered link. rel: "me" is
+# what earns the green check mark next to your site on a Mastodon
+# profile: Mastodon fetches the address you put in a profile metadata
+# field and verifies it only if that page links back with rel="me" to
+# the profile. Since the icons sit in the footer, every page carries the
+# link -- put your home page in the profile field and it just works. The
+# url: here has to be your profile as Mastodon shows it
+# (https://instance/@handle). More than one entry may carry rel: "me".
 social:
   - name: "Mastodon"
     url: "https://mastodon.social/@yourname"

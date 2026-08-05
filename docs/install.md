@@ -177,6 +177,19 @@ The example is fully commented. The short version:
   `colors` (7 keys per light/dark mode -- omitted keys fall back to the
   built-in blue palette).
 
+`social` is the row of icons in the footer. Each entry takes `name`,
+`url` and either `icon` (a name from the built-in set) or `icon_svg`
+(your own markup), plus an optional `rel` that is passed through to the
+rendered link. `rel: "me"` on the Mastodon entry is what gets your site
+verified -- the green check mark next to it on your profile: Mastodon
+fetches the address from your profile's metadata field and accepts it
+only if that page links back to the profile with `rel="me"`. The footer
+is on every page, so pointing the profile field at your home page is
+enough; the entry's `url` has to be the profile as Mastodon shows it
+(`https://instance/@handle`). Several entries may carry it. Bluesky
+verifies domains a different way (DNS or `/.well-known`), so `rel: "me"`
+does nothing for a Bluesky entry.
+
 `site.lang` selects `locales/<lang>.yml` for every generated string --
 `en`, `cs` and `de` ship with the engine; a partial locale falls back to
 English per key. Adding another language is data, not code -- see
