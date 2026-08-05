@@ -10,11 +10,11 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.1 -- unreleased
+## 1.1 -- 2026-08-05
 
-Four things a site can now do that it couldn't, and one class of defect
+Six things a site can now do that it couldn't, and one class of defect
 removed from the deploy. Nothing to migrate: `git pull`, rebuild, deploy.
-Two changes are worth knowing about before you upgrade, both at the bottom.
+Three changes are worth knowing about before you upgrade, all at the bottom.
 
 ### New
 
@@ -145,7 +145,7 @@ Two changes are worth knowing about before you upgrade, both at the bottom.
   enormous slug failed with a filesystem error rather than a plain
   "too long".
 
-### Worth knowing before upgrading
+### Upgrading
 
 - **The wizard menu was renumbered.** It lists five activities now, so a
   scripted `printf "4\n" | ./blog.sh` picks a different entry than it did
