@@ -1789,7 +1789,14 @@ def run_wizard
       puts t('cli.wizard_prompt_action')
       puts
       index = Tui.menu(WIZARD_MENU.map { |_, desc| desc }, hint: t('cli.menu_hint'))
-      break if index.nil?
+      # Esc leaves the cursor on the line right under the hint, so the shell
+      # prompt lands flush against the menu. One blank line to sit on the
+      # way out -- which is also what the piped branch below already does
+      # with its `puts` after reading the choice.
+      if index.nil?
+        puts
+        break
+      end
 
       puts
       run_wizard_choice(WIZARD_MENU[index].first)
