@@ -268,6 +268,35 @@ no-gems promise for real. *Cost:* one more config key, and the
 conversion quality (JPEG, fixed 90) is not configurable -- a knob
 nobody asked for would outlive the question.
 
+**Platform players are built from the address, not from the platform's
+embed code -- and only for platforms whose address says enough.** YouTube
+worked this way from the start; Vimeo, PeerTube, archive.org, Spotify,
+SoundCloud and Mixcloud now follow it (`lib/embed.rb`). The engine stores a
+provider and an id, never foreign HTML, so a post carries no third party's
+markup or tracking, and a platform changing its embed path is one edit here
+rather than a re-import of every post. It also costs no network call at any
+point: writing a post stays an offline operation.
+*Cost:* six patterns that a platform can invalidate, each of which fails
+visibly (an empty player) rather than silently. The rules came from the
+live services, not their docs, which is where the corrections came from --
+an unlisted Vimeo link needs its hash or the player answers 403, a Spotify
+URL copied from a browser carries an `intl-xx` segment the embed path
+rejects, SoundCloud has no id to extract so the whole watch URL is handed
+to the widget (which is also how a private track's secret_token gets
+through), and Mixcloud's widget redirects to a second hostname that the
+page's CSP has to allow as well.
+
+**A page's frame-src is computed from the players it actually carries.**
+PeerTube is federated, so the host is a property of the post rather than of
+the engine: a fixed policy could not name it in advance, and widening
+frame-src for every site to cover every supported platform would hand every
+page permissions it does not use. Post pages and listings therefore compute
+their own frame origins from their blocks. The PeerTube host is taken with
+`URI.parse` and an explicit hostname shape, never pattern-matched out of the
+raw string -- `https://good.example@evil.test/w/x` reads as the good host to
+a careless regex and as the evil one to the browser. *Cost:* a page's CSP is
+no longer a constant, and a new provider has to say which origins it needs.
+
 **A phone video is mentioned, not refused -- the opposite of HEIC, and
 for a measurable reason.** A HEIC photo displays in Safari and nowhere
 else; HEVC video plays in the large majority of browsers, so refusing it

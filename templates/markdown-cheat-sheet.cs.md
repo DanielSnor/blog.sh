@@ -251,7 +251,7 @@ Cesta může vést kamkoliv na disku, soubor se zkopíruje sám. Holé jméno so
 
 ## Video
 
-Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor (.mp4, .mov, .m4v) i pro YouTube. **Popisek je u videa povinný.**
+Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor (.mp4, .mov, .m4v) i pro adresu videa: YouTube, Vimeo, PeerTube, archive.org. **Popisek je u videa povinný.**
 
 ```
 !![Popisek videa](/cesta/k/videu.mp4)
@@ -266,10 +266,14 @@ Samotná adresa na YouTube napsaná na řádku se na přehrávač **nezmění** 
 
 Stejné dva vykřičníky jako u videa — rozlišuje je přípona souboru
 (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Popisek je povinný**
-a soubor se vykreslí jako nativní přehrávač.
+a soubor se vykreslí jako nativní přehrávač. Na tentýž řádek jde napsat
+i adresu ze Spotify, SoundCloudu nebo Mixcloudu — udělá se z ní přehrávač
+té platformy.
 
 ```
 !![Popisek nahrávky](/cesta/k/nahravce.mp3)
+!![Popisek nahrávky](https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT)
+!![Popisek nahrávky](https://soundcloud.com/nasa/apollo-11-onboard-recorder)
 ```
 
 ## Přílohy

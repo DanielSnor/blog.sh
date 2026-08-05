@@ -18,7 +18,7 @@
        those integrations are actually configured (see csp_content in
        build/build_blog.rb) -- a site with neither configured gets a tighter
        policy for free. -->
-  <meta http-equiv="Content-Security-Policy" content="<%= csp_content %>">
+  <meta http-equiv="Content-Security-Policy" content="<%= csp_content(page_frame_origins) %>">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= h(page_title) %></title>
   <meta name="description" content="<%= h(page_description) %>">

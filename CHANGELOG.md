@@ -34,6 +34,20 @@ prints what an installation is running.
 
 ### New
 
+- **Six more platforms play in a post, from their address alone.** A
+  `!![caption](url)` line now recognises Vimeo, PeerTube and archive.org
+  as video, and Spotify, SoundCloud and Mixcloud as audio -- the same
+  gesture YouTube has always used, and the same rule: the engine stores a
+  provider and an id, never the platform's own embed code, so no third
+  party's markup or tracking ends up in a post and no network call happens
+  while writing one. Each page asks its Content-Security-Policy for
+  exactly the players it carries, which is what lets a PeerTube video work
+  at all: the instance is a property of the post, not of the engine. The
+  addresses that trip people up are handled -- an unlisted Vimeo link
+  keeps its hash, a Spotify URL copied from a browser loses the `intl-xx`
+  segment that would 404 the player, a private SoundCloud track keeps its
+  token, and Mixcloud's second hostname is allowed because its widget
+  redirects there.
 - **An interrupted post is offered back instead of just kept.** The text
   from an editor session has always survived an aborted save in
   `.last-edit.md`, but recovering it meant copying the file out by hand

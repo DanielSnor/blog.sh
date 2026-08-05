@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'embed'
+
 # lib/markdown_parser.rb -- markdown text -> content blocks (the JSON schema
 # shared with the Tumblr/Twitter importers and build_blog.rb).
 #
@@ -494,6 +496,14 @@ module MarkdownParser
         # its own tracking along with it).
         return [{ 'type' => 'video', 'provider' => 'youtube', 'url' => target,
                   'youtube_id' => yt[1], 'caption' => caption }, counter]
+      end
+
+      # The other platforms whose address alone says how to play it (see
+      # lib/embed.rb). Same shape as YouTube above -- provider plus the
+      # identifying part, never their embed code -- and the same gesture
+      # for the author: paste the address you would send a friend.
+      if (embed = Embed.detect(target))
+        return [{ 'type' => Embed.kind(embed), 'url' => target, 'caption' => caption }.merge(embed), counter]
       end
 
       counter += 1

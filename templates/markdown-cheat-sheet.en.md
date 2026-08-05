@@ -251,11 +251,13 @@ The path can point anywhere on disk, the file gets copied automatically. A bare 
 
 ## Video
 
-Two exclamation marks, otherwise same as an image. Works for a local file (.mp4, .mov, .m4v) and for YouTube. **The caption is mandatory for a video.**
+Two exclamation marks, otherwise same as an image. Works for a local file (.mp4, .mov, .m4v) and for a video address: YouTube, Vimeo, PeerTube, archive.org. **The caption is mandatory for a video.**
 
 ```
 !![Video caption](/path/to/video.mp4)
 !![Video caption](https://www.youtube.com/watch?v=jNQXAC9IVRw)
+!![Video caption](https://vimeo.com/76979871)
+!![Video caption](https://framatube.org/w/aRVpP8pRc9Nz1Aq9dFGxnw)
 ```
 
 !![The very first video on YouTube](https://www.youtube.com/watch?v=jNQXAC9IVRw)
@@ -266,10 +268,14 @@ A bare YouTube address on its own line does **not** turn into a player — it be
 
 Same two exclamation marks as a video — the file extension tells them apart
 (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **The caption is mandatory**,
-and the file renders as a native player.
+and the file renders as a native player. The same line also takes a
+Spotify, SoundCloud or Mixcloud address and turns it into that platform's
+player.
 
 ```
 !![Audio caption](/path/to/recording.mp3)
+!![Audio caption](https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT)
+!![Audio caption](https://soundcloud.com/nasa/apollo-11-onboard-recorder)
 ```
 
 ## Attachments

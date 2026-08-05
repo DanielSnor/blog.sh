@@ -1,0 +1,182 @@
+# frozen_string_literal: true
+
+require 'cgi'
+require 'uri'
+
+# lib/embed.rb -- the platforms whose watch/listen address can be turned
+# into a player by looking at it, with no network call anywhere.
+#
+# One module, used from both ends of the engine: the CLI's parser stores
+# what it recognised (provider + the identifying part), and the build turns
+# that back into an <iframe> src. Keeping the knowledge in one place is what
+# stops the two from drifting -- a stored post and a rendered page have to
+# agree about what a URL meant.
+#
+# The engine never stores foreign HTML for these. The same rule YouTube has
+# followed since the beginning: a provider's embed code can carry whatever
+# the provider likes, so the iframe is built here out of a validated id.
+# That also means a platform changing its embed path is one edit for every
+# post already written, instead of a re-import.
+#
+# Every pattern below was checked against the live services rather than
+# their documentation, which is where the traps came from: an unlisted
+# Vimeo link needs its hash or the player answers 403, a Spotify URL copied
+# from a browser carries an `intl-xx` segment that 404s the embed path,
+# SoundCloud has no numeric id to extract at all, and Mixcloud's widget
+# redirects to a second hostname that the page's CSP has to allow too.
+module Embed
+  # A single video/audio track's id is all that goes into the data. What
+  # the id means per provider is written into each pattern below.
+  VIMEO_RE = %r{\Ahttps?://(?:www\.)?vimeo\.com/(\d+)(?:/([0-9a-zA-Z]+))?}
+  VIMEO_PLAYER_RE = %r{\Ahttps?://player\.vimeo\.com/video/(\d+)}
+  # intl-cs, intl-de ... is what a browser's address bar hands over today,
+  # and it is exactly what the /embed/ path does not accept.
+  SPOTIFY_RE = %r{\Ahttps?://open\.spotify\.com/(?:intl-[a-z-]+/)?(track|album|playlist|episode|show|artist)/([A-Za-z0-9]+)}
+  SOUNDCLOUD_RE = %r{\Ahttps?://(?:www\.|m\.)?soundcloud\.com/[\w-]+/[\w%-]+}
+  MIXCLOUD_RE = %r{\Ahttps?://(?:www\.)?mixcloud\.com/([\w-]+/[\w%-]+)}
+  ARCHIVE_RE = %r{\Ahttps?://archive\.org/details/([\w.@%-]+)}
+  # PeerTube is federated, so there is no domain to match on: the shape of
+  # the path is the signal. Both forms the software itself serves are
+  # accepted, and its own normalisation treats the short id and the full
+  # UUID identically for watch and embed alike.
+  #
+  # The id has to have PeerTube's exact shape, not merely be a word: `/w/`
+  # is a short path any site might use, and turning someone's ordinary link
+  # into an iframe pointing at a page that isn't a player is worse than
+  # leaving it a link. So: a full UUID, or the short id PeerTube derives
+  # from one, which is base64url of sixteen bytes and therefore always
+  # exactly 22 characters.
+  #
+  # A 22-character slug on some other site's /w/ page would still be taken
+  # for one. That is the residual cost of a federated platform having no
+  # domain to check, and it fails visibly (an empty player, one edit away
+  # from being a plain link) rather than quietly.
+  PEERTUBE_ID_RE = /\A(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{22})\z/
+  PEERTUBE_PATH_RE = %r{\A/(?:w|videos/watch)/([^/]+)/?\z}
+
+  VIDEO_PROVIDERS = %w[vimeo peertube archive_org].freeze
+  AUDIO_PROVIDERS = %w[spotify soundcloud mixcloud].freeze
+
+  # Height in CSS pixels for the audio players, which are a fixed-height
+  # strip rather than a 16:9 picture -- Spotify's compact player, and what
+  # SoundCloud's and Mixcloud's widgets are drawn for.
+  AUDIO_HEIGHTS = { 'spotify' => 152, 'soundcloud' => 166, 'mixcloud' => 120 }.freeze
+
+  module_function
+
+  # The block fields for a URL this module recognises, or nil. Only the
+  # provider and the identifying parts -- the caller owns type and caption.
+  def detect(url)
+    text = url.to_s.strip
+    if (m = VIMEO_RE.match(text)) || (m = VIMEO_PLAYER_RE.match(text))
+      # The second capture is the unlisted-video hash. Without it the
+      # player answers 403 for those, which is a broken embed, not a
+      # degraded one -- verified against a real unlisted video.
+      { 'provider' => 'vimeo', 'embed_id' => m[1], 'embed_hash' => m[2] }.compact
+    elsif (m = SPOTIFY_RE.match(text))
+      { 'provider' => 'spotify', 'embed_kind' => m[1].downcase, 'embed_id' => m[2] }
+    elsif SOUNDCLOUD_RE.match?(text)
+      # No id to extract: the widget takes the whole watch URL, which is
+      # also how a private track's secret_token reaches the player.
+      { 'provider' => 'soundcloud' }
+    elsif (m = MIXCLOUD_RE.match(text))
+      { 'provider' => 'mixcloud', 'embed_id' => m[1] }
+    elsif (m = ARCHIVE_RE.match(text))
+      { 'provider' => 'archive_org', 'embed_id' => m[1] }
+    else
+      peertube(text)
+    end
+  end
+
+  # PeerTube's host ends up in the page's CSP, so it is parsed rather than
+  # pattern-matched out of the raw string: `https://good.example@evil.test/w/x`
+  # reads as the good host to a careless regex and as the evil one to the
+  # browser. URI.parse plus an explicit hostname shape is the version that
+  # cannot disagree with what the browser will do.
+  def peertube(text)
+    uri = begin
+      URI.parse(text)
+    rescue URI::InvalidURIError
+      return nil
+    end
+    return nil unless uri.is_a?(URI::HTTPS) || uri.is_a?(URI::HTTP)
+    return nil if uri.userinfo
+    return nil unless uri.host.to_s.match?(/\A(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}\z/i)
+
+    m = PEERTUBE_PATH_RE.match(uri.path.to_s)
+    return nil unless m && PEERTUBE_ID_RE.match?(m[1])
+
+    port = uri.port && ![80, 443].include?(uri.port) ? ":#{uri.port}" : ''
+    { 'provider' => 'peertube', 'embed_id' => m[1], 'embed_origin' => "https://#{uri.host}#{port}" }
+  end
+
+  def video?(block)
+    VIDEO_PROVIDERS.include?(block['provider'].to_s)
+  end
+
+  def audio?(block)
+    AUDIO_PROVIDERS.include?(block['provider'].to_s)
+  end
+
+  def kind(fields)
+    VIDEO_PROVIDERS.include?(fields['provider'].to_s) ? 'video' : 'audio'
+  end
+
+  # The iframe src for a stored block, or nil when the block is not one of
+  # ours (or lost the fields it needs -- a hand-edited JSON, an import).
+  def src(block)
+    id = block['embed_id'].to_s
+    case block['provider'].to_s
+    when 'vimeo'
+      return nil if id.empty?
+
+      hash = block['embed_hash'].to_s
+      "https://player.vimeo.com/video/#{id}#{hash.empty? ? '' : "?h=#{CGI.escape(hash)}"}"
+    when 'spotify'
+      kind = block['embed_kind'].to_s
+      return nil if id.empty? || kind.empty?
+
+      "https://open.spotify.com/embed/#{kind}/#{id}"
+    when 'soundcloud'
+      url = block['url'].to_s
+      return nil unless SOUNDCLOUD_RE.match?(url)
+
+      "https://w.soundcloud.com/player/?url=#{CGI.escape(url)}"
+    when 'mixcloud'
+      return nil if id.empty?
+
+      "https://www.mixcloud.com/widget/iframe/?feed=#{CGI.escape("/#{id}/")}"
+    when 'archive_org'
+      id.empty? ? nil : "https://archive.org/embed/#{id}"
+    when 'peertube'
+      origin = block['embed_origin'].to_s
+      return nil if id.empty? || !origin.match?(%r{\Ahttps://[a-z0-9.-]+(?::\d+)?\z}i)
+
+      "#{origin}/videos/embed/#{id}"
+    end
+  end
+
+  # What the page's frame-src has to allow for this block. Mixcloud needs
+  # two: its widget URL answers with a redirect to player-widget.mixcloud.com,
+  # and a CSP naming only the address in the src blocks the player the
+  # moment it follows that redirect.
+  def frame_origins(block)
+    case block['provider'].to_s
+    when 'vimeo' then ['https://player.vimeo.com']
+    when 'spotify' then ['https://open.spotify.com']
+    when 'soundcloud' then ['https://w.soundcloud.com']
+    when 'mixcloud' then ['https://www.mixcloud.com', 'https://player-widget.mixcloud.com']
+    when 'archive_org' then ['https://archive.org']
+    when 'peertube' then src(block) ? [block['embed_origin'].to_s] : []
+    else []
+    end
+  end
+
+  # Every origin a page carrying these blocks needs -- computed per page
+  # rather than added to every site's CSP, so a blog that embeds nothing
+  # keeps the narrow policy it has today. PeerTube is the reason this can't
+  # be a constant: the host is a property of the post, not of the engine.
+  def frame_origins_for(blocks)
+    Array(blocks).flat_map { |block| frame_origins(block) }.uniq
+  end
+end

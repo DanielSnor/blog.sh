@@ -67,13 +67,20 @@ module MarkdownWriter
         # turning it into a dead link to a name that isn't a URL.
         "[#{b['label']}](#{File.join(media_dir, file['url'].to_s)})" if file
       when 'audio'
-        # Mirrors the video branch: a local file writes back as !![](file);
-        # an imported embed-only audio (a Spotify iframe, say) has no
-        # markdown form and is dropped here -- the CLI's content-loss
-        # safeguard counts it before anything is saved.
+        # Mirrors the video branch: a local file writes back as !![](file),
+        # and so does a platform the engine can build a player for from the
+        # address alone -- that address is exactly what the author typed.
+        # An imported embed-only audio with no recognisable address (a raw
+        # iframe from an old export) still has no markdown form and is
+        # dropped here, which the CLI's content-loss safeguard catches
+        # before anything is saved.
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
-        "!![#{caption.empty? ? 'Audio' : caption}](#{File.join(media_dir, media['url'].to_s)})" if media
+        if media
+          "!![#{caption.empty? ? 'Audio' : caption}](#{File.join(media_dir, media['url'].to_s)})"
+        elsif Embed.src(b)
+          "!![#{caption.empty? ? 'Audio' : caption}](#{b['url']})"
+        end
       when 'video'
         # Without this, `edit` would silently drop the video -- filter_map
         # below throws out a nil. An empty caption would be rejected on save,
@@ -85,6 +92,8 @@ module MarkdownWriter
           "!![#{caption.empty? ? 'Video' : caption}](#{File.join(media_dir, media['url'].to_s)})"
         elsif youtube_playable?(b)
           "!![#{caption.empty? ? 'YT Video' : caption}](#{b['url']})"
+        elsif Embed.src(b)
+          "!![#{caption.empty? ? 'Video' : caption}](#{b['url']})"
         end
       end
     end.join("\n\n")

@@ -12,6 +12,7 @@ require 'digest'
 require_relative '../lib/sidebar'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
+require_relative '../lib/embed'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/file_size'
@@ -343,7 +344,11 @@ CLIENT_I18N_SCRIPT_HASH = "'sha256-#{Digest::SHA256.base64digest(CLIENT_I18N_SCR
 # those integrations are actually configured -- a site with neither gets a
 # tighter policy for free, instead of a hardcoded allowlist for services it
 # doesn't use.
-def csp_content
+# frame_origins comes from the page's own posts (see Embed.frame_origins_for):
+# a site that embeds nothing keeps exactly the policy it had, and a PeerTube
+# instance -- whose host is a property of the post, not of the engine -- can
+# be allowed for the one page that plays a video from it.
+def csp_content(frame_origins = [])
   analytics_origin = ANALYTICS && ANALYTICS['src'] ? URI.parse(ANALYTICS['src']) : nil
   analytics_origin &&= "#{analytics_origin.scheme}://#{analytics_origin.host}"
   mastodon_origin = MASTODON_INSTANCE ? "https://#{MASTODON_INSTANCE}" : nil
@@ -353,9 +358,11 @@ def csp_content
   script_src = ["'self'", CLIENT_I18N_SCRIPT_HASH, analytics_origin].compact.join(' ')
   connect_src = ["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact.join(' ')
 
+  frame_src = (%w[https://www.youtube.com https://www.youtube-nocookie.com] + Array(frame_origins)).uniq.join(' ')
+
   "default-src 'self'; script-src #{script_src}; style-src 'self' 'unsafe-inline'; " \
     "img-src 'self' https: data:; font-src 'self'; connect-src #{connect_src}; " \
-    "frame-src https://www.youtube.com https://www.youtube-nocookie.com; " \
+    "frame-src #{frame_src}; " \
     "object-src 'none'; base-uri 'self'; form-action 'self'"
 end
 
@@ -508,10 +515,27 @@ def render_audio(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
     %(<audio controls preload="metadata" src="#{media_prefix}#{local_media['url']}"></audio>)
+  elsif (src = Embed.src(block))
+    embed_iframe(src, block)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
     block['embed_html']
   else
     "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
+  end
+end
+
+# The players the engine builds itself, out of a provider and an id it
+# validated (lib/embed.rb) -- never out of the platform's own embed code.
+# Audio widgets are a fixed-height strip, video is 16:9 in the same
+# responsive box YouTube uses.
+def embed_iframe(src, block)
+  provider = block['provider'].to_s
+  title = h(provider.tr('_', '.'))
+  common = %(loading="lazy" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen)
+  if (height = Embed::AUDIO_HEIGHTS[provider])
+    %(<iframe class="embed-audio" src="#{h(src)}" title="#{title}" width="100%" height="#{height}" #{common}></iframe>)
+  else
+    %(<div class="embed-responsive"><iframe src="#{h(src)}" title="#{title}" #{common}></iframe></div>)
   end
 end
 
@@ -542,6 +566,8 @@ def render_video(block, media_prefix)
       %(title="YouTube" frameborder="0" loading="lazy" ) +
       %(allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ) +
       %(allowfullscreen></iframe></div>)
+  elsif (src = Embed.src(block))
+    embed_iframe(src, block)
   else
     %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{block['url']}">#{block['url']}</a></p>)
   end
@@ -984,7 +1010,8 @@ def render_post_html(post, template)
          image: post_og_image(post),
          og_type: 'article',
          # Drafts must never end up in search engines or link previews.
-         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : '')
+         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : '',
+         frame_origins: Embed.frame_origins_for(post['content']))
 end
 
 def rss_item(post)
@@ -1144,7 +1171,8 @@ def nav_current(href, active)
   href == active ? ' aria-current="page"' : ''
 end
 
-def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website', extra_head: '')
+def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website',
+           extra_head: '', frame_origins: [])
   LAYOUT.result_with_hash(
     main_html: main_html,
     page_title: title,
@@ -1153,7 +1181,10 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     nav_active: nav_active_for(path),
     og_image: image,
     og_type: og_type,
-    extra_head: extra_head
+    extra_head: extra_head,
+    # The players a page carries decide its frame-src, so the policy is
+    # computed here rather than widened for the whole site (csp_content).
+    page_frame_origins: frame_origins
   )
 end
 
@@ -1183,7 +1214,10 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     main_html = template.result_with_hash(list_html: list_html, pagination: pagination, heading: heading)
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
-                           path: page_url(number, fixed, base_path)))
+                           path: page_url(number, fixed, base_path),
+                           # A listing renders the same blocks the post page does,
+                           # players included, so it needs the same permissions.
+                           frame_origins: Embed.frame_origins_for(page_posts.flat_map { |p| p['content'] })))
   end
   pages.size
 end

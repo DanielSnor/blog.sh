@@ -252,7 +252,7 @@ Der Pfad darf irgendwohin auf der Platte zeigen, die Datei wird automatisch kopi
 
 ## Video
 
-Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei (.mp4, .mov, .m4v) und für YouTube. **Bei einem Video ist die Unterschrift Pflicht.**
+Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei (.mp4, .mov, .m4v) und für eine Videoadresse: YouTube, Vimeo, PeerTube, archive.org. **Bei einem Video ist die Unterschrift Pflicht.**
 
 ```
 !![Videounterschrift](/pfad/zum/video.mp4)
@@ -267,7 +267,9 @@ Eine bloße YouTube-Adresse auf eigener Zeile wird **nicht** zum Player — sie 
 
 Dieselben zwei Ausrufezeichen wie beim Video — unterschieden werden sie an
 der Dateiendung (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Die
-Unterschrift ist Pflicht**, gerendert wird ein nativer Player.
+Unterschrift ist Pflicht**, gerendert wird ein nativer Player. Dieselbe
+Zeile nimmt auch eine Adresse von Spotify, SoundCloud oder Mixcloud und
+macht daraus den Player der jeweiligen Plattform.
 
 ```
 !![Unterschrift der Aufnahme](/pfad/zur/aufnahme.mp3)

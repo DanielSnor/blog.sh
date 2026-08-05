@@ -71,8 +71,8 @@ dedup by `source`).
 | `hr` | no fields |
 | `image` | `media` (see below); `alt_text`; `caption` |
 | `file` | `media` (`url`, `size` in bytes); `label` -- an attachment offered for download; the post's type becomes `document` when its text is caption-short |
-| `video` | one of three shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
-| `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
+| `video` | one of four shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; another platform the address alone identifies (Vimeo, PeerTube, archive.org) -- `provider`, `url`, `embed_id` (+ `embed_hash` for an unlisted Vimeo, `embed_origin` for the PeerTube instance), see `lib/embed.rb`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
+| `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; a platform the address identifies (Spotify, SoundCloud, Mixcloud) -- `provider`, `url` and, where there is one, `embed_id`/`embed_kind`, see `lib/embed.rb`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
 | `link` | `url`; `title`; `description` -- rendered as a link card |
 
 An unrecognized `type` renders as its raw JSON in a `<pre>` -- loud,
