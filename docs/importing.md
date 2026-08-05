@@ -23,10 +23,19 @@ duplicated.
 ## What every import does
 
 - **Media comes home.** Images are downloaded (or copied from the export),
-  stored in `media.nosync/<year>/<slug>/`, and measured -- the build drops
-  an image block without pixel dimensions, so the importers never write one.
-  Downloads follow redirects and retry transient failures; a file that still
-  can't be fetched costs that image, not the post, and the summary says so.
+  stored in `media.nosync/<year>/<slug>/`, and measured, so every page can
+  reserve layout space for them (one without known dimensions still renders,
+  the page just jumps once while it loads). Downloads follow redirects and
+  retry transient failures; a file that still can't be fetched costs that
+  image, not the post, and the summary says so.
+- **A re-import updates, never duplicates.** Posts are matched on their
+  source identity -- platform, account and the item's own id -- not on the
+  title, so fixing a typo at the source and importing again updates the
+  existing post in place, keeping its slug and URL. The one exception is an
+  item with no usable identity (a plain RSS item with neither `guid` nor
+  `link`): rather than guess and risk merging two different posts, a
+  re-import writes it again -- a duplicate you can delete, where a wrong
+  match would destroy a post you can't get back.
 - **Origin becomes a tag.** Every imported post is tagged with its platform
   (`tumblr`, `wordpress`, ...; for a plain feed, the site's domain), so
   `/tag/tumblr/` is the whole of one old blog. Deduplicated
@@ -34,6 +43,12 @@ duplicated.
 - **One bad item costs one item.** A date that won't parse or markup nothing
   anticipated is counted under `error` and named on stderr; the run
   continues. A rejected API key still stops everything, as it should.
+- **A dying source still leaves a summary.** If the platform stops answering
+  mid-run (a 5xx on page twelve, a feed that goes away), the run stops,
+  says so, and reports honest partial counts -- everything written up to
+  that point is saved. The scripted path exits non-zero so cron notices.
+  Re-running once the source recovers picks up safely: the posts already
+  written are matched and updated, not duplicated.
 - **Progress is narrated** -- what's being read and how big it is, then a
   running counter. A silent minute means something is wrong, not that it's
   working.
@@ -259,5 +274,8 @@ working). The same selector is why re-importing later is safe.
 | `Tumblr API returned 401 Unauthorized` | Wrong `TUMBLR_API_KEY` or blog name. |
 | Many `skipped (not a post)` from a WXR | Normal -- menu items, attachments and pages travel in the same export. |
 | `skipped (error)` with stderr lines | Those items were malformed at the source; the rest imported. Re-run after a fix overwrites in place. |
+| `The source stopped answering after N item(s)` | The platform died mid-run. Everything written so far is saved; re-run once the source recovers -- posts are matched on their source id, so nothing duplicates. |
+| `cannot move '<slug>' into <year>: a different post already owns ...` | A re-imported item's date moved into a year where another post has the same slug. That one item is skipped, nothing was touched; rename one of the slugs and re-run. |
+| The same id-less post appears twice after a re-import | The item carries neither `guid` nor `link`, so it can't be matched. Delete the extra copy; better, give the item a `guid` at the source. |
 | The deploy stops with a % increase warning | The guard doing its job after a bulk change -- re-run with `--force` once the numbers look right. |
 | An imported post shows a shifted date | `site.timezone` wasn't set and the machine runs UTC -- set it and rebuild; stored dates don't change, only the rendered day. |

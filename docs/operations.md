@@ -91,6 +91,45 @@ with no escape codes in the output. Colors honor `NO_COLOR` and
 `./blog.sh preview [<port>]` serves the built site locally (default
 port 8000) when you want to look at it without deploying.
 
+### Properties and actions
+
+`./blog.sh props <slug>` (in the wizard: pick a post, then `v`) shows
+everything about one post in one place -- state, type, tags, the pin,
+the announcement -- and offers the guarded actions:
+
+- **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
+  delete;
+- **draft**: publish, schedule (or reschedule, or cancel the schedule),
+  rename the slug, delete.
+
+Type and tags are shown here but *edited* in the frontmatter of `edit`,
+prefilled with their current values -- one keystroke away from the text
+they describe. The pin is the exception: it is a switch, not a value,
+so `[c]` flips it right here (the `pinned:` header line keeps working
+too). The pinned post is also marked `[PINNED]` in every list and
+picker, so it can be found without remembering it. A plain draft shows
+no time on purpose: a draft has none until publishing or scheduling
+gives it one.
+
+**Renaming a slug** never breaks a link. The old address stays on the
+site as a one-page redirect to the new one, recorded in the post itself
+(`former_slugs`), so it survives edits, re-imports and full rebuilds. A
+rename costs one extra page per old address -- not a 404. Two things to
+know: unpublishing takes the redirects off the site along with the post
+(they return when it does), and deleting the post deletes its old
+addresses' redirects with it. Renaming a draft is free -- nothing is
+published yet -- but its preview URL changes, so share the new link.
+One consequence the redirect can't cover: feed readers identify posts by
+their URL, so a renamed post may appear once more as a new item in
+subscribers' readers. The redirect keeps every clicked link working;
+what a reader app shows is its own business.
+
+The wizard menu lists five activities, not every command: publish,
+schedule, unpublish, delete and the announcement live in this dialog
+(and the draft dialog) instead of being menu items. Every CLI command
+still exists unchanged -- `./blog.sh unpublish <slug>` works exactly as
+before; only the menu stopped listing it.
+
 ## Writing from a phone
 
 The trick is that a bare filename in an image line resolves against the
@@ -109,6 +148,92 @@ The trick is that a bare filename in an image line resolves against the
    is looked for in the post's own `media.nosync/<year>/<slug>/` first and
    in `incoming/` only after that, so a file that's already been saved
    resolves without any upload (and without being copied again).
+
+iPhones photograph in HEIC by default, which only Safari can display.
+Attaching one stops the save with the exact conversion command -- or, with
+`media.convert_heic: true` in `config/site.yml`, the engine converts it to
+JPEG itself during the save (detected by content, so a HEIC named `.jpg`
+is caught too; AVIF, which browsers do display, is left alone). The
+simplest fix is on the phone itself: Settings → Camera → Formats →
+Most Compatible.
+
+## Pinning a post to the front page
+
+The `[c]` action in `./blog.sh props <slug>` pins a published post --
+or unpins it again; `pinned: true` in the post's header
+(`./blog.sh edit <slug>`) does the same thing the long way round. A
+pinned post is held at the top of the front page, marked with a pin in
+the corner of its date badge. It appears there once: while it is still on the front
+page anyway it is lifted to the top rather than shown twice, and once it
+has aged onto `/page/2/` the front page keeps the copy at the top while
+page 2 lists it in its normal place, unmarked.
+
+Only the front page. Type and tag listings, the RSS feed, the sitemap
+and the search index stay strictly chronological -- a pin is a statement
+about the front page, not about the archive. Toggling it costs one or
+two files in a deploy, because pagination is anchored and the front page
+is the only flexible one. Pin a second post and the newest of them wins,
+with a warning in the build output.
+
+## Publishing slots
+
+Set the times posts usually go out and `[s]` stops asking for a date:
+
+```yaml
+publishing:
+  slots:
+    - "mon 09:30"
+    - "wed 09:30"
+    - "fri 09:30"
+    # or a single "daily 09:00"
+```
+
+The draft dialog then names the next FREE slot in the `[s]` choice
+itself, and the prompt offers it: Enter accepts, typing a date overrides
+it, the cancel word backs out. Free means no other scheduled post is
+aimed at that exact time, so three drafts written in one evening queue
+onto three consecutive slots instead of publishing together, and the
+confirmation says which post goes out before this one.
+
+The offer also names the slots it had to walk past, and the post sitting
+in each:
+
+```
+Publish when?
+  Next free slot: Aug 9, 2026 17:30
+  Earlier slots are taken:
+     Aug 6, 2026 17:30 → 'a-post'
+     Aug 8, 2026 08:30 → 'another'
+```
+
+Without that line an offer of Sunday evening on a site whose slots
+include Saturday morning reads as a queue that skips Saturdays -- the
+answer being that Saturday was already taken. The properties dialog of a
+scheduled draft prints the whole queue for the same reason, with an arrow
+on the post you are looking at.
+
+Slots only ever suggest. A post scheduled by hand for 14:17 occupies no
+slot and blocks nobody, nothing moves a post that already has a time,
+and without the key in `config/site.yml` the prompt is the plain one it
+always was. Times follow `site.timezone`, daylight saving included --
+"mon 09:30" is 09:30 on the wall clock on both sides of the change. The
+cron still runs every 15 minutes, so a slot publishes within that window
+of its time.
+
+## Attachments and the document type
+
+A line that is nothing but `[label](handbook.pdf)` -- a bare filename,
+whitelisted extension -- makes the file part of the post: it is picked
+up from `incoming/` exactly like a photo, stored in
+`media.nosync/<year>/<slug>/`, and rendered as a download card showing
+the label, the extension and the file's size. A link to an address stays
+a link; the engine can only publish files it was handed.
+
+Whitelisted: `.pdf .zip .tgz .epub .txt .md .ics .gpx .csv` (`.tar.gz`
+is not, because only the last suffix survives the rename -- use `.tgz`).
+A post whose text is a short line plus attachments is filed under
+DOCUMENTS, which appears in the nav once the first such post exists; a
+longer article that attaches its data stays an article with a file on it.
 
 ## Importing from another platform
 
@@ -170,25 +295,89 @@ publish/edit flows run it for you. The deploy script alone:
 
 Things worth knowing:
 
-- **The safety guards.** A deploy stops when the file count dropped or
-  grew by more than ~20% versus the last deploy. That almost always
-  means a broken or duplicated build, not intent -- check the build
-  output first. If the change is genuinely intended (bulk import, mass
-  deletion), rerun with `--force`. A deploy that was interrupted is the
-  one exception: it leaves a `.deploy_manifest*.json.incomplete` marker,
-  and the run that resumes it skips both guards once (it says so) --
-  otherwise the half-written manifest would look like an explosion in
-  size and lock out every later deploy, including the ones `./blog.sh`
-  runs for you, which cannot pass `--force`.
+- **The safety guards.** Four of them, all measuring this build against
+  the last build a deploy *accepted* -- recorded in
+  `.deploy_baseline.json` before the first byte goes out, so no upload
+  failure can move it:
+
+  | Guard | Trips at | What it does |
+  | --- | --- | --- |
+  | File count dropped | >20%, at least 8 files | stops |
+  | Total bytes dropped | >50%, at least 25 MB | stops |
+  | File count grew | >20%, at least 25 files | stops |
+  | Total bytes grew | >50% | says so, continues |
+
+  A drop almost always means a broken build; the byte version catches
+  what counts cannot -- the same pages, each nearly empty. Growth in
+  bytes is only a notice, because adding a video is authoring, not a
+  malfunction; a single file too big to host is caught separately and by
+  name (below). If a swing is genuinely intended (bulk import, mass
+  deletion), rerun with `--force`. An empty build is always refused.
+
+  The percentages need those absolute floors to be usable on a small
+  site: 20% of a 32-file build is six files, so two posts published at
+  once would otherwise read as an explosion -- and abort a flow that
+  `./blog.sh` runs for you, which cannot pass `--force`.
+
+  A drop also measures against the manifest when that is larger, since
+  every entry in it is a file that really did upload. Growth never does:
+  the manifest legitimately lags the build after a failed upload or on a
+  fresh target, and reading that lag as growth is exactly what used to
+  disable these guards.
+- **One file-size limit, everywhere.** A single file over 100 MB is
+  refused -- when the post is saved (so you can still shrink it) and
+  again before a deploy sends it. The same limit applies to every
+  backend so the site stays portable: the strictest supported target
+  (git pages) refuses anything larger. `--force` does not lift it, since
+  the target would refuse the file on every run. Files between 50 MB and
+  100 MB are named but allowed. A file already on the target from before
+  this limit existed is reported, not refused.
 - **`--prune` is the only destructive flag.** Without it, files the
   build stopped generating stay live on the target (the deploy log
   counts these "orphans"). With the `git` backend every deploy is a
   snapshot and prunes implicitly -- the log says "(snapshot deploy)".
+- **The previous run's outcome is reported, not acted on.** A deploy that
+  failed or was interrupted says so at the top of the next one, and after
+  three unfinished runs in a row it says that too -- something is being
+  refused every time. Deliberately a warning however high that count
+  goes: stopping after N attempts would be its own dead end.
 - **Manifests are disposable.** `.deploy_manifest*.json` (one per
   backend) records what the target already has. Deleting one is always
-  safe -- the next deploy re-uploads everything once and rebuilds it.
+  safe -- the next deploy re-uploads everything once and rebuilds it. The
+  guards are unaffected, because their reference lives elsewhere.
 - **Switching backends** starts from a fresh manifest on purpose; the
-  first deploy to a new target uploads the whole site.
+  first deploy to a new target uploads the whole site. The baseline is
+  *shared* across backends -- it describes the build, which is the same
+  wherever it goes -- so switching targets no longer leaves the guards
+  with nothing to compare against.
+
+### Checking the guards by hand
+
+`--dry-run` needs no target and writes nothing, which makes it the way to
+prove the guards still behave before trusting a release. Copy a build to a
+scratch directory, point `DEPLOY_TARGET_DIR` at a throwaway path with
+`DEPLOY_BACKEND=local`, and work through the cases that are easy to get
+wrong:
+
+| Set up | `--dry-run` must |
+| --- | --- |
+| Delete one post from a small site | pass -- the absolute floor covers it |
+| Delete most of the build | stop, naming the accepted build it compared against |
+| Publish two posts at once on a small site | pass |
+| Duplicate the build | stop |
+| Baseline intact, manifest truncated, build complete | pass -- this is recovery after a failed upload, and it is the case a naive fix breaks |
+| Same, but the build is also broken | stop |
+| Same file count, contents emptied past 25 MB | stop on bytes |
+| Add one 60 MB file | pass, with a notice |
+| Add one 120 MB file | stop, naming the file |
+| Empty `public.nosync/` | stop |
+| Delete `.deploy_baseline.json` | pass, saying the growth guard stands down once |
+| Any of the above | leave `.deploy_baseline.json` untouched -- a dry run is read-only |
+
+Two things make this easier to reason about: the failure state is anything
+that leaves `last_run.outcome` in `.deploy_baseline.json` set to something
+other than `ok`, and a run under `--only` must never change that file at
+all (that is how the sidebar cron stays out of the way).
 
 ## Cron (sidebar widgets and post stats)
 
@@ -239,11 +428,12 @@ everything generated is rebuildable:
 | `trash/` | optional -- deleted-but-recoverable posts |
 
 Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
-(self-heals with one full re-upload), `incoming/` (transient staging), and
+(self-heals with one full re-upload), `.deploy_baseline.json` (the guards'
+reference; losing it costs one deploy with the growth guard standing down,
+and it is rewritten by that same run), `incoming/` (transient staging), and
 the working files next to them -- `.last-edit.md` (the text from the last
-editor session), `.deploy-pending` and `.deploy_manifest*.json.incomplete`
-(markers that say a deploy still owes the target something; see
-[Deploying](#deploying)).
+editor session) and `.deploy-pending` (a marker that says a scheduled
+publish still owes the target a deploy; see [Deploying](#deploying)).
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
 
@@ -256,14 +446,17 @@ The same list is exactly what to move when changing machines.
 | `Missing env.sh` | Copy the template: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
 | `Missing config/site.yml` | Same idea: `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
 | `Duplicate year/slug ... build stopped` | Two posts resolve to the same URL and media directory. Rename one slug; the build aborts rather than silently overwriting one with the other. |
-| Deploy stopped with a "% drop/increase" message | The shrink/growth guard -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. |
+| Deploy stopped with a "% drop/increase" message | One of the four guards -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. The message names what it compared against, and when. |
+| Deploy or save stopped naming a file over 100 MB | One limit for every backend, so the site stays portable ([Deploying](#deploying)). Shrink the file, or take it out of the post and link to it instead. `--force` does not lift this -- the target would refuse it every run. |
+| `N deploys in a row have not finished` | Something is refused every time: an oversized file, expired credentials, a target that is gone. The guards are still on; the failures listed under that line say which. |
 | `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer UI and update `SURFER_TOKEN`. |
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
 | `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
 | Sidebar widget disappeared from the page | Its fetch returned nothing repeatedly (`refresh-sidebar` logs say which) -- the widget card hides when its JSON is empty/unreachable. Check the instance/feed URL in `config/site.yml`. |
 | `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues, and a copy already uploaded stays on the site rather than being pruned, so the page keeps working until you fix it. |
 | `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |
-| `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. HEIC (the iPhone default) additionally displays only in Safari -- convert it, or set the phone to "Most Compatible". |
+| `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. |
+| `HEIC displays only in Safari` when attaching a photo | The iPhone default format. Convert it with the command the message prints, set `media.convert_heic: true` to have the engine do it, or set the phone to Settings → Camera → Formats → Most Compatible. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |
 | sftp deploy hangs | It's waiting for a password -- the sftp backend needs key-based auth (see [install.md](install.md#sftp-hosts-with-neither-rsync-nor-git)). |

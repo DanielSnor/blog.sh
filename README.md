@@ -57,8 +57,10 @@ deploy step around exactly that. A few of the choices that came out of it:
   post is just the reply count on its announcement.
 - **Deploys default to paranoid.** `scripts/deploy-web.sh` diffs a SHA-256 +
   size + mtime manifest so it only ships what changed, and refuses to
-  proceed if the file count swings too far in either direction versus the
-  last deploy -- a bad `--prune` run can't silently empty your site.
+  proceed if the file count or the total bytes swing too far versus the last
+  build it accepted -- a bad `--prune` run can't silently empty your site.
+  A single file too large for the strictest supported target is refused when
+  the post is saved, not discovered at deploy time.
 - **Nothing renders that wasn't asked for.** Sidebar widgets (toots,
   Pixelfed posts, commits, per-post stats) are fetched server-side on a
   cron, never by the visitor's browser -- so there's no client-side call
@@ -78,15 +80,27 @@ deploy step around exactly that. A few of the choices that came out of it:
   post -- no hotlinking to external hosts
 - Post states are `published` / `draft`, with a per-post `draft_token`
   for private preview links
+- A published post can be pinned (`pinned: true`) to the top of the front
+  page -- once, marked in its date badge, and nowhere else in the archive
+- A post can carry files: a lone `[label](handbook.pdf)` line becomes a
+  download card with the file's size, and a short post built around one
+  is filed as a `document`
 
 **Authoring -- `blog.sh` (CLI and interactive wizard)**
 - `add` -- always starts as a draft; after saving, offers a preview and
   a publish / schedule / keep-as-draft / back-to-editing prompt
 - `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
+- `props <slug>` -- one post's state and its guarded actions in one
+  place: publish, unpublish, (re-)announce, delete, and **renaming the
+  slug without breaking a link** -- the old address stays on the site as
+  a permanent redirect to the new one
 - `publish <slug>` -- shows a preview before confirming, never publishes blind
 - `schedule <slug>` -- automatic publishing (toot included) by a cron step
   when the post's date arrives; asks for that date, whether reached as the
-  [s] dialog choice or as its own command; run again to cancel
+  [s] dialog choice or as its own command; run again to cancel. With
+  `publishing.slots` configured it offers the next free slot instead, so
+  several drafts queue onto consecutive slots rather than publishing
+  together
 - `unpublish <slug>` -- returns a post to draft, deletes its announcement;
   gets a fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
@@ -112,7 +126,7 @@ deploy step around exactly that. A few of the choices that came out of it:
   chat transcripts (a ```chat fence), horizontal rules, fenced code blocks
   with a language hint, GFM-style aligned tables, images, video (local
   file or YouTube) with automatic sizing, audio with a native player,
-  backslash escaping
+  file attachments as download cards, backslash escaping
 - The full syntax reference at `/markdown/` is generated directly from
   this parser, so it can't drift out of sync with what's actually supported;
   its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the
@@ -181,8 +195,11 @@ deploy step around exactly that. A few of the choices that came out of it:
   SHA-256 + size + mtime manifest means only new/changed files are
   uploaded
 - `--prune` (optional, the one destructive operation), `--dry-run`, `--only=`
-- Safety nets against both a sudden drop and a sudden spike in file count
-  versus the previous deploy
+- Safety nets against a sudden drop or spike in file count *and* in total
+  bytes, measured against the last build a deploy accepted, so a failed
+  upload can't disarm them
+- One file-size limit across every backend (refused at 100 MB, flagged at
+  50 MB), enforced when a post is saved as well as before it ships
 
 **Appearance / UX**
 - Light/dark theme via CSS custom properties and `prefers-color-scheme`, with a manual toggle
@@ -227,6 +244,13 @@ deploy step around exactly that. A few of the choices that came out of it:
   same adapter, so an import can run from cron as well as from the wizard
 - Re-running an import overwrites in place (matched on source id), never
   duplicates
+- A post can be pinned to the top of the front page, and a post can carry
+  files: a lone `[label](handbook.pdf)` line becomes a download card with
+  the file's size, and a short post built around one is filed as a
+  document
+- Optional publishing slots (`mon 09:30`, …) turn `[s]` into a queue:
+  drafts written in one sitting go out on consecutive slots instead of
+  together
 
 ## Stack
 
@@ -287,7 +311,11 @@ iCloud doesn't exist, it's just a name.
   GitHub/GitLab/Codeberg Pages branch, an rclone remote, or just a local
   directory served by your own web server), a Mastodon or Bluesky
   account for comments and the auto-announcement, cron for the sidebar
-  widgets
+  widgets -- and, only if you turn on `media.convert_heic` (converting
+  iPhone HEIC photos to JPEG on save), an image tool the machine
+  typically already has: `sips` (built into macOS), `heif-convert`,
+  ImageMagick or vips. Off by default; without a tool the engine refuses
+  the file with instructions instead of breaking
 
 ## Getting started
 
@@ -337,6 +365,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh                      # interactive wizard (menu)
 ./blog.sh add                  # creates a draft, shows a preview, asks what's next
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
+./blog.sh props [<slug>]       # a post's state + actions (publish, rename the slug, delete...)
 ./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
 ./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)

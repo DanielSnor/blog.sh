@@ -3,6 +3,7 @@
 # Usage:
 #   ./blog.sh add
 #   ./blog.sh edit [<slug>]
+#   ./blog.sh props [<slug>]
 #   ./blog.sh publish [<slug>]
 #   ./blog.sh unpublish [<slug>]
 #   ./blog.sh delete [<slug>]

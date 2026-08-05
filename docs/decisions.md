@@ -168,11 +168,65 @@ the oldest makes old pages immutable; the landing page absorbs new
 posts and splits only when full. Same reason there's no "page X of Y"
 label: the total would put a changing byte on every page.
 
-**Deploys are paranoid by default.** A >20% swing in file count against
-the last deploy aborts (a broken build must never be mirrored),
-deletion is opt-in (`--prune`), manifests are per-backend so switching
-targets can't inherit foreign state, and every manifest is disposable --
-deleting one costs one full re-upload, never correctness.
+**Attributes live in the frontmatter, actions live in a dialog.** A
+post's type and tags are edited where the text is -- prefilled in the
+header of `edit`, so the current state is visible before it's changed.
+Operations with consequences (publish, unpublish, rename, delete, the
+announcement) each get a guarded prompt in the `props` dialog instead.
+The wizard menu then lists activities, not operations: five entries,
+with everything post-shaped reached through the post. The CLI commands
+all remain -- scripts don't navigate menus.
+
+The pin is the deliberate exception, and it moved on first contact with
+reality: it started as an attribute, and the very first person to unpin
+a post read "pinned: yes" in the dialog and found no way to act on it --
+the dialog sent them into an editor session to flip one boolean. Type
+and tags are *values you write*; the pin is a *switch*, its consequence
+lives on the front page, and a switch behind an editor round-trip is
+exactly the friction the dialog exists to remove. So `[c]` toggles it in
+place, and the frontmatter keeps accepting `pinned:` as before -- two
+doors, one state.
+
+**A slug rename is an action with a permanent redirect, not an
+attribute.** A published slug is an address other people hold; editing it
+like a tag would break every copy of that address silently. So renaming
+is a guarded action that records the old address in the post
+(`former_slugs`) and the build keeps a one-page redirect standing there
+-- for as long as the post itself is published. The address book lives in
+the post's own JSON rather than a separate registry, so it moves,
+backs up and restores with the post and can never orphan.
+
+**Deploys are paranoid by default.** A large swing in file count or total
+bytes aborts (a broken build must never be mirrored), deletion is opt-in
+(`--prune`), manifests are per-backend so switching targets can't inherit
+foreign state, and every manifest is disposable -- deleting one costs one
+full re-upload, never correctness.
+
+**The guards measure the build against the build.** They used to compare
+it against the manifest, which is the state of the *target* -- so any
+failed upload knocked their reference out of true, and the patch for that
+was a marker that stood them down until a clean run came along. When the
+failure was permanent, that was never. The reference is now the shape of
+the last build the guards themselves accepted, written before the first
+byte moves, so there is nothing left to switch off. The manifest is still
+allowed to serve as a *floor* for the drop direction, because a partial
+manifest can only ever understate the site: as a floor it can hide a
+drop, never invent one. It is never a reference for growth, which is
+precisely the reading that caused the original defect. Percentages carry
+absolute floors as well, asymmetric on purpose -- a missed increase costs
+transferred bytes that the next `--prune` reclaims, a missed drop deletes
+live pages.
+
+**One file-size limit for every backend, and no key to loosen it.** The
+hosts differ wildly -- GitHub Pages refuses a single file over 100 MiB, a
+plain rsync target refuses nothing -- but a per-backend limit would mean a
+post that saves today becomes undeployable the day the site moves. The
+strictest supported target therefore sets the rule for all of them, and
+the number is decimal (100 MB, ~4.7% under GitHub's limit) so the engine
+refuses before the host does. Refusal happens at save time, where the
+author can still act, as well as at deploy time; a config key would only
+restate the question every installation would then answer differently,
+the same reasoning as the fixed JPEG quality in the HEIC converter.
 
 **Six deploy backends behind one small contract.** The manifest logic
 is target-independent; backends only move bytes. Self-diffing targets
@@ -191,6 +245,28 @@ hand-rolled that a gem would provide -- multipart uploads, JPEG/MP4
 header parsing, YAML-adjacent frontmatter, and a static file server
 for `./blog.sh preview` (`lib/preview_server.rb`, plain `TCPServer`)
 instead of the `webrick`-dependent `ruby -run -e httpd` one-liner.
+
+**HEIC is refused with instructions by default; converting it is an
+opt-in (`media.convert_heic`), never automatic.** The iPhone's default
+photo format displays only in Safari, so silently attaching one puts a
+broken image in front of most readers -- but converting silently would
+mean the site serves a different file than the author handed over, and
+would make an image tool a de-facto dependency of the engine. So the
+default is the same honesty the engine uses elsewhere: stop before
+anything is copied or deleted, name the file, print the exact command.
+The opt-in conversion shells out to whatever the machine already has
+(sips is part of macOS; heif-convert, ImageMagick and vips are probed
+for an actual HEIC delegate first), and a missing or failing tool
+degrades back to the refusal. Detection is by content -- the ftyp box
+-- not extension, so a HEIC named `.jpg` is caught, and AVIF, which
+shares the container but which browsers render natively, is recognized
+and deliberately left alone. A converted staging file in `incoming/`
+counts as consumed by a successful save, exactly like a directly copied
+photo. Pure-Ruby conversion was not an option to reject politely: HEIC
+decoding is HEVC decompression, and a native gem for it would break the
+no-gems promise for real. *Cost:* one more config key, and the
+conversion quality (JPEG, fixed 90) is not configurable -- a knob
+nobody asked for would outlive the question.
 
 **`rexml` is required lazily, inside the two fetchers that need it, not
 at load time.** `rexml` ships as a Ruby *default gem* -- present in a

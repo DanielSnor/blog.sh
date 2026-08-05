@@ -273,6 +273,22 @@ Unterschrift ist Pflicht**, gerendert wird ein nativer Player.
 !![Unterschrift der Aufnahme](/pfad/zur/aufnahme.mp3)
 ```
 
+## Anhänge
+
+Eine Zeile, die nur ein Link ist und deren Ziel ein bloßer Dateiname ist,
+macht aus der Datei eine Download-Karte samt Größe -- dieselbe Kurzform
+wie bei Bildern, die Datei kann also in `incoming/` liegen und wird über
+ihren Namen gefunden. Zählende Endungen: .pdf, .zip, .tgz, .epub, .txt,
+.md, .ics, .gpx, .csv. Ein Link auf eine Adresse bleibt ein Link.
+
+```
+[Lesetagebuch 2025](tagebuch.pdf)
+```
+
+Ein Beitrag, dessen Text nur eine kurze Zeile plus Anhänge ist, landet
+unter **Dokumente**; ein ganzer Artikel, der seine Daten anhängt, bleibt
+ein Artikel mit Anhang.
+
 ## Escaping
 
 Um ein Zeichen zu schreiben, das in Markdown etwas bedeutet, stell ihm einen Backslash voran.

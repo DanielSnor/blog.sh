@@ -17,6 +17,7 @@ nav:
   video: "Video"
   links: "Odkazy"
   audio: "Audio"
+  documents: "Dokumenty"
   menu_label: "Menu"
   search_label: "Hledat"
   search_placeholder: "Hledat…"
@@ -50,6 +51,7 @@ type:
   video: "Video"
   audio: "Audio"
   link: "Odkazy"
+  document: "Dokumenty"
   title: "%{label} – %{short_name}"
   description: "Příspěvky typu %{label} na osobním webu %{author}."
 
@@ -104,6 +106,13 @@ cli:
   image_dimensions_unknown: "⚠️  %{file}: rozměry obrázku nejde přečíst, takže mu stránka nemůže rezervovat místo a při načtení může poskočit. PNG, JPEG, GIF a WebP se čtou vždy."
   image_heic_hint: "   HEIC zobrazí jen Safari — nejdřív ho převeď: sips -s format jpeg SOUBOR --out SOUBOR.jpg (macOS), heif-convert SOUBOR SOUBOR.jpg (Linux)."
   post_changed_while_editing: "❌ '%{slug}' se během editace změnil na disku (cron publikuje naplánované posty sám). Nic se neuložilo, takže se z té změny nic neztratilo — otevři post znovu a udělej úpravu nad aktuální verzí."
+  unknown_frontmatter_key: "❌ Neznámý klíč v hlavičce: %{keys}. Znám: %{known}. Překlep by se při uložení tiše zahodil, takže se nic nezapsalo — text ti zůstal, viz níže."
+  heic_refused: "❌ %{files}: HEIC zobrazí jen Safari — ostatní prohlížeče by ukázaly rozbitý obrázek. Nic se neuložilo a soubor zůstává, kde je. Nejdřív ho převeď (%{command}), nebo zapni media.convert_heic: true v config/site.yml a engine to udělá sám."
+  heic_no_tool: "❌ %{files}: media.convert_heic je zapnuté, ale žádný převodník se nenašel (zkoušeno sips, heif-convert, heif-dec, magick/convert, vips). Nic se neuložilo. Převeď ručně: %{command}"
+  heic_converted: "🔄 %{file} → %{target} (HEIC převeden přes %{tool})."
+  heic_convert_failed: "❌ %{file}: převod HEIC přes %{tool} selhal — nic se neuložilo a soubor zůstává, kde je. Převeď ručně: %{command}"
+  media_too_large: "❌ %{files}: nad limitem %{limit} na soubor, který nejstriktnější cíl nasazení odmítne — nic se neuložilo a soubor zůstává, kde je. Zmenši ho, nebo ho z postu vynech a odkaž na něj."
+  media_large: "⚠️  %{files}: blízko limitu %{limit} na soubor. Uloženo — ale ty bajty zaplatí každý čtenář, zvaž zmenšení."
 
   double_frontmatter_error: |
     ❌ V textu je druhá hlavička.
@@ -148,7 +157,13 @@ cli:
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nerozumím, zkus p / e / s / d / x."
   schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, prázdné = zrušit): "
-  menu_hint: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · psaní = slug · Esc zpět"
+  what_next_prompt_slot: "Co dál? [p] publikovat  [e] upravit  [s] naplánovat (%{slot})  [d] nechat draftem  [x] smazat: "
+  schedule_slot_offer: "Publikovat kdy?\n  Nejbližší volný slot: %{slot}"
+  schedule_slot_keys: "  [Enter] přijmout  ·  vlastní datum (YYYY-MM-DD HH:MM)  ·  „%{cancel_word}\" = zpět"
+  schedule_queue_position: "  %{count}. post ve frontě (předchozí: '%{slug}', %{date})."
+  schedule_slots_taken: "  Dřívější sloty jsou obsazené:"
+  props_queue_heading: "Fronta (%{count} naplánovaných):"
+  menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
   wizard_continue_prompt: "Stiskni klávesu pro pokračování…"
   qr_hint: "Naskenuj telefonem a náhled se otevře."
   announcing: "Oznamuji"
@@ -170,7 +185,7 @@ cli:
   backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), oznámení se neposlalo."
   schedule_only_drafts: "Post '%{slug}' už je publikovaný — plánovat jde jen drafty."
   scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
-  schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Opětovné schedule plán zruší."
+  schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Zrušení: opětovné schedule, nebo [n] ve vlastnostech postu."
   unscheduled_label: "Plán zrušen: '%{slug}' zůstává draftem."
 
   already_published: "Post '%{slug}' už je publikovaný: %{url}"
@@ -230,6 +245,7 @@ cli:
     usage:
       ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
+      ./blog.sh props [<slug>]       ukáže stav postu a jeho akce (publikovat, stáhnout z webu, přejmenovat slug, smazat…)
       ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
       ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
@@ -249,16 +265,46 @@ cli:
   wizard_choice_prompt: "Volba: "
   wizard_unknown_choice: "Neznámá volba, zkus znovu."
   wizard_menu_add: "Nový příspěvek"
-  wizard_menu_edit: "Upravit příspěvek"
-  wizard_menu_publish: "Publikovat draft (ukáže náhled, zeptá se, co dál)"
-  wizard_menu_schedule: "Naplánovat draft (publikuje se automaticky, až přijde jeho datum)"
-  wizard_menu_unpublish: "Vrátit publikovaný post zpátky do draftu"
-  wizard_menu_delete: "Smazat příspěvek (přesune do koše)"
+  wizard_menu_post: "Příspěvek — upravit text, nebo jeho vlastnosti a akce (publikovat, přejmenovat, smazat…)"
   wizard_menu_restore: "Obnovit příspěvek z koše"
-  wizard_menu_toot: "(Znovu) poslat komentářový toot (Mastodon)"
-  wizard_menu_bluesky: "(Znovu) poslat oznámení na Bluesky"
   wizard_menu_list: "Seznam všech postů (bez editace, jen pro rozkoukání)"
   wizard_menu_rebuild: "Rebuild a nasadit web (bez vazby na konkrétní post)"
+  edit_what_prompt: "Co upravit? [Enter] text  [v] vlastnosti a akce  [cokoliv jiného] zpět: "
+  props_label_state: "stav"
+  props_label_scheduled: "naplánováno"
+  props_label_type: "typ"
+  props_label_tags: "štítky"
+  props_label_pinned: "připnutí"
+  props_label_announced: "oznámení"
+  props_draft_banner: "draft — není na webu, jen náhled"
+  props_state_published: "publikováno, %{date}"
+  props_pinned_yes: "ano — drží se nahoře na úvodní stránce"
+  props_announces_on_publish: "zatím ne — odejde s publikací"
+  props_not_announced: "bez oznámení"
+  props_attributes_hint: "Typ a štítky se upravují v hlavičce při editaci textu."
+  props_actions_draft: "[p] publikovat  [s] naplánovat  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_actions_scheduled: "[p] publikovat hned  [s] přeplánovat  [n] zrušit plán  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_actions_published: "[u] stáhnout z webu  [t] oznámit (%{network})  [c] připnout/odepnout  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_actions_published_plain: "[u] stáhnout z webu  [c] připnout/odepnout  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
+  props_unknown_draft: "Nerozumím, zkus p / s / r / x."
+  props_unknown_scheduled: "Nerozumím, zkus p / s / n / r / x."
+  props_unknown_published: "Nerozumím, zkus u / t / c / r / x."
+  props_unknown_published_plain: "Nerozumím, zkus u / c / r / x."
+  pin_on: "📌 Připnuto — po příštím rebuildu se drží nahoře na úvodní stránce."
+  pin_off: "Odepnuto — po příštím rebuildu zpátky v běžném chronologickém pořadí."
+  pin_other: "Pozn.: připnutý je i „%{slug}\" — nahoře bude novější z nich, dokud ho neodepneš."
+  rename_taken: "Slug „%{slug}\" už patří jinému postu — zvol jiný."
+  rename_prompt: "Nový slug (prázdné = zrušit): "
+  rename_unusable: "Ze „%{input}\" po slugifikaci nic použitelného nezbylo — nic se nepřejmenovalo."
+  rename_too_long: "Ten slug je příliš dlouhý na název souboru — zkrať ho a zkus znovu. Nic se nepřejmenovalo."
+  rename_same: "To už je slug tohohle postu — není co měnit."
+  rename_confirm: "%{old_url}\n  -> %{new_url}\n  Stará adresa funguje dál: bude trvale přesměrovávat na novou."
+  rename_confirm_draft: "%{old} -> %{new} — s tím se změní i adresa náhledu (pošli si nový odkaz)."
+  rename_go: "Přejmenovat? [a/N] "
+  renamed_label: "✅ Přejmenováno: %{slug}"
+
+redirect:
+  moved: "Tenhle příspěvek se přestěhoval:"
 
 cron:
   no_scheduled_due: "Žádný naplánovaný post není na řadě."
@@ -300,6 +346,7 @@ import:
   rebuilding: "Přebuildovávám a nasazuji"
   cancelled: "Zrušeno, nic se nezapsalo."
   interrupted: "Přerušeno. Dosud zapsané posty už jsou v content.nosync/ — opakovaný import je bezpečný, přepíše je na místě."
+  source_died: "⚠️  Zdroj přestal odpovídat po %{count} položkách: %{error}. Čísla níže jsou částečný součet, ne celý zdroj. Už zapsané posty jsou uložené — opakované spuštění je bezpečné, párují se přes source id a nikdy se nezduplikují."
   source:
     bluesky: "Bluesky"
     instagram: "Instagram (export účtu)"

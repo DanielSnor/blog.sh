@@ -14,10 +14,10 @@
 # an install from a tarball (or any copy without .git, which is how the
 # engine gets vendored) would then report nothing at all.
 module BlogSh
-  VERSION = '1.0.1'
+  VERSION = '1.1'
 
-  # For the User-Agent headers: "blog-sh/1.0.1", with the role in the name
-  # so a server log can tell a feed fetch from an upload.
+  # For the User-Agent headers: "blog-sh-<role>/1.1", with the role in the
+  # name so a server log can tell a feed fetch from an upload.
   def self.user_agent(role = nil)
     "blog-sh#{role ? "-#{role}" : ''}/#{VERSION}"
   end

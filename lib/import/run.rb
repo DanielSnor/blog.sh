@@ -21,7 +21,15 @@ module Import
   # import wrote fewer posts than the source has -- the question anyone
   # looks at a summary to answer.
   class Run
-    Result = Struct.new(:written, :skipped, :media, :media_failures, :samples, keyword_init: true)
+    # `interrupted` is nil on a complete run, and the error's message when
+    # the SOURCE died mid-paging -- a 5xx from an API on page 12, a feed
+    # that stopped answering. `scanned` says how far it got. Everything
+    # written up to that point is real and on disk, which is exactly what
+    # the report has to say: the old behaviour was a raw backtrace and no
+    # summary at all, so a three-hour run that died at item 900 of 2000
+    # told the operator nothing about what it had done.
+    Result = Struct.new(:written, :scanned, :skipped, :media, :media_failures, :samples, :interrupted,
+                        keyword_init: true)
 
     def initialize(adapter, dry_run: false, limit: nil, on_post: nil, on_scan: nil)
       @adapter = adapter
@@ -49,46 +57,59 @@ module Import
       media_failures = []
       samples = []
 
-      @adapter.each_item do |item|
-        break if @limit && written >= @limit
+      interrupted = nil
 
-        scanned += 1
-        @on_scan&.call(scanned, written)
+      # The rescue around the whole iteration is for the PAGING, not the
+      # items: each item's own failures are caught inside the block below,
+      # so what reaches here is the source itself dying between pages.
+      # Recording it instead of crashing means the summary still runs and
+      # the counts are honest -- and thanks to the source-id matching in
+      # PostWriter, re-running after the source recovers picks up where
+      # this run got to without duplicating anything it wrote.
+      # An abort() (a rejected API key) is SystemExit, not StandardError,
+      # and still stops everything, as it should.
+      begin
+        @adapter.each_item do |item|
+          break if @limit && written >= @limit
 
-        # One malformed item -- a date that won't parse, markup nothing
-        # anticipated -- must cost that item, not the run: dying on item
-        # 2000 of 6000 leaves a third of an archive imported and no report
-        # of what happened. Counted under :error and named on stderr, so
-        # the summary shows the loss instead of pretending completeness.
-        # An abort() (e.g. a rejected API key) is SystemExit, not
-        # StandardError, and still stops everything -- as it should.
-        begin
-          Dir.mktmpdir do |tmpdir|
-            media = Media.new(tmpdir, dry_run: @dry_run)
-            post = @adapter.map(item, media)
+          scanned += 1
+          @on_scan&.call(scanned, written)
 
-            if post.is_a?(Symbol)
-              skipped[post] += 1
-              next
+          # One malformed item -- a date that won't parse, markup nothing
+          # anticipated -- must cost that item, not the run: dying on item
+          # 2000 of 6000 leaves a third of an archive imported and no report
+          # of what happened. Counted under :error and named on stderr, so
+          # the summary shows the loss instead of pretending completeness.
+          begin
+            Dir.mktmpdir do |tmpdir|
+              media = Media.new(tmpdir, dry_run: @dry_run)
+              post = @adapter.map(item, media)
+
+              if post.is_a?(Symbol)
+                skipped[post] += 1
+                next
+              end
+
+              tag_with_platform(post)
+              media_count += media.count
+              media_failures.concat(media.failures)
+
+              PostWriter.write(post, media_files: media.files) unless @dry_run
+              written += 1
+              samples << post['slug'] if samples.size < 5
+              @on_post&.call(written, post, scanned)
             end
-
-            tag_with_platform(post)
-            media_count += media.count
-            media_failures.concat(media.failures)
-
-            PostWriter.write(post, media_files: media.files) unless @dry_run
-            written += 1
-            samples << post['slug'] if samples.size < 5
-            @on_post&.call(written, post, scanned)
+          rescue StandardError => e
+            skipped[:error] += 1
+            warn "  item #{scanned} failed: #{e.class}: #{e.message}"
           end
-        rescue StandardError => e
-          skipped[:error] += 1
-          warn "  item #{scanned} failed: #{e.class}: #{e.message}"
         end
+      rescue StandardError => e
+        interrupted = "#{e.class}: #{e.message.lines.first.to_s.strip[0, 160]}"
       end
 
-      Result.new(written: written, skipped: skipped, media: media_count,
-                 media_failures: media_failures, samples: samples)
+      Result.new(written: written, scanned: scanned, skipped: skipped, media: media_count,
+                 media_failures: media_failures, samples: samples, interrupted: interrupted)
     end
 
     private

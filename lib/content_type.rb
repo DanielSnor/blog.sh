@@ -10,7 +10,7 @@ module ContentType
   # Media outranks form: audio outranks image because a song post usually
   # carries cover art too, and the song is the point; a chat with a photo
   # is a photo post for the same reason.
-  PRIORITY = %w[video audio image chat quote link text].freeze
+  PRIORITY = %w[document video audio image chat quote link text].freeze
 
   # A media post is one where the text is just a caption. Past this many
   # characters the post is an article and its media are illustrations, so
@@ -19,7 +19,10 @@ module ContentType
   # while a review with a poster falls to text.
   CAPTION_LIMIT = 500
 
-  MEDIA = %w[video audio image].freeze
+  # A file claims the post only caption-deep, exactly like a photo: a
+  # short line plus an attachment is a document post ("here, take this"),
+  # while an article that happens to attach its data stays an article.
+  MEDIA = %w[document video audio image].freeze
 
   module_function
 
@@ -28,7 +31,7 @@ module ContentType
     return explicit if PRIORITY.include?(explicit)
 
     blocks = post['content']
-    types = blocks.map { |b| b['type'] }
+    types = blocks.map { |b| b['type'] == 'file' ? 'document' : b['type'] }
     # A quote is a text subtype, not a block type, so it can't win the scan
     # on its own. Only a post that OPENS with one counts as a quote post --
     # a quote cited mid-text leaves the post a text post.

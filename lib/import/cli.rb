@@ -46,6 +46,10 @@ module Import
 
       result = Run.new(adapter, limit: limit, on_post: on_post).call
       report(result)
+      # A cron or a script must see a partial run as a failure, or nobody
+      # ever finds out the source died -- the summary above already said
+      # everything a human needs.
+      exit 1 if result.interrupted
       result
     end
 
@@ -68,7 +72,12 @@ module Import
 
     def report(result)
       puts
-      puts "Done. #{result.written} post(s) written, #{result.media} media file(s)."
+      if result.interrupted
+        puts "⚠️  The source stopped answering after #{result.scanned} item(s): #{result.interrupted}"
+        puts "   #{result.written} post(s) written so far are saved. Re-running is safe -- posts are matched on their source id, never duplicated."
+      else
+        puts "Done. #{result.written} post(s) written, #{result.media} media file(s)."
+      end
       result.skipped.sort_by { |reason, _| reason.to_s }.each do |reason, count|
         puts "  #{count} skipped (#{reason})"
       end

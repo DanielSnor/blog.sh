@@ -272,6 +272,22 @@ a soubor se vykreslí jako nativní přehrávač.
 !![Popisek nahrávky](/cesta/k/nahravce.mp3)
 ```
 
+## Přílohy
+
+Řádek, který je jen odkaz a jehož cíl je holé jméno souboru, udělá ze
+souboru kartu ke stažení i s velikostí — stejná zkratka jako u obrázků,
+takže soubor můžeš nahrát do `incoming/` a odkázat se na něj jménem.
+Přípony, které se počítají: .pdf, .zip, .tgz, .epub, .txt, .md, .ics,
+.gpx, .csv. Odkaz na adresu zůstává obyčejným odkazem.
+
+```
+[Čtenářský deník 2025](denik.pdf)
+```
+
+Post, jehož text je jen krátká věta plus přílohy, spadne pod
+**Dokumenty**; delší článek, který k sobě přibalí data, zůstává článkem
+s přílohou.
+
 ## Escapování
 
 Když chcete napsat znak, který má v markdownu význam, předsaďte mu zpětné lomítko.

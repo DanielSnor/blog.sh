@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'open3'
 require 'tempfile'
 require 'shellwords'
 
@@ -40,6 +41,7 @@ module DeployBackend
     # them (deploy_web.rb narrows to --only and a --force run arrives
     # with every file listed), so the batch just executes the list.
     def sync(public_dir:, files:, orphans:, only: nil, prune: false, force: false, logger: nil)
+      @failed_orphans = []
       return true if files.empty? && !(prune && orphans.any?)
 
       Tempfile.create('blog-sh-sftp') do |f|
@@ -47,10 +49,39 @@ module DeployBackend
         f.flush
         full = ['sftp', '-b', f.path, *Shellwords.split(ENV['SFTP_ARGS'].to_s), target]
         logger&.call("  #{full.join(' ')} (#{files.size} put(s)#{prune ? ", #{orphans.size} rm(s)" : ''})")
-        ok = system(*full)
+        output, status = Open3.capture2e(*full)
+        print output
+        ok = status.success?
+        @failed_orphans = failed_deletes(output, orphans) if prune
         logger&.call(ok ? '  ✅ sftp finished' : '  ❌ sftp failed')
-        !!ok
+        ok
       end
+    end
+
+    # Orphans whose remote delete did NOT go through. A `-rm` may fail
+    # without aborting the batch, and deploy_web.rb used to drop every
+    # orphan from the manifest regardless -- so a file a permission
+    # change made undeletable stayed live on the target forever, with
+    # nothing left that knew about it. Matched by ORDER, not by parsing
+    # paths out of the echo: sftp -b echoes each command as "sftp> <cmd>",
+    # the batch is generated here, so the Nth "-rm" segment IS the Nth
+    # orphan; a segment with any output after the echoed command is a
+    # failure -- a successful rm prints nothing -- except "No such file",
+    # which means the file is already gone, i.e. exactly what a prune
+    # wanted.
+    def failed_deletes(output, orphans)
+      rm_segments = output.split(/^sftp> /).select { |seg| seg.start_with?('-rm ') }
+      rm_segments.each_with_index.filter_map do |seg, i|
+        error = seg.lines.drop(1).map(&:strip).reject(&:empty?)
+        next if error.empty?
+        next if error.any? { |l| l.match?(/no such file/i) }
+
+        orphans[i]
+      end
+    end
+
+    def failed_orphans
+      Array(@failed_orphans)
     end
 
     def batch_commands(public_dir, files, orphans, prune)

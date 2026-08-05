@@ -272,6 +272,22 @@ and the file renders as a native player.
 !![Audio caption](/path/to/recording.mp3)
 ```
 
+## Attachments
+
+A line that is nothing but a link whose target is a bare filename turns
+that file into a download card with its size on it -- the same shorthand
+images use, so the file can be staged in `incoming/` and picked up by
+name. Extensions that count: .pdf, .zip, .tgz, .epub, .txt, .md, .ics,
+.gpx, .csv. A link to an address stays an ordinary link.
+
+```
+[Reading diary 2025](diary.pdf)
+```
+
+A post whose text is just a short line plus attachments is filed under
+**Documents**; a full article that happens to attach its data stays an
+article with a file on it.
+
 ## Escaping
 
 To write a character that means something in Markdown, put a backslash in front of it.

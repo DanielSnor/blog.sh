@@ -785,3 +785,68 @@ footer .copyright { color: var(--text); }
   .post-list-item h2 { font-size: 1.3rem; }
   .tag-heading { font-size: 1.3rem; }
 }
+
+/* The pinned post's copy at the top of the first listing page. The mark
+   rides the badge's corner rather than replacing the type icon, so the
+   badge still says what kind of post it is; its ground is the same pair
+   .date-badge:hover already uses (a genuine neutral, not a shade of the
+   accent -- see that rule's own comment), just applied to the resting
+   state instead of on hover. Hovering the badge then swaps the mark to
+   the inverse of that pair -- without it, the mark would land on the
+   exact same colour the badge's own background just became and vanish
+   into it. Only this copy carries it -- the post's ordinary chronological
+   entry further down looks like every other post. */
+.date-badge { position: relative; }
+.date-badge .pin-mark {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--hover-invert);
+  color: var(--badge-hover-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.date-badge:hover .pin-mark { background: var(--badge-hover-text); color: var(--hover-invert); }
+.date-badge .pin-mark svg { width: 13px; height: 13px; display: block; margin: 0; }
+
+/* Attachment cards (type "document" and any post carrying a file block).
+   The whole card is the link, so the tap target is the card and not a
+   word inside it; the extension rides a coloured tile instead of a
+   per-format icon file, which keeps a new whitelisted extension a
+   one-line change. The size is the point of the card -- a download
+   deserves to say what it costs before it starts. */
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  margin: 0.5rem 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+  transition: 0.2s ease-in-out;
+}
+.file-card:hover { border-color: var(--accent); background: var(--pill-bg); }
+.file-icon {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+.file-meta { flex: 1 1 auto; min-width: 0; }
+.file-label { display: block; font-size: 0.9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-sub { display: block; font-size: 0.75rem; margin-top: 0.15rem; color: var(--meta-text); }
+.file-arrow { flex: 0 0 auto; width: 18px; height: 18px; opacity: 0.5; }

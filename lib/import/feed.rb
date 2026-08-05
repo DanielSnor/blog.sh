@@ -109,7 +109,15 @@ module Import
           abort('❌ This import needs rexml, which your Ruby install is missing -- `gem install rexml` ' \
                 'or install your distribution\'s fuller Ruby package.')
         end
-        REXML::Document.new(read_source)
+        begin
+          REXML::Document.new(read_source)
+        rescue REXML::ParseException => e
+          # label() parses the document before the run even starts, so a
+          # malformed file used to take the wizard down with a raw REXML
+          # backtrace pages long. One line naming the source and the
+          # actual problem is what the author can act on.
+          abort("❌ #{@source} is not readable as XML: #{e.message.lines.find { |l| !l.strip.empty? }.to_s.strip[0, 120]}")
+        end
       end
     end
 
@@ -145,13 +153,27 @@ module Import
 
     def channel_host
       link = if atom?
-               document.elements["feed/link[@rel='alternate']"]&.attribute('href')&.value
+               # A rel-less <link> IS an alternate link per the Atom spec --
+               # requiring an explicit rel="alternate" left account (and
+               # item post_url) empty on perfectly valid feeds, and an
+               # empty account is what let two different feeds' items
+               # cross-match on bare ids.
+               atom_alternate(document.elements['feed'])
              else
                document.elements['rss/channel/link']&.text
              end
       URI.parse(link.to_s).host
     rescue URI::InvalidURIError
       nil
+    end
+
+    def atom_alternate(parent)
+      return nil unless parent
+
+      links = parent.get_elements('link')
+      picked = links.find { |l| l.attribute('rel')&.value == 'alternate' } ||
+               links.find { |l| l.attribute('rel').nil? }
+      picked&.attribute('href')&.value
     end
 
     # --- per-item -------------------------------------------------------
@@ -244,7 +266,7 @@ module Import
     end
 
     def item_link(item)
-      return item.elements["link[@rel='alternate']"]&.attribute('href')&.value.to_s if atom?
+      return atom_alternate(item).to_s if atom?
 
       text_of(item, 'link')
     end

@@ -73,6 +73,34 @@ module Tui
     "#{text[0, width - 1]}…"
   end
 
+  # The same, for text that carries colour: an ANSI string's length is not
+  # its visible width, so only the printable characters are counted and the
+  # escape sequences pass through untouched. A cut inside a colour gets a
+  # reset appended, or the colour would bleed into the rest of the screen.
+  #
+  # Exists because menu rows are coloured for a reason -- the [DRAFT] /
+  # [SCHEDULED] / [PINNED] markers -- and measuring them used to mean
+  # stripping them.
+  def truncate_ansi(text, width)
+    return text if width <= 1 || strip_ansi(text).length <= width
+
+    out = +''
+    visible = 0
+    coloured = false
+    text.scan(/\e\[[0-9;]*m|./) do |token|
+      if token.start_with?("\e")
+        out << token
+        coloured = true
+      else
+        break if visible >= width - 1
+
+        out << token
+        visible += 1
+      end
+    end
+    "#{out}…#{coloured ? "\e[0m" : ''}"
+  end
+
   # One keypress, normalized: :up/:down/:enter/:escape, or the character
   # itself. A lone Esc is distinguished from an escape sequence by
   # waiting a beat for the rest of the sequence -- the classic ambiguity
@@ -169,8 +197,19 @@ module Tui
       avail = term_width - 2 # "› " / "  " prefix
       print "\e[#{lines}A" if painted_once
       items[offset, window].each_with_index do |item, i|
-        plain = truncate_to_width(strip_ansi(item), avail)
-        line = (offset + i) == selected ? paint("› #{plain}", :invert) : "  #{plain}"
+        line =
+          if (offset + i) == selected
+            # Stripped here, and only here: the whole row is painted
+            # :invert, and a colour's own reset inside it would end the
+            # inversion mid-line. Being the inverted row is the stronger
+            # signal anyway.
+            paint("› #{truncate_to_width(strip_ansi(item), avail)}", :invert)
+          else
+            # Colour kept, so the state markers read the same in a picker as
+            # they do in `list` -- the picker used to be the one place that
+            # showed them in plain grey.
+            "  #{truncate_ansi(item, avail)}"
+          end
         print "\e[2K#{line}\n"
       end
       if hint
@@ -191,16 +230,30 @@ module Tui
         selected = (selected + 1) % items.size
         offset = clamp_offset(selected, offset, window, items.size)
       when :enter then return selected
-      when :escape, 'q', '0' then return nil
+      when :escape then return nil
       when String
-        if key =~ /\A[1-9]\z/
+        # Without allow_text, single keys keep their shortcuts: q/0 cancel,
+        # 1-9 pick a visible row directly. With allow_text those characters
+        # have to be typeable -- slugs beginning with a digit (or q) were
+        # impossible to enter, and the first keypress silently retargeted
+        # to a visible row instead -- so every alphanumeric key starts a
+        # typed line, and Enter resolves it: a plain in-range number picks
+        # that row (the quick pick, one keystroke later), an empty line
+        # cancels, anything else is the slug. Same contract as the piped,
+        # non-interactive picker.
+        if !allow_text && %w[q 0].include?(key)
+          return nil
+        elsif !allow_text && key =~ /\A[1-9]\z/
           relative = key.to_i - 1
           index = offset + relative
           return index if relative < window && index < items.size
         elsif allow_text && key =~ /\A[[:alnum:]]\z/
           print "\e[?25h#{text_prompt}#{key}"
           rest = $stdin.gets.to_s.strip
-          return "#{key}#{rest}"
+          line = "#{key}#{rest}"
+          return line.to_i - 1 if line =~ /\A\d+\z/ && (1..items.size).cover?(line.to_i)
+
+          return line
         end
       end
     end

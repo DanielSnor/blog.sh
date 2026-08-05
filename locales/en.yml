@@ -18,6 +18,7 @@ nav:
   video: "Video"
   links: "Links"
   audio: "Audio"
+  documents: "Documents"
   menu_label: "Menu"
   search_label: "Search"
   search_placeholder: "Search…"
@@ -51,6 +52,7 @@ type:
   video: "Video"
   audio: "Audio"
   link: "Links"
+  document: "Documents"
   title: "%{label} – %{short_name}"
   description: "Posts of type %{label} on %{author}'s personal site."
 
@@ -112,6 +114,13 @@ cli:
   image_dimensions_unknown: "⚠️  %{file}: the image size could not be read, so the page cannot reserve space for it and may jump while loading. PNG, JPEG, GIF and WebP are always read."
   image_heic_hint: "   HEIC displays only in Safari -- convert it first: sips -s format jpeg FILE --out FILE.jpg (macOS), heif-convert FILE FILE.jpg (Linux)."
   post_changed_while_editing: "❌ '%{slug}' changed on disk while you were editing it (the scheduled-publish cron publishes on its own). Nothing was saved, so nothing of that change was lost -- reopen the post and redo your edit on the current version."
+  unknown_frontmatter_key: "❌ Unknown key in the header: %{keys}. I know: %{known}. A typo here would be silently dropped on save, so nothing was written -- your text is kept, see below."
+  heic_refused: "❌ %{files}: HEIC displays only in Safari -- other browsers would show a broken image. Nothing was saved and the file stays where it is. Convert it first (%{command}), or set media.convert_heic: true in config/site.yml and the engine will convert it for you."
+  heic_no_tool: "❌ %{files}: media.convert_heic is on, but no converter was found (tried sips, heif-convert, heif-dec, magick/convert, vips). Nothing was saved. Convert by hand: %{command}"
+  heic_converted: "🔄 %{file} → %{target} (HEIC converted via %{tool})."
+  heic_convert_failed: "❌ %{file}: HEIC conversion via %{tool} failed -- nothing was saved and the file stays where it is. Convert by hand: %{command}"
+  media_too_large: "❌ %{files}: over the %{limit} per-file limit, which the strictest deploy target refuses -- nothing was saved and the file stays where it is. Shrink it, or leave it out of the post and link to it instead."
+  media_large: "⚠️  %{files}: close to the %{limit} per-file limit. Saved -- but every reader pays for those bytes, so consider shrinking it."
 
   double_frontmatter_error: |
     ❌ There's a second frontmatter header in the text.
@@ -157,7 +166,13 @@ cli:
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Not understood, try p / e / s / d / x."
   schedule_date_prompt: "Publish at (YYYY-MM-DD HH:MM, empty = cancel): "
-  menu_hint: "↑↓ move · Enter select · 1-9 quick pick · type = slug · Esc back"
+  what_next_prompt_slot: "What next? [p] publish  [e] edit  [s] schedule (%{slot})  [d] keep as draft  [x] delete: "
+  schedule_slot_offer: "Publish when?\n  Next free slot: %{slot}"
+  schedule_slot_keys: "  [Enter] accept  ·  your own date (YYYY-MM-DD HH:MM)  ·  \"%{cancel_word}\" = back"
+  schedule_queue_position: "  Post %{count} in the queue (previous: '%{slug}', %{date})."
+  schedule_slots_taken: "  Earlier slots are taken:"
+  props_queue_heading: "The queue (%{count} scheduled):"
+  menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
   wizard_continue_prompt: "Press any key to continue…"
   qr_hint: "Scan with your phone to open the preview."
   announcing: "Announcing"
@@ -179,7 +194,7 @@ cli:
   backdated_no_toot: "Post date isn't current (a backdated post), the announcement was not sent."
   schedule_only_drafts: "Post '%{slug}' is already published -- only drafts can be scheduled."
   scheduled_label: "Scheduled: '%{slug}' publishes automatically at %{date}."
-  schedule_cron_note: "Requires the publish-scheduled.sh cron to be installed -- see docs/operations.md. Run schedule again to cancel."
+  schedule_cron_note: "Requires the publish-scheduled.sh cron to be installed -- see docs/operations.md. To cancel: run schedule again, or [n] in the post's properties."
   unscheduled_label: "Schedule cancelled: '%{slug}' stays a draft."
 
   already_published: "Post '%{slug}' is already published: %{url}"
@@ -239,6 +254,7 @@ cli:
     usage:
       ./blog.sh add                  creates a draft, shows a preview and asks what's next
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
+      ./blog.sh props [<slug>]       shows a post's state and its actions (publish, unpublish, rename the slug, delete...)
       ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
@@ -258,16 +274,49 @@ cli:
   wizard_choice_prompt: "Choice: "
   wizard_unknown_choice: "Unknown choice, try again."
   wizard_menu_add: "New post"
-  wizard_menu_edit: "Edit a post"
-  wizard_menu_publish: "Publish a draft (shows a preview, asks what's next)"
-  wizard_menu_schedule: "Schedule a draft (publishes automatically when its date arrives)"
-  wizard_menu_unpublish: "Move a published post back to draft"
-  wizard_menu_delete: "Delete a post (moves it to trash)"
+  wizard_menu_post: "A post -- edit the text, or its properties and actions (publish, rename, delete...)"
   wizard_menu_restore: "Restore a post from trash"
-  wizard_menu_toot: "(Re-)send the comment toot (Mastodon)"
-  wizard_menu_bluesky: "(Re-)send the Bluesky announcement"
   wizard_menu_list: "List of all posts (no editing, just browsing)"
   wizard_menu_rebuild: "Rebuild and deploy the site (not tied to a specific post)"
+  edit_what_prompt: "Edit what? [Enter] the text  [v] properties and actions  [anything else] back: "
+  props_label_state: "state"
+  props_label_scheduled: "scheduled"
+  props_label_type: "type"
+  props_label_tags: "tags"
+  props_label_pinned: "pinned"
+  props_label_announced: "announced"
+  props_draft_banner: "draft -- not on the site, preview only"
+  props_state_published: "published, %{date}"
+  props_pinned_yes: "yes -- held at the top of the front page"
+  props_announces_on_publish: "not yet -- goes out when the post publishes"
+  props_not_announced: "not announced"
+  props_attributes_hint: "Type and tags are edited in the header when you edit the text."
+  props_actions_draft: "[p] publish  [s] schedule  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_scheduled: "[p] publish now  [s] reschedule  [n] cancel the schedule  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_published: "[u] unpublish  [t] announce (%{network})  [c] pin/unpin  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_published_plain: "[u] unpublish  [c] pin/unpin  [r] rename slug  [x] delete  [Enter] back: "
+  props_unknown_draft: "Not understood, try p / s / r / x."
+  props_unknown_scheduled: "Not understood, try p / s / n / r / x."
+  props_unknown_published: "Not understood, try u / t / c / r / x."
+  props_unknown_published_plain: "Not understood, try u / c / r / x."
+  pin_on: "📌 Pinned -- held at the top of the front page after the next rebuild."
+  pin_off: "Unpinned -- back in plain chronological order after the next rebuild."
+  pin_other: "Note: '%{slug}' is pinned too -- the newer of the two shows until you unpin it."
+  rename_taken: "Slug '%{slug}' already belongs to another post -- pick a different one."
+  rename_prompt: "New slug (empty = cancel): "
+  rename_unusable: "Nothing usable is left of \"%{input}\" after slugification -- nothing renamed."
+  rename_too_long: "That slug is too long to be a filename -- shorten it and try again. Nothing renamed."
+  rename_same: "That is already the post's slug -- nothing to do."
+  rename_confirm: "%{old_url}\n  -> %{new_url}\n  The old address keeps working: it will permanently redirect to the new one."
+  rename_confirm_draft: "%{old} -> %{new} -- the draft's preview address changes with it (share the new link)."
+  rename_go: "Rename? [y/N] "
+  renamed_label: "✅ Renamed: %{slug}"
+
+# The one line on a renamed post's redirect stub -- the page a reader sees
+# for a fraction of a second (or with meta-refresh disabled) at an old
+# address.
+redirect:
+  moved: "This post has moved:"
 
 cron:
   no_scheduled_due: "No scheduled post is due."
@@ -309,6 +358,7 @@ import:
   rebuilding: "Rebuilding and deploying"
   cancelled: "Cancelled, nothing was written."
   interrupted: "Interrupted. Posts written so far are already in content.nosync/ — re-running the import is safe, it overwrites them in place."
+  source_died: "⚠️  The source stopped answering after %{count} item(s): %{error}. The counts below are a partial tally, not the whole source. Posts already written are saved — re-running is safe, they are matched on their source id and never duplicated."
   source:
     bluesky: "Bluesky"
     instagram: "Instagram (account export)"

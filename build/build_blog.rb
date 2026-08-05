@@ -14,6 +14,7 @@ require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
+require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 
 SiteConfig.use_site_timezone!
@@ -489,6 +490,20 @@ def render_block(block, media_prefix, seen = {})
   when 'code'
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
     %(<pre><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
+  when 'file'
+    file = (block['media'] || []).first || {}
+    label = block['label'].to_s.empty? ? file['url'].to_s : block['label']
+    ext = File.extname(file['url'].to_s).delete('.').upcase
+    ext = 'FILE' if ext.empty?
+    size = human_size(file['size'])
+    sub = [ext, size].compact.reject(&:empty?).join(' · ')
+    %(<a class="file-card" href="#{media_prefix}#{file['url']}" download>) +
+      %(<span class="file-icon">#{h(ext[0, 4])}</span>) +
+      %(<span class="file-meta"><span class="file-label">#{h(label)}</span>) +
+      %(<span class="file-sub">#{h(sub)}</span></span>) +
+      '<svg class="file-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' \
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M6 12l6 6 6-6"/>' \
+      '<path d="M5 21h14"/></svg></a>'
   when 'image'
     media = (block['media'] || []).first || {}
     caption = block['caption'] ? "<figcaption>#{CGI.escapeHTML(block['caption'])}</figcaption>" : ''
@@ -565,6 +580,13 @@ end
 # an Integer-only test silently stripped width/height off every one of them.
 # And rather than plain `.to_i`, because that raises on the `false` a broken
 # header reader could once produce.
+# Bytes as something a reader can weigh a click against. Shared with the
+# deploy script and the size limit it enforces, so a size reads the same
+# on an attachment card and in the message that refuses one.
+def human_size(bytes)
+  FileSize.human(bytes)
+end
+
 def size_attrs(media)
   w = Integer(media['width'], exception: false)
   h = Integer(media['height'], exception: false)
@@ -614,6 +636,7 @@ CONTENT_ICONS = {
   'link' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/></svg>',
   'audio' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 6a8.5 8.5 0 010 12"/></svg>',
   'quote' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/></svg>',
+  'document' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>',
   'chat' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
 }.freeze
 
@@ -650,12 +673,23 @@ def dominant_content_type(post)
   TYPE_CACHE[post] ||= ContentType.dominant(post)
 end
 
-def date_badge(post, link: nil)
+PIN_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' \
+            'stroke-linejoin="round" stroke-linecap="round"><path d="M12 17v5"/>' \
+            '<path d="M9 4h6v3l2 4H7l2-4z"/></svg>'
+
+# `pinned:` marks the copy held at the top of the first listing page, not
+# the post itself -- the same post appears again further down in its
+# chronological place, and there the badge is a plain one. The mark
+# explains why this copy is first; on page 3 it would read as a sorting
+# bug. Its colour comes from the palette's text colour, so it keeps its
+# contrast on any accent without per-palette tuning.
+def date_badge(post, link: nil, pinned: false)
   icon = CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
+  pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
   inner = "#{icon}<span>#{date}</span>"
   inner = %(<a href="#{link}">#{inner}</a>) if link
-  %(<div class="date-badge">#{inner}</div>)
+  %(<div class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</div>)
 end
 
 # Folding/slugification lives in lib/slug.rb, shared with the CLI and both
@@ -783,11 +817,17 @@ def comments_attrs(post)
   end
 end
 
-def render_list_item(post)
+def render_list_item(post, pinned: false)
+  # The pinned copy is rendered separately and NOT cached under the same
+  # key: it differs from the post's ordinary appearance by exactly the
+  # badge mark, and caching one over the other would leak the mark into
+  # the chronological copy (or lose it from the pinned one).
+  return build_list_item(post, pinned: true) if pinned
+
   LIST_ITEM_CACHE[post] ||= build_list_item(post)
 end
 
-def build_list_item(post)
+def build_list_item(post, pinned: false)
   prefix = post_path(post)
   content = post_content_html(post)
   excerpt = excerpt?(post)
@@ -798,7 +838,7 @@ def build_list_item(post)
   <<~HTML
     <div class="card post-list-item">
       <div class="post-header">
-        #{date_badge(post, link: prefix)}
+        #{date_badge(post, link: prefix, pinned: pinned)}
         <div class="post-body">
           #{title}
           #{stats}
@@ -1018,10 +1058,21 @@ end
 # the same source for every one of what can be thousands of listing pages is
 # pure waste).
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
-                  title: SITE_TITLE, description: SITE_DESCRIPTION)
+                  title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
   pages, fixed = anchored_pages(posts)
   pages.each do |number, page_posts|
-    list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
+    # The landing page shows the pinned post ONCE, at the top: when it
+    # would otherwise appear further down that same page, it is lifted out
+    # rather than duplicated. Anchored pagination is unaffected either
+    # way -- the landing page is the only flexible one, and lifting keeps
+    # its item count identical, so no /page/N/ boundary moves.
+    if pinned && number > fixed
+      rest = page_posts.reject { |post| post.equal?(pinned) }
+      list_html = ([render_list_item(pinned, pinned: true)] +
+                   rest.map { |post| render_list_item(post) }).join("\n")
+    else
+      list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
+    end
     pagination = pagination_html(number, fixed, base_path)
     out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
     # Without this distinction, every listing page would share one identical <title>.
@@ -1201,7 +1252,7 @@ posts.reverse!
 # only get their own page at a hidden address.
 drafts, posts = posts.partition { |p| draft?(p) }
 
-CONTENT_TYPES = %w[text quote chat image video audio link].freeze
+CONTENT_TYPES = %w[text quote chat image video audio link document].freeze
 CONTENT_TYPE_LABELS = {
   'text' => t('type.text'),
   'quote' => t('type.quote'),
@@ -1209,7 +1260,8 @@ CONTENT_TYPE_LABELS = {
   'image' => t('type.image'),
   'video' => t('type.video'),
   'audio' => t('type.audio'),
-  'link' => t('type.link')
+  'link' => t('type.link'),
+  'document' => t('type.document')
 }.freeze
 
 # Only content types with at least one published post get a nav item, a
@@ -1222,7 +1274,8 @@ CONTENT_TYPE_LABELS = {
 PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
 NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
-          'video' => 'video', 'audio' => 'audio', 'link' => 'links' }.fetch(type)
+          'video' => 'video', 'audio' => 'audio', 'link' => 'links',
+          'document' => 'documents' }.fetch(type)
   ["/type/#{type}/", t("nav.#{key}")]
 end.freeze
 
@@ -1258,7 +1311,72 @@ end
   emit(File.join(dir, 'index.html'), render_post_html(post, post_template))
 end
 
-page_count = write_listing(posts, index_template, PUBLIC_DIR)
+# A tiny self-contained page, deliberately not layout(): a reader spends a
+# fraction of a second here, and a stub carrying the full nav, CSS and
+# widgets would be a second copy of the site chrome to keep in sync for a
+# page whose entire job is to leave. noindex keeps it out of search
+# results in favour of the canonical target.
+def redirect_stub_html(post)
+  url = "#{SITE_BASE_URL}#{post_path(post)}"
+  <<~HTML
+    <!doctype html>
+    <html lang="#{SITE_LANG}">
+    <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0; url=#{url}">
+    <link rel="canonical" href="#{url}">
+    <meta name="robots" content="noindex">
+    <title>#{h(post['title'] || post['slug'])}</title>
+    </head>
+    <body>
+    <p>#{h(t('redirect.moved'))} <a href="#{url}">#{h(url)}</a></p>
+    </body>
+    </html>
+  HTML
+end
+
+# A renamed post keeps answering at every address it ever had: each entry
+# in former_slugs ("year/slug", frozen at rename time) becomes a one-page
+# stub redirecting to the post's current URL. Emitted after the real
+# pages so a stub can never overwrite one -- if a NEW post has since
+# taken an old address, the live page wins and the skip is said out loud,
+# because a silent stub there would hijack it. Drafts emit nothing: an
+# unpublished post is off the site, old addresses included, and the stubs
+# come back when it does. Stubs stay out of listings, feeds, the sitemap
+# and the search index by construction -- they are not posts.
+posts.each do |post|
+  Array(post['former_slugs']).each do |former|
+    parts = former.to_s.split('/').reject(&:empty?)
+    # "." and ".." can only arrive via a hand-edited JSON (slugify never
+    # emits them), but hand-edited JSON is exactly where this list lives
+    # -- and a ".." here would write the stub outside posts/, up to and
+    # including over the homepage or above public.nosync entirely.
+    unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' }
+      warn "⚠️  #{post['slug']}: unusable former_slugs entry #{former.inspect} -- expected \"year/slug\"."
+      next
+    end
+
+    dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
+    if WRITTEN[dest]
+      warn "⚠️  #{post['slug']}: redirect for #{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
+      next
+    end
+
+    emit(dest, redirect_stub_html(post))
+  end
+end
+
+# Only the homepage takes a pinned post; type and tag listings stay
+# strictly chronological, and the feeds ignore it entirely -- a pin is a
+# statement about the front page, not about the archive.
+# Same truth test the CLI writes with, so a hand-edited "false" or 0
+# doesn't pin a post the author believes is unpinned.
+pinned = ->(post) { %w[true yes 1].include?(post['pinned'].to_s.strip.downcase) }
+pinned_post = posts.find(&pinned)
+if posts.count(&pinned) > 1
+  warn "⚠️  More than one post is pinned; using the newest (#{pinned_post['slug']})."
+end
+page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_post)
 
 tags_map = {}
 posts.each do |post|

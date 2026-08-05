@@ -3,6 +3,7 @@ env.sh
 .nova/
 .deploy_manifest*.json
 .deploy_manifest*.json.incomplete
+.deploy_baseline.json
 .deploy-pending
 .last-edit.md
 .stats_full_refresh_at
@@ -15,3 +16,7 @@ drafts/
 content.nosync/
 media.nosync/
 public.nosync/
+
+# Per-install graphics dropped into the working copy must never ride
+# an unrelated commit into the public engine repo again.
+assets/images/daniel.png

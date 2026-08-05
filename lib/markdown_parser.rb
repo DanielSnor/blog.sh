@@ -124,6 +124,28 @@ module MarkdownParser
   VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
   AUDIO_EXTENSIONS = %w[.mp3 .m4a .ogg .opus .aac .flac .wav].freeze
 
+  # Attachments a post can hand over for download. A whitelist rather than
+  # "anything with a dot": a link line is overwhelmingly a link, and only
+  # an extension the site actually publishes should silently turn into an
+  # uploaded file. Office formats can join later; nothing here needs the
+  # engine to understand the format, only to carry it.
+  # No .gz: File.extname sees only the last suffix, so a .tar.gz would be
+  # stored and served as NN.gz and unpack to a name without its .tar. .tgz
+  # says the same thing in one extension and survives the round trip.
+  FILE_EXTENSIONS = %w[.pdf .zip .tgz .epub .txt .md .ics .gpx .csv].freeze
+
+  # A link line whose target is a bare filename with a known extension is
+  # an attachment, exactly like a bare filename in an image line. A URL is
+  # always just a link -- the engine can only publish files it is given.
+  # Same shape as IMAGE_RE, including the optional quoted title: a target
+  # may contain spaces, because `edit` round-trips the block as a full
+  # path -- and a repo can live under "Mobile Documents". A link that
+  # HAS a title stays a link, though (see the file branch): a title is a
+  # link's affordance, an attachment has nowhere to put it, and turning
+  # one into an upload would both discard the title and demand a file
+  # the author never meant to publish.
+  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"([^"]*)")?\)\z/
+
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
   # a real newline afterwards leaves every formatting offset intact.
@@ -148,6 +170,22 @@ module MarkdownParser
 
   def audio_path?(path)
     AUDIO_EXTENSIONS.include?(File.extname(path.to_s).downcase)
+  end
+
+  # An attachment is a bare filename (the incoming/ shorthand) or a path
+  # inside the post's own media directory (what `edit` writes back). A
+  # relative path to anywhere else stays a link: an existing post whose
+  # paragraph happens to be `[Data](stats/2025.csv)` must not turn itself
+  # into an upload on re-save. Any URL -- including the protocol-relative
+  # //host/x.pdf -- is a link too; the engine can only publish files it
+  # was handed.
+  def file_line?(path, media_dir = nil)
+    name = path.to_s
+    return false if name.match?(%r{\A(?:[a-z][a-z0-9+.-]*:)?//}i)
+    return false unless FILE_EXTENSIONS.include?(File.extname(name).downcase)
+    return true if File.dirname(name) == '.'
+
+    media_dir && File.expand_path(name).start_with?("#{File.expand_path(media_dir)}/")
   end
 
   # --- tables ---------------------------------------------------------------
@@ -322,7 +360,7 @@ module MarkdownParser
     #    come;
     # 2. incoming_dir -- the write-before-upload shorthand, which lets a
     #    phone-typed markdown line stay short instead of spelling out a full
-    #    path like /app/data/blog/incoming/foto.jpg every time.
+    #    path like <repo>/incoming/foto.jpg every time.
     #
     # A name in neither place still resolves to incoming_dir, so it's that
     # path the author is told to upload to. Without an incoming_dir (e.g.
@@ -474,6 +512,31 @@ module MarkdownParser
       media_files[src] = filename if src
       counter -= 1 unless src
       return [{ 'type' => 'image', 'media' => [{ 'url' => filename }], 'alt_text' => (alt.empty? ? nil : alt), 'caption' => caption }.compact, counter]
+    elsif (m = LINK_LINE_RE.match(para)) && m[3].nil? && file_line?(m[2], media_dir)
+      # A whole line that is just [label](file.pdf) with a bare filename:
+      # the file travels with the post like a photo does, and the block
+      # carries its size so the page can say what a click costs. The label
+      # falls back to the filename -- an attachment with no words is still
+      # better than a link reading "download".
+      counter += 1
+      label, target = m[1].strip, m[2].strip
+      filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
+      media_files[src] = filename if src
+      counter -= 1 unless src
+      file = { 'url' => filename }
+      # Three places the bytes can be, in order: the file being copied in
+      # now, a source an earlier block in this same post already
+      # registered (a post referencing one attachment twice priced only
+      # the first card without this), and finally the post's own media
+      # directory -- which is where a round-tripped edit finds it, and
+      # without which every edit silently dropped the size from the card
+      # for good, since nothing else ever writes it back.
+      source = src || media_files.key(filename) ||
+               (media_dir && File.join(media_dir, filename))
+      size = (File.size(source) if source && File.exist?(source)) rescue nil
+      file['size'] = size if size&.positive?
+      return [{ 'type' => 'file', 'media' => [file],
+                'label' => (label.empty? ? File.basename(target) : label) }, counter]
     elsif para.match?(/(?<!\\)!\[[^\]]*\]\([^)]+\)/)
       # An image in the middle of a paragraph can't be rendered -- the
       # schema only knows image blocks. This used to silently turn into a

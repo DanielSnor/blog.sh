@@ -18,6 +18,7 @@ nav:
   video: "Video"
   links: "Links"
   audio: "Audio"
+  documents: "Dokumente"
   menu_label: "Menü"
   search_label: "Suche"
   search_placeholder: "Suchen…"
@@ -51,6 +52,7 @@ type:
   video: "Video"
   audio: "Audio"
   link: "Links"
+  document: "Dokumente"
   title: "%{label} – %{short_name}"
   description: "Beiträge vom Typ %{label} auf der persönlichen Seite von %{author}."
 
@@ -105,6 +107,13 @@ cli:
   image_dimensions_unknown: "⚠️  %{file}: Die Bildgröße ist nicht lesbar, die Seite kann keinen Platz dafür reservieren und springt beim Laden möglicherweise. PNG, JPEG, GIF und WebP werden immer gelesen."
   image_heic_hint: "   HEIC zeigt nur Safari an -- wandle es zuerst um: sips -s format jpeg DATEI --out DATEI.jpg (macOS), heif-convert DATEI DATEI.jpg (Linux)."
   post_changed_while_editing: "❌ '%{slug}' wurde während des Bearbeitens auf der Festplatte geändert (der Cron veröffentlicht geplante Beiträge selbst). Es wurde nichts gespeichert, also ging von dieser Änderung nichts verloren -- öffne den Beitrag erneut und wende deine Änderung auf die aktuelle Fassung an."
+  unknown_frontmatter_key: "❌ Unbekannter Schlüssel im Kopf: %{keys}. Bekannt: %{known}. Ein Tippfehler würde beim Speichern still verworfen, also wurde nichts geschrieben -- dein Text bleibt erhalten, siehe unten."
+  heic_refused: "❌ %{files}: HEIC zeigt nur Safari an -- andere Browser würden ein kaputtes Bild zeigen. Es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Wandle sie zuerst um (%{command}), oder setze media.convert_heic: true in config/site.yml und die Engine erledigt das selbst."
+  heic_no_tool: "❌ %{files}: media.convert_heic ist an, aber kein Konverter wurde gefunden (versucht: sips, heif-convert, heif-dec, magick/convert, vips). Es wurde nichts gespeichert. Wandle von Hand um: %{command}"
+  heic_converted: "🔄 %{file} → %{target} (HEIC umgewandelt via %{tool})."
+  heic_convert_failed: "❌ %{file}: HEIC-Umwandlung via %{tool} fehlgeschlagen -- es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Wandle von Hand um: %{command}"
+  media_too_large: "❌ %{files}: über dem Limit von %{limit} pro Datei, das das strengste Deploy-Ziel ablehnt -- es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Verkleinere sie, oder lass sie aus dem Beitrag heraus und verlinke sie."
+  media_large: "⚠️  %{files}: nahe am Limit von %{limit} pro Datei. Gespeichert -- aber jeder Leser zahlt diese Bytes, überlege eine Verkleinerung."
 
   double_frontmatter_error: |
     ❌ Im Text steht ein zweiter Frontmatter-Kopf.
@@ -154,7 +163,13 @@ cli:
   left_as_draft: "Bleibt Entwurf. Später veröffentlichen: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nicht verstanden, versuch p / e / s / d / x."
   schedule_date_prompt: "Veröffentlichen am (JJJJ-MM-TT HH:MM, leer = abbrechen): "
-  menu_hint: "↑↓ bewegen · Enter wählen · 1-9 Schnellwahl · Tippen = Slug · Esc zurück"
+  what_next_prompt_slot: "Wie weiter? [p] veröffentlichen  [e] bearbeiten  [s] planen (%{slot})  [d] Entwurf lassen  [x] löschen: "
+  schedule_slot_offer: "Veröffentlichen wann?\n  Nächster freier Slot: %{slot}"
+  schedule_slot_keys: "  [Enter] übernehmen  ·  eigenes Datum (JJJJ-MM-TT HH:MM)  ·  „%{cancel_word}\" = zurück"
+  schedule_queue_position: "  %{count}. Beitrag in der Warteschlange (davor: '%{slug}', %{date})."
+  schedule_slots_taken: "  Frühere Slots sind belegt:"
+  props_queue_heading: "Die Warteschlange (%{count} geplant):"
+  menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
   wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"
   qr_hint: "Mit dem Handy scannen, um die Vorschau zu öffnen."
   announcing: "Kündige an"
@@ -176,7 +191,7 @@ cli:
   backdated_no_toot: "Das Beitragsdatum ist nicht aktuell (rückdatierter Beitrag), die Ankündigung wurde nicht verschickt."
   schedule_only_drafts: "Beitrag '%{slug}' ist schon veröffentlicht -- planen lassen sich nur Entwürfe."
   scheduled_label: "Geplant: '%{slug}' wird automatisch veröffentlicht am %{date}."
-  schedule_cron_note: "Setzt den installierten publish-scheduled.sh-Cron voraus -- siehe docs/operations.md. Nochmal schedule ausführen bricht den Plan ab."
+  schedule_cron_note: "Setzt den installierten publish-scheduled.sh-Cron voraus -- siehe docs/operations.md. Abbrechen: nochmal schedule ausführen, oder [n] in den Eigenschaften des Beitrags."
   unscheduled_label: "Planung aufgehoben: '%{slug}' bleibt ein Entwurf."
 
   already_published: "Beitrag '%{slug}' ist schon veröffentlicht: %{url}"
@@ -236,6 +251,7 @@ cli:
     Verwendung:
       ./blog.sh add                  legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+      ./blog.sh props [<slug>]       zeigt Status und Aktionen eines Beitrags (veröffentlichen, zurückziehen, Slug umbenennen, löschen...)
       ./blog.sh publish [<slug>]     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit)
       ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
@@ -255,16 +271,46 @@ cli:
   wizard_choice_prompt: "Auswahl: "
   wizard_unknown_choice: "Unbekannte Auswahl, versuch es nochmal."
   wizard_menu_add: "Neuer Beitrag"
-  wizard_menu_edit: "Beitrag bearbeiten"
-  wizard_menu_publish: "Entwurf veröffentlichen (zeigt eine Vorschau, fragt wie weiter)"
-  wizard_menu_schedule: "Entwurf planen (wird automatisch veröffentlicht, wenn sein Datum erreicht ist)"
-  wizard_menu_unpublish: "Veröffentlichten Beitrag auf Entwurf zurücksetzen"
-  wizard_menu_delete: "Beitrag löschen (wandert in den Papierkorb)"
+  wizard_menu_post: "Ein Beitrag -- den Text bearbeiten, oder seine Eigenschaften und Aktionen (veröffentlichen, umbenennen, löschen...)"
   wizard_menu_restore: "Beitrag aus dem Papierkorb zurückholen"
-  wizard_menu_toot: "Kommentar-Toot (erneut) senden (Mastodon)"
-  wizard_menu_bluesky: "Bluesky-Ankündigung (erneut) senden"
   wizard_menu_list: "Liste aller Beiträge (nur ansehen, kein Bearbeiten)"
   wizard_menu_rebuild: "Seite neu bauen und deployen (unabhängig von einem Beitrag)"
+  edit_what_prompt: "Was bearbeiten? [Enter] den Text  [v] Eigenschaften und Aktionen  [alles andere] zurück: "
+  props_label_state: "Status"
+  props_label_scheduled: "geplant"
+  props_label_type: "Typ"
+  props_label_tags: "Tags"
+  props_label_pinned: "angepinnt"
+  props_label_announced: "Ankündigung"
+  props_draft_banner: "Entwurf -- nicht auf der Website, nur Vorschau"
+  props_state_published: "veröffentlicht, %{date}"
+  props_pinned_yes: "ja -- bleibt oben auf der Startseite"
+  props_announces_on_publish: "noch nicht -- geht mit der Veröffentlichung raus"
+  props_not_announced: "nicht angekündigt"
+  props_attributes_hint: "Typ und Tags werden im Kopf bearbeitet, wenn du den Text bearbeitest."
+  props_actions_draft: "[p] veröffentlichen  [s] planen  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_actions_scheduled: "[p] sofort veröffentlichen  [s] umplanen  [n] Plan aufheben  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_actions_published: "[u] zurück auf Entwurf  [t] ankündigen (%{network})  [c] anpinnen/lösen  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_actions_published_plain: "[u] zurück auf Entwurf  [c] anpinnen/lösen  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
+  props_unknown_draft: "Nicht verstanden, versuch p / s / r / x."
+  props_unknown_scheduled: "Nicht verstanden, versuch p / s / n / r / x."
+  props_unknown_published: "Nicht verstanden, versuch u / t / c / r / x."
+  props_unknown_published_plain: "Nicht verstanden, versuch u / c / r / x."
+  pin_on: "📌 Angepinnt -- bleibt nach dem nächsten Rebuild oben auf der Startseite."
+  pin_off: "Nicht mehr angepinnt -- nach dem nächsten Rebuild wieder in normaler Reihenfolge."
+  pin_other: "Hinweis: '%{slug}' ist ebenfalls angepinnt -- oben steht der neuere von beiden, bis du ihn löst."
+  rename_taken: "Der Slug '%{slug}' gehört bereits einem anderen Beitrag -- wähle einen anderen."
+  rename_prompt: "Neuer Slug (leer = abbrechen): "
+  rename_unusable: "Von \"%{input}\" bleibt nach der Slugifizierung nichts Brauchbares -- nichts umbenannt."
+  rename_too_long: "Dieser Slug ist zu lang für einen Dateinamen -- kürze ihn und versuch es erneut. Nichts umbenannt."
+  rename_same: "Das ist bereits der Slug dieses Beitrags -- nichts zu tun."
+  rename_confirm: "%{old_url}\n  -> %{new_url}\n  Die alte Adresse funktioniert weiter: sie leitet dauerhaft auf die neue um."
+  rename_confirm_draft: "%{old} -> %{new} -- die Vorschau-Adresse des Entwurfs ändert sich mit (teile den neuen Link)."
+  rename_go: "Umbenennen? [j/N] "
+  renamed_label: "✅ Umbenannt: %{slug}"
+
+redirect:
+  moved: "Dieser Beitrag ist umgezogen:"
 
 cron:
   no_scheduled_due: "Kein geplanter Beitrag ist fällig."
@@ -305,6 +351,7 @@ import:
   rebuilding: "Baue neu und deploye"
   cancelled: "Abgebrochen, nichts geschrieben."
   interrupted: "Unterbrochen. Bereits geschriebene Beiträge liegen in content.nosync/ — den Import erneut auszuführen ist sicher, er überschreibt sie an Ort und Stelle."
+  source_died: "⚠️  Die Quelle hat nach %{count} Einträgen aufgehört zu antworten: %{error}. Die Zahlen unten sind eine Teilsumme, nicht die ganze Quelle. Bereits geschriebene Beiträge sind gespeichert — ein erneuter Lauf ist sicher, sie werden über ihre Source-ID zugeordnet und nie dupliziert."
   source:
     bluesky: "Bluesky"
     instagram: "Instagram (Konto-Export)"
