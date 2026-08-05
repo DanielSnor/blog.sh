@@ -73,6 +73,34 @@ module Tui
     "#{text[0, width - 1]}…"
   end
 
+  # The same, for text that carries colour: an ANSI string's length is not
+  # its visible width, so only the printable characters are counted and the
+  # escape sequences pass through untouched. A cut inside a colour gets a
+  # reset appended, or the colour would bleed into the rest of the screen.
+  #
+  # Exists because menu rows are coloured for a reason -- the [DRAFT] /
+  # [SCHEDULED] / [PINNED] markers -- and measuring them used to mean
+  # stripping them.
+  def truncate_ansi(text, width)
+    return text if width <= 1 || strip_ansi(text).length <= width
+
+    out = +''
+    visible = 0
+    coloured = false
+    text.scan(/\e\[[0-9;]*m|./) do |token|
+      if token.start_with?("\e")
+        out << token
+        coloured = true
+      else
+        break if visible >= width - 1
+
+        out << token
+        visible += 1
+      end
+    end
+    "#{out}…#{coloured ? "\e[0m" : ''}"
+  end
+
   # One keypress, normalized: :up/:down/:enter/:escape, or the character
   # itself. A lone Esc is distinguished from an escape sequence by
   # waiting a beat for the rest of the sequence -- the classic ambiguity
@@ -169,8 +197,19 @@ module Tui
       avail = term_width - 2 # "› " / "  " prefix
       print "\e[#{lines}A" if painted_once
       items[offset, window].each_with_index do |item, i|
-        plain = truncate_to_width(strip_ansi(item), avail)
-        line = (offset + i) == selected ? paint("› #{plain}", :invert) : "  #{plain}"
+        line =
+          if (offset + i) == selected
+            # Stripped here, and only here: the whole row is painted
+            # :invert, and a colour's own reset inside it would end the
+            # inversion mid-line. Being the inverted row is the stronger
+            # signal anyway.
+            paint("› #{truncate_to_width(strip_ansi(item), avail)}", :invert)
+          else
+            # Colour kept, so the state markers read the same in a picker as
+            # they do in `list` -- the picker used to be the one place that
+            # showed them in plain grey.
+            "  #{truncate_ansi(item, avail)}"
+          end
         print "\e[2K#{line}\n"
       end
       if hint
