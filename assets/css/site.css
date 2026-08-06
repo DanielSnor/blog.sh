@@ -103,8 +103,17 @@ nav ul { list-style: none; display: flex; flex-wrap: wrap; min-width: 0; margin:
 /* 1.25rem rather than the original 1.875rem: eight gaps at nine items,
    so the difference is 80px -- the whole overflow and then some, in
    every locale, without a single label getting shorter. */
+/* The explicit height matters as much as the line-height: the link inside
+   is 60px tall plus two 5px borders and a -5px top margin, so its border
+   box contributes 65px to the row unless the row is told otherwise. The
+   bar used to be `height: 60px`, which simply clipped that; once it became
+   `min-height` (so the menu can wrap), the extra 5px grew the bar instead
+   and left a strip of bar background under the active item's fill. Fixing
+   the row's height keeps the overflow purely visual -- which is the whole
+   point of it: it is what lets a hovered link paint over the bar's frame. */
 nav li {
   margin-left: 1.25rem;
+  height: 60px;
   text-transform: uppercase;
   font-weight: 400;
   font-size: 0.875rem;
