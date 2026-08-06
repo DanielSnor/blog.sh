@@ -1,15 +1,21 @@
 # frozen_string_literal: true
 
 require_relative 'run'
+require_relative '../i18n'
+
+# Operator tools speak English on purpose: a migrate script is reached by
+# typing a path, not the authoring UI, and its output lands in cron logs.
+# The pin is load-bearing twice over -- adapter postscripts render through
+# I18n so the wizard can translate them, and forcing the language here
+# keeps that lookup off SiteConfig, so a script still runs where no
+# site.yml answers.
+I18n.force_lang('en')
 
 module Import
   # The non-interactive front end: what `scripts/migrate_*.rb` need so each
   # one is a handful of lines rather than its own copy of progress reporting
   # and summary formatting. The wizard (scripts/import.rb) does its own
   # thing, since it also has a preview pass and prompts to run.
-  #
-  # Deliberately plain English and no I18n, matching the scripts it serves:
-  # these are operator tools reached by typing a path, not the authoring UI.
   module Cli
     module_function
 

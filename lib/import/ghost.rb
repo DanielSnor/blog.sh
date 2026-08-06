@@ -3,6 +3,7 @@
 require 'json'
 require 'time'
 require 'uri'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
 require_relative 'permalinks'
@@ -89,7 +90,7 @@ module Import
     def postscript
       return nil if @scheduled.zero?
 
-      "#{@scheduled} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
+      I18n.t('import.note.ghost_scheduled', count: @scheduled)
     end
 
     private
