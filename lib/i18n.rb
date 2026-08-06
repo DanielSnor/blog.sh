@@ -18,6 +18,16 @@ module I18n
     @lang ||= SiteConfig.get('site', 'lang', default: DEFAULT_LANG)
   end
 
+  # Picks the language without asking SiteConfig -- for the one caller
+  # that cannot afford to: `./blog.sh doctor` runs ON a broken config, and
+  # reading site.yml through SiteConfig would abort on the very syntax
+  # error the user ran doctor to have explained. Doctor digs the language
+  # out of the raw file itself, tolerating failure, and tells I18n here.
+  def force_lang(code)
+    @lang = File.exist?(File.join(LOCALES_DIR, "#{code}.yml")) ? code : DEFAULT_LANG
+    @data = nil
+  end
+
   def default_data
     @default_data ||= load_locale(DEFAULT_LANG)
   end

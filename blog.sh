@@ -11,6 +11,7 @@
 #   ./blog.sh toot [<slug>]
 #   ./blog.sh rebuild
 #   ./blog.sh list [--type=image] [--tag=foo]
+#   ./blog.sh doctor [--online]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -46,6 +47,22 @@ case "${1:-}" in
   # misbehaving -- it must not depend on env.sh or config being right.
   version | --version | -v)
     exec ruby scripts/manage_post.rb version
+    ;;
+  # Doctor takes that furthest: it exists to explain an install with no
+  # env.sh, no config, or a config that won't parse, so the "Missing
+  # env.sh" guard below would turn away the one command that could say
+  # what to do about it. It still reads env.sh when there IS one --
+  # half of what it checks (the access token, the deploy target) lives
+  # there -- and goes to its own script for the reasons in its header.
+  doctor)
+    shift
+    if [ -f env.sh ]; then
+      set -a
+      # shellcheck source=/dev/null
+      . ./env.sh
+      set +a
+    fi
+    exec ruby scripts/doctor.rb "$@"
     ;;
 esac
 

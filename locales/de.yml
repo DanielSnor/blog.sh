@@ -289,6 +289,7 @@ cli:
       ./blog.sh rebuild              baut und deployt die ganze Seite, unabhängig von einem Beitrag
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh doctor [--online]    liest die Konfiguration und sagt, was daran nicht stimmt
       ./blog.sh help                 zeigt diese Hilfe
       ./blog.sh version              gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
@@ -451,3 +452,109 @@ import:
     boost: "Boost"
     reblog: "Reblog"
     error: "Konvertierung fehlgeschlagen — siehe Zeilen oben"
+
+# ./blog.sh doctor -- liest die Konfiguration auf der Platte und sagt, was
+# daran nicht stimmt (lib/doctor.rb). Jede Zeile mit einem Hinweis muss
+# für sich allein verständlich sein: Sie liest jemand, der nicht weiß, in
+# welcher Datei die Einstellung steht, geschweige denn unter welchem
+# Schlüssel.
+doctor:
+  heading: "Prüfung dieser Installation"
+  running_online: "Prüft auch, ob Server und Zugriffstoken noch antworten (--online)"
+  legend: "❌ macht etwas kaputt · ⚠️  einen Blick wert · ✅ in Ordnung"
+  all_good: "Nichts zu beanstanden."
+  summary: "%{errors} Problem(e), %{warnings} zum Nachsehen, %{oks} in Ordnung."
+  summary_clean: "Keine Probleme. %{oks} Prüfung(en) bestanden."
+  hint_online: "Mit --online wird zusätzlich geprüft, ob die Feeds, das Analyseskript und der Zugriffstoken noch antworten."
+
+  env_ok: "env.sh ist vorhanden und nur für dich lesbar."
+  env_missing: "Es gibt keine env.sh, also sind weder Token noch ein Deploy-Ziel eingerichtet."
+  env_missing_fix: "Führe ./setup.sh aus, oder kopiere von Hand: cp env.sh.example env.sh && chmod 600 env.sh"
+  env_mode: "env.sh hat die Rechte %{mode} -- andere Benutzer dieses Rechners können deine Token lesen."
+  env_mode_fix: "chmod 600 env.sh"
+
+  site_yml_ok: "config/site.yml lässt sich lesen."
+  site_yml_missing: "Es gibt keine config/site.yml, also kann nichts erzeugt werden."
+  site_yml_missing_fix: "Führe ./setup.sh aus, oder kopiere die kommentierte Vorlage: cp config/site.yml.example config/site.yml"
+  site_yml_empty: "config/site.yml ist leer oder enthält keine Einstellungen."
+  site_yml_syntax: "config/site.yml ist kein gültiges YAML: %{message}."
+  site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen."
+
+  identity_ok: "Die Identität der Website ist ausgefüllt."
+  key_missing: "%{key} fehlt in config/site.yml."
+  base_url_missing: "Die Website hat keine Adresse -- RSS, Sitemap und jede Vorschau beim Teilen brauchen eine."
+  base_url_missing_fix: "Setze site.base_url in config/site.yml oder SITE_BASE_URL in env.sh."
+  base_url_placeholder: "Die Adresse ist immer noch das https://example.com aus der Vorlage."
+  base_url_placeholder_fix: "Lokal unproblematisch. Setze die echte Adresse vor dem Deploy, sonst zeigt jeder Link, den die Website über sich selbst veröffentlicht, auf example.com."
+  base_url_shape: "Die Adresse (%{value}) ist keine URL."
+  base_url_shape_fix: "Sie muss mit http:// oder https:// beginnen und einen Hostnamen enthalten."
+  base_url_slash: "Die Adresse (%{value}) endet mit einem Schrägstrich, was in erzeugten Links doppelte Schrägstriche ergibt."
+  base_url_slash_fix: "Entferne den Schrägstrich am Ende."
+  page_size: "site.page_size ist %{value}; es muss eine ganze Zahl größer als null sein."
+
+  placeholders: "Immer noch der Text aus der Vorlage: %{keys}."
+  placeholders_fix: "Lokal harmlos, aber genau das würden Besucher lesen. ./setup.sh fragt alles ab."
+
+  lang_unknown: "site.lang ist \"%{lang}\", aber es gibt keine passende locales/%{lang}.yml."
+  lang_unknown_fix: "Verfügbar: %{available}. Wie man eine weitere hinzufügt, steht in docs/localization.md."
+
+  timezone_ok: "Zeitstempel werden in %{zone} geschrieben."
+  timezone_unknown: "site.timezone \"%{zone}\" ist keine Zeitzone, die dieser Rechner kennt."
+  timezone_unknown_fix: "Nimm einen IANA-Namen wie Europe/Prague oder America/New_York (siehe /usr/share/zoneinfo), oder UTC. Ein Tippfehler würde jeden Beitrag stillschweigend falsch datieren."
+
+  no_network: "Kein Netzwerk für Kommentare eingerichtet -- Beiträge werden nirgends angekündigt."
+  both_networks: "Beide Abschnitte sind eingerichtet, mastodon: und bluesky:, und der Build lehnt das ab."
+  both_networks_fix: "Kommentare und der Ankündigungsbeitrag leben auf genau einem Netzwerk. Kommentiere den aus, den du nicht willst."
+  mastodon_instance_shape: "mastodon.instance ist \"%{value}\" -- dort gehört nur der Hostname hin, ohne https:// und ohne Pfad."
+  mastodon_ok: "Angekündigt wird auf %{instance}."
+  mastodon_token_missing: "mastodon: ist eingerichtet, aber MASTODON_ACCESS_TOKEN ist leer, also wird nie etwas angekündigt."
+  mastodon_token_missing_fix: "Erstelle ihn auf der Instanz unter Einstellungen -> Entwicklung -> Neue Anwendung, Berechtigung write:statuses, und trage ihn in env.sh ein."
+  toot_length: "mastodon.toot_length ist %{value}; es muss eine ganze Zahl größer als null sein."
+  bluesky_ok: "Angekündigt wird als %{handle}."
+  bluesky_password_missing: "bluesky: ist eingerichtet, aber BLUESKY_APP_PASSWORD ist leer, also wird nie etwas angekündigt."
+  bluesky_password_missing_fix: "Auf Bluesky unter Settings -> App Passwords. Ein APP-Passwort, niemals das Kontopasswort. Trage es in env.sh ein."
+
+  banner_ok: "Das Bannerbild ist vorhanden und die angegebene Größe passt zur Datei."
+  banner_default: "Immer noch das Banner, das mit der Engine ausgeliefert wird."
+  banner_missing: "Das Bannerbild %{path} ist nicht da, also zeigt jede Seite ein kaputtes Bild."
+  banner_missing_fix: "Lege die Datei dorthin, wohin banner.src zeigt, oder ändere banner.src."
+  banner_dimensions: "Das Banner ist mit %{declared} angegeben, die Datei ist aber %{actual}, also springt die Seite beim Laden."
+  banner_dimensions_fix: "Setze banner.width auf %{width} und banner.height auf %{height}."
+
+  colors_ok: "Die Palette ist vollständig und jeder Wert ist eine Farbe."
+  colors_missing: "In der Palette %{mode} fehlen %{keys}; die fallen auf das Blau der Engine zurück."
+  colors_missing_fix: "Setze entweder alle sieben oder lass den Abschnitt ganz weg -- eine halbe Palette mischt zwei Entwürfe."
+  colors_hex: "colors.%{mode}.%{key} ist %{value}, das ist keine Farbe."
+  colors_hex_fix: "Werte sehen aus wie \"#1da1f2\" oder \"#fff\" -- mit Anführungszeichen, sonst liest YAML das # als Kommentar."
+
+  fonts_ok: "Jede in der Konfiguration genannte Schriftdatei liegt in assets/fonts/."
+  fonts_missing: "In der Konfiguration genannt, aber nicht in assets/fonts/: %{files}."
+  fonts_missing_fix: "Die Website rendert in der Ersatzschrift, was genau so aussieht, als würde die Konfiguration nicht wirken. Lege die Datei dorthin oder nimm sie aus fonts.faces heraus."
+
+  widgets_ok: "%{count} Seitenleisten-Widget(s), alle ausgefüllt."
+  widget_shape: "Das Widget %{name} enthält keine Einstellungen."
+  widget_incomplete: "Dem Widget %{name} fehlt %{key}, also kann es nie etwas anzeigen."
+  widget_account_id: "Das Toots-Widget will eine numerische Konto-ID und hat %{value}."
+  widget_account_id_fix: "Nicht den @Namen -- die Nummer. Öffne das RSS deines Profils (https://instanz/@du.rss) oder frage die API der Instanz; ./setup.sh sucht sie selbst heraus."
+  widget_heading: "Das Widget %{name} hat keine Überschrift und erscheint deshalb ohne Titel."
+  widget_limit: "Das Limit des Widgets %{name} ist %{value}; es muss eine ganze Zahl größer als null sein."
+
+  slots_ok: "%{count} Veröffentlichungszeit(en)."
+  slots_shape: "publishing.slots muss eine Liste sein."
+  slots_bad: "Veröffentlichungszeiten, die ignoriert werden: %{values}."
+  slots_bad_fix: "Das Format ist \"<Tag> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun oder daily, dann eine Uhrzeit im 24-Stunden-Format. Ausgeschriebene Tagesnamen funktionieren nicht."
+
+  backend_ok: "Deploy über das Backend %{name}."
+  backend_unknown: "DEPLOY_BACKEND ist \"%{name}\", das ist kein Backend dieser Engine."
+  backend_unknown_fix: "Bekannte Backends: %{known}."
+  backend_incomplete: "Dem Backend %{name} fehlt %{values}, also lädt der Deploy nichts hoch."
+  backend_incomplete_fix: "Der Deploy sagt das und endet sauber, was eine rein lokale Installation genau so will -- trage die Werte in env.sh ein, wenn die Website online soll."
+
+  widget_label: "der Feed des Widgets %{name}"
+  analytics_label: "das Analyseskript"
+  online_ok: "%{label} antwortet."
+  online_failed: "%{label} (%{url}) hat nicht geantwortet: %{message}."
+  token_ok: "Der Zugriffstoken funktioniert -- %{handle}."
+  token_invalid: "%{instance} hat den Zugriffstoken abgelehnt."
+  token_invalid_fix: "Seit er nicht mehr funktioniert, wurde nichts angekündigt, und es wird auch nichts angekündigt, bis er ersetzt ist. Erstelle einen neuen und trage ihn in env.sh ein."
+  token_unchecked: "Der Token konnte gegen %{instance} nicht geprüft werden (%{code})."

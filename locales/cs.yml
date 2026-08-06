@@ -283,6 +283,7 @@ cli:
       ./blog.sh rebuild              přebuilduje a nasadí celý web, bez vazby na konkrétní post
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh doctor [--online]    přečte konfiguraci a řekne, co je s ní špatně
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -446,3 +447,108 @@ import:
     boost: "boost"
     reblog: "reblog"
     error: "převod selhal — viz řádky výše"
+
+# ./blog.sh doctor — přečte konfiguraci na disku a řekne, co je s ní
+# špatně (lib/doctor.rb). Každý řádek s radou musí dávat smysl sám o sobě:
+# čte ho někdo, kdo neví, ve kterém souboru to nastavení bydlí, natož pod
+# kterým klíčem.
+doctor:
+  heading: "Kontrola této instalace"
+  running_online: "Kontroluju i dostupnost serverů a platnost tokenu (--online)"
+  legend: "❌ něco to rozbíjí · ⚠️  stojí za pohled · ✅ v pořádku"
+  all_good: "Nic špatně."
+  summary: "%{errors} problém(ů), %{warnings} ke zvážení, %{oks} v pořádku."
+  summary_clean: "Bez problémů. %{oks} kontrol prošlo."
+  hint_online: "S přepínačem --online se navíc ověří, že feedy, měřicí skript a přístupový token pořád odpovídají."
+
+  env_ok: "env.sh existuje a čte ho jen tvůj účet."
+  env_missing: "env.sh není, takže nejsou nastavené žádné tokeny ani cíl nasazení."
+  env_missing_fix: "Spusť ./setup.sh, nebo zkopíruj ručně: cp env.sh.example env.sh && chmod 600 env.sh"
+  env_mode: "env.sh má práva %{mode} — tvoje tokeny si na tomhle stroji přečte i někdo jiný."
+  env_mode_fix: "chmod 600 env.sh"
+
+  site_yml_ok: "config/site.yml se načítá."
+  site_yml_missing: "config/site.yml není, takže se nedá nic vygenerovat."
+  site_yml_missing_fix: "Spusť ./setup.sh, nebo zkopíruj okomentovanou šablonu: cp config/site.yml.example config/site.yml"
+  site_yml_empty: "config/site.yml je prázdný, nebo to není sada nastavení."
+  site_yml_syntax: "config/site.yml není platné YAML: %{message}."
+  site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek."
+
+  identity_ok: "Identita webu je vyplněná."
+  key_missing: "V config/site.yml chybí %{key}."
+  base_url_missing: "Web nemá adresu — RSS, sitemapa i každý náhled při sdílení ji potřebují."
+  base_url_missing_fix: "Nastav site.base_url v config/site.yml, nebo SITE_BASE_URL v env.sh."
+  base_url_placeholder: "Adresa webu je pořád https://example.com ze šablony."
+  base_url_placeholder_fix: "Dokud se na web díváš jen lokálně, nevadí to. Před nasazením nastav skutečnou, jinak každý odkaz, který web sám o sobě zveřejní, míří na example.com."
+  base_url_shape: "Adresa webu (%{value}) není URL."
+  base_url_shape_fix: "Musí začínat na http:// nebo https:// a obsahovat jméno serveru."
+  base_url_slash: "Adresa webu (%{value}) končí lomítkem, takže v generovaných odkazech vzniknou dvojitá lomítka."
+  base_url_slash_fix: "Smaž koncové lomítko."
+  page_size: "site.page_size je %{value}; musí to být celé číslo větší než nula."
+
+  placeholders: "Pořád je tam text ze šablony: %{keys}."
+  placeholders_fix: "Lokálně to nevadí, ale tohle by četli návštěvníci. ./setup.sh se na všechno zeptá."
+
+  lang_unknown: "site.lang je \"%{lang}\", ale žádný locales/%{lang}.yml k tomu neexistuje."
+  lang_unknown_fix: "K dispozici: %{available}. Jak přidat další, je v docs/localization.md."
+
+  timezone_ok: "Časy se zapisují v zóně %{zone}."
+  timezone_unknown: "site.timezone \"%{zone}\" není zóna, kterou tenhle stroj zná."
+  timezone_unknown_fix: "Použij název podle IANA, třeba Europe/Prague nebo America/New_York (viz /usr/share/zoneinfo), nebo UTC. Překlep by tiše posunul datum u každého postu."
+
+  no_network: "Není nastavená žádná síť pro komentáře — posty se nikam neoznamují."
+  both_networks: "Jsou nastavené obě sekce, mastodon: i bluesky:, a build to odmítá."
+  both_networks_fix: "Komentáře i oznamovací post žijí přesně na jedné síti. Tu, kterou nechceš, zakomentuj."
+  mastodon_instance_shape: "mastodon.instance je \"%{value}\" — patří tam jen jméno serveru, bez https:// a bez cesty."
+  mastodon_ok: "Oznamuje se na %{instance}."
+  mastodon_token_missing: "mastodon: je nastavený, ale MASTODON_ACCESS_TOKEN je prázdný, takže se nikdy nic neoznámí."
+  mastodon_token_missing_fix: "Vytvoř ho na instanci v Nastavení -> Pro vývojáře -> Nová aplikace, rozsah write:statuses, a vlož do env.sh."
+  toot_length: "mastodon.toot_length je %{value}; musí to být celé číslo větší než nula."
+  bluesky_ok: "Oznamuje se jako %{handle}."
+  bluesky_password_missing: "bluesky: je nastavený, ale BLUESKY_APP_PASSWORD je prázdné, takže se nikdy nic neoznámí."
+  bluesky_password_missing_fix: "Na Bluesky v Settings -> App Passwords. Heslo APLIKACE, nikdy heslo k účtu. Vlož do env.sh."
+
+  banner_ok: "Obrázek hlavičky existuje a uvedené rozměry sedí se souborem."
+  banner_default: "Pořád je to hlavička, která se dodává s enginem."
+  banner_missing: "Obrázek hlavičky %{path} tam není, takže na každé stránce bude rozbitý obrázek."
+  banner_missing_fix: "Dej soubor tam, kam ukazuje banner.src, nebo banner.src změň."
+  banner_dimensions: "U hlavičky je uvedeno %{declared}, ale soubor má %{actual}, takže stránka při načítání poskočí."
+  banner_dimensions_fix: "Nastav banner.width na %{width} a banner.height na %{height}."
+
+  colors_ok: "Paleta je úplná a každá hodnota je barva."
+  colors_missing: "V paletě %{mode} chybí %{keys}; ty spadnou na výchozí modrou enginu."
+  colors_missing_fix: "Buď nastav všech sedm, nebo sekci vynech celou — půlka palety míchá dva návrhy dohromady."
+  colors_hex: "colors.%{mode}.%{key} je %{value}, což není barva."
+  colors_hex_fix: "Hodnoty vypadají jako \"#1da1f2\" nebo \"#fff\" — s uvozovkami, jinak YAML přečte # jako komentář."
+
+  fonts_ok: "Každý soubor s písmem, který config jmenuje, je v assets/fonts/."
+  fonts_missing: "Config je jmenuje, ale v assets/fonts/ nejsou: %{files}."
+  fonts_missing_fix: "Web se vykreslí náhradním písmem, což vypadá přesně jako nefunkční config. Buď soubor dodej, nebo ho vyhoď z fonts.faces."
+
+  widgets_ok: "%{count} widget(ů) v postranním panelu, všechny vyplněné."
+  widget_shape: "Widget %{name} není sada nastavení."
+  widget_incomplete: "Widget %{name} nemá %{key}, takže nikdy nic nezobrazí."
+  widget_account_id: "Widget s tooty chce číselné ID účtu a má %{value}."
+  widget_account_id_fix: "Ne @jméno — číslo. Otevři si RSS svého profilu (https://instance/@ty.rss) nebo se zeptej API instance; ./setup.sh si ho dohledá sám."
+  widget_heading: "Widget %{name} nemá nadpis, takže se zobrazí bez titulku."
+  widget_limit: "Limit widgetu %{name} je %{value}; musí to být celé číslo větší než nula."
+
+  slots_ok: "%{count} publikačních slotů."
+  slots_shape: "publishing.slots musí být seznam."
+  slots_bad: "Publikační sloty, které se budou ignorovat: %{values}."
+  slots_bad_fix: "Formát je \"<den> HH:MM\" — mon, tue, wed, thu, fri, sat, sun nebo daily, pak čas ve 24hodinovém formátu. Plné názvy dnů nefungují."
+
+  backend_ok: "Nasazuje se backendem %{name}."
+  backend_unknown: "DEPLOY_BACKEND je \"%{name}\", což není backend, který engine má."
+  backend_unknown_fix: "Známé backendy: %{known}."
+  backend_incomplete: "Backendu %{name} chybí %{values}, takže nasazení nic nenahraje."
+  backend_incomplete_fix: "Nasazení to řekne a skončí v pořádku, což je přesně to, co chce instalace jen pro lokální použití — až budeš chtít web online, doplň hodnoty do env.sh."
+
+  widget_label: "feed widgetu %{name}"
+  analytics_label: "měřicí skript"
+  online_ok: "%{label} odpovídá."
+  online_failed: "%{label} (%{url}) neodpověděl: %{message}."
+  token_ok: "Přístupový token funguje — %{handle}."
+  token_invalid: "%{instance} odmítla přístupový token."
+  token_invalid_fix: "Od chvíle, kdy přestal fungovat, se nic neoznámilo a nic se neoznámí, dokud ho nevyměníš. Vytvoř nový a vlož ho do env.sh."
+  token_unchecked: "Token se proti %{instance} nepodařilo ověřit (%{code})."

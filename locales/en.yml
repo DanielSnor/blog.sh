@@ -292,6 +292,7 @@ cli:
       ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh doctor [--online]    reads the configuration and says what is wrong with it
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
@@ -458,3 +459,108 @@ import:
     boost: "boost"
     reblog: "reblog"
     error: "failed to convert -- see the lines above"
+
+# ./blog.sh doctor -- reads the configuration on disk and reports what is
+# wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on
+# its own: it is read by someone who does not know which file the setting
+# lives in, let alone which key.
+doctor:
+  heading: "Checking this install"
+  running_online: "Checking hosts and tokens too (--online)"
+  legend: "❌ breaks something · ⚠️  worth a look · ✅ fine"
+  all_good: "Nothing wrong here."
+  summary: "%{errors} problem(s), %{warnings} worth a look, %{oks} fine."
+  summary_clean: "No problems. %{oks} check(s) passed."
+  hint_online: "Add --online to also check that the feeds, the analytics script and the access token still answer."
+
+  env_ok: "env.sh is there and only you can read it."
+  env_missing: "There is no env.sh, so no tokens and no deploy target are configured."
+  env_missing_fix: "Run ./setup.sh, or copy it by hand: cp env.sh.example env.sh && chmod 600 env.sh"
+  env_mode: "env.sh is mode %{mode} -- other users on this machine can read your tokens."
+  env_mode_fix: "chmod 600 env.sh"
+
+  site_yml_ok: "config/site.yml parses."
+  site_yml_missing: "There is no config/site.yml, so nothing can be built."
+  site_yml_missing_fix: "Run ./setup.sh, or copy the documented template: cp config/site.yml.example config/site.yml"
+  site_yml_empty: "config/site.yml is empty, or is not a set of settings."
+  site_yml_syntax: "config/site.yml is not valid YAML: %{message}."
+  site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value."
+
+  identity_ok: "The site's identity is filled in."
+  key_missing: "%{key} is missing from config/site.yml."
+  base_url_missing: "The site has no address -- RSS, the sitemap and every share preview need one."
+  base_url_missing_fix: "Set site.base_url in config/site.yml, or SITE_BASE_URL in env.sh."
+  base_url_placeholder: "The site's address is still the example's https://example.com."
+  base_url_placeholder_fix: "Fine while you are only looking at it locally. Set the real one before you deploy, or every link the site publishes about itself points at example.com."
+  base_url_shape: "The site's address (%{value}) is not a URL."
+  base_url_shape_fix: "It has to start with http:// or https:// and carry a host name."
+  base_url_slash: "The site's address (%{value}) ends with a slash, which produces doubled slashes in generated links."
+  base_url_slash_fix: "Drop the trailing slash."
+  page_size: "site.page_size is %{value}; it has to be a whole number greater than zero."
+
+  placeholders: "Still the example's text: %{keys}."
+  placeholders_fix: "Harmless locally, but this is what visitors would read. ./setup.sh asks for all of it."
+
+  lang_unknown: "site.lang is \"%{lang}\", and there is no locales/%{lang}.yml to go with it."
+  lang_unknown_fix: "Available: %{available}. To add another, see docs/localization.md."
+
+  timezone_ok: "Timestamps are written in %{zone}."
+  timezone_unknown: "site.timezone \"%{zone}\" is not a timezone this machine knows."
+  timezone_unknown_fix: "Use an IANA name like Europe/Prague or America/New_York (see /usr/share/zoneinfo), or UTC. A typo here would silently date every post wrong."
+
+  no_network: "No comments network configured -- posts are not announced anywhere."
+  both_networks: "Both mastodon: and bluesky: are configured, and the build refuses that."
+  both_networks_fix: "Comments and the announcement post live on exactly one network. Comment out the section you do not want."
+  mastodon_instance_shape: "mastodon.instance is \"%{value}\" -- it takes a host name only, with no https:// and no path."
+  mastodon_ok: "Announcing to %{instance}."
+  mastodon_token_missing: "mastodon: is configured but MASTODON_ACCESS_TOKEN is empty, so nothing is ever announced."
+  mastodon_token_missing_fix: "Create one on the instance under Preferences -> Development -> New application, scope write:statuses, and put it in env.sh."
+  toot_length: "mastodon.toot_length is %{value}; it has to be a whole number greater than zero."
+  bluesky_ok: "Announcing as %{handle}."
+  bluesky_password_missing: "bluesky: is configured but BLUESKY_APP_PASSWORD is empty, so nothing is ever announced."
+  bluesky_password_missing_fix: "Settings -> App Passwords on Bluesky. An APP password, never the account password. Put it in env.sh."
+
+  banner_ok: "The banner image is there and its declared size matches the file."
+  banner_default: "Still the banner the engine ships with."
+  banner_missing: "The banner image %{path} is not there, so every page will show a broken image."
+  banner_missing_fix: "Put the file where banner.src points, or change banner.src."
+  banner_dimensions: "The banner is declared %{declared} but the file is %{actual}, so the page jumps as it loads."
+  banner_dimensions_fix: "Set banner.width to %{width} and banner.height to %{height}."
+
+  colors_ok: "The palette is complete and every value is a colour."
+  colors_missing: "The %{mode} palette is missing %{keys}; those fall back to the engine's blue."
+  colors_missing_fix: "Either set all seven, or omit the section entirely -- a half-set palette mixes two designs."
+  colors_hex: "colors.%{mode}.%{key} is %{value}, which is not a colour."
+  colors_hex_fix: "Values look like \"#1da1f2\" or \"#fff\" -- with the quotes, or YAML reads the # as a comment."
+
+  fonts_ok: "Every font file named in the config is in assets/fonts/."
+  fonts_missing: "Named in the config but not in assets/fonts/: %{files}."
+  fonts_missing_fix: "The site renders in the fallback font, which looks exactly like the config not working. Put the file there, or drop it from fonts.faces."
+
+  widgets_ok: "%{count} sidebar widget(s), all filled in."
+  widget_shape: "The %{name} widget is not a set of settings."
+  widget_incomplete: "The %{name} widget has no %{key}, so it can never show anything."
+  widget_account_id: "The toots widget wants a numeric account id and has %{value}."
+  widget_account_id_fix: "Not the @handle -- the number. Open your profile's RSS (https://instance/@you.rss) or ask the instance's API; ./setup.sh looks it up for you."
+  widget_heading: "The %{name} widget has no heading, so it appears without a title."
+  widget_limit: "The %{name} widget's limit is %{value}; it has to be a whole number greater than zero."
+
+  slots_ok: "%{count} publishing slot(s)."
+  slots_shape: "publishing.slots has to be a list."
+  slots_bad: "Publishing slots that will be ignored: %{values}."
+  slots_bad_fix: "The format is \"<day> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun or daily, then a 24-hour time. Full day names do not work."
+
+  backend_ok: "Deploying with the %{name} backend."
+  backend_unknown: "DEPLOY_BACKEND is \"%{name}\", which is not a backend this engine has."
+  backend_unknown_fix: "Known backends: %{known}."
+  backend_incomplete: "The %{name} deploy backend is missing %{values}, so deploys upload nothing."
+  backend_incomplete_fix: "Deploys say so and exit cleanly, which is what a local-only install wants -- set the values in env.sh when you want the site online."
+
+  widget_label: "the %{name} widget's feed"
+  analytics_label: "the analytics script"
+  online_ok: "%{label} answers."
+  online_failed: "%{label} (%{url}) did not answer: %{message}."
+  token_ok: "The access token works -- %{handle}."
+  token_invalid: "%{instance} rejected the access token."
+  token_invalid_fix: "Nothing has been announced since it stopped working, and nothing will be until it is replaced. Create a new one and put it in env.sh."
+  token_unchecked: "Could not check the token against %{instance} (%{code})."
