@@ -550,6 +550,8 @@ doctor:
   slots_bad: "Publishing slots that will be ignored: %{values}."
   slots_bad_fix: "The format is \"<day> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun or daily, then a 24-hour time. Full day names do not work."
 
+  backend_unset: "No deploy target chosen, so the site is built locally and goes nowhere."
+  backend_unset_fix: "That is a fine place to start -- ./blog.sh preview shows the build. Run ./setup.sh when you want it online."
   backend_ok: "Deploying with the %{name} backend."
   backend_unknown: "DEPLOY_BACKEND is \"%{name}\", which is not a backend this engine has."
   backend_unknown_fix: "Known backends: %{known}."

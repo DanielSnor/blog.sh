@@ -544,6 +544,8 @@ doctor:
   slots_bad: "Veröffentlichungszeiten, die ignoriert werden: %{values}."
   slots_bad_fix: "Das Format ist \"<Tag> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun oder daily, dann eine Uhrzeit im 24-Stunden-Format. Ausgeschriebene Tagesnamen funktionieren nicht."
 
+  backend_unset: "Kein Deploy-Ziel gewählt, die Website wird also lokal gebaut und geht nirgendwohin."
+  backend_unset_fix: "Als Anfang völlig in Ordnung -- ./blog.sh preview zeigt den Build. Führe ./setup.sh aus, wenn sie online soll."
   backend_ok: "Deploy über das Backend %{name}."
   backend_unknown: "DEPLOY_BACKEND ist \"%{name}\", das ist kein Backend dieser Engine."
   backend_unknown_fix: "Bekannte Backends: %{known}."

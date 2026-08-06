@@ -538,6 +538,8 @@ doctor:
   slots_bad: "Publikační sloty, které se budou ignorovat: %{values}."
   slots_bad_fix: "Formát je \"<den> HH:MM\" — mon, tue, wed, thu, fri, sat, sun nebo daily, pak čas ve 24hodinovém formátu. Plné názvy dnů nefungují."
 
+  backend_unset: "Není vybraný cíl nasazení, web se tedy staví lokálně a nikam neputuje."
+  backend_unset_fix: "Jako začátek to úplně stačí — build ukáže ./blog.sh preview. Až ho budeš chtít online, spusť ./setup.sh."
   backend_ok: "Nasazuje se backendem %{name}."
   backend_unknown: "DEPLOY_BACKEND je \"%{name}\", což není backend, který engine má."
   backend_unknown_fix: "Známé backendy: %{known}."

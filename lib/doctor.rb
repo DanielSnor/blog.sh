@@ -398,6 +398,17 @@ module Doctor
 
   def check_deploy
     name = ENV['DEPLOY_BACKEND'].to_s
+
+    # An unset DEPLOY_BACKEND means Surfer -- that is the compatibility
+    # default from before backends existed, and it is right. But an
+    # install with no backend named AND no Surfer values set has not
+    # half-configured Surfer, it has not chosen at all, and saying
+    # "the surfer backend is missing SURFER_URL" to somebody who just
+    # answered "nowhere yet" is an answer to a question they didn't ask.
+    if name.empty? && BACKEND_VALUES['surfer'].all? { |v| ENV[v].to_s.empty? }
+      return [warn(t('backend_unset'), t('backend_unset_fix'))]
+    end
+
     name = 'surfer' if name.empty?
 
     unless DeployBackend::BACKENDS.key?(name)
