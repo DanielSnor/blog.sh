@@ -353,6 +353,18 @@ prints what an installation is running.
   forever -- and nothing short of hand-editing the post's JSON could
   remove the entry. Those entries are marked "taken by another post".
 
+- **Builds and deploys take a lock, so two runs can no longer rewrite
+  `public.nosync` at the same time.** Two of the things that write it come
+  from cron -- the scheduled publish every quarter of an hour, the sidebar
+  refresh every half -- and on a large archive a build plus a deploy takes
+  longer than a tick, so the overlap was ordinary. What it produced was
+  not: a deploy walking a tree that was being rewritten under it, or
+  pruning as an orphan a page the other run had just published. A run
+  that finds the lock held does not queue up behind it; cron says so and
+  leaves without mailing, a run you started reports it and exits non-zero
+  so nothing tells you a deploy happened when it did not. Where the
+  filesystem cannot lock at all, everything behaves as it did before.
+
 ### Changed
 
 - **A YAML syntax error in `config/site.yml` is now a sentence, not a
@@ -566,6 +578,43 @@ prints what an installation is running.
   upload, an unchanged re-run stops the same way, every time. It now says
   to read the reason above first, and distinguishes a transfer that broke
   off from a guard waiting to be answered.
+
+### Upgrading
+
+- **Nothing to migrate.** `git pull`, rebuild, deploy. Verified against a
+  1.1 installation whose config was left exactly as it was: the same site
+  comes out, page for page, with no warnings -- every new config section
+  (`fonts`, palettes, the wizards) is optional, and `doctor` runs on a 1.1
+  config without complaining about their absence.
+- **Going back works too**, which is worth knowing before you tag: the 1.1
+  engine builds posts that 1.2 has written since. `former_slugs`
+  redirects still come out, and the fields 1.1 has no notion of
+  (`redirect_from`, a resolved `embed_src`) are ignored rather than fatal
+  -- the only difference is that the redirect stubs `redirect_from` would
+  have produced are not emitted, because that feature does not exist
+  there.
+- **Two more working files** sit next to the ones from 1.1:
+  `.last-edit.meta` (which command wrote the editor buffer) and
+  `.blog-sh.lock` (the build/deploy lock below). Both are gitignored, and
+  neither needs backing up. `*.bak` is gitignored now as well -- the
+  wizards keep a backup of the file they rewrite, and for `env.sh` that
+  copy holds your previous tokens.
+- **Builds and deploys now take a lock**, so the publishing cron, the
+  sidebar cron and a person at the CLI cannot walk into each other's
+  half-written `public.nosync`. A run that finds the lock held does not
+  queue: a cron tick says so and leaves (exit 0, no mail), a run you
+  started reports it and exits non-zero rather than let its caller think
+  a deploy happened. On a filesystem that cannot lock, everything behaves
+  exactly as it did before.
+- **The wizard menu grew to six entries** with the queue screen, so a
+  scripted `printf "N\n" | ./blog.sh` may select a different one than in
+  1.1. The CLI commands are the stable interface; `./blog.sh queue` is the
+  one to pipe.
+- **The import wizard's source menu is two levels now** (blogs / social
+  networks / dead sites), so the same caveat applies to
+  `printf "N\n" | ./import.sh`. The non-interactive path is unchanged: a
+  piped run still gets one flat numbered list, and `migrate_*.rb` scripts
+  are unaffected.
 
 ## 1.1 -- 2026-08-05
 
