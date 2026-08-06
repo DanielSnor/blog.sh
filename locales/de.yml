@@ -379,6 +379,8 @@ import:
   beehiiv_path_invalid: "%{path} existiert nicht."
   blogger_path_prompt: "Pfad zum Blogger-Backup-XML (leer = abbrechen): "
   blogger_path_invalid: "%{path} existiert nicht."
+  wix_path_prompt: "Pfad zur Wix-Blog-CSV (leer = abbrechen): "
+  wix_path_invalid: "%{path} existiert nicht."
   jekyll_dir_prompt: "Pfad zum Site-Baum oder Markdown-Ordner (leer = abbrechen): "
   jekyll_dir_invalid: "%{dir} existiert nicht."
   jekyll_permalink_prompt: "Permalink-Muster der alten Seite, z. B. /:year/:month/:day/:title/ (leer = Weiterleitungen nur aus explizitem Front-Matter-Permalink): "
@@ -424,6 +426,7 @@ import:
     squarespace: "Squarespace (XML-Export)"
     substack: "Substack (entpackter Export)"
     tumblr: "Tumblr"
+    wix: "Wix (Blog-CSV-Export)"
     twitter: "Twitter/X (entpackter Export)"
     feed: "WordPress-Export oder RSS/Atom-Feed"
   reason:

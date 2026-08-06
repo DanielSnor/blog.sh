@@ -47,6 +47,16 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Wix joined the import sources** -- the seventeenth. Point the
+  wizard (or `migrate_wix.rb`) at the blog CSV from the Wix admin. The
+  rich-content JSON converts to blocks directly -- formatting spans,
+  headings, lists, tables, buttons as links, the cover image leading
+  the post -- and node types with no equivalent (video, galleries,
+  polls) are counted by name in the summary. Images download from
+  Wix's CDN by id; category cells holding Wix's internal hex ids
+  instead of names are dropped. Kept permalinks come from the export's
+  own Post Page URL column.
+
 - **Jekyll, Hugo and every markdown folder joined the import sources**
   -- the sixteenth, and really a whole family: a `_posts/` tree, a Hugo
   content directory, or the output of converters like Meddler and

@@ -243,9 +243,9 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Sixteen sources: Bluesky and Tumblr via their APIs; beehiiv, Blogger,
-  Ghost, Instagram, Mastodon, Medium, Pixelfed, Squarespace, Substack
-  and Twitter/X from their account exports and backups; a Jekyll or Hugo
+- Seventeen sources: Bluesky and Tumblr via their APIs; beehiiv,
+  Blogger, Ghost, Instagram, Mastodon, Medium, Pixelfed, Squarespace,
+  Substack, Twitter/X and Wix from their account exports and backups; a Jekyll or Hugo
   tree (or any converter-made markdown folder) straight from disk; WordPress from a WXR
   file, any RSS/Atom feed by URL, and any podcast feed with its
   episodes' audio downloaded for keeps -- Tumblr and Twitter carried
@@ -253,7 +253,7 @@ deploy step around exactly that. A few of the choices that came out of it:
   archive (2008-2022)
 - A blog that keeps its domain keeps its addresses: sources that know
   their posts' original URLs (beehiiv, Blogger, Ghost, Medium,
-  Squarespace, Substack, WordPress, Tumblr) can record each
+  Squarespace, Substack, WordPress, Tumblr, Wix) can record each
   one as a `redirect_from` (Substack's `/p/<slug>` comes straight from
   the export), and the built site answers at every old path with a
   redirect
@@ -458,6 +458,7 @@ Available sources:
 | Substack | an unpacked export | newsletters and podcasts, drafts included, full text of paid posts (the export is the author's); threads and pages are skipped, tags don't exist in the export |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
+| Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN |
 | WordPress | a WXR export file | every post; pages, attachments and menu items are skipped |
 | RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 
@@ -479,6 +480,7 @@ ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
 ruby scripts/migrate_substack.rb <path-to-unpacked-export>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+ruby scripts/migrate_wix.rb <posts.csv>
 ruby scripts/migrate_feed.rb <export.xml | feed-url>
 ```
 

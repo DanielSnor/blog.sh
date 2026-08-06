@@ -55,8 +55,8 @@ duplicated.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
   (beehiiv, Blogger, Ghost, Jekyll/Hugo with a pattern, Medium,
-  Squarespace, Substack, WordPress/feed and Tumblr today) can record
-  each published post's old path as `redirect_from` -- the build then serves a redirect at every one
+  Squarespace, Substack, Wix, WordPress/feed and Tumblr today) can
+  record each published post's old path as `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -406,6 +406,26 @@ Since the export carries no explicit quote flag, a quote is recognised by an
 embedded status link -- which deliberately also skips a tweet that merely
 links to another tweet. Media is copied from the export itself, no network.
 t.co links come out as their readable targets.
+
+### Wix
+
+```bash
+ruby scripts/migrate_wix.rb <posts.csv>
+```
+
+In the Wix admin: export the blog as CSV. Post bodies arrive as Wix's
+rich-content JSON, which converts to blocks more directly than HTML
+ever would -- paragraphs with their bold/italic/link spans, headings,
+lists, tables, dividers, buttons as links. Whatever has no blog.sh
+equivalent (video, galleries, polls) is **counted by name** in the
+summary rather than silently dropped. The cover image leads the post.
+
+The export carries no files -- images download from Wix's CDN by their
+id, so import while the old site is still up. A post with no published
+date is a draft (Wix has no explicit status column), and category cells
+that hold Wix's internal 24-hex ids instead of names are dropped: an id
+makes no tag anyone would click. Kept permalinks come straight from the
+export's own Post Page URL column.
 
 ### WordPress, or any RSS/Atom feed
 

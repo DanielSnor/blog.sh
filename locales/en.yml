@@ -386,6 +386,8 @@ import:
   beehiiv_path_invalid: "%{path} does not exist."
   blogger_path_prompt: "Path to the Blogger backup XML (empty = cancel): "
   blogger_path_invalid: "%{path} does not exist."
+  wix_path_prompt: "Path to the Wix blog CSV (empty = cancel): "
+  wix_path_invalid: "%{path} does not exist."
   jekyll_dir_prompt: "Path to the site tree or markdown folder (empty = cancel): "
   jekyll_dir_invalid: "%{dir} does not exist."
   jekyll_permalink_prompt: "Old site's permalink pattern, e.g. /:year/:month/:day/:title/ (empty = redirects only from explicit front matter permalinks): "
@@ -431,6 +433,7 @@ import:
     squarespace: "Squarespace (XML export)"
     substack: "Substack (unpacked export)"
     tumblr: "Tumblr"
+    wix: "Wix (blog CSV export)"
     twitter: "Twitter/X (archive export)"
     feed: "WordPress export or RSS/Atom feed"
   reason:

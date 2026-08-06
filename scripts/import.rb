@@ -30,6 +30,7 @@ require_relative '../lib/import/blogger'
 require_relative '../lib/import/bluesky'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
+require_relative '../lib/import/wix'
 require_relative '../lib/import/feed'
 require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
@@ -67,6 +68,7 @@ SOURCES = [
   ['substack', -> { build_substack }],
   ['tumblr', -> { build_tumblr }],
   ['twitter', -> { build_twitter }],
+  ['wix', -> { build_wix }],
   ['feed', -> { build_feed }]
 ].freeze
 
@@ -291,6 +293,17 @@ def build_substack
   end
 
   Import::Substack.new(dir, site_url: url)
+end
+
+def build_wix
+  path = ask('import.wix_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Wix.new(path) if File.exist?(path)
+
+  puts t('import.wix_path_invalid', path: path)
+  nil
 end
 
 def ask_source

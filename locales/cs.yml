@@ -374,6 +374,8 @@ import:
   beehiiv_path_invalid: "%{path} neexistuje."
   blogger_path_prompt: "Cesta k XML záloze z Bloggeru (prázdné = zrušit): "
   blogger_path_invalid: "%{path} neexistuje."
+  wix_path_prompt: "Cesta k CSV exportu blogu z Wixu (prázdné = zrušit): "
+  wix_path_invalid: "%{path} neexistuje."
   jekyll_dir_prompt: "Cesta ke stromu webu nebo složce markdownů (prázdné = zrušit): "
   jekyll_dir_invalid: "%{dir} neexistuje."
   jekyll_permalink_prompt: "Permalink vzor starého webu, např. /:year/:month/:day/:title/ (prázdné = redirecty jen z explicitních permalinků ve front matter): "
@@ -419,6 +421,7 @@ import:
     squarespace: "Squarespace (XML export)"
     substack: "Substack (rozbalený export)"
     tumblr: "Tumblr"
+    wix: "Wix (CSV export blogu)"
     twitter: "Twitter/X (rozbalený archiv)"
     feed: "Export z WordPressu nebo RSS/Atom feed"
   reason:
