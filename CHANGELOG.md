@@ -469,6 +469,31 @@ prints what an installation is running.
 
 ### Fixes
 
+- **An image a post uses twice no longer goes missing from the media
+  folder.** Every importer collects a post's media into a source-keyed
+  map, so registering the same file or URL a second time overwrote the
+  first filename with the second: the post said `02.jpg`, the disk said
+  `12.jpg`, and the build reported the first as MISSING. Old archives do
+  this all the time -- the same photo in the text and in a gallery hit 9
+  posts of 1623 in one real import. The same source now gets its first
+  filename back, in previews as well, so the preview's counts match what
+  the real run writes.
+
+- **A media download that fails with a status code now says so and, when
+  the failure is temporary, retries.** Any unsuccessful HTTP status used
+  to fall through silently as a missing file: no retry, no line saying
+  why, media quietly absent at the end of an hours-long run. A 5xx or 429
+  is now retried like a dropped connection always was; a 404 is reported
+  once and accepted, because retrying a permanent answer only slows the
+  run down. Same distinction the Wayback importer already draws.
+
+- **The import preview stops counting media as if they had already
+  arrived.** A preview downloads nothing, so its media number is what the
+  run will go after -- one real archive promised 64 files of which the
+  source had kept none. The preview now words it that way and adds, when
+  media are involved at all, that only the real run can say how many
+  actually arrive.
+
 - **Page Up (and Home, End, Insert, Delete) used to leave a stray key
   behind in every menu.** Only the first character after the escape
   bracket was read, so the `~` that ends those sequences arrived a moment

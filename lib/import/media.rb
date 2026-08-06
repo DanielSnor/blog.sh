@@ -33,12 +33,27 @@ module Import
       @failures = []
       @counter = 0
       @registered = 0
+      # source (url or path) -> allocated filename. @files can't serve this
+      # purpose even though it looks like it should: it is keyed by source
+      # too, so registering the same image twice used to OVERWRITE the
+      # first filename with the second -- the post says 02.jpg, the disk
+      # says 12.jpg, and the build reports MISSING media. Old posts use
+      # the same image in the text and in a gallery all the time (9 of
+      # 1623 posts in one real archive), so the same source now simply
+      # gets its first filename back. Kept separately from @files because
+      # it must work in dry-run as well, where @files stays empty --
+      # otherwise the preview would count the duplicate the real run
+      # no longer writes.
+      @by_source = {}
     end
 
     # Deliberately not @files.size: in dry-run nothing is fetched, so
     # @files stays empty, and reporting 0 media would understate exactly
     # the number someone reads a preview to find out -- how much this
-    # import is about to download.
+    # import is about to download. The preview's wording carries the other
+    # half of the truth: this is what the run will GO AFTER, not what will
+    # arrive -- one real archive registered 64 files of which the source
+    # had kept none, and a bare number here read as a promise.
     def count
       @registered
     end
@@ -55,9 +70,13 @@ module Import
     # decides whether that costs the whole block or just the media).
     def from_url(url)
       return nil if url.to_s.empty?
+      return @by_source[url] if @by_source.key?(url)
 
       filename = allocate(extension_for(url))
-      return filename if @dry_run
+      if @dry_run
+        @by_source[url] = filename
+        return filename
+      end
 
       body = self.class.fetch(url)
       if body.nil?
@@ -69,6 +88,7 @@ module Import
       path = File.join(@tmpdir, filename)
       File.binwrite(path, body)
       @files[path] = filename
+      @by_source[url] = filename
       filename
     end
 
@@ -100,6 +120,9 @@ module Import
       return unless path
 
       @files.delete(path)
+      # Or a later reference to the same source would resurrect a filename
+      # whose bytes were just judged to not be media at all.
+      @by_source.delete_if { |_, name| name == filename }
       @registered -= 1
       begin
         File.delete(path)
@@ -124,7 +147,10 @@ module Import
         return nil
       end
 
+      return @by_source[path] if @by_source.key?(path)
+
       filename = allocate(File.extname(path))
+      @by_source[path] = filename
       return filename if @dry_run
 
       @files[path] = filename
@@ -153,6 +179,22 @@ module Import
       case res
       when Net::HTTPRedirection then fetch(res['location'], redirects: redirects - 1, retries: retries)
       when Net::HTTPSuccess then res.body
+      when Net::HTTPServerError, Net::HTTPTooManyRequests
+        # "Not now", not "not there" -- the same distinction wayback.rb
+        # draws. This used to fall through the case silently: any failed
+        # status became a bare nil, no retry, no line saying why, and an
+        # hours-long import ended with media quietly missing.
+        if retries.positive?
+          sleep 1
+          return fetch(url, redirects: redirects, retries: retries - 1)
+        end
+        warn "  fetch gave up on #{url}: HTTP #{res.code}"
+        nil
+      else
+        # 404 and friends are answers, not weather -- retrying won't
+        # change them, but the run report must say what happened.
+        warn "  fetch failed on #{url}: HTTP #{res.code}"
+        nil
       end
     end
 

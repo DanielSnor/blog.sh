@@ -458,6 +458,11 @@ def report(result, dry_run:)
   puts Tui.paint(t('import.source_died', count: result.scanned, error: result.interrupted), :yellow) if result.interrupted
   puts Tui.paint(t(dry_run ? 'import.would_write' : 'import.written',
                    count: result.written, media: result.media), dry_run ? :cyan : :green)
+  # A preview counts what the run will go after, not what will arrive --
+  # nothing is downloaded here, and one real archive promised 64 files of
+  # which the source had kept none. Said out loud, or the number above
+  # reads as a delivery.
+  puts Tui.paint(t('import.media_not_verified'), :cyan) if dry_run && result.media.positive?
 
   unless result.samples.empty?
     puts t('import.sample_slugs')
