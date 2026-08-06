@@ -427,6 +427,11 @@ prints what an installation is running.
   leaves without mailing, a run you started reports it and exits non-zero
   so nothing tells you a deploy happened when it did not. Where the
   filesystem cannot lock at all, everything behaves as it did before.
+  The lock file is shared rather than private, and a run that may not
+  write it falls back to opening it read-only: the publishing cron often
+  runs as a different user than the person at the keyboard, and a lock
+  only one of them could open would have left exactly the collision it
+  exists to prevent.
 
 ### Changed
 

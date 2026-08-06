@@ -42,11 +42,8 @@ module RunLock
   def hold(root, label: nil)
     return yield if ENV[ENV_MARKER] == '1'
 
-    file = begin
-      File.open(path(root), File::CREAT | File::RDWR, 0o600)
-    rescue SystemCallError
-      return yield
-    end
+    file = open_lock(root)
+    return yield if file.nil?
 
     begin
       unless file.flock(File::LOCK_EX | File::LOCK_NB)
@@ -81,11 +78,8 @@ module RunLock
   def acquire!(root, label: nil, busy_exit: 1)
     return true if ENV[ENV_MARKER] == '1'
 
-    file = begin
-      File.open(path(root), File::CREAT | File::RDWR, 0o600)
-    rescue SystemCallError
-      return true
-    end
+    file = open_lock(root)
+    return true if file.nil?
 
     locked = begin
       file.flock(File::LOCK_EX | File::LOCK_NB)
@@ -107,13 +101,38 @@ module RunLock
     true
   end
 
+  # The lock file belongs to whoever ran first, and on a real
+  # installation that is usually not the person at the keyboard: the
+  # publishing cron runs as root while a hand-run build may not, and a
+  # root-owned 0600 file would hand every human run an EACCES -- which,
+  # degrading to "no lock", would leave exactly the collision this file
+  # exists to prevent, on the one machine where it matters.
+  #
+  # So the file is created group- and world-writable (the umask still has
+  # the last word) and, when it already exists and belongs to somebody
+  # else, it is opened read-only: flock works just as well on a read-only
+  # handle. All that is lost is the line saying who holds it.
+  def open_lock(root)
+    File.open(path(root), File::CREAT | File::RDWR, 0o666)
+  rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
+    begin
+      File.open(path(root), File::RDONLY)
+    rescue SystemCallError
+      nil
+    end
+  rescue SystemCallError
+    nil
+  end
+
   # Who holds it and since when -- so the line in cron mail says something
   # an operator can act on, rather than "busy".
   def write_holder(file, label)
     file.truncate(0)
     file.write("#{Process.pid} #{label || 'run'} #{Time.now.iso8601}\n")
     file.flush
-  rescue SystemCallError
+  rescue SystemCallError, IOError
+    # Read-only handle (see open_lock) -- the lock still holds, it just
+    # can't say whose it is.
     nil
   end
 
