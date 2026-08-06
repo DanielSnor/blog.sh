@@ -57,5 +57,11 @@ module SiteHeader
     lines << claim unless claim.empty?
     lines << Tui.paint(url, :dim) unless url.empty?
     lines.map { |line| "#{bar}#{line}" }.join("\n")
+  rescue StandardError, SystemExit
+    # ./setup.sh and ./style.sh print this banner too, and they run on
+    # configs too broken for SiteConfig to load -- which is exactly when
+    # somebody reaches for a wizard. The identity lines are a courtesy;
+    # the tool line alone is still true.
+    "#{Tui.paint('▍', :cyan)}#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}"
   end
 end

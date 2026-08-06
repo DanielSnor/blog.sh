@@ -63,6 +63,7 @@ require_relative '../lib/tui'
 require_relative '../lib/config_writer'
 require_relative '../lib/wizard'
 require_relative '../lib/version'
+require_relative '../lib/site_header'
 
 def t(key, **vars)
   I18n.t("setup.#{key}", **vars)
@@ -171,7 +172,7 @@ def run
   # actually gave.
   @fresh = !File.exist?(SITE_YML)
 
-  puts Tui.paint("== blog.sh setup #{BlogSh::VERSION} ==", :bold)
+  puts SiteHeader.render(tool: './setup.sh')
   puts
   puts t('intro')
   puts

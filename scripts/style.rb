@@ -44,6 +44,8 @@ require_relative '../lib/config_writer'
 require_relative '../lib/wizard'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/version'
+require_relative '../lib/site_header'
+require_relative '../lib/qr_code'
 
 def t(key, **vars)
   I18n.t("style.#{key}", **vars)
@@ -167,11 +169,16 @@ end
 # I want this?", and once the diff is confirmed the answer costs a rerun.
 # Fourteen hexes answer nothing; the site itself does -- see
 # lib/palette_preview.rb for where the page comes from.
+#
+# On a deployed site the preview travels the same road a draft preview
+# does: it is uploaded and answered with the full address (and a QR code)
+# rather than a tmp/ path nobody on a server can open. Deploy runs
+# WITHOUT --prune -- a preview must never delete anything.
 def offer_palette_preview(colors, name)
   return unless Wizard.confirm(t('q_palette_preview'), default: true)
 
   require_relative '../lib/palette_preview'
-  path = Tui.spinner(t('pv_building')) do
+  result = Tui.spinner(t('pv_building')) do
     PalettePreview.generate(
       root: ROOT, colors: colors, fonts: current['fonts'] || {},
       labels: { title: t('pv_title', name: name), light: t('colors_light'), dark: t('colors_dark'), hint: t('pv_hint') },
@@ -179,12 +186,50 @@ def offer_palette_preview(colors, name)
                 tags: t('pv_post_tags').split(',').map(&:strip) }
     )
   end
-  shown = relative(path)
-  puts Tui.paint(t(open_in_browser(path) ? 'pv_opened' : 'pv_written', path: shown), :green)
+
+  url = preview_site_url
+  if result[:site] && url
+    show_preview_online(url, result[:local])
+  else
+    shown = relative(result[:local])
+    puts Tui.paint(t(open_in_browser(result[:local]) ? 'pv_opened' : 'pv_written', path: shown), :green)
+  end
   puts
 rescue StandardError => e
   puts Tui.paint("⚠️  #{t('pv_failed', message: e.message.to_s.lines.first.to_s.strip)}", :yellow)
   puts
+end
+
+# The address the uploaded preview will answer on -- only when there is
+# both a configured deploy target and a base URL to build it from.
+def preview_site_url
+  require_relative '../lib/deploy_backend'
+  return nil unless DeployBackend.pick.configured?
+
+  base = (ENV['SITE_BASE_URL'] || current.dig('site', 'base_url')).to_s.chomp('/')
+  return nil if base.empty?
+
+  "#{base}/palette-preview.html"
+end
+
+def show_preview_online(url, local_fallback)
+  puts t('pv_uploading')
+  # --only: one file, unconditionally, and nothing else even considered
+  # -- a preview upload must not sweep along whatever else happens to sit
+  # undeployed in public.nosync, let alone prune.
+  unless system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--only=palette-preview.html')
+    puts Tui.paint("⚠️  #{t('pv_upload_failed', path: relative(local_fallback))}", :yellow)
+    open_in_browser(local_fallback)
+    return
+  end
+
+  puts Tui.paint(t('pv_online', url: url), :cyan)
+  if Tui.interactive? && (qr = QrCode.render(url))
+    puts
+    puts qr
+    puts Tui.paint(I18n.t('cli.qr_hint'), :dim)
+  end
+  open_in_browser(url)
 end
 
 # `open`/`xdg-open` take a plain path; no shell, so a space in the
@@ -495,7 +540,7 @@ SECTIONS = [
 ].freeze
 
 def run
-  puts Tui.paint("== blog.sh style #{BlogSh::VERSION} ==", :bold)
+  puts SiteHeader.render(tool: './style.sh')
   puts
   puts t('intro')
   puts

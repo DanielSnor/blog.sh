@@ -39,6 +39,10 @@ prints what an installation is running.
   Every question can be skipped with Enter, and re-running it is how you
   change any of this later. Editing the files by hand keeps working
   exactly as before; the two are interchangeable, in both directions.
+  Both wizards open with the same ▍ identity banner `./blog.sh` and
+  `./import.sh` print -- which site this is, which version -- so a shell
+  with several installs never leaves you guessing which one is about to
+  be reconfigured.
 
 - **`./style.sh` -- the appearance half, and seven palettes to pick
   from.** Split from setup by lifecycle rather than by file (both write
@@ -68,8 +72,13 @@ prints what an installation is running.
   finishing the fourteen-value custom route) offers a preview -- your
   own built site with the candidate colors, or on a fresh install a
   bundled sample post rendered through the real builder -- light and
-  dark side by side in `tmp/palette-preview.html`, opened in the
-  browser where one is available. The colors go through the same code
+  dark side by side. On a deployed site the preview travels the way a
+  draft preview does: uploaded to the site's own
+  `/palette-preview.html` (one file, never pruning) and answered with
+  the full address and a QR code, so a palette picked at an SSH prompt
+  can be judged on a phone. Locally it lands in
+  `tmp/palette-preview.html` and opens in the browser where one is
+  available. The colors go through the same code
   the build uses (`lib/colors_css.rb`, extracted for exactly this), so
   the preview cannot drift from what a rebuild would produce. Nothing
   is written until the wizard's usual confirmation.

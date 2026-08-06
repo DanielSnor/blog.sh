@@ -34,18 +34,32 @@ module PalettePreview
   # labels: {title:, light:, dark:, hint:} -- translated by the caller,
   # this module owns no locale strings. sample: {title:, paragraphs:,
   # tags:} for the fixture post on installs with no build yet.
-  # Returns the path of the written preview.
+  #
+  # Returns {local:, site:}. `local` always exists: a standalone file in
+  # tmp/ whose references point into the built tree via file://, for
+  # opening right here. `site` is a second copy in public.nosync itself
+  # with the references left site-absolute -- served from the site root
+  # (the deployed site, or ./blog.sh preview) they resolve on their own.
+  # It exists only when the install has a real build; a fixture render
+  # has no site for the copy to live on, so it is nil there.
   def generate(root:, colors:, fonts:, labels:, sample:)
     public_dir = File.join(root, 'public.nosync')
-    public_dir = fixture_build(root, sample) unless File.file?(File.join(public_dir, 'index.html'))
+    built = File.file?(File.join(public_dir, 'index.html'))
+    public_dir = fixture_build(root, sample) unless built
 
     css = ColorsCss.generate(colors: colors, fonts: fonts, fonts_dir: File.join(root, 'assets', 'fonts'))
     page = transform(File.read(File.join(public_dir, 'index.html'), encoding: 'utf-8'), css, public_dir)
 
-    out = File.join(root, 'tmp', 'palette-preview.html')
-    FileUtils.mkdir_p(File.dirname(out))
-    File.write(out, wrap(page, labels: labels))
-    out
+    local = File.join(root, 'tmp', 'palette-preview.html')
+    FileUtils.mkdir_p(File.dirname(local))
+    File.write(local, wrap(rebase(page, file_url(public_dir)), labels: labels))
+
+    site = nil
+    if built
+      site = File.join(public_dir, 'palette-preview.html')
+      File.write(site, wrap(page, labels: labels))
+    end
+    { local: local, site: site }
   end
 
   # The real builder over one bundled post. Slow on nothing: a one-post
@@ -83,6 +97,8 @@ module PalettePreview
   # pairs it with the first real close tag and swallows the whole page.
   # Every replacement is a block -- site.css holds backslashes
   # (content: '\203a') that String#sub would read as backreferences.
+  # References stay site-absolute here; rebase() below rewrites them for
+  # the copy that has to stand alone as a file.
   def transform(page, css, public_dir)
     page = page.gsub(/<!--.*?-->/m, '')
     page = page.sub(%r{<link rel="stylesheet" href="/assets/css/colors\.css[^"]*">}) { "<style>\n#{css}</style>" }
@@ -90,18 +106,19 @@ module PalettePreview
     page = page.sub(%r{<link rel="stylesheet" href="/assets/css/site\.css[^"]*">}) { "<style>\n#{site_css}</style>" }
     page = page.gsub(%r{<script.*?</script>}m, '')
 
-    # Absolute references only resolve under a web server; the preview is
-    # a lone file. Point them straight into the built tree instead.
-    base = file_url(public_dir)
-    page = page.gsub(/(src|href)="\//) { "#{Regexp.last_match(1)}=\"#{base}/" }
-    page = page.gsub(/srcset="([^"]*)"/) do
-      list = Regexp.last_match(1)
-      %(srcset="#{list.gsub(%r{(\A|,\s*)/}) { "#{Regexp.last_match(1)}#{base}/" }}")
-    end
-
     # Hover states are half of what is being judged, so links stay live to
     # the mouse -- they just lead nowhere.
     page.sub('</body>', '<script>document.addEventListener("click",e=>e.preventDefault())</script></body>')
+  end
+
+  # Absolute references only resolve under a web server; the tmp/ copy is
+  # a lone file, so its references point straight into the built tree.
+  def rebase(page, base)
+    page = page.gsub(/(src|href)="\//) { "#{Regexp.last_match(1)}=\"#{base}/" }
+    page.gsub(/srcset="([^"]*)"/) do
+      list = Regexp.last_match(1)
+      %(srcset="#{list.gsub(%r{(\A|,\s*)/}) { "#{Regexp.last_match(1)}#{base}/" }}")
+    end
   end
 
   # CGI.escape, not escapeURIComponent: the latter arrived in Ruby 3.2
