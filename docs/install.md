@@ -35,10 +35,17 @@ site on the internet.
 Each block below is the whole path for one platform: prerequisites,
 clone, config, first post, local preview. They end at the same place --
 a site you can see at `http://localhost:8000/` -- and from there,
-[section 6](#6-pick-a-deploy-target) takes it to the internet. The
-config example works as-is, so you can leave editing it for later;
-before deploying for real, fill in at least `site:` and `banner:`
-([section 2](#2-configure-the-site----configsiteyml)).
+[section 6](#6-pick-a-deploy-target) takes it to the internet.
+
+`./setup.sh` is the config step: it asks for the settings a site needs,
+checks the answers as it goes, and writes `config/site.yml` and `env.sh`
+for you. Every question can be skipped with Enter, and nothing is
+written until you have seen the diff and confirmed it -- so it is also
+the way to change any of this later. If you would rather edit the files
+yourself, the numbered sections below are the full reference and
+[section 2](#2-configure-the-site----configsiteyml) still starts with
+the two `cp` commands; the wizard leaves both files commented and
+hand-editable either way.
 
 ### macOS
 
@@ -66,8 +73,7 @@ Then:
 ```bash
 git clone https://github.com/DanielSnor/blog.sh.git myblog
 cd myblog
-cp config/site.yml.example config/site.yml
-cp env.sh.example env.sh && chmod 600 env.sh
+./setup.sh           # a few questions -> config/site.yml and env.sh
 ./blog.sh add        # write the first post; publish or keep as draft
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
@@ -89,8 +95,7 @@ both already complete.)
 ```bash
 git clone https://github.com/DanielSnor/blog.sh.git myblog
 cd myblog
-cp config/site.yml.example config/site.yml
-cp env.sh.example env.sh && chmod 600 env.sh
+./setup.sh           # a few questions -> config/site.yml and env.sh
 ./blog.sh add        # write the first post; publish or keep as draft
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
@@ -112,8 +117,7 @@ that Ubuntu terminal, it's the Linux path verbatim:
 sudo apt update && sudo apt install -y ruby-full git
 git clone https://github.com/DanielSnor/blog.sh.git myblog
 cd myblog
-cp config/site.yml.example config/site.yml
-cp env.sh.example env.sh && chmod 600 env.sh
+./setup.sh           # a few questions -> config/site.yml and env.sh
 ./blog.sh add        # write the first post; publish or keep as draft
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
@@ -164,6 +168,14 @@ your content -- see [Updating the engine](#9-updating-the-engine).
 ```bash
 cp config/site.yml.example config/site.yml
 ```
+
+Or let `./setup.sh` do it: it seeds the file from this same example --
+comments and all -- and fills in the answers you give it, which is the
+same file you would have written by hand, minus the chance of a tab
+where a space belongs. It covers the `site` block, the comments network
+and the deploy target; `./style.sh` covers `banner`, `about`, `footer`,
+`social`, `colors`, `fonts` and `widgets`. Both are re-runnable and
+neither takes anything away from editing the file directly.
 
 The example is fully commented. The short version:
 
@@ -227,6 +239,15 @@ canonical URL normally comes from `site.base_url` in `config/site.yml`
 a staging or local environment can point somewhere other than production
 while building from the same config. One site, one URL? Set
 `site.base_url` and leave this out.
+
+Watch the order they start in: the example above ships `SITE_BASE_URL`
+**active and pointing at `https://example.com`**, so filling in
+`site.base_url` carefully and leaving this file alone gives a site that
+still calls itself example.com in its feed, its sitemap and every share
+preview. Either comment this line out or give it the same address.
+`./setup.sh` writes both to the same value for exactly this reason, and
+`./blog.sh doctor` reports the address that would actually be used
+rather than the one in the config.
 
 ## 4. Banner and favicon
 

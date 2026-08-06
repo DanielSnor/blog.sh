@@ -490,9 +490,11 @@ The same list is exactly what to move when changing machines.
 | Symptom | Cause and fix |
 | --- | --- |
 | Anything at all, and you need to know what you're running | `./blog.sh version` -- it needs neither `env.sh` nor a config, on purpose. |
+| Anything config-shaped, and you want the whole picture | `./blog.sh doctor` -- it reads whatever is on disk and reports every problem at once, each with a fix line. It runs on a config too broken for anything else to load, including one whose YAML won't parse, and needs neither `env.sh` nor a valid config. Add `--online` to also ask whether the feeds, the analytics script and the access token still answer. |
+| `config/site.yml is not valid YAML` | The message names the line and column. Almost always a tab where spaces belong, a missing quote, or a colon inside an unquoted value (`title: Colon: here`). `./blog.sh doctor` says the same thing without stopping at the first problem. |
 | A save aborted and took your text with it | It didn't: the text is in `.last-edit.md`, and the next `add`/`edit` offers it back -- `[r]` opens the editor on it, `[d]` throws it away, `[c]` leaves it alone. Text from an interrupted `edit <slug>` is only offered to that same post: restoring it into an `add` would make a second post out of it, so the offer names the command that does continue it. |
-| `Missing env.sh` | Copy the template: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
-| `Missing config/site.yml` | Same idea: `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
+| `Missing env.sh` | `./setup.sh`, or copy the template by hand: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
+| `Missing config/site.yml` | Same two ways: `./setup.sh`, or `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
 | `Duplicate year/slug ... build stopped` | Two posts resolve to the same URL and media directory. Rename one slug; the build aborts rather than silently overwriting one with the other. |
 | Deploy stopped with a "% drop/increase" message | One of the four guards -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. The message names what it compared against, and when. |
 | Deploy or save stopped naming a file over 100 MB | One limit for every backend, so the site stays portable ([Deploying](#deploying)). Shrink the file, or take it out of the post and link to it instead. `--force` does not lift this -- the target would refuse it every run. |

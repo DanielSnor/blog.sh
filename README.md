@@ -292,6 +292,7 @@ deploy step around exactly that. A few of the choices that came out of it:
 
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
+setup.sh                 Setup wizard -- identity, address, comments network, deploy target
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
@@ -347,15 +348,23 @@ copy-paste path per platform -- Ruby included -- in
 [docs/install.md → Quick start](docs/install.md#quick-start). The steps
 below assume Ruby 2.7+ is already on the machine:
 
-1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
-   site's title, description, social links, and (optionally) analytics,
-   sidebar widgets, and the comments network (Mastodon or Bluesky). Set
-   `site.timezone` if you'll publish from a server -- a server clock is
-   usually UTC, and without it `schedule` reads times as UTC and a post
-   written after midnight can be dated to the previous day.
-2. Copy `env.sh.example` to `env.sh` and `chmod 600 env.sh`. An unedited
-   copy is enough to try things out locally -- without the Surfer values,
-   uploads are simply skipped (logged, not an error).
+1. `./setup.sh` -- it asks for the site's title, description, timezone,
+   address, comments network (Mastodon or Bluesky) and deploy target,
+   checks each answer as you give it, and writes `config/site.yml` and
+   `env.sh`. Every question can be skipped, nothing is written until you
+   have seen the diff and confirmed it, and re-running it is how you
+   change any of this later.
+
+   Prefer to do it by hand? Copy `config/site.yml.example` to
+   `config/site.yml` and `env.sh.example` to `env.sh` (`chmod 600
+   env.sh`) and edit them; both are fully commented, an unedited pair is
+   already a working local site, and the wizard writes the same files
+   without disturbing a line you wrote yourself.
+2. `./blog.sh doctor` any time you want to know whether the
+   configuration is sound -- it reads what is on disk and reports every
+   problem at once, in whole sentences, including the ones that fail
+   silently (a timezone typo, a banner whose declared size no longer
+   matches the file, a sidebar widget that can never show anything).
 3. Replace `assets/images/header.png` (the banner) and
    `assets/images/favicon.png` with your own -- defaults ship with the engine
    (`assets/images/defaults/`, copied to any missing live name at build time),
@@ -399,6 +408,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh rebuild              # rebuilds and deploys the whole site
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```

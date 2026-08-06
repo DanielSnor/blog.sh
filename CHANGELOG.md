@@ -10,6 +10,69 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.3 -- unreleased
+
+### New
+
+- **`./setup.sh` -- setting a site up is now a conversation.** The
+  documented path was to copy two files and edit 277 lines of commented
+  YAML; this asks instead, and checks every answer as it arrives. The
+  timezone is offered from the machine's own zone database and rejected
+  if it isn't one -- the setting whose typo would otherwise silently date
+  every post two hours off. The address is checked for shape and written
+  to **both** `config/site.yml` and `env.sh`, because env.sh's copy
+  overrides the other and the shipped example has it pointing at
+  `example.com`: fill in only the config and the site still calls itself
+  example.com in its feed, sitemap and every share preview. The Mastodon
+  token is verified against the instance on the spot, and the numeric
+  account id comes back out of that same call -- so the sidebar widget
+  that is most often filled in with an `@handle` (and then silently shows
+  nothing) can simply be offered, already correct. Choosing one comments
+  network switches the other off, since a config with both is one the
+  build refuses to load.
+
+  Nothing is written until the end: answers are collected, both files'
+  diffs are shown with secrets masked, and one confirmation covers the
+  lot -- so Ctrl-C anywhere leaves an existing install exactly as it was.
+  Every question can be skipped with Enter, and re-running it is how you
+  change any of this later. Editing the files by hand keeps working
+  exactly as before; the two are interchangeable, in both directions.
+
+- **`./blog.sh doctor` -- what is wrong with this configuration, all of
+  it, at once.** Every abort in the engine is correct where it stands,
+  but each reports only the first problem, from wherever the code
+  happened to notice. Doctor reads what is on disk and reports the lot in
+  whole sentences, each with a fix line written for somebody who does not
+  know which file the setting lives in. It concentrates on what fails
+  *silently*: an unknown timezone (Ruby falls back to UTC and says
+  nothing), a banner whose declared size no longer matches the file so
+  every page jumps as it loads, a widget that can never show anything, a
+  font named in the config but missing from `assets/fonts/`, a deploy
+  backend configured half way, the example's text still sitting where
+  visitors would read it. `--online` additionally asks whether the feeds,
+  the analytics script and the access token still answer.
+
+  It runs on configurations too broken for anything else to load,
+  including one whose YAML will not parse -- which is exactly when it is
+  wanted. Exit status is non-zero for errors only; warnings are advice.
+
+### Changed
+
+- **A YAML syntax error in `config/site.yml` is now a sentence, not a
+  backtrace.** It used to surface as a Psych exception from whichever
+  entry point happened to read the file first. It now names the line, the
+  column, the three usual causes (a tab where spaces belong, a missing
+  quote, a colon inside an unquoted value) and points at `doctor`.
+
+- **Configuration written by the engine keeps its comments.** Both
+  wizards write through a text-level editor that substitutes values into
+  the documented template and leaves every other byte alone, rather than
+  loading the YAML and dumping it back -- which would have thrown away
+  the ~200 lines of explanation, the commented-out blocks you uncomment
+  when you want a widget, and the folded scalars real sites keep HTML in.
+  Every write is verified by reading the file back, and restored from its
+  backup if it does not read the way it was asked for.
+
 ## 1.2 -- unreleased
 
 ### New
