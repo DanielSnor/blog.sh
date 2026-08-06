@@ -28,8 +28,11 @@ can't give without having read the preview.
 Sources: Bluesky (public API, no credentials), Tumblr (needs
 TUMBLR_API_KEY in env.sh), LiveJournal (needs LJ_PASSWORD in env.sh --
 there is no export file, and the password travels only as a challenge
-digest), the Wayback Machine (point it at a DEAD blog's old URL --
-its archived feed captures reassemble the history, images and all),
+digest), the Wayback Machine (point it at a DEAD blog's old URL -- its
+archived feed captures reassemble as much of the history as the Archive
+kept; the preview says how many captures it found, whether that feed
+carried whole posts or only excerpts, and how many of the blog's images
+the Archive ever fetched, because none of that is guaranteed),
 any podcast RSS feed by URL (episode audio and artwork are
 downloaded for keeps -- the preview says how many gigabytes), and sixteen
 things you already have on disk -- a beehiiv posts CSV, an unpacked

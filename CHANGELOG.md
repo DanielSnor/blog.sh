@@ -414,6 +414,29 @@ prints what an installation is running.
 
 ### Fixes
 
+- **A Wayback rescue now says up front what it can and cannot recover.**
+  Two things decide whether the hours a rescue takes are worth spending,
+  and the preview reported neither, so both were discovered the hard way:
+  whether that blog's feed carried whole posts or only teasers, and
+  whether the crawler ever fetched its pictures. A real rescue promised
+  sixty-four images and delivered none -- the Archive had kept
+  forty-five pictures of that site across six years and every one was
+  part of the page furniture.
+
+  Truncated items are now counted and named. The test is where the item's
+  last link POINTS, not what it says: a teaser ends with a link back to
+  the post itself, which is the "read more" the blog appended where it
+  cut the text off. Looking for the phrase would only work in the
+  language it was written in, and the tempting shortcut -- "no
+  content:encoded means summary" -- is wrong, because plenty of feeds
+  carry the whole post in plain description. And one CDX query now asks
+  what images the Archive holds of that host, reported by year: pictures
+  from years missing there cannot arrive, whatever the posts reference.
+
+  The help text was overclaiming to match. It said archived feed captures
+  reassemble the history "images and all"; they reassemble as much of it
+  as the Archive kept, which is the entire point of measuring first.
+
 - **Footer headings only render over content.** An emptied social list
   (or one never filled in) left its heading -- "Find me on", pointing at
   nothing -- on every page, and the links and note columns had the same

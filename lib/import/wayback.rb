@@ -57,6 +57,9 @@ module Import
       @lost_images = 0
       @unparsed = 0
       @dated_by_capture = 0
+      @summary_only = 0
+      @full_bodied = 0
+      @archived_images = nil
       # Queries the Archive never answered. Kept apart from queries that
       # came back empty, because only the second kind says anything about
       # the blog -- see refuse_unanswered.
@@ -86,6 +89,7 @@ module Import
     # ever saw as pages (no feed captures) falls through to page mode:
     # every archived post page, newest capture of each, read one by one.
     def each_item(&block)
+      probe_images
       unless @mode == :pages
         asked = @cdx_failures.size
         captures = discover
@@ -137,6 +141,20 @@ module Import
       notes << "#{@unparsed} archived page(s) could not be read as posts -- see the skip counts." if @unparsed.positive?
       notes << "#{@dated_by_capture} post(s) carry the capture date -- the page itself said nothing better." if @dated_by_capture.positive?
       notes << "#{@lost_images} image(s) the Archive never saved are lost -- their posts came over without them." if @lost_images.positive?
+      # The two things that decide whether a rescue is worth the hours it
+      # takes, and neither is visible from the post count alone.
+      if @summary_only.positive?
+        seen = @summary_only + @full_bodied
+        notes << "#{@summary_only} of #{seen} feed item(s) carried a summary, not the whole post -- " \
+                 'that blog published excerpts, so those arrive truncated however many captures exist.'
+      end
+      if @archived_images && @archived_images[:total].zero?
+        notes << "The Archive holds no images at all for #{host}: every picture these posts point at is gone."
+      elsif @archived_images
+        spread = @archived_images[:years].first(12).map { |year, n| "#{year}: #{n}" }.join(', ')
+        notes << "The Archive holds #{@archived_images[:total]} image(s) of #{host} (#{spread}) -- " \
+                 'pictures from years missing there cannot arrive, whatever the posts reference.'
+      end
       # A run that finished still needs to say which questions went
       # unanswered: a feed candidate the Archive refused is a piece of the
       # blog that silently did not come over.
@@ -153,6 +171,8 @@ module Import
     def map_feed_item(feed, item, media)
       post = feed.map(item, media)
       return post unless post.is_a?(Hash)
+
+      summary_only?(item) ? @summary_only += 1 : @full_bodied += 1
 
       # The Archive sometimes answers an image URL with an HTML page and
       # a straight-faced 200 -- saved as 01.jpg it would render broken.
@@ -444,6 +464,50 @@ module Import
       else
         raise "HTTP #{response.code} (#{url})"
       end
+    end
+
+    # A feed item that ends with a link BACK TO ITSELF is a teaser: that
+    # last link is the "read more" the blog appended where it cut the post
+    # off, and no number of captures recovers what the feed never sent.
+    #
+    # Structural on purpose. The obvious test -- look for "read more" --
+    # only works in the language it was written in, and the tempting
+    # shortcut of "no content:encoded" is wrong too: plenty of feeds carry
+    # the whole post in plain description. Where the last link POINTS is
+    # neither. Checked against a b2evolution feed whose items were mixed:
+    # it named every truncated one and no other.
+    def summary_only?(item)
+      link = item_link(item)
+      return false if link.empty?
+
+      body = %w[content:encoded description content summary]
+             .filter_map { |name| item.elements[name]&.text }.max_by(&:length).to_s
+      last = body.scan(/<a[^>]+href="([^"]+)"/im).last
+      !last.nil? && last[0].split('#').first == link
+    end
+
+    def item_link(item)
+      node = item.elements['link']
+      return '' unless node
+
+      text = node.text.to_s.strip
+      text.empty? ? node.attributes['href'].to_s.strip : text
+    end
+
+    # What the Archive has of this blog's PICTURES. A feed only references
+    # images; whether they arrive depends on whether the crawler ever
+    # fetched them, and nothing in the feed says. One CDX query answers it
+    # before the run instead of after -- a preview used to promise sixty
+    # images for a blog whose pictures the Archive had never once visited.
+    def probe_images
+      asked = @cdx_failures.size
+      rows = cdx_rows("#{host}/*", extra: { 'filter' => ['statuscode:200', 'mimetype:image/.*'],
+                                            'collapse' => 'urlkey' })
+      # Unanswered is not empty -- say nothing rather than something wrong.
+      return if @cdx_failures.size > asked
+
+      @archived_images = { total: rows.size,
+                           years: rows.map { |r| r[:timestamp].to_s[0, 4] }.tally.sort }
     end
 
     # A query the Archive never answered is not an empty archive, and the
