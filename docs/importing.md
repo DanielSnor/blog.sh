@@ -54,8 +54,9 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (Blogger, Ghost, Medium, Substack, WordPress/feed and Tumblr today)
-  can record each published post's old path as `redirect_from` -- the build then serves a redirect at every one
+  (Blogger, Ghost, Medium, Squarespace, Substack, WordPress/feed and
+  Tumblr today) can record each published post's old path as
+  `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -287,6 +288,28 @@ the same feed) are skipped and counted.
 No redirects here: on Libsyn the feed's per-episode link points at the
 mp3 itself, not at an episode page, so there is no original address to
 keep -- a guessed one would 404 with a straight face.
+
+### Squarespace
+
+```bash
+ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
+```
+
+In Squarespace: **Settings → Import/Export → Export**, pick "WordPress
+format". It is almost a WordPress export, and everything a WXR import
+does applies -- pages and attachments counted as skips, drafts as
+drafts. The differences are all in what a plain parse would silently
+lose, and the importer restores each: image URLs hidden in `data-src`,
+audio players that are just a `<div>` with data attributes (they become
+native audio blocks with the file downloaded -- better than the
+original hotlink), video embeds stored as escaped markup in an
+attribute (YouTube becomes a video block, other players a link), and
+the post's feature image, which the export ships as a separate
+attachment item right after the post.
+
+The media is not in the file -- everything downloads from Squarespace's
+CDN, so import while the old site is still up. Kept permalinks record
+the `/blog/<slug>` paths from the export itself.
 
 ### Substack
 

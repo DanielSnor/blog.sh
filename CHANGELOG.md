@@ -47,6 +47,17 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Squarespace joined the import sources** -- the fourteenth. Point the
+  wizard (or `migrate_squarespace.rb`) at the "WordPress format" XML
+  export. It reads like a WordPress import wherever it can, and restores
+  what Squarespace's markup hides from a plain parse: images whose URL
+  lives in `data-src` (all of them), audio players that are a `<div>`
+  with data attributes (they become native audio blocks, file
+  downloaded), video embeds stored as escaped markup in an attribute,
+  and the feature image the export ships as a separate attachment item
+  after its post. Slugs and kept permalinks come from the export's own
+  `<link>` paths.
+
 - **Blogger joined the import sources** -- the thirteenth. Point the
   wizard (or `migrate_blogger.rb`) at the Atom backup file from
   Settings → Manage blog → Back up content. The backup mixes posts with

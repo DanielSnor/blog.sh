@@ -243,16 +243,16 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Thirteen sources: Bluesky and Tumblr via their APIs; Blogger, Ghost,
-  Instagram, Mastodon, Medium, Pixelfed, Substack and Twitter/X from
-  their account exports and backups; WordPress from a WXR file, any
-  RSS/Atom feed by URL, and any podcast feed with its episodes' audio
-  downloaded for keeps -- Tumblr and Twitter carried over from the
-  original migration of four Tumblr blogs and a Twitter archive
-  (2008-2022)
+- Fourteen sources: Bluesky and Tumblr via their APIs; Blogger, Ghost,
+  Instagram, Mastodon, Medium, Pixelfed, Squarespace, Substack and
+  Twitter/X from their account exports and backups; WordPress from a WXR
+  file, any RSS/Atom feed by URL, and any podcast feed with its
+  episodes' audio downloaded for keeps -- Tumblr and Twitter carried
+  over from the original migration of four Tumblr blogs and a Twitter
+  archive (2008-2022)
 - A blog that keeps its domain keeps its addresses: sources that know
-  their posts' original URLs (Blogger, Ghost, Medium, Substack,
-  WordPress, Tumblr) can record each
+  their posts' original URLs (Blogger, Ghost, Medium, Squarespace,
+  Substack, WordPress, Tumblr) can record each
   one as a `redirect_from` (Substack's `/p/<slug>` comes straight from
   the export), and the built site answers at every old path with a
   redirect
@@ -451,6 +451,7 @@ Available sources:
 | Medium | an unpacked export | posts and drafts; images download from Medium's CDN, likely responses to other articles become drafts for review, newer exports carry no tags |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
 | Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode with audio: the mp3 and artwork download and are hosted locally -- the preview says how many gigabytes that means; items without an enclosure are skipped |
+| Squarespace | the "WordPress format" XML export | posts and drafts, feature images included; images, audio and video markup that a plain parse would lose is restored, pages and attachments are counted as skips |
 | Substack | an unpacked export | newsletters and podcasts, drafts included, full text of paid posts (the export is the author's); threads and pages are skipped, tags don't exist in the export |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
@@ -469,6 +470,7 @@ ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
 ruby scripts/migrate_medium.rb <path-to-unpacked-export>
 ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
 ruby scripts/migrate_podcast.rb <feed-url | export.xml>
+ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
 ruby scripts/migrate_substack.rb <path-to-unpacked-export>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>

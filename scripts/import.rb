@@ -36,6 +36,7 @@ require_relative '../lib/import/medium'
 require_relative '../lib/import/pixelfed'
 require_relative '../lib/import/podcast'
 require_relative '../lib/import/instagram'
+require_relative '../lib/import/squarespace'
 require_relative '../lib/import/substack'
 
 def t(key, **vars)
@@ -58,6 +59,7 @@ SOURCES = [
   ['medium', -> { build_medium }],
   ['pixelfed', -> { build_pixelfed }],
   ['podcast', -> { build_podcast }],
+  ['squarespace', -> { build_squarespace }],
   ['substack', -> { build_substack }],
   ['tumblr', -> { build_tumblr }],
   ['twitter', -> { build_twitter }],
@@ -219,6 +221,17 @@ def build_podcast
   return Import::Podcast.new(source) if source.start_with?('http://', 'https://')
 
   puts t('import.feed_source_invalid', source: source)
+  nil
+end
+
+def build_squarespace
+  path = ask('import.squarespace_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Squarespace.new(path) if File.exist?(path)
+
+  puts t('import.squarespace_path_invalid', path: path)
   nil
 end
 
