@@ -491,7 +491,7 @@ Available sources:
 | beehiiv | the posts CSV export | newsletters, drafts included, full text of paid posts; the email chrome is undone, images download at full quality; the CSV has no publish date, only created_at |
 | Blogger | the Atom backup file | posts and drafts; the comments and settings the backup mixes in are skipped and counted, images download full-size (the markup only points at thumbnails), YouTube embeds become video blocks |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
-| Facebook | an unpacked JSON export | your own posts with photos and videos from the archive; crossposts from Twitter/Posterous are skipped and counted by default (their own imports carry the originals), as are wordless check-ins and app stories |
+| Facebook | an unpacked export, HTML or JSON | your own posts with photos and videos from the archive; crossposts from Twitter/Posterous are skipped and counted by default (their own imports carry the originals), as are wordless check-ins and app stories |
 | Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages are skipped, images download from the live site |
 | Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | LiveJournal | `LJ_PASSWORD` (challenge digest, never plaintext) | every entry via the API — LJ has no export file; friends-only and private arrive as drafts, comments stay behind |
@@ -503,7 +503,7 @@ Available sources:
 | Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode with audio: the mp3 and artwork download and are hosted locally -- the preview says how many gigabytes that means; items without an enclosure are skipped |
 | Squarespace | the "WordPress format" XML export | posts and drafts, feature images included; images, audio and video markup that a plain parse would lose is restored, pages and attachments are counted as skips |
 | Substack | an unpacked export | newsletters and podcasts, drafts included, full text of paid posts (the export is the author's); threads and pages are skipped, tags don't exist in the export |
-| Threads | an unpacked JSON export | your own standalone posts with media from the archive; replies to other people's threads are skipped and counted, bare URLs become links |
+| Threads | an unpacked export, HTML or JSON | your own standalone posts with media from the archive; replies to other people's threads are skipped and counted, bare URLs become links |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
 | Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN |

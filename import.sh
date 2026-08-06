@@ -36,7 +36,7 @@ the Archive ever fetched, because none of that is guaranteed),
 any podcast RSS feed by URL (episode audio and artwork are
 downloaded for keeps -- the preview says how many gigabytes), and sixteen
 things you already have on disk -- a beehiiv posts CSV, an unpacked
-Facebook JSON export (crossposts from other platforms are skipped and
+Facebook export, HTML or JSON (crossposts from other platforms are skipped and
 counted -- their own imports carry the originals), a Blogger Atom
 backup (posts come over, the comments and settings it mixes in are
 skipped out loud), a Ghost JSON export (plus the still-running site's
