@@ -294,6 +294,17 @@ prints what an installation is running.
 
 ### Fixes
 
+- **The menu no longer runs under the search box.** A site using every
+  content type has nine items in the bar, and nine did not fit: measured
+  against the 908px a 940px page leaves, the three shipped locales came
+  out at 906 (English), 927 (Czech) and 899 (German) -- so Czech
+  overflowed outright and the other two had single-digit slack, which is
+  why it collided anyway. Between the mobile breakpoint and the full
+  width every locale overflowed. The bar now sizes itself: the menu may
+  wrap to a second row, the search box never shrinks or gets overlapped
+  (and is 160px rather than 225px), and the gap between items is 1.25rem
+  rather than 1.875rem -- 80px recovered without shortening any label.
+  Czech now has 126px of slack where it had -19.
 - **A post moved to another year keeps its old link working.** Editing a
   post's date across a New Year moves its address from
   `/posts/2019/slug/` to `/posts/2020/slug/`; the redirect a rename would

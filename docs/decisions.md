@@ -44,6 +44,21 @@ every page carries (and the URL never changed), while a nav slot is
 paid for by every visitor on every page. With quote and chat arriving,
 seven items was the budget.
 
+**The bar sizes itself instead of being sized for a label set.** That
+"budget" was a count, and a count is the wrong unit: the `document` type
+made it nine items, and a site that uses all of them ran its longest
+label under the search field -- measured at 906px (en), 927 (cs) and 899
+(de) against the 908 available, so one locale overflowed and the other
+two had single-digit slack. Anywhere between the mobile breakpoint and
+the full width, every locale did. Three rules replace the budget: the
+menu may wrap to a second row, the search box never shrinks or is
+overlapped, and the gap between items is 1.25rem rather than 1.875rem
+(eight gaps at nine items -- 80px, more than the whole overflow, without
+shortening a single label). A tenth type, a longer translation or a
+different font now costs a taller bar rather than a hidden item.
+*Cost:* a denser menu, and a two-row bar in the narrow band where the
+longest locale still doesn't fit on one.
+
 **The menu lists only types the site actually has.** Nav items, `/type/`
 listings and their sitemap entries exist only for content types with at
 least one published post -- a young site's menu grows with its content

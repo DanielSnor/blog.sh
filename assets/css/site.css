@@ -69,23 +69,37 @@ body {
   border-radius: 6px;
 }
 
+/* The bar holds two things that both want the width: the type filters and
+   the search box. With every content type present the menu is nine items,
+   and measured against the 908px this has inside a 940px page, the three
+   shipped locales came out at 906 (en), 927 (cs) and 899 (de) -- so the
+   longest one already ran under the search field and the other two had
+   single-digit slack. The three rules that keep it honest, in order:
+   the menu may wrap to a second row (a bar that grows is better than a
+   label hidden under an input), the search box never shrinks or gets
+   overlapped, and `min-width: 0` lets the menu actually give way instead
+   of forcing the overflow it used to. Between 700px and the full width
+   the same applied to every locale, English included. */
 nav {
   background: var(--nav-bg);
   padding: 0 1rem;
-  height: 60px;
+  min-height: 60px;
   box-sizing: content-box;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  gap: 1rem;
   border-top: 5px solid var(--nav-border);
   border-bottom: 5px solid var(--nav-border);
 }
 
-nav ul { list-style: none; display: flex; margin: 0; padding: 0; }
+nav ul { list-style: none; display: flex; flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; }
 
+/* 1.25rem rather than the original 1.875rem: eight gaps at nine items,
+   so the difference is 80px -- the whole overflow and then some, in
+   every locale, without a single label getting shorter. */
 nav li {
-  float: left;
-  margin-left: 1.875rem;
+  margin-left: 1.25rem;
   text-transform: uppercase;
   font-weight: 400;
   font-size: 0.875rem;
@@ -154,9 +168,13 @@ nav a[aria-current="page"]:hover {
 }
 .nav-toggle:hover { color: var(--accent); }
 
-.search-form { position: relative; align-self: center; display: flex; }
+/* flex: 0 0 auto -- the search box is the one thing in the bar that must
+   not be squeezed: a field narrower than its placeholder is useless, and
+   an overlapped one is worse. 160px rather than 225px buys the menu
+   another 65px, and still fits "Search…" with room to type in. */
+.search-form { position: relative; align-self: center; display: flex; flex: 0 0 auto; }
 .search-form input[type="search"] {
-  width: 225px;
+  width: 160px;
   height: 30px;
   background: var(--search-bg);
   color: #3a3a3a;
