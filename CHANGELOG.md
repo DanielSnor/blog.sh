@@ -47,6 +47,16 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **beehiiv joined the import sources** -- the fifteenth. Point the
+  wizard (or `migrate_beehiiv.rb`) at the posts CSV from Settings →
+  Exports. Each row carries the whole email as HTML; the importer
+  slices out the content, drops the template variables, tracking pixel
+  and unsubscribe footer, unwraps the layout tables, and rewrites the
+  CDN's baked-in quality=80 to full quality before downloading. The
+  subtitle becomes the first paragraph, paid posts import in full,
+  YouTube thumbnail links become video blocks. Honest gap, the CSV's
+  own: it carries created_at but no publish date.
+
 - **Squarespace joined the import sources** -- the fourteenth. Point the
   wizard (or `migrate_squarespace.rb`) at the "WordPress format" XML
   export. It reads like a WordPress import wherever it can, and restores

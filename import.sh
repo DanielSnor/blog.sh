@@ -27,13 +27,13 @@ can't give without having read the preview.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
 in env.sh), any podcast RSS feed by URL (episode audio and artwork are
-downloaded for keeps -- the preview says how many gigabytes), and ten
-things you already have on disk -- a Blogger Atom backup (posts come
-over, the comments and settings it mixes in are skipped out loud), a
-Ghost JSON export (plus the still-running site's URL, its images only
-exist there),
-an unpacked Medium export, a Squarespace XML export, an unpacked
-Substack export, a Twitter/X archive, a Mastodon account archive, a Pixelfed statuses export, an
+downloaded for keeps -- the preview says how many gigabytes), and eleven
+things you already have on disk -- a beehiiv posts CSV, a Blogger Atom
+backup (posts come over, the comments and settings it mixes in are
+skipped out loud), a Ghost JSON export (plus the still-running site's
+URL, its images only exist there), an unpacked Medium export, a
+Squarespace XML export, an unpacked Substack export, a Twitter/X
+archive, a Mastodon account archive, a Pixelfed statuses export, an
 Instagram export (HTML or JSON, whichever you asked Instagram for), and
 WordPress or any RSS/Atom feed (one option, since a WXR export is RSS
 with extra elements and the file itself says which it is).
@@ -41,6 +41,7 @@ with extra elements and the file itself says which it is).
 Each source is also a script, for cron or a scripted migration. These write
 immediately, with no preview pass:
 
+  ruby scripts/migrate_beehiiv.rb <posts.csv>
   ruby scripts/migrate_blogger.rb <blog-backup.xml>
   ruby scripts/migrate_bluesky.rb <handle>
   ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
@@ -59,9 +60,10 @@ LIMIT=n works on all of them and imports only the first n posts -- the way to
 sample a large archive before committing hours to it.
 
 When the new site keeps the old blog's domain, imports from sources that
-know their original URLs (WordPress or a feed, Tumblr) can keep the old
-addresses alive: the wizard asks, the scripts take KEEP_PERMALINKS=1, and
-every published post then redirects from the path it used to live at.
+know their original URLs (beehiiv, Blogger, Ghost, Medium, Squarespace,
+Substack, Tumblr, WordPress or a feed) can keep the old addresses alive:
+the wizard asks, the scripts take KEEP_PERMALINKS=1, and every published
+post then redirects from the path it used to live at.
 
 Re-running any import is safe: posts are matched on their source id and
 overwritten in place, never duplicated. Nothing is deployed either way --

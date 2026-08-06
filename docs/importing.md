@@ -54,9 +54,9 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (Blogger, Ghost, Medium, Squarespace, Substack, WordPress/feed and
-  Tumblr today) can record each published post's old path as
-  `redirect_from` -- the build then serves a redirect at every one
+  (beehiiv, Blogger, Ghost, Medium, Squarespace, Substack,
+  WordPress/feed and Tumblr today) can record each published post's old
+  path as `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -83,6 +83,27 @@ count swung wildly" shape it watches for. Check the numbers, then re-run
 `./scripts/deploy-web.sh` with `--force`.
 
 ## The sources
+
+### beehiiv
+
+```bash
+ruby scripts/migrate_beehiiv.rb <posts.csv>
+```
+
+In beehiiv: **Settings → Exports**, the posts CSV. One file, no media:
+each row carries the entire EMAIL as HTML, and most of the import is
+undoing that -- slicing out the real content, dropping template
+variables, tracking pixels and the unsubscribe footer, turning the
+layout tables back into prose. The subtitle becomes the first
+paragraph, paid posts import in full, YouTube thumbnails become video
+blocks, and images download from beehiiv's CDN with the email's
+quality=80 rewritten to full quality.
+
+Two things worth knowing, both the CSV's: **the only date in it is
+`created_at`** -- beehiiv does not export the publish date, so a
+long-scheduled archive can sit slightly early on the timeline -- and
+tags ride in a semicolon-separated column that not every export
+populates.
 
 ### Blogger
 

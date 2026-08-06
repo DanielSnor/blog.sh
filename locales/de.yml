@@ -375,6 +375,8 @@ import:
   ghost_path_invalid: "%{path} existiert nicht."
   ghost_url_prompt: "URL der (noch laufenden) Ghost-Seite — ihre Bilder existieren nur dort (leer = abbrechen): "
   ghost_url_invalid: "%{url} ist keine URL — sie muss mit http:// oder https:// beginnen."
+  beehiiv_path_prompt: "Pfad zur beehiiv-Posts-CSV (leer = abbrechen): "
+  beehiiv_path_invalid: "%{path} existiert nicht."
   blogger_path_prompt: "Pfad zum Blogger-Backup-XML (leer = abbrechen): "
   blogger_path_invalid: "%{path} existiert nicht."
   podcast_source_prompt: "Podcast-Feed-URL oder Pfad zu einer gespeicherten Feed-Datei (leer = abbrechen): "
@@ -406,6 +408,7 @@ import:
   interrupted: "Unterbrochen. Bereits geschriebene Beiträge liegen in content.nosync/ — den Import erneut auszuführen ist sicher, er überschreibt sie an Ort und Stelle."
   source_died: "⚠️  Die Quelle hat nach %{count} Einträgen aufgehört zu antworten: %{error}. Die Zahlen unten sind eine Teilsumme, nicht die ganze Quelle. Bereits geschriebene Beiträge sind gespeichert — ein erneuter Lauf ist sicher, sie werden über ihre Source-ID zugeordnet und nie dupliziert."
   source:
+    beehiiv: "beehiiv (Posts-CSV-Export)"
     blogger: "Blogger (Atom-Backup)"
     bluesky: "Bluesky"
     ghost: "Ghost (JSON-Export)"

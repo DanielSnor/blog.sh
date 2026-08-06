@@ -243,16 +243,16 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Fourteen sources: Bluesky and Tumblr via their APIs; Blogger, Ghost,
-  Instagram, Mastodon, Medium, Pixelfed, Squarespace, Substack and
-  Twitter/X from their account exports and backups; WordPress from a WXR
+- Fifteen sources: Bluesky and Tumblr via their APIs; beehiiv, Blogger,
+  Ghost, Instagram, Mastodon, Medium, Pixelfed, Squarespace, Substack
+  and Twitter/X from their account exports and backups; WordPress from a WXR
   file, any RSS/Atom feed by URL, and any podcast feed with its
   episodes' audio downloaded for keeps -- Tumblr and Twitter carried
   over from the original migration of four Tumblr blogs and a Twitter
   archive (2008-2022)
 - A blog that keeps its domain keeps its addresses: sources that know
-  their posts' original URLs (Blogger, Ghost, Medium, Squarespace,
-  Substack, WordPress, Tumblr) can record each
+  their posts' original URLs (beehiiv, Blogger, Ghost, Medium,
+  Squarespace, Substack, WordPress, Tumblr) can record each
   one as a `redirect_from` (Substack's `/p/<slug>` comes straight from
   the export), and the built site answers at every old path with a
   redirect
@@ -443,6 +443,7 @@ Available sources:
 
 | Source | Needs | Scope |
 | --- | --- | --- |
+| beehiiv | the posts CSV export | newsletters, drafts included, full text of paid posts; the email chrome is undone, images download at full quality; the CSV has no publish date, only created_at |
 | Blogger | the Atom backup file | posts and drafts; the comments and settings the backup mixes in are skipped and counted, images download full-size (the markup only points at thumbnails), YouTube embeds become video blocks |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
 | Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages are skipped, images download from the live site |
@@ -462,6 +463,7 @@ Every source is also reachable without the wizard, for a cron job or a
 scripted migration -- same mapping, no preview pass, writes immediately:
 
 ```bash
+ruby scripts/migrate_beehiiv.rb <posts.csv>
 ruby scripts/migrate_blogger.rb <blog-backup.xml>
 ruby scripts/migrate_bluesky.rb <handle>
 ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
