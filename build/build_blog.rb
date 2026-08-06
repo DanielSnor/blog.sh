@@ -17,6 +17,7 @@ require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/file_size'
 require_relative '../lib/i18n'
+require_relative '../lib/colors_css'
 
 SiteConfig.use_site_timezone!
 
@@ -25,18 +26,24 @@ ROOT = File.expand_path('..', __dir__)
 # (downloadable again any time from wherever the site is actually deployed).
 # That doesn't lose a local Time Machine backup, it just stops iCloud from
 # mirroring it -- worth nothing for data that can always be re-fetched.
-CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
+# Both content and output are overridable for the one caller that builds
+# somewhere else on purpose: ./style.sh's palette preview renders a
+# bundled sample post into tmp/ through this same script, without
+# touching the real content or the real build (lib/palette_preview.rb).
+CONTENT_DIR = ENV['BLOG_SH_CONTENT_DIR'] || File.join(ROOT, 'content.nosync', 'posts')
 MEDIA_DIR = File.join(ROOT, 'media.nosync')
 # .nosync: a derived artifact (rebuildable any time) gains nothing from being
 # synced -- on a Mac it was also pure I/O overhead. The directory name means
 # nothing to a server, where iCloud doesn't exist anyway.
-PUBLIC_DIR = File.join(ROOT, 'public.nosync')
+PUBLIC_DIR = ENV['BLOG_SH_PUBLIC_DIR'] || File.join(ROOT, 'public.nosync')
 
 # One writer of public.nosync at a time -- a concurrent build and deploy
 # walk the same tree while it is being rewritten (see lib/run_lock.rb).
-# Inherited when the publishing cron already holds it.
+# Inherited when the publishing cron already holds it. A build redirected
+# elsewhere (the palette preview) neither touches that tree nor should
+# fail because a real build happens to be running.
 require_relative '../lib/run_lock'
-RunLock.acquire!(ROOT, label: 'build')
+RunLock.acquire!(ROOT, label: 'build') unless ENV['BLOG_SH_PUBLIC_DIR']
 # No ?v= cache-buster on site.css on purpose: a static host that serves every
 # file with `Cache-Control: public, max-age=0` plus an ETag (e.g. Cloudron
 # Surfer) makes browsers revalidate on each load and pick up a changed
@@ -107,201 +114,10 @@ MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 # Also enforces the mastodon/bluesky exclusivity right at build time.
 COMMENT_NETWORK = SiteConfig.comment_network
 
-# Color palette. Only these 7-per-mode keys (config/site.yml's
-# `colors.light.*`/`colors.dark.*`) are real per-site choices -- everything
-# else the CSS references (--card-bg, --nav-text, --nav-border,
-# --hover-invert, --badge-hover-text, --search-bg) is derived from them in
-# color_properties below, not separately configurable. They never varied
-# independently across every palette this engine has actually shipped, so
-# exposing them as their own config keys would just be more to fill in for
-# no real choice. Defaults to blog.sh's own blue palette when `colors:` is
-# absent (or partial) in config/site.yml.
-DEFAULT_COLORS = {
-  'light' => {
-    'bg' => '#f5f8fa', 'text' => '#444a5a', 'meta_text' => '#657784',
-    'accent' => '#1da1f2', 'nav_bg' => '#eaf5fd', 'border' => '#e1e8ed',
-    'pill_bg' => '#d6ecfc'
-  },
-  'dark' => {
-    'bg' => '#111111', 'text' => '#ffffff', 'meta_text' => '#6a7f8c',
-    'accent' => '#4ab3f4', 'nav_bg' => '#192734', 'border' => '#263340',
-    'pill_bg' => '#16324a'
-  }
-}.freeze
+# The color palette and the generated stylesheet live in
+# lib/colors_css.rb, shared with ./style.sh -- its palette preview must
+# render through the exact code the build uses, or it drifts.
 
-def color_for(mode, key)
-  SiteConfig.get('colors', mode, key) || DEFAULT_COLORS[mode][key]
-end
-
-def color_properties(mode)
-  text = color_for(mode, 'text')
-  meta_text = color_for(mode, 'meta_text')
-  nav_bg = color_for(mode, 'nav_bg')
-  {
-    'bg' => color_for(mode, 'bg'),
-    # White in light mode (a card floating on a tinted page), but in dark
-    # mode it's the same tinted surface as the nav bar, not white -- true
-    # across every palette this engine has shipped (orange/bluebird/garden/
-    # sunflower all set dark card-bg == dark nav-bg exactly).
-    'card-bg' => mode == 'dark' ? nav_bg : '#ffffff',
-    'text' => text,
-    'meta-text' => meta_text,
-    'accent' => color_for(mode, 'accent'),
-    'nav-bg' => nav_bg,
-    'nav-text' => text,
-    'border' => color_for(mode, 'border'),
-    'nav-border' => meta_text,
-    'pill-bg' => color_for(mode, 'pill_bg'),
-    'search-bg' => mode == 'dark' ? '#eeeeee' : '#ffffff',
-    'hover-invert' => mode == 'dark' ? '#ffffff' : meta_text,
-    'badge-hover-text' => mode == 'dark' ? 'var(--accent)' : '#ffffff',
-    # Independently optional (config/site.yml's colors.<mode>.banner_title/
-    # banner_claim) since the banner overlay's title and claim can be shown
-    # or colored independently -- see BANNER_SHOW_TITLE/_CLAIM below. Same
-    # default either falls back to as before this pair existed: nav-bg in
-    # light mode (a readable tone against most banner images without being
-    # pure white), white in dark mode.
-    'banner-title-color' => color_for(mode, 'banner_title') || (mode == 'dark' ? '#ffffff' : nav_bg),
-    'banner-claim-color' => color_for(mode, 'banner_claim') || (mode == 'dark' ? '#ffffff' : nav_bg)
-  }
-end
-
-def color_declarations(mode, indent)
-  color_properties(mode).map { |name, value| "#{indent}--#{name}: #{value};" }.join("\n")
-end
-
-# Header typography. Same idea as the palette: the two lines painted over
-# the banner -- the site's name and its claim -- are a per-site choice, so
-# they live in config/site.yml (`fonts.*`) and reach the stylesheet as
-# custom properties. A site that says nothing keeps what the engine has
-# always used.
-#
-# Family and size are separate keys per line, because a font swap is
-# usually also a size decision: a serif set at 45px does not fill the
-# banner the way the monospace default does, and having to accept the old
-# number with a new face would make the setting half-useful.
-#
-# The narrow-screen sizes are NOT config: site.css scales them from these
-# with calc(), so the responsive step survives whatever unit someone writes
-# (px, rem, clamp()) without a second pair of keys to keep in sync.
-DEFAULT_FONTS = {
-  'banner_title' => '"JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
-  'banner_claim' => '"JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
-  'banner_title_size' => '45px',
-  'banner_claim_size' => '20px'
-}.freeze
-
-# What a font file may be called on the way into a @font-face, and what CSS
-# calls the format. Anything else is refused by name rather than written
-# into the stylesheet and left to fail in the browser.
-FONT_FORMATS = { '.woff2' => 'woff2', '.woff' => 'woff', '.ttf' => 'truetype', '.otf' => 'opentype' }.freeze
-FONTS_DIR = File.join(ROOT, 'assets', 'fonts')
-
-# A value from config lands inside a CSS declaration, so it must not be
-# able to end one. Everything here would either break the stylesheet or
-# smuggle in rules of its own -- a font stack needs none of it.
-CSS_VALUE_FORBIDDEN = /[;{}<>@\\\n\r]/.freeze
-
-def safe_css_value(value, what)
-  text = value.to_s.strip
-  return nil if text.empty?
-  return text unless text.match?(CSS_VALUE_FORBIDDEN)
-
-  warn "⚠️  config/site.yml: #{what} contains characters that can't go into CSS (;{}<>@\\) -- ignoring it."
-  nil
-end
-
-def font_setting(key)
-  safe_css_value(SiteConfig.get('fonts', key), "fonts.#{key}") || DEFAULT_FONTS[key]
-end
-
-# @font-face blocks for the files a site dropped into assets/fonts/ and
-# declared in `fonts.faces`. The engine's own bundled faces stay in
-# site.css: they ship with the engine, these belong to the installation.
-#
-# A declared file that isn't there is said out loud. Silence would mean a
-# site quietly rendering in its fallback font, which looks like the config
-# not working and gives nothing to go on.
-def font_face_css
-  faces = SiteConfig.get('fonts', 'faces')
-  return '' unless faces.is_a?(Array) && faces.any?
-
-  blocks = faces.filter_map { |face| font_face_block(face) }
-  blocks.empty? ? '' : "#{blocks.join("\n")}\n\n"
-end
-
-def font_face_block(face)
-  return warn_face('an entry under fonts.faces is not a family/file pair') unless face.is_a?(Hash)
-
-  family = safe_css_value(face['family'].to_s.delete('"'), 'fonts.faces family')
-  file = File.basename(face['file'].to_s)
-  return warn_face("#{face.inspect} needs both `family` and `file`") if family.nil? || file.empty?
-
-  format = FONT_FORMATS[File.extname(file).downcase]
-  return warn_face("#{file} is not a web font format (#{FONT_FORMATS.keys.join(', ')})") unless format
-  return warn_face("#{file} is declared in config/site.yml but not in assets/fonts/") unless File.exist?(File.join(FONTS_DIR, file))
-
-  weight = safe_css_value(face['weight'], 'fonts.faces weight') || '400 700'
-  style = %w[normal italic oblique].include?(face['style'].to_s) ? face['style'] : 'normal'
-  <<~FACE.chomp
-    @font-face {
-      font-family: "#{family}";
-      font-style: #{style};
-      font-weight: #{weight};
-      font-display: swap;
-      src: url("/assets/fonts/#{file}") format("#{format}");
-    }
-  FACE
-end
-
-def warn_face(message)
-  warn "⚠️  config/site.yml: #{message} -- that face is skipped."
-  nil
-end
-
-# Generates assets/css/colors.css -- the one file that actually differs
-# between two sites built on this engine. templates/layout.html.erb loads
-# it just before the shared site.css, which carries no site-specific value
-# of its own.
-#
-# The name is narrower than the contents: it also carries the header fonts
-# (and the @font-face blocks for a site's own font files). Keeping one
-# generated stylesheet rather than adding a second is what makes typography
-# cost two changed files instead of every page in the archive -- the link
-# tag sits in the layout, so a new stylesheet re-renders the lot.
-def build_colors_css
-  <<~CSS
-    /* Generated at build time from config/site.yml (`colors:` and `fonts:`)
-       -- edit the config and rebuild, don't edit this file by hand. */
-    #{font_face_css}:root {
-      --banner-title-font: #{font_setting('banner_title')};
-      --banner-claim-font: #{font_setting('banner_claim')};
-      --banner-title-size: #{font_setting('banner_title_size')};
-      --banner-claim-size: #{font_setting('banner_claim_size')};
-    }
-
-    :root,
-    :root[data-theme="light"] {
-    #{color_declarations('light', '  ')}
-    }
-
-    /* WARNING: the dark values appear twice below and must stay identical.
-       CSS can't share a declaration block across an @media boundary, so
-       "follow the system" and "explicitly switched" can't be written
-       together. (A single declaration would be possible via light-dark(),
-       but that needs Safari 17.5+ / Chrome 123+, and colors would fall
-       apart completely in older browsers.) */
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-    #{color_declarations('dark', '    ')}
-      }
-    }
-
-    :root[data-theme="dark"] {
-    #{color_declarations('dark', '  ')}
-    }
-  CSS
-end
 DEFAULT_OG_IMAGE = "#{SITE_BASE_URL}#{BANNER['src']}"
 
 def t(key, **vars)
@@ -1357,7 +1173,10 @@ Dir.glob(File.join(ROOT, 'assets', '**', '*')).each do |src|
 
   emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
-emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'), build_colors_css)
+emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
+     ColorsCss.generate(colors: SiteConfig.get('colors', default: {}),
+                        fonts: SiteConfig.get('fonts', default: {}),
+                        fonts_dir: File.join(ROOT, 'assets', 'fonts')))
 ico = build_favicon_ico
 emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
 

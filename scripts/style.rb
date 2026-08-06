@@ -18,6 +18,7 @@
 # before it is kept.
 
 require 'yaml'
+require 'rbconfig'
 require_relative '../lib/site_config'
 
 ROOT = File.expand_path('..', __dir__)
@@ -139,12 +140,14 @@ def section_palette
     puts Tui.paint("   #{mode}: #{COLOR_KEYS.map { |k| data[mode][k] }.join('  ')}", :dim)
   end
   puts
+  offer_palette_preview(data, palette_name(chosen, data))
 end
 
 # For somebody who knows exactly what they want, or who is matching a
 # palette from somewhere else. Fourteen prompts is a lot, which is why
 # it is behind a menu entry rather than the default path.
 def section_colors_by_hand
+  candidate = { 'light' => {}, 'dark' => {} }
   %w[light dark].each do |mode|
     puts Tui.paint(t("colors_#{mode}"), :bold)
     puts
@@ -154,8 +157,43 @@ def section_colors_by_hand
         t('e_hex') unless answer.match?(HEX)
       end
       site.set(['colors', mode, key], value) if value
+      candidate[mode][key] = value || current.dig('colors', mode, key)
     end
   end
+  offer_palette_preview(candidate, t('pv_custom_name'))
+end
+
+# The preview comes BEFORE the write on purpose: it exists to answer "do
+# I want this?", and once the diff is confirmed the answer costs a rerun.
+# Fourteen hexes answer nothing; the site itself does -- see
+# lib/palette_preview.rb for where the page comes from.
+def offer_palette_preview(colors, name)
+  return unless Wizard.confirm(t('q_palette_preview'), default: true)
+
+  require_relative '../lib/palette_preview'
+  path = Tui.spinner(t('pv_building')) do
+    PalettePreview.generate(
+      root: ROOT, colors: colors, fonts: current['fonts'] || {},
+      labels: { title: t('pv_title', name: name), light: t('colors_light'), dark: t('colors_dark'), hint: t('pv_hint') },
+      sample: { title: t('pv_post_title'), paragraphs: [t('pv_post_p1'), t('pv_post_p2')],
+                tags: t('pv_post_tags').split(',').map(&:strip) }
+    )
+  end
+  shown = relative(path)
+  puts Tui.paint(t(open_in_browser(path) ? 'pv_opened' : 'pv_written', path: shown), :green)
+  puts
+rescue StandardError => e
+  puts Tui.paint("⚠️  #{t('pv_failed', message: e.message.to_s.lines.first.to_s.strip)}", :yellow)
+  puts
+end
+
+# `open`/`xdg-open` take a plain path; no shell, so a space in the
+# install path (a Mac's "Mobile Documents") stays one argument. A false
+# or nil return -- headless server, no opener -- just means the path gets
+# printed instead.
+def open_in_browser(path)
+  cmd = RbConfig::CONFIG['host_os'].include?('darwin') ? 'open' : 'xdg-open'
+  !!system(cmd, path, out: File::NULL, err: File::NULL)
 end
 
 # --- banner ----------------------------------------------------------

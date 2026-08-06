@@ -58,6 +58,16 @@ prints what an installation is running.
   wizard lists whatever is in it, and a palette you add needs no
   translation to appear.
 
+  And a palette can be **looked at before it is kept**: picking one (or
+  finishing the fourteen-value custom route) offers a preview -- your
+  own built site with the candidate colors, or on a fresh install a
+  bundled sample post rendered through the real builder -- light and
+  dark side by side in `tmp/palette-preview.html`, opened in the
+  browser where one is available. The colors go through the same code
+  the build uses (`lib/colors_css.rb`, extracted for exactly this), so
+  the preview cannot drift from what a rebuild would produce. Nothing
+  is written until the wizard's usual confirmation.
+
   The banner section is the other one worth naming: give it the path to
   an image and it copies the file into place and **measures** it.
   `banner.width`/`height` exist to reserve layout space before the image
