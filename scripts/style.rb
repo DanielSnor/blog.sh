@@ -528,14 +528,18 @@ end
 
 # --- the menu --------------------------------------------------------
 
+# In the order the page reads, top to bottom: the whole page first
+# (palette), then the header (image, fonts), the sidebar (bio, widgets),
+# the footer (texts and links, then the icon row that lives in it), and
+# last the one thing with no place on the page at all.
 SECTIONS = [
   ['palette', 'section_palette'],
   ['banner', 'section_banner'],
+  ['fonts', 'section_fonts'],
   ['about', 'section_about'],
+  ['widgets', 'section_widgets'],
   ['footer', 'section_footer'],
   ['social', 'section_social'],
-  ['widgets', 'section_widgets'],
-  ['fonts', 'section_fonts'],
   ['analytics', 'section_analytics']
 ].freeze
 
