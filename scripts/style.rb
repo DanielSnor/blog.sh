@@ -179,9 +179,13 @@ def section_banner
   alt = Wizard.ask(t('q_banner_alt'), current.dig('banner', 'alt'), hint: t('h_banner_alt'))
   site.set(%w[banner alt], alt) if alt
 
-  show_title = Wizard.confirm(t('q_show_title'))
+  # Enter keeps whatever the site already does -- which for an unset key is
+  # ON, the engine's own default (BANNER_SHOW_TITLE/_CLAIM in
+  # build_blog.rb). Asking with a bare [y/N] meant a run through the banner
+  # section turned both overlays off for anyone who pressed Enter.
+  show_title = Wizard.confirm(t('q_show_title'), default: current.dig('banner', 'show_title') != false)
   site.set(%w[banner show_title], show_title)
-  show_claim = Wizard.confirm(t('q_show_claim'))
+  show_claim = Wizard.confirm(t('q_show_claim'), default: current.dig('banner', 'show_claim') != false)
   site.set(%w[banner show_claim], show_claim)
   puts
 end

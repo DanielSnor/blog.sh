@@ -1858,9 +1858,13 @@ def edit_post(slug)
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
   check_video_playback(media_files)
-  resolve_embed_lookups(blocks)
   fill_image_dimensions(blocks, media_files, media_dir)
   restore_posters(blocks, post['content'])
+  # Before the lookup, not after it: a player the post already has is not
+  # worth a network call, and asking anyway is what made an edit depend on
+  # a service answering.
+  restore_embed_lookups(blocks, post['content'])
+  resolve_embed_lookups(blocks)
 
   # Checks for a drop in every block type, not just images: markdown can't
   # express a link card or a foreign embed (Instagram), so saving would
@@ -2277,6 +2281,33 @@ def restore_posters(blocks, original_blocks)
 
     poster = posters[b.dig('media', 0, 'url') || b['url']]
     b['poster'] = poster if poster
+  end
+end
+
+# The player address of a Funkwhale/Bandcamp embed, carried over from the
+# stored post the same way a poster is -- and for the same reason: markdown
+# cannot express it, so the round-trip hands back a block without it.
+#
+# Without this the re-lookup that follows decides whether a WORKING player
+# survives an ordinary edit, and that lookup can fail for reasons that have
+# nothing to do with the post: a laptop on a train, a service having a bad
+# minute. Adding a sentence to a post then deleted its player, and the
+# message said "editing and saving again retries" while doing the opposite.
+# A block that never had a player still has none here, so its lookup runs
+# as before.
+def restore_embed_lookups(blocks, original_blocks)
+  stored = {}
+  Array(original_blocks).each do |block|
+    url = block['url'].to_s
+    stored[url] ||= block['embed_src'] if !url.empty? && block['embed_src']
+  end
+  return if stored.empty?
+
+  blocks.each do |block|
+    next if block['embed_src']
+
+    src = stored[block['url'].to_s]
+    block['embed_src'] = src if src
   end
 end
 

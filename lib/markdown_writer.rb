@@ -74,11 +74,18 @@ module MarkdownWriter
         # iframe from an old export) still has no markdown form and is
         # dropped here, which the CLI's content-loss safeguard catches
         # before anything is saved.
+        #
+        # `Embed.detect` and not just `Embed.src`: a Funkwhale or Bandcamp
+        # block whose lookup has not succeeded yet has no player address,
+        # but its own address still round-trips into the same block. Asking
+        # for the player instead made such a post UNEDITABLE -- the writer
+        # dropped the block, the loss safeguard stopped the save, and the
+        # only way to edit the post at all was for the service to answer.
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
         if media
           "!![#{caption.empty? ? 'Audio' : caption}](#{File.join(media_dir, media['url'].to_s)})"
-        elsif Embed.src(b)
+        elsif Embed.src(b) || Embed.detect(b['url'].to_s)
           "!![#{caption.empty? ? 'Audio' : caption}](#{b['url']})"
         end
       when 'video'
@@ -92,7 +99,7 @@ module MarkdownWriter
           "!![#{caption.empty? ? 'Video' : caption}](#{File.join(media_dir, media['url'].to_s)})"
         elsif youtube_playable?(b)
           "!![#{caption.empty? ? 'YT Video' : caption}](#{b['url']})"
-        elsif Embed.src(b)
+        elsif Embed.src(b) || Embed.detect(b['url'].to_s)
           "!![#{caption.empty? ? 'Video' : caption}](#{b['url']})"
         end
       end

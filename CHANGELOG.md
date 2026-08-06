@@ -384,6 +384,31 @@ prints what an installation is running.
 
 ### Fixes
 
+- **A video whose address the engine cannot play no longer injects markup
+  into the page.** The "video unavailable" notice printed that address
+  unescaped, in the post page, in every listing it appears in, and in the
+  RSS feed -- and the address comes from an import or a hand-edited post,
+  which is exactly the input that cannot be trusted. The audio notice next
+  to it had been escaping it all along.
+- **A pinned post's player works on the front page.** Each page asks its
+  Content-Security-Policy for the players it carries, computed from the
+  posts in that page's slice -- but the landing page also lifts the pinned
+  post to the top, and once that post has aged onto `/page/2/` it is not
+  in the slice. Its player was on the front page with nothing allowing it.
+- **Editing a post no longer takes away a Funkwhale or Bandcamp player.**
+  Their player address cannot be written in markdown, so the round-trip
+  handed back a block without it and the re-lookup decided whether a
+  working player survived -- offline, it did not. It is carried over from
+  the stored post now, like a video's poster, and the lookup only runs for
+  a block that has no player yet. A block still waiting for one also
+  round-trips instead of being dropped: without that, such a post could
+  not be edited at all until the service answered, which is the opposite
+  of the "saving again retries" the message promises.
+- **Enter in `./style.sh`'s banner section keeps the overlays as they
+  are.** The two questions about painting the site's name and description
+  over the banner were plain `[y/N]`, so pressing Enter -- which the
+  wizard documents as keeping a value -- turned both off.
+
 - **The queue screen and the properties dialog can no longer overwrite a
   post the cron published while you were deciding.** Both read the post,
   then wait at a prompt -- and the scheduled-publish cron runs every 15

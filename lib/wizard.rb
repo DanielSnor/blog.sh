@@ -169,10 +169,18 @@ module Wizard
     options[index].first
   end
 
-  def confirm(prompt)
+  # `default:` is what Enter means. Without one, Enter is a no -- right for
+  # "Write these changes?", wrong for a question about a setting that is
+  # already on: pressing Enter through the wizard is documented as keeping
+  # things as they are, and for the banner's two overlays it silently
+  # turned them off instead.
+  def confirm(prompt, default: nil)
+    answer = Tui.key_choice(prompt)
+    return default if default != nil && answer.to_s.empty?
+
     # y English, j German, a Czech ("ano") -- the prompt is translated,
     # so the key that means yes has to be too.
-    %w[y j a].include?(Tui.key_choice(prompt))
+    %w[y j a].include?(answer)
   end
 
   # Everything a run collected, shown once and written once.

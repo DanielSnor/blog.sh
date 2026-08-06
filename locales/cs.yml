@@ -729,8 +729,8 @@ style:
   banner_measured: "✅ Změřeno: %{width}x%{height}. Přesně to rezervuje místo, než se obrázek načte."
   q_banner_alt: "Alternativní text hlavičky"
   h_banner_alt: "Co místo obrázku přečte odečítač obrazovky."
-  q_show_title: "Vypsat krátký název webu přes hlavičku? [a/N] "
-  q_show_claim: "A přes hlavičku i popis? [a/N] "
+  q_show_title: "Vypsat krátký název webu přes hlavičku? [A/n] "
+  q_show_claim: "A přes hlavičku i popis? [A/n] "
 
   q_about_heading: "Nadpis sekce „O mně\""
   q_about_html: "Tvoje bio"

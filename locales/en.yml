@@ -742,8 +742,8 @@ style:
   banner_measured: "✅ Measured: %{width}x%{height}. That is what reserves the space before it loads."
   q_banner_alt: "Alt text for the banner"
   h_banner_alt: "What a screen reader says in place of the image."
-  q_show_title: "Paint the site's short name over the banner? [y/N] "
-  q_show_claim: "Paint the description over the banner too? [y/N] "
+  q_show_title: "Paint the site's short name over the banner? [Y/n] "
+  q_show_claim: "Paint the description over the banner too? [Y/n] "
 
   q_about_heading: "\"About\" heading"
   q_about_html: "Your bio"

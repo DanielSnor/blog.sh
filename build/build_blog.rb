@@ -575,7 +575,12 @@ def render_video(block, media_prefix)
   elsif (src = Embed.src(block))
     embed_iframe(src, block)
   else
-    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{block['url']}">#{block['url']}</a></p>)
+    # Escaped, both times. The address here comes from an import or a
+    # hand-edited post, which is exactly the input that cannot be trusted:
+    # unescaped it closed the href and wrote markup of its own into every
+    # page the post appears on -- and into the RSS feed, which carries the
+    # same rendered HTML.
+    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
   end
 end
 
@@ -1218,12 +1223,18 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     main_html = template.result_with_hash(list_html: list_html, pagination: pagination, heading: heading)
+    # A listing renders the same blocks the post page does, players
+    # included, so it needs the same permissions. The pinned post counts as
+    # one of them wherever it is lifted onto the landing page: once it has
+    # aged onto /page/2/ it is no longer in this page's own slice, and
+    # computing the policy from the slice alone left its player on the
+    # front page with nothing allowing it.
+    shown = page_posts
+    shown = ([pinned] + page_posts).uniq if pinned && number > fixed
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
-                           # A listing renders the same blocks the post page does,
-                           # players included, so it needs the same permissions.
-                           frame_origins: Embed.frame_origins_for(page_posts.flat_map { |p| p['content'] })))
+                           frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] })))
   end
   pages.size
 end

@@ -736,8 +736,8 @@ style:
   banner_measured: "✅ Vermessen: %{width}x%{height}. Genau das reserviert den Platz, bevor das Bild lädt."
   q_banner_alt: "Alternativtext für das Banner"
   h_banner_alt: "Was ein Screenreader anstelle des Bildes vorliest."
-  q_show_title: "Den Kurznamen über das Banner schreiben? [j/N] "
-  q_show_claim: "Und die Beschreibung ebenfalls? [j/N] "
+  q_show_title: "Den Kurznamen über das Banner schreiben? [J/n] "
+  q_show_claim: "Und die Beschreibung ebenfalls? [J/n] "
 
   q_about_heading: "Überschrift für „Über mich\""
   q_about_html: "Deine Kurzbiografie"
