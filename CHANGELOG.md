@@ -47,6 +47,17 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Podcasts joined the import sources** -- the twelfth: any RSS feed
+  whose items carry audio enclosures (Libsyn, Buzzsprout, Anchor, ...).
+  Episodes become posts -- artwork, a native audio player, then the
+  shownotes -- with the mp3 downloaded and hosted locally, so the
+  archive outlives the hosting account. The preview adds up the
+  enclosure sizes and says how many gigabytes a show means before
+  anything is written. Adapter notes like that one (and Ghost's
+  scheduled-posts count, Medium's response count) now appear in the
+  wizard's preview too -- previously only the scripted imports printed
+  them.
+
 - **A migrated blog can keep its old addresses.** Posts have a new
   `redirect_from` key -- a list of site-root paths the post answered at on
   its previous platform -- and the build serves a redirect at each one,

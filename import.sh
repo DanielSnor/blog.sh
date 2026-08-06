@@ -26,7 +26,9 @@ means typing the number of posts, not pressing y: it's the one answer you
 can't give without having read the preview.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
-in env.sh), and eight things you already have on disk -- a Ghost JSON
+in env.sh), any podcast RSS feed by URL (episode audio and artwork are
+downloaded for keeps -- the preview says how many gigabytes), and eight
+things you already have on disk -- a Ghost JSON
 export (plus the still-running site's URL, its images only exist there),
 an unpacked Medium export, an unpacked Substack export, a Twitter/X
 archive, a Mastodon account archive, a Pixelfed statuses export, an
@@ -43,6 +45,7 @@ immediately, with no preview pass:
   ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
   ruby scripts/migrate_medium.rb <path-to-unpacked-export>
   ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
+  ruby scripts/migrate_podcast.rb <feed-url | export.xml>
   ruby scripts/migrate_substack.rb <path-to-unpacked-export>
   ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
   ruby scripts/migrate_twitter.rb <path-to-extracted-export>

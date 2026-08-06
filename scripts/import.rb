@@ -33,6 +33,7 @@ require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
 require_relative '../lib/import/medium'
 require_relative '../lib/import/pixelfed'
+require_relative '../lib/import/podcast'
 require_relative '../lib/import/instagram'
 require_relative '../lib/import/substack'
 
@@ -54,6 +55,7 @@ SOURCES = [
   ['mastodon', -> { build_mastodon }],
   ['medium', -> { build_medium }],
   ['pixelfed', -> { build_pixelfed }],
+  ['podcast', -> { build_podcast }],
   ['substack', -> { build_substack }],
   ['tumblr', -> { build_tumblr }],
   ['twitter', -> { build_twitter }],
@@ -195,6 +197,18 @@ def build_twitter
   Import::Twitter.new(dir)
 end
 
+def build_podcast
+  source = ask('import.podcast_source_prompt')
+  return nil unless source
+
+  local = File.expand_path(source)
+  return Import::Podcast.new(local) if File.exist?(local)
+  return Import::Podcast.new(source) if source.start_with?('http://', 'https://')
+
+  puts t('import.feed_source_invalid', source: source)
+  nil
+end
+
 # The URL prompt is the one place empty does NOT cancel: the /p/<slug>
 # paths that redirects need are derivable from the export alone, so the
 # domain is a nice-to-have for provenance, not a requirement worth
@@ -326,6 +340,10 @@ def run_import(adapter)
   preview = Import::Run.new(adapter, dry_run: true, on_scan: scan_reporter).call
   print "\r\e[2K" if Tui.interactive?
   report(preview, dry_run: true)
+  # The adapter's own note -- scheduled posts becoming drafts, gigabytes
+  # of podcast audio -- belongs in the preview, where it can still change
+  # the answer to the question below.
+  puts "  #{adapter.postscript}" if adapter.respond_to?(:postscript) && adapter.postscript
 
   if preview.written.zero?
     puts

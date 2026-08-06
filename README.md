@@ -243,11 +243,12 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Eleven sources: Bluesky and Tumblr via their APIs; Ghost, Instagram,
+- Twelve sources: Bluesky and Tumblr via their APIs; Ghost, Instagram,
   Mastodon, Medium, Pixelfed, Substack and Twitter/X from their account
-  exports; WordPress from a WXR file and any RSS/Atom feed by URL --
-  Tumblr and Twitter carried over from the original migration of four
-  Tumblr blogs and a Twitter archive (2008-2022)
+  exports; WordPress from a WXR file, any RSS/Atom feed by URL, and any
+  podcast feed with its episodes' audio downloaded for keeps -- Tumblr
+  and Twitter carried over from the original migration of four Tumblr
+  blogs and a Twitter archive (2008-2022)
 - A blog that keeps its domain keeps its addresses: sources that know
   their posts' original URLs (Ghost, Medium, Substack, WordPress, Tumblr)
   can record each
@@ -447,6 +448,7 @@ Available sources:
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
 | Medium | an unpacked export | posts and drafts; images download from Medium's CDN, likely responses to other articles become drafts for review, newer exports carry no tags |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
+| Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode with audio: the mp3 and artwork download and are hosted locally -- the preview says how many gigabytes that means; items without an enclosure are skipped |
 | Substack | an unpacked export | newsletters and podcasts, drafts included, full text of paid posts (the export is the author's); threads and pages are skipped, tags don't exist in the export |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
@@ -463,6 +465,7 @@ ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
 ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
 ruby scripts/migrate_medium.rb <path-to-unpacked-export>
 ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
+ruby scripts/migrate_podcast.rb <feed-url | export.xml>
 ruby scripts/migrate_substack.rb <path-to-unpacked-export>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>

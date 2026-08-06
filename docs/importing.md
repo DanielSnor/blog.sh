@@ -244,6 +244,27 @@ hashtag-only lines are dropped from captions -- they are already the post's
 tags, and would otherwise render as a stack of one-word paragraphs. Replies
 and reblogs are skipped and counted.
 
+### Podcast
+
+```bash
+ruby scripts/migrate_podcast.rb <feed-url | export.xml>
+```
+
+Any podcast RSS feed works -- Libsyn, Buzzsprout, Anchor, anything whose
+items carry an audio enclosure. A bare `<show>.libsyn.com` URL is
+expanded to the metadata-carrying feed automatically. Each episode
+becomes a post: artwork, then the audio itself as a native player, then
+the shownotes. **The audio downloads and is hosted locally** -- the
+archive has to outlive the hosting account, which is usually why anyone
+migrates a podcast -- and the preview's size note says what that means
+in gigabytes before anything is written, because a long-running show
+means real disk. Items without an enclosure (blog posts syndicated into
+the same feed) are skipped and counted.
+
+No redirects here: on Libsyn the feed's per-episode link points at the
+mp3 itself, not at an episode page, so there is no original address to
+keep -- a guessed one would 404 with a straight face.
+
 ### Substack
 
 ```bash
