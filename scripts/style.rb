@@ -69,6 +69,24 @@ def site
   @site ||= ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
 end
 
+# Same arrangement as setup.rb: a value still equal to the template's
+# ("Your Site", the example bio) is a placeholder, not an answer, and
+# the prompt shows it as a suggestion. These are exactly the leftovers
+# doctor keeps pointing at, and this wizard is where they get fixed.
+def template_values
+  @template_values ||= begin
+    data = YAML.load_file(SITE_YML_EXAMPLE, aliases: true)
+    data.is_a?(Hash) ? data : {}
+  rescue StandardError
+    {}
+  end
+end
+
+def template?(*keys)
+  value = current.dig(*keys)
+  !value.nil? && value == template_values.dig(*keys)
+end
+
 # --- palettes --------------------------------------------------------
 
 def palettes
@@ -176,7 +194,8 @@ def section_banner
   # the copy would have recorded the OLD image's dimensions for the new one.
   measure_banner(src, @pending_banner)
 
-  alt = Wizard.ask(t('q_banner_alt'), current.dig('banner', 'alt'), hint: t('h_banner_alt'))
+  alt = Wizard.ask(t('q_banner_alt'), current.dig('banner', 'alt'), hint: t('h_banner_alt'),
+                   suggested: template?('banner', 'alt'))
   site.set(%w[banner alt], alt) if alt
 
   # Enter keeps whatever the site already does -- which for an unset key is
@@ -231,7 +250,8 @@ end
 # --- words -----------------------------------------------------------
 
 def section_about
-  heading = Wizard.ask(t('q_about_heading'), current.dig('about', 'heading'))
+  heading = Wizard.ask(t('q_about_heading'), current.dig('about', 'heading'), hint: t('h_about_heading'),
+                       suggested: template?('about', 'heading'))
   site.set(%w[about heading], heading) if heading
 
   html = Wizard.ask_text(t('q_about_html'), current.dig('about', 'html'),
@@ -242,7 +262,8 @@ end
 
 def section_footer
   %w[links_heading note_heading social_heading copyright].each do |key|
-    value = Wizard.ask(t("q_footer_#{key}"), current.dig('footer', key), hint: t("h_footer_#{key}"))
+    value = Wizard.ask(t("q_footer_#{key}"), current.dig('footer', key), hint: t("h_footer_#{key}"),
+                       suggested: template?('footer', key))
     site.set(['footer', key], value) if value
   end
 
@@ -293,7 +314,12 @@ def ask_social_entry
   # rel="me" is what earns the verification tick on a Mastodon profile,
   # and it is the single least discoverable thing in the whole config --
   # so it is offered rather than documented, and only where it can work.
-  entry['rel'] = 'me' if icon == 'mastodon' && Wizard.confirm(t('q_social_rel'))
+  # The hint carries the other half nobody guesses: the profile has to
+  # link back, or nothing turns green.
+  if icon == 'mastodon'
+    puts Tui.paint("   #{t('h_social_rel')}", :dim)
+    entry['rel'] = 'me' if Wizard.confirm(t('q_social_rel'))
+  end
   entry
 end
 
@@ -374,7 +400,7 @@ def section_analytics
   end
 
   site.set(%w[analytics src], src)
-  id = Wizard.ask(t('q_analytics_id'), current.dig('analytics', 'website_id'))
+  id = Wizard.ask(t('q_analytics_id'), current.dig('analytics', 'website_id'), hint: t('h_analytics_id'))
   site.set(%w[analytics website_id], id) if id
   puts
 end
