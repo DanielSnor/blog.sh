@@ -130,6 +130,13 @@ deploy step around exactly that. A few of the choices that came out of it:
   with a language hint, GFM-style aligned tables, images, video (local
   file or YouTube) with automatic sizing, audio with a native player,
   file attachments as download cards, backslash escaping
+- A platform's own address turns into its player, from the address alone:
+  YouTube, Vimeo, PeerTube and archive.org as video, Spotify, SoundCloud
+  and Mixcloud as audio. The engine stores a provider and an id, never the
+  platform's embed code, and each page asks its Content-Security-Policy
+  for exactly the players it carries. Funkwhale and Bandcamp keep no id in
+  their address, so those two are looked up once when the post is saved --
+  the only moment writing a post touches the network
 - The full syntax reference at `/markdown/` is generated directly from
   this parser, so it can't drift out of sync with what's actually supported;
   its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the

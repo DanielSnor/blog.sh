@@ -210,6 +210,9 @@ mastodon:
 # is derived from them at build time (see color_properties in
 # build/build_blog.rb), not separately configurable, since it's never
 # varied independently across any palette this engine has shipped.
+# Ready-made palettes live in config/palettes.yml -- `./style.sh` lists
+# them and writes the chosen one in here, which beats picking fourteen hex
+# values by hand. Adding your own to that file makes it appear in the list.
 # Rebuild after changing any value here: ./blog.sh rebuild.
 #
 # banner_title / banner_claim are the one exception: two more OPTIONAL
