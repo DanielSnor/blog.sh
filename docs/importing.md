@@ -54,8 +54,8 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (Ghost, Substack, WordPress/feed and Tumblr today) can record each
-  published post's old path as `redirect_from` -- the build then serves a redirect at every one
+  (Ghost, Medium, Substack, WordPress/feed and Tumblr today) can record
+  each published post's old path as `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -204,6 +204,32 @@ replies and boosts (2984 and 1059 of 6591 in the archive this was built
 against). A content warning becomes the post's title. Attachment dimensions
 come from the archive's own metadata, and audio attachments become audio
 blocks with a native player.
+
+### Medium
+
+```bash
+ruby scripts/migrate_medium.rb <path-to-unpacked-export>
+```
+
+In Medium: **Settings → Security and apps → Download your information**.
+Unpack the ZIP and point the script at the directory itself -- the one
+holding `posts/`. Each post is a self-contained HTML file; the importer
+reads the metadata Medium hides in it (title, date, canonical URL, tags)
+and strips what Medium bakes into every body: the title repeated as a
+heading, the subtitle repeated below it, the opening divider. The
+subtitle becomes the post's first paragraph; bookmark cards keep their
+durable part, the link.
+
+**The images are not in the export** -- they download from Medium's CDN,
+which works for as long as Medium serves them. Import sooner rather than
+later.
+
+Medium's export cannot tell your articles from responses you wrote under
+other people's -- both are just files. A published one-paragraph body
+with no image is almost never an article, so those import as **drafts
+for review**, counted in the summary: a wrong guess costs a look, not a
+lost text. Newer exports carry no tags at all; the summary says how many
+posts arrived bare.
 
 ### Pixelfed
 

@@ -31,6 +31,7 @@ require_relative '../lib/import/twitter'
 require_relative '../lib/import/feed'
 require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
+require_relative '../lib/import/medium'
 require_relative '../lib/import/pixelfed'
 require_relative '../lib/import/instagram'
 require_relative '../lib/import/substack'
@@ -51,6 +52,7 @@ SOURCES = [
   ['ghost', -> { build_ghost }],
   ['instagram', -> { build_instagram }],
   ['mastodon', -> { build_mastodon }],
+  ['medium', -> { build_medium }],
   ['pixelfed', -> { build_pixelfed }],
   ['substack', -> { build_substack }],
   ['tumblr', -> { build_tumblr }],
@@ -117,6 +119,17 @@ def build_instagram
   return Import::Instagram.new(dir) if Import::Instagram.format_of(dir)
 
   puts t('import.instagram_dir_invalid', dir: dir)
+  nil
+end
+
+def build_medium
+  dir = ask('import.medium_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Medium.new(dir) if Dir.exist?(File.join(dir, 'posts'))
+
+  puts t('import.medium_dir_invalid', dir: dir)
   nil
 end
 

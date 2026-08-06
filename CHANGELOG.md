@@ -36,6 +36,17 @@ prints what an installation is running.
   (a real Substack habit with the newest posts). Tags don't exist in
   the export at all -- posts arrive with just the platform tag.
 
+- **Medium joined the import sources** -- the eleventh. Point the wizard
+  (or `migrate_medium.rb`) at the unpacked export. Posts and drafts
+  import with the title/subtitle duplicates and opening divider Medium
+  bakes into every body stripped out; the subtitle becomes the first
+  paragraph, bookmark cards become links, code blocks keep their
+  language. Images download from Medium's CDN -- they are not in the
+  export. Published one-paragraph posts with no image are almost always
+  responses written under someone else's article, so they arrive as
+  drafts for review, counted in the summary; so does the number of posts
+  that came without tags, which newer Medium exports no longer include.
+
 - **A migrated blog can keep its old addresses.** Posts have a new
   `redirect_from` key -- a list of site-root paths the post answered at on
   its previous platform -- and the build serves a redirect at each one,
