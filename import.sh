@@ -25,8 +25,10 @@ were skipped and why -- then confirm before anything is written. Confirming
 means typing the number of posts, not pressing y: it's the one answer you
 can't give without having read the preview.
 
-Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
-in env.sh), any podcast RSS feed by URL (episode audio and artwork are
+Sources: Bluesky (public API, no credentials), Tumblr (needs
+TUMBLR_API_KEY in env.sh), LiveJournal (needs LJ_PASSWORD in env.sh --
+there is no export file, and the password travels only as a challenge
+digest), any podcast RSS feed by URL (episode audio and artwork are
 downloaded for keeps -- the preview says how many gigabytes), and fourteen
 things you already have on disk -- a beehiiv posts CSV, a Blogger Atom
 backup (posts come over, the comments and settings it mixes in are
@@ -49,6 +51,7 @@ immediately, with no preview pass:
   ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
   ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
   PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>
+  LJ_PASSWORD=... ruby scripts/migrate_livejournal.rb <username>
   ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
   ruby scripts/migrate_medium.rb <path-to-unpacked-export>
   URL_PATTERN=... ruby scripts/migrate_movabletype.rb <mt-export.txt>

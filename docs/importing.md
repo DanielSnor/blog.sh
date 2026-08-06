@@ -260,6 +260,29 @@ pattern (`PERMALINK='/:year/:month/:day/:title/'`, the wizard asks) to
 keep permalinks; a post's explicit front matter `permalink` always
 wins, and without either, no redirect is guessed at.
 
+### LiveJournal
+
+```bash
+LJ_PASSWORD=... ruby scripts/migrate_livejournal.rb <username>
+```
+
+LiveJournal has no export file, so the import reads the account's own
+XML-RPC API -- which is why it needs the password (in `env.sh`, like
+the other credentials). It never travels in plaintext: every call sends
+only a challenge-response digest. Entries come over with their tags;
+`<lj user>` mentions become the links they meant, the `<lj-cut>` fold
+disappears (an archive has no fold -- the content behind it stays),
+and the plain-text bodies LJ used to auto-format get their paragraphs
+back.
+
+**Friends-only and private entries arrive as drafts**, counted in the
+summary: they were never public, and a static site has no lock to put
+them behind. Comments stay behind entirely. The API rate-limits
+enthusiasm; a long journal may pause, and re-running picks up safely.
+Kept permalinks use the API's own address for each entry -- the number
+in an LJ URL is not the internal id, so it is never reconstructed,
+only read.
+
 ### Mastodon
 
 ```bash

@@ -40,6 +40,7 @@ require_relative '../lib/import/pixelfed'
 require_relative '../lib/import/podcast'
 require_relative '../lib/import/instagram'
 require_relative '../lib/import/jekyll'
+require_relative '../lib/import/livejournal'
 require_relative '../lib/import/squarespace'
 require_relative '../lib/import/substack'
 
@@ -61,6 +62,7 @@ SOURCES = [
   ['ghost', -> { build_ghost }],
   ['instagram', -> { build_instagram }],
   ['jekyll', -> { build_jekyll }],
+  ['livejournal', -> { build_livejournal }],
   ['mastodon', -> { build_mastodon }],
   ['medium', -> { build_medium }],
   ['movabletype', -> { build_movabletype }],
@@ -147,6 +149,19 @@ def build_jekyll
   print t('import.jekyll_permalink_prompt')
   pattern = $stdin.gets.to_s.strip
   Import::Jekyll.new(dir, permalink: pattern.empty? ? nil : pattern)
+end
+
+# The password is a credential and comes from the environment, exactly
+# like the Tumblr key: a prompt would invite pasting it into history.
+def build_livejournal
+  password = ENV['LJ_PASSWORD']
+  if password.to_s.empty?
+    puts t('import.livejournal_password_missing')
+    return nil
+  end
+
+  username = ask('import.livejournal_user_prompt')
+  username && Import::Livejournal.new(username, password: password)
 end
 
 def build_mastodon

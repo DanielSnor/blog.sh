@@ -47,6 +47,17 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **LiveJournal joined the import sources** -- the nineteenth, and the
+  one that comes entirely over the wire: LJ has no export file, so the
+  import speaks its XML-RPC API, challenge digest for every call (the
+  password never travels in plaintext) and the lastsync protocol
+  instead of page numbers. `<lj user>` mentions become links, lj-cut
+  folds disappear with their content kept, auto-formatted plain-text
+  bodies get their paragraphs back. Friends-only and private entries
+  arrive as drafts, counted; comments stay behind. Permalinks are
+  taken from the API's own url field, never computed -- the number in
+  an LJ URL is itemid*256+anum, and a reconstruction would 404.
+
 - **Movable Type and TypePad joined the import sources** -- the
   eighteenth: the line-based MT Import Format half the pre-WXR web once
   spoke, which TypePad exports to this day (gzip read transparently).
