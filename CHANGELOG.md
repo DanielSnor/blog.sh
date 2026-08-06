@@ -450,6 +450,14 @@ prints what an installation is running.
   and the English export the reader was built against still reads back
   identical -- all 288 posts, byte for byte, before and after.
 
+  The profile lookup follows: the summary line's `@username` was found
+  by the English row label only, so a localized export fell back to
+  the directory's name. Both readers now try the labels MetaHtml knows
+  -- and the JSON reader repairs the key before comparing, because a
+  localized export mangles its keys exactly as it mangles its values.
+  A language the tables don't know still means the directory name, a
+  fallback rather than a failure.
+
 - **A Wayback rescue now says up front what it can and cannot recover.**
   Two things decide whether the hours a rescue takes are worth spending,
   and the preview reported neither, so both were discovered the hard way:

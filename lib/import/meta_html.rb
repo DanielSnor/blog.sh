@@ -40,6 +40,18 @@ module Import
     MERIDIEMS = %w[am pm dopol. odpol.].freeze
     AFTERNOON = %w[pm odpol.].freeze
 
+    # The row label a profile file gives the account's username --
+    # "Username" verified against a real English export, "Uživatelské
+    # jméno" being Meta's own Czech term (their help centre uses no
+    # other). The Czech one is a looser claim than the months above, and
+    # can afford to be: a label that never matches falls back to the
+    # export directory's name, today's behaviour exactly, where a wrong
+    # month would silently mis-date an archive. Tried as a list, not a
+    # translation, because Meta's localization is patchy -- the Czech
+    # export this codebase was built against leaves whole labels in
+    # English mid-page.
+    USERNAME_LABELS = ['Username', 'Uživatelské jméno'].freeze
+
     # "dub 10, 2014 9:02:15 odpol." (Facebook, with seconds) and
     # "Jul 29, 2026 6:28 am" (Threads, without) are the same shape once
     # the seconds go optional. Anchored by the caller as needed.
@@ -103,6 +115,16 @@ module Import
       return false unless match
 
       MONTHS.key?(match[1].downcase.delete_suffix('.')) && MERIDIEMS.include?(match[7].downcase)
+    end
+
+    # Case-insensitive on purpose: the label is a display string, and
+    # which letters Meta capitalizes has already varied between
+    # products. A JSON reader hands its keys through its mojibake
+    # repair before asking, since Meta mangles the keys of a localized
+    # export exactly as it mangles the values.
+    def username_label?(text)
+      node = text.to_s.strip
+      USERNAME_LABELS.any? { |label| label.casecmp?(node) }
     end
 
     # Tag soup to text nodes, entities decoded -- the same treatment the

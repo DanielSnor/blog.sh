@@ -303,14 +303,15 @@ module Import
       end
 
       # From the profile page of the export. The label is in whatever
-      # language the export was requested in, so a miss is expected rather
-      # than exceptional.
+      # language the export was requested in -- the languages MetaHtml
+      # knows are tried, and a miss still just means the directory's
+      # name, not a failure.
       def account
         @account ||= begin
           path = File.join(@export_dir, 'personal_information', 'personal_information',
                            'personal_information.html')
           nodes = File.exist?(path) ? MetaHtml.text_nodes(File.read(path, encoding: 'utf-8')) : []
-          index = nodes.index('Username')
+          index = nodes.find_index { |node| MetaHtml.username_label?(node) }
           index ? nodes[index + 1].to_s : fallback_account
         rescue StandardError
           fallback_account
@@ -462,12 +463,17 @@ module Import
 
       # The profile file nests the username differently between export
       # versions (string_map_data in the ones seen, plain keys in others),
-      # so it is searched for rather than reached for.
+      # so it is searched for rather than reached for. The key is a
+      # localized display label, and in a localized export it arrives
+      # mojibake-mangled like any other string -- so it goes through
+      # repair before the comparison, which on an English key changes
+      # nothing.
       def find_username(node)
         case node
         when Hash
-          if node.key?('Username')
-            value = node['Username']
+          key = node.keys.find { |k| MetaHtml.username_label?(repair(k.to_s)) }
+          if key
+            value = node[key]
             return repair(value.is_a?(Hash) ? value['value'].to_s : value.to_s)
           end
 
