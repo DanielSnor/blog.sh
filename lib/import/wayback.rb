@@ -25,6 +25,20 @@ module Import
     # Where platforms kept their feeds, tried in this order when the
     # given URL is not already one.
     FEED_PATHS = %w[rss feed atom.xml index.xml rss.xml feed/rss rss-kanal feeds/posts/default].freeze
+    # The Archive rate-limits, and a rescue is exactly the shape of
+    # traffic it rate-limits: dozens of queries in a row from one client.
+    # A 5xx during one of those means "not now", not "not there", so it
+    # is waited out rather than believed.
+    RETRIES = 4
+    RETRY_BACKOFF = 15
+    # The network failures worth a second try: a connection the Archive
+    # dropped or never completed. A refused DNS lookup or a bad
+    # certificate is not going to fix itself in fifteen seconds.
+    TRANSIENT = [Errno::ECONNRESET, Errno::EPIPE, Net::OpenTimeout, Net::ReadTimeout].freeze
+
+    # Raised for a failure that may pass on its own, and caught by the
+    # retry in http_get. Anything else stays what it was.
+    Busy = Class.new(StandardError)
 
     attr_accessor :keep_permalinks
 
@@ -43,6 +57,10 @@ module Import
       @lost_images = 0
       @unparsed = 0
       @dated_by_capture = 0
+      # Queries the Archive never answered. Kept apart from queries that
+      # came back empty, because only the second kind says anything about
+      # the blog -- see refuse_unanswered.
+      @cdx_failures = []
       @pack = PACKS.find { |p| p.matches?(host) }
     end
 
@@ -69,8 +87,16 @@ module Import
     # every archived post page, newest capture of each, read one by one.
     def each_item(&block)
       unless @mode == :pages
+        asked = @cdx_failures.size
         captures = discover
         return each_feed_item(captures, &block) unless captures.empty?
+
+        # Every candidate UNANSWERED and every candidate EMPTY both leave
+        # no captures here, and only the second is a fact about the blog.
+        # Falling through to page mode on the first sent the rescue after
+        # a site whose feed was in the Archive all along, and then blamed
+        # the site for not having one.
+        refuse_unanswered if @cdx_failures.size > asked
       end
 
       each_page_item(&block)
@@ -111,6 +137,14 @@ module Import
       notes << "#{@unparsed} archived page(s) could not be read as posts -- see the skip counts." if @unparsed.positive?
       notes << "#{@dated_by_capture} post(s) carry the capture date -- the page itself said nothing better." if @dated_by_capture.positive?
       notes << "#{@lost_images} image(s) the Archive never saved are lost -- their posts came over without them." if @lost_images.positive?
+      # A run that finished still needs to say which questions went
+      # unanswered: a feed candidate the Archive refused is a piece of the
+      # blog that silently did not come over.
+      if @cdx_failures.any?
+        notes << "#{@cdx_failures.size} Archive #{@cdx_failures.size == 1 ? 'query' : 'queries'} went " \
+                 'unanswered even after retrying -- anything they held is missing from this run. ' \
+                 'Re-running is safe and picks it up.'
+      end
       notes.empty? ? nil : notes.join("\n  ")
     end
 
@@ -149,15 +183,26 @@ module Import
     # shape; a user pattern stands in anywhere else; and with neither,
     # refusing with samples beats importing tag pages as articles.
     def post_pages
+      asked = @cdx_failures.size
       rows = cdx_rows("#{host}/*", extra: { 'filter' => ['statuscode:200', 'mimetype:text/html'],
                                             'collapse' => 'urlkey' })
+      refuse_unanswered if @cdx_failures.size > asked
+
       paths = rows.group_by { |r| URI.parse(r[:original]).path rescue nil }
       paths.delete(nil)
       posts = paths.select { |path, _| post_path?(path) }
       if posts.empty?
-        sample = paths.keys.reject { |p| p == '/' }.first(12).join("\n  ")
+        sample = paths.keys.reject { |p| p == '/' }.first(12)
+        # Asking for a pattern and then printing nothing to build one
+        # from is worse than saying there is nothing: the operator spent
+        # the next ten minutes looking for their own mistake.
+        if sample.empty?
+          abort("❌ Nothing to rescue: the Archive kept no post pages of #{host}, only its front page.")
+        end
+
         abort("❌ No feed captures, and no way to tell posts from listings on #{host}.\n" \
-              "Pass POST_PATTERN (a regex the post paths match). Archived paths look like:\n  #{sample}")
+              "Pass POST_PATTERN (a regex the post paths match). Archived paths look like:\n  " \
+              "#{sample.join("\n  ")}")
       end
 
       # The NEWEST capture of each page: the most complete version of a
@@ -358,11 +403,31 @@ module Import
       end
     end
 
+    # A busy Archive is waited out here, once, for everything that talks
+    # to it -- CDX queries, feed captures, archived pages, images. A
+    # rescue makes hundreds of these requests over hours, so the odds of
+    # meeting a bad minute somewhere in there are close to one.
+    def http_get(url, redirects_left = 5)
+      attempt = 0
+      begin
+        attempt += 1
+        request(url, redirects_left)
+      rescue Busy, *TRANSIENT => e
+        raise if attempt > RETRIES
+
+        wait = RETRY_BACKOFF * attempt
+        warn "  the Wayback Machine is busy (#{e.message.lines.first.to_s.strip[0, 60]}) -- " \
+             "waiting #{wait}s, attempt #{attempt} of #{RETRIES}"
+        sleep wait
+        retry
+      end
+    end
+
     # The Archive is slow the way a library is slow -- CDX queries and
     # snapshot fetches routinely take longer than the 30 s budget
     # FeedHttp rightly enforces on living feeds. Patience here, not
     # there.
-    def http_get(url, redirects_left = 5)
+    def request(url, redirects_left)
       uri = URI.parse(url)
       response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',
                                                      open_timeout: 30, read_timeout: 180) do |http|
@@ -374,9 +439,21 @@ module Import
         raise "too many redirects (#{url})" if redirects_left.zero?
 
         http_get(URI.join(url, response['location']).to_s, redirects_left - 1)
+      when Net::HTTPServerError, Net::HTTPTooManyRequests
+        raise Busy, "HTTP #{response.code} (#{url})"
       else
         raise "HTTP #{response.code} (#{url})"
       end
+    end
+
+    # A query the Archive never answered is not an empty archive, and the
+    # difference is the whole message: one is "try again in a minute",
+    # the other is "this blog is not in there".
+    def refuse_unanswered
+      abort("❌ The Wayback Machine did not answer #{@cdx_failures.size} of its queries, so what it " \
+            "holds of #{host} is unknown.\n  #{@cdx_failures.last(3).join("\n  ")}\n" \
+            '   It rate-limits long rescues. Wait a few minutes and run this again, or pass a larger ' \
+            'WAYBACK_DELAY (seconds between queries) to keep under the limit.')
     end
 
     def cdx_rows(candidate, extra: nil)
@@ -391,7 +468,11 @@ module Import
       original = header.index('original')
       mime = header.index('mimetype')
       rows.map { |r| { timestamp: r[ts], original: r[original], mimetype: r[mime] } }
-    rescue StandardError
+    rescue StandardError => e
+      # Still [], because one unanswered candidate among nine must not
+      # end a rescue the other eight can finish -- but recorded, so a run
+      # that found nothing can say which kind of nothing it found.
+      @cdx_failures << "#{candidate} -- #{e.message.lines.first.to_s.strip[0, 100]}"
       []
     end
 
