@@ -465,7 +465,29 @@ import:
   # Adapter-Postscripts — die Hinweise unter Vorschau und Zusammenfassung. Der
   # Skript-Weg (migrate_*.rb) gibt sie auf Englisch aus, siehe lib/import/cli.rb.
   note:
+    facebook_crossposts: "%{count} Beitrag/Beiträge waren Crossposts von anderen Plattformen (Twitter, Posterous, …) — übersprungen, damit sie die eigenen Importe jener Plattformen nicht doppeln. FACEBOOK_CROSSPOSTS=1 nimmt sie mit."
+    feed_unmapped: "%{count} Beitrag/Beiträge hatten keine brauchbare Originaladresse (nackte „?p=123“-Permalinks tragen ihre Identität im Query-String) — ohne Weiterleitung importiert."
     ghost_scheduled: "%{count} Beitrag/Beiträge waren in Ghost geplant — als Entwürfe importiert; plane sie hier, wenn du so weit bist."
+    livejournal_nonpublic: "%{count} Einträge waren nur für Freunde oder privat — als Entwürfe importiert, öffentlich waren sie nie."
+    medium_responses: "%{count} Beitrag/Beiträge sahen aus wie Antworten unter fremden Artikeln — zur Durchsicht als Entwürfe importiert."
+    medium_untagged: "%{count} veröffentlichte Beiträge kamen ohne Tags — neuere Medium-Exporte enthalten sie schlicht nicht."
+    movabletype_comments: "%{count} Kommentar(e)"
+    movabletype_pings: "%{count} Trackback(s)"
+    movabletype_and: " und "
+    movabletype_left_behind: "Der Export trug auch %{parts} — ein statisches Archiv hat dafür keinen Platz, sie blieben zurück."
+    podcast_audio_size: "Das Audio der Episoden summiert sich auf ~%{size} zum Herunterladen und Hosten."
+    threads_replies: "%{count} Antwort(en) auf fremde Threads übersprungen — ein Archiv hält deine eigenständigen Beiträge."
+    tumblr_unmapped: "%{count} Beitrag/Beiträge hatten keine brauchbare Originaladresse — ohne Weiterleitung importiert."
+    wayback_snapshots: "%{count} Feed-Schnappschüsse aus der Wayback Machine gelesen."
+    wayback_unreadable: "%{count} Schnappschüsse waren keine lesbaren Feeds — übersprungen."
+    wayback_unparsed: "%{count} archivierte Seiten ließen sich nicht als Beiträge lesen — siehe die Zähler der Übersprungenen."
+    wayback_dated_by_capture: "%{count} Beitrag/Beiträge tragen das Datum des Schnappschusses — die Seite selbst wusste nichts Besseres."
+    wayback_lost_images: "%{count} Bild(er) hat das Archiv nie gespeichert — ihre Beiträge kamen ohne sie an."
+    wayback_summary_only: "%{count} von %{seen} Feed-Einträgen trugen nur eine Zusammenfassung, nicht den ganzen Beitrag — dieses Blog veröffentlichte Auszüge, also kommen sie gekürzt an, egal wie viele Schnappschüsse es gibt."
+    wayback_no_images: "Das Archiv hat für %{host} überhaupt keine Bilder: jedes Bild, auf das diese Beiträge zeigen, ist weg."
+    wayback_images_spread: "Das Archiv hält %{count} Bild(er) von %{host} (%{spread}) — Bilder aus Jahren, die dort fehlen, können nicht ankommen, egal worauf die Beiträge verweisen."
+    wayback_unanswered: "%{count} Archiv-Anfrage(n) blieben auch nach Wiederholung unbeantwortet — was sie hielten, fehlt in diesem Lauf. Ein neuer Lauf ist sicher und holt es nach."
+    wix_dropped: "Rich-Content-Knoten ohne blog.sh-Entsprechung sind entfallen: %{listed}."
 
 # ./blog.sh doctor -- liest die Konfiguration auf der Platte und sagt, was
 # daran nicht stimmt (lib/doctor.rb). Jede Zeile mit einem Hinweis muss

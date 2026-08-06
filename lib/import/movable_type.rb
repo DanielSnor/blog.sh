@@ -3,6 +3,7 @@
 require 'time'
 require 'uri'
 require 'zlib'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
 require_relative 'permalinks'
@@ -107,11 +108,11 @@ module Import
 
     def postscript
       parts = []
-      parts << "#{@comments} comment(s)" if @comments.positive?
-      parts << "#{@pings} trackback(s)" if @pings.positive?
+      parts << I18n.t('import.note.movabletype_comments', count: @comments) if @comments.positive?
+      parts << I18n.t('import.note.movabletype_pings', count: @pings) if @pings.positive?
       return nil if parts.empty?
 
-      "The export also held #{parts.join(' and ')} -- a static archive has nowhere to put them, so they were left behind."
+      I18n.t('import.note.movabletype_left_behind', parts: parts.join(I18n.t('import.note.movabletype_and')))
     end
 
     private

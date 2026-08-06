@@ -5,6 +5,7 @@ require 'json'
 require 'net/http'
 require 'tempfile'
 require 'uri'
+require_relative '../i18n'
 require_relative 'feed'
 
 module Import
@@ -136,33 +137,26 @@ module Import
 
     def postscript
       notes = []
-      notes << "#{@snapshots_read} feed capture(s) read from the Wayback Machine." if @snapshots_read.positive?
-      notes << "#{@unreadable} capture(s) were not readable feeds and were skipped." if @unreadable.positive?
-      notes << "#{@unparsed} archived page(s) could not be read as posts -- see the skip counts." if @unparsed.positive?
-      notes << "#{@dated_by_capture} post(s) carry the capture date -- the page itself said nothing better." if @dated_by_capture.positive?
-      notes << "#{@lost_images} image(s) the Archive never saved are lost -- their posts came over without them." if @lost_images.positive?
+      notes << I18n.t('import.note.wayback_snapshots', count: @snapshots_read) if @snapshots_read.positive?
+      notes << I18n.t('import.note.wayback_unreadable', count: @unreadable) if @unreadable.positive?
+      notes << I18n.t('import.note.wayback_unparsed', count: @unparsed) if @unparsed.positive?
+      notes << I18n.t('import.note.wayback_dated_by_capture', count: @dated_by_capture) if @dated_by_capture.positive?
+      notes << I18n.t('import.note.wayback_lost_images', count: @lost_images) if @lost_images.positive?
       # The two things that decide whether a rescue is worth the hours it
       # takes, and neither is visible from the post count alone.
       if @summary_only.positive?
-        seen = @summary_only + @full_bodied
-        notes << "#{@summary_only} of #{seen} feed item(s) carried a summary, not the whole post -- " \
-                 'that blog published excerpts, so those arrive truncated however many captures exist.'
+        notes << I18n.t('import.note.wayback_summary_only', count: @summary_only, seen: @summary_only + @full_bodied)
       end
       if @archived_images && @archived_images[:total].zero?
-        notes << "The Archive holds no images at all for #{host}: every picture these posts point at is gone."
+        notes << I18n.t('import.note.wayback_no_images', host: host)
       elsif @archived_images
         spread = @archived_images[:years].first(12).map { |year, n| "#{year}: #{n}" }.join(', ')
-        notes << "The Archive holds #{@archived_images[:total]} image(s) of #{host} (#{spread}) -- " \
-                 'pictures from years missing there cannot arrive, whatever the posts reference.'
+        notes << I18n.t('import.note.wayback_images_spread', count: @archived_images[:total], host: host, spread: spread)
       end
       # A run that finished still needs to say which questions went
       # unanswered: a feed candidate the Archive refused is a piece of the
       # blog that silently did not come over.
-      if @cdx_failures.any?
-        notes << "#{@cdx_failures.size} Archive #{@cdx_failures.size == 1 ? 'query' : 'queries'} went " \
-                 'unanswered even after retrying -- anything they held is missing from this run. ' \
-                 'Re-running is safe and picks it up.'
-      end
+      notes << I18n.t('import.note.wayback_unanswered', count: @cdx_failures.size) if @cdx_failures.any?
       notes.empty? ? nil : notes.join("\n  ")
     end
 

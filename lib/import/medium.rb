@@ -3,6 +3,7 @@
 require 'cgi'
 require 'time'
 require 'uri'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
 require_relative 'permalinks'
@@ -103,8 +104,8 @@ module Import
 
     def postscript
       notes = []
-      notes << "#{@comments} post(s) looked like responses to other people's articles -- imported as drafts for review." if @comments.positive?
-      notes << "#{@untagged} published post(s) came without tags -- newer Medium exports simply don't include them." if @untagged.positive?
+      notes << I18n.t('import.note.medium_responses', count: @comments) if @comments.positive?
+      notes << I18n.t('import.note.medium_untagged', count: @untagged) if @untagged.positive?
       notes.empty? ? nil : notes.join("\n  ")
     end
 

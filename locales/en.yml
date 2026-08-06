@@ -472,7 +472,29 @@ import:
   # Adapter postscripts -- the notes under the preview and the summary. The
   # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.
   note:
+    facebook_crossposts: "%{count} post(s) were crossposts from other platforms (Twitter, Posterous, ...) -- skipped so they don't duplicate those platforms' own imports. FACEBOOK_CROSSPOSTS=1 includes them."
+    feed_unmapped: "%{count} post(s) had no usable original address (plain \"?p=123\" permalinks have their identity in the query string) -- imported without a redirect."
     ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
+    livejournal_nonpublic: "%{count} entr(y/ies) were friends-only or private -- imported as drafts, they were never public."
+    medium_responses: "%{count} post(s) looked like responses to other people's articles -- imported as drafts for review."
+    medium_untagged: "%{count} published post(s) came without tags -- newer Medium exports simply don't include them."
+    movabletype_comments: "%{count} comment(s)"
+    movabletype_pings: "%{count} trackback(s)"
+    movabletype_and: " and "
+    movabletype_left_behind: "The export also held %{parts} -- a static archive has nowhere to put them, so they were left behind."
+    podcast_audio_size: "The episodes' audio adds up to ~%{size} to download and host."
+    threads_replies: "%{count} repl(y/ies) to other people's threads were skipped -- an archive holds your own standalone posts."
+    tumblr_unmapped: "%{count} post(s) had no usable original address -- imported without a redirect."
+    wayback_snapshots: "%{count} feed capture(s) read from the Wayback Machine."
+    wayback_unreadable: "%{count} capture(s) were not readable feeds and were skipped."
+    wayback_unparsed: "%{count} archived page(s) could not be read as posts -- see the skip counts."
+    wayback_dated_by_capture: "%{count} post(s) carry the capture date -- the page itself said nothing better."
+    wayback_lost_images: "%{count} image(s) the Archive never saved are lost -- their posts came over without them."
+    wayback_summary_only: "%{count} of %{seen} feed item(s) carried a summary, not the whole post -- that blog published excerpts, so those arrive truncated however many captures exist."
+    wayback_no_images: "The Archive holds no images at all for %{host}: every picture these posts point at is gone."
+    wayback_images_spread: "The Archive holds %{count} image(s) of %{host} (%{spread}) -- pictures from years missing there cannot arrive, whatever the posts reference."
+    wayback_unanswered: "%{count} Archive quer(y/ies) went unanswered even after retrying -- anything they held is missing from this run. Re-running is safe and picks it up."
+    wix_dropped: "Rich Content nodes with no blog.sh equivalent were dropped: %{listed}."
 
 # ./blog.sh doctor -- reads the configuration on disk and reports what is
 # wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on

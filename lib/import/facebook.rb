@@ -3,6 +3,7 @@
 require 'digest'
 require 'json'
 require 'time'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'meta_text'
 require_relative 'permalinks'
@@ -116,7 +117,7 @@ module Import
     def postscript
       return nil if @crossposts.zero?
 
-      "#{@crossposts} post(s) were crossposts from other platforms (Twitter, Posterous, ...) -- skipped so they don't duplicate those platforms' own imports. FACEBOOK_CROSSPOSTS=1 includes them."
+      I18n.t('import.note.facebook_crossposts', count: @crossposts)
     end
 
     private

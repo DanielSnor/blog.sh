@@ -4,6 +4,7 @@ require 'csv'
 require 'json'
 require 'time'
 require 'uri'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'permalinks'
 
@@ -82,7 +83,7 @@ module Import
       return nil if @unknown.empty?
 
       listed = @unknown.sort_by { |_, n| -n }.map { |type, n| "#{n}× #{type}" }.join(', ')
-      "Rich Content nodes with no blog.sh equivalent were dropped: #{listed}."
+      I18n.t('import.note.wix_dropped', listed: listed)
     end
 
     private

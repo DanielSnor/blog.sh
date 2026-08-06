@@ -4,6 +4,7 @@ require 'digest'
 require 'net/http'
 require 'time'
 require 'uri'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
 require_relative 'permalinks'
@@ -108,7 +109,7 @@ module Import
     def postscript
       return nil if @nonpublic.zero?
 
-      "#{@nonpublic} entr(y/ies) were friends-only or private -- imported as drafts, they were never public."
+      I18n.t('import.note.livejournal_nonpublic', count: @nonpublic)
     end
 
     private

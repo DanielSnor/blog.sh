@@ -3,6 +3,7 @@
 require 'time'
 require 'uri'
 require_relative '../feed_http'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
 require_relative 'permalinks'
@@ -115,7 +116,7 @@ module Import
     def postscript
       return nil if @unmapped_permalinks.zero?
 
-      "#{@unmapped_permalinks} post(s) had no usable original address (plain \"?p=123\" permalinks have their identity in the query string) -- imported without a redirect."
+      I18n.t('import.note.feed_unmapped', count: @unmapped_permalinks)
     end
 
     private

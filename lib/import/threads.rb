@@ -3,6 +3,7 @@
 require 'digest'
 require 'json'
 require 'time'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'meta_text'
 
@@ -96,7 +97,7 @@ module Import
     def postscript
       return nil if @replies.zero?
 
-      "#{@replies} repl(y/ies) to other people's threads were skipped -- an archive holds your own standalone posts."
+      I18n.t('import.note.threads_replies', count: @replies)
     end
 
     private

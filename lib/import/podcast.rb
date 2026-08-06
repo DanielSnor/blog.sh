@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative '../i18n'
 require_relative 'feed'
 
 module Import
@@ -77,7 +78,7 @@ module Import
              else
                "#{(@bytes / 1_048_576.0).round} MB"
              end
-      "The episodes' audio adds up to ~#{size} to download and host."
+      I18n.t('import.note.podcast_audio_size', size: size)
     end
 
     private
