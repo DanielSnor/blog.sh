@@ -284,7 +284,8 @@ prints what an installation is running.
   anything is written. Adapter notes like that one (and Ghost's
   scheduled-posts count, Medium's response count) now appear in the
   wizard's preview too -- previously only the scripted imports printed
-  them.
+  them. They say it in the wizard's language as well; the scripts stay
+  deliberately English.
 
 - **A migrated blog can keep its old addresses.** Posts have a new
   `redirect_from` key -- a list of site-root paths the post answered at on
