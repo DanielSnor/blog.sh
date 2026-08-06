@@ -61,79 +61,29 @@ I18n.force_lang(existing.dig('site', 'lang').to_s.empty? ? 'en' : existing.dig('
 
 require_relative '../lib/tui'
 require_relative '../lib/config_writer'
+require_relative '../lib/wizard'
 require_relative '../lib/version'
 
 def t(key, **vars)
   I18n.t("setup.#{key}", **vars)
 end
 
-# --- asking ----------------------------------------------------------
-
-# Every prompt shows what the setting is now and takes Enter to keep it.
-# The current value is the template's placeholder on a first run, which
-# is exactly the right default: it is what the site says today.
+# The prompt loop, the menu and the review-and-write moment live in
+# lib/wizard.rb, shared with ./style.sh -- see the reasoning there.
 def ask(label, current, hint: nil)
-  puts Tui.paint(label, :bold)
-  puts Tui.paint("   #{hint}", :dim) if hint
-  shown = current.to_s.empty? ? t('empty_value') : current.to_s
-  print t('prompt_with_current', current: shown)
-  answer = $stdin.gets
-  # EOF (a piped run that ran out of input) means "keep everything from
-  # here on", not "answer empty" -- an empty answer would silently blank
-  # the rest of the config.
-  raise Interrupt if answer.nil?
-
-  answer = answer.strip
-  puts
-  answer.empty? ? current : answer
+  Wizard.ask(label, current, hint: hint)
 end
 
-# Asks until the answer passes, or the user gives up by pressing Enter.
-# The check returns nil when happy, or the sentence explaining what is
-# wrong -- said immediately, while the user still has the answer in mind.
-def ask_valid(label, current, hint: nil)
-  loop do
-    answer = ask(label, current, hint: hint)
-    return answer if answer == current || answer.to_s.empty?
-
-    problem = yield(answer)
-    return answer unless problem
-
-    puts Tui.paint("   #{problem}", :red)
-    puts
-  end
+def ask_valid(label, current, hint: nil, &check)
+  Wizard.ask_valid(label, current, hint: hint, &check)
 end
 
 def choose(label, options, current_index: 0)
-  puts Tui.paint(label, :bold)
-  puts
-  unless Tui.interactive?
-    options.each_with_index { |(_, desc), i| puts "  #{i + 1}) #{desc}" }
-    print t('choice_prompt')
-    line = $stdin.gets
-    raise Interrupt if line.nil?
-
-    # The range check is not defensive tidiness: "".to_i and "abc".to_i
-    # are both 0, so index would be -1, and options[-1] in Ruby is the
-    # LAST option -- a piped run that answered nothing would silently
-    # pick the bottom of the menu. scripts/import.rb was bitten by
-    # exactly this once; it is not a mistake worth making twice.
-    answer = line.strip
-    index = answer.to_i - 1
-    puts
-    return options[current_index].first unless answer.match?(/\A\d+\z/) && index.between?(0, options.size - 1)
-
-    return options[index].first
-  end
-
-  index = Tui.menu(options.map { |(_, desc)| desc }, hint: t('menu_hint'))
-  puts
-  index.nil? ? options[current_index].first : options[index].first
+  Wizard.choose(label, options, current_index: current_index)
 end
 
 def confirm(prompt)
-  answer = Tui.key_choice(prompt)
-  %w[y j a].include?(answer)
+  Wizard.confirm(prompt)
 end
 
 # --- detection -------------------------------------------------------
@@ -468,69 +418,20 @@ end
 # --- writing ---------------------------------------------------------
 
 def review_and_write(site, env)
-  puts Tui.paint(t('section_review'), :bold)
-  puts
+  outcome = Wizard.review_and_write([[relative(SITE_YML), site], [relative(ENV_SH), env]])
+  return unless outcome == :written
 
-  unless site.changed? || env.changed?
-    puts t('nothing_changed')
-    puts
-    return
-  end
-
-  show_diff(File.basename(SITE_YML), site.diff)
-  show_diff(File.basename(ENV_SH), env.diff, secret: true)
-
-  unless confirm(t('q_write'))
-    puts t('cancelled')
-    puts
-    return
-  end
-  puts
-
-  begin
-    wrote_site = site.save!
-    wrote_env = env.save!
-  rescue ConfigWriter::VerificationFailed => e
-    # The writer already put the file back; all that is left is to say so
-    # in a way that does not read as "your config is now ruined".
-    puts Tui.paint("❌ #{t('write_failed', message: e.message)}", :red)
-    exit 1
-  end
-
-  puts Tui.paint(t('written_site', path: relative(SITE_YML)), :green) if wrote_site
-  puts Tui.paint(t('written_env', path: relative(ENV_SH)), :green) if wrote_env
-
-  # env.sh was read by the shell that started this process, so everything
+  # env.sh was read by the SHELL that started this process, so everything
   # just written to it is invisible here until it is copied across --
   # without this the closing check would report the deploy backend the
   # user replaced thirty seconds ago.
   env.values.each { |name, value| ENV[name] = value }
 
+  puts Tui.paint(t('env_permissions', path: relative(ENV_SH)), :dim) if env.changed?
   puts
   puts t('next_steps')
   puts
   run_doctor
-end
-
-# Secrets are masked in the diff, not omitted: seeing that the token line
-# changed is the point, seeing the token is not -- and this diff is the
-# kind of thing that ends up pasted into an issue.
-def show_diff(name, diff, secret: false)
-  return if diff.to_s.empty?
-
-  puts Tui.paint("--- #{name}", :bold)
-  diff.each_line do |line|
-    shown = secret ? mask(line) : line
-    colour = line.start_with?('+') ? :green : :red
-    print Tui.paint(shown, colour)
-  end
-  puts
-end
-
-MASKED = /\A([-+]\s*(?:export\s+)?(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*\z/.freeze
-
-def mask(line)
-  line.sub(MASKED) { "#{Regexp.last_match(1)}#{Tui.paint('••••••••', :dim)}\n" }
 end
 
 def relative(path)
@@ -561,13 +462,4 @@ def run_doctor
   puts Tui.paint(t('doctor_hint'), :dim)
 end
 
-begin
-  run
-rescue Interrupt
-  # Nothing has been written -- that is the whole arrangement -- so this
-  # can say so plainly instead of apologising.
-  puts
-  puts
-  puts t('interrupted')
-  exit 130
-end
+Wizard.guard { run }

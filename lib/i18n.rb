@@ -45,6 +45,19 @@ module I18n
     SiteConfig.load_yaml(path)
   end
 
+  # The same lookup as t, but nil instead of aborting when the key isn't
+  # there. For the one case where a missing translation is legitimate:
+  # names of things a USER added -- a palette in config/palettes.yml that
+  # the engine never shipped -- where the data file's own label is the
+  # right fallback and demanding a locale entry would mean nobody can add
+  # a palette without editing three translations.
+  def lookup(key, **vars)
+    value = dig_key(data, key) || dig_key(default_data, key)
+    return nil if value.nil?
+
+    vars.empty? ? value : value.gsub(/%\{(\w+)\}/) { vars.fetch(Regexp.last_match(1).to_sym, Regexp.last_match(0)).to_s }
+  end
+
   # Dotted key path, e.g. t('nav.all'). %{name}-style placeholders in the
   # string are substituted from **vars.
   def t(key, **vars)

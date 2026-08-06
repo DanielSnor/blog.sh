@@ -56,6 +56,52 @@ module ConfigWriter
 
   INDENT = 2
 
+  # A minimal diff of two line arrays, as ["-old\n", "+new\n", ...].
+  #
+  # Line-for-line comparison is not good enough here, and the way it
+  # fails matters: adding one entry to a list shifts every line below it
+  # by one, so a one-line change is reported as "everything from here to
+  # the end of the file changed". This diff is shown to somebody who is
+  # about to approve a write to their own config -- reading as though
+  # the tool intends to rewrite the whole thing is the one impression it
+  # must not give.
+  #
+  # Plain LCS by dynamic programming. These files are a few hundred
+  # lines, so the quadratic table is a rounding error, and the code is
+  # short enough to be obviously right -- which matters more here than
+  # the cleverness of Myers.
+  def self.diff_lines(before, after)
+    lcs = Array.new(before.size + 1) { Array.new(after.size + 1, 0) }
+    before.size.downto(1) do |i|
+      after.size.downto(1) do |j|
+        lcs[i - 1][j - 1] = if before[i - 1] == after[j - 1]
+                              lcs[i][j] + 1
+                            else
+                              [lcs[i][j - 1], lcs[i - 1][j]].max
+                            end
+      end
+    end
+
+    out = []
+    i = 0
+    j = 0
+    while i < before.size && j < after.size
+      if before[i] == after[j]
+        i += 1
+        j += 1
+      elsif lcs[i + 1][j] >= lcs[i][j + 1]
+        out << "-#{before[i]}"
+        i += 1
+      else
+        out << "+#{after[j]}"
+        j += 1
+      end
+    end
+    out.concat(before[i..].map { |l| "-#{l}" }) if i < before.size
+    out.concat(after[j..].map { |l| "+#{l}" }) if j < after.size
+    out
+  end
+
   # A YAML scalar for a Ruby value, with the quoting YAML requires.
   #
   # Strings go through JSON: YAML 1.2 is a JSON superset, so a JSON string
@@ -165,6 +211,14 @@ module ConfigWriter
       @lines.join
     end
 
+    # Everything this run has set, as key_path => value. For the caller
+    # that has to answer "what would the config say if I saved now?"
+    # before saving -- a wizard whose second visit to a section must
+    # offer the value the first visit set, not the one still on disk.
+    def intended
+      @intended.dup
+    end
+
     # The line where `key_path` is declared, active or commented, or nil.
     # Read-only, and bounded at every level: the search for each segment
     # happens only inside the previous segment's body, so a lookup for
@@ -207,29 +261,12 @@ module ConfigWriter
       @lines[start..value_extent(decl)].join
     end
 
-    # A unified-ish diff of what save! would write. Deliberately built
-    # here rather than shelled out to diff(1): the wizard shows it before
-    # asking for confirmation, and that must work on a machine with no
-    # diff in PATH (and without a temp file holding a copy of a config
-    # that has an API token two lines further down).
+    # What save! would change. Built here rather than shelled out to
+    # diff(1): the wizard shows this before asking for confirmation, and
+    # that must work on a machine with no diff in PATH -- and without
+    # writing a temp copy of a config that has an API token in it.
     def diff
-      before = @original.lines
-      after = @lines
-      out = []
-      # Line-for-line is enough because every edit here either replaces a
-      # line in place or replaces a contiguous run -- indices only shift
-      # inside a run, and showing a run as removals followed by additions
-      # reads correctly anyway.
-      max = [before.size, after.size].max
-      (0...max).each do |i|
-        b = before[i]
-        a = after[i]
-        next if b == a
-
-        out << "-#{b}" if b
-        out << "+#{a}" if a
-      end
-      out.join
+      ConfigWriter.diff_lines(@original.lines, @lines).join
     end
 
     # Sets a scalar. Activates every commented ancestor on the way down --
@@ -617,15 +654,7 @@ module ConfigWriter
     end
 
     def diff
-      before = @original.lines
-      out = []
-      [before.size, @lines.size].max.times do |i|
-        next if before[i] == @lines[i]
-
-        out << "-#{before[i]}" if before[i]
-        out << "+#{@lines[i]}" if @lines[i]
-      end
-      out.join
+      ConfigWriter.diff_lines(@original.lines, @lines).join
     end
 
     # Values are single-quoted, with the one escape POSIX sh allows inside
