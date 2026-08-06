@@ -27,12 +27,13 @@ can't give without having read the preview.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
 in env.sh), any podcast RSS feed by URL (episode audio and artwork are
-downloaded for keeps -- the preview says how many gigabytes), and eleven
+downloaded for keeps -- the preview says how many gigabytes), and twelve
 things you already have on disk -- a beehiiv posts CSV, a Blogger Atom
 backup (posts come over, the comments and settings it mixes in are
 skipped out loud), a Ghost JSON export (plus the still-running site's
-URL, its images only exist there), an unpacked Medium export, a
-Squarespace XML export, an unpacked Substack export, a Twitter/X
+URL, its images only exist there), a Jekyll or Hugo tree (or any
+folder of markdown files a converter produced), an unpacked Medium
+export, a Squarespace XML export, an unpacked Substack export, a Twitter/X
 archive, a Mastodon account archive, a Pixelfed statuses export, an
 Instagram export (HTML or JSON, whichever you asked Instagram for), and
 WordPress or any RSS/Atom feed (one option, since a WXR export is RSS
@@ -46,6 +47,7 @@ immediately, with no preview pass:
   ruby scripts/migrate_bluesky.rb <handle>
   ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
   ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
+  PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>
   ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
   ruby scripts/migrate_medium.rb <path-to-unpacked-export>
   ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
@@ -60,8 +62,9 @@ LIMIT=n works on all of them and imports only the first n posts -- the way to
 sample a large archive before committing hours to it.
 
 When the new site keeps the old blog's domain, imports from sources that
-know their original URLs (beehiiv, Blogger, Ghost, Medium, Squarespace,
-Substack, Tumblr, WordPress or a feed) can keep the old addresses alive:
+know their original URLs (beehiiv, Blogger, Ghost, Jekyll/Hugo with a
+PERMALINK pattern, Medium, Squarespace, Substack, Tumblr, WordPress or a
+feed) can keep the old addresses alive:
 the wizard asks, the scripts take KEEP_PERMALINKS=1, and every published
 post then redirects from the path it used to live at.
 

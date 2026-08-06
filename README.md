@@ -243,9 +243,10 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Fifteen sources: Bluesky and Tumblr via their APIs; beehiiv, Blogger,
+- Sixteen sources: Bluesky and Tumblr via their APIs; beehiiv, Blogger,
   Ghost, Instagram, Mastodon, Medium, Pixelfed, Squarespace, Substack
-  and Twitter/X from their account exports and backups; WordPress from a WXR
+  and Twitter/X from their account exports and backups; a Jekyll or Hugo
+  tree (or any converter-made markdown folder) straight from disk; WordPress from a WXR
   file, any RSS/Atom feed by URL, and any podcast feed with its
   episodes' audio downloaded for keeps -- Tumblr and Twitter carried
   over from the original migration of four Tumblr blogs and a Twitter
@@ -449,6 +450,7 @@ Available sources:
 | Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages are skipped, images download from the live site |
 | Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
+| Jekyll/Hugo | the site tree (or any markdown folder) | posts and drafts with front matter, YAML or TOML; images come from the tree itself, no network; Liquid highlight becomes a code block |
 | Medium | an unpacked export | posts and drafts; images download from Medium's CDN, likely responses to other articles become drafts for review, newer exports carry no tags |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
 | Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode with audio: the mp3 and artwork download and are hosted locally -- the preview says how many gigabytes that means; items without an enclosure are skipped |
@@ -468,6 +470,7 @@ ruby scripts/migrate_blogger.rb <blog-backup.xml>
 ruby scripts/migrate_bluesky.rb <handle>
 ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
 ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
+PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>
 ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
 ruby scripts/migrate_medium.rb <path-to-unpacked-export>
 ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>

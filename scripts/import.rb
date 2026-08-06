@@ -37,6 +37,7 @@ require_relative '../lib/import/medium'
 require_relative '../lib/import/pixelfed'
 require_relative '../lib/import/podcast'
 require_relative '../lib/import/instagram'
+require_relative '../lib/import/jekyll'
 require_relative '../lib/import/squarespace'
 require_relative '../lib/import/substack'
 
@@ -57,6 +58,7 @@ SOURCES = [
   ['bluesky', -> { build_bluesky }],
   ['ghost', -> { build_ghost }],
   ['instagram', -> { build_instagram }],
+  ['jekyll', -> { build_jekyll }],
   ['mastodon', -> { build_mastodon }],
   ['medium', -> { build_medium }],
   ['pixelfed', -> { build_pixelfed }],
@@ -125,6 +127,24 @@ end
 # One prompt for all three inputs it accepts: they are the same format --
 # a WXR export is RSS 2.0 with extra elements -- so asking which kind it is
 # would be asking the user something the file already says.
+# The pattern prompt is the second place empty does not cancel: without
+# a pattern only posts with an explicit front matter permalink get a
+# redirect, which is a valid answer.
+def build_jekyll
+  dir = ask('import.jekyll_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  unless Dir.exist?(dir)
+    puts t('import.jekyll_dir_invalid', dir: dir)
+    return nil
+  end
+
+  print t('import.jekyll_permalink_prompt')
+  pattern = $stdin.gets.to_s.strip
+  Import::Jekyll.new(dir, permalink: pattern.empty? ? nil : pattern)
+end
+
 def build_mastodon
   dir = ask('import.mastodon_dir_prompt')
   return nil unless dir

@@ -54,9 +54,9 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (beehiiv, Blogger, Ghost, Medium, Squarespace, Substack,
-  WordPress/feed and Tumblr today) can record each published post's old
-  path as `redirect_from` -- the build then serves a redirect at every one
+  (beehiiv, Blogger, Ghost, Jekyll/Hugo with a pattern, Medium,
+  Squarespace, Substack, WordPress/feed and Tumblr today) can record
+  each published post's old path as `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -234,6 +234,30 @@ only findable by importing the same account both ways -- 173 of 288 posts,
 exactly those falling in Pacific daylight-saving months, disagreed by
 exactly an hour, and the JSON export's epochs settled which side was
 right. The JSON path has none of this: an epoch means what it says.
+
+### Jekyll, Hugo, or any markdown folder
+
+```bash
+PERMALINK='/:year/:month/:day/:title/' ruby scripts/migrate_jekyll.rb <path-to-site-tree>
+```
+
+Point it at a Jekyll tree (`_posts/`, `_drafts/`), a Hugo content
+directory, or **any folder of markdown files with front matter** -- the
+output of converters like Meddler (Medium) or Substack2Markdown lands
+here too. YAML and TOML front matter both read; the body is blog.sh's
+own markdown and goes through the same parser authoring uses, so
+nothing is lost to an HTML round-trip. `.html` bodies take the HTML
+path instead. Liquid `{% highlight %}` becomes a code block; other
+Liquid tags are dropped.
+
+**Images come from the tree itself** -- root-relative paths resolve
+against the site root, relative ones against the post -- so this works
+with no network, for a site that died years ago.
+
+One thing a tree cannot tell you is its old URL shape: pass the
+pattern (`PERMALINK='/:year/:month/:day/:title/'`, the wizard asks) to
+keep permalinks; a post's explicit front matter `permalink` always
+wins, and without either, no redirect is guessed at.
 
 ### Mastodon
 

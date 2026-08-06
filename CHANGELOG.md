@@ -47,6 +47,17 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Jekyll, Hugo and every markdown folder joined the import sources**
+  -- the sixteenth, and really a whole family: a `_posts/` tree, a Hugo
+  content directory, or the output of converters like Meddler and
+  Substack2Markdown. YAML and TOML front matter both read, the body
+  goes through blog.sh's own markdown parser (no HTML round-trip), and
+  images come from the tree itself -- no network, works for a site that
+  died years ago. Liquid `highlight` becomes a code block. Because a
+  tree cannot tell you its old URL shape, kept permalinks take a
+  pattern (`PERMALINK='/:year/:month/:day/:title/'`); an explicit front
+  matter permalink always wins.
+
 - **beehiiv joined the import sources** -- the fifteenth. Point the
   wizard (or `migrate_beehiiv.rb`) at the posts CSV from Settings →
   Exports. Each row carries the whole email as HTML; the importer
