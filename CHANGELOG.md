@@ -421,6 +421,13 @@ prints what an installation is running.
   pipe that is the thing you copy into the next command, and `browse`
   itself falls back to exactly that when it isn't talking to a terminal.
 
+- **Two more built-in social icons: Facebook and X.** The footer set
+  covered the Fediverse and the usual code-and-video suspects but not the
+  two networks half the world still lives on -- the first site imported
+  from Ghost had both and nothing to show for them. `icon: facebook` and
+  `icon: x` now work in `site.yml`, the appearance wizard offers them,
+  and `icon_svg` remains the escape hatch for everything else.
+
 - **Builds and deploys take a lock, so two runs can no longer rewrite
   `public.nosync` at the same time.** Two of the things that write it come
   from cron -- the scheduled publish every quarter of an hour, the sidebar

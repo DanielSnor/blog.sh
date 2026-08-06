@@ -56,7 +56,7 @@ HEX = /\A#(\h{3}|\h{6})\z/.freeze
 
 # The icons the build already knows how to draw. Anything else needs
 # icon_svg, which is markup and belongs in the file rather than a prompt.
-ICONS = %w[mastodon pixelfed linkedin github bluesky instagram threads youtube rss email].freeze
+ICONS = %w[mastodon pixelfed linkedin github bluesky instagram threads facebook x youtube rss email].freeze
 
 def current
   @current ||= begin

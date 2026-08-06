@@ -205,7 +205,7 @@ footer:
   social_heading: "Find me on"
 
 # icon = a name from the built-in set: mastodon, pixelfed, linkedin,
-# github, bluesky, instagram, threads, youtube, rss, email.
+# github, bluesky, instagram, threads, facebook, x, youtube, rss, email.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is
