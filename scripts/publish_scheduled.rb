@@ -21,6 +21,14 @@ require_relative '../lib/site_config'
 
 SiteConfig.use_site_timezone!
 
+# Held for the whole run -- publishing, the rebuild and the deploy are one
+# operation as far as the site is concerned, and the sidebar cron or a
+# person at the CLI must not walk into the middle of it. A tick that finds
+# the lock held leaves quietly: nothing has been published, and cron is
+# back in fifteen minutes (see lib/run_lock.rb).
+require_relative '../lib/run_lock'
+RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0)
+
 # A post is announced before the site is rebuilt (so the toot's URL and the
 # comment thread exist in the same build), which means a failed deploy would
 # otherwise leave a live announcement pointing at a page that was never

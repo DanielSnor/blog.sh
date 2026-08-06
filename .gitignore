@@ -9,6 +9,7 @@ env.sh
 .deploy_manifest*.json.incomplete
 .deploy_baseline.json
 .deploy-pending
+.blog-sh.lock
 .last-edit.md
 .last-edit.meta
 .stats_full_refresh_at

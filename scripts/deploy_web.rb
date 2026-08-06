@@ -42,6 +42,13 @@ PRUNE = ARGV.include?('--prune')
 ONLY = ARGV.find { |a| a.start_with?('--only=') }&.delete_prefix('--only=')&.split(',')
 ROOT = File.expand_path('..', __dir__)
 PUBLIC_DIR = File.join(ROOT, 'public.nosync')
+
+# The same lock the build takes: a deploy walks public.nosync file by file
+# and reads the manifest, and a build rewriting it underneath produces
+# either an ENOENT on a file that was there a moment ago or a manifest
+# describing a tree that no longer exists.
+require_relative '../lib/run_lock'
+RunLock.acquire!(ROOT, label: 'deploy')
 BACKEND = DeployBackend.pick
 # One manifest per backend (the suffix): the manifest records what THIS
 # target already has, so switching DEPLOY_BACKEND must never inherit

@@ -31,6 +31,12 @@ MEDIA_DIR = File.join(ROOT, 'media.nosync')
 # synced -- on a Mac it was also pure I/O overhead. The directory name means
 # nothing to a server, where iCloud doesn't exist anyway.
 PUBLIC_DIR = File.join(ROOT, 'public.nosync')
+
+# One writer of public.nosync at a time -- a concurrent build and deploy
+# walk the same tree while it is being rewritten (see lib/run_lock.rb).
+# Inherited when the publishing cron already holds it.
+require_relative '../lib/run_lock'
+RunLock.acquire!(ROOT, label: 'build')
 # No ?v= cache-buster on site.css on purpose: a static host that serves every
 # file with `Cache-Control: public, max-age=0` plus an ETag (e.g. Cloudron
 # Surfer) makes browsers revalidate on each load and pick up a changed

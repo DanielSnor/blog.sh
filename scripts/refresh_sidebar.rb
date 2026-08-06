@@ -18,6 +18,12 @@ SiteConfig.use_site_timezone!
 ROOT = File.expand_path('..', __dir__)
 PUBLIC_DIR = File.join(ROOT, 'public.nosync')
 
+# Writes widget JSONs into public.nosync, so it queues behind a build or a
+# deploy like everything else. A skipped refresh is harmless -- cron is
+# back in half an hour -- so this leaves quietly rather than mailing.
+require_relative '../lib/run_lock'
+RunLock.acquire!(ROOT, label: 'sidebar', busy_exit: 0)
+
 abort('❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb).') unless Dir.exist?(PUBLIC_DIR)
 
 puts Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))

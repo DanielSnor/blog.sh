@@ -460,6 +460,29 @@ at a page that was never uploaded. A post that cannot be published (a slug
 the target year already owns, a malformed date) is reported by name and
 skipped; the rest of the batch still publishes.
 
+### One writer at a time
+
+Building and deploying take an advisory lock (`.blog-sh.lock` in the
+project root), because two of the things that write `public.nosync` run
+from cron: the scheduled publish every 15 minutes and the sidebar refresh
+every 30. On a large archive a build plus a full deploy takes longer than
+a tick, so overlapping runs are ordinary -- and what they do to each other
+is not: a deploy walking a tree that is being rewritten, or pruning as an
+orphan a page the other run has just published.
+
+A run that finds the lock held does not wait for it. A cron tick says so
+and leaves with exit 0 -- cron is back in fifteen minutes, and a queue of
+blocked publishes would all wake up and do the same work at once. A run
+you started reports it and exits non-zero, so `./blog.sh` doesn't tell you
+a deploy happened when it didn't. The scheduled publish holds the lock for
+its whole run (publish, rebuild, deploy are one operation as far as the
+site is concerned), and the build and deploy it shells out to inherit it
+rather than deadlock against their own parent.
+
+If the filesystem can't do advisory locks -- some network mounts -- the
+lock degrades to no lock, which is where every installation was before
+this existed.
+
 ## Backup
 
 Back up the per-deployment data -- the engine itself is a git clone and
