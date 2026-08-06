@@ -40,16 +40,17 @@ module Import
     MERIDIEMS = %w[am pm dopol. odpol.].freeze
     AFTERNOON = %w[pm odpol.].freeze
 
-    # The row label a profile file gives the account's username --
-    # "Username" verified against a real English export, "Uživatelské
-    # jméno" being Meta's own Czech term (their help centre uses no
-    # other). The Czech one is a looser claim than the months above, and
-    # can afford to be: a label that never matches falls back to the
-    # export directory's name, today's behaviour exactly, where a wrong
-    # month would silently mis-date an archive. Tried as a list, not a
-    # translation, because Meta's localization is patchy -- the Czech
-    # export this codebase was built against leaves whole labels in
-    # English mid-page.
+    # The row label a profile file gives the account's username -- each
+    # verified against a real export requested in that language, the
+    # Czech one arriving as a string_map_data key mangled like every
+    # other localized string, which is why the JSON reader repairs
+    # before it compares. A language missing from this list costs
+    # nothing -- a label that never matches falls back to the export
+    # directory's name, where a wrong month would silently mis-date an
+    # archive -- so this list may grow on weaker evidence than the
+    # months above. Tried as a list, not a translation, because Meta's
+    # localization is patchy: the Czech export this codebase was built
+    # against leaves whole labels in English mid-page.
     USERNAME_LABELS = ['Username', 'Uživatelské jméno'].freeze
 
     # "dub 10, 2014 9:02:15 odpol." (Facebook, with seconds) and
