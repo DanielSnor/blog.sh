@@ -184,11 +184,14 @@ def run
   env = ConfigWriter::EnvFile.new(ENV_SH, template: ENV_SH_EXAMPLE)
   current = current_values
 
+  # Address and deploy back to back on purpose: "where the site lives"
+  # and "where the build goes" are one theme, and the comments network is
+  # an optional integration -- it goes last, like in the config file.
   ask_language(site, current)
   ask_identity(site, current)
   ask_address(site, env, current)
-  ask_network(site, env, current)
   ask_deploy(env, current)
+  ask_network(site, env, current)
 
   review_and_write(site, env)
 end
