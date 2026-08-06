@@ -159,11 +159,19 @@ ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
 ```
 
 In Facebook: **Accounts Centre → Your information and permissions →
-Download your information** -- ask for **JSON** (the HTML variant is
-not supported, and the JSON has proper timestamps where HTML prints a
-wall clock in an unnamed timezone). Unpack the ZIP and point the
-script at the directory; photos and videos come from the archive
-itself, no network.
+Download your information**. Either format -- **HTML and JSON are both
+read**, and the export says which one it is, so there is nothing to
+choose here. Unpack the ZIP and point the script at the directory;
+photos and videos come from the archive itself, no network. Where you
+still get to pick, pick JSON: its timestamps are epochs, while the
+HTML prints a wall clock in the account's own timezone without naming
+it. The import reads that wall clock in the *site's* timezone -- the
+same place, when you import your own archive into your own blog, and
+verified epoch-exact against the JSON of the same account -- but an
+archive from someone in another timezone is better taken as JSON. The
+HTML timestamps are also printed in the export's own language; Czech
+and English are understood, and an export in another language says so
+and skips what it cannot date rather than guessing.
 
 The one thing to know: **an older Facebook account is mostly not
 Facebook**. Posts mirrored in from Twitter, Posterous and their era --
@@ -463,13 +471,22 @@ tag), and the newest posts sometimes ship as CSV rows with no HTML body
 ruby scripts/migrate_threads.rb <path-to-unpacked-export>
 ```
 
-In Threads: **Settings → Account → Download your information** -- ask
-for **JSON**. Unpack the ZIP and point the script at the directory.
-Your own standalone posts import with their media from the archive;
+In Threads: **Settings → Account → Download your information**. Either
+format -- **HTML and JSON are both read**, and the export says which
+one it is. Unpack the ZIP and point the script at the directory. Your
+own standalone posts import with their media from the archive;
 **replies to other people's threads are skipped and counted** -- the
 same rule as Bluesky and Twitter, an archive holds your own posts.
 Bare URLs in the text become real links, and Meta's mangled encoding
 is repaired the same way as for Facebook and Instagram.
+
+JSON is the better ask if you have replies to keep out: only it marks
+them, so the HTML page imports every box it holds. HTML timestamps are
+printed to the minute in Meta's fixed Pacific clock (no daylight
+saving; the same convention, and the same conversion, as the Instagram
+HTML export) -- correct to the minute, but a re-import should stick to
+whichever format the first import used, since the lost seconds mean
+the two formats mint different identities for text-only posts.
 
 One flag the export carries deserves a word: `cross_post_source` is
 NOT treated as "this came from elsewhere" -- on real exports it sits

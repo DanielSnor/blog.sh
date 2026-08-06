@@ -145,28 +145,42 @@ prints what an installation is running.
   that came without tags, which newer Medium exports no longer include.
 
 - **Threads joined the import sources** -- the twenty-second, closing
-  the social-network roster. The JSON export's shape is Meta's oddest
-  yet -- every post is a media list even when there is no media, with
-  the text riding in a title field -- and it is read as found: your
-  standalone posts import with media from the archive, replies to
-  other people's threads are skipped and counted (the Bluesky rule),
-  bare URLs become real links, and the shared MetaText repair fixes
-  the encoding. The export's cross_post_source flag is deliberately
-  NOT a skip signal: on real exports it marks posts written directly
-  in the Threads app too -- it records where a post was shared TO,
-  and skipping on it would empty the archive.
+  the social-network roster, and both formats the export dialog offers
+  are read: the JSON, whose shape is Meta's oddest yet -- every post is
+  a media list even when there is no media, with the text riding in a
+  title field -- and the HTML page, read back into that same odd shape
+  so both walk the same mapping. Your standalone posts import with
+  media from the archive, replies to other people's threads are skipped
+  and counted (the Bluesky rule), bare URLs become real links, and the
+  shared MetaText repair fixes the encoding. Ask for JSON where you get
+  a choice: only it marks replies, and its timestamps carry the seconds
+  the HTML page never prints -- the page's minute-level dates, in
+  Meta's fixed no-DST Pacific clock, convert back verified-exact to the
+  minute against the same account's JSON. The export's
+  cross_post_source flag is deliberately NOT a skip signal: on real
+  exports it marks posts written directly in the Threads app too -- it
+  records where a post was shared TO, and skipping on it would empty
+  the archive.
 
 - **Facebook joined the import sources** -- the twenty-first, built and
-  verified against a real "Download Your Information" JSON export. Your
-  own posts import with photos and videos from the archive itself; the
-  headline behaviour is what does NOT import silently: posts Facebook
-  mirrored in from Twitter, Posterous and their era -- on the reference
-  export, 95 % of everything -- are recognized and skipped with a
-  count, because those platforms' own imports carry the originals
-  (`FACEBOOK_CROSSPOSTS=1` includes them). Wordless check-ins and app
-  stories are counted skips too. Meta's byte-mangled text encoding is
-  repaired by the same logic the Instagram importer proved out, now in
-  a shared module for the whole Meta family.
+  verified against a real "Download Your Information" export in both
+  the formats Meta offers: JSON and HTML read the same, epoch-identical
+  down to the minted re-import ids (the HTML prints its wall clock with
+  seconds, in the account's own timezone with daylight saving observed
+  -- measured against the JSON of the same account -- and is read in
+  the site's zone, the same place when the archive is your own). The
+  HTML's dates come localized; Czech and English are understood, and an
+  unknown language skips what it cannot date and says so rather than
+  guessing. Your own posts import with photos and videos from the
+  archive itself; the headline behaviour is what does NOT import
+  silently: posts Facebook mirrored in from Twitter, Posterous and
+  their era -- on the reference export, 95 % of everything -- are
+  recognized and skipped with a count, because those platforms' own
+  imports carry the originals (`FACEBOOK_CROSSPOSTS=1` includes them).
+  Wordless check-ins and app stories are counted skips too. Meta's
+  byte-mangled text encoding is repaired by the same logic the
+  Instagram importer proved out, now in a shared module for the whole
+  Meta family.
 
 - **The import wizard's source menu is now two levels.** Twenty-one
   sources in one column was a kilometre of scrolling; the first
