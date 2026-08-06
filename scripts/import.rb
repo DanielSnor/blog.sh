@@ -29,6 +29,7 @@ require_relative '../lib/import/bluesky'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
 require_relative '../lib/import/feed'
+require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
 require_relative '../lib/import/pixelfed'
 require_relative '../lib/import/instagram'
@@ -46,6 +47,7 @@ end
 # their script after a change here.
 SOURCES = [
   ['bluesky', -> { build_bluesky }],
+  ['ghost', -> { build_ghost }],
   ['instagram', -> { build_instagram }],
   ['mastodon', -> { build_mastodon }],
   ['pixelfed', -> { build_pixelfed }],
@@ -137,6 +139,32 @@ def build_feed
 
   puts t('import.feed_source_invalid', source: source)
   nil
+end
+
+# Two prompts, because the export genuinely cannot answer the second one:
+# every image in it is a "__GHOST_URL__/..." reference -- the site's own
+# address, deliberately never spelled out -- and the files only exist on
+# the live site. So the URL is required, and importing after the old site
+# goes dark loses exactly the images.
+def build_ghost
+  path = ask('import.ghost_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  unless File.exist?(path)
+    puts t('import.ghost_path_invalid', path: path)
+    return nil
+  end
+
+  url = ask('import.ghost_url_prompt')
+  return nil unless url
+
+  unless url.start_with?('http://', 'https://')
+    puts t('import.ghost_url_invalid', url: url)
+    return nil
+  end
+
+  Import::Ghost.new(path, site_url: url)
 end
 
 def build_twitter

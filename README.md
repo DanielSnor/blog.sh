@@ -243,11 +243,15 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Eight sources: Bluesky and Tumblr via their APIs; Instagram, Mastodon,
-  Pixelfed and Twitter/X from their account exports; WordPress from a WXR
-  file and any RSS/Atom feed by URL -- Tumblr and Twitter carried over from
-  the original migration of four Tumblr blogs and a Twitter archive
-  (2008-2022)
+- Nine sources: Bluesky and Tumblr via their APIs; Ghost, Instagram,
+  Mastodon, Pixelfed and Twitter/X from their account exports; WordPress
+  from a WXR file and any RSS/Atom feed by URL -- Tumblr and Twitter
+  carried over from the original migration of four Tumblr blogs and a
+  Twitter archive (2008-2022)
+- A blog that keeps its domain keeps its addresses: sources that know
+  their posts' original URLs (Ghost, WordPress, Tumblr) can record each
+  one as a `redirect_from`, and the built site answers at every old path
+  with a redirect
 - `lib/import/` holds what every source shares -- media download or copy,
   filename numbering, skip accounting, progress callbacks -- so an adapter
   only has to page a source and shape one item
@@ -436,6 +440,7 @@ Available sources:
 | Source | Needs | Scope |
 | --- | --- | --- |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
+| Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages are skipped, images download from the live site |
 | Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
@@ -449,6 +454,7 @@ scripted migration -- same mapping, no preview pass, writes immediately:
 
 ```bash
 ruby scripts/migrate_bluesky.rb <handle>
+ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
 ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
 ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
 ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>

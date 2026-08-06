@@ -26,16 +26,18 @@ means typing the number of posts, not pressing y: it's the one answer you
 can't give without having read the preview.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
-in env.sh), and five things you already have on disk -- a Twitter/X archive,
-a Mastodon account archive, a Pixelfed statuses export, an Instagram export
-(HTML or JSON, whichever you asked Instagram for), and WordPress or any
-RSS/Atom feed (one option, since a WXR export is RSS with extra elements
-and the file itself says which it is).
+in env.sh), and six things you already have on disk -- a Ghost JSON export
+(plus the still-running site's URL, its images only exist there), a
+Twitter/X archive, a Mastodon account archive, a Pixelfed statuses export,
+an Instagram export (HTML or JSON, whichever you asked Instagram for), and
+WordPress or any RSS/Atom feed (one option, since a WXR export is RSS with
+extra elements and the file itself says which it is).
 
 Each source is also a script, for cron or a scripted migration. These write
 immediately, with no preview pass:
 
   ruby scripts/migrate_bluesky.rb <handle>
+  ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
   ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
   ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
   ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>

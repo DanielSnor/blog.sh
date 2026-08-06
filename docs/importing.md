@@ -54,8 +54,8 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (WordPress/feed and Tumblr today) can record each published post's old
-  path as `redirect_from` -- the build then serves a redirect at every one
+  (Ghost, WordPress/feed and Tumblr today) can record each published
+  post's old path as `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -97,6 +97,31 @@ is imported). Rich-text facets become formatting spans, hashtag facets
 become tags. A video arrives as an HLS playlist rather than a file, so the
 post gets its poster frame as an image -- better in an archive than a
 "video unavailable" placeholder.
+
+### Ghost
+
+```bash
+ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
+```
+
+In Ghost Admin: **Settings → Advanced → Import/Export → Export your
+content**. The JSON file is the whole database -- posts, pages, tags --
+but **not the images**: they appear only as `__GHOST_URL__/...`
+references, and the files themselves exist only on the live site. That is
+why the site URL is a required second argument, and why the import has to
+happen **while the old site is still up** -- afterwards there is nowhere
+left to download from.
+
+Every post comes over, drafts included. Posts Ghost had scheduled arrive
+as drafts too, and the summary says how many: their publish times were a
+promise made to a different site, and this one's queue should not
+announce posts nobody here reviewed. Pages (about, contact, ...) are
+skipped and counted -- they are site furniture, not timeline entries. A
+custom excerpt becomes the post's first paragraph, the feature image its
+first image. YouTube embeds become the same video blocks a hand-written
+post gets; any other embedded player becomes a link to the embedded page,
+which outlives the player. Ghost's internal `#hashtag` tags are routing
+config, not labels, and are dropped.
 
 ### Instagram
 

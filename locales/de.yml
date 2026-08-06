@@ -371,6 +371,10 @@ import:
   instagram_dir_prompt: "Pfad zum entpackten Instagram-Export, HTML oder JSON (leer = abbrechen): "
   instagram_dir_invalid: "Unter %{dir} finden sich keine Beiträge -- gib das entpackte Exportverzeichnis selbst an, das mit your_instagram_activity/."
   feed_source_prompt: "Feed-URL oder Pfad zu einer WordPress-Exportdatei (leer = abbrechen): "
+  ghost_path_prompt: "Pfad zum Ghost-JSON-Export (leer = abbrechen): "
+  ghost_path_invalid: "%{path} existiert nicht."
+  ghost_url_prompt: "URL der (noch laufenden) Ghost-Seite — ihre Bilder existieren nur dort (leer = abbrechen): "
+  ghost_url_invalid: "%{url} ist keine URL — sie muss mit http:// oder https:// beginnen."
   feed_source_invalid: "%{source} ist weder eine vorhandene Datei noch eine http(s)-Adresse."
   twitter_dir_prompt: "Pfad zum entpackten Twitter/X-Export (leer = abbrechen): "
   twitter_dir_invalid: "Unter %{dir} liegt keine data/tweets.js -- gib das entpackte Exportverzeichnis selbst an."
@@ -393,6 +397,7 @@ import:
   source_died: "⚠️  Die Quelle hat nach %{count} Einträgen aufgehört zu antworten: %{error}. Die Zahlen unten sind eine Teilsumme, nicht die ganze Quelle. Bereits geschriebene Beiträge sind gespeichert — ein erneuter Lauf ist sicher, sie werden über ihre Source-ID zugeordnet und nie dupliziert."
   source:
     bluesky: "Bluesky"
+    ghost: "Ghost (JSON-Export)"
     instagram: "Instagram (Konto-Export)"
     mastodon: "Mastodon (Konto-Archiv)"
     pixelfed: "Pixelfed (Status-Export)"

@@ -14,6 +14,18 @@ prints what an installation is running.
 
 ### New
 
+- **Ghost joined the import sources** -- the ninth. Point the wizard (or
+  `migrate_ghost.rb`) at the JSON export plus the still-running site's
+  URL: the export never carries the images, only `__GHOST_URL__`
+  references to them, so they download from the live site -- import
+  before the old site goes dark. Drafts stay drafts, scheduled posts
+  arrive as drafts (their publish times were the old site's promise, and
+  the summary counts them), pages are skipped out loud. A custom excerpt
+  becomes the first paragraph, the feature image the first image, YouTube
+  embeds the same video blocks hand-written posts get. Note for scripted
+  imports: the wizard's source menu gained an entry, so a piped
+  `printf "N\n"` may now pick a different source.
+
 - **A migrated blog can keep its old addresses.** Posts have a new
   `redirect_from` key -- a list of site-root paths the post answered at on
   its previous platform -- and the build serves a redirect at each one,
