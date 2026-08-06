@@ -578,35 +578,40 @@ doctor:
   token_unchecked: "Could not check the token against %{instance} (%{code})."
 
 # ./setup.sh -- the core setup wizard (scripts/setup.rb). Prompts are a
-# label, an optional hint under it, and the current value; hints explain
-# what the setting DOES, not what to type, since the current value
-# already shows the shape.
+# label, a hint under it, and the pre-filled value. Hints explain what
+# the setting does and, where the shape of an answer is not obvious, end
+# with an example -- on a fresh install the "current value" is only the
+# template's filler, so it cannot show the shape. Whether anybody
+# actually chose the value is what the "Now:" vs. "Suggested:" line says
+# (wizard.prompt_with_current / prompt_with_suggestion).
 setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
-  intro_skip: "Every question can be skipped -- Enter keeps what is there. Nothing is written until you have seen the diff and said yes."
+  intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."
+  intro_expert: "(Rather edit YAML yourself? The wizard only fills in config/site.yml, whose commented template is config/site.yml.example.)"
 
   section_identity: "Who the site is"
   section_address: "Where the site lives"
   section_network: "Where the comments live"
   section_deploy: "Where the site is published"
 
-  q_title: "Full title"
-  h_title: "The browser tab on the homepage, and the basis for every other page's title."
+  q_title: "Full site title"
+  h_title: "Shown in the browser tab and the basis of every page's title. E.g.: The Blue Notebook -- Petra's notes."
   q_short_name: "Short name"
-  h_short_name: "Used in listing titles (\"Tag: foo -- YOURSITE\") and as the banner overlay's title."
-  q_description: "One-line description"
-  h_description: "The claim over the banner, the meta description, and the RSS description. Plain text -- no HTML."
+  h_short_name: "A shortened form of the title for tight spots: the heading over the site's header image and listing titles (\"Tag: garden -- Blue Notebook\"). E.g. just: Blue Notebook."
+  q_description: "One-sentence description"
+  h_description: "What the site is about. Shown across the site header, in link-share previews and in RSS readers. Plain text, no HTML -- e.g.: Writing about the garden, books and whatever makes me smile."
   q_author: "Author"
-  h_author: "Your name, as it should appear in the feed and the page metadata."
+  h_author: "Your name or nickname, as it should appear in the RSS feed and the page metadata."
   q_timezone: "Timezone"
-  h_timezone: "Every timestamp this engine writes is in this zone. An IANA name like Europe/Prague; the machine's own is offered."
-  e_timezone: "This machine does not know a zone called \"%{zone}\". Look in /usr/share/zoneinfo -- it is Europe/Prague, not Europe/Praha."
+  h_timezone: "Publish times are calculated in this zone. An IANA name like Europe/Prague. Mind servers: the machine is often on UTC, but this should be the zone you live in."
+  e_timezone: "This machine does not know a zone called \"%{zone}\". Zones are named Continent/City, in English -- Europe/Prague, not Praha or CEST; the full list is in /usr/share/zoneinfo."
 
   q_base_url: "Site address"
-  h_base_url: "The canonical URL. RSS, the sitemap and every share preview are built from it. Written to both config/site.yml and env.sh, since env.sh's copy overrides the other."
+  h_base_url: "The address the site will be seen at, e.g. https://mysite.com -- no trailing slash. RSS, the sitemap and share previews are built from it. Written to config/site.yml and env.sh at once, so the two copies cannot drift apart."
   e_base_url: "That is not a URL -- it has to start with http:// or https:// and carry a host name."
   e_base_url_slash: "Drop the trailing slash, or generated links end up with two."
 
+  section_network_intro: "blog.sh has no comment box of its own. Instead, every new post is announced on your social network account, and replies to that announcement show up under the post as its comments. So you are picking the network where you already have an account (or will make one)."
   q_network: "Which network carries the comments?"
   network_mastodon: "Mastodon -- each post is announced there, and the replies are its comments"
   network_bluesky: "Bluesky -- the same arrangement, on Bluesky"
@@ -614,9 +619,9 @@ setup:
   network_off: "No network. Posts are published without being announced anywhere."
 
   q_instance: "Mastodon instance"
-  h_instance: "The host name only -- mastodonczech.cz, not https://mastodonczech.cz/@you."
+  h_instance: "Just the name of the server your account is on -- mastodon.social, not https://mastodon.social/@you."
   e_instance: "The host name only, with no https:// and no path."
-  token_where: "Make one on %{instance} under Preferences -> Development -> New application, with the scope write:statuses."
+  token_where: "The token is the key that lets the blog post announcements in your name. Make one on %{instance}: Preferences -> Development -> New application, tick the write:statuses scope, and copy the access token here."
   q_token: "Access token (Enter to skip -- it is not shown as you type): "
   token_skipped: "No token. The site works; it just never announces anything until you add one to env.sh."
   checking_token: "Asking the instance whether the token works"
@@ -636,35 +641,37 @@ setup:
   q_app_password: "App password (Enter to skip -- it is not shown as you type): "
   password_skipped: "No app password. The site works; it just never announces anything until you add one to env.sh."
 
+  section_deploy_intro: "The built site is an ordinary folder of files; this picks where ./blog.sh deploy uploads it after every change. Go by where the site will run -- and if you don't know yet, keep the first option. It can be changed any time by running ./setup.sh again."
   q_backend: "Where should the built site go?"
-  backend_none: "Nowhere yet -- build and preview locally, decide later"
-  backend_surfer: "Cloudron Surfer -- upload through its Files API"
-  backend_local: "A directory on this machine -- one your own nginx/Caddy serves"
-  backend_rsync: "rsync -- any destination, local or over SSH"
-  backend_git: "Git -- force-push the build to a branch for GitHub/GitLab/Codeberg Pages"
-  backend_rclone: "rclone -- S3, R2, B2, WebDAV, anything rclone speaks"
-  backend_sftp: "SFTP -- for hosts with neither rsync nor git"
+  backend_none: "Nowhere yet -- write and preview locally, decide later"
+  backend_surfer: "Cloudron Surfer -- you run your own Cloudron with the Surfer app on it"
+  backend_local: "A directory on this machine -- a web server (nginx, Caddy...) runs right here"
+  backend_rsync: "rsync -- your own server, the one you log into over SSH"
+  backend_git: "GitHub/GitLab/Codeberg Pages -- the git host serves the site for free"
+  backend_rclone: "rclone -- cloud storage like S3, R2, B2 or WebDAV"
+  backend_sftp: "SFTP -- classic web hosting, uploaded to over SFTP"
   backend_skipped: "No deploy target. Builds stay local; ./blog.sh preview shows them."
 
   q_surfer_url: "Surfer app URL"
-  h_surfer_url: "The Cloudron app's base URL -- its Files API lives underneath it."
+  h_surfer_url: "The address the Surfer app runs at -- the same one the site's visitors will see. E.g. https://blog.mydomain.com."
+  surfer_token_where: "Surfer issues the token in its web interface: log into the app and open Settings -> Access Tokens."
   q_surfer_token: "Surfer access token (not shown as you type): "
   q_surfer_remote_dir: "Subdirectory on Surfer"
-  h_surfer_remote_dir: "Where under the app the site goes. Empty means the app's root."
+  h_surfer_remote_dir: "Fill in only if the site should live in a subfolder next to something else. Enter = the site sits right at the app's address."
   q_deploy_target_dir: "Directory"
-  h_deploy_target_dir: "The absolute path the build is copied into -- the one your web server serves."
+  h_deploy_target_dir: "The absolute path of the folder your web server shows the world -- the build is copied into it. E.g. /var/www/mysite."
   q_rsync_target: "rsync destination"
-  h_rsync_target: "As rsync takes it: user@server:/var/www/mysite, or a local path."
+  h_rsync_target: "Write what you would give rsync: user@server:/var/www/mysite, or a local path."
   q_git_pages_remote: "Git remote"
-  h_git_pages_remote: "The repository the build is pushed to, e.g. git@github.com:you/site.git."
+  h_git_pages_remote: "The repository the built site is pushed to and Pages serves from. E.g. git@github.com:you/site.git."
   q_git_pages_branch: "Branch"
-  h_git_pages_branch: "Which branch the snapshot is force-pushed to. gh-pages is the usual answer."
+  h_git_pages_branch: "The branch the site is force-pushed to. gh-pages is the usual answer."
   q_rclone_target: "rclone destination"
-  h_rclone_target: "remote:path, e.g. r2:my-bucket/site. The credentials live in rclone's own config."
+  h_rclone_target: "remote:path, e.g. r2:my-bucket/site. Credentials live in rclone's own configuration (rclone config)."
   q_sftp_target: "SFTP host"
-  h_sftp_target: "user@server, as openssh takes it."
+  h_sftp_target: "user@server -- the login and address your hosting gave you."
   q_sftp_remote_dir: "Remote directory"
-  h_sftp_remote_dir: "Where on that host the site goes."
+  h_sftp_remote_dir: "The folder on the server the hosting shows the world -- often www or public_html."
   target_ok: "✅ %{dir} exists."
   target_missing: "%{dir} does not exist yet. Create it before the first deploy, or the deploy will have nowhere to put the site."
 
@@ -679,6 +686,7 @@ setup:
 # the end where everything is shown as a diff and written or dropped.
 wizard:
   prompt_with_current: "Now: %{current}\n> "
+  prompt_with_suggestion: "Suggested: %{current}\n> "
   empty_value: "(not set)"
   choice_prompt: "Choice: "
   menu_hint: "↑↓ move · Enter select · 1-9 quick pick · Esc keep current"

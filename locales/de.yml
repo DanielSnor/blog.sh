@@ -572,12 +572,17 @@ doctor:
   token_unchecked: "Der Token konnte gegen %{instance} nicht geprüft werden (%{code})."
 
 # ./setup.sh -- der Assistent für die Grundeinrichtung (scripts/setup.rb).
-# Eine Eingabeaufforderung besteht aus Bezeichnung, optionalem Hinweis und
-# dem aktuellen Wert; der Hinweis sagt, was die Einstellung BEWIRKT, nicht
-# was einzutippen ist -- die Form zeigt schon der aktuelle Wert.
+# Eine Eingabeaufforderung besteht aus Bezeichnung, Hinweis und dem
+# vorausgefüllten Wert. Der Hinweis sagt, was die Einstellung bewirkt, und
+# endet mit einem Beispiel, wo die Form der Antwort nicht offensichtlich
+# ist -- auf einer frischen Installation ist der "aktuelle Wert" nur der
+# Platzhalter der Vorlage und zeigt keine Form. Ob jemand den Wert
+# wirklich gewählt hat, sagt die Zeile "Jetzt:" vs. "Vorschlag:"
+# (wizard.prompt_with_current / prompt_with_suggestion).
 setup:
   intro: "Hier werden die Einstellungen abgefragt, die eine Website zum Laufen braucht. Die Antworten werden unterwegs geprüft und in config/site.yml und env.sh geschrieben."
-  intro_skip: "Jede Frage lässt sich überspringen -- Enter behält, was da ist. Nichts wird geschrieben, bevor du die Änderungen gesehen und bestätigt hast."
+  intro_skip: "Jede Frage lässt sich überspringen -- Enter übernimmt den darunter vorausgefüllten Wert. Nichts wird geschrieben, bevor du alle Änderungen zusammen gesehen und bestätigt hast."
+  intro_expert: "(Lieber selbst YAML bearbeiten? Der Assistent füllt nur config/site.yml aus, dessen kommentierte Vorlage config/site.yml.example ist.)"
 
   section_identity: "Wem die Website gehört"
   section_address: "Wo die Website wohnt"
@@ -585,22 +590,23 @@ setup:
   section_deploy: "Wohin die Website veröffentlicht wird"
 
   q_title: "Vollständiger Titel"
-  h_title: "Der Browser-Tab auf der Startseite und die Grundlage für den Titel jeder anderen Seite."
+  h_title: "Steht im Browser-Tab und ist die Grundlage für den Titel jeder Seite. Z. B.: Das blaue Heft -- Notizen von Petra."
   q_short_name: "Kurzname"
-  h_short_name: "Wird in Listentiteln verwendet (\"Schlagwort: foo -- DEINESEITE\") und als Titel über dem Banner."
-  q_description: "Einzeilige Beschreibung"
-  h_description: "Der Claim über dem Banner, die Meta-Description und die RSS-Beschreibung. Reiner Text -- kein HTML."
+  h_short_name: "Die Kurzform des Titels für enge Stellen: die Überschrift über dem Kopfbild der Website und Listentitel (\"Schlagwort: Garten -- Blaues Heft\"). Z. B. nur: Blaues Heft."
+  q_description: "Beschreibung in einem Satz"
+  h_description: "Worum es auf der Website geht. Steht über dem Seitenkopf, in Vorschauen beim Teilen von Links und in RSS-Readern. Reiner Text ohne HTML -- z. B.: Ich schreibe über Garten, Bücher und alles, was mich freut."
   q_author: "Autor"
-  h_author: "Dein Name, so wie er im Feed und in den Seiten-Metadaten stehen soll."
+  h_author: "Dein Name oder Spitzname, so wie er im RSS-Feed und in den Seiten-Metadaten stehen soll."
   q_timezone: "Zeitzone"
-  h_timezone: "Jeder Zeitstempel, den die Engine schreibt, steht in dieser Zone. Ein IANA-Name wie Europe/Berlin; die des Rechners wird vorgeschlagen."
-  e_timezone: "Dieser Rechner kennt keine Zone namens \"%{zone}\". Sieh in /usr/share/zoneinfo nach -- es heißt Europe/Prague, nicht Europe/Praha."
+  h_timezone: "Veröffentlichungszeiten werden in dieser Zone gerechnet. Ein IANA-Name wie Europe/Berlin. Vorsicht bei Servern: die Maschine läuft oft auf UTC, hierher gehört aber die Zone, in der du lebst."
+  e_timezone: "Dieser Rechner kennt keine Zone namens \"%{zone}\". Zonen heißen Kontinent/Stadt, auf Englisch -- Europe/Berlin, nicht Berlin oder MEZ; die vollständige Liste steht in /usr/share/zoneinfo."
 
   q_base_url: "Adresse der Website"
-  h_base_url: "Die kanonische URL. RSS, Sitemap und jede Vorschau beim Teilen werden daraus gebaut. Wird in config/site.yml UND env.sh geschrieben, weil die Kopie in env.sh die andere überschreibt."
+  h_base_url: "Die Adresse, unter der die Website zu sehen sein wird, z. B. https://meineseite.de -- ohne Schrägstrich am Ende. RSS, Sitemap und Vorschauen beim Teilen werden daraus gebaut. Wird in config/site.yml und env.sh zugleich geschrieben, damit die beiden Kopien nicht auseinanderlaufen."
   e_base_url: "Das ist keine URL -- sie muss mit http:// oder https:// beginnen und einen Hostnamen enthalten."
   e_base_url_slash: "Entferne den Schrägstrich am Ende, sonst stehen in erzeugten Links zwei."
 
+  section_network_intro: "blog.sh hat keine eigene Kommentarfunktion. Stattdessen wird jeder neue Beitrag auf deinem Konto in einem sozialen Netzwerk angekündigt, und Antworten auf diese Ankündigung erscheinen unter dem Beitrag als seine Kommentare. Du wählst also das Netzwerk, auf dem du schon ein Konto hast (oder eines anlegst)."
   q_network: "Welches Netzwerk trägt die Kommentare?"
   network_mastodon: "Mastodon -- jeder Beitrag wird dort angekündigt, die Antworten sind seine Kommentare"
   network_bluesky: "Bluesky -- dieselbe Anordnung, auf Bluesky"
@@ -608,9 +614,9 @@ setup:
   network_off: "Kein Netzwerk. Beiträge werden veröffentlicht, aber nirgends angekündigt."
 
   q_instance: "Mastodon-Instanz"
-  h_instance: "Nur der Hostname -- mastodon.social, nicht https://mastodon.social/@du."
+  h_instance: "Nur der Name des Servers, auf dem dein Konto liegt -- mastodon.social, nicht https://mastodon.social/@du."
   e_instance: "Nur der Hostname, ohne https:// und ohne Pfad."
-  token_where: "Erstelle ihn auf %{instance} unter Einstellungen -> Entwicklung -> Neue Anwendung, mit der Berechtigung write:statuses."
+  token_where: "Der Token ist der Schlüssel, mit dem der Blog Ankündigungen in deinem Namen posten darf. Erstelle ihn auf %{instance}: Einstellungen -> Entwicklung -> Neue Anwendung, die Berechtigung write:statuses ankreuzen und den Zugriffstoken hierher kopieren."
   q_token: "Zugriffstoken (Enter überspringt -- die Eingabe wird nicht angezeigt): "
   token_skipped: "Kein Token. Die Website funktioniert, sie kündigt nur nie etwas an, bis du einen in env.sh einträgst."
   checking_token: "Frage die Instanz, ob der Token funktioniert"
@@ -630,35 +636,37 @@ setup:
   q_app_password: "App-Passwort (Enter überspringt -- die Eingabe wird nicht angezeigt): "
   password_skipped: "Kein App-Passwort. Die Website funktioniert, sie kündigt nur nie etwas an, bis du eines in env.sh einträgst."
 
+  section_deploy_intro: "Die fertige Website ist ein gewöhnlicher Ordner voller Dateien; hier wird gewählt, wohin ./blog.sh deploy ihn nach jeder Änderung hochlädt. Richte dich danach, wo die Website laufen wird -- und wenn du es noch nicht weißt, lass die erste Option stehen. Ändern geht jederzeit, ./setup.sh einfach noch einmal starten."
   q_backend: "Wohin soll die gebaute Website?"
-  backend_none: "Noch nirgendwo -- lokal bauen und ansehen, später entscheiden"
-  backend_surfer: "Cloudron Surfer -- Upload über dessen Files-API"
-  backend_local: "Ein Verzeichnis auf diesem Rechner -- eines, das dein nginx/Caddy ausliefert"
-  backend_rsync: "rsync -- jedes Ziel, lokal oder über SSH"
-  backend_git: "Git -- der Build wird als Snapshot in einen Branch gepusht, für GitHub/GitLab/Codeberg Pages"
-  backend_rclone: "rclone -- S3, R2, B2, WebDAV, alles was rclone spricht"
-  backend_sftp: "SFTP -- für Hosts, die weder rsync noch git haben"
+  backend_none: "Noch nirgendwo -- lokal schreiben und ansehen, später entscheiden"
+  backend_surfer: "Cloudron Surfer -- du betreibst ein eigenes Cloudron mit der Surfer-App darauf"
+  backend_local: "Ein Verzeichnis auf diesem Rechner -- ein Webserver (nginx, Caddy ...) läuft direkt hier"
+  backend_rsync: "rsync -- dein eigener Server, auf dem du dich per SSH anmeldest"
+  backend_git: "GitHub/GitLab/Codeberg Pages -- der Git-Host liefert die Website kostenlos aus"
+  backend_rclone: "rclone -- Cloud-Speicher wie S3, R2, B2 oder WebDAV"
+  backend_sftp: "SFTP -- klassisches Webhosting, hochgeladen wird per SFTP"
   backend_skipped: "Kein Deploy-Ziel. Builds bleiben lokal; ./blog.sh preview zeigt sie."
 
   q_surfer_url: "URL der Surfer-App"
-  h_surfer_url: "Die Basis-URL der Cloudron-App -- darunter liegt ihre Files-API."
+  h_surfer_url: "Die Adresse, unter der die Surfer-App läuft -- dieselbe, die die Besucher der Website sehen. Z. B. https://blog.meinedomain.de."
+  surfer_token_where: "Den Token stellt Surfer in seiner Weboberfläche aus: in der App anmelden und Settings -> Access Tokens öffnen."
   q_surfer_token: "Surfer-Zugriffstoken (die Eingabe wird nicht angezeigt): "
   q_surfer_remote_dir: "Unterverzeichnis auf Surfer"
-  h_surfer_remote_dir: "Wohin unterhalb der App die Website gehört. Leer bedeutet das Wurzelverzeichnis der App."
+  h_surfer_remote_dir: "Nur ausfüllen, wenn die Website in einem Unterordner neben etwas anderem wohnen soll. Enter = die Website liegt direkt unter der Adresse der App."
   q_deploy_target_dir: "Verzeichnis"
-  h_deploy_target_dir: "Der absolute Pfad, in den der Build kopiert wird -- der, den dein Webserver ausliefert."
+  h_deploy_target_dir: "Der absolute Pfad des Ordners, den dein Webserver der Welt zeigt -- dorthin wird der Build kopiert. Z. B. /var/www/meineseite."
   q_rsync_target: "rsync-Ziel"
-  h_rsync_target: "So wie rsync es nimmt: user@server:/var/www/meineseite, oder ein lokaler Pfad."
+  h_rsync_target: "Schreib, was du rsync geben würdest: user@server:/var/www/meineseite, oder ein lokaler Pfad."
   q_git_pages_remote: "Git-Remote"
-  h_git_pages_remote: "Das Repository, in das gepusht wird, z. B. git@github.com:du/seite.git."
+  h_git_pages_remote: "Das Repository, in das die fertige Website gepusht wird und aus dem Pages ausliefert. Z. B. git@github.com:du/seite.git."
   q_git_pages_branch: "Branch"
-  h_git_pages_branch: "In welchen Branch der Snapshot gepusht wird. gh-pages ist die übliche Antwort."
+  h_git_pages_branch: "In diesen Branch wird die Website force-gepusht. gh-pages ist die übliche Antwort."
   q_rclone_target: "rclone-Ziel"
-  h_rclone_target: "remote:pfad, z. B. r2:mein-bucket/seite. Die Zugangsdaten liegen in rclones eigener Konfiguration."
+  h_rclone_target: "remote:pfad, z. B. r2:mein-bucket/seite. Die Zugangsdaten liegen in rclones eigener Konfiguration (rclone config)."
   q_sftp_target: "SFTP-Host"
-  h_sftp_target: "user@server, so wie openssh es nimmt."
+  h_sftp_target: "user@server -- Anmeldename und Adresse, wie dein Hoster sie dir gegeben hat."
   q_sftp_remote_dir: "Verzeichnis auf dem Host"
-  h_sftp_remote_dir: "Wohin auf diesem Host die Website gehört."
+  h_sftp_remote_dir: "Der Ordner auf dem Server, den das Hosting der Welt zeigt -- oft www oder public_html."
   target_ok: "✅ %{dir} existiert."
   target_missing: "%{dir} existiert noch nicht. Lege es vor dem ersten Deploy an, sonst hat der Deploy keinen Ort für die Website."
 
@@ -673,6 +681,7 @@ setup:
 # Ende, in dem alles als Diff gezeigt und geschrieben oder verworfen wird.
 wizard:
   prompt_with_current: "Jetzt: %{current}\n> "
+  prompt_with_suggestion: "Vorschlag: %{current}\n> "
   empty_value: "(nicht gesetzt)"
   choice_prompt: "Auswahl: "
   menu_hint: "↑↓ bewegen · Enter wählen · 1-9 Schnellwahl · Esc aktuellen Wert behalten"

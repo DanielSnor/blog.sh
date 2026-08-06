@@ -33,15 +33,19 @@ module Wizard
   # which is what makes every question skippable and the whole run
   # re-runnable over a config somebody already has a site on.
   #
+  # `suggested:` changes only the default's label: "Now:" claims somebody
+  # chose this value, and for a template placeholder or a detected
+  # timezone nobody did. Enter takes what is shown either way.
+  #
   # EOF means "keep everything from here on", not "answer empty": a piped
   # run that runs out of input must not silently blank the rest of the
   # config, so it raises and the caller's handler reports that nothing
   # was written.
-  def ask(label, current, hint: nil)
+  def ask(label, current, hint: nil, suggested: false)
     puts Tui.paint(label, :bold)
     puts Tui.paint("   #{hint}", :dim) if hint
     shown = current.to_s.empty? ? t('empty_value') : current.to_s
-    print t('prompt_with_current', current: shown)
+    print t(suggested ? 'prompt_with_suggestion' : 'prompt_with_current', current: shown)
     answer = $stdin.gets
     raise Interrupt if answer.nil?
 
@@ -54,9 +58,9 @@ module Wizard
   # block returns nil when happy or the sentence explaining what is
   # wrong -- said immediately, while the answer is still in mind, rather
   # than saved up for a validation report at the end.
-  def ask_valid(label, current, hint: nil)
+  def ask_valid(label, current, hint: nil, suggested: false)
     loop do
-      answer = ask(label, current, hint: hint)
+      answer = ask(label, current, hint: hint, suggested: suggested)
       return answer if answer == current || answer.to_s.empty?
 
       problem = yield(answer)

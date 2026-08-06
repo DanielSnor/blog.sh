@@ -17,9 +17,11 @@ prints what an installation is running.
 - **`./setup.sh` -- setting a site up is now a conversation.** The
   documented path was to copy two files and edit 277 lines of commented
   YAML; this asks instead, and checks every answer as it arrives. The
-  timezone is offered from the machine's own zone database and rejected
-  if it isn't one -- the setting whose typo would otherwise silently date
-  every post two hours off. The address is checked for shape and written
+  timezone is offered from the machine's own zone database -- unless the
+  machine sits on UTC, which is a fact about the datacenter rather than
+  about the person answering; then the wizard's own language makes the
+  suggestion -- and rejected if it isn't a real zone: the setting whose
+  typo would otherwise silently date every post two hours off. The address is checked for shape and written
   to **both** `config/site.yml` and `env.sh`, because env.sh's copy
   overrides the other and the shipped example has it pointing at
   `example.com`: fill in only the config and the site still calls itself

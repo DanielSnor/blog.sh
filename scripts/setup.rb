@@ -70,12 +70,12 @@ end
 
 # The prompt loop, the menu and the review-and-write moment live in
 # lib/wizard.rb, shared with ./style.sh -- see the reasoning there.
-def ask(label, current, hint: nil)
-  Wizard.ask(label, current, hint: hint)
+def ask(label, current, hint: nil, suggested: false)
+  Wizard.ask(label, current, hint: hint, suggested: suggested)
 end
 
-def ask_valid(label, current, hint: nil, &check)
-  Wizard.ask_valid(label, current, hint: hint, &check)
+def ask_valid(label, current, hint: nil, suggested: false, &check)
+  Wizard.ask_valid(label, current, hint: hint, suggested: suggested, &check)
 end
 
 def choose(label, options, current_index: 0)
@@ -109,6 +109,20 @@ def valid_timezone?(zone)
   return false unless zone.match?(SiteConfig::ZONE_NAME_RE)
 
   zone == 'UTC' || File.exist?(File.join('/usr/share/zoneinfo', zone))
+end
+
+# A machine set to UTC is almost always a server, and its zone is a fact
+# about the datacenter, not about the person answering -- offered as a
+# default it gets accepted, and every post is then timestamped hours off.
+# The language just chosen for the wizard is the better witness there;
+# English narrows nothing down, so it falls back to the detection.
+ZONE_FOR_LANG = { 'cs' => 'Europe/Prague', 'de' => 'Europe/Berlin' }.freeze
+
+def suggest_timezone
+  detected = detect_timezone
+  return detected unless detected.nil? || detected == 'UTC' || detected.start_with?('Etc/')
+
+  ZONE_FOR_LANG[I18n.lang] || detected
 end
 
 LOCALE_FOR = { 'en' => 'en_US', 'cs' => 'cs_CZ', 'de' => 'de_DE' }.freeze
@@ -162,6 +176,7 @@ def run
   puts t('intro')
   puts
   puts Tui.paint(t('intro_skip'), :dim)
+  puts Tui.paint(t('intro_expert'), :dim)
   puts
 
   site = ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
@@ -190,6 +205,25 @@ def current_values
   data.is_a?(Hash) ? data : {}
 end
 
+# The template's own values, so a prompt can tell a placeholder from an
+# answer: on a fresh run every default is the template's, and on a re-run
+# whatever still matches it ("Your Name...", example.com) is exactly what
+# nobody has answered yet. Those defaults are shown as suggestions, not
+# as facts somebody chose.
+def template_values
+  @template_values ||= begin
+    data = YAML.load_file(SITE_YML_EXAMPLE, aliases: true)
+    data.is_a?(Hash) ? data : {}
+  rescue StandardError
+    {}
+  end
+end
+
+def template?(current, *keys)
+  value = current.dig(*keys)
+  !value.nil? && value == template_values.dig(*keys)
+end
+
 # First, and in a menu rather than a prompt, because the answer decides
 # what language the REST of the wizard speaks -- and a question about
 # language is the one question that cannot be asked in the language the
@@ -215,24 +249,31 @@ def ask_identity(site, current)
   puts Tui.paint(t('section_identity'), :bold)
   puts
 
-  title = ask(t('q_title'), current.dig('site', 'title'), hint: t('h_title'))
+  title = ask(t('q_title'), current.dig('site', 'title'), hint: t('h_title'),
+              suggested: template?(current, 'site', 'title'))
   site.set(%w[site title], title)
 
-  short = ask(t('q_short_name'), current.dig('site', 'short_name'), hint: t('h_short_name'))
+  short = ask(t('q_short_name'), current.dig('site', 'short_name'), hint: t('h_short_name'),
+              suggested: template?(current, 'site', 'short_name'))
   site.set(%w[site short_name], short)
 
-  desc = ask(t('q_description'), current.dig('site', 'description'), hint: t('h_description'))
+  desc = ask(t('q_description'), current.dig('site', 'description'), hint: t('h_description'),
+             suggested: template?(current, 'site', 'description'))
   site.set(%w[site description], desc)
 
-  author = ask(t('q_author'), current.dig('site', 'author'), hint: t('h_author'))
+  author = ask(t('q_author'), current.dig('site', 'author'), hint: t('h_author'),
+               suggested: template?(current, 'site', 'author'))
   site.set(%w[site author], author)
 
   # On a first run the "current" value is the template's Europe/Prague,
-  # which is a placeholder rather than an answer -- so the machine's own
-  # zone wins there. On a re-run the config's value is a real decision
-  # somebody made, and detection must not quietly overrule it.
-  zone = (@fresh ? detect_timezone : nil) || current.dig('site', 'timezone') || detect_timezone
-  zone = ask_valid(t('q_timezone'), zone, hint: t('h_timezone')) do |answer|
+  # which is a placeholder rather than an answer -- so the suggestion
+  # (the machine's zone, unless that is a server's UTC) wins there. On a
+  # re-run the config's value is a real decision somebody made, and
+  # detection must not quietly overrule it.
+  config_zone = current.dig('site', 'timezone')
+  zone = @fresh ? (suggest_timezone || config_zone) : (config_zone || suggest_timezone)
+  zone = ask_valid(t('q_timezone'), zone, hint: t('h_timezone'),
+                   suggested: @fresh || config_zone.to_s.empty?) do |answer|
     valid_timezone?(answer) ? nil : t('e_timezone', zone: answer)
   end
   site.set(%w[site timezone], zone) if zone
@@ -248,7 +289,8 @@ def ask_address(site, env, current)
   puts Tui.paint(t('section_address'), :bold)
   puts
 
-  url = ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url')) do |answer|
+  url = ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url'),
+                  suggested: template?(current, 'site', 'base_url')) do |answer|
     if !answer.match?(%r{\Ahttps?://[^/\s]+})
       t('e_base_url')
     elsif answer.end_with?('/')
@@ -263,6 +305,11 @@ end
 
 def ask_network(site, env, current)
   puts Tui.paint(t('section_network'), :bold)
+  puts
+  # The one place the wizard explains a concept before asking: that the
+  # comments ARE a social network's replies is the engine's central
+  # arrangement, and nothing on a fresh install has shown it yet.
+  puts t('section_network_intro')
   puts
 
   now = if current['mastodon'] then 'mastodon'
@@ -372,6 +419,8 @@ SECRET_VALUES = %w[SURFER_TOKEN].freeze
 def ask_deploy(env, _current)
   puts Tui.paint(t('section_deploy'), :bold)
   puts
+  puts t('section_deploy_intro')
+  puts
 
   now = ENV['DEPLOY_BACKEND'].to_s
   now = 'surfer' unless now.empty? || BACKENDS.any? { |b| b.first == now }
@@ -389,6 +438,9 @@ def ask_deploy(env, _current)
   values = BACKENDS.find { |b| b.first == chosen }.last
   values.each do |name|
     if SECRET_VALUES.include?(name)
+      # Same courtesy the Mastodon token gets: say where a secret comes
+      # from before asking for it.
+      puts t('surfer_token_where') if name == 'SURFER_TOKEN'
       value = Tui.password(t("q_#{name.downcase}"))
       puts
     else
