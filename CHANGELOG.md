@@ -294,6 +294,29 @@ prints what an installation is running.
 
 ### Fixes
 
+- **A busy Wayback Machine no longer reads as a blog that was never
+  archived.** Every query to the Archive ran inside a rescue that turned
+  any failure into "nothing here", and the Archive rate-limits precisely
+  the traffic a rescue makes -- a dozen queries in a row from one
+  client. A run that met a 503 therefore announced `No feed captures,
+  and no way to tell posts from listings`, followed by an empty list of
+  sample paths to build a `POST_PATTERN` from, because that query had
+  failed too: a transport hiccup stated as a fact about the blog, and
+  the one hint for working around it missing. The feed was in the
+  Archive the whole time.
+
+  Requests now wait a busy Archive out -- four attempts, fifteen seconds
+  longer between each -- and that covers everything the rescue fetches,
+  captures and images included, not just the index queries. An
+  unanswered query is kept apart from one that came back empty: only the
+  second is a fact about the blog, and a run that cannot tell which it
+  got now says so and stops, rather than falling through to page mode
+  and blaming the site. Queries still unanswered after the retries are
+  named in the summary, so a rescue that quietly missed part of a blog
+  says which part. And when the Archive genuinely kept no post pages,
+  that is now its own sentence instead of a request for a pattern with
+  nothing to build one from.
+
 - **The menu no longer runs under the search box.** A site using every
   content type has nine items in the bar, and nine did not fit: measured
   against the 908px a 940px page leaves, the three shipped locales came
