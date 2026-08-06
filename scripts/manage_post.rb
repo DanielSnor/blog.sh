@@ -2216,7 +2216,12 @@ end
 # query language as the site's search box, a look at the post under the
 # cursor, and Enter to open it.
 
-BROWSE_HOT_KEYS = %w[/ t s g x p].freeze
+# The keys this screen claims. Deliberately none of the letters that mean
+# an ACTION elsewhere in the CLI -- p is "publish" in three dialogs and x
+# is "delete" in two, and a key whose meaning depends on which screen you
+# are looking at is a key that will eventually be pressed on the wrong
+# one. Preview is the space bar, the way every file manager does it.
+BROWSE_HOT_KEYS = ['/', 't', 's', 'g', 'z', ' '].freeze
 
 # The title is what a person recognises a post by, so it goes where the
 # eye lands. Over half of an imported archive has no title at all (a
@@ -2513,13 +2518,13 @@ def cmd_browse(filters = {})
       state[:selected] = 0
       state[:offset] = 0
       print "\e[2J\e[H"
-    when 'x'
+    when 'z'
       active.each_key { |name| active[name] = nil }
       state[:query] = ''
       state[:selected] = 0
       state[:offset] = 0
       contexts.clear
-    when 'p'
+    when ' '
       selected = row && view[row]
       next if selected.nil?
 

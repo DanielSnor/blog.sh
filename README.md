@@ -115,9 +115,9 @@ deploy step around exactly that. A few of the choices that came out of it:
   count), a **live full-text search that speaks the same query language
   as the site's search box** -- words are ANDed, `"a quoted phrase"` is
   one token, `-word` excludes, diacritics never decide a match -- a line
-  of the post's own text showing why it matched, `p` for a read-only
-  preview of the whole post, and Enter to open the one you were looking
-  for. Piped or scripted, it prints the same list `list` does
+  of the post's own text showing why it matched, the space bar for a
+  read-only preview of the whole post, and Enter to open the one you were
+  looking for. Piped or scripted, it prints the same list `list` does
 - `list [--type=] [--tag=] [--drafts]` -- the same filters, printed:
   one line per post, for grep and for pipes
 - `rebuild` -- build and deploy in one step

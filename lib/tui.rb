@@ -444,6 +444,10 @@ module Tui
           rows, status = yield(query, true)
         elsif hot_keys.include?(key)
           return [:key, key, rows.empty? ? nil : state[:selected]]
+        elsif key == ' '
+          # Space pages when nobody has claimed it -- which is what it does
+          # in `less`, and what the preview screen wants.
+          page.call(row_window)
         end
       end
     end

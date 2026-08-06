@@ -412,7 +412,10 @@ prints what an installation is running.
   own text showing why it matched; `p` opens the whole post read-only
   (the same markdown `edit` would give you, with media lines shortened to
   their file names); Enter opens it for editing and comes back to the same
-  row, same filter. The rows lead with the title, falling back to the slug
+  row, same filter. The keys are deliberately none of the letters that
+  mean an action elsewhere in the CLI -- p is "publish" in three dialogs
+  and x is "delete" in two -- so the preview is the space bar, the way
+  every file manager does it, and clearing the filters is z. The rows lead with the title, falling back to the slug
   for the posts that have none -- on an imported archive that is over half
   of them. `list` is unchanged and still prints the slug first: down a
   pipe that is the thing you copy into the next command, and `browse`
