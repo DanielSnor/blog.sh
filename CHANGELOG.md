@@ -438,6 +438,18 @@ prints what an installation is running.
 
 ### Fixes
 
+- **An Instagram HTML export requested in Czech now imports, instead of
+  "importing" zero posts without a word of why.** The HTML reader knew
+  English month names only, and any box whose printed date it did not
+  recognize was quietly dropped -- so an export requested in the one
+  language this project ships a locale for came out as a clean, silent
+  zero. The timestamp reading now lives with the rest of the
+  Meta-family HTML machinery (Czech and English tables, each verified
+  against a real export); an unrecognized language is named in one
+  line, a file none of whose posts could be dated says so out loud,
+  and the English export the reader was built against still reads back
+  identical -- all 288 posts, byte for byte, before and after.
+
 - **A Wayback rescue now says up front what it can and cannot recover.**
   Two things decide whether the hours a rescue takes are worth spending,
   and the preview reported neither, so both were discovered the hard way:

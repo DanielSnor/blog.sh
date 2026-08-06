@@ -277,6 +277,13 @@ exactly those falling in Pacific daylight-saving months, disagreed by
 exactly an hour, and the JSON export's epochs settled which side was
 right. The JSON path has none of this: an epoch means what it says.
 
+That clock also prints its month names in the language the export was
+requested in. Czech and English are understood -- the same tables the
+Facebook and Threads imports use -- and an export in another language
+names the token it cannot read and skips those posts, rather than
+guessing at a calendar; a file none of whose posts could be dated says
+so in one line instead of importing nothing in silence.
+
 ### Jekyll, Hugo, or any markdown folder
 
 ```bash
