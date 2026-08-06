@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.3 -- unreleased
+## 1.2 -- unreleased
 
 ### New
 
@@ -83,34 +83,6 @@ prints what an installation is running.
   It runs on configurations too broken for anything else to load,
   including one whose YAML will not parse -- which is exactly when it is
   wanted. Exit status is non-zero for errors only; warnings are advice.
-
-### Changed
-
-- **A YAML syntax error in `config/site.yml` is now a sentence, not a
-  backtrace.** It used to surface as a Psych exception from whichever
-  entry point happened to read the file first. It now names the line, the
-  column, the three usual causes (a tab where spaces belong, a missing
-  quote, a colon inside an unquoted value) and points at `doctor`.
-
-- **Configuration written by the engine keeps its comments.** Both
-  wizards write through a text-level editor that substitutes values into
-  the documented template and leaves every other byte alone, rather than
-  loading the YAML and dumping it back -- which would have thrown away
-  the ~200 lines of explanation, the commented-out blocks you uncomment
-  when you want a widget, and the folded scalars real sites keep HTML in.
-  Every write is verified by reading the file back, and restored from its
-  backup if it does not read the way it was asked for.
-
-  The diff both wizards show before writing is a proper LCS diff.
-  Line-for-line comparison failed in a way that mattered: adding one
-  entry to a list shifts every line below it, so a four-line change read
-  as "everything from here to the end of the file" -- which is precisely
-  the impression a tool asking permission to edit your config must not
-  give.
-
-## 1.2 -- unreleased
-
-### New
 
 - **Ghost joined the import sources** -- the ninth. Point the wizard (or
   `migrate_ghost.rb`) at the JSON export plus the still-running site's
@@ -304,15 +276,6 @@ prints what an installation is running.
   itself owns (`/posts/`, `/tag/`, ...) are refused out loud, and a live
   page always wins over a redirect.
 
-### Changed
-
-- The "what next?" menu after a save reads in flow order --
-  `[d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete` --
-  the states a post moves through, rather than most-frequent-first. The
-  keys are unchanged.
-
-### New
-
 - **The queue got its own screen.** `./blog.sh queue` (and a matching
   wizard menu entry) lists every scheduled post in publish order and
   acts on the one you pick: move it a slot earlier or later, publish it
@@ -389,6 +352,35 @@ prints what an installation is running.
   overwrite a live page with a redirect stub and says so on every build,
   forever -- and nothing short of hand-editing the post's JSON could
   remove the entry. Those entries are marked "taken by another post".
+
+### Changed
+
+- **A YAML syntax error in `config/site.yml` is now a sentence, not a
+  backtrace.** It used to surface as a Psych exception from whichever
+  entry point happened to read the file first. It now names the line, the
+  column, the three usual causes (a tab where spaces belong, a missing
+  quote, a colon inside an unquoted value) and points at `doctor`.
+
+- **Configuration written by the engine keeps its comments.** Both
+  wizards write through a text-level editor that substitutes values into
+  the documented template and leaves every other byte alone, rather than
+  loading the YAML and dumping it back -- which would have thrown away
+  the ~200 lines of explanation, the commented-out blocks you uncomment
+  when you want a widget, and the folded scalars real sites keep HTML in.
+  Every write is verified by reading the file back, and restored from its
+  backup if it does not read the way it was asked for.
+
+  The diff both wizards show before writing is a proper LCS diff.
+  Line-for-line comparison failed in a way that mattered: adding one
+  entry to a list shifts every line below it, so a four-line change read
+  as "everything from here to the end of the file" -- which is precisely
+  the impression a tool asking permission to edit your config must not
+  give.
+
+- The "what next?" menu after a save reads in flow order --
+  `[d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete` --
+  the states a post moves through, rather than most-frequent-first. The
+  keys are unchanged.
 
 ### Fixes
 
