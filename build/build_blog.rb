@@ -18,6 +18,7 @@ require_relative '../lib/content_type'
 require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 require_relative '../lib/colors_css'
+require_relative '../lib/post_text'
 
 SiteConfig.use_site_timezone!
 
@@ -729,18 +730,12 @@ def plain_text_length(post)
   end
 end
 
+# Lives in lib/post_text.rb, shared with the CLI's archive browser -- the
+# terminal searches these same words with no index to consult, so the two
+# must extract the same text or the same query would answer differently
+# in the browser and in the terminal.
 def plain_text_for_search(post)
-  parts = post['content'].flat_map do |block|
-    case block['type']
-    when 'text' then [block['text']]
-    when 'list' then (block['items'] || []).map { |it| it['text'] }
-    when 'table' then ((block['header'] || []) + (block['rows'] || []).flatten).map { |c| c['text'] }
-    when 'image' then [block['alt_text'], block['caption']]
-    when 'link' then [block['title'], block['description']]
-    else []
-    end
-  end
-  parts.compact.join(' ')
+  PostText.plain(post)
 end
 
 def truncate_excerpt(text, len = 200)
@@ -1391,7 +1386,7 @@ def search_index_entry(post)
     title: post['title'],
     date: post_display_time(post).strftime(t('date_format')),
     excerpt: truncate_excerpt(text),
-    folded: fold([post['title'], text, (post['tags'] || []).join(' ')].compact.join(' '))
+    folded: PostText.searchable(post, text)
   }
 end
 
