@@ -599,6 +599,23 @@ module ConfigWriter
       @lines.join
     end
 
+    # What this run has set NAME to, before anything is saved -- so a
+    # caller can act on an answer it just collected (checking that a
+    # deploy directory exists) without reaching into the file or the
+    # environment, neither of which knows about it yet.
+    def value(name)
+      @intended[name]
+    end
+
+    # All of them, for the caller that has to bring its own process's ENV
+    # up to date: env.sh is read by the SHELL that started us, so anything
+    # written here is invisible to this process until someone copies it
+    # across. Without that, a check run after the write still sees the
+    # values the wizard just replaced.
+    def values
+      @intended.dup
+    end
+
     def diff
       before = @original.lines
       out = []
