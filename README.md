@@ -218,6 +218,11 @@ deploy step around exactly that. A few of the choices that came out of it:
   badge hover, search input background) is derived from those 7, not
   separately configurable. Defaults to blog.sh's own blue palette
   (`DEFAULT_COLORS`) if `colors:` is omitted
+- Four whole palettes ship in `config/palettes.yml` -- default blue,
+  warm, monochrome, high contrast, each in both modes -- so `./style.sh`
+  can set a palette in one keystroke instead of asking for fourteen hex
+  values. Add your own by adding an entry; the wizard lists what's in
+  the file
 - Banner overlay: `site.short_name` (top-left) and `site.description`
   (bottom-right, wraps to multiple lines) render on top of the banner
   image. Each overlay darkens the corner it sits in so it stays readable
@@ -293,6 +298,7 @@ deploy step around exactly that. A few of the choices that came out of it:
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
 setup.sh                 Setup wizard -- identity, address, comments network, deploy target
+style.sh                 Appearance wizard -- palette, banner, about, footer, sidebar
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
@@ -360,21 +366,27 @@ below assume Ruby 2.7+ is already on the machine:
    env.sh`) and edit them; both are fully commented, an unedited pair is
    already a working local site, and the wizard writes the same files
    without disturbing a line you wrote yourself.
-2. `./blog.sh doctor` any time you want to know whether the
+2. `./style.sh` for how it looks and what it says about itself: the
+   palette (four ship with the engine, so it is one keystroke rather
+   than fourteen hex values), the banner image (copied into place and
+   measured, so its declared size can't drift from the file), your bio,
+   the footer, the social icons and the sidebar widgets. A menu, so you
+   can come back to one section without walking through the rest.
+3. `./blog.sh doctor` any time you want to know whether the
    configuration is sound -- it reads what is on disk and reports every
    problem at once, in whole sentences, including the ones that fail
    silently (a timezone typo, a banner whose declared size no longer
    matches the file, a sidebar widget that can never show anything).
-3. Replace `assets/images/header.png` (the banner) and
-   `assets/images/favicon.png` with your own -- defaults ship with the engine
-   (`assets/images/defaults/`, copied to any missing live name at build time),
-   so a fresh clone renders before you've drawn anything, and the live names
-   are gitignored so your artwork survives `git pull`. Update `banner.width`/
-   `height` to your image's real size; that's what reserves layout space
-   before it loads.
-4. `./blog.sh add` to write your first post.
-5. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
-6. `./blog.sh preview` to look at it locally before deploying anywhere
+4. The favicon is the one piece of artwork no wizard handles: replace
+   `assets/images/favicon.png` with your own. Both it and the banner
+   ship as defaults (`assets/images/defaults/`, copied to any missing
+   live name at build time), so a fresh clone renders before you've
+   drawn anything, and the live names are gitignored so your artwork
+   survives `git pull` -- which also means nothing else keeps a copy, so
+   put both in your backup.
+5. `./blog.sh add` to write your first post.
+6. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
+7. `./blog.sh preview` to look at it locally before deploying anywhere
    (serves `public.nosync/` at `http://localhost:8000`, Ctrl-C stops it).
 
 Every integration beyond the core (analytics, each sidebar widget,

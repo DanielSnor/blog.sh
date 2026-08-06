@@ -38,6 +38,34 @@ prints what an installation is running.
   change any of this later. Editing the files by hand keeps working
   exactly as before; the two are interchangeable, in both directions.
 
+- **`./style.sh` -- the appearance half, and four palettes to pick
+  from.** Split from setup by lifecycle rather than by file (both write
+  `config/site.yml`): setup asks the things you answer once, this is
+  everything you come back and fiddle with, so it is a menu you dip into
+  -- palette, banner, about, footer, social icons, sidebar widgets,
+  fonts, analytics.
+
+  The palette section is the reason it exists. Choosing between fourteen
+  hex values is exactly as blind in a wizard as it is in YAML, so whole
+  palettes now ship in `config/palettes.yml` -- default blue, warm,
+  monochrome and high contrast, each in both light and dark -- and
+  picking one is a keystroke. They are the palettes from the "Seven
+  keys" gallery on blogsh.app, whose light modes are exactly what that
+  page showed; the dark modes are new, since the gallery only ever had
+  light homepages. Add your own by adding an entry to that file: the
+  wizard lists whatever is in it, and a palette you add needs no
+  translation to appear.
+
+  The banner section is the other one worth naming: give it the path to
+  an image and it copies the file into place and **measures** it.
+  `banner.width`/`height` exist to reserve layout space before the image
+  loads, they have always been copied by hand, and a stale pair makes
+  every page jump as it loads.
+
+  As everywhere else here: every question skippable, nothing written
+  until you have seen the diff and confirmed it, and the file keeps
+  every comment it had.
+
 - **`./blog.sh doctor` -- what is wrong with this configuration, all of
   it, at once.** Every abort in the engine is correct where it stands,
   but each reports only the first problem, from wherever the code
@@ -72,6 +100,13 @@ prints what an installation is running.
   when you want a widget, and the folded scalars real sites keep HTML in.
   Every write is verified by reading the file back, and restored from its
   backup if it does not read the way it was asked for.
+
+  The diff both wizards show before writing is a proper LCS diff.
+  Line-for-line comparison failed in a way that mattered: adding one
+  entry to a list shifts every line below it, so a four-line change read
+  as "everything from here to the end of the file" -- which is precisely
+  the impression a tool asking permission to edit your config must not
+  give.
 
 ## 1.2 -- unreleased
 

@@ -263,6 +263,11 @@ brings the site back wearing the engine's default artwork. Set
 dimensions of your image: those attributes are what reserves space before
 it loads, and a mismatch makes the page jump.
 
+`./style.sh` does that part for you -- give it the path to an image and
+it copies the file into place, reads its real dimensions and writes
+them, so the pair can never drift from the file. `./blog.sh doctor`
+reports it if they ever do.
+
 The favicon is used three ways from that one file: the `<link rel="icon">`,
 an `apple-touch-icon` (iOS scales it down for a home-screen bookmark), and
 a generated `/favicon.ico` for clients that request the root path without
