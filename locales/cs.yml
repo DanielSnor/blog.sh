@@ -261,11 +261,11 @@ cli:
   no_published_posts: "Žádný publikovaný post k dispozici."
   trash_empty: "Koš je prázdný."
 
-  default_rebuild_reason: "Přebuiluji a nasazuji"
+  default_rebuild_reason: "Sestavuji a nasazuji"
   build_failed: "\n❌ Build selhal — nenasazuji. Příspěvek je uložený, po opravě spusť ./scripts/deploy-web.sh"
-  deploy_failed: "\n❌ Nasazení selhalo. Web je přebuildovaný; důvod je výš. Přerušený přenos stačí spustit znovu (./scripts/deploy-web.sh) — pojistka, která nahrávání zastavila, ho zastaví stejně znovu, dokud neuděláš, co říká."
+  deploy_failed: "\n❌ Nasazení selhalo. Web je sestavený; důvod je výš. Přerušený přenos stačí spustit znovu (./scripts/deploy-web.sh) — pojistka, která nahrávání zastavila, ho zastaví stejně znovu, dokud neuděláš, co říká."
 
-  rebuild_prompt: "Přebuildovat a nasadit web teď? [Y/n] "
+  rebuild_prompt: "Znovu sestavit a nasadit web teď? [Y/n] "
 
   usage: |
     usage:
@@ -280,7 +280,7 @@ cli:
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
-      ./blog.sh rebuild              přebuilduje a nasadí celý web, bez vazby na konkrétní post
+      ./blog.sh rebuild              znovu sestaví a nasadí celý web, bez vazby na konkrétní post
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
@@ -299,7 +299,7 @@ cli:
   wizard_menu_queue: "Fronta naplánovaných postů — pořadí, publikovat hned, vyřadit"
   wizard_menu_restore: "Koš — obnovit smazané posty"
   wizard_menu_browse: "Archiv — filtry, hledání, náhled; Enter otevře příspěvek"
-  wizard_menu_rebuild: "Rebuild a nasadit web po změně nastavení"
+  wizard_menu_rebuild: "Web — znovu sestavit a nasadit po změně nastavení"
   browse_keys: "↑↓ pohyb · Enter otevřít · / hledat · p náhled · t typ · s stav · g štítek · x zrušit filtry · Esc zpět"
   browse_search_keys: "piš dotaz · Enter potvrdit · „fráze v uvozovkách“ · -bez tohoto slova · Esc zrušit hledání"
   browse_searching: "Hledat: %{query}▏"
@@ -359,8 +359,8 @@ cli:
   addresses_drop_confirm: "Zrušit %{address}? Ten odkaz tím přestane fungovat natrvalo. [a/N] "
   addresses_dropped: "🔗 %{address} zrušeno — už nikam nepřesměrovává."
   addresses_none: "Tenhle post nemá žádné staré adresy."
-  pin_on: "📌 Připnuto — po příštím rebuildu se drží nahoře na úvodní stránce."
-  pin_off: "Odepnuto — po příštím rebuildu zpátky v běžném chronologickém pořadí."
+  pin_on: "📌 Připnuto — po příštím sestavení se drží nahoře na úvodní stránce."
+  pin_off: "Odepnuto — po příštím sestavení zpátky v běžném chronologickém pořadí."
   pin_other: "Pozn.: připnutý je i „%{slug}\" — nahoře bude novější z nich, dokud ho neodepneš."
   rename_taken: "Slug „%{slug}\" už patří jinému postu — zvol jiný."
   rename_prompt: "Nový slug (prázdné = zrušit): "
@@ -444,8 +444,8 @@ import:
   nothing_to_import: "Není co importovat."
   confirm_prompt: "Zapsat těchto %{count} postů? Potvrď napsáním %{count} (cokoli jiného ruší): "
   running: "Importuji %{label} — stahuji média, může to chvíli trvat…"
-  rebuild_prompt: "Přebuildovat a nasadit web? [Y/n] "
-  rebuilding: "Přebuildovávám a nasazuji"
+  rebuild_prompt: "Znovu sestavit a nasadit web? [Y/n] "
+  rebuilding: "Sestavuji a nasazuji"
   cancelled: "Zrušeno, nic se nezapsalo."
   interrupted: "Přerušeno. Dosud zapsané posty už jsou v content.nosync/ — opakovaný import je bezpečný, přepíše je na místě."
   source_died: "⚠️  Zdroj přestal odpovídat po %{count} položkách: %{error}. Čísla níže jsou částečný součet, ne celý zdroj. Už zapsané posty jsou uložené — opakované spuštění je bezpečné, párují se přes source id a nikdy se nezduplikují."
@@ -767,7 +767,7 @@ style:
   palette_set: "✅ %{name}."
   palettes_unreadable: "config/palettes.yml se nepodařilo přečíst (%{message}), takže zbývá jen ruční zadání."
   q_palette_preview: "Ukázat náhled, jak s touhle paletou vypadá web? [A/n] "
-  pv_building: "Stavím náhled"
+  pv_building: "Sestavuji náhled"
   pv_title: "Náhled palety: %{name}"
   pv_hint: "Světlý a tmavý režim vedle sebe. Odkazy schválně nikam nevedou, najetí myší funguje. Nic zatím není zapsáno — rozhoduje se zpátky v průvodci."
   pv_opened: "✅ Náhled se otevřel v prohlížeči (%{path})."
@@ -894,6 +894,6 @@ style:
   q_list_title: "Název odkazu"
   q_list_url: "Adresa, kam míří"
 
-  q_rebuild: "Přestavět web hned, ať se na to můžeš podívat? [a/N] "
-  rebuilt: "✅ Postaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
+  q_rebuild: "Znovu sestavit web hned, ať se na to můžeš podívat? [a/N] "
+  rebuilt: "✅ Sestaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
   rebuild_failed: "Build nedoběhl — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."

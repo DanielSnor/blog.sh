@@ -308,7 +308,7 @@ cli:
   wizard_menu_queue: "The scheduled-post queue -- reorder, publish now, remove"
   wizard_menu_restore: "Trash -- restore a deleted post"
   wizard_menu_browse: "The archive -- filters, search, preview; Enter opens the post"
-  wizard_menu_rebuild: "Rebuild and deploy the site after a settings change"
+  wizard_menu_rebuild: "The site -- rebuild and deploy after a settings change"
   browse_keys: "↑↓ move · Enter open · / search · p preview · t type · s state · g tag · x clear filters · Esc back"
   browse_search_keys: "type to search · Enter keep it · \"a quoted phrase\" · -without this word · Esc drop the search"
   browse_searching: "Search: %{query}▏"

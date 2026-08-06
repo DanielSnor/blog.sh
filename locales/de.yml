@@ -305,7 +305,7 @@ cli:
   wizard_menu_queue: "Die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, entfernen"
   wizard_menu_restore: "Papierkorb -- gelöschte Beiträge wiederherstellen"
   wizard_menu_browse: "Das Archiv -- Filter, Suche, Vorschau; Enter öffnet den Beitrag"
-  wizard_menu_rebuild: "Website nach einer Einstellungsänderung neu bauen und ausliefern"
+  wizard_menu_rebuild: "Die Website -- nach einer Einstellungsänderung neu bauen und ausliefern"
   browse_keys: "↑↓ bewegen · Enter öffnen · / suchen · p Vorschau · t Typ · s Status · g Schlagwort · x Filter löschen · Esc zurück"
   browse_search_keys: "tippen zum Suchen · Enter übernehmen · „eine Wortgruppe“ · -ohne dieses Wort · Esc Suche verwerfen"
   browse_searching: "Suchen: %{query}▏"
