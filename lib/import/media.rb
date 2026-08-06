@@ -43,6 +43,13 @@ module Import
       @registered
     end
 
+    # Lets an adapter tell a preview from a real run -- in dry-run no
+    # bytes exist, so any "is the downloaded file actually an image?"
+    # judgement has to be suspended.
+    def dry_run?
+      @dry_run
+    end
+
     # Downloads url and registers it, returning the local filename to
     # store in the post (or nil when it couldn't be fetched -- the caller
     # decides whether that costs the whole block or just the media).
@@ -80,6 +87,25 @@ module Import
 
       path = @files.key(filename)
       path && MediaDimensions.image(path)
+    end
+
+    # Un-registers a downloaded file an adapter decided was not media
+    # after all (the Wayback Machine answers missing images with an HTML
+    # page and a 200) -- so the fake never gets copied into the post's
+    # media directory.
+    def discard(filename)
+      return if @dry_run
+
+      path = @files.key(filename)
+      return unless path
+
+      @files.delete(path)
+      @registered -= 1
+      begin
+        File.delete(path)
+      rescue SystemCallError
+        nil
+      end
     end
 
     # Registers a file the export already contains. Same contract as

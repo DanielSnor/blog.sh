@@ -452,6 +452,29 @@ embedded status link -- which deliberately also skips a tweet that merely
 links to another tweet. Media is copied from the export itself, no network.
 t.co links come out as their readable targets.
 
+### Wayback Machine — rescuing a dead blog
+
+```bash
+ruby scripts/migrate_wayback.rb <https://dead-blog.example>
+```
+
+For the blog whose platform no longer exists -- blog.cz, Posterous, a
+deleted account anywhere. The trick is that the Internet Archive
+crawled the blog's **feed** again and again over the years, and each
+capture carries the posts of its day: reading every distinct capture
+oldest-first reassembles the history, with the usual re-import
+matching merging the overlaps. Point it at the blog's old URL (the
+common feed paths are tried) or straight at its feed; images recover
+from the Archive the same way, rerouted to the nearest capture.
+
+Honesty is the whole design here. The Archive only has what its
+crawler met: posts it never saw stay lost, images it never saved are
+dropped and **counted** (it answers a missing image with an HTML page
+and a straight-faced 200 -- anything that doesn't measure as an image
+is treated as lost, not saved broken). The Archive is also slow the
+way a library is slow -- one request per second (`WAYBACK_DELAY` to go
+gentler), so a long history takes minutes and narrates its progress.
+
 ### Wix
 
 ```bash

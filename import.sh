@@ -28,7 +28,9 @@ can't give without having read the preview.
 Sources: Bluesky (public API, no credentials), Tumblr (needs
 TUMBLR_API_KEY in env.sh), LiveJournal (needs LJ_PASSWORD in env.sh --
 there is no export file, and the password travels only as a challenge
-digest), any podcast RSS feed by URL (episode audio and artwork are
+digest), the Wayback Machine (point it at a DEAD blog's old URL --
+its archived feed captures reassemble the history, images and all),
+any podcast RSS feed by URL (episode audio and artwork are
 downloaded for keeps -- the preview says how many gigabytes), and fourteen
 things you already have on disk -- a beehiiv posts CSV, a Blogger Atom
 backup (posts come over, the comments and settings it mixes in are
@@ -61,6 +63,7 @@ immediately, with no preview pass:
   ruby scripts/migrate_substack.rb <path-to-unpacked-export>
   ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
   ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+  ruby scripts/migrate_wayback.rb <https://dead-blog.example[/rss]>
   ruby scripts/migrate_wix.rb <posts.csv>
   ruby scripts/migrate_feed.rb <export.xml | feed-url>
 

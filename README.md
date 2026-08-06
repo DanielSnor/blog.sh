@@ -243,7 +243,7 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Nineteen sources: Bluesky, LiveJournal and Tumblr via their APIs;
+- Twenty sources: Bluesky, LiveJournal and Tumblr via their APIs;
   beehiiv, Blogger, Ghost, Instagram, Mastodon, Medium, Movable
   Type/TypePad, Pixelfed, Squarespace, Substack, Twitter/X and Wix from
   their account exports and backups; a Jekyll or Hugo
@@ -251,7 +251,8 @@ deploy step around exactly that. A few of the choices that came out of it:
   file, any RSS/Atom feed by URL, and any podcast feed with its
   episodes' audio downloaded for keeps -- Tumblr and Twitter carried
   over from the original migration of four Tumblr blogs and a Twitter
-  archive (2008-2022)
+  archive (2008-2022); and the Wayback Machine, for a blog whose
+  platform no longer exists at all
 - A blog that keeps its domain keeps its addresses: sources that know
   their posts' original URLs (beehiiv, Blogger, Ghost, Medium, Movable
   Type/TypePad, Squarespace, Substack, WordPress, Tumblr, Wix) can record each
@@ -462,6 +463,7 @@ Available sources:
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
 | Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN |
+| Wayback Machine | the dead blog's old URL | the Archive's captures of the blog's FEED, every distinct version oldest-first — overlaps merge, images recover from the Archive, what it never saved is counted as lost |
 | WordPress | a WXR export file | every post; pages, attachments and menu items are skipped |
 | RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 
@@ -485,6 +487,7 @@ ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
 ruby scripts/migrate_substack.rb <path-to-unpacked-export>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+ruby scripts/migrate_wayback.rb <https://dead-blog.example>
 ruby scripts/migrate_wix.rb <posts.csv>
 ruby scripts/migrate_feed.rb <export.xml | feed-url>
 ```

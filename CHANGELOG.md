@@ -47,6 +47,19 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **The Wayback Machine joined the import sources** -- the twentieth,
+  and the one for blogs whose platform no longer exists at all. The
+  Archive crawled the blog's FEED over and over for years; reading
+  every distinct capture oldest-first (CDX index, digest-deduplicated,
+  original bytes via the id_ endpoint) reassembles the history, and
+  re-import matching merges the overlaps. Images recover from the
+  Archive by the same time machine. What the crawler never met stays
+  lost and is said so: unreadable captures are counted, and a missing
+  image -- which the Archive answers with an HTML page and a 200 -- is
+  detected by failing to measure as an image and counted as lost
+  rather than saved broken. Verified live by rescuing posts from a
+  Posterous blog dead since 2013.
+
 - **LiveJournal joined the import sources** -- the nineteenth, and the
   one that comes entirely over the wire: LJ has no export file, so the
   import speaks its XML-RPC API, challenge digest for every call (the

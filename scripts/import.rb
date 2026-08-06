@@ -30,6 +30,7 @@ require_relative '../lib/import/blogger'
 require_relative '../lib/import/bluesky'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
+require_relative '../lib/import/wayback'
 require_relative '../lib/import/wix'
 require_relative '../lib/import/feed'
 require_relative '../lib/import/ghost'
@@ -72,6 +73,7 @@ SOURCES = [
   ['substack', -> { build_substack }],
   ['tumblr', -> { build_tumblr }],
   ['twitter', -> { build_twitter }],
+  ['wayback', -> { build_wayback }],
   ['wix', -> { build_wix }],
   ['feed', -> { build_feed }]
 ].freeze
@@ -328,6 +330,18 @@ def build_substack
   end
 
   Import::Substack.new(dir, site_url: url)
+end
+
+def build_wayback
+  url = ask('import.wayback_url_prompt')
+  return nil unless url
+
+  unless url.start_with?('http://', 'https://')
+    puts t('import.wayback_url_invalid', url: url)
+    return nil
+  end
+
+  Import::Wayback.new(url)
 end
 
 def build_wix
