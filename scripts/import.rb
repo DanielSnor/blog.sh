@@ -33,6 +33,7 @@ require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
 require_relative '../lib/import/pixelfed'
 require_relative '../lib/import/instagram'
+require_relative '../lib/import/substack'
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -51,6 +52,7 @@ SOURCES = [
   ['instagram', -> { build_instagram }],
   ['mastodon', -> { build_mastodon }],
   ['pixelfed', -> { build_pixelfed }],
+  ['substack', -> { build_substack }],
   ['tumblr', -> { build_tumblr }],
   ['twitter', -> { build_twitter }],
   ['feed', -> { build_feed }]
@@ -178,6 +180,31 @@ def build_twitter
   end
 
   Import::Twitter.new(dir)
+end
+
+# The URL prompt is the one place empty does NOT cancel: the /p/<slug>
+# paths that redirects need are derivable from the export alone, so the
+# domain is a nice-to-have for provenance, not a requirement worth
+# aborting over.
+def build_substack
+  dir = ask('import.substack_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  unless File.exist?(File.join(dir, 'posts.csv'))
+    puts t('import.substack_dir_invalid', dir: dir)
+    return nil
+  end
+
+  print t('import.substack_url_prompt')
+  url = $stdin.gets.to_s.strip
+  url = nil if url.empty?
+  if url && !url.start_with?('http://', 'https://')
+    puts t('import.ghost_url_invalid', url: url)
+    return nil
+  end
+
+  Import::Substack.new(dir, site_url: url)
 end
 
 def ask_source

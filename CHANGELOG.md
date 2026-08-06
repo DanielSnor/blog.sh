@@ -26,6 +26,16 @@ prints what an installation is running.
   imports: the wizard's source menu gained an entry, so a piped
   `printf "N\n"` may now pick a different source.
 
+- **Substack joined the import sources** -- the tenth. Point the wizard
+  (or `migrate_substack.rb`) at the unpacked export directory.
+  Newsletters and podcasts import, drafts included, podcast mp3s
+  download as leading audio blocks, and paid posts arrive in full --
+  the export is the author's own, so the paywall marker is simply
+  removed. Subtitles become first paragraphs. Threads and pages are
+  skipped out loud, as are posts whose HTML the export didn't include
+  (a real Substack habit with the newest posts). Tags don't exist in
+  the export at all -- posts arrive with just the platform tag.
+
 - **A migrated blog can keep its old addresses.** Posts have a new
   `redirect_from` key -- a list of site-root paths the post answered at on
   its previous platform -- and the build serves a redirect at each one,

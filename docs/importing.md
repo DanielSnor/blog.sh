@@ -54,8 +54,8 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (Ghost, WordPress/feed and Tumblr today) can record each published
-  post's old path as `redirect_from` -- the build then serves a redirect at every one
+  (Ghost, Substack, WordPress/feed and Tumblr today) can record each
+  published post's old path as `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -217,6 +217,29 @@ are downloaded; real pixel sizes come from the export's metadata. Trailing
 hashtag-only lines are dropped from captions -- they are already the post's
 tags, and would otherwise render as a stack of one-word paragraphs. Replies
 and reblogs are skipped and counted.
+
+### Substack
+
+```bash
+ruby scripts/migrate_substack.rb <path-to-unpacked-export> [site-url]
+```
+
+In Substack: **Settings → Exports → Export your data**. Unpack the ZIP
+and point the script at the directory itself -- the one holding
+`posts.csv` and `posts/`. The site URL is optional: the `/p/<slug>`
+paths that redirects need come straight out of the export, the domain
+only adds each post's full address for the record.
+
+Newsletters and podcasts come over, drafts included; a podcast episode's
+mp3 downloads and leads the post as an audio block. **Paid posts import
+in full** -- the export is the author's, so it carries the complete
+text, and the paywall marker is simply removed. The subtitle becomes the
+post's first paragraph. Threads and pages are skipped and counted.
+
+Two honest gaps, both the export's: **tags don't exist in it** (Substack
+keeps them only on the live site -- posts arrive with just the platform
+tag), and the newest posts sometimes ship as CSV rows with no HTML body
+-- those are skipped and counted rather than imported empty.
 
 ### Tumblr
 
