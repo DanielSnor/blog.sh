@@ -1038,7 +1038,7 @@ def pick_among_years(slug, paths)
   puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint'))
+    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain'))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
@@ -2079,7 +2079,7 @@ def pick_among_trashed(slug, paths)
   puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint'))
+    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain'))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
@@ -2832,7 +2832,8 @@ def run_wizard
       puts
       puts t('cli.wizard_prompt_action')
       puts
-      index = Tui.menu(WIZARD_MENU.map { |_, desc| desc }, hint: t('cli.menu_hint'))
+      index = Tui.menu(WIZARD_MENU.map { |_, desc| desc },
+                       hint: t('cli.wizard_menu_hint', count: WIZARD_MENU.size))
       # Esc leaves the cursor on the line right under the hint, so the shell
       # prompt lands flush against the menu. One blank line to sit on the
       # way out -- which is also what the piped branch below already does

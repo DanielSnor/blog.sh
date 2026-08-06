@@ -196,6 +196,8 @@ cli:
   queue_compact_prompt: "Den Rest der Warteschlange (%{count}) einen Slot nach vorn rücken? [j/N] "
   queue_compacted: "Warteschlange gerückt: jeder folgende Post übernahm den früheren Slot."
   menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
+  menu_hint_plain: "↑↓ bewegen · Enter wählen · 1-9 Schnellwahl · Esc abbrechen"
+  wizard_menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc beenden"
   wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"
   qr_hint: "Mit dem Handy scannen, um die Vorschau zu öffnen."
   announcing: "Kündige an"
