@@ -56,12 +56,18 @@ module Doctor
   # mastodon.instance's "mastodon.social" is deliberately NOT here: it is
   # the template's placeholder AND the largest real instance, so flagging
   # it would cry wolf at the people most likely to be right.
+  # The footer headings ("Links", "Find me on") are deliberately not
+  # here either, for the same reason as mastodon.social: they are
+  # placeholder AND perfectly good answers, so an English site keeping
+  # them is more likely right than stale. The copyright line is not --
+  # nobody's real copyright reads "All rights reserved" with no name.
   PLACEHOLDERS = {
     %w[site title] => 'Your Name - personal web/log',
     %w[site short_name] => 'YOURSITE',
     %w[site description] => 'Personal web/log of Your Name',
     %w[site author] => 'Your Name',
-    %w[banner alt] => 'Your Site'
+    %w[banner alt] => 'Your Site',
+    %w[footer copyright] => 'All rights reserved &copy; 2026'
   }.freeze
 
   COLOR_KEYS = %w[bg text meta_text accent nav_bg border pill_bg].freeze
@@ -204,6 +210,9 @@ module Doctor
   def check_placeholders(data)
     stale = PLACEHOLDERS.select { |path, value| dig(data, *path) == value }.keys
     stale << %w[about html] if dig(data, 'about', 'html').to_s.include?('A short bio about yourself')
+    # Substring, like about.html: the note is folded YAML, so the loaded
+    # value differs from the template file's literal text by its wrapping.
+    stale << %w[footer note_html] if dig(data, 'footer', 'note_html').to_s.include?('caught your eye')
 
     social = data['social']
     stale << %w[social] if social.is_a?(Array) && social.any? { |s| s.is_a?(Hash) && s['url'].to_s.include?('yourname') }

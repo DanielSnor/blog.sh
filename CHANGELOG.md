@@ -398,6 +398,12 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Footer headings only render over content.** An emptied social list
+  (or one never filled in) left its heading -- "Find me on", pointing at
+  nothing -- on every page, and the links and note columns had the same
+  habit. Each footer block now appears only when it has something to
+  show; the three-column layout keeps its shape either way. Found live
+  on the first site configured wholly through the wizards.
 - **The trash is keyed by year and slug, like the content it holds.** The
   same slug in two years is two posts -- backdating makes that ordinary --
   but the trash was keyed by slug alone, so deleting the older one wiped
