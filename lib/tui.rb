@@ -151,6 +151,26 @@ module Tui
     end
   end
 
+  # A line of input that never appears on screen -- for the one dialog in
+  # this engine that asks for a credential (./setup.sh). Echo is restored
+  # by noecho's own ensure, so an interrupt mid-answer can't leave the
+  # terminal silent, which is the classic way a password prompt breaks a
+  # shell.
+  #
+  # Piped input skips the ceremony: there is no terminal to echo to, and
+  # $stdin.noecho would raise on a pipe.
+  def password(prompt)
+    print prompt
+    unless interactive?
+      value = $stdin.gets.to_s.chomp
+      return value
+    end
+
+    value = $stdin.noecho(&:gets).to_s.chomp
+    puts
+    value
+  end
+
   # Clamps a scrolling window of `window` items (out of `total`) so that
   # `selected` stays inside it, moving the window by the minimum amount
   # rather than re-centering it. Wraparound (selected jumping from the

@@ -439,6 +439,35 @@ reference encoder.
 config is meant to sync across environments so local and production
 render identically; tokens are meant to exist only where they're used.
 
+**Config written by the engine is edited as text, never dumped from a
+parsed hash.** Loading `config/site.yml`, changing a key and writing it
+back is one line of Ruby and would have destroyed the thing that makes
+the file usable: of its 277 example lines, only about 60 are keys. The
+rest is the documentation for every setting the engine has, plus the
+commented-out blocks you uncomment when you want a widget or a custom
+font -- and real sites hand-edit around it (sean.cz keeps an `<img>`
+inside `about.html`'s folded scalar). So `lib/config_writer.rb`
+substitutes values line by line and leaves every other byte identical,
+and a config that doesn't exist yet is seeded from the example verbatim
+so every key it will ever set is already present to be substituted into.
+*Cost:* a text editor for a structured format, which is only safe
+because it is anchored (key name plus the exact indentation its parent
+implies, searched only inside that parent) and verified afterwards by
+reparsing the file and comparing the values back. Prose comments in the
+template parse as keys otherwise -- `# Optional: posts per listing page`
+would index as `Optional:`.
+
+**`./setup.sh` asks for credentials; `./import.sh` deliberately does
+not.** The import wizard reads `TUMBLR_API_KEY` from the environment
+because a bulk import is not the place to be handling a token, and there
+is a documented file for it. Setup is that file's other end -- it exists
+to create `env.sh` -- so refusing to ask would leave the one job it
+cannot delegate undone. The token is read without echo, masked in the
+diff it shows back, written into a file created mode 600, and verified
+against the instance before it is kept. *Cost:* one dialog in this
+engine handles a secret, so that is one place to be careful about
+rather than none.
+
 **Colors are 7 keys per mode; everything else is derived.** Across
 every palette this engine actually shipped, the other custom properties
 never varied independently -- so they're computed in one function

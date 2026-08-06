@@ -10,6 +10,129 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.3 -- unreleased
+
+### New
+
+- **`./setup.sh` -- setting a site up is now a conversation.** The
+  documented path was to copy two files and edit 277 lines of commented
+  YAML; this asks instead, and checks every answer as it arrives. The
+  timezone is offered from the machine's own zone database and rejected
+  if it isn't one -- the setting whose typo would otherwise silently date
+  every post two hours off. The address is checked for shape and written
+  to **both** `config/site.yml` and `env.sh`, because env.sh's copy
+  overrides the other and the shipped example has it pointing at
+  `example.com`: fill in only the config and the site still calls itself
+  example.com in its feed, sitemap and every share preview. The Mastodon
+  token is verified against the instance on the spot, and the numeric
+  account id comes back out of that same call -- so the sidebar widget
+  that is most often filled in with an `@handle` (and then silently shows
+  nothing) can simply be offered, already correct. Choosing one comments
+  network switches the other off, since a config with both is one the
+  build refuses to load.
+
+  Nothing is written until the end: answers are collected, both files'
+  diffs are shown with secrets masked, and one confirmation covers the
+  lot -- so Ctrl-C anywhere leaves an existing install exactly as it was.
+  Every question can be skipped with Enter, and re-running it is how you
+  change any of this later. Editing the files by hand keeps working
+  exactly as before; the two are interchangeable, in both directions.
+
+- **`./style.sh` -- the appearance half, and four palettes to pick
+  from.** Split from setup by lifecycle rather than by file (both write
+  `config/site.yml`): setup asks the things you answer once, this is
+  everything you come back and fiddle with, so it is a menu you dip into
+  -- palette, banner, about, footer, social icons, sidebar widgets,
+  fonts, analytics.
+
+  The palette section is the reason it exists. Choosing between fourteen
+  hex values is exactly as blind in a wizard as it is in YAML, so whole
+  palettes now ship in `config/palettes.yml` -- default blue, warm,
+  monochrome and high contrast, each in both light and dark -- and
+  picking one is a keystroke. They are the palettes from the "Seven
+  keys" gallery on blogsh.app, whose light modes are exactly what that
+  page showed; the dark modes are new, since the gallery only ever had
+  light homepages. Add your own by adding an entry to that file: the
+  wizard lists whatever is in it, and a palette you add needs no
+  translation to appear.
+
+  The banner section is the other one worth naming: give it the path to
+  an image and it copies the file into place and **measures** it.
+  `banner.width`/`height` exist to reserve layout space before the image
+  loads, they have always been copied by hand, and a stale pair makes
+  every page jump as it loads.
+
+  As everywhere else here: every question skippable, nothing written
+  until you have seen the diff and confirmed it, and the file keeps
+  every comment it had.
+
+- **`./blog.sh doctor` -- what is wrong with this configuration, all of
+  it, at once.** Every abort in the engine is correct where it stands,
+  but each reports only the first problem, from wherever the code
+  happened to notice. Doctor reads what is on disk and reports the lot in
+  whole sentences, each with a fix line written for somebody who does not
+  know which file the setting lives in. It concentrates on what fails
+  *silently*: an unknown timezone (Ruby falls back to UTC and says
+  nothing), a banner whose declared size no longer matches the file so
+  every page jumps as it loads, a widget that can never show anything, a
+  font named in the config but missing from `assets/fonts/`, a deploy
+  backend configured half way, the example's text still sitting where
+  visitors would read it. `--online` additionally asks whether the feeds,
+  the analytics script and the access token still answer.
+
+  It runs on configurations too broken for anything else to load,
+  including one whose YAML will not parse -- which is exactly when it is
+  wanted. Exit status is non-zero for errors only; warnings are advice.
+
+### Changed
+
+- **A YAML syntax error in `config/site.yml` is now a sentence, not a
+  backtrace.** It used to surface as a Psych exception from whichever
+  entry point happened to read the file first. It now names the line, the
+  column, the three usual causes (a tab where spaces belong, a missing
+  quote, a colon inside an unquoted value) and points at `doctor`.
+
+- **Configuration written by the engine keeps its comments.** Both
+  wizards write through a text-level editor that substitutes values into
+  the documented template and leaves every other byte alone, rather than
+  loading the YAML and dumping it back -- which would have thrown away
+  the ~200 lines of explanation, the commented-out blocks you uncomment
+  when you want a widget, and the folded scalars real sites keep HTML in.
+  Every write is verified by reading the file back, and restored from its
+  backup if it does not read the way it was asked for.
+
+  The diff both wizards show before writing is a proper LCS diff.
+  Line-for-line comparison failed in a way that mattered: adding one
+  entry to a list shifts every line below it, so a four-line change read
+  as "everything from here to the end of the file" -- which is precisely
+  the impression a tool asking permission to edit your config must not
+  give.
+
+### Fixes
+
+- **A busy Wayback Machine no longer reads as a blog that was never
+  archived.** Every query to the Archive ran inside a rescue that turned
+  any failure into "nothing here", and the Archive rate-limits precisely
+  the traffic a rescue makes -- a dozen queries in a row from one
+  client. A run that met a 503 therefore announced `No feed captures,
+  and no way to tell posts from listings`, followed by an empty list of
+  sample paths to build a `POST_PATTERN` from, because that query had
+  failed too: a transport hiccup stated as a fact about the blog, and
+  the one hint for working around it missing. The feed was in the
+  Archive the whole time.
+
+  Requests now wait a busy Archive out -- four attempts, fifteen seconds
+  longer between each -- and that covers everything the rescue fetches,
+  captures and images included, not just the index queries. An
+  unanswered query is kept apart from one that came back empty: only the
+  second is a fact about the blog, and a run that cannot tell which it
+  got now says so and stops, rather than falling through to page mode
+  and blaming the site. Queries still unanswered after the retries are
+  named in the summary, so a rescue that quietly missed part of a blog
+  says which part. And when the Archive genuinely kept no post pages,
+  that is now its own sentence instead of a request for a pattern with
+  nothing to build one from.
+
 ## 1.2 -- unreleased
 
 ### New

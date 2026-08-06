@@ -218,6 +218,11 @@ deploy step around exactly that. A few of the choices that came out of it:
   badge hover, search input background) is derived from those 7, not
   separately configurable. Defaults to blog.sh's own blue palette
   (`DEFAULT_COLORS`) if `colors:` is omitted
+- Four whole palettes ship in `config/palettes.yml` -- default blue,
+  warm, monochrome, high contrast, each in both modes -- so `./style.sh`
+  can set a palette in one keystroke instead of asking for fourteen hex
+  values. Add your own by adding an entry; the wizard lists what's in
+  the file
 - Banner overlay: `site.short_name` (top-left) and `site.description`
   (bottom-right, wraps to multiple lines) render on top of the banner
   image. Each overlay darkens the corner it sits in so it stays readable
@@ -293,6 +298,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
+setup.sh                 Setup wizard -- identity, address, comments network, deploy target
+style.sh                 Appearance wizard -- palette, banner, about, footer, sidebar
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
@@ -348,25 +355,39 @@ copy-paste path per platform -- Ruby included -- in
 [docs/install.md → Quick start](docs/install.md#quick-start). The steps
 below assume Ruby 2.7+ is already on the machine:
 
-1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
-   site's title, description, social links, and (optionally) analytics,
-   sidebar widgets, and the comments network (Mastodon or Bluesky). Set
-   `site.timezone` if you'll publish from a server -- a server clock is
-   usually UTC, and without it `schedule` reads times as UTC and a post
-   written after midnight can be dated to the previous day.
-2. Copy `env.sh.example` to `env.sh` and `chmod 600 env.sh`. An unedited
-   copy is enough to try things out locally -- without the Surfer values,
-   uploads are simply skipped (logged, not an error).
-3. Replace `assets/images/header.png` (the banner) and
-   `assets/images/favicon.png` with your own -- defaults ship with the engine
-   (`assets/images/defaults/`, copied to any missing live name at build time),
-   so a fresh clone renders before you've drawn anything, and the live names
-   are gitignored so your artwork survives `git pull`. Update `banner.width`/
-   `height` to your image's real size; that's what reserves layout space
-   before it loads.
-4. `./blog.sh add` to write your first post.
-5. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
-6. `./blog.sh preview` to look at it locally before deploying anywhere
+1. `./setup.sh` -- it asks for the site's title, description, timezone,
+   address, comments network (Mastodon or Bluesky) and deploy target,
+   checks each answer as you give it, and writes `config/site.yml` and
+   `env.sh`. Every question can be skipped, nothing is written until you
+   have seen the diff and confirmed it, and re-running it is how you
+   change any of this later.
+
+   Prefer to do it by hand? Copy `config/site.yml.example` to
+   `config/site.yml` and `env.sh.example` to `env.sh` (`chmod 600
+   env.sh`) and edit them; both are fully commented, an unedited pair is
+   already a working local site, and the wizard writes the same files
+   without disturbing a line you wrote yourself.
+2. `./style.sh` for how it looks and what it says about itself: the
+   palette (four ship with the engine, so it is one keystroke rather
+   than fourteen hex values), the banner image (copied into place and
+   measured, so its declared size can't drift from the file), your bio,
+   the footer, the social icons and the sidebar widgets. A menu, so you
+   can come back to one section without walking through the rest.
+3. `./blog.sh doctor` any time you want to know whether the
+   configuration is sound -- it reads what is on disk and reports every
+   problem at once, in whole sentences, including the ones that fail
+   silently (a timezone typo, a banner whose declared size no longer
+   matches the file, a sidebar widget that can never show anything).
+4. The favicon is the one piece of artwork no wizard handles: replace
+   `assets/images/favicon.png` with your own. Both it and the banner
+   ship as defaults (`assets/images/defaults/`, copied to any missing
+   live name at build time), so a fresh clone renders before you've
+   drawn anything, and the live names are gitignored so your artwork
+   survives `git pull` -- which also means nothing else keeps a copy, so
+   put both in your backup.
+5. `./blog.sh add` to write your first post.
+6. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
+7. `./blog.sh preview` to look at it locally before deploying anywhere
    (serves `public.nosync/` at `http://localhost:8000`, Ctrl-C stops it).
 
 Every integration beyond the core (analytics, each sidebar widget,
@@ -400,6 +421,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh rebuild              # rebuilds and deploys the whole site
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```
