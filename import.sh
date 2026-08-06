@@ -31,14 +31,17 @@ there is no export file, and the password travels only as a challenge
 digest), the Wayback Machine (point it at a DEAD blog's old URL --
 its archived feed captures reassemble the history, images and all),
 any podcast RSS feed by URL (episode audio and artwork are
-downloaded for keeps -- the preview says how many gigabytes), and fourteen
-things you already have on disk -- a beehiiv posts CSV, a Blogger Atom
+downloaded for keeps -- the preview says how many gigabytes), and sixteen
+things you already have on disk -- a beehiiv posts CSV, an unpacked
+Facebook JSON export (crossposts from other platforms are skipped and
+counted -- their own imports carry the originals), a Blogger Atom
 backup (posts come over, the comments and settings it mixes in are
 skipped out loud), a Ghost JSON export (plus the still-running site's
 URL, its images only exist there), a Jekyll or Hugo tree (or any
 folder of markdown files a converter produced), an unpacked Medium
 export, a Movable Type or TypePad export file, a Squarespace XML
-export, an unpacked Substack export, a Twitter/X archive, a Mastodon
+export, an unpacked Substack export, an unpacked Threads export, a
+Twitter/X archive, a Mastodon
 account archive, a Pixelfed statuses export, a Wix blog CSV, an
 Instagram export (HTML or JSON, whichever you asked Instagram for), and
 WordPress or any RSS/Atom feed (one option, since a WXR export is RSS
@@ -50,6 +53,7 @@ immediately, with no preview pass:
   ruby scripts/migrate_beehiiv.rb <posts.csv>
   ruby scripts/migrate_blogger.rb <blog-backup.xml>
   ruby scripts/migrate_bluesky.rb <handle>
+  ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
   ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
   ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
   PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>
@@ -61,6 +65,7 @@ immediately, with no preview pass:
   ruby scripts/migrate_podcast.rb <feed-url | export.xml>
   ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
   ruby scripts/migrate_substack.rb <path-to-unpacked-export>
+  ruby scripts/migrate_threads.rb <path-to-unpacked-export>
   ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
   ruby scripts/migrate_twitter.rb <path-to-extracted-export>
   ruby scripts/migrate_wayback.rb <https://dead-blog.example[/rss]>

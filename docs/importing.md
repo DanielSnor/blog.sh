@@ -144,6 +144,31 @@ become tags. A video arrives as an HLS playlist rather than a file, so the
 post gets its poster frame as an image -- better in an archive than a
 "video unavailable" placeholder.
 
+### Facebook
+
+```bash
+ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
+```
+
+In Facebook: **Accounts Centre → Your information and permissions →
+Download your information** -- ask for **JSON** (the HTML variant is
+not supported, and the JSON has proper timestamps where HTML prints a
+wall clock in an unnamed timezone). Unpack the ZIP and point the
+script at the directory; photos and videos come from the archive
+itself, no network.
+
+The one thing to know: **an older Facebook account is mostly not
+Facebook**. Posts mirrored in from Twitter, Posterous and their era --
+often the vast majority -- are recognized (by the platform name in
+Facebook's own title line, and by the era's link shorteners) and
+**skipped with a count**, because those platforms' own imports carry
+the originals; importing them here would duplicate an entire Twitter
+archive. `FACEBOOK_CROSSPOSTS=1` includes them for an account that
+really lived on Facebook. Wordless check-ins and app stories are
+skipped and counted too. Facebook's export has no post ids at all, so
+re-import identity is minted from timestamp plus content -- stable
+across re-exports.
+
 ### Ghost
 
 ```bash
@@ -424,6 +449,25 @@ keeps them only on the live site -- posts arrive with just the platform
 tag), and the newest posts sometimes ship as CSV rows with no HTML body
 -- those are skipped and counted rather than imported empty.
 
+### Threads
+
+```bash
+ruby scripts/migrate_threads.rb <path-to-unpacked-export>
+```
+
+In Threads: **Settings → Account → Download your information** -- ask
+for **JSON**. Unpack the ZIP and point the script at the directory.
+Your own standalone posts import with their media from the archive;
+**replies to other people's threads are skipped and counted** -- the
+same rule as Bluesky and Twitter, an archive holds your own posts.
+Bare URLs in the text become real links, and Meta's mangled encoding
+is repaired the same way as for Facebook and Instagram.
+
+One flag the export carries deserves a word: `cross_post_source` is
+NOT treated as "this came from elsewhere" -- on real exports it sits
+on posts written directly in the Threads app too, recording where a
+post was *shared to*. Nothing is skipped because of it.
+
 ### Tumblr
 
 ```bash
@@ -466,6 +510,18 @@ oldest-first reassembles the history, with the usual re-import
 matching merging the overlaps. Point it at the blog's old URL (the
 common feed paths are tried) or straight at its feed; images recover
 from the Archive the same way, rerouted to the nearest capture.
+
+A blog the Archive only ever saw as pages -- no feed captures -- falls
+through to **page mode**: every archived post page, the newest capture
+of each. Which paths are posts is the one thing pages cannot say about
+themselves, so a **platform pack** answers it for platforms one was
+written for (blog.cz ships built in: `/YYMM/slug` paths, the article
+markup, Czech long-form dates), `POST_PATTERN` answers it anywhere
+else, and with neither the run refuses and prints sample paths to
+build a pattern from. `WAYBACK_MODE=pages` skips the feed attempt
+outright. Pages that refuse to parse as posts are skipped and counted
+(`unparsed`); posts whose page names no date carry their capture date,
+also counted.
 
 Honesty is the whole design here. The Archive only has what its
 crawler met: posts it never saw stay lost, images it never saved are

@@ -145,6 +145,39 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Threads joined the import sources** -- the twenty-second, closing
+  the social-network roster. The JSON export's shape is Meta's oddest
+  yet -- every post is a media list even when there is no media, with
+  the text riding in a title field -- and it is read as found: your
+  standalone posts import with media from the archive, replies to
+  other people's threads are skipped and counted (the Bluesky rule),
+  bare URLs become real links, and the shared MetaText repair fixes
+  the encoding. The export's cross_post_source flag is deliberately
+  NOT a skip signal: on real exports it marks posts written directly
+  in the Threads app too -- it records where a post was shared TO,
+  and skipping on it would empty the archive.
+
+- **Facebook joined the import sources** -- the twenty-first, built and
+  verified against a real "Download Your Information" JSON export. Your
+  own posts import with photos and videos from the archive itself; the
+  headline behaviour is what does NOT import silently: posts Facebook
+  mirrored in from Twitter, Posterous and their era -- on the reference
+  export, 95 % of everything -- are recognized and skipped with a
+  count, because those platforms' own imports carry the originals
+  (`FACEBOOK_CROSSPOSTS=1` includes them). Wordless check-ins and app
+  stories are counted skips too. Meta's byte-mangled text encoding is
+  repaired by the same logic the Instagram importer proved out, now in
+  a shared module for the whole Meta family.
+
+- **The import wizard's source menu is now two levels.** Twenty-one
+  sources in one column was a kilometre of scrolling; the first
+  question is now what the thing WAS -- a blog or publishing platform,
+  a social network, or a dead site (the Wayback Machine) -- and the
+  second picks the source inside the group. Backing out of a group
+  returns to the groups, not out of the wizard. **Scripted runs are
+  untouched:** the piped/non-interactive path keeps the single flat
+  numbered list, so existing `printf "N\n"` automation survives.
+
 - **The Wayback Machine joined the import sources** -- the twentieth,
   and the one for blogs whose platform no longer exists at all. The
   Archive crawled the blog's FEED over and over for years; reading
@@ -157,6 +190,16 @@ prints what an installation is running.
   detected by failing to measure as an image and counted as lost
   rather than saved broken. Verified live by rescuing posts from a
   Posterous blog dead since 2013.
+
+  A blog the Archive never saw a feed of falls through to **page
+  mode**: every archived post page, newest capture of each. Platform
+  packs decide which paths are posts and how the markup spells title,
+  date and body -- **blog.cz ships built in** (`/YYMM/slug`, the
+  article div, Czech long-form dates, windows-1250 era encodings
+  converted), `POST_PATTERN` covers platforms without a pack, and with
+  neither the run refuses and prints sample archived paths to build a
+  pattern from. Unparseable pages and posts dated only by their
+  capture are counted, never papered over.
 
 - **LiveJournal joined the import sources** -- the nineteenth, and the
   one that comes entirely over the wire: LJ has no export file, so the
@@ -349,6 +392,17 @@ prints what an installation is running.
 
 ### Fixes
 
+- **The menu no longer runs under the search box.** A site using every
+  content type has nine items in the bar, and nine did not fit: measured
+  against the 908px a 940px page leaves, the three shipped locales came
+  out at 906 (English), 927 (Czech) and 899 (German) -- so Czech
+  overflowed outright and the other two had single-digit slack, which is
+  why it collided anyway. Between the mobile breakpoint and the full
+  width every locale overflowed. The bar now sizes itself: the menu may
+  wrap to a second row, the search box never shrinks or gets overlapped
+  (and is 160px rather than 225px), and the gap between items is 1.25rem
+  rather than 1.875rem -- 80px recovered without shortening any label.
+  Czech now has 126px of slack where it had -19.
 - **A post moved to another year keeps its old link working.** Editing a
   post's date across a New Year moves its address from
   `/posts/2019/slug/` to `/posts/2020/slug/`; the redirect a rename would
