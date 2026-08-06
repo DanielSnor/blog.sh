@@ -87,7 +87,12 @@ nav {
   box-sizing: content-box;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  /* flex-start, NOT center: the active item's fill is exactly the bar's
+     60px content box (the transparent 5px borders and background-clip
+     keep it off the frame), so it only sits flush if the menu starts at
+     the top. Centering it left a strip of bar showing under the fill.
+     The search box centres itself with its own align-self. */
+  align-items: flex-start;
   gap: 1rem;
   border-top: 5px solid var(--nav-border);
   border-bottom: 5px solid var(--nav-border);
@@ -131,18 +136,30 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
    paint over. The negative margins let the fill spill into the gap on
    each side without widening the item -- without them every item after
    the active one shifts sideways, so the whole bar jumps as you move
-   between listings. They match the nav's own 16px padding rather than
-   some smaller inset, so an active HOME (always the first item) sits
-   flush with the bar's edge instead of leaving a 4px sliver of
-   background beside it. Only ever one item is active, so a fill
-   reaching 16px into a 30px gap can't collide with a neighbour's. */
+   between listings.
+
+   The inset is HALF the gap between items, so the fill reaches exactly
+   as far towards its neighbours as they are from it. It used to be the
+   nav's own 16px against a 30px gap, which was nearly half; when the
+   gap dropped to 20px to fit nine types, that same 16px left 4px of air
+   before the next label and the fill read as a too-wide block.
+
+   The first item is the exception: it has no neighbour on its left, and
+   the bar's own 16px padding is what it has to reach across to sit
+   flush with the edge instead of leaving a sliver of background beside
+   it. */
 nav a[aria-current="page"] {
   background: var(--accent);
   background-clip: padding-box;
   color: #ffffff;
-  padding: 0 16px;
-  margin-left: -16px;
-  margin-right: -16px;
+  padding: 0 0.625rem;
+  margin-left: -0.625rem;
+  margin-right: -0.625rem;
+}
+
+nav li:first-child a[aria-current="page"] {
+  padding-left: 1rem;
+  margin-left: -1rem;
 }
 /* Without this the generic :hover above would paint the text --accent
    on an --accent ground and the label would vanish. Inverts the way
