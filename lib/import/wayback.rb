@@ -47,12 +47,13 @@ module Import
     # are posts (as opposed to listings, tag pages, calendars). A
     # platform pack supplies it for hosts it knows; anywhere else the
     # user does, or page mode refuses with samples to build one from.
-    def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false)
+    def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false, pack: nil)
       @url = url.sub(%r{/+\z}, '')
       @delay = delay
       @post_pattern = post_pattern && Regexp.new(post_pattern)
       @mode = mode
       @keep_permalinks = keep_permalinks
+      @pack_name = pack.to_s.empty? ? nil : pack.to_s
       @snapshots_read = 0
       @unreadable = 0
       @lost_images = 0
@@ -65,7 +66,14 @@ module Import
       # came back empty, because only the second kind says anything about
       # the blog -- see refuse_unanswered.
       @cdx_failures = []
-      @pack = PACKS.find { |p| p.matches?(host) }
+      @pack =
+        if @pack_name
+          PACKS.find { |p| p.key == @pack_name } ||
+            abort("❌ Unknown pack '#{@pack_name}'. Built-in packs: #{PACKS.map(&:key).join(', ')}")
+        else
+          PACKS.find { |p| p.matches?(host) }
+        end
+      @sniffed = false
     end
 
     def label
@@ -137,6 +145,7 @@ module Import
 
     def postscript
       notes = []
+      notes << I18n.t('import.note.wayback_pack_detected', platform: @pack.key) if @sniffed
       notes << I18n.t('import.note.wayback_snapshots', count: @snapshots_read) if @snapshots_read.positive?
       notes << I18n.t('import.note.wayback_unreadable', count: @unreadable) if @unreadable.positive?
       notes << I18n.t('import.note.wayback_unparsed', count: @unparsed) if @unparsed.positive?
@@ -204,6 +213,7 @@ module Import
 
       paths = rows.group_by { |r| URI.parse(r[:original]).path rescue nil }
       paths.delete(nil)
+      sniff_pack(paths)
       posts = paths.select { |path, _| post_path?(path) }
       if posts.empty?
         sample = paths.keys.reject { |p| p == '/' }.first(12)
@@ -223,6 +233,29 @@ module Import
       # post the Archive ever saw.
       posts.map { |path, captures| captures.max_by { |c| c[:timestamp] }.merge(path: path) }
            .sort_by { |c| c[:path] }
+    end
+
+    # Neither the host nor the operator named a platform -- so one
+    # archived page gets fetched and the packs look at its markup.
+    # b2evolution is the whole reason this exists: every installation
+    # lived on its own domain, so there is no address shape to know it
+    # by, and without this the operator's only path was hand-writing
+    # POST_PATTERN for software with a perfectly recognizable template.
+    # Best-effort by design: a page the Archive won't serve right now
+    # just means no pack, and page mode then refuses with samples the
+    # way it always has.
+    def sniff_pack(paths)
+      return if @pack || @post_pattern
+
+      sample = paths['/'] || paths.each_value.first
+      return unless sample
+
+      capture = sample.max_by { |c| c[:timestamp] }
+      html = to_utf8(http_get("https://web.archive.org/web/#{capture[:timestamp]}id_/#{capture[:original]}"))
+      @pack = PACKS.find { |p| p.respond_to?(:detect?) && p.detect?(html) }
+      @sniffed = !@pack.nil?
+    rescue StandardError
+      nil
     end
 
     def post_path?(path)
@@ -560,6 +593,34 @@ module Import
     # A pack teaches page mode one dead platform: which paths were posts
     # and how its markup spelled title, date and body. Built from real
     # archived pages, not documentation -- there is none left.
+    #
+    # A pack is picked three ways, in this order: by name
+    # (WAYBACK_PACK=b2evolution) when the operator already knows what the
+    # site ran; by host, for platforms that had one (blog.cz); and by
+    # markup, sniffed from one archived page, for software that lived on
+    # anyone's domain (see sniff_pack).
+
+    # Shared by the packs: every platform's body div nests freely, and
+    # counting div tags finds its true end, where any regex would stop at
+    # the first nested close.
+    module PackMarkup
+      module_function
+
+      def balanced_div(html, opening)
+        m = html.match(opening)
+        return nil unless m
+
+        index = m.end(0)
+        depth = 1
+        while depth.positive? && (nxt = html.match(%r{<div\b|</div>}i, index))
+          depth += nxt[0].start_with?('</') ? -1 : 1
+          index = nxt.end(0)
+        end
+        return nil if depth.positive?
+
+        html[m.end(0)...(index - '</div>'.length)]
+      end
+    end
 
     # blog.cz (†2020, once the biggest Czech blog platform). Verified
     # against real captures: posts live at /YYMM/slug, the article sits
@@ -572,6 +633,10 @@ module Import
       DATE = /(\d{1,2})\.\s*(#{MONTHS.join('|')})\s*(\d{4})(?:\s*v\s*(\d{1,2}):(\d{2}))?/
 
       module_function
+
+      def key
+        'blogcz'
+      end
 
       def matches?(host)
         host.end_with?('.blog.cz')
@@ -598,24 +663,101 @@ module Import
           date: date, body: body }
       end
 
-      # The body div nests freely; counting div tags finds its true end,
-      # where any regex would stop at the first nested close.
       def balanced_div(html, opening)
-        m = html.match(opening)
-        return nil unless m
-
-        index = m.end(0)
-        depth = 1
-        while depth.positive? && (nxt = html.match(%r{<div\b|</div>}i, index))
-          depth += nxt[0].start_with?('</') ? -1 : 1
-          index = nxt.end(0)
-        end
-        return nil if depth.positive?
-
-        html[m.end(0)...(index - '</div>'.length)]
+        PackMarkup.balanced_div(html, opening)
       end
     end
 
-    PACKS = [BlogCz].freeze
+    # b2evolution -- self-hosted blog software, the workhorse of the
+    # 2003-2010 blogosphere's first wave. No host shape to recognize
+    # (every installation lived on its own domain), so this pack is
+    # chosen by markup or by name, never by address.
+    #
+    # Verified against a real 2008 skin, not documentation: the body sits
+    # in <div class="bText">, rendered by the stock _item_content.inc.php
+    # template that skins practically never replaced -- which is what
+    # makes this pack general. The title is <h3 class="bTitle"> (an <h2>
+    # fallback for skins that used the request title); tags are links in
+    # <div class="posttags"> behind a localized label ("Tags:",
+    # "Značky:"); ads and search boxes sit OUTSIDE bText, so taking only
+    # the balanced div excludes them by construction.
+    #
+    # The date is the skin's choice. The numeric form b2evolution shipped
+    # is y/m/d with a TWO-DIGIT year ("08/12/07" is 2008-12-07 -- not
+    # guessable from a rendered page, taken from the template source),
+    # tried alongside the four-digit form; anything else falls back to
+    # the capture timestamp, which map_page already counts out loud.
+    module B2evolution
+      DATE = %r{\b(\d{2}|\d{4})/(\d{1,2})/(\d{1,2})\b}
+
+      module_function
+
+      def key
+        'b2evolution'
+      end
+
+      def matches?(_host)
+        false
+      end
+
+      # What sniff_pack asks: does this rendered page carry b2evolution's
+      # markup? The generator meta is definitive when present; the stock
+      # content template's class is the fallback for skins that dropped
+      # the meta.
+      def detect?(html)
+        html.match?(/<meta[^>]+content=["'][^"']*b2evolution/i) || html.include?('class="bText"')
+      end
+
+      # The date-form permalinks a stock install produced, with or
+      # without the /index.php prefix. Query-string permalinks
+      # (?p=123, ?title=slug) collapse to one path in the CDX index and
+      # cannot be told apart here -- POST_PATTERN stays the escape hatch
+      # for those installs.
+      def post_path?(path)
+        path.match?(%r{\A(?:/index\.php)?/\d{4}/\d{1,2}/\d{1,2}/[^/]+\z})
+      end
+
+      def parse(html)
+        body = PackMarkup.balanced_div(html, /<div class="bText"[^>]*>/)
+        return nil unless body
+
+        title = html[%r{<h3 class="bTitle"[^>]*>(.*?)</h3>}m, 1] ||
+                html[%r{<h2[^>]*>(.*?)</h2>}m, 1]
+
+        date = nil
+        if (m = html.match(%r{<div class="date[^"]*"[^>]*>(.*?)</div>}m))
+          date = parse_date(m[1])
+        end
+
+        tags = []
+        if (m = html.match(%r{<div class="posttags"[^>]*>(.*?)</div>}m))
+          tags = m[1].scan(%r{<a[^>]*>(.*?)</a>}m).flatten
+                     .map { |t| CGI.unescapeHTML(t.gsub(/<[^>]+>/, '')).strip }
+                     .reject(&:empty?)
+        end
+
+        { title: CGI.unescapeHTML(title.to_s.gsub(/<[^>]+>/, '')).strip,
+          date: date, body: body, tags: tags }
+      end
+
+      def parse_date(text)
+        m = text.match(DATE)
+        return nil unless m
+
+        year = m[1].to_i
+        # b2evolution predates 1970 by nothing: a two-digit year below 70
+        # is this century, the rest were the platform's own lifetime.
+        year += year < 70 ? 2000 : 1900 if year < 100
+        month = m[2].to_i
+        day = m[3].to_i
+        return nil unless month.between?(1, 12) && day.between?(1, 31)
+
+        Time.local(year, month, day)
+      rescue ArgumentError
+        nil
+      end
+    end
+
+    PACKS = [BlogCz, B2evolution].freeze
   end
 end

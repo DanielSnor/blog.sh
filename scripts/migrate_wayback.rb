@@ -11,6 +11,7 @@
 #   WAYBACK_DELAY=2 ruby scripts/migrate_wayback.rb <url>    # gentler pace
 #   WAYBACK_MODE=pages ruby scripts/migrate_wayback.rb <url> # skip feeds
 #   POST_PATTERN='^/\d{4}/\d{2}/' ruby scripts/migrate_wayback.rb <url>
+#   WAYBACK_PACK=b2evolution ruby scripts/migrate_wayback.rb <url>
 #
 # For a blog whose platform no longer exists: the Wayback Machine
 # archived its FEED again and again over the years, and reading every
@@ -42,5 +43,6 @@ mode = ENV['WAYBACK_MODE'] == 'pages' ? :pages : :auto
 
 Import::Cli.run(Import::Wayback.new(url, delay: delay, mode: mode,
                                          post_pattern: ENV['POST_PATTERN'],
+                                         pack: ENV['WAYBACK_PACK'],
                                          keep_permalinks: Import::Cli.keep_permalinks_from_env),
                 limit: Import::Cli.limit_from_env)

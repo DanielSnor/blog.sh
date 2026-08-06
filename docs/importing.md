@@ -549,10 +549,19 @@ A blog the Archive only ever saw as pages -- no feed captures -- falls
 through to **page mode**: every archived post page, the newest capture
 of each. Which paths are posts is the one thing pages cannot say about
 themselves, so a **platform pack** answers it for platforms one was
-written for (blog.cz ships built in: `/YYMM/slug` paths, the article
-markup, Czech long-form dates), `POST_PATTERN` answers it anywhere
-else, and with neither the run refuses and prints sample paths to
-build a pattern from. `WAYBACK_MODE=pages` skips the feed attempt
+written for, `POST_PATTERN` answers it anywhere else, and with neither
+the run refuses and prints sample paths to build a pattern from. Two
+packs ship built in: **blog.cz** (`/YYMM/slug` paths, the article
+markup, Czech long-form dates), picked automatically by host, and
+**b2evolution** -- the self-hosted workhorse of the 2003--2010
+blogosphere, which lived on anyone's domain, so it is recognized by
+its markup instead: when neither host nor pattern says anything, one
+archived page is fetched and sniffed for the stock `bText` template or
+the generator meta. `WAYBACK_PACK=b2evolution` names it outright.
+b2evolution's numeric dates are `y/m/d` with a two-digit year (taken
+from the template source -- a rendered `08/12/07` cannot say which
+order it means); installs with query-string permalinks (`?p=123`)
+still need `POST_PATTERN`. `WAYBACK_MODE=pages` skips the feed attempt
 outright. Pages that refuse to parse as posts are skipped and counted
 (`unparsed`); posts whose page names no date carry their capture date,
 also counted.

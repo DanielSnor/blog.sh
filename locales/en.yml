@@ -519,6 +519,7 @@ import:
     threads_replies: "%{count} repl(y/ies) to other people's threads were skipped -- an archive holds your own standalone posts."
     threads_html_replies: "The HTML page does not mark replies, so this import could not tell them apart -- an account with replies is better imported from JSON, which marks and skips them."
     tumblr_unmapped: "%{count} post(s) had no usable original address -- imported without a redirect."
+    wayback_pack_detected: "Recognized %{platform} markup and read the pages with its reader."
     wayback_snapshots: "%{count} feed capture(s) read from the Wayback Machine."
     wayback_unreadable: "%{count} capture(s) were not readable feeds and were skipped."
     wayback_unparsed: "%{count} archived page(s) could not be read as posts -- see the skip counts."

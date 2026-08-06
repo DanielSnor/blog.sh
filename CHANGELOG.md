@@ -441,6 +441,19 @@ prints what an installation is running.
   bookkeeping. Worth knowing before deploying: theme-color touches the
   layout, so the first deploy after this rewrites every page once.
 
+- **The Wayback rescue reads b2evolution sites now, and finds them by
+  itself.** A second platform pack for page mode, built from a real 2008
+  skin rather than documentation: the body in the stock `bText` template
+  (which skins practically never replaced -- that is what makes the pack
+  general), `h3.bTitle` titles, tags behind their localized label, ads
+  and search boxes excluded by construction, and the shipped `y/m/d`
+  two-digit dates read in the order the template source says, which no
+  rendered page could tell you. Unlike blog.cz there is no host to
+  recognize -- every b2evolution lived on its own domain -- so when
+  neither the host nor `POST_PATTERN` says anything, one archived page
+  is sniffed for the platform's markup and the run says so in its
+  report; `WAYBACK_PACK=b2evolution` names it outright.
+
 - **Builds and deploys take a lock, so two runs can no longer rewrite
   `public.nosync` at the same time.** Two of the things that write it come
   from cron -- the scheduled publish every quarter of an hour, the sidebar

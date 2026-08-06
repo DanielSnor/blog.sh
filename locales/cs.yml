@@ -507,6 +507,7 @@ import:
     threads_replies: "%{count} odpovědí na cizí thready přeskočeno — archiv drží tvoje samostatné posty."
     threads_html_replies: "HTML stránka odpovědi nijak neznačí, takže tenhle import je neuměl odlišit — účet s odpověďmi je lepší importovat z JSONu, který je značí a přeskakuje."
     tumblr_unmapped: "%{count} postů nemělo použitelnou původní adresu — naimportovány bez přesměrování."
+    wayback_pack_detected: "Poznal jsem značkování platformy %{platform} a četl stránky podle něj."
     wayback_snapshots: "%{count} snímků feedu přečteno z Wayback Machine."
     wayback_unreadable: "%{count} snímků nebyly čitelné feedy — přeskočeny."
     wayback_unparsed: "%{count} archivovaných stránek nešlo přečíst jako posty — viz počty přeskočených."

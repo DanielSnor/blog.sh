@@ -512,6 +512,7 @@ import:
     threads_replies: "%{count} Antwort(en) auf fremde Threads übersprungen — ein Archiv hält deine eigenständigen Beiträge."
     threads_html_replies: "Die HTML-Seite markiert Antworten nicht, dieser Import konnte sie also nicht unterscheiden — ein Konto mit Antworten importiert man besser aus dem JSON, das sie markiert und überspringt."
     tumblr_unmapped: "%{count} Beitrag/Beiträge hatten keine brauchbare Originaladresse — ohne Weiterleitung importiert."
+    wayback_pack_detected: "%{platform}-Markup erkannt und die Seiten mit dessen Leser gelesen."
     wayback_snapshots: "%{count} Feed-Schnappschüsse aus der Wayback Machine gelesen."
     wayback_unreadable: "%{count} Schnappschüsse waren keine lesbaren Feeds — übersprungen."
     wayback_unparsed: "%{count} archivierte Seiten ließen sich nicht als Beiträge lesen — siehe die Zähler der Übersprungenen."
