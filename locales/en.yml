@@ -292,6 +292,8 @@ cli:
       ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
+                                     walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online]    reads the configuration and says what is wrong with it
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
@@ -305,8 +307,36 @@ cli:
   wizard_menu_post: "A post -- edit the text, or its properties and actions (publish, rename, delete...)"
   wizard_menu_queue: "The scheduled-post queue -- reorder, publish now, remove"
   wizard_menu_restore: "Restore a post from trash"
-  wizard_menu_list: "List of all posts (no editing, just browsing)"
+  wizard_menu_browse: "Browse the archive — filter, search, preview; Enter opens the post"
   wizard_menu_rebuild: "Rebuild and deploy the site (not tied to a specific post)"
+  browse_keys: "↑↓ move · Enter open · / search · p preview · t type · s state · g tag · x clear filters · Esc back"
+  browse_search_keys: "type to search · Enter keep it · \"a quoted phrase\" · -without this word · Esc drop the search"
+  browse_searching: "Search: %{query}▏"
+  browse_empty: "(nothing matches)"
+  browse_indexing: "Reading the text of %{count} posts…"
+  browse_heading: "Archive"
+  browse_total: "%{count} post(s)"
+  browse_of_total: "%{count} of %{total}"
+  browse_filter_prefix: "Filter:  %{filters}"
+  browse_filter_type: "type=%{value}"
+  browse_filter_state: "state=%{value}"
+  browse_filter_tag: "tag=%{value}"
+  browse_filter_search: "search “%{query}”"
+  browse_filter_none: "all"
+  browse_state_published: "published"
+  browse_state_draft: "in progress"
+  browse_state_scheduled: "scheduled"
+  browse_state_pinned: "pinned"
+  browse_menu_hint: "↑↓ move · Enter select · Esc back"
+  browse_tag_menu_hint: "↑↓ move · Enter select · type = tag · Esc back"
+  browse_tag_prompt: "Enter a tag: "
+  browse_preview_keys: "↑↓ scroll · PgUp/PgDn by pages · Esc back to the list"
+  browse_preview_empty: "(the post has no text)"
+  browse_preview_status: "preview"
+  browse_preview_image: "[image: %{file} — %{alt}]"
+  browse_preview_media: "[media: %{file} — %{caption}]"
+  browse_preview_no_caption: "no caption"
+  browse_preview_tags: "tags: %{tags}"
   edit_what_prompt: "Edit what? [Enter] the text  [v] properties and actions  [anything else] back: "
   props_label_state: "state"
   props_label_scheduled: "scheduled"

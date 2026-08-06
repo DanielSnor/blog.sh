@@ -26,6 +26,8 @@ require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
+require_relative '../lib/post_text'
+require_relative '../lib/search_query'
 require_relative '../lib/publishing'
 require_relative '../lib/publish_slots'
 require_relative '../lib/tui'
@@ -2170,19 +2172,20 @@ def state_marker(post)
   marks.empty? ? '' : "  #{marks.join(' ')}"
 end
 
+# A plain draft shows no date, the same rule the properties dialog
+# follows: a draft's time is set by publishing or scheduling, so the
+# timestamp in its JSON is bookkeeping, not a fact about the post. Dashes
+# rather than blanks, so the column still lines up and reads as
+# deliberately empty. A scheduled draft does have a time -- schedule gave
+# it one -- and keeps showing it.
+def row_date(post)
+  return '----------' if post[:state] == DRAFT && !post[:scheduled]
+
+  Time.parse(post[:date]).strftime('%Y-%m-%d')
+end
+
 def summary_row(post)
-  # A plain draft shows no date, the same rule the properties dialog
-  # follows: a draft's time is set by publishing or scheduling, so the
-  # timestamp in its JSON is bookkeeping, not a fact about the post. Dashes
-  # rather than blanks, so the column still lines up and reads as
-  # deliberately empty. A scheduled draft does have a time -- schedule gave
-  # it one -- and keeps showing it.
-  date = if post[:state] == DRAFT && !post[:scheduled]
-           '----------'
-         else
-           Time.parse(post[:date]).strftime('%Y-%m-%d')
-         end
-  "#{date}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
 end
 
 def load_posts_summary
@@ -2202,6 +2205,330 @@ def cmd_list(filters)
   posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
+  puts
+end
+
+# --- browsing the archive --------------------------------------------
+#
+# `list` prints the whole archive and scrolls it past you -- fine down a
+# pipe, useless as a way to look around 4000 posts. This is the same data
+# as a screen you can stay in: filters, a live search that speaks the same
+# query language as the site's search box, a look at the post under the
+# cursor, and Enter to open it.
+
+BROWSE_HOT_KEYS = %w[/ t s g x p].freeze
+
+# The title is what a person recognises a post by, so it goes where the
+# eye lands. Over half of an imported archive has no title at all (a
+# tweet, a photo) -- those show the slug instead, dimmed, because it is
+# derived from the text and reads well enough to pick from. `list` keeps
+# the slug-first row: on the command line the slug is the thing you copy
+# into the next command.
+def browse_row(post)
+  title = post[:title].to_s.strip
+  label = title.empty? ? Tui.paint(post[:slug], :dim) : title
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{label}"
+end
+
+def browse_posts
+  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    summary = post_summary(file)
+    summary&.merge(path: file)
+  end.sort_by { |post| post[:date].to_s }.reverse
+end
+
+# Built on the first search and not before it: reading and folding every
+# post costs a couple of seconds on a large archive, and someone who only
+# came to scroll through last month should not pay for a search they never
+# ran. Keeping the plain text as well as the folded form is what lets the
+# screen show WHY a post matched.
+def browse_index(posts)
+  Tui.spinner(t('cli.browse_indexing', count: posts.size)) do
+    posts.each_with_object({}) do |summary, index|
+      begin
+        post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
+        text = PostText.plain(post).gsub(/\s+/, ' ').strip
+        index[summary[:slug]] = { text: text, folded: PostText.searchable(post, text) }
+      rescue JSON::ParserError, SystemCallError
+        # post_summary already warned about this file; a post that cannot
+        # be read simply matches nothing.
+        index[summary[:slug]] = { text: '', folded: '' }
+      end
+    end
+  end
+end
+
+def browse_state_match?(post, state)
+  case state
+  when 'draft' then post[:state] == DRAFT && !post[:scheduled]
+  when 'scheduled' then !post[:scheduled].nil? && post[:scheduled] != false
+  when 'pinned' then !!post[:pinned]
+  else post[:state] != DRAFT
+  end
+end
+
+def browse_filtered(posts, filters, index, tokens)
+  posts.select do |post|
+    next false if filters[:type] && post[:type] != filters[:type]
+    next false if filters[:state] && !browse_state_match?(post, filters[:state])
+    next false if filters[:tag] && post[:tags].none? { |tag| Slug.fold(tag) == Slug.fold(filters[:tag]) }
+    next true if tokens.empty?
+
+    SearchQuery.match?(index.to_h.dig(post[:slug], :folded).to_s, tokens)
+  end
+end
+
+def browse_status(filters, query, searching, shown, total)
+  if searching
+    return [t('cli.browse_searching', query: query),
+            t('cli.browse_of_total', count: shown, total: total)]
+  end
+
+  parts = []
+  parts << t('cli.browse_filter_type', value: filters[:type]) if filters[:type]
+  parts << t('cli.browse_filter_state', value: t("cli.browse_state_#{filters[:state]}")) if filters[:state]
+  parts << t('cli.browse_filter_tag', value: filters[:tag]) if filters[:tag]
+  parts << t('cli.browse_filter_search', query: query) unless query.to_s.strip.empty?
+  return [t('cli.browse_heading'), t('cli.browse_total', count: total)] if parts.empty?
+
+  [t('cli.browse_filter_prefix', filters: parts.join(' · ')),
+   t('cli.browse_of_total', count: shown, total: total)]
+end
+
+# Folding character by character, keeping the position each folded
+# character came from -- so a hit found in the folded text can be shown
+# from the original, with its diacritics and capitals intact. Whitespace
+# is passed through as a single space rather than folded away, which is
+# what Slug.fold does to a lone space and would otherwise glue every word
+# to the next one.
+def fold_with_offsets(text)
+  folded = +''
+  offsets = []
+  text.each_char.with_index do |char, position|
+    piece = char.match?(/\s/) ? ' ' : Slug.fold(char)
+    piece.each_char { offsets << position }
+    folded << piece
+  end
+  [folded, offsets]
+end
+
+# One line of the post's own text around the first word that matched --
+# the answer to "why is this in my results?", which a full-text search
+# owes the reader. Only ever computed for the row under the cursor, and
+# cached, because folding a post character by character is not something
+# to repeat on every arrow key.
+def browse_context(entry, tokens, width, cache, slug)
+  return nil if entry.nil? || tokens.empty?
+
+  cache[slug] ||= begin
+    text = entry[:text].to_s
+    folded, offsets = fold_with_offsets(text)
+    token = tokens.reject(&:negated).find { |candidate| folded.include?(candidate.text) }
+    if token.nil? || text.empty?
+      ''
+    else
+      at = offsets[folded.index(token.text)] || 0
+      start = [at - 30, 0].max
+      fragment = text[start, width].to_s.strip
+      "#{start.positive? ? '…' : ''}#{fragment}#{start + width < text.length ? '…' : ''}"
+    end
+  end
+  cache[slug].empty? ? nil : cache[slug]
+end
+
+def browse_pick_type(posts)
+  counts = posts.group_by { |post| post[:type] }.transform_values(&:size).sort_by { |type, count| [-count, type] }
+  rows = [format('%-14s %d', t('cli.browse_filter_none'), posts.size)] +
+         counts.map { |type, count| format('%-14s %d', type, count) }
+  index = Tui.menu(rows, hint: t('cli.browse_menu_hint'))
+  return :cancel if index.nil?
+
+  index.zero? ? nil : counts[index - 1].first
+end
+
+BROWSE_STATES = %w[published draft scheduled pinned].freeze
+
+def browse_pick_state(posts)
+  counts = BROWSE_STATES.map { |state| [state, posts.count { |post| browse_state_match?(post, state) }] }
+  rows = [format('%-14s %d', t('cli.browse_filter_none'), posts.size)] +
+         counts.map { |state, count| format('%-14s %d', t("cli.browse_state_#{state}"), count) }
+  index = Tui.menu(rows, hint: t('cli.browse_menu_hint'))
+  return :cancel if index.nil?
+
+  index.zero? ? nil : counts[index - 1].first
+end
+
+# 1893 tags on a real archive, so this is a scrollable list of its own,
+# ordered by how much of the archive each one covers -- and a tag can be
+# typed instead, which is faster than arrowing to it.
+def browse_pick_tag(posts)
+  counts = Hash.new(0)
+  posts.each { |post| post[:tags].each { |tag| counts[tag] += 1 } }
+  return nil if counts.empty?
+
+  entries = counts.sort_by { |tag, count| [-count, Slug.fold(tag)] }
+  width = entries.map { |tag, _| tag.length }.max.clamp(8, 32)
+  rows = [format("%-#{width}s %d", t('cli.browse_filter_none'), posts.size)] +
+         entries.map { |tag, count| format("%-#{width}s %d", tag, count) }
+  choice = Tui.menu(rows, hint: t('cli.browse_tag_menu_hint'), allow_text: true,
+                          text_prompt: t('cli.browse_tag_prompt'))
+  return :cancel if choice.nil?
+  return choice.strip if choice.is_a?(String)
+
+  choice.zero? ? nil : entries[choice - 1].first
+end
+
+# The post as its own text, wrapped to the terminal: the same markdown
+# `edit` opens, so there is one answer in this engine to "what does this
+# post say" rather than a second renderer to keep in step. Media lines are
+# the exception -- an absolute path into media.nosync is noise in a
+# preview, where the file name and the alt text are the whole point.
+def browse_preview_lines(post, markdown, width)
+  markdown.split("\n").flat_map do |line|
+    case line
+    when /\A!!\[(.*?)\]\((.*?)\)\z/
+      [t('cli.browse_preview_media', file: File.basename(Regexp.last_match(2)),
+                                     caption: Regexp.last_match(1).empty? ? t('cli.browse_preview_no_caption') : Regexp.last_match(1))]
+    when /\A!\[(.*?)\]\((.*?)(?: "(.*)")?\)\z/
+      [t('cli.browse_preview_image', file: File.basename(Regexp.last_match(2)),
+                                     alt: Regexp.last_match(1).empty? ? t('cli.browse_preview_no_caption') : Regexp.last_match(1))]
+    else
+      wrap_to_width(line, width)
+    end
+  end
+end
+
+def wrap_to_width(line, width)
+  return [''] if line.strip.empty?
+
+  out = []
+  current = +''
+  line.split(/\s+/).each do |word|
+    # A URL longer than the terminal is one "word" -- broken here rather
+    # than left for the row truncation, which would hide the rest of it.
+    word.scan(/.{1,#{width}}/m).each do |piece|
+      if current.empty?
+        current = +piece
+      elsif current.length + 1 + piece.length <= width
+        current << ' ' << piece
+      else
+        out << current
+        current = +piece
+      end
+    end
+  end
+  out << current unless current.empty?
+  out
+end
+
+def browse_preview(summary)
+  post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
+  year = File.basename(File.dirname(summary[:path]))
+  markdown = MarkdownWriter.blocks_to_markdown(post['content'], File.join(MEDIA_DIR, year, summary[:slug]))
+  width = [Tui.term_width - 4, 40].max
+  header = [Tui.paint(post['title'].to_s.empty? ? summary[:slug] : post['title'], :bold),
+            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary)}  ·  #{summary[:slug]}"]
+  header << t('cli.browse_preview_tags', tags: post['tags'].join(', ')) unless (post['tags'] || []).empty?
+  lines = header + [''] + browse_preview_lines(post, markdown, width)
+  state = { selected: 0, offset: 0 }
+  Tui.browse(state, keys: t('cli.browse_preview_keys'), empty: t('cli.browse_preview_empty'), cursor: false) do
+    [lines, [t('cli.browse_preview_status'), '']]
+  end
+  puts
+rescue JSON::ParserError, SystemCallError => e
+  puts t('cli.unreadable_post', path: summary[:path], error: e.message.lines.first.to_s.strip[0, 100])
+  puts
+end
+
+def cmd_browse(filters = {})
+  # Piped runs keep the line-based list they always got: there is no
+  # screen to scroll and no keys to press.
+  return cmd_list(filters) unless Tui.interactive?
+
+  posts = browse_posts
+  if posts.empty?
+    puts t('cli.no_posts_to_pick')
+    puts
+    return
+  end
+
+  active = { type: filters[:type], state: filters[:drafts] ? 'draft' : nil, tag: filters[:tag] }
+  index = nil
+  contexts = {}
+  view = []
+  state = { selected: 0, offset: 0, query: '' }
+
+  loop do
+    result = Tui.browse(state,
+                        keys: t('cli.browse_keys'),
+                        empty: t('cli.browse_empty'),
+                        hot_keys: BROWSE_HOT_KEYS,
+                        search_hint: t('cli.browse_search_keys'),
+                        context: lambda { |row|
+                          post = view[row]
+                          post && browse_context(index.to_h[post[:slug]], SearchQuery.parse(state[:query]),
+                                                 [Tui.term_width - 12, 40].max, contexts, post[:slug])
+                        }) do |query, searching|
+      tokens = SearchQuery.parse(query)
+      view = browse_filtered(posts, active, index, tokens)
+      [view.map { |post| browse_row(post) }, browse_status(active, query, searching, view.size, posts.size)]
+    end
+
+    break if result.nil?
+
+    kind, value, row = result
+    if kind == :enter
+      selected = view[value]
+      next if selected.nil?
+
+      # Everything below prints, so the frame this screen would repaint
+      # over is gone -- the next pass starts a fresh one.
+      state.delete(:lines)
+      puts
+      post_crossroads(selected[:slug])
+      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
+      posts = browse_posts
+      index = nil
+      contexts.clear
+      next
+    end
+
+    case value
+    when '/'
+      # The index is built here, before the typing starts, so the wait
+      # happens once and in the open rather than under the first keystroke.
+      index ||= browse_index(posts)
+      contexts.clear
+      state[:searching] = true
+    when 't', 's', 'g'
+      state.delete(:lines)
+      puts
+      picked = case value
+               when 't' then browse_pick_type(posts)
+               when 's' then browse_pick_state(posts)
+               else browse_pick_tag(posts)
+               end
+      key = { 't' => :type, 's' => :state, 'g' => :tag }.fetch(value)
+      active[key] = picked unless picked == :cancel
+      state[:selected] = 0
+      state[:offset] = 0
+      print "\e[2J\e[H"
+    when 'x'
+      active.each_key { |name| active[name] = nil }
+      state[:query] = ''
+      state[:selected] = 0
+      state[:offset] = 0
+      contexts.clear
+    when 'p'
+      selected = row && view[row]
+      next if selected.nil?
+
+      state.delete(:lines)
+      puts
+      browse_preview(selected)
+      print "\e[2J\e[H"
+    end
+  end
   puts
 end
 
@@ -2434,7 +2761,7 @@ WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
   ['post', t('cli.wizard_menu_post')],
   ['queue', t('cli.wizard_menu_queue')],
-  ['list', t('cli.wizard_menu_list')],
+  ['browse', t('cli.wizard_menu_browse')],
   ['restore', t('cli.wizard_menu_restore')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
 ].freeze
@@ -2445,7 +2772,13 @@ WIZARD_MENU = [
 # `./blog.sh edit` skips this crossroads entirely and `props` is its own
 # command.
 def wizard_post_entry
-  slug = pick_slug_interactively
+  post_crossroads(pick_slug_interactively)
+end
+
+# The crossroads itself, reached from the wizard's post entry and from
+# Enter in the archive browser -- both have a post in hand at that point
+# and the same two things to do with it.
+def post_crossroads(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
@@ -2467,7 +2800,7 @@ def run_wizard_choice(command)
   when 'post' then wizard_post_entry
   when 'queue' then cmd_queue
   when 'restore' then cmd_restore(pick_trash_interactively)
-  when 'list' then cmd_list({})
+  when 'browse' then cmd_browse({})
   when 'rebuild' then cmd_rebuild
   end
 # Plenty of cmd_*/pick_*_interactively paths end in `abort` (cancellation,
@@ -2601,14 +2934,17 @@ else
     # the URL line would sit in the buffer the whole time, so push it out.
     $stdout.flush
     PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
-  when 'list'
+  when 'list', 'browse'
     filters = {}
     ARGV.each do |arg|
       filters[:type] = Regexp.last_match(1) if arg =~ /\A--type=(.+)\z/
       filters[:tag] = Regexp.last_match(1) if arg =~ /\A--tag=(.+)\z/
       filters[:drafts] = true if arg == '--drafts'
     end
-    cmd_list(filters)
+    # Same filters, two ways to read the answer: `list` prints it,
+    # `browse` puts you inside it. Down a pipe they are the same command,
+    # because a screen you can't press keys in is just a list.
+    command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
   when 'help'
     print_usage
   when 'version', '--version', '-v'

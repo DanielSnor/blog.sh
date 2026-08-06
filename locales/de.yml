@@ -289,6 +289,8 @@ cli:
       ./blog.sh rebuild              baut und deployt die ganze Seite, unabhängig von einem Beitrag
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
+                                     geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
       ./blog.sh doctor [--online]    liest die Konfiguration und sagt, was daran nicht stimmt
       ./blog.sh help                 zeigt diese Hilfe
       ./blog.sh version              gibt die Version der Engine aus
@@ -302,8 +304,36 @@ cli:
   wizard_menu_post: "Ein Beitrag -- den Text bearbeiten, oder seine Eigenschaften und Aktionen (veröffentlichen, umbenennen, löschen...)"
   wizard_menu_queue: "Die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, entfernen"
   wizard_menu_restore: "Beitrag aus dem Papierkorb zurückholen"
-  wizard_menu_list: "Liste aller Beiträge (nur ansehen, kein Bearbeiten)"
+  wizard_menu_browse: "Archiv durchsehen — Filter, Suche, Vorschau; Enter öffnet den Beitrag"
   wizard_menu_rebuild: "Seite neu bauen und deployen (unabhängig von einem Beitrag)"
+  browse_keys: "↑↓ bewegen · Enter öffnen · / suchen · p Vorschau · t Typ · s Status · g Schlagwort · x Filter löschen · Esc zurück"
+  browse_search_keys: "tippen zum Suchen · Enter übernehmen · „eine Wortgruppe“ · -ohne dieses Wort · Esc Suche verwerfen"
+  browse_searching: "Suchen: %{query}▏"
+  browse_empty: "(nichts passt dazu)"
+  browse_indexing: "Lese den Text von %{count} Beiträgen…"
+  browse_heading: "Archiv"
+  browse_total: "%{count} Beitrag/Beiträge"
+  browse_of_total: "%{count} von %{total}"
+  browse_filter_prefix: "Filter:  %{filters}"
+  browse_filter_type: "Typ=%{value}"
+  browse_filter_state: "Status=%{value}"
+  browse_filter_tag: "Schlagwort=%{value}"
+  browse_filter_search: "Suche „%{query}“"
+  browse_filter_none: "alle"
+  browse_state_published: "veröffentlicht"
+  browse_state_draft: "in Arbeit"
+  browse_state_scheduled: "geplant"
+  browse_state_pinned: "angepinnt"
+  browse_menu_hint: "↑↓ bewegen · Enter wählen · Esc zurück"
+  browse_tag_menu_hint: "↑↓ bewegen · Enter wählen · Tippen = Schlagwort · Esc zurück"
+  browse_tag_prompt: "Schlagwort eingeben: "
+  browse_preview_keys: "↑↓ blättern · PgUp/PgDn seitenweise · Esc zurück zur Liste"
+  browse_preview_empty: "(der Beitrag hat keinen Text)"
+  browse_preview_status: "Vorschau"
+  browse_preview_image: "[Bild: %{file} — %{alt}]"
+  browse_preview_media: "[Medium: %{file} — %{caption}]"
+  browse_preview_no_caption: "ohne Bildunterschrift"
+  browse_preview_tags: "Schlagwörter: %{tags}"
   edit_what_prompt: "Was bearbeiten? [Enter] den Text  [v] Eigenschaften und Aktionen  [alles andere] zurück: "
   props_label_state: "Status"
   props_label_scheduled: "geplant"

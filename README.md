@@ -110,7 +110,16 @@ deploy step around exactly that. A few of the choices that came out of it:
 - `toot <slug>` / `bluesky <slug>` -- sends (or resends) the announcement
   after the fact, even for older posts that don't have one yet; never
   overwrites an existing one
-- `list [--type=] [--tag=] [--drafts]` -- filtered listing
+- `browse [--type=] [--tag=] [--drafts]` -- the archive as a screen you
+  can stay in: filters by type, state and tag (each offered with its
+  count), a **live full-text search that speaks the same query language
+  as the site's search box** -- words are ANDed, `"a quoted phrase"` is
+  one token, `-word` excludes, diacritics never decide a match -- a line
+  of the post's own text showing why it matched, `p` for a read-only
+  preview of the whole post, and Enter to open the one you were looking
+  for. Piped or scripted, it prints the same list `list` does
+- `list [--type=] [--tag=] [--drafts]` -- the same filters, printed:
+  one line per post, for grep and for pipes
 - `rebuild` -- build and deploy in one step
 - Run with no arguments for an interactive menu: arrow keys and single
   keypresses in a terminal (numbers and slugs still work), plain
@@ -427,7 +436,10 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
 ./blog.sh rebuild              # rebuilds and deploys the whole site
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
+./blog.sh browse [--type=image] [--tag=foo] [--drafts]
+                               # the archive on screen: filters, search, preview, Enter opens the post
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+                               # the same, printed one line per post
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh version              # which version this installation is running
 ./blog.sh help

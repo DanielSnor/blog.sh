@@ -10,6 +10,7 @@
 #   ./blog.sh restore [<slug>]
 #   ./blog.sh toot [<slug>]
 #   ./blog.sh rebuild
+#   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
 #   ./blog.sh doctor [--online]
 #   ./blog.sh help

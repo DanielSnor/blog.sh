@@ -117,13 +117,43 @@ module Tui
       seq = $stdin.getch
       return :escape unless seq == '['
 
-      case $stdin.getch
-      when 'A' then :up
-      when 'B' then :down
-      else :other
-      end
+      read_csi
     else
       ch
+    end
+  end
+
+  # Page Up is "\e[5~" and Home is "\e[1~": a sequence with a numeric
+  # parameter and a terminator. Reading a single character after the "["
+  # named the arrows correctly and left the rest of every other sequence
+  # in the buffer, where the trailing "~" arrived a moment later as a
+  # phantom keypress. So the parameters are drained up to the terminator
+  # whether or not the key turns out to be one worth naming -- including
+  # modified keys like "\e[1;5A" (Ctrl-Up), which read as their unmodified
+  # selves rather than as junk.
+  CSI_KEYS = { '5' => :page_up, '6' => :page_down,
+               '1' => :home, '7' => :home, '4' => :end, '8' => :end }.freeze
+
+  def read_csi
+    params = +''
+    loop do
+      # A sequence that stops mid-way (a serial line dropping bytes) must
+      # not block the terminal waiting for a terminator that isn't coming.
+      return :other unless IO.select([$stdin], nil, nil, 0.05)
+
+      ch = $stdin.getch
+      case ch
+      when 'A' then return :up
+      when 'B' then return :down
+      when 'H' then return :home
+      when 'F' then return :end
+      when '~' then return CSI_KEYS.fetch(params, :other)
+      when /[0-9;]/
+        params << ch
+        return :other if params.length > 8
+      else
+        return :other
+      end
     end
   end
 
@@ -279,6 +309,176 @@ module Tui
     end
   ensure
     print "\e[?25h"
+  end
+
+  # Two strings on one line, the second flush right -- the status line of
+  # `browse` below, where the left half says what is being shown and the
+  # right half says where in it you are.
+  def pad_between(left, right, width)
+    gap = width - strip_ansi(left).length - strip_ansi(right).length
+    return truncate_to_width(left, width) if gap < 1
+
+    "#{left}#{' ' * gap}#{right}"
+  end
+
+  # A screen for walking a long list: the scrolling window of `menu`, plus
+  # a status line, a live search fed by the caller, and single keys the
+  # caller handles itself.
+  #
+  # The block IS the view -- given the current query (and whether it is
+  # still being typed) it returns [rows, status], where status is either
+  # one string or a [left, right] pair; the position counter joins the
+  # right-hand side. Everything that decides
+  # what ends up on screen (filters, search, ordering, every word of it)
+  # stays with the caller; this method paints and reads keys, nothing
+  # else. Which is also why the search here does not know what a match is:
+  # `browse` collects the characters, the caller decides what they mean.
+  #
+  # Returns [:enter, index], [:key, character, index] or nil on Esc.
+  # `state` is the caller's to keep between calls -- leaving the screen
+  # for a post and coming back lands on the same row instead of at the
+  # top -- and carries the height of the last frame, so a re-entry
+  # repaints over it. A caller that PRINTS anything in between (a submenu,
+  # an editor, a preview) must drop state[:lines] first, or the repaint
+  # would land in the middle of whatever it printed.
+  def browse(state, keys:, empty:, hot_keys: [], context: nil, search_hint: nil, cursor: true)
+    query = state[:query].to_s
+    searching = !state.delete(:searching).nil?
+    state[:selected] = state[:selected].to_i
+    state[:offset] = state[:offset].to_i
+    rows, status = yield(query, searching)
+
+    # Two of the lines are the status and the keys; one more is left for
+    # whatever was on screen before, the same courtesy `menu` pays.
+    window = [term_height - 4, 4].max
+    lines = window + 2
+    print "\e[#{state[:lines]}A" if state[:lines]
+    state[:lines] = lines
+    painted = false
+
+    print "\e[?25l"
+    loop do
+      state[:selected] = 0 if state[:selected].to_i >= rows.size
+      ctx = rows.empty? || context.nil? ? nil : context.call(state[:selected])
+      row_window = ctx ? window - 1 : window
+      state[:offset] = clamp_offset(state[:selected].to_i, state[:offset].to_i, row_window, rows.size)
+
+      print "\e[#{lines}A" if painted
+      avail = term_width - 2
+      shown = rows[state[:offset], row_window] || []
+      out = []
+      shown.each_with_index do |row, i|
+        index = state[:offset] + i
+        if cursor && index == state[:selected]
+          out << paint("› #{truncate_to_width(strip_ansi(row), avail)}", :invert)
+          out << paint("      #{truncate_to_width(ctx, avail - 4)}", :dim) if ctx
+        else
+          out << "  #{truncate_ansi(row, avail)}"
+        end
+      end
+      out << paint("  #{truncate_to_width(empty, avail)}", :dim) if rows.empty?
+      out << '' while out.size < window
+      position = rows.size > row_window ? "#{state[:offset] + 1}-#{state[:offset] + shown.size}/#{rows.size}" : ''
+      left, right = Array(status)
+      out << paint(pad_between(left.to_s, [right, position].compact.reject(&:empty?).join('  ·  '), term_width), :bold)
+      out << paint(fit_keys(searching ? search_hint.to_s : keys, term_width), :dim)
+      out.each { |line| print "\e[2K#{line}\n" }
+      painted = true
+
+      move = lambda do |delta|
+        next if rows.empty?
+
+        state[:selected] = (state[:selected] + delta) % rows.size
+      end
+
+      # Paging moves the window, not just the cursor: leaving the offset to
+      # clamp_offset would scroll by a single line and land the cursor at
+      # the bottom edge, which reads as a broken Page Down rather than as a
+      # page.
+      page = lambda do |delta|
+        next if rows.empty?
+
+        state[:selected] = (state[:selected] + delta).clamp(0, rows.size - 1)
+        state[:offset] = (state[:offset] + delta).clamp(0, [rows.size - row_window, 0].max)
+      end
+
+      key = read_key
+      case key
+      when :up then move.call(-1)
+      when :down then move.call(1)
+      when :page_up then page.call(-row_window)
+      when :page_down then page.call(row_window)
+      when :home then state[:selected] = 0
+      when :end then state[:selected] = [rows.size - 1, 0].max
+      when :enter
+        # Enter while typing keeps the search and hands the keys back;
+        # only then does it open a post. Otherwise the first Enter after a
+        # search would open whatever the cursor happened to sit on.
+        if searching
+          searching = false
+          rows, status = yield(query, false)
+        elsif !rows.empty?
+          return [:enter, state[:selected]]
+        end
+      when :escape
+        return nil unless searching
+
+        searching = false
+        query = ''
+        state[:query] = ''
+        state[:selected] = 0
+        state[:offset] = 0
+        rows, status = yield('', false)
+      when String
+        if searching
+          query = edit_query(query, key)
+          # A character outside ASCII arrives one byte at a time in raw
+          # mode, so a query mid-diacritic is not yet text -- folding it
+          # would raise. The next byte completes it; until then the screen
+          # simply doesn't move.
+          next unless query.valid_encoding?
+
+          state[:query] = query
+          state[:selected] = 0
+          state[:offset] = 0
+          rows, status = yield(query, true)
+        elsif hot_keys.include?(key)
+          return [:key, key, rows.empty? ? nil : state[:selected]]
+        end
+      end
+    end
+  ensure
+    print "\e[?25h"
+  end
+
+  # The keys line, trimmed to fit rather than cut off: the first entry
+  # (how to move) and the last (the way out) survive to the narrowest
+  # terminal, and the ones in between drop from the right, which is why
+  # the locale strings put the least essential last. Losing "Esc back" off
+  # the edge of an 80-column window is how a screen becomes a trap.
+  def fit_keys(text, width)
+    parts = text.to_s.split(' · ')
+    parts.delete_at(parts.size - 2) while parts.size > 2 && parts.join(' · ').length > width
+    truncate_to_width(parts.join(' · '), width)
+  end
+
+  BACKSPACE = ["\u007F", "\b"].freeze
+
+  # Backspace deletes a whole character rather than a byte -- deleting
+  # half of "č" would leave the query unparseable until another byte
+  # arrived, which for the person typing looks like a wedged screen.
+  # Other control characters are dropped: a stray Tab or Ctrl-key means
+  # nothing in a search box, and letting one into the string would put an
+  # unprintable character on the status line.
+  def edit_query(query, key)
+    if BACKSPACE.include?(key)
+      return query.sub(/.\z/m, '') if query.valid_encoding?
+
+      return query.b[0..-2].to_s.force_encoding(Encoding::UTF_8)
+    end
+    return query if key.b.getbyte(0).to_i < 0x20
+
+    (query.b + key.b).force_encoding(Encoding::UTF_8)
   end
 
   # Waits for a single keypress, then clears the visible screen -- \e[2J

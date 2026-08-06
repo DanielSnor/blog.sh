@@ -395,6 +395,27 @@ prints what an installation is running.
   forever -- and nothing short of hand-editing the post's JSON could
   remove the entry. Those entries are marked "taken by another post".
 
+- **The archive is something you can walk through, not just a list that
+  scrolls past.** `./blog.sh browse` (and the wizard's fourth entry) shows
+  the same posts as `list` as a screen you stay in: arrows and Page
+  Up/Down through the whole archive, filters by type, state and tag with
+  the count next to each, and a search that filters as you type. The
+  search is the site's own: words are ANDed, `"a quoted phrase"` counts as
+  one, `-word` excludes, and diacritics never decide a match -- the query
+  language and the folding live in `lib/search_query.rb` next to a note
+  that they and `assets/js/search.js` change together, because a query
+  that means one thing in the browser and another in the terminal is
+  worse than no search in the terminal at all. It searches the full text
+  of every post, so under the selected row there is a line of that post's
+  own text showing why it matched; `p` opens the whole post read-only
+  (the same markdown `edit` would give you, with media lines shortened to
+  their file names); Enter opens it for editing and comes back to the same
+  row, same filter. The rows lead with the title, falling back to the slug
+  for the posts that have none -- on an imported archive that is over half
+  of them. `list` is unchanged and still prints the slug first: down a
+  pipe that is the thing you copy into the next command, and `browse`
+  itself falls back to exactly that when it isn't talking to a terminal.
+
 - **Builds and deploys take a lock, so two runs can no longer rewrite
   `public.nosync` at the same time.** Two of the things that write it come
   from cron -- the scheduled publish every quarter of an hour, the sidebar
@@ -438,6 +459,15 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Page Up (and Home, End, Insert, Delete) used to leave a stray key
+  behind in every menu.** Only the first character after the escape
+  bracket was read, so the `~` that ends those sequences arrived a moment
+  later as a keypress of its own -- in a menu that accepts typed text,
+  that was a `~` in the box nobody typed. The whole sequence is read now,
+  Page Up/Down and Home/End do what they say in the lists long enough to
+  need them, and a modified arrow (Ctrl-Up and friends) reads as the plain
+  arrow instead of as junk.
+
 - **An Instagram HTML export requested in Czech now imports, instead of
   "importing" zero posts without a word of why.** The HTML reader knew
   English month names only, and any box whose printed date it did not
@@ -455,8 +485,9 @@ prints what an installation is running.
   the directory's name. Both readers now try the labels MetaHtml knows
   -- and the JSON reader repairs the key before comparing, because a
   localized export mangles its keys exactly as it mangles its values.
-  A language the tables don't know still means the directory name, a
-  fallback rather than a failure.
+  Label and mangling were both confirmed against a real Czech-requested
+  export. A language the tables don't know still means the directory
+  name, a fallback rather than a failure.
 
 - **A Wayback rescue now says up front what it can and cannot recover.**
   Two things decide whether the hours a rescue takes are worth spending,
@@ -697,10 +728,11 @@ prints what an installation is running.
   started reports it and exits non-zero rather than let its caller think
   a deploy happened. On a filesystem that cannot lock, everything behaves
   exactly as it did before.
-- **The wizard menu grew to six entries** with the queue screen, so a
-  scripted `printf "N\n" | ./blog.sh` may select a different one than in
-  1.1. The CLI commands are the stable interface; `./blog.sh queue` is the
-  one to pipe.
+- **The wizard menu grew to six entries** with the queue screen, and its
+  fourth entry is now the archive browser rather than the flat listing, so
+  a scripted `printf "N\n" | ./blog.sh` may select a different one than in
+  1.1. The CLI commands are the stable interface; `./blog.sh queue` and
+  `./blog.sh list` are the ones to pipe.
 - **The import wizard's source menu is two levels now** (blogs / social
   networks / dead sites), so the same caveat applies to
   `printf "N\n" | ./import.sh`. The non-interactive path is unchanged: a
