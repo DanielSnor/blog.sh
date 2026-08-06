@@ -428,6 +428,19 @@ prints what an installation is running.
   `icon: x` now work in `site.yml`, the appearance wizard offers them,
   and `icon_svg` remains the escape hatch for everything else.
 
+- **Three finishing touches for crawlers and phones.** Post pages now
+  carry `article:published_time` and one `article:tag` per tag (the
+  `og:type=article` was already there, just bare), plus a schema.org
+  BlogPosting block as JSON-LD -- the shape rich results actually read.
+  The JSON-LD needs no CSP loosening: script-src governs execution and a
+  data block never executes. And every page names a `theme-color` per
+  colour scheme, taken from the palette's own background through the same
+  resolution colors.css uses -- so the browser chrome on a phone stops
+  banding against whatever palette the site runs. Drafts get none of the
+  article metadata; their pages stay noindex and their dates are
+  bookkeeping. Worth knowing before deploying: theme-color touches the
+  layout, so the first deploy after this rewrites every page once.
+
 - **Builds and deploys take a lock, so two runs can no longer rewrite
   `public.nosync` at the same time.** Two of the things that write it come
   from cron -- the scheduled publish every quarter of an hour, the sidebar

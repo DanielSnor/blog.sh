@@ -104,6 +104,14 @@ BANNER = SiteConfig.fetch('banner')
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
 ANALYTICS = SiteConfig.get('analytics')
+SITE_COLORS = SiteConfig.get('colors', default: {})
+# The browser chrome around the page (address bar on phones, title bar in
+# installed PWAs) takes its colour from these -- one per scheme, matching
+# the page background exactly, so the frame never bands against the site.
+# Derived through the same resolution colors.css uses, so a palette change
+# moves both in one rebuild.
+THEME_COLOR_LIGHT = ColorsCss.color_for(SITE_COLORS, 'light', 'bg')
+THEME_COLOR_DARK = ColorsCss.color_for(SITE_COLORS, 'dark', 'bg')
 ABOUT = SiteConfig.fetch('about')
 FOOTER = SiteConfig.fetch('footer')
 SOCIAL = SiteConfig.get('social', default: [])
@@ -830,6 +838,37 @@ def post_description(post)
   truncate_excerpt(text, META_DESCRIPTION_LENGTH)
 end
 
+# What a crawler is told about a post beyond the OG basics: the article's
+# time and tags as og meta, and the same facts once more as schema.org
+# JSON-LD, which is what rich results actually read. Only for published
+# posts -- a draft's date is bookkeeping and the page is noindex anyway.
+#
+# The JSON-LD block is data, not script: CSP's script-src governs
+# execution, and a text/ld+json block never executes, so the strict
+# policy above needs no widening. "</" is escaped so post text can never
+# close the script element from inside the JSON.
+def post_structured_head(post)
+  published = post_display_time(post).iso8601
+  tags = post['tags'] || []
+  lines = [%(<meta property="article:published_time" content="#{h(published)}">)]
+  lines += tags.map { |tag| %(<meta property="article:tag" content="#{h(tag)}">) }
+
+  data = {
+    '@context' => 'https://schema.org',
+    '@type' => 'BlogPosting',
+    'headline' => post['title'].to_s.empty? ? post['slug'] : post['title'],
+    'datePublished' => published,
+    'url' => "#{SITE_BASE_URL}#{post_path(post)}",
+    'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_path(post)}",
+    'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR },
+    'image' => post_og_image(post),
+    'description' => post_description(post)
+  }
+  data['keywords'] = tags.join(', ') unless tags.empty?
+  lines << %(<script type="application/ld+json">#{JSON.generate(data).gsub('</', '<\/')}</script>)
+  lines.map { |line| "\n  #{line}" }.join
+end
+
 def render_post_html(post, template)
   content_html = post_content_html(post)
   draft_banner = draft?(post) ? draft_banner(post) : ''
@@ -840,7 +879,7 @@ def render_post_html(post, template)
          image: post_og_image(post),
          og_type: 'article',
          # Drafts must never end up in search engines or link previews.
-         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : '',
+         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : post_structured_head(post),
          frame_origins: Embed.frame_origins_for(post['content']))
 end
 
@@ -1171,7 +1210,7 @@ Dir.glob(File.join(ROOT, 'assets', '**', '*')).each do |src|
   emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
 emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
-     ColorsCss.generate(colors: SiteConfig.get('colors', default: {}),
+     ColorsCss.generate(colors: SITE_COLORS,
                         fonts: SiteConfig.get('fonts', default: {}),
                         fonts_dir: File.join(ROOT, 'assets', 'fonts')))
 ico = build_favicon_ico

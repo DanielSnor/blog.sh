@@ -20,6 +20,8 @@
        policy for free. -->
   <meta http-equiv="Content-Security-Policy" content="<%= csp_content(page_frame_origins) %>">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="<%= h(THEME_COLOR_LIGHT) %>" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="<%= h(THEME_COLOR_DARK) %>" media="(prefers-color-scheme: dark)">
   <title><%= h(page_title) %></title>
   <meta name="description" content="<%= h(page_description) %>">
   <link rel="canonical" href="<%= h(page_url) %>">
