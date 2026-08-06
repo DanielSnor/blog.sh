@@ -47,6 +47,18 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Threads joined the import sources** -- the twenty-second, closing
+  the social-network roster. The JSON export's shape is Meta's oddest
+  yet -- every post is a media list even when there is no media, with
+  the text riding in a title field -- and it is read as found: your
+  standalone posts import with media from the archive, replies to
+  other people's threads are skipped and counted (the Bluesky rule),
+  bare URLs become real links, and the shared MetaText repair fixes
+  the encoding. The export's cross_post_source flag is deliberately
+  NOT a skip signal: on real exports it marks posts written directly
+  in the Threads app too -- it records where a post was shared TO,
+  and skipping on it would empty the archive.
+
 - **Facebook joined the import sources** -- the twenty-first, built and
   verified against a real "Download Your Information" JSON export. Your
   own posts import with photos and videos from the archive itself; the

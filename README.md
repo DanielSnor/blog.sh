@@ -243,8 +243,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Twenty-one sources: Bluesky, LiveJournal and Tumblr via their APIs;
-  Facebook,
+- Twenty-two sources: Bluesky, LiveJournal and Tumblr via their APIs;
+  Facebook, Threads,
   beehiiv, Blogger, Ghost, Instagram, Mastodon, Medium, Movable
   Type/TypePad, Pixelfed, Squarespace, Substack, Twitter/X and Wix from
   their account exports and backups; a Jekyll or Hugo
@@ -462,6 +462,7 @@ Available sources:
 | Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode with audio: the mp3 and artwork download and are hosted locally -- the preview says how many gigabytes that means; items without an enclosure are skipped |
 | Squarespace | the "WordPress format" XML export | posts and drafts, feature images included; images, audio and video markup that a plain parse would lose is restored, pages and attachments are counted as skips |
 | Substack | an unpacked export | newsletters and podcasts, drafts included, full text of paid posts (the export is the author's); threads and pages are skipped, tags don't exist in the export |
+| Threads | an unpacked JSON export | your own standalone posts with media from the archive; replies to other people's threads are skipped and counted, bare URLs become links |
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
 | Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN |
@@ -488,6 +489,7 @@ ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
 ruby scripts/migrate_podcast.rb <feed-url | export.xml>
 ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
 ruby scripts/migrate_substack.rb <path-to-unpacked-export>
+ruby scripts/migrate_threads.rb <path-to-unpacked-export>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>
 ruby scripts/migrate_wayback.rb <https://dead-blog.example>

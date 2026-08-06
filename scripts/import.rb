@@ -28,6 +28,7 @@ require_relative '../lib/import/run'
 require_relative '../lib/import/beehiiv'
 require_relative '../lib/import/blogger'
 require_relative '../lib/import/bluesky'
+require_relative '../lib/import/threads'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
 require_relative '../lib/import/wayback'
@@ -73,6 +74,7 @@ SOURCES = [
   ['podcast', -> { build_podcast }],
   ['squarespace', -> { build_squarespace }],
   ['substack', -> { build_substack }],
+  ['threads', -> { build_threads }],
   ['tumblr', -> { build_tumblr }],
   ['twitter', -> { build_twitter }],
   ['wayback', -> { build_wayback }],
@@ -123,6 +125,17 @@ end
 # The key is read from the environment rather than prompted for: it's a
 # credential, it belongs in env.sh next to the other tokens, and a prompt
 # would invite pasting it into shell history.
+def build_threads
+  dir = ask('import.threads_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Threads.new(dir) if Import::Threads.posts_file(dir)
+
+  puts t('import.threads_dir_invalid', dir: dir)
+  nil
+end
+
 def build_tumblr
   api_key = ENV['TUMBLR_API_KEY']
   if api_key.to_s.empty?
@@ -378,7 +391,7 @@ end
 GROUPS = [
   ['blogs', %w[beehiiv blogger ghost jekyll livejournal medium movabletype
                podcast squarespace substack tumblr wix feed]],
-  ['social', %w[bluesky facebook instagram mastodon pixelfed twitter]],
+  ['social', %w[bluesky facebook instagram mastodon pixelfed threads twitter]],
   ['wayback', %w[wayback]]
 ].freeze
 

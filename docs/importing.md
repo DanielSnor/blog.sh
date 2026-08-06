@@ -449,6 +449,25 @@ keeps them only on the live site -- posts arrive with just the platform
 tag), and the newest posts sometimes ship as CSV rows with no HTML body
 -- those are skipped and counted rather than imported empty.
 
+### Threads
+
+```bash
+ruby scripts/migrate_threads.rb <path-to-unpacked-export>
+```
+
+In Threads: **Settings → Account → Download your information** -- ask
+for **JSON**. Unpack the ZIP and point the script at the directory.
+Your own standalone posts import with their media from the archive;
+**replies to other people's threads are skipped and counted** -- the
+same rule as Bluesky and Twitter, an archive holds your own posts.
+Bare URLs in the text become real links, and Meta's mangled encoding
+is repaired the same way as for Facebook and Instagram.
+
+One flag the export carries deserves a word: `cross_post_source` is
+NOT treated as "this came from elsewhere" -- on real exports it sits
+on posts written directly in the Threads app too, recording where a
+post was *shared to*. Nothing is skipped because of it.
+
 ### Tumblr
 
 ```bash
