@@ -144,6 +144,31 @@ become tags. A video arrives as an HLS playlist rather than a file, so the
 post gets its poster frame as an image -- better in an archive than a
 "video unavailable" placeholder.
 
+### Facebook
+
+```bash
+ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
+```
+
+In Facebook: **Accounts Centre → Your information and permissions →
+Download your information** -- ask for **JSON** (the HTML variant is
+not supported, and the JSON has proper timestamps where HTML prints a
+wall clock in an unnamed timezone). Unpack the ZIP and point the
+script at the directory; photos and videos come from the archive
+itself, no network.
+
+The one thing to know: **an older Facebook account is mostly not
+Facebook**. Posts mirrored in from Twitter, Posterous and their era --
+often the vast majority -- are recognized (by the platform name in
+Facebook's own title line, and by the era's link shorteners) and
+**skipped with a count**, because those platforms' own imports carry
+the originals; importing them here would duplicate an entire Twitter
+archive. `FACEBOOK_CROSSPOSTS=1` includes them for an account that
+really lived on Facebook. Wordless check-ins and app stories are
+skipped and counted too. Facebook's export has no post ids at all, so
+re-import identity is minted from timestamp plus content -- stable
+across re-exports.
+
 ### Ghost
 
 ```bash

@@ -31,8 +31,10 @@ there is no export file, and the password travels only as a challenge
 digest), the Wayback Machine (point it at a DEAD blog's old URL --
 its archived feed captures reassemble the history, images and all),
 any podcast RSS feed by URL (episode audio and artwork are
-downloaded for keeps -- the preview says how many gigabytes), and fourteen
-things you already have on disk -- a beehiiv posts CSV, a Blogger Atom
+downloaded for keeps -- the preview says how many gigabytes), and fifteen
+things you already have on disk -- a beehiiv posts CSV, an unpacked
+Facebook JSON export (crossposts from other platforms are skipped and
+counted -- their own imports carry the originals), a Blogger Atom
 backup (posts come over, the comments and settings it mixes in are
 skipped out loud), a Ghost JSON export (plus the still-running site's
 URL, its images only exist there), a Jekyll or Hugo tree (or any
@@ -50,6 +52,7 @@ immediately, with no preview pass:
   ruby scripts/migrate_beehiiv.rb <posts.csv>
   ruby scripts/migrate_blogger.rb <blog-backup.xml>
   ruby scripts/migrate_bluesky.rb <handle>
+  ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
   ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
   ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
   PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>

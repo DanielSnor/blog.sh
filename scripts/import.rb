@@ -32,6 +32,7 @@ require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
 require_relative '../lib/import/wayback'
 require_relative '../lib/import/wix'
+require_relative '../lib/import/facebook'
 require_relative '../lib/import/feed'
 require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
@@ -60,6 +61,7 @@ SOURCES = [
   ['beehiiv', -> { build_beehiiv }],
   ['blogger', -> { build_blogger }],
   ['bluesky', -> { build_bluesky }],
+  ['facebook', -> { build_facebook }],
   ['ghost', -> { build_ghost }],
   ['instagram', -> { build_instagram }],
   ['jekyll', -> { build_jekyll }],
@@ -250,6 +252,17 @@ end
 # address, deliberately never spelled out -- and the files only exist on
 # the live site. So the URL is required, and importing after the old site
 # goes dark loses exactly the images.
+def build_facebook
+  dir = ask('import.facebook_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Facebook.new(dir) if Import::Facebook.posts_dir(dir)
+
+  puts t('import.facebook_dir_invalid', dir: dir)
+  nil
+end
+
 def build_ghost
   path = ask('import.ghost_path_prompt')
   return nil unless path
@@ -355,14 +368,46 @@ def build_wix
   nil
 end
 
+# The interactive menu is two levels -- twenty sources in one column
+# was a kilometre of scrolling. The groups are by what the THING was
+# (a blog you published, a network you posted to, a site that no
+# longer exists), because that is the question the user can answer
+# without reading the whole list. The non-interactive path below stays
+# ONE flat list on purpose: scripted `printf "N\n"` runs keep working
+# across group reshuffles.
+GROUPS = [
+  ['blogs', %w[beehiiv blogger ghost jekyll livejournal medium movabletype
+               podcast squarespace substack tumblr wix feed]],
+  ['social', %w[bluesky facebook instagram mastodon pixelfed twitter]],
+  ['wayback', %w[wayback]]
+].freeze
+
 def ask_source
   puts
   if Tui.interactive?
-    index = Tui.menu(SOURCES.map { |key, _| source_name(key) }, hint: t('import.menu_hint'))
-    return nil if index.nil?
+    loop do
+      group_index = Tui.menu(GROUPS.map { |key, _| t("import.group.#{key}") },
+                             hint: t('import.menu_hint'))
+      return nil if group_index.nil?
 
-    puts
-    return SOURCES[index]
+      key, members = GROUPS[group_index]
+      # A group of one needs no second question.
+      choices = members.map { |name| SOURCES.find { |k, _| k == name } }.compact
+      if choices.size == 1
+        puts
+        return choices.first
+      end
+
+      puts
+      puts t("import.group.#{key}")
+      index = Tui.menu(choices.map { |k, _| source_name(k) }, hint: t('import.menu_hint'))
+      # Backing out of a group is not backing out of the import --
+      # return to the group question instead of quitting the wizard.
+      next if index.nil?
+
+      puts
+      return choices[index]
+    end
   end
 
   SOURCES.each_with_index { |(key, _), i| puts "#{i + 1}) #{source_name(key)}" }

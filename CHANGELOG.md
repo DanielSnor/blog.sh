@@ -47,6 +47,27 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Facebook joined the import sources** -- the twenty-first, built and
+  verified against a real "Download Your Information" JSON export. Your
+  own posts import with photos and videos from the archive itself; the
+  headline behaviour is what does NOT import silently: posts Facebook
+  mirrored in from Twitter, Posterous and their era -- on the reference
+  export, 95 % of everything -- are recognized and skipped with a
+  count, because those platforms' own imports carry the originals
+  (`FACEBOOK_CROSSPOSTS=1` includes them). Wordless check-ins and app
+  stories are counted skips too. Meta's byte-mangled text encoding is
+  repaired by the same logic the Instagram importer proved out, now in
+  a shared module for the whole Meta family.
+
+- **The import wizard's source menu is now two levels.** Twenty-one
+  sources in one column was a kilometre of scrolling; the first
+  question is now what the thing WAS -- a blog or publishing platform,
+  a social network, or a dead site (the Wayback Machine) -- and the
+  second picks the source inside the group. Backing out of a group
+  returns to the groups, not out of the wizard. **Scripted runs are
+  untouched:** the piped/non-interactive path keeps the single flat
+  numbered list, so existing `printf "N\n"` automation survives.
+
 - **The Wayback Machine joined the import sources** -- the twentieth,
   and the one for blogs whose platform no longer exists at all. The
   Archive crawled the blog's FEED over and over for years; reading

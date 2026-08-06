@@ -243,7 +243,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Twenty sources: Bluesky, LiveJournal and Tumblr via their APIs;
+- Twenty-one sources: Bluesky, LiveJournal and Tumblr via their APIs;
+  Facebook,
   beehiiv, Blogger, Ghost, Instagram, Mastodon, Medium, Movable
   Type/TypePad, Pixelfed, Squarespace, Substack, Twitter/X and Wix from
   their account exports and backups; a Jekyll or Hugo
@@ -449,6 +450,7 @@ Available sources:
 | beehiiv | the posts CSV export | newsletters, drafts included, full text of paid posts; the email chrome is undone, images download at full quality; the CSV has no publish date, only created_at |
 | Blogger | the Atom backup file | posts and drafts; the comments and settings the backup mixes in are skipped and counted, images download full-size (the markup only points at thumbnails), YouTube embeds become video blocks |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
+| Facebook | an unpacked JSON export | your own posts with photos and videos from the archive; crossposts from Twitter/Posterous are skipped and counted by default (their own imports carry the originals), as are wordless check-ins and app stories |
 | Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages are skipped, images download from the live site |
 | Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | LiveJournal | `LJ_PASSWORD` (challenge digest, never plaintext) | every entry via the API — LJ has no export file; friends-only and private arrive as drafts, comments stay behind |
@@ -474,6 +476,7 @@ scripted migration -- same mapping, no preview pass, writes immediately:
 ruby scripts/migrate_beehiiv.rb <posts.csv>
 ruby scripts/migrate_blogger.rb <blog-backup.xml>
 ruby scripts/migrate_bluesky.rb <handle>
+ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
 ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
 ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
 PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>
