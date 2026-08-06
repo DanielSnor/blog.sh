@@ -35,6 +35,7 @@ require_relative '../lib/import/feed'
 require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
 require_relative '../lib/import/medium'
+require_relative '../lib/import/movable_type'
 require_relative '../lib/import/pixelfed'
 require_relative '../lib/import/podcast'
 require_relative '../lib/import/instagram'
@@ -62,6 +63,7 @@ SOURCES = [
   ['jekyll', -> { build_jekyll }],
   ['mastodon', -> { build_mastodon }],
   ['medium', -> { build_medium }],
+  ['movabletype', -> { build_movabletype }],
   ['pixelfed', -> { build_pixelfed }],
   ['podcast', -> { build_podcast }],
   ['squarespace', -> { build_squarespace }],
@@ -183,6 +185,24 @@ def build_medium
 
   puts t('import.medium_dir_invalid', dir: dir)
   nil
+end
+
+# Same two-prompt shape as Jekyll, for the same reason: the file cannot
+# tell you its old URL shape, and an empty pattern is a valid answer
+# (no redirects, or only TypePad's own UNIQUE URL lines).
+def build_movabletype
+  path = ask('import.movabletype_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  unless File.exist?(path)
+    puts t('import.movabletype_path_invalid', path: path)
+    return nil
+  end
+
+  print t('import.movabletype_pattern_prompt')
+  pattern = $stdin.gets.to_s.strip
+  Import::MovableType.new(path, url_pattern: pattern.empty? ? nil : pattern)
 end
 
 def build_pixelfed

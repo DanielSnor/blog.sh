@@ -47,6 +47,17 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Movable Type and TypePad joined the import sources** -- the
+  eighteenth: the line-based MT Import Format half the pre-WXR web once
+  spoke, which TypePad exports to this day (gzip read transparently).
+  Sections are kept verbatim -- the reference WP importer's habit of
+  trimming blank lines is exactly how paragraphs and `<pre>` blocks
+  die. Plain-text bodies (`CONVERT BREAKS`) get paragraphs back before
+  parsing, comments and trackbacks are counted and left behind. The
+  format has no ids and no URLs: identity is minted from
+  date + basename, and kept permalinks take `URL_PATTERN` with
+  TypePad's own `UNIQUE URL:` lines winning where present.
+
 - **Wix joined the import sources** -- the seventeenth. Point the
   wizard (or `migrate_wix.rb`) at the blog CSV from the Wix admin. The
   rich-content JSON converts to blocks directly -- formatting spans,

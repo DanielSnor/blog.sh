@@ -27,16 +27,16 @@ can't give without having read the preview.
 
 Sources: Bluesky (public API, no credentials), Tumblr (needs TUMBLR_API_KEY
 in env.sh), any podcast RSS feed by URL (episode audio and artwork are
-downloaded for keeps -- the preview says how many gigabytes), and thirteen
+downloaded for keeps -- the preview says how many gigabytes), and fourteen
 things you already have on disk -- a beehiiv posts CSV, a Blogger Atom
 backup (posts come over, the comments and settings it mixes in are
 skipped out loud), a Ghost JSON export (plus the still-running site's
 URL, its images only exist there), a Jekyll or Hugo tree (or any
 folder of markdown files a converter produced), an unpacked Medium
-export, a Squarespace XML export, an unpacked Substack export, a
-Twitter/X archive, a Mastodon account archive, a Pixelfed statuses
-export, a Wix blog CSV, an Instagram export (HTML or JSON, whichever
-you asked Instagram for), and
+export, a Movable Type or TypePad export file, a Squarespace XML
+export, an unpacked Substack export, a Twitter/X archive, a Mastodon
+account archive, a Pixelfed statuses export, a Wix blog CSV, an
+Instagram export (HTML or JSON, whichever you asked Instagram for), and
 WordPress or any RSS/Atom feed (one option, since a WXR export is RSS
 with extra elements and the file itself says which it is).
 
@@ -51,6 +51,7 @@ immediately, with no preview pass:
   PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>
   ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
   ruby scripts/migrate_medium.rb <path-to-unpacked-export>
+  URL_PATTERN=... ruby scripts/migrate_movabletype.rb <mt-export.txt>
   ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
   ruby scripts/migrate_podcast.rb <feed-url | export.xml>
   ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
@@ -65,10 +66,11 @@ sample a large archive before committing hours to it.
 
 When the new site keeps the old blog's domain, imports from sources that
 know their original URLs (beehiiv, Blogger, Ghost, Jekyll/Hugo with a
-PERMALINK pattern, Medium, Squarespace, Substack, Tumblr, Wix, WordPress
-or a feed) can keep the old addresses alive: the wizard asks, the
-scripts take KEEP_PERMALINKS=1, and every published post then redirects
-from the path it used to live at.
+PERMALINK pattern, Medium, Movable Type/TypePad with URL_PATTERN,
+Squarespace, Substack, Tumblr, Wix, WordPress or a feed) can keep the
+old addresses alive: the wizard asks, the scripts take
+KEEP_PERMALINKS=1, and every published post then redirects from the
+path it used to live at.
 
 Re-running any import is safe: posts are matched on their source id and
 overwritten in place, never duplicated. Nothing is deployed either way --

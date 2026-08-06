@@ -54,9 +54,10 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (beehiiv, Blogger, Ghost, Jekyll/Hugo with a pattern, Medium,
-  Squarespace, Substack, Wix, WordPress/feed and Tumblr today) can
-  record each published post's old path as `redirect_from` -- the build then serves a redirect at every one
+  (beehiiv, Blogger, Ghost, Jekyll/Hugo and Movable Type/TypePad with a
+  pattern, Medium, Squarespace, Substack, Wix, WordPress/feed and
+  Tumblr today) can record each published post's old path as
+  `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -299,6 +300,27 @@ with no image is almost never an article, so those import as **drafts
 for review**, counted in the summary: a wrong guess costs a look, not a
 lost text. Newer exports carry no tags at all; the summary says how many
 posts arrived bare.
+
+### Movable Type / TypePad
+
+```bash
+URL_PATTERN='/%Y/%m/{basename}.html' ruby scripts/migrate_movabletype.rb <mt-export.txt>
+```
+
+The MT Import Format file -- Tools → Export in Movable Type, and the
+export TypePad produces to this day; gzipped files read transparently.
+Posts and drafts come over with categories and keywords as tags; the
+comments and trackbacks the file also holds are counted and left
+behind, a static archive having nowhere to put them. Bodies written as
+plain text (`CONVERT BREAKS`) get their paragraphs back before parsing.
+
+Two things the format simply lacks, and what stands in for them: **no
+post ids** (the re-import identity is minted from date + basename,
+stable across re-exports) and **no URLs** -- kept permalinks take a
+pattern (`URL_PATTERN='/%Y/%m/{basename}.html'`, strftime parts plus
+`{basename}`), and a TypePad `UNIQUE URL:` line, where present, always
+wins over it. TypePad has been known to shorten basenames in real
+URLs, so spot-check a few redirects against the old site.
 
 ### Pixelfed
 
