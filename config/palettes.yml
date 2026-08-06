@@ -8,9 +8,12 @@
 # locales/<lang>.yml and fall back to the label here, so a palette you
 # add needs no translation to work.
 #
-# The four below are the ones from the gallery on blogsh.app. Their
-# light modes are exactly what that page shows; the dark modes are new,
-# since the gallery only ever had light homepages.
+# The first four below are the ones from the gallery on blogsh.app.
+# Their light modes are exactly what that page shows; the dark modes are
+# new, since the gallery only ever had light homepages. The last three
+# come from the TangerineUI Classic family the engine's own palette grew
+# out of -- bluebird over there IS the default palette here, to the last
+# hex -- mapped key for key from its variants.
 
 # The palette the engine ships with. Twitter-era blue on a
 #   barely-tinted page.
@@ -95,3 +98,68 @@ contrast:
     nav_bg: "#000000"
     border: "#333333"
     pill_bg: "#1c2c52"
+
+# Cream and gold, dark mode in deep brown. The golden yellow stays on
+#   tag pills and the dark meta line; links go olive instead, because
+#   yellow text on cream is unreadable and the accent is above all a
+#   text colour here.
+sunflower:
+  label: "Sunflower"
+  light:
+    bg: "#fbf1e1"
+    text: "#444a5a"
+    meta_text: "#6b3f14"
+    accent: "#5c6b4a"
+    nav_bg: "#ebd9af"
+    border: "#cebe9a"
+    pill_bg: "#fbe197"
+  dark:
+    bg: "#241708"
+    text: "#ecdfc0"
+    meta_text: "#f3c05c"
+    accent: "#9fb187"
+    nav_bg: "#3a2a14"
+    border: "#4f3a1e"
+    pill_bg: "#644b0a"
+
+# Pale green page with a khaki nav bar and grass-green links; the dark
+#   mode is warm near-black with the same green doing the talking.
+garden:
+  label: "Garden"
+  light:
+    bg: "#edf2e2"
+    text: "#444a5a"
+    meta_text: "#8a9474"
+    accent: "#32863a"
+    nav_bg: "#e5dfc5"
+    border: "#d2c898"
+    pill_bg: "#c8e8ca"
+  dark:
+    bg: "#111111"
+    text: "#c4b48a"
+    meta_text: "#6b6855"
+    accent: "#58ba64"
+    nav_bg: "#1e1808"
+    border: "#2a1a08"
+    pill_bg: "#1e3010"
+
+# Steel blue on a cool grey page -- deeper and calmer than the default's
+#   sky blue; the dark mode is navy rather than neutral black.
+ocean:
+  label: "Ocean"
+  light:
+    bg: "#edf2f7"
+    text: "#444a5a"
+    meta_text: "#8090a4"
+    accent: "#1a5fa0"
+    nav_bg: "#dce8f2"
+    border: "#c8d8ea"
+    pill_bg: "#ccddf0"
+  dark:
+    bg: "#111111"
+    text: "#b0c8de"
+    meta_text: "#6888a4"
+    accent: "#4a9fd4"
+    nav_bg: "#102030"
+    border: "#203040"
+    pill_bg: "#162438"

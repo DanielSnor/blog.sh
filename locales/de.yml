@@ -462,6 +462,10 @@ import:
     boost: "Boost"
     reblog: "Reblog"
     error: "Konvertierung fehlgeschlagen — siehe Zeilen oben"
+  # Adapter-Postscripts — die Hinweise unter Vorschau und Zusammenfassung. Der
+  # Skript-Weg (migrate_*.rb) gibt sie auf Englisch aus, siehe lib/import/cli.rb.
+  note:
+    ghost_scheduled: "%{count} Beitrag/Beiträge waren in Ghost geplant — als Entwürfe importiert; plane sie hier, wenn du so weit bist."
 
 # ./blog.sh doctor -- liest die Konfiguration auf der Platte und sagt, was
 # daran nicht stimmt (lib/doctor.rb). Jede Zeile mit einem Hinweis muss
@@ -734,6 +738,9 @@ style:
     warm: "Warm -- Creme und Braun, Terrakotta als Akzent"
     mono: "Monochrom -- ganz ohne Farbton, der Akzent ist ein dunkleres Grau"
     contrast: "Hoher Kontrast -- Schwarz auf Weiß, Hypertext-Blau"
+    sunflower: "Sonnenblume -- Creme und Gold, olivgrüne Links, dunkler Modus in Braun"
+    garden: "Garten -- Grün und Khaki, dunkler Modus in warmem Schwarz"
+    ocean: "Ozean -- Stahlblau, dunkler Modus in Navy"
 
   colors_light: "Heller Modus"
   colors_dark: "Dunkler Modus"

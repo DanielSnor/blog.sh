@@ -457,6 +457,10 @@ import:
     boost: "boost"
     reblog: "reblog"
     error: "převod selhal — viz řádky výše"
+  # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
+  # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.
+  note:
+    ghost_scheduled: "%{count} postů bylo v Ghostu naplánováno — dorazily jako drafty; naplánuj je tady, až budeš chtít."
 
 # ./blog.sh doctor — přečte konfiguraci na disku a řekne, co je s ní
 # špatně (lib/doctor.rb). Každý řádek s radou musí dávat smysl sám o sobě:
@@ -726,6 +730,9 @@ style:
     warm: "Teplá — krémová a hnědá, terakotový accent"
     mono: "Monochrom — bez barevného tónu, accent je tmavší šedá"
     contrast: "Vysoký kontrast — černá na bílé, hypertextová modrá"
+    sunflower: "Slunečnice — krém a zlatá, olivové odkazy, tmavý režim v hnědé"
+    garden: "Zahrada — zeleň a khaki, tmavý režim do teplé černi"
+    ocean: "Oceán — ocelová modř, tmavý režim v navy"
 
   colors_light: "Světlý režim"
   colors_dark: "Tmavý režim"

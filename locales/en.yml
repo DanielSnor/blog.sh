@@ -469,6 +469,10 @@ import:
     boost: "boost"
     reblog: "reblog"
     error: "failed to convert -- see the lines above"
+  # Adapter postscripts -- the notes under the preview and the summary. The
+  # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.
+  note:
+    ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
 
 # ./blog.sh doctor -- reads the configuration on disk and reports what is
 # wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on
@@ -739,6 +743,9 @@ style:
     warm: "Warm -- cream and brown, terracotta accent"
     mono: "Monochrome -- no hue at all, the accent is a darker grey"
     contrast: "High contrast -- black on white, hypertext blue"
+    sunflower: "Sunflower -- cream and gold, olive links, dark mode in brown"
+    garden: "Garden -- greens and khaki, dark mode in warm black"
+    ocean: "Ocean -- steel blue, dark mode in navy"
 
   colors_light: "Light mode"
   colors_dark: "Dark mode"

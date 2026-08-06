@@ -40,7 +40,7 @@ prints what an installation is running.
   change any of this later. Editing the files by hand keeps working
   exactly as before; the two are interchangeable, in both directions.
 
-- **`./style.sh` -- the appearance half, and four palettes to pick
+- **`./style.sh` -- the appearance half, and seven palettes to pick
   from.** Split from setup by lifecycle rather than by file (both write
   `config/site.yml`): setup asks the things you answer once, this is
   everything you come back and fiddle with, so it is a menu you dip into
@@ -54,7 +54,13 @@ prints what an installation is running.
   picking one is a keystroke. They are the palettes from the "Seven
   keys" gallery on blogsh.app, whose light modes are exactly what that
   page showed; the dark modes are new, since the gallery only ever had
-  light homepages. Add your own by adding an entry to that file: the
+  light homepages. Three more come from the TangerineUI Classic family
+  the engine's own palette grew out of (its bluebird IS the default
+  palette, to the last hex): **sunflower** in cream and gold with olive
+  links -- the golden yellow stays on tag pills, because yellow text on
+  cream is unreadable and the accent is above all a text colour here --
+  **garden** in greens and khaki, and **ocean** in steel blue over navy.
+  Add your own by adding an entry to that file: the
   wizard lists whatever is in it, and a palette you add needs no
   translation to appear.
 
