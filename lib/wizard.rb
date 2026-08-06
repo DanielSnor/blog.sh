@@ -227,10 +227,14 @@ module Wizard
     puts
   end
 
-  MASKED = /\A([-+]\s*(?:export\s+)?(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*\z/.freeze
+  # `$` and not `\z`: diff lines arrive from `each_line` WITH their trailing
+  # newline, and `.*` never crosses one -- so the anchored form could not
+  # match a single real line, and every token in the review diff was printed
+  # in the clear, in the one place the comment above promises it is not.
+  MASKED = /\A([-+]\s*(?:export\s+)?(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*$/.freeze
 
   def mask(line)
-    line.sub(MASKED) { "#{Regexp.last_match(1)}••••••••\n" }
+    line.sub(MASKED) { "#{Regexp.last_match(1)}••••••••" }
   end
 
   # Wraps a wizard's main loop so an interrupt says the one thing worth

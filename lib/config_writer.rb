@@ -702,9 +702,19 @@ module ConfigWriter
         FileUtils.cp(@path, backup_path)
         File.chmod(0o600, backup_path)
       end
-      existed = File.exist?(@path)
+      # Read BEFORE the write: AtomicWrite replaces the file with a new
+      # inode, so afterwards the mode is the new file's and the old one is
+      # gone. Skipping the chmod when the file existed -- which is what this
+      # did -- therefore dropped an env.sh full of live tokens from 0600 to
+      # whatever the umask says (0644 by default) on every single save,
+      # while the wizard printed "readable only by you (mode 600)" a few
+      # lines earlier.
+      previous = File.stat(@path).mode & 0o7777 if File.exist?(@path)
       AtomicWrite.write(@path, current)
-      File.chmod(0o600, @path) unless existed
+      # A mode that already lets nobody but the owner in is kept exactly --
+      # somebody who chose 0400 meant it. Anything wider is not a choice
+      # this file can honour.
+      File.chmod(previous && (previous & 0o077).zero? ? previous : 0o600, @path)
       true
     end
 

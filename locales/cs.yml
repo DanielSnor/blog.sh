@@ -723,6 +723,7 @@ style:
   h_banner_file: "Jakékoli PNG, JPEG, GIF nebo WebP. Zkopíruje se na místo a změří, takže rozměry v configu budou sedět se souborem."
   banner_not_found: "%{path} není soubor, hlavička zůstala beze změny."
   banner_copied: "✅ Zkopírováno do %{path}."
+  banner_pending: "✅ Nainstaluje se jako %{path}, až zápis potvrdíš."
   banner_missing: "%{path} tam není, takže nebylo co změřit."
   banner_unmeasurable: "Rozměry obrázku nejde přečíst, šířka a výška zůstaly, jak byly. PNG, JPEG, GIF a WebP se čtou vždycky."
   banner_measured: "✅ Změřeno: %{width}x%{height}. Přesně to rezervuje místo, než se obrázek načte."

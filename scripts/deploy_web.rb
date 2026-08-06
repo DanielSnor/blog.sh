@@ -395,7 +395,18 @@ SHRINK_MIN_FILES = 8
 GROWTH_MIN_FILES = 25
 SHRINK_MIN_BYTES = 25_000_000
 
-if !ONLY && !FORCE && swing?(build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
+# `--only` stands the guards down because a run that ships three named
+# files has nothing to say about the shape of the whole build -- true for
+# every per-file backend, and false for a snapshot one. git pages copies
+# and force-pushes the ENTIRE build whatever it was handed (see
+# deploy_backend/git.rb, and `sync`'s own "--only widens to the full
+# build"), so there `--only` disarms four guards over a push that replaces
+# the live site. The half-hourly refresh-sidebar cron is exactly such a
+# run: a broken build it never looked at would go out unexamined, and a
+# force-push leaves nothing to restore from. Same reasoning, and the same
+# SNAPSHOT test, as the per-file size limit above.
+
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{build_files} files, but #{shrink_files} were expected from #{ref_source}.
        That's a #{(100 - (build_files * 100.0 / shrink_files)).round}% drop -- looks like a broken build.
@@ -405,7 +416,7 @@ end
 
 # What the counts cannot see: the same number of files, each of them nearly
 # empty. A broken template or a lost media prefix does exactly that.
-if !ONLY && !FORCE && swing?(build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ holds #{FileSize.human(build_bytes)}, but #{FileSize.human(shrink_bytes)} were expected from #{ref_source}.
        The file count looks reasonable, so this is content going missing inside the pages rather than pages going missing.
@@ -417,7 +428,7 @@ end
 # matching year/slug, but not against duplication of some other kind), a
 # badly merged import, or an accidentally copied tree. Normal growth is a
 # handful of files per published post.
-if !ONLY && !FORCE && swing?(build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{build_files} files, only #{growth_files} were expected from #{ref_source}.
        That's a #{((build_files * 100.0 / growth_files) - 100).round}% increase -- looks like a duplicated or broken build.
@@ -430,7 +441,7 @@ end
 # precisely, by name, by the per-file limit. Aborting on the total would
 # just recreate the dead end this whole change removes, in the flows that
 # cannot pass --force.
-if !ONLY && !FORCE && swing?(build_bytes, growth_bytes, BYTES_GROWTH_NOTICE, 0, :up)
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, growth_bytes, BYTES_GROWTH_NOTICE, 0, :up)
   notices << "⚠️  The build grew from #{FileSize.human(growth_bytes)} to #{FileSize.human(build_bytes)} " \
              "since #{ref_source} -- expected if you added media, worth a look if you didn't."
 end

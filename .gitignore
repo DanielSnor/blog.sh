@@ -1,4 +1,8 @@
 env.sh
+# The wizards keep a .bak of the file they rewrite. For env.sh that copy
+# holds the PREVIOUS live tokens, and `env.sh` above is a literal -- it
+# does not cover it. This repo is public and `git add -A` is one keystroke.
+*.bak
 .DS_Store
 .nova/
 .deploy_manifest*.json

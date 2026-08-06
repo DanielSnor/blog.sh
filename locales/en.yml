@@ -736,6 +736,7 @@ style:
   h_banner_file: "Any PNG, JPEG, GIF or WebP. It is copied into place and measured, so the config's width and height match the file."
   banner_not_found: "%{path} is not a file, so the banner was left alone."
   banner_copied: "✅ Copied into %{path}."
+  banner_pending: "✅ Will be installed as %{path} once you confirm the write."
   banner_missing: "%{path} is not there, so nothing could be measured."
   banner_unmeasurable: "The image size could not be read, so width and height were left as they were. PNG, JPEG, GIF and WebP are always readable."
   banner_measured: "✅ Measured: %{width}x%{height}. That is what reserves the space before it loads."

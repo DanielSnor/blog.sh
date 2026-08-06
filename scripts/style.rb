@@ -156,14 +156,25 @@ def section_banner
   unless answer.to_s.empty?
     path = File.expand_path(answer.strip.gsub(/\A['"]|['"]\z/, ''))
     if File.file?(path)
-      install_banner(path, src)
+      # Remembered, NOT copied. The copy used to happen the moment the path
+      # was typed, so answering "no" to the review at the end printed
+      # "Nothing written" over an image that was already gone -- and the
+      # banner is a per-install file outside git, with no backup anywhere.
+      # Everything else in these wizards writes only after the confirmation;
+      # this is the one thing that touches a file, so it waits with them.
+      @pending_banner = path
+      puts Tui.paint(t('banner_pending', path: src), :green)
+      puts
     else
       puts Tui.paint("⚠️  #{t('banner_not_found', path: path)}", :yellow)
       puts
     end
   end
 
-  measure_banner(src)
+  # Measured from whatever will be in place after the write: the new file if
+  # one was given, the installed one otherwise. Measuring the target before
+  # the copy would have recorded the OLD image's dimensions for the new one.
+  measure_banner(src, @pending_banner)
 
   alt = Wizard.ask(t('q_banner_alt'), current.dig('banner', 'alt'), hint: t('h_banner_alt'))
   site.set(%w[banner alt], alt) if alt
@@ -175,16 +186,20 @@ def section_banner
   puts
 end
 
-def install_banner(path, src)
+# Runs after review_and_write reports :written -- never before it.
+def install_pending_banner
+  return unless @pending_banner
+
   require 'fileutils'
+  src = site.intended[%w[banner src]] || current.dig('banner', 'src') || '/assets/images/header.png'
   target = File.join(ROOT, src.sub(%r{\A/}, ''))
   FileUtils.mkdir_p(File.dirname(target))
-  FileUtils.cp(path, target)
+  FileUtils.cp(@pending_banner, target)
   puts Tui.paint(t('banner_copied', path: src), :green)
 end
 
-def measure_banner(src)
-  target = File.join(ROOT, src.sub(%r{\A/}, ''))
+def measure_banner(src, source_file = nil)
+  target = source_file || File.join(ROOT, src.sub(%r{\A/}, ''))
   unless File.file?(target)
     puts Tui.paint("⚠️  #{t('banner_missing', path: src)}", :yellow)
     puts
@@ -432,7 +447,10 @@ def run
   end
 
   outcome = Wizard.review_and_write([[relative(SITE_YML), site]])
-  offer_rebuild if outcome == :written
+  return unless outcome == :written
+
+  install_pending_banner
+  offer_rebuild
 end
 
 # The in-memory config the prompts read from is the file plus everything
@@ -458,7 +476,10 @@ def offer_rebuild
   return unless Wizard.confirm(t('q_rebuild'))
 
   puts
-  ok = system("cd #{ROOT} && ruby build/build_blog.rb")
+  # No shell: ROOT is an installation path, and every path with a space in
+  # it (a Mac's "Mobile Documents", say) turned this into two broken words
+  # and reported "the build did not finish" on a perfectly good install.
+  ok = system('ruby', 'build/build_blog.rb', chdir: ROOT)
   if ok
     puts
     puts Tui.paint(t('rebuilt'), :green)

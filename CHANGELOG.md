@@ -384,6 +384,48 @@ prints what an installation is running.
 
 ### Fixes
 
+- **The queue screen and the properties dialog can no longer overwrite a
+  post the cron published while you were deciding.** Both read the post,
+  then wait at a prompt -- and the scheduled-publish cron runs every 15
+  minutes. Writing that captured copy afterwards reverted the post to a
+  draft, dropped the announcement URL (so `unpublish` could never delete
+  the toot again), let the next deploy take the live page down, and let
+  the next cron tick publish and announce it a second time. Renaming was
+  worse still: the stale copy still looked like a draft, so no redirect
+  was recorded and the address the post had been live at simply died. The
+  staleness check now runs as the last instruction before each write
+  rather than at the top of the dialog.
+- **`./style.sh` no longer replaces your banner before you confirm.** The
+  image was copied in the moment you typed its path, so answering "no" to
+  the review printed "Nothing written" over a file that was already gone
+  -- and the banner is a per-install file outside git with no backup. It
+  is now installed only after the write is confirmed, and the dimensions
+  written into the config are measured from the new file rather than the
+  old one.
+- **Secrets keep their permissions, and their backup keeps out of git.**
+  Saving `env.sh` dropped it from 0600 to whatever the umask says, because
+  the atomic write replaces the file and the mode was only set for a file
+  that did not exist yet -- while the wizard printed "readable only by you
+  (mode 600)" a few lines earlier. A stricter mode you chose yourself is
+  now kept, anything wider is tightened. `*.bak` joined `.gitignore`: the
+  wizards keep a backup of the file they rewrite, and for `env.sh` that
+  copy holds the previous live tokens. And the mask over the review diff
+  never matched a single line -- diff lines carry their newline and the
+  pattern was anchored with `\z` -- so every token was printed in the
+  clear in exactly the place the code promised it was hidden.
+- **Notes are stripped outside fenced code only.** `//` opens a comment in
+  half the languages anyone would paste into a ```js fence, and both
+  strippers ran over the whole file: saving a post deleted those lines
+  from the sample, and the `<!-- -->` one -- multiline and non-greedy --
+  ate whole paragraphs between a note and the next `-->`. Editing such a
+  post, changing nothing but its title, was enough.
+- **`--only` no longer stands the deploy guards down for a backend that
+  ignores it.** git pages force-pushes the entire build whatever it is
+  handed, so a `--only` run there replaces the live site -- and
+  `refresh-sidebar.sh` is exactly such a run, every half hour. Reproduced
+  end to end: a build that lost its content went out unexamined and left
+  a branch with no posts and nothing to restore from.
+
 - **A busy Wayback Machine no longer reads as a blog that was never
   archived.** Every query to the Archive ran inside a rescue that turned
   any failure into "nothing here", and the Archive rate-limits precisely

@@ -730,6 +730,7 @@ style:
   h_banner_file: "Jedes PNG, JPEG, GIF oder WebP. Es wird an seinen Platz kopiert und vermessen, damit Breite und Höhe in der Konfiguration zur Datei passen."
   banner_not_found: "%{path} ist keine Datei, das Banner blieb unverändert."
   banner_copied: "✅ Nach %{path} kopiert."
+  banner_pending: "✅ Wird als %{path} installiert, sobald du den Schreibvorgang bestätigst."
   banner_missing: "%{path} ist nicht da, es gab also nichts zu vermessen."
   banner_unmeasurable: "Die Bildgröße war nicht lesbar, Breite und Höhe blieben unverändert. PNG, JPEG, GIF und WebP sind immer lesbar."
   banner_measured: "✅ Vermessen: %{width}x%{height}. Genau das reserviert den Platz, bevor das Bild lädt."

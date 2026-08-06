@@ -518,10 +518,53 @@ def editor_round_trip(initial_content, hint_comment)
       abort("$EDITOR (#{editor}) failed -- set the EDITOR environment variable " \
             'to an editor that exists here (e.g. export EDITOR=vim) and rerun.')
     end
-    edited = File.read(path, encoding: 'utf-8')
-    edited = edited.gsub(/^<!--.*?-->\n/m, '')
-    edited.gsub(%r{^//.*\n?}, '')
+    strip_editor_notes(File.read(path, encoding: 'utf-8'))
   end
+end
+
+# Removes the guide block and the author's own `//` notes -- OUTSIDE fenced
+# code only.
+#
+# This used to be two gsubs over the whole file. `//` opens a comment in
+# half the languages anyone would paste into a ```js fence, so saving a post
+# deleted those lines from the code sample; the content-loss guard counts
+# block TYPES, so a code block that merely lost lines looked untouched. The
+# `<!--` one was worse: written `/m` and non-greedy, it ate everything up to
+# the next `-->` anywhere in the post, prose and fence boundaries included.
+# Editing such a post -- changing only its title -- was enough to lose them.
+#
+# Line-based rather than regex-based on purpose: every line that is not a
+# note is passed through byte for byte, so nothing else can be reshaped by
+# accident.
+def strip_editor_notes(text)
+  kept = []
+  in_fence = false
+  in_comment = false
+
+  text.each_line do |line|
+    if line.lstrip.start_with?('```')
+      in_fence = !in_fence
+      kept << line
+      next
+    end
+    if in_fence
+      kept << line
+      next
+    end
+    if in_comment
+      in_comment = false if line.include?('-->')
+      next
+    end
+    if line.start_with?('<!--')
+      in_comment = true unless line.include?('-->')
+      next
+    end
+    next if line.start_with?('//')
+
+    kept << line
+  end
+
+  kept.join
 end
 
 # Full syntax reference. The in-editor hint just links to it, so the hint
@@ -821,7 +864,7 @@ def queue_position(time, entries)
   { count: earlier.size + 1, slug: earlier.last[1], date: earlier.last[0] }
 end
 
-def prompt_and_schedule(path, post, rebuild: true)
+def prompt_and_schedule(path, post, rebuild: true, raw: nil)
   # Read once when slots are configured (the offer needs it); a site
   # without slots pays nothing here and reads the archive only after it
   # has actually scheduled something, for the queue line.
@@ -878,7 +921,7 @@ def prompt_and_schedule(path, post, rebuild: true)
     return false
   end
 
-  write_scheduled_date(path, post, date)
+  write_scheduled_date(path, post, date, raw: raw)
   rebuild_and_deploy(t('cli.updating_preview')) if rebuild
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   position = queue_position(date, entries || scheduled_entries(except_slug: post['slug']))
@@ -1135,7 +1178,11 @@ end
 # Shared by the CLI toggle above and the [n] action in the properties
 # dialog -- the wizard lost the standalone `schedule` menu item, so
 # without this the dialog could plan a post but never change its mind.
-def unschedule_post(path, post, slug)
+# `raw:` for the same reason write_scheduled_date takes it: this writes a
+# captured post back after a prompt, and the cron may have published it in
+# the meantime.
+def unschedule_post(path, post, slug, raw: nil)
+  abort_if_post_changed(path, raw, slug) if raw
   updated = post.dup
   updated.delete('scheduled')
   AtomicWrite.write_json(path, updated)
@@ -1150,7 +1197,19 @@ end
 # and publishing it later hits the same missing media year that used to
 # abort the cron. Shared by prompt_and_schedule and the queue screen,
 # which rewrites times too. Returns the (possibly moved) path.
-def write_scheduled_date(path, post, date)
+#
+# `raw:` is the bytes the caller read before it started asking questions.
+# Every caller here writes a captured copy of the post back, and the
+# scheduled-publish cron runs every 15 minutes -- so between that read and
+# this write the post may already be published, announced and live. Writing
+# the capture then reverts it to a draft, drops the announcement URL (so
+# `unpublish` could never delete the toot), lets the next deploy --prune
+# take the live page down, and lets the next cron tick publish and announce
+# it a second time. The check therefore belongs HERE, at the last
+# instruction before the write, not at the top of a dialog that then waits
+# for a keypress.
+def write_scheduled_date(path, post, date, raw: nil, slug: nil)
+  abort_if_post_changed(path, raw, slug || post['slug']) if raw
   updated = post.merge('date' => date.iso8601, 'scheduled' => true)
   new_year = date.year.to_s
   new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
@@ -1176,11 +1235,16 @@ end
 # copy.
 def queue_entries
   Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
-    post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
+    raw = File.read(file, encoding: 'utf-8') rescue next
+    post = JSON.parse(raw) rescue next
     next unless post.is_a?(Hash) && post['scheduled']
 
     time = Time.parse(post['date']) rescue next
-    { time: time, slug: post['slug'], path: file, post: post }
+    # The bytes travel with the entry, not just the parsed hash: every
+    # write below happens after a prompt that can sit open for minutes,
+    # and this is what the staleness guard compares against at the last
+    # possible moment (see write_scheduled_date).
+    { time: time, slug: post['slug'], path: file, post: post, raw: raw }
   end.sort_by { |entry| entry[:time] }
 end
 
@@ -1250,9 +1314,9 @@ def queue_act(entries, index)
     queue_offer_compact(freed, entries[(index + 1)..])
   when 's'
     puts
-    prompt_and_schedule(entry[:path], entry[:post], rebuild: false)
+    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw])
   when 'n'
-    unschedule_post(entry[:path], entry[:post], entry[:slug])
+    unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
     queue_offer_compact(entry[:time], entries[(index + 1)..])
   when '' then false
   else
@@ -1282,8 +1346,8 @@ def queue_swap(entries, index, other_index)
     return false
   end
 
-  write_scheduled_date(entry[:path], entry[:post], other[:time])
-  write_scheduled_date(other[:path], other[:post], entry[:time])
+  write_scheduled_date(entry[:path], entry[:post], other[:time], raw: entry[:raw])
+  write_scheduled_date(other[:path], other[:post], entry[:time], raw: other[:raw])
   puts Tui.paint(t('cli.queue_swapped', slug: entry[:slug],
                                         date: other[:time].getlocal.strftime(t('date_time_format'))), :green)
   puts
@@ -1306,7 +1370,7 @@ def queue_offer_compact(freed_time, rest)
 
   times = [freed_time] + rest.map { |entry| entry[:time] }
   rest.each_with_index do |entry, i|
-    entry[:path] = write_scheduled_date(entry[:path], entry[:post], times[i])
+    entry[:path] = write_scheduled_date(entry[:path], entry[:post], times[i], raw: entry[:raw])
   end
   puts Tui.paint(t('cli.queue_compacted'), :green)
   puts
@@ -1466,19 +1530,16 @@ def cmd_props(slug)
       case Tui.key_choice(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'))
       when 'p' then return publish_draft(slug)
       when 's'
-        abort_if_post_changed(path, original_raw, slug)
         puts
-        prompt_and_schedule(path, post)
+        prompt_and_schedule(path, post, raw: original_raw)
       when 'n'
         unless post['scheduled']
           puts t('cli.props_unknown_draft')
           next
         end
-        abort_if_post_changed(path, original_raw, slug)
-        unschedule_post(path, post, slug)
+        unschedule_post(path, post, slug, raw: original_raw)
       when 'r'
-        abort_if_post_changed(path, original_raw, slug)
-        slug = rename_post(path, post)
+        slug = rename_post(path, post, raw: original_raw)
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.
@@ -1506,11 +1567,9 @@ def cmd_props(slug)
         puts
         network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
       when 'c'
-        abort_if_post_changed(path, original_raw, slug)
-        toggle_pin(path, post, slug)
+        toggle_pin(path, post, slug, raw: original_raw)
       when 'r'
-        abort_if_post_changed(path, original_raw, slug)
-        slug = rename_post(path, post)
+        slug = rename_post(path, post, raw: original_raw)
       when 'a'
         props_addresses(path, slug)
       when 'x'
@@ -1530,7 +1589,8 @@ end
 # header still carries `pinned:` and still works; this is the short way.
 # Unpinning deletes the key rather than writing false, so an unpinned
 # post looks like every other unpinned post.
-def toggle_pin(path, post, slug)
+def toggle_pin(path, post, slug, raw: nil)
+  abort_if_post_changed(path, raw, slug) if raw
   if truthy_frontmatter?(post['pinned'])
     updated = post.dup
     updated.delete('pinned')
@@ -1642,7 +1702,7 @@ end
 
 # Returns the slug the caller should continue with: the new one after a
 # rename, the old one after any kind of cancel.
-def rename_post(path, post)
+def rename_post(path, post, raw: nil)
   old_slug = post['slug']
   year = File.basename(File.dirname(path))
 
@@ -1694,6 +1754,13 @@ def rename_post(path, post)
     puts t('cli.cancelled')
     return old_slug
   end
+
+  # After the confirmation, before the first move. A capture written back
+  # here is worse than elsewhere: `draft?(post)` reads the STALE state, so
+  # a post the cron published two prompts ago is renamed as if it were a
+  # draft -- no former_slugs, and the address it has been live at since
+  # then dies with no redirect.
+  abort_if_post_changed(path, raw, old_slug) if raw
 
   updated = post.merge('slug' => new_slug)
   unless draft?(post)
