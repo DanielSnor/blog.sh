@@ -36,6 +36,14 @@ duplicated.
   `link`): rather than guess and risk merging two different posts, a
   re-import writes it again -- a duplicate you can delete, where a wrong
   match would destroy a post you can't get back.
+
+  The other exception is about WHERE the export sits. Several sources have
+  no account name anywhere in their files (Facebook, Threads, Jekyll, Wix,
+  Movable Type, Substack), so the identity borrows the export's own
+  directory or file name. Unpack the next export into a folder named after
+  its date and every post in it is a new post: the archive imports a second
+  time, slugs and all. Import from the same path each time -- or rename the
+  new export to the old name -- and matching works as described.
 - **Origin becomes a tag.** Every imported post is tagged with its platform
   (`tumblr`, `wordpress`, ...; for a plain feed, the site's domain), so
   `/tag/tumblr/` is the whole of one old blog. Deduplicated

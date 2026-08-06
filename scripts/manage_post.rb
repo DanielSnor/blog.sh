@@ -365,11 +365,15 @@ EDITOR_BUFFER_PATH = File.join(ROOT, '.last-edit.md')
 EDITOR_BUFFER_META_PATH = File.join(ROOT, '.last-edit.meta')
 
 def keep_editor_buffer(text, origin = nil)
-  File.write(EDITOR_BUFFER_PATH, text)
+  # Atomic, like every post write: this file is the only copy of what was
+  # just typed, and a plain write that runs out of disk truncates the
+  # PREVIOUS buffer to nothing -- while the notice below still says the
+  # text is safe.
+  AtomicWrite.write(EDITOR_BUFFER_PATH, text)
   File.chmod(0o600, EDITOR_BUFFER_PATH)
   return unless origin
 
-  File.write(EDITOR_BUFFER_META_PATH, JSON.generate(origin.merge('saved_at' => Time.now.iso8601)))
+  AtomicWrite.write(EDITOR_BUFFER_META_PATH, JSON.generate(origin.merge('saved_at' => Time.now.iso8601)))
   File.chmod(0o600, EDITOR_BUFFER_META_PATH)
 rescue SystemCallError
   nil # a buffer we can't write is not a reason to refuse the save
@@ -487,7 +491,9 @@ def arm_editor_buffer_notice
 
   @editor_buffer_notice_armed = true
   at_exit do
-    warn t('cli.editor_buffer_kept', path: EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
+    # Existing is not enough -- an empty file is not a rescued post, and
+    # promising one that isn't there is worse than saying nothing.
+    warn t('cli.editor_buffer_kept', path: EDITOR_BUFFER_PATH) if File.size?(EDITOR_BUFFER_PATH)
   end
 end
 
@@ -1976,13 +1982,17 @@ def edit_post(slug)
   # a restore from trash would otherwise come back without its image.
   keep = (blocks.flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
           post['content'].map { |b| b.dig('poster', 0, 'url') }).compact.to_set
+
+  # The post first, its unreferenced media second. Pruning ahead of the
+  # write meant a failure in between left a post that still names files
+  # that are already gone; this order can at worst leave a file nothing
+  # references, which the next save collects.
+  AtomicWrite.write_json(new_path, updated)
   if Dir.exist?(new_media_dir)
     Dir.children(new_media_dir).each do |f|
       File.delete(File.join(new_media_dir, f)) unless keep.include?(f)
     end
   end
-
-  AtomicWrite.write_json(new_path, updated)
   discard_editor_buffer
   File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
   # Housekeeping only, and it runs last on purpose: an incoming/ the CLI
@@ -2017,11 +2027,17 @@ def delete_post(slug)
   year = File.basename(File.dirname(path))
   media_dir = File.join(MEDIA_DIR, year, slug)
 
-  # No git, no backup elsewhere -- deleted posts go to trash/<slug>/ instead
-  # of straight away, so a mistake can be undone via `restore`. Deleting the
-  # same slug a second time overwrites the old version in trash -- trash
-  # only ever holds the most recent deletion.
-  trash_dir = File.join(TRASH_DIR, slug)
+  # No git, no backup elsewhere -- deleted posts go to trash/<year>/<slug>/
+  # instead of straight away, so a mistake can be undone via `restore`.
+  # Deleting the same year+slug a second time overwrites that version in
+  # trash; trash only ever holds the most recent deletion of each post.
+  #
+  # Keyed by year AND slug, because content is: the same slug in two years
+  # is two posts (backdating makes that ordinary), and a trash keyed by
+  # slug alone made deleting the older one destroy the newer one's trashed
+  # copy AND its whole media directory -- the undo for a deliberate delete,
+  # gone without a word.
+  trash_dir = File.join(TRASH_DIR, year, slug)
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
   FileUtils.mv(path, File.join(trash_dir, 'post.json'))
@@ -2041,10 +2057,49 @@ end
 # based on the year in the post's date. Won't overwrite an existing post
 # with the same slug -- that conflict (a new post was created under the same
 # slug after the old one was deleted) has to be resolved by hand.
+# Every trashed copy of a slug: the year-keyed ones, plus a flat
+# trash/<slug>/ left over from an installation that deleted a post before
+# the trash grew years. Both are restorable -- an upgrade must not strand
+# somebody's undo.
+def trashed_paths(slug)
+  (Dir.glob(File.join(TRASH_DIR, '*', slug, 'post.json')) +
+   [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) }.uniq.sort
+end
+
+# Mirrors pick_among_years, over what is in the trash rather than what is
+# published: a number picks, anything else cancels.
+def pick_among_trashed(slug, paths)
+  readable = paths.filter_map { |f| (summary = post_summary(f)) && [f, summary] }
+  abort t('cli.nothing_in_trash', slug: slug) if readable.empty?
+
+  paths = readable.map(&:first)
+  rows = readable.map { |(_, summary)| summary_row(summary) }
+  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+
+  if Tui.interactive?
+    choice = Tui.menu(rows, hint: t('cli.menu_hint'))
+    abort t('cli.cancelled_empty') if choice.nil?
+    puts
+    return paths[choice]
+  end
+
+  rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
+  puts
+  print t('cli.enter_number')
+  input = $stdin.gets&.strip.to_s
+  puts
+  abort t('cli.cancelled_empty') unless input =~ /\A\d+\z/ && (1..paths.size).cover?(input.to_i)
+  paths[input.to_i - 1]
+end
+
 def cmd_restore(slug)
-  trash_dir = File.join(TRASH_DIR, slug)
-  trash_json = File.join(trash_dir, 'post.json')
-  abort t('cli.nothing_in_trash', slug: slug) unless File.exist?(trash_json)
+  found = trashed_paths(slug)
+  abort t('cli.nothing_in_trash', slug: slug) if found.empty?
+
+  # Two years of the same slug can sit in the trash at once now, so the
+  # same rule as everywhere else applies: never guess, show both and ask.
+  trash_json = found.size == 1 ? found.first : pick_among_trashed(slug, found)
+  trash_dir = File.dirname(trash_json)
 
   post = JSON.parse(File.read(trash_json, encoding: 'utf-8'))
   year = Time.parse(post['date']).year.to_s

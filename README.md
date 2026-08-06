@@ -586,7 +586,7 @@ generalizing for anyone else to adopt this as-is:
   HTML and JSON exports, because they are one archive serialised twice.
   What a new source needs is an adapter with three methods -- everything
   else (media, dedup, dry-run, reporting, HTML → blocks) is already
-  shared. Threads is feasible but deferred (see below).
+  shared.
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:

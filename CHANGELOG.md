@@ -384,6 +384,29 @@ prints what an installation is running.
 
 ### Fixes
 
+- **The trash is keyed by year and slug, like the content it holds.** The
+  same slug in two years is two posts -- backdating makes that ordinary --
+  but the trash was keyed by slug alone, so deleting the older one wiped
+  the newer one's trashed copy and its whole media directory. The undo for
+  a deliberate delete, gone without a word. `restore` now offers both when
+  both are there, and still finds a flat `trash/<slug>/` left by an older
+  installation.
+- **A re-import that moves a published post across a New Year keeps its
+  address alive.** The move itself was handled -- JSON and media travel
+  together -- but the redirect was not recorded, so every link to the post
+  died. A source that starts reporting its dates in another timezone is
+  enough to trigger it. Drafts record nothing, as they have no public
+  address to keep.
+- **The editor buffer is written atomically**, like every post is: it is
+  the only copy of what was just typed, and a plain write that runs out of
+  disk truncated the previous buffer to nothing. The notice that says the
+  text is safe now checks the file has something in it rather than merely
+  existing.
+- **A save writes the post before pruning its media**, not after. The old
+  order could leave a post naming files that were already deleted; this
+  one can at worst leave a file nothing references, which the next save
+  collects.
+
 - **A video whose address the engine cannot play no longer injects markup
   into the page.** The "video unavailable" notice printed that address
   unescaped, in the post page, in every listing it appears in, and in the

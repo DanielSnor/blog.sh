@@ -112,6 +112,21 @@ module PostWriter
               "#{new_path} -- resolve the slug clash by hand"
       end
 
+      # A published post that moves years vacates its public address, and
+      # the redirect for it has to be recorded here exactly as edit_post
+      # records it -- a re-import from a source that started reporting its
+      # dates in another timezone is enough to move a post across a New
+      # Year, and every link to it died with no stub behind it.
+      #
+      # Read from the OLD file: `post` is what the import built, and the
+      # state that decides whether there is a public address to keep is the
+      # state the post is in now.
+      if old && old['state'] != 'draft'
+        vacated = "#{old_year}/#{slug}"
+        former = (Array(post['former_slugs']).map(&:to_s) + [vacated]).uniq - ["#{year}/#{slug}"]
+        post['former_slugs'] = former unless former.empty?
+      end
+
       FileUtils.mkdir_p(new_dir)
       move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
     end
