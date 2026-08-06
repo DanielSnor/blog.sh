@@ -190,11 +190,13 @@ cli:
   queue_compact_prompt: "Posunout zbytek fronty (%{count}) o slot dopředu? [a/N] "
   queue_compacted: "Fronta posunuta: každý následující post převzal dřívější slot."
   menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
+  menu_hint_plain: "↑↓ pohyb · Enter výběr · 1-9 rychlá volba · Esc zrušit"
+  wizard_menu_hint: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · Esc konec"
   wizard_continue_prompt: "Stiskni klávesu pro pokračování…"
   qr_hint: "Naskenuj telefonem a náhled se otevře."
   announcing: "Oznamuji"
   preview_serving: "Servíruji public.nosync na %{url} — Ctrl-C ukončí."
-  preview_missing_public: "public.nosync ještě neexistuje — nejdřív build (ruby build/build_blog.rb)."
+  preview_missing_public: "public.nosync ještě neexistuje — nejdřív ho sestav (ruby build/build_blog.rb)."
   schedule_date_invalid: "Tohle datum neumím přečíst — čekám např. 2026-08-15 09:00."
   schedule_date_not_future: "Datum publikace musí být v budoucnosti."
 
@@ -262,10 +264,10 @@ cli:
   trash_empty: "Koš je prázdný."
 
   default_rebuild_reason: "Sestavuji a nasazuji"
-  build_failed: "\n❌ Build selhal — nenasazuji. Příspěvek je uložený, po opravě spusť ./scripts/deploy-web.sh"
+  build_failed: "\n❌ Sestavení selhalo — nenasazuji. Příspěvek je uložený, po opravě spusť ./scripts/deploy-web.sh"
   deploy_failed: "\n❌ Nasazení selhalo. Web je sestavený; důvod je výš. Přerušený přenos stačí spustit znovu (./scripts/deploy-web.sh) — pojistka, která nahrávání zastavila, ho zastaví stejně znovu, dokud neuděláš, co říká."
 
-  rebuild_prompt: "Znovu sestavit a nasadit web teď? [Y/n] "
+  rebuild_prompt: "Znovu sestavit a nasadit web teď? [A/n] "
 
   usage: |
     usage:
@@ -444,7 +446,7 @@ import:
   nothing_to_import: "Není co importovat."
   confirm_prompt: "Zapsat těchto %{count} postů? Potvrď napsáním %{count} (cokoli jiného ruší): "
   running: "Importuji %{label} — stahuji média, může to chvíli trvat…"
-  rebuild_prompt: "Znovu sestavit a nasadit web? [Y/n] "
+  rebuild_prompt: "Znovu sestavit a nasadit web? [A/n] "
   rebuilding: "Sestavuji a nasazuji"
   cancelled: "Zrušeno, nic se nezapsalo."
   interrupted: "Přerušeno. Dosud zapsané posty už jsou v content.nosync/ — opakovaný import je bezpečný, přepíše je na místě."
@@ -564,7 +566,7 @@ doctor:
   timezone_unknown_fix: "Použij název podle IANA, třeba Europe/Prague nebo America/New_York (viz /usr/share/zoneinfo), nebo UTC. Překlep by tiše posunul datum u každého postu."
 
   no_network: "Není nastavená žádná síť pro komentáře — posty se nikam neoznamují."
-  both_networks: "Jsou nastavené obě sekce, mastodon: i bluesky:, a build to odmítá."
+  both_networks: "Jsou nastavené obě sekce, mastodon: i bluesky:, a sestavení to odmítá."
   both_networks_fix: "Komentáře i oznamovací post žijí přesně na jedné síti. Tu, kterou nechceš, zakomentuj."
   mastodon_instance_shape: "mastodon.instance je \"%{value}\" — patří tam jen jméno serveru, bez https:// a bez cesty."
   mastodon_ok: "Oznamuje se na %{instance}."
@@ -606,7 +608,7 @@ doctor:
   slots_bad_fix: "Formát je \"<den> HH:MM\" — mon, tue, wed, thu, fri, sat, sun nebo daily, pak čas ve 24hodinovém formátu. Plné názvy dnů nefungují."
 
   backend_unset: "Není vybraný cíl nasazení, web se tedy staví lokálně a nikam neputuje."
-  backend_unset_fix: "Jako začátek to úplně stačí — build ukáže ./blog.sh preview. Až ho budeš chtít online, spusť ./setup.sh."
+  backend_unset_fix: "Jako začátek to úplně stačí — sestavený web ukáže ./blog.sh preview. Až ho budeš chtít online, spusť ./setup.sh."
   backend_ok: "Nasazuje se backendem %{name}."
   backend_unknown: "DEPLOY_BACKEND je \"%{name}\", což není backend, který engine má."
   backend_unknown_fix: "Známé backendy: %{known}."
@@ -694,7 +696,7 @@ setup:
   backend_git: "GitHub/GitLab/Codeberg Pages — web zadarmo servíruje git hosting"
   backend_rclone: "rclone — cloudová úložiště jako S3, R2, B2 nebo WebDAV"
   backend_sftp: "SFTP — klasický webhosting, kam se nahrává přes SFTP"
-  backend_skipped: "Bez cíle nasazení. Buildy zůstanou lokálně; ukáže je ./blog.sh preview."
+  backend_skipped: "Bez cíle nasazení. Sestavený web zůstane lokálně; ukáže ho ./blog.sh preview."
 
   q_surfer_url: "URL Surfer aplikace"
   h_surfer_url: "Adresa, na které Surfer appka běží — stejná, kterou uvidí návštěvníci webu. Třeba https://blog.mojedomena.cz."
@@ -703,7 +705,7 @@ setup:
   q_surfer_remote_dir: "Podadresář na Surferu"
   h_surfer_remote_dir: "Vyplň, jen když má web bydlet v podsložce vedle něčeho dalšího. Enter = web bude přímo na adrese appky."
   q_deploy_target_dir: "Adresář"
-  h_deploy_target_dir: "Absolutní cesta ke složce, kterou tvůj webserver ukazuje světu — do ní se build zkopíruje. Třeba /var/www/mujweb."
+  h_deploy_target_dir: "Absolutní cesta ke složce, kterou tvůj webserver ukazuje světu — do ní se sestavený web zkopíruje. Třeba /var/www/mujweb."
   q_rsync_target: "Cíl pro rsync"
   h_rsync_target: "Zapiš to, co bys dal rsyncu: user@server:/var/www/mujweb, nebo lokální cesta."
   q_git_pages_remote: "Git remote"
@@ -761,7 +763,7 @@ style:
   menu_fonts: "Písma — písmo a velikost názvu a popisu na hlavičce"
   menu_analytics: "Měření návštěvnosti — skript, jestli nějaký máš"
 
-  palette_intro: "Paleta je sedm barev na režim. Všechno ostatní — pozadí karet, barvy při najetí myší, vyhledávací pole — se z nich při buildu dopočítá samo."
+  palette_intro: "Paleta je sedm barev na režim. Všechno ostatní — pozadí karet, barvy při najetí myší, vyhledávací pole — se z nich při sestavení dopočítá samo."
   q_palette: "Kterou paletu?"
   palette_custom: "Zadat hodnoty ručně (je jich čtrnáct)"
   palette_set: "✅ %{name}."
@@ -896,4 +898,4 @@ style:
 
   q_rebuild: "Znovu sestavit web hned, ať se na to můžeš podívat? [a/N] "
   rebuilt: "✅ Sestaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
-  rebuild_failed: "Build nedoběhl — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."
+  rebuild_failed: "Sestavení nedoběhlo — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."
