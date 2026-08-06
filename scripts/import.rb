@@ -25,6 +25,7 @@ require_relative '../lib/site_header'
 require_relative '../lib/i18n'
 require_relative '../lib/publishing'
 require_relative '../lib/import/run'
+require_relative '../lib/import/blogger'
 require_relative '../lib/import/bluesky'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
@@ -49,6 +50,7 @@ end
 # cron pipes a number today, but anyone who has scripted one should re-read
 # their script after a change here.
 SOURCES = [
+  ['blogger', -> { build_blogger }],
   ['bluesky', -> { build_bluesky }],
   ['ghost', -> { build_ghost }],
   ['instagram', -> { build_instagram }],
@@ -73,6 +75,17 @@ def ask(prompt_key)
   print t(prompt_key)
   value = $stdin.gets.to_s.strip
   value.empty? ? nil : value
+end
+
+def build_blogger
+  path = ask('import.blogger_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Blogger.new(path) if File.exist?(path)
+
+  puts t('import.blogger_path_invalid', path: path)
+  nil
 end
 
 def build_bluesky

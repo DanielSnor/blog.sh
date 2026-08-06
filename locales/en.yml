@@ -382,6 +382,8 @@ import:
   ghost_path_invalid: "%{path} does not exist."
   ghost_url_prompt: "URL of the (still running) Ghost site — its images only exist there (empty = cancel): "
   ghost_url_invalid: "%{url} is not a URL — it has to start with http:// or https://."
+  blogger_path_prompt: "Path to the Blogger backup XML (empty = cancel): "
+  blogger_path_invalid: "%{path} does not exist."
   podcast_source_prompt: "Podcast feed URL or path to a saved feed file (empty = cancel): "
   medium_dir_prompt: "Path to the unpacked Medium export (the directory with posts/; empty = cancel): "
   medium_dir_invalid: "%{dir} has no posts/ directory — point this at the unpacked export."
@@ -409,6 +411,7 @@ import:
   interrupted: "Interrupted. Posts written so far are already in content.nosync/ — re-running the import is safe, it overwrites them in place."
   source_died: "⚠️  The source stopped answering after %{count} item(s): %{error}. The counts below are a partial tally, not the whole source. Posts already written are saved — re-running is safe, they are matched on their source id and never duplicated."
   source:
+    blogger: "Blogger (Atom backup)"
     bluesky: "Bluesky"
     ghost: "Ghost (JSON export)"
     instagram: "Instagram (account export)"

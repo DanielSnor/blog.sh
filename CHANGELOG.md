@@ -47,6 +47,17 @@ prints what an installation is running.
   drafts for review, counted in the summary; so does the number of posts
   that came without tags, which newer Medium exports no longer include.
 
+- **Blogger joined the import sources** -- the thirteenth. Point the
+  wizard (or `migrate_blogger.rb`) at the Atom backup file from
+  Settings → Manage blog → Back up content. The backup mixes posts with
+  every comment ever left and the blog's settings; the kind marker
+  tells them apart, and the skips are counted by name. Drafts stay
+  drafts, labels become tags, YouTube embeds become video blocks, and
+  image URLs have their size token rewritten so the full-size files
+  download instead of the 320px thumbnails the markup actually points
+  at. Kept permalinks come out as real `/2015/03/post.html` files, so
+  blogspot-era links survive without server configuration.
+
 - **Podcasts joined the import sources** -- the twelfth: any RSS feed
   whose items carry audio enclosures (Libsyn, Buzzsprout, Anchor, ...).
   Episodes become posts -- artwork, a native audio player, then the

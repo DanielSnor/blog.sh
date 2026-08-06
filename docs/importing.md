@@ -54,8 +54,8 @@ duplicated.
   working.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
-  (Ghost, Medium, Substack, WordPress/feed and Tumblr today) can record
-  each published post's old path as `redirect_from` -- the build then serves a redirect at every one
+  (Blogger, Ghost, Medium, Substack, WordPress/feed and Tumblr today)
+  can record each published post's old path as `redirect_from` -- the build then serves a redirect at every one
   of them, so nothing anyone ever linked goes dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
@@ -82,6 +82,29 @@ count swung wildly" shape it watches for. Check the numbers, then re-run
 `./scripts/deploy-web.sh` with `--force`.
 
 ## The sources
+
+### Blogger
+
+```bash
+ruby scripts/migrate_blogger.rb <blog-backup.xml>
+```
+
+In Blogger: **Settings → Manage blog → Back up content**. The file is an
+Atom feed that mixes your posts with **every comment anyone ever left**
+and the blog's settings -- the importer tells them apart by their kind
+marker, so the summary's `comment` and `not_a_post` counts are expected,
+not a problem. Drafts come over as drafts.
+
+Blogger's markup only ever points at thumbnails -- the size token in
+each image URL (`/s320/`) is rewritten up front so the full-size file
+downloads instead. The link-to-itself every image sits in is unwrapped;
+a link to anywhere else is the author's and stays. YouTube embeds become
+the same video blocks a hand-written post gets.
+
+Old Blogger addresses (`/2015/03/post.html`) become real `.html` files
+when permalinks are kept, so links from the blogspot era keep working
+without any server configuration -- provided the blog ran on a custom
+domain the new site now answers at.
 
 ### Bluesky
 
