@@ -153,7 +153,9 @@ prints what an installation is running.
   media from the archive, replies to other people's threads are skipped
   and counted (the Bluesky rule), bare URLs become real links, and the
   shared MetaText repair fixes the encoding. Ask for JSON where you get
-  a choice: only it marks replies, and its timestamps carry the seconds
+  a choice: only it marks replies -- an HTML run ends by saying so,
+  every time, since it cannot know whether there was anything to miss
+  -- and its timestamps carry the seconds
   the HTML page never prints -- the page's minute-level dates, in
   Meta's fixed no-DST Pacific clock, convert back verified-exact to the
   minute against the same account's JSON. The export's

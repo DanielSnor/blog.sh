@@ -502,6 +502,7 @@ import:
     movabletype_left_behind: "Export nesl i %{parts} — statický archiv pro ně nemá místo, zůstaly venku."
     podcast_audio_size: "Audio epizod má dohromady ~%{size} ke stažení a hostování."
     threads_replies: "%{count} odpovědí na cizí thready přeskočeno — archiv drží tvoje samostatné posty."
+    threads_html_replies: "HTML stránka odpovědi nijak neznačí, takže tenhle import je neuměl odlišit — účet s odpověďmi je lepší importovat z JSONu, který je značí a přeskakuje."
     tumblr_unmapped: "%{count} postů nemělo použitelnou původní adresu — naimportovány bez přesměrování."
     wayback_snapshots: "%{count} snímků feedu přečteno z Wayback Machine."
     wayback_unreadable: "%{count} snímků nebyly čitelné feedy — přeskočeny."

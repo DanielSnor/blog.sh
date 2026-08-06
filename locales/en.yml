@@ -514,6 +514,7 @@ import:
     movabletype_left_behind: "The export also held %{parts} -- a static archive has nowhere to put them, so they were left behind."
     podcast_audio_size: "The episodes' audio adds up to ~%{size} to download and host."
     threads_replies: "%{count} repl(y/ies) to other people's threads were skipped -- an archive holds your own standalone posts."
+    threads_html_replies: "The HTML page does not mark replies, so this import could not tell them apart -- an account with replies is better imported from JSON, which marks and skips them."
     tumblr_unmapped: "%{count} post(s) had no usable original address -- imported without a redirect."
     wayback_snapshots: "%{count} feed capture(s) read from the Wayback Machine."
     wayback_unreadable: "%{count} capture(s) were not readable feeds and were skipped."

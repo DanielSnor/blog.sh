@@ -488,7 +488,9 @@ Bare URLs in the text become real links, and Meta's mangled encoding
 is repaired the same way as for Facebook and Instagram.
 
 JSON is the better ask if you have replies to keep out: only it marks
-them, so the HTML page imports every box it holds. HTML timestamps are
+them, so the HTML page imports every box it holds -- and an HTML run
+says so when it finishes, every time, since it cannot know whether
+there was anything to miss. HTML timestamps are
 printed to the minute in Meta's fixed Pacific clock (no daylight
 saving; the same convention, and the same conversion, as the Instagram
 HTML export) -- correct to the minute, but a re-import should stick to

@@ -121,7 +121,12 @@ module Import
       }
     end
 
+    # The JSON run counts what it skipped; the HTML run cannot count
+    # what nothing in the page marks, so instead of a silent zero it
+    # says exactly that, every time -- whether there was anything to
+    # miss is precisely what it cannot know.
     def postscript
+      return I18n.t('import.note.threads_html_replies') if @format == :html
       return nil if @replies.zero?
 
       I18n.t('import.note.threads_replies', count: @replies)
