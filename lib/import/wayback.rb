@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'cgi'
 require 'json'
 require 'net/http'
 require 'tempfile'
@@ -23,17 +24,26 @@ module Import
     CDX = 'https://web.archive.org/cdx/search/cdx'
     # Where platforms kept their feeds, tried in this order when the
     # given URL is not already one.
-    FEED_PATHS = %w[rss feed atom.xml index.xml rss.xml feed/rss feeds/posts/default].freeze
+    FEED_PATHS = %w[rss feed atom.xml index.xml rss.xml feed/rss rss-kanal feeds/posts/default].freeze
 
     attr_accessor :keep_permalinks
 
-    def initialize(url, delay: 1.0, keep_permalinks: false)
+    # post_pattern is a regex string for page mode: which archived PATHS
+    # are posts (as opposed to listings, tag pages, calendars). A
+    # platform pack supplies it for hosts it knows; anywhere else the
+    # user does, or page mode refuses with samples to build one from.
+    def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false)
       @url = url.sub(%r{/+\z}, '')
       @delay = delay
+      @post_pattern = post_pattern && Regexp.new(post_pattern)
+      @mode = mode
       @keep_permalinks = keep_permalinks
       @snapshots_read = 0
       @unreadable = 0
       @lost_images = 0
+      @unparsed = 0
+      @dated_by_capture = 0
+      @pack = PACKS.find { |p| p.matches?(host) }
     end
 
     def label
@@ -54,10 +64,19 @@ module Import
       host.sub(/\Awww\./, '')
     end
 
-    def each_item
-      captures = discover
-      abort("❌ The Wayback Machine has no feed captures for #{host} -- tried #{feed_candidates.join(', ')}.") if captures.empty?
+    # Feeds first -- machine-readable and cheap. A blog the Archive only
+    # ever saw as pages (no feed captures) falls through to page mode:
+    # every archived post page, newest capture of each, read one by one.
+    def each_item(&block)
+      unless @mode == :pages
+        captures = discover
+        return each_feed_item(captures, &block) unless captures.empty?
+      end
 
+      each_page_item(&block)
+    end
+
+    def each_feed_item(captures)
       # Oldest first: overlapping captures then replay history in order,
       # and the newest version of a post is the one that sticks.
       captures.sort_by! { |c| c[:timestamp] }
@@ -66,13 +85,38 @@ module Import
         next unless feed
 
         @snapshots_read += 1
-        feed.each_item { |item| yield [feed, item] }
+        feed.each_item { |item| yield [:feed, feed, item] }
+        sleep @delay
+      end
+    end
+
+    def each_page_item
+      pages = post_pages
+      @total = pages.size
+      pages.each do |page|
+        yield [:page, page, nil]
         sleep @delay
       end
     end
 
     def map(pair, media)
-      feed, item = pair
+      kind, a, b = pair
+      kind == :feed ? map_feed_item(a, b, media) : map_page(a, media)
+    end
+
+    def postscript
+      notes = []
+      notes << "#{@snapshots_read} feed capture(s) read from the Wayback Machine." if @snapshots_read.positive?
+      notes << "#{@unreadable} capture(s) were not readable feeds and were skipped." if @unreadable.positive?
+      notes << "#{@unparsed} archived page(s) could not be read as posts -- see the skip counts." if @unparsed.positive?
+      notes << "#{@dated_by_capture} post(s) carry the capture date -- the page itself said nothing better." if @dated_by_capture.positive?
+      notes << "#{@lost_images} image(s) the Archive never saved are lost -- their posts came over without them." if @lost_images.positive?
+      notes.empty? ? nil : notes.join("\n  ")
+    end
+
+    private
+
+    def map_feed_item(feed, item, media)
       post = feed.map(item, media)
       return post unless post.is_a?(Hash)
 
@@ -99,14 +143,172 @@ module Import
       post
     end
 
-    def postscript
-      notes = ["#{@snapshots_read} feed capture(s) read from the Wayback Machine."]
-      notes << "#{@unreadable} capture(s) were not readable feeds and were skipped." if @unreadable.positive?
-      notes << "#{@lost_images} image(s) the Archive never saved are lost -- their posts came over without them." if @lost_images.positive?
-      notes.join("\n  ")
+    # --- page mode ------------------------------------------------------
+
+    # Which archived pages are POSTS. The pack knows its platform's URL
+    # shape; a user pattern stands in anywhere else; and with neither,
+    # refusing with samples beats importing tag pages as articles.
+    def post_pages
+      rows = cdx_rows("#{host}/*", extra: { 'filter' => ['statuscode:200', 'mimetype:text/html'],
+                                            'collapse' => 'urlkey' })
+      paths = rows.group_by { |r| URI.parse(r[:original]).path rescue nil }
+      paths.delete(nil)
+      posts = paths.select { |path, _| post_path?(path) }
+      if posts.empty?
+        sample = paths.keys.reject { |p| p == '/' }.first(12).join("\n  ")
+        abort("❌ No feed captures, and no way to tell posts from listings on #{host}.\n" \
+              "Pass POST_PATTERN (a regex the post paths match). Archived paths look like:\n  #{sample}")
+      end
+
+      # The NEWEST capture of each page: the most complete version of a
+      # post the Archive ever saw.
+      posts.map { |path, captures| captures.max_by { |c| c[:timestamp] }.merge(path: path) }
+           .sort_by { |c| c[:path] }
     end
 
-    private
+    def post_path?(path)
+      return @post_pattern.match?(path) if @post_pattern
+      return @pack.post_path?(path) if @pack
+
+      false
+    end
+
+    def map_page(page, media)
+      html = http_get("https://web.archive.org/web/#{page[:timestamp]}id_/#{page[:original]}")
+      html = to_utf8(html)
+      parsed = @pack&.parse(html) || generic_parse(html)
+      unless parsed
+        @unparsed += 1
+        return :unparsed
+      end
+
+      body = reroute_images(parsed[:body], page)
+      blocks = localize_images(HtmlBlocks.parse(body).blocks, media)
+      return :empty if blocks.empty?
+
+      date = parsed[:date]
+      unless date
+        @dated_by_capture += 1
+        date = Time.strptime(page[:timestamp], '%Y%m%d%H%M%S')
+      end
+
+      slug = Slug.slugify(File.basename(page[:path]))
+      slug = Slug.slugify(parsed[:title].to_s.split(/\s+/).first(10).join(' ')) if slug.empty?
+
+      post = {
+        'slug' => slug,
+        'title' => parsed[:title].to_s.empty? ? slug : parsed[:title],
+        'date' => date.iso8601,
+        'state' => 'published',
+        'tags' => parsed[:tags] || [],
+        'content' => blocks,
+        'source' => {
+          'platform' => 'wayback',
+          'account' => host,
+          'post_url' => page[:original],
+          'original_id' => page[:path]
+        }
+      }
+      post['redirect_from'] = [page[:path]] if @keep_permalinks
+      strip_fake_images(post, media) || post
+    end
+
+    # Same 200-that-is-really-HTML defence the feed path has; returns
+    # :empty when nothing survives, nil when the post is fine.
+    def strip_fake_images(post, media)
+      return nil if media.dry_run?
+
+      post['content'] = post['content'].reject do |block|
+        lost = block['type'] == 'image' && !block.dig('media', 0, 'width')
+        if lost
+          @lost_images += 1
+          media.discard(block.dig('media', 0, 'url'))
+        end
+        lost
+      end
+      post['content'].empty? ? :empty : nil
+    end
+
+    # The era this rescues predates UTF-8 as a habit -- Czech pages in
+    # particular spoke windows-1250. Net::HTTP hands the body over as
+    # BINARY, so the charset declaration is read from the raw bytes
+    # FIRST (an ASCII-only pattern is legal against any encoding);
+    # matching UTF-8 regexps against the undecided string is exactly
+    # the Encoding::CompatibilityError this method exists to prevent.
+    def to_utf8(raw)
+      declared = raw.b[/charset=["']?([A-Za-z0-9_-]+)/, 1]
+      utf8 = raw.dup.force_encoding('UTF-8')
+      return utf8 if utf8.valid_encoding? && (declared.nil? || declared.match?(/\Autf-?8\z/i))
+
+      source = declared && !declared.match?(/\Autf-?8\z/i) ? declared : 'windows-1250'
+      raw.dup.force_encoding(source).encode('UTF-8', invalid: :replace, undef: :replace)
+    rescue StandardError
+      raw.dup.force_encoding('ISO-8859-1').encode('UTF-8', invalid: :replace, undef: :replace)
+    end
+
+    # Every image goes back through the time machine: absolutized
+    # against the original host, then asked of the Archive at this
+    # page's own moment -- it redirects to the nearest copy it holds.
+    def reroute_images(body, page)
+      body.gsub(/(<img[^>]*\ssrc=")([^"]+)(")/i) do
+        prefix, src, suffix = Regexp.last_match(1), Regexp.last_match(2), Regexp.last_match(3)
+        absolute = begin
+          URI.join(page[:original], src).to_s
+        rescue StandardError
+          src
+        end
+        if absolute.start_with?('http') && !absolute.include?('web.archive.org')
+          "#{prefix}https://web.archive.org/web/#{page[:timestamp]}id_/#{absolute}#{suffix}"
+        else
+          "#{prefix}#{src}#{suffix}"
+        end
+      end
+    end
+
+    # The fallback for platforms nobody wrote a pack for: honest and
+    # modest. It reads what pages declare -- a heading, a time element
+    # or article:published_time, an article container -- and gives up
+    # loudly (an :unparsed count) rather than guessing at soup.
+    def generic_parse(html)
+      body = html[%r{<article[^>]*>(.*?)</article>}m, 1] ||
+             html[%r{<div[^>]*class="[^"]*(?:entry-content|post-content|article-content|articleText)[^"]*"[^>]*>(.*)}m, 1]
+      return nil unless body
+
+      title = text_of(html[%r{<h1[^>]*>(.*?)</h1>}m, 1]) ||
+              text_of(html[%r{<h2[^>]*>(.*?)</h2>}m, 1]) ||
+              text_of(html[%r{<title[^>]*>(.*?)</title>}m, 1])
+      stamp = html[/property="article:published_time"[^>]*content="([^"]+)"/, 1] ||
+              html[/<time[^>]*datetime="([^"]+)"/, 1]
+      date = begin
+        stamp && Time.parse(stamp)
+      rescue StandardError
+        nil
+      end
+      { title: title, date: date, body: body }
+    end
+
+    def text_of(fragment)
+      return nil if fragment.nil?
+
+      clean = CGI.unescapeHTML(fragment.gsub(/<[^>]+>/, '')).gsub(/\s+/, ' ').strip
+      clean.empty? ? nil : clean
+    end
+
+    def localize_images(blocks, media)
+      blocks.filter_map do |block|
+        next block unless block['type'] == 'image'
+
+        url = block.dig('media', 0, 'url').to_s
+        filename = url.start_with?('http') ? media.from_url(url) : nil
+        next nil unless filename
+
+        width, height = media.dimensions(filename)
+        entry = { 'url' => filename }
+        entry['width'] = width if width
+        entry['height'] = height if height
+        block.merge('media' => [entry])
+      end
+    end
 
     def host
       URI.parse(@url).host || @url
@@ -177,9 +379,11 @@ module Import
       end
     end
 
-    def cdx_rows(candidate)
-      query = URI.encode_www_form(url: candidate, output: 'json', limit: 1000,
-                                  filter: 'statuscode:200', collapse: 'digest')
+    def cdx_rows(candidate, extra: nil)
+      params = { url: candidate, output: 'json', limit: 1000,
+                 filter: 'statuscode:200', collapse: 'digest' }
+      params = params.merge(limit: 15_000).merge(extra) if extra
+      query = URI.encode_www_form(params)
       body = http_get("#{CDX}?#{query}")
       rows = JSON.parse(body)
       header = rows.shift or return []
@@ -211,5 +415,68 @@ module Import
       @unreadable += 1
       nil
     end
+
+    # --- platform packs -------------------------------------------------
+    #
+    # A pack teaches page mode one dead platform: which paths were posts
+    # and how its markup spelled title, date and body. Built from real
+    # archived pages, not documentation -- there is none left.
+
+    # blog.cz (†2020, once the biggest Czech blog platform). Verified
+    # against real captures: posts live at /YYMM/slug, the article sits
+    # in <div class="article"> with an <h2> title, a Czech long-form
+    # date ("30. října 2011 v 18:25") and the body in
+    # <div class="articleText">.
+    module BlogCz
+      MONTHS = %w[ledna února března dubna května června července srpna
+                  září října listopadu prosince].freeze
+      DATE = /(\d{1,2})\.\s*(#{MONTHS.join('|')})\s*(\d{4})(?:\s*v\s*(\d{1,2}):(\d{2}))?/
+
+      module_function
+
+      def matches?(host)
+        host.end_with?('.blog.cz')
+      end
+
+      def post_path?(path)
+        path.match?(%r{\A/\d{4}/[a-z0-9][a-z0-9-]*\z})
+      end
+
+      def parse(html)
+        article = html[/<div class="article[" ].*/m]
+        return nil unless article
+
+        title = article[%r{<h2[^>]*>(.*?)</h2>}m, 1]
+        body = balanced_div(article, /<div class="articleText"[^>]*>/)
+        return nil unless body
+
+        date = nil
+        if (m = article[0, 2000].match(DATE))
+          date = Time.local(m[3].to_i, MONTHS.index(m[2]) + 1, m[1].to_i,
+                            m[4].to_i, m[5].to_i)
+        end
+        { title: CGI.unescapeHTML(title.to_s.gsub(/<[^>]+>/, '')).strip,
+          date: date, body: body }
+      end
+
+      # The body div nests freely; counting div tags finds its true end,
+      # where any regex would stop at the first nested close.
+      def balanced_div(html, opening)
+        m = html.match(opening)
+        return nil unless m
+
+        index = m.end(0)
+        depth = 1
+        while depth.positive? && (nxt = html.match(%r{<div\b|</div>}i, index))
+          depth += nxt[0].start_with?('</') ? -1 : 1
+          index = nxt.end(0)
+        end
+        return nil if depth.positive?
+
+        html[m.end(0)...(index - '</div>'.length)]
+      end
+    end
+
+    PACKS = [BlogCz].freeze
   end
 end

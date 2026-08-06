@@ -463,7 +463,7 @@ Available sources:
 | Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
 | Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN |
-| Wayback Machine | the dead blog's old URL | the Archive's captures of the blog's FEED, every distinct version oldest-first — overlaps merge, images recover from the Archive, what it never saved is counted as lost |
+| Wayback Machine | the dead blog's old URL | the Archive's feed captures reassembled oldest-first; blogs with no archived feed fall through to page mode (platform packs — blog.cz built in — or `POST_PATTERN`); what the Archive never saved is counted as lost |
 | WordPress | a WXR export file | every post; pages, attachments and menu items are skipped |
 | RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 

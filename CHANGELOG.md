@@ -60,6 +60,16 @@ prints what an installation is running.
   rather than saved broken. Verified live by rescuing posts from a
   Posterous blog dead since 2013.
 
+  A blog the Archive never saw a feed of falls through to **page
+  mode**: every archived post page, newest capture of each. Platform
+  packs decide which paths are posts and how the markup spells title,
+  date and body -- **blog.cz ships built in** (`/YYMM/slug`, the
+  article div, Czech long-form dates, windows-1250 era encodings
+  converted), `POST_PATTERN` covers platforms without a pack, and with
+  neither the run refuses and prints sample archived paths to build a
+  pattern from. Unparseable pages and posts dated only by their
+  capture are counted, never papered over.
+
 - **LiveJournal joined the import sources** -- the nineteenth, and the
   one that comes entirely over the wire: LJ has no export file, so the
   import speaks its XML-RPC API, challenge digest for every call (the

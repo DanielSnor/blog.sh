@@ -467,6 +467,18 @@ matching merging the overlaps. Point it at the blog's old URL (the
 common feed paths are tried) or straight at its feed; images recover
 from the Archive the same way, rerouted to the nearest capture.
 
+A blog the Archive only ever saw as pages -- no feed captures -- falls
+through to **page mode**: every archived post page, the newest capture
+of each. Which paths are posts is the one thing pages cannot say about
+themselves, so a **platform pack** answers it for platforms one was
+written for (blog.cz ships built in: `/YYMM/slug` paths, the article
+markup, Czech long-form dates), `POST_PATTERN` answers it anywhere
+else, and with neither the run refuses and prints sample paths to
+build a pattern from. `WAYBACK_MODE=pages` skips the feed attempt
+outright. Pages that refuse to parse as posts are skipped and counted
+(`unparsed`); posts whose page names no date carry their capture date,
+also counted.
+
 Honesty is the whole design here. The Archive only has what its
 crawler met: posts it never saw stay lost, images it never saved are
 dropped and **counted** (it answers a missing image with an HTML page
