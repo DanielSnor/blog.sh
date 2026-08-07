@@ -37,6 +37,7 @@
 #   whole design and not an implementation detail.
 
 require 'yaml'
+require_relative '../lib/yaml_compat'
 require_relative '../lib/site_config'
 
 ROOT = File.expand_path('..', __dir__)
@@ -50,7 +51,7 @@ ENV_SH_EXAMPLE = File.join(ROOT, 'env.sh.example')
 # comes out of the raw file rather than through SiteConfig, which would
 # abort on the very thing the user came here to fix.
 existing = begin
-  loaded = File.exist?(SITE_YML) ? YAML.load_file(SITE_YML, aliases: true) : nil
+  loaded = File.exist?(SITE_YML) ? YamlCompat.load_file(SITE_YML) : nil
   loaded.is_a?(Hash) ? loaded : {}
 rescue StandardError
   {}
@@ -202,7 +203,7 @@ end
 def current_values
   data = begin
     path = File.exist?(SITE_YML) ? SITE_YML : SITE_YML_EXAMPLE
-    YAML.load_file(path, aliases: true) || {}
+    YamlCompat.load_file(path) || {}
   rescue StandardError
     {}
   end
@@ -216,7 +217,7 @@ end
 # as facts somebody chose.
 def template_values
   @template_values ||= begin
-    data = YAML.load_file(SITE_YML_EXAMPLE, aliases: true)
+    data = YamlCompat.load_file(SITE_YML_EXAMPLE)
     data.is_a?(Hash) ? data : {}
   rescue StandardError
     {}

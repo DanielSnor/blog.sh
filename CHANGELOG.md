@@ -502,6 +502,15 @@ prints what an installation is running.
 
 ### Fixes
 
+- **The wizards work on Ruby 2.7 and 3.0 again.** `YAML.load_file(path,
+  aliases: true)` is Psych 4 (Ruby 3.1+); Psych 3 -- the system Ruby of
+  Debian 11, squarely inside the "Ruby 2.7 or newer" this engine
+  promises -- does not know the keyword and raises. Two readers carried a
+  guard for that; eight did not, and the ones that did not were the 1.2
+  wizards' own: on Ruby 2.7, `setup.sh` and `style.sh` could not write a
+  config at all, failing verification with a message that blamed the
+  file. One guarded loader (`lib/yaml_compat.rb`) now serves them all.
+
 - **Scheduling works again.** A fix in the previous round gave the
   scheduling dialog a parameter carrying the post file's bytes from
   before the prompt -- evidence for the are-you-editing-a-stale-file

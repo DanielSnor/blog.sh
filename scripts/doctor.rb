@@ -18,12 +18,13 @@
 # first symptom of it.
 
 require 'yaml'
+require_relative '../lib/yaml_compat'
 require_relative '../lib/site_config'
 
 ROOT = File.expand_path('..', __dir__)
 
 lang = begin
-  data = YAML.load_file(File.join(ROOT, 'config', 'site.yml'), aliases: true)
+  data = YamlCompat.load_file(File.join(ROOT, 'config', 'site.yml'))
   data.is_a?(Hash) ? data.dig('site', 'lang') : nil
 rescue StandardError
   nil

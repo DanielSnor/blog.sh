@@ -18,6 +18,7 @@
 # before it is kept.
 
 require 'yaml'
+require_relative '../lib/yaml_compat'
 require 'rbconfig'
 require_relative '../lib/site_config'
 
@@ -30,7 +31,7 @@ PALETTES_YML = File.join(ROOT, 'config', 'palettes.yml')
 # file, because asking SiteConfig would abort on a config this wizard may
 # well have been started to repair.
 existing = begin
-  loaded = File.exist?(SITE_YML) ? YAML.load_file(SITE_YML, aliases: true) : nil
+  loaded = File.exist?(SITE_YML) ? YamlCompat.load_file(SITE_YML) : nil
   loaded.is_a?(Hash) ? loaded : {}
 rescue StandardError
   {}
@@ -61,7 +62,7 @@ ICONS = %w[mastodon pixelfed linkedin github bluesky instagram threads facebook 
 def current
   @current ||= begin
     path = File.exist?(SITE_YML) ? SITE_YML : SITE_YML_EXAMPLE
-    data = YAML.load_file(path, aliases: true) || {}
+    data = YamlCompat.load_file(path) || {}
     data.is_a?(Hash) ? data : {}
   rescue StandardError
     {}
@@ -78,7 +79,7 @@ end
 # doctor keeps pointing at, and this wizard is where they get fixed.
 def template_values
   @template_values ||= begin
-    data = YAML.load_file(SITE_YML_EXAMPLE, aliases: true)
+    data = YamlCompat.load_file(SITE_YML_EXAMPLE)
     data.is_a?(Hash) ? data : {}
   rescue StandardError
     {}

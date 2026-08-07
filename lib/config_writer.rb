@@ -4,6 +4,7 @@ require 'json'
 require 'yaml'
 require 'fileutils'
 require_relative 'atomic_write'
+require_relative 'yaml_compat'
 
 # lib/config_writer.rb -- changes a value in config/site.yml or env.sh
 # without touching anything else in the file.
@@ -596,7 +597,7 @@ module ConfigWriter
     # there. Lists compare on the keys we wrote (string keys, since that
     # is what YAML gives back).
     def verify!
-      data = YAML.load_file(@path, aliases: true) || {}
+      data = YamlCompat.load_file(@path) || {}
       @intended.each do |key_path, expected|
         actual = key_path.reduce(data) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
         actual = actual.map { |h| h.transform_keys(&:to_s) } if actual.is_a?(Array)
