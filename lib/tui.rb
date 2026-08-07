@@ -443,9 +443,12 @@ module Tui
       # title, which keeps newlines inside a wrapped <title>) carrying a
       # newline or a tab painted its own line break inside the frame, so
       # the screen ended up taller than the cursor-up count and drifted
-      # further with every keystroke. ESC is kept -- the rows carry the
-      # colour sequences this file wrote itself.
-      out.each { |line| print "\e[2K#{line.to_s.gsub(/[\u0000-\u0008\u000A-\u001A\u001C-\u001F\u007F]/, ' ')}\r\n" }
+      # further with every keystroke. TAB is in the class too -- it is the
+      # character the note above names, and a tab expands to whatever
+      # stop width the terminal keeps, which no column arithmetic here
+      # can predict. ESC is the one exception: the rows carry the colour
+      # sequences this file wrote itself.
+      out.each { |line| print "\e[2K#{line.to_s.gsub(/[\u0000-\u001A\u001C-\u001F\u007F]/, ' ')}\r\n" }
       painted = true
 
       move = lambda do |delta|

@@ -42,7 +42,11 @@ module FeedHttp
 
   # Returns the response body as a String; raises RuntimeError on a non-2xx
   # response so the calling fetcher can catch it and return an empty list.
-  def get(url, redirects_left = MAX_REDIRECTS, deadline = now + TOTAL_TIMEOUT)
+  # max_body: nil lifts the ceiling for callers that legitimately fetch a
+  # whole archive -- lib/import/feed.rb pulls entire WXR exports through
+  # this same method, and a cap sized for a sidebar widget aborted those
+  # imports at the door.
+  def get(url, redirects_left = MAX_REDIRECTS, deadline = now + TOTAL_TIMEOUT, max_body: MAX_BODY)
     remaining = deadline - now
     raise "timed out after #{TOTAL_TIMEOUT}s (#{url})" if remaining <= 0
 
@@ -60,7 +64,7 @@ module FeedHttp
     case res
     when Net::HTTPSuccess
       body = res.body.to_s
-      raise "response too large (#{body.bytesize} bytes, #{url})" if body.bytesize > MAX_BODY
+      raise "response too large (#{body.bytesize} bytes, #{url})" if max_body && body.bytesize > max_body
 
       body
     when Net::HTTPRedirection
@@ -72,7 +76,7 @@ module FeedHttp
       target = URI.join(url, res['location'])
       raise "refusing a #{target.scheme.inspect} redirect (#{url})" unless %w[http https].include?(target.scheme)
 
-      get(target.to_s, redirects_left - 1, deadline)
+      get(target.to_s, redirects_left - 1, deadline, max_body: max_body)
     else
       raise "HTTP #{res.code} (#{url})"
     end

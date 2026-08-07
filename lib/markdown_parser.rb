@@ -316,7 +316,14 @@ module MarkdownParser
     if quoted_lines.size > 1 && (m = /\A(?:—|--)\s+(.+)\z/.match(quoted_lines.last.strip))
       cite = m[1].strip
       quoted_lines.pop
-      quoted_lines.pop while quoted_lines.last.to_s.empty?
+      # The emptiness test has to come AFTER the emptiness of the array
+      # itself: `[].last` is nil and `nil.to_s.empty?` is true, so a quote
+      # whose only line above the attribution was blank spun here forever
+      # at full CPU -- `./blog.sh add` never returned, and the author lost
+      # the text they had just written to a Ctrl-C. The writer emits
+      # exactly that shape for a stored whitespace-only quote with a cite,
+      # so editing such a post hung on every save.
+      quoted_lines.pop while !quoted_lines.empty? && quoted_lines.last.to_s.strip.empty?
     end
 
     text, formatting = parse_inline(quoted_lines.join("\n"))

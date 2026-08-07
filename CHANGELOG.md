@@ -668,6 +668,31 @@ prints what an installation is running.
   - **A post title containing a line break no longer walks the archive
     browser's screen down the terminal.**
 
+- **A third audit, over the previous two audits' fixes.**
+  - **Writing a quotation with nothing above its attribution could hang
+    the editor.** A loop that discarded blank lines never stopped once it
+    ran out of them: `add` never returned, and a stored quote of that
+    shape hung on every save.
+  - **The queue's `[p]`, and the draft dialog's own actions, now act on
+    the post shown.** They looked the post up by name again, so with the
+    same name in two years they could publish, edit or delete the other
+    one. (Three of these were described as fixed in the previous release
+    notes and were not in the code — the entry has been corrected.)
+  - **A feed's identity no longer comes from the wrong link.** The
+    previous fix took the first address a feed offered, which for a feed
+    declaring its licence first was Creative Commons — and a wrong
+    identity is worse than none, because unrelated archives then share it
+    and overwrite each other. A local export path could become an
+    identity the same way.
+  - **A link that ends in a bracket keeps it.** Trimming punctuation off
+    announcement links took the closing bracket off addresses that own
+    one, such as Wikipedia's.
+  - **A tab in a post title no longer walks the archive browser's frame
+    down the screen** — the character the previous fix named was the one
+    it did not remove.
+  - **Importing a large archive over the network works again**, after a
+    size ceiling meant for a sidebar widget was applied to it.
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed

@@ -806,8 +806,12 @@ def draft_decision_loop(slug, path: nil)
     slot = next_publish_slot(slug)
     prompt = slot ? t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format'))) : t('cli.what_next_prompt')
     case Tui.key_choice(prompt)
-    when 'p' then return publish_draft(slug)
-    when 'e' then edit_post(slug)
+    # Every action gets the path the dialog is SHOWING. Re-resolving by
+    # slug here meant the screen could describe one post while the
+    # keystroke acted on another -- two drafts sharing a slug in different
+    # years is ordinary, and the dialog is where the author decides.
+    when 'p' then return publish_draft(slug, path: path)
+    when 'e' then edit_post(slug, path: path)
     when 's'
       puts
       return if prompt_and_schedule(path, post, raw: raw)
@@ -817,7 +821,7 @@ def draft_decision_loop(slug, path: nil)
       puts
       return
     when 'x'
-      next unless delete_post(slug)
+      next unless delete_post(slug, path: path)
 
       rebuild_and_deploy(t('cli.updating_preview'))
       return
@@ -985,8 +989,13 @@ def announce_on_publish(post, year, date)
   announce_post(post, year: year, date: date, force: force)
 end
 
-def publish_draft(slug)
-  path = find_post_path(slug)
+# `path:` names the exact post when the caller already has it. The queue
+# holds one row per scheduled post, and two of them can share a slug in
+# different years -- looking the post up by slug again would publish, and
+# ANNOUNCE, whichever the lookup preferred rather than the row the author
+# picked.
+def publish_draft(slug, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
@@ -1353,7 +1362,7 @@ def queue_act(entries, index)
   when 'd' then queue_swap(entries, index, index + 1)
   when 'p'
     freed = entry[:time]
-    publish_draft(entry[:slug])
+    publish_draft(entry[:slug], path: entry[:path])
     queue_offer_compact(freed, entries[(index + 1)..])
   when 's'
     puts
@@ -1429,6 +1438,18 @@ def queue_offer_compact(freed_time, rest)
   return false unless answer.start_with?(t('cli.confirm_yes_char'))
 
   times = [freed_time] + rest.map { |entry| entry[:time] }
+  # The whole loop is checked before the first write, for the reason
+  # queue_swap is: write_scheduled_date ABORTS the process, and an abort
+  # partway through N writes left the queue half-shifted -- some posts
+  # moved forward, some not -- while the message on the way out says
+  # nothing was saved.
+  rest.each_with_index do |entry, i|
+    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
+    target = File.join(CONTENT_DIR, times[i].year.to_s, "#{entry[:post]['slug']}.json")
+    next if File.expand_path(target) == File.expand_path(entry[:path])
+
+    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target) if File.exist?(target)
+  end
   rest.each_with_index do |entry, i|
     entry[:path] = write_scheduled_date(entry[:path], entry[:post], times[i], raw: entry[:raw])
   end
@@ -1854,8 +1875,8 @@ def cmd_edit(slug)
   draft_decision_loop(slug) if draft?(JSON.parse(File.read(path, encoding: 'utf-8')))
 end
 
-def edit_post(slug)
-  path = find_post_path(slug)
+def edit_post(slug, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   # Kept to compare against just before the save: an editor session is
@@ -2063,8 +2084,8 @@ end
 # true on an actual delete, false when the user cancelled -- callers
 # decide separately whether/how to rebuild (the two call sites want
 # different rebuild behavior, see cmd_delete vs draft_decision_loop).
-def delete_post(slug)
-  path = find_post_path(slug)
+def delete_post(slug, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))

@@ -165,7 +165,9 @@ module Import
       return File.read(@source, encoding: 'utf-8') if File.exist?(@source.to_s)
 
       begin
-        FeedHttp.get(@source)
+        # No body ceiling here: this is a whole archive, not a widget --
+        # a WXR export of a few thousand posts is legitimately tens of MB.
+        FeedHttp.get(@source, max_body: nil)
       rescue StandardError => e
         # A feed URL that 404s, times out or resolves nowhere raised through
         # to the wizard as a raw backtrace: the same defect the malformed-XML
@@ -217,7 +219,13 @@ module Import
                # fixed for item bodies, one screen above.
                text_of(document.elements['rss/channel'], 'link')
              end
-      host_of(link) || host_of(fallback_channel_link) || host_of(@source)
+      # @source only when it is an ADDRESS. A local export path would
+      # otherwise be read as a host -- "Downloads/blog.xml" giving the
+      # account "Downloads", so two unrelated exports in one folder
+      # share an identity and overwrite each other's posts. A file has
+      # no host, and inventing one is worse than admitting it.
+      source_url = @source.to_s.match?(%r{\Ahttps?://}) ? @source : nil
+      host_of(link) || host_of(fallback_channel_link) || host_of(source_url)
     end
 
     # The host is the account half of every post's source key, and a nil
@@ -236,8 +244,20 @@ module Import
       parent = atom? ? document.elements['feed'] : document.elements['rss/channel']
       return nil unless parent
 
-      any_link = parent.get_elements('link').filter_map { |l| l.attribute('href')&.value }.first
-      any_link || text_of(parent, 'link') || text_of(parent, 'id')
+      # Only the rels that name THIS feed's own site. "Any link" was far too
+      # generous: a feed that declares its licence first ("rel=license",
+      # pointing at creativecommons.org) handed that host over as the
+      # account -- and a wrong account is worse than no account, because
+      # every unrelated feed carrying the same licence link then shares one
+      # identity and their posts overwrite each other. rel=hub (WebSub) and
+      # rel=next (paged feeds) are the same trap.
+      own = %w[alternate self]
+      links = parent.get_elements('link').select do |l|
+        rel = l.attribute('rel')&.value
+        rel.nil? || own.include?(rel)
+      end
+      links.filter_map { |l| l.attribute('href')&.value }.first ||
+        text_of(parent, 'link') || text_of(parent, 'id')
     end
 
     def host_of(link)

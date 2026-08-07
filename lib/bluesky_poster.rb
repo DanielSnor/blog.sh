@@ -25,9 +25,14 @@ module BlueskyPoster
   # Trailing punctuation is not part of the address, the way Bluesky's own
   # detectFacets treats it: a URL that ends a sentence used to carry the
   # full stop (or the closing bracket of a parenthesised aside) into the
-  # facet, and the link in the announcement was dead. A closing bracket is
-  # kept when the URL opened one, so /Page(ID-1) still works.
-  URL_RE = %r{https?://[^\s]*[^\s.,;:!?'")\]]}
+  # facet, and the link in the announcement was dead.
+  #
+  # Two alternatives, not one, and the balanced form comes FIRST: an
+  # address that opens a bracket keeps the one that closes it
+  # (".../Ruby_(programming_language)" is a real Wikipedia URL, and
+  # trimming its bracket produced a dead link -- which the first attempt
+  # at this did, while the comment claimed otherwise).
+  URL_RE = %r{https?://\S*?\([^\s()]*\)|https?://\S*[^\s.,;:!?'")\]]}
   # [[:word:]] is Unicode-aware, so Czech (and any other) diacritics in a
   # tag survive into the facet.
   TAG_RE = /(?:\A|(?<=\s))#([[:word:]]+)/
