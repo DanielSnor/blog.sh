@@ -208,7 +208,14 @@ module Import
                # cross-match on bare ids.
                atom_alternate(document.elements['feed'])
              else
-               document.elements['rss/channel/link']&.text
+               # text_of, not .text: REXML's .text returns only the FIRST
+               # text child, so a pretty-printed feed (a newline before the
+               # value) yields whitespace, URI.parse raises, the account
+               # comes out nil -- and without an account PostWriter cannot
+               # build a source key, so re-importing DUPLICATES the whole
+               # archive instead of matching it. The same fault c3f768b
+               # fixed for item bodies, one screen above.
+               text_of(document.elements['rss/channel'], 'link')
              end
       URI.parse(link.to_s).host
     rescue URI::InvalidURIError

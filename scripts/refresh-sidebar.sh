@@ -33,11 +33,21 @@ set +a
 # Exit 3 = another run holds the build lock. That is a quiet skip, not a
 # failure: nothing was regenerated, so there is nothing to upload, and
 # cron is back in half an hour. Anything else non-zero is real.
-if ! ruby scripts/refresh_sidebar.rb; then
-  code=$?
-  [ "$code" -eq 3 ] && exit 0
-  exit "$code"
-fi
+# NOT `if ! ruby ...; then code=$?`: inside that branch $? is the status of
+# the NEGATED pipeline, which is always 0 -- so the exit-3 test never
+# matched and every real failure was reported to cron as success. A
+# monitored job (systemd, launchd) then sees a clean run forever while the
+# sidebar has not refreshed for weeks.
+# `|| code=$?` and not a bare call: `set -e` would end the script at the
+# first non-zero status, and not `if ! ruby ...; then code=$?` either --
+# inside that branch $? is the status of the NEGATED pipeline, always 0,
+# so the exit-3 test never matched and every real failure was reported to
+# cron as SUCCESS. A monitored job then sees a clean run forever while
+# the sidebar has not refreshed for weeks.
+code=0
+ruby scripts/refresh_sidebar.rb || code=$?
+[ "$code" -eq 3 ] && exit 0
+[ "$code" -ne 0 ] && exit "$code"
 
 # Upload whichever widget files this site actually has -- Sidebar.FEEDS
 # only writes JSONs for configured widgets, so a hardcoded list makes

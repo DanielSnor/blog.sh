@@ -765,7 +765,15 @@ def draft_decision_loop(slug)
     path = find_post_path(slug)
     return unless path
 
-    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    # The bytes are kept, not just the parsed post: this dialog then waits
+    # on a keypress, and the scheduled-publish cron runs every 15 minutes.
+    # [s] below hands them to prompt_and_schedule so write_scheduled_date
+    # can refuse to write a capture the cron has already overtaken --
+    # without them it would revert a published post to a draft and drop
+    # the announcement URL. Every other scheduling path passes this; this
+    # was the one that did not.
+    raw = File.read(path, encoding: 'utf-8')
+    post = JSON.parse(raw)
     return unless draft?(post)
 
     # No extra `puts` before "Preview:" -- rebuild_and_deploy (called right
@@ -785,7 +793,7 @@ def draft_decision_loop(slug)
     when 'e' then edit_post(slug)
     when 's'
       puts
-      return if prompt_and_schedule(path, post)
+      return if prompt_and_schedule(path, post, raw: raw)
     when 'd', ''
       puts
       puts t('cli.left_as_draft', slug: slug)

@@ -24,9 +24,22 @@ module MarkdownWriter
   ESCAPABLE = '*`~[]!\\#>|.+_-'
 
   # Higher number = renders further out when two spans cover the exact same
-  # range (only possible for e.g. "**[text](url)**", where the bold and the
-  # link entries end up with identical start/end) -- link is always innermost.
-  WRAP_PRIORITY = { 'link' => 0, 'code' => 0, 'italic' => 1, 'strikethrough' => 1, 'bold' => 2 }.freeze
+  # range (e.g. "**[text](url)**", where the bold and the link entries end up
+  # with identical start/end).
+  #
+  # Every value is DISTINCT, and that is the point: the containment test in
+  # render_markdown_range asks whether some other span dominates this one,
+  # with a strict >. Two types sharing a number meant neither dominated, so
+  # both were emitted as top-level and the shared text was written TWICE --
+  # "`code`" inside a link came back as "config.rbconfig.rb", doubling again
+  # with every edit. `link`/`code` and `italic`/`strikethrough` were the two
+  # colliding pairs, and both shapes come straight out of the HTML importers.
+  #
+  # The order itself is not arbitrary either: code is innermost because a
+  # link wrapping code ("[`config.rb`](url)") round-trips with both spans
+  # intact, while code wrapping a link ("`[config.rb](url)`") is markdown for
+  # a literal string and loses the link entirely.
+  WRAP_PRIORITY = { 'code' => 0, 'link' => 1, 'italic' => 2, 'strikethrough' => 3, 'bold' => 4 }.freeze
 
   module_function
 
@@ -58,13 +71,15 @@ module MarkdownWriter
         '---'
       when 'chat'
         body = (b['lines'] || []).map { |l| l['name'] ? "#{l['name']}: #{l['text']}" : l['text'].to_s }.join("\n")
-        "```chat\n#{body}\n```"
+        fence = fence_for(body)
+        "#{fence}chat\n#{body}\n#{fence}"
       when 'code'
-        "```#{b['lang']}\n#{b['text']}\n```"
+        fence = fence_for(b['text'])
+        "#{fence}#{b['lang']}\n#{b['text']}\n#{fence}"
       when 'image'
         media = (b['media'] || []).first || {}
         path = File.join(media_dir, media['url'].to_s)
-        cap = b['caption'] ? %( "#{b['caption']}") : ''
+        cap = b['caption'] ? %( "#{escape_title(b['caption'])}") : ''
         "![#{b['alt_text']}](#{path}#{cap})"
       when 'file'
         file = (b['media'] || []).first
@@ -134,6 +149,29 @@ module MarkdownWriter
     /\A(?:-{3,}|_{3,})[ \t]*\z/ # horizontal rule
   ].freeze
 
+  # Quoted titles -- an image's caption and a link's title -- are delimited
+  # by the very character they may contain. Interpolated raw, a caption
+  # holding a straight quote produced a line the parser could not match:
+  # the image fell through to the mid-paragraph guard and `blog.sh edit`
+  # ABORTED on save, with a message naming a rule the author had not
+  # broken and no escape form that would have worked. The link case was
+  # worse for being silent -- the link was destroyed and its raw markdown
+  # published as body text. The parser unescapes the same pair.
+  def escape_title(text)
+    text.to_s.gsub(/([\\"])/) { "\\#{Regexp.last_match(1)}" }
+  end
+
+  # A fence long enough that the block's own content cannot close it: one
+  # backtick more than the longest run inside, never fewer than three. A
+  # fixed ``` meant a code block demonstrating a fenced example was cut at
+  # its inner fence on the next edit -- the rest of the code became prose
+  # and the block's tail was lost, with no warning, because the loss guard
+  # only reports block types that vanish entirely.
+  def fence_for(text)
+    longest = text.to_s.scan(/`+/).map(&:length).max.to_i
+    '`' * [3, longest + 1].max
+  end
+
   def escape_block_starts(rendered)
     rendered.split("\n", -1).map do |line|
       if BLOCK_START_RES.any? { |re| re.match?(line) }
@@ -154,7 +192,7 @@ module MarkdownWriter
     when 'code' then "`#{chunk}`"
     when 'link'
       url = link_url_for_markdown(f['url'].to_s)
-      f['title'] ? %([#{chunk}](#{url} "#{f['title']}")) : "[#{chunk}](#{url})"
+      f['title'] ? %([#{chunk}](#{url} "#{escape_title(f['title'])}")) : "[#{chunk}](#{url})"
     else chunk
     end
   end

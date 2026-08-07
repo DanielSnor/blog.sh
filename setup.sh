@@ -84,7 +84,13 @@ if ! ruby -e 'exit((RUBY_VERSION.split(".").map(&:to_i) <=> [2, 7]) >= 0)'; then
   exit 1
 fi
 
-[ -t 1 ] && clear
+# `clear` fails on a TERM this machine has no terminfo entry for --
+# ghostty, kitty, wezterm and friends ship theirs into ~/.terminfo, which
+# a fresh account or an SSH target does not have. As the last command of
+# an AND-list it is what `set -e` sees, so the whole tool died before
+# printing a word. A screen that cannot be cleared is not a reason to
+# refuse to run.
+{ [ -t 1 ] && clear 2>/dev/null; } || true
 
 # env.sh is read when it exists and is NOT required when it doesn't --
 # the opposite of blog.sh's guard, and the whole point: this is the

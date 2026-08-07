@@ -169,7 +169,10 @@ module Import
                    media.from_url(src)
                  else
                    local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, File.dirname(post_path))
-                   File.exist?(local) ? media.from_file(local) : nil
+                   # Unconditionally: from_file spends the number and records
+                   # the miss itself. Stat-ing here instead made numbering
+                   # depend on which files happened to be present.
+                   media.from_file(local)
                  end
       return nil unless filename
 

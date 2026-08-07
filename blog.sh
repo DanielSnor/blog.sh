@@ -70,7 +70,13 @@ esac
 # No banner here: the identity block (which engine, which site, which
 # mode) is printed by the Ruby side via SiteHeader, which knows the
 # version and the site's name -- this wrapper knows neither.
-[ -t 1 ] && clear
+# `clear` fails on a TERM this machine has no terminfo entry for --
+# ghostty, kitty, wezterm and friends ship theirs into ~/.terminfo, which
+# a fresh account or an SSH target does not have. As the last command of
+# an AND-list it is what `set -e` sees, so the whole tool died before
+# printing a word. A screen that cannot be cleared is not a reason to
+# refuse to run.
+{ [ -t 1 ] && clear 2>/dev/null; } || true
 
 if [ ! -f env.sh ]; then
   echo "Missing env.sh -- copy the documented template first:"

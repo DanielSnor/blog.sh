@@ -241,7 +241,12 @@ def ask_language(site, current)
 
   now = current.dig('site', 'lang').to_s
   options = langs.map { |code| [code, LANGUAGE_NAMES.fetch(code, code)] }
-  index = [langs.index(now) || 0, 0].max
+  # A missing site.lang means English everywhere else in the engine; here
+  # langs.index('') was nil and the fallback to 0 offered whatever sorts
+  # first -- Czech. Esc and an unusable piped answer both keep the OFFERED
+  # option, so two "leave it alone" keystrokes switched the install's
+  # language and rebuilt the public site in it.
+  index = langs.index(now) || langs.index('en') || 0
   chosen = choose('Language / Jazyk / Sprache', options, current_index: index)
 
   I18n.force_lang(chosen)

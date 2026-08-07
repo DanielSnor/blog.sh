@@ -74,7 +74,13 @@ if ! ruby -e 'exit((RUBY_VERSION.split(".").map(&:to_i) <=> [2, 7]) >= 0)'; then
   exit 1
 fi
 
-[ -t 1 ] && clear
+# `clear` fails on a TERM this machine has no terminfo entry for --
+# ghostty, kitty, wezterm and friends ship theirs into ~/.terminfo, which
+# a fresh account or an SSH target does not have. As the last command of
+# an AND-list it is what `set -e` sees, so the whole tool died before
+# printing a word. A screen that cannot be cleared is not a reason to
+# refuse to run.
+{ [ -t 1 ] && clear 2>/dev/null; } || true
 
 # Read when present, not required: this wizard writes only site.yml, but
 # the rebuild it offers at the end deploys nothing without env.sh's

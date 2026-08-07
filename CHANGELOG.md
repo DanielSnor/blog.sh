@@ -524,6 +524,69 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Seven defects a pre-release audit found, each of them a way to lose
+  or corrupt what you had written.**
+  - **`[s]` in the draft preview was the one scheduling path that did not
+    check whether the post had changed underneath it.** The
+    scheduled-publish cron runs every fifteen minutes; if it published
+    while you sat at that prompt, `[s]` wrote the pre-publication copy
+    back — the post reverted to a draft and its announcement URL was
+    dropped, so `unpublish` could no longer delete the toot and the next
+    cron tick announced the post a second time. The other three
+    scheduling routes had the guard all along.
+  - **Two markdown spans covering the same words duplicated the text on
+    every save.** A link around inline code, or italics around a
+    strikethrough, produced both spans at the top level instead of one
+    inside the other — `config.rb` came back as `config.rbconfig.rb`,
+    doubling again with each edit. Both shapes are what the HTML
+    importers produce from ordinary posts.
+  - **A code block containing a fence line lost everything after it.**
+    Fenced with exactly three backticks whatever the content, a block
+    that demonstrated fenced code closed at its own example: the rest
+    became prose and the tail vanished, silently, because no block type
+    had disappeared. Fences now grow one backtick longer than anything
+    inside them, and the parser accepts three-or-more.
+  - **A double quote in an image caption made the post uneditable.** The
+    caption is written inside quotes, so an unescaped one broke the line
+    the parser had to match, and saving aborted with a complaint about a
+    rule you had not broken. The same fault in a link title was worse for
+    being silent: the link was destroyed and its markdown published as
+    visible text. Both are escaped and unescaped now.
+  - **The archive browser painted as a diagonal staircase.** Inside raw
+    mode the kernel stops turning a newline into a carriage return plus a
+    newline, so every row started where the previous one ended.
+  - **Imported media could be republished as the wrong picture.** A file
+    missing on one run and present on the next shifted every later
+    filename, and the copy step skips a name that already exists — so the
+    post pointed at the previous run's bytes. Numbers are now spent when
+    a file is referenced, present or not, exactly as they are for a
+    download that fails.
+  - **Every entry point died on a terminal this machine has no entry
+    for.** `clear` fails on ghostty, kitty, wezterm and `TERM=dumb`, and
+    as the last command of an and-list under `set -e` it took the whole
+    tool with it — before printing a word.
+
+- **Four more from the same audit.**
+  - **A re-import of an indented feed duplicated the whole archive.** The
+    channel address was read in the one way that returns only the first
+    line of text, so a feed whose `<link>` sits on its own line resolved
+    to nothing — and without it, nothing matches what is already there.
+    A Wayback rescue reading many captures of one feed duplicated every
+    post many times over in a single pass.
+  - **The sidebar cron reported every failure as success.** The status it
+    tested belonged to the negation, not to the run, so it was always
+    zero: a monitored job saw a clean run forever while the sidebar had
+    not refreshed for weeks.
+  - **A paragraph beginning "1) " grew a visible backslash.** The writer
+    escapes the parenthesis so the line cannot turn into a list; the
+    parser knew how to undo that for "1." but not for "1)", so the
+    backslash was published — on an edit that may have changed only the
+    title.
+  - **`./setup.sh` offered Czech to a config with no language set.**
+    Every other part of the engine reads a missing language as English.
+    Two "leave it alone" keystrokes were enough to switch the install and
+    rebuild the public site in the other language.
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed

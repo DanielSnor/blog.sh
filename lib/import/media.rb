@@ -159,21 +159,33 @@ module Import
     # from_url, minus the network.
     def from_file(path)
       return nil if path.to_s.empty?
+      return @by_source[path] if @by_source.key?(path)
+
+      # Allocated BEFORE the existence check, exactly as from_url allocates
+      # before the fetch: the number has to be spent whether or not this
+      # file is here. Checking first meant numbering depended on WHICH
+      # files happened to exist, so a staged or half-synced export gave
+      # 01.jpg to the second picture -- and on the re-import that the
+      # engine advertises as safe, PostWriter.copy_media skips a name that
+      # already exists, leaving the post pointing at the previous run's
+      # bytes. The wrong photo, published, silently.
+      filename = allocate(File.extname(path))
       # The existence check used to be skipped in dry-run, so a preview of an
       # archive whose media tree is incomplete promised more posts and more
       # files than the real run could write, and the real run then dropped
       # the missing ones without naming them. A stat is not a fetch, so this
       # keeps the dry-run contract (nothing is read, written or downloaded).
       # Recorded rather than just skipped: the count is then honest AND the
-      # summary still names what the archive is missing.
+      # summary still names what the archive is missing. Remembered as a
+      # failure for the same reason from_url remembers one -- a second
+      # reference to the same missing file must not count the loss twice.
       unless File.exist?(path)
         @failures << path
+        @by_source[path] = nil
+        uncount
         return nil
       end
 
-      return @by_source[path] if @by_source.key?(path)
-
-      filename = allocate(File.extname(path))
       @by_source[path] = filename
       return filename if @dry_run
 

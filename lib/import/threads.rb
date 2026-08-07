@@ -216,10 +216,13 @@ module Import
         uri = entry['uri'].to_s
         next nil if uri.empty?
 
-        path = [File.join(@dir, uri),
-                File.join(@dir, uri.sub(%r{\Ayour_instagram_activity/}, ''))]
-               .find { |candidate| File.exist?(candidate) }
-        next nil unless path
+        # The first candidate when none exists, not nil: Media#from_file has
+        # to see a referenced-but-missing file too, or its number goes to
+        # the next picture and a re-import of a staged export publishes the
+        # wrong one. from_file records the failure and names it in the summary.
+        candidates = [File.join(@dir, uri),
+                      File.join(@dir, uri.sub(%r{\Ayour_instagram_activity/}, ''))]
+        path = candidates.find { |candidate| File.exist?(candidate) } || candidates.first
 
         filename = media.from_file(path)
         next nil unless filename

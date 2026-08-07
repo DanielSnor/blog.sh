@@ -433,7 +433,12 @@ module Tui
       left, right = Array(status)
       out << paint(pad_between(left.to_s, [right, position].compact.reject(&:empty?).join('  ·  '), term_width), :bold)
       out << paint(fit_keys(searching ? search_hint.to_s : keys, term_width), :dim)
-      out.each { |line| print "\e[2K#{line}\n" }
+      # "\r\n", not "\n": this whole loop runs inside raw_screen, and raw
+      # mode clears OPOST, so the kernel no longer turns a newline into
+      # carriage-return + newline. With a bare LF every row starts where
+      # the previous one ended and the screen reads as a diagonal
+      # staircase. The carriage return has to be written by hand here.
+      out.each { |line| print "\e[2K#{line}\r\n" }
       painted = true
 
       move = lambda do |delta|
@@ -511,8 +516,19 @@ module Tui
   # terminal) just runs the block -- getch then does its own per-key raw
   # exactly as before.
   def raw_screen(&block)
-    $stdin.raw(&block)
+    entered = false
+    $stdin.raw do
+      entered = true
+      return block.call
+    end
   rescue StandardError
+    # Only a stdin that could not enter raw mode falls through to the
+    # unmodified block. Without the flag, an exception raised INSIDE the
+    # block was caught here too and the block ran a SECOND time -- every
+    # keystroke and every repaint replayed on the way out of a screen
+    # that had already failed once.
+    raise if entered
+
     yield
   end
 

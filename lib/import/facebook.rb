@@ -186,13 +186,18 @@ module Import
       end
     end
 
+    # Falls back to the first candidate rather than nil when none of them
+    # exists: Media#from_file has to see every referenced file, present or
+    # not, or the numbering shifts between runs of a staged export and the
+    # summary never names what is missing. It decides; this only says where
+    # to look.
     def resolve(uri)
       return nil if uri.empty?
 
-      [File.join(@dir, uri),
-       File.join(@dir, uri.sub(%r{\Ayour_facebook_activity/}, '')),
-       File.join(@posts_dir, '..', uri.sub(%r{\Ayour_facebook_activity/}, ''))]
-        .find { |candidate| File.exist?(candidate) }
+      candidates = [File.join(@dir, uri),
+                    File.join(@dir, uri.sub(%r{\Ayour_facebook_activity/}, '')),
+                    File.join(@posts_dir, '..', uri.sub(%r{\Ayour_facebook_activity/}, ''))]
+      candidates.find { |candidate| File.exist?(candidate) } || candidates.first
     end
 
     def link_blocks(links)

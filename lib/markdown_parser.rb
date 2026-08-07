@@ -45,7 +45,13 @@ module MarkdownParser
   # the title used to get shoved into the address and the link ended up dead.
   # The escape class and the writer's ESCAPABLE change together: every
   # character the writer may put a backslash before must lose it here, or
-  # the backslash becomes visible text on the next edit. The block sigils
+  # the backslash becomes visible text on the next edit. ")" is in the
+  # class for exactly that reason and is NOT in ESCAPABLE: the writer only
+  # ever escapes it at the start of a line, where "1) first" would
+  # otherwise round-trip into an ordered list -- but the backslash it
+  # wrote had no way back out, so imported "1) ... 2) ..." enumerations
+  # published a visible "1\)" the moment anything else in the post was
+  # edited. The block sigils
   # (# > - + . _ |) joined for the writer's line-start escaping -- a
   # paragraph beginning ">50 %" must not round-trip into a quote.
   #
@@ -65,7 +71,7 @@ module MarkdownParser
   # Alternative order is load-bearing: plain bold -- whose closer is
   # exactly two stars, the (?!\*) guard -- comes before the tail-collision
   # shapes, or "**F** dál ... ***v***" would read as one span from F to v.
-  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:(?!\*\*).)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:(?!\*\*).)*?)\*|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:(?!\*\*).)+?)\*\*\*|\*(?<italic>.+?)\*|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>[^"]*)")?\)/m
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:(?!\*\*).)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:(?!\*\*).)*?)\*|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:(?!\*\*).)+?)\*\*\*|\*(?<italic>.+?)\*|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -124,7 +130,7 @@ module MarkdownParser
         inner_text, inner_formatting = parse_inline(m[:ltext])
         result << inner_text
         entry = { 'type' => 'link', 'url' => m[:lurl], 'start' => start, 'end' => result.length }
-        entry['title'] = m[:ltitle] if m[:ltitle] && !m[:ltitle].empty?
+        entry['title'] = unescape_title(m[:ltitle]) if m[:ltitle] && !m[:ltitle].empty?
         formatting << entry
         formatting.concat(shift_formatting(inner_formatting, start))
       end
@@ -159,7 +165,7 @@ module MarkdownParser
 
   # --- block-level regexes -------------------------------------------------
 
-  IMAGE_RE = /\A!\[([^\]]*)\]\(([^)"]+?)(?:\s+"([^"]*)")?\)\z/
+  IMAGE_RE = /\A!\[([^\]]*)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
   # Two exclamation marks = video, whether a local file or YouTube.
   # Deliberately explicit: a bare address on its own line stays a plain
   # paragraph, so a video can also just be linked to instead of every link
@@ -198,7 +204,7 @@ module MarkdownParser
   # link's affordance, an attachment has nowhere to put it, and turning
   # one into an upload would both discard the title and demand a file
   # the author never meant to publish.
-  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"([^"]*)")?\)\z/
+  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
 
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
@@ -476,7 +482,25 @@ module MarkdownParser
     format('%02d%s', number, ext)
   end
 
-  CODE_FENCE_LINE_RE = /\A```(\S*)\z/
+  # Three backticks or more, so a block whose own text contains a ``` line
+  # can be fenced by a longer run -- the standard markdown escape hatch, and
+  # what the writer now emits. Fixed at exactly three, a code block holding a
+  # fenced example closed at the inner fence: the block split into two empty
+  # code blocks with the text stranded between them as prose, and the edit
+  # guard stayed silent because no block TYPE had disappeared. The closing
+  # fence must be at least as long as the opening one (a shorter run inside
+  # is content, not a terminator).
+  # The writer escapes a backslash and a double quote inside a quoted title
+  # (an image caption, a link title) because the quote is the delimiter.
+  # Undone here so the stored value is what the author typed. nil stays nil:
+  # "no title" and "empty title" are different answers upstream.
+  def unescape_title(text)
+    return text if text.nil?
+
+    text.gsub(/\\(.)/) { Regexp.last_match(1) }
+  end
+
+  CODE_FENCE_LINE_RE = /\A(`{3,})(\S*)\z/
 
   # Splits raw body text into alternating :prose / :code segments on lines of
   # exactly ``` (optionally followed by a language hint, e.g. ```ruby). A code
@@ -525,10 +549,14 @@ module MarkdownParser
 
       segments << { type: :prose, text: buffer.join("\n") } unless buffer.empty?
       buffer = []
-      lang = m[1]
+      fence = m[1]
+      lang = m[2]
       i += 1
       code_lines = []
-      while i < lines.length && lines[i].strip != '```'
+      # Closed only by a fence at least as long as the opening one, and with
+      # nothing after it: a shorter or annotated run is part of the content.
+      until i >= lines.length ||
+            ((closing = /\A(`{3,})\z/.match(lines[i].strip)) && closing[1].length >= fence.length)
         code_lines << lines[i]
         i += 1
       end
@@ -579,7 +607,7 @@ module MarkdownParser
       return [{ 'type' => 'video', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
     elsif (m = IMAGE_RE.match(para))
       counter += 1
-      alt, path, caption = m[1], m[2], m[3]
+      alt, path, caption = m[1], m[2], unescape_title(m[3])
       # A single exclamation mark is for images only. A video with just one
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.
