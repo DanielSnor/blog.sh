@@ -557,6 +557,17 @@ module ConfigWriter
         if line_indent.nil? # blank -- may be interior, decided by what follows
           next
         end
+        # A block sequence may sit at the SAME indentation as the key that
+        # owns it -- valid YAML, and exactly what YAML.dump emits. Read as
+        # "not deeper, therefore not mine", the key's extent was one line:
+        # set_list then wrote the new entries and left the old ones below
+        # them, which is invalid YAML, so verify! rolled the file back and
+        # ./style.sh abandoned every other answer in the session and
+        # blamed the user's file.
+        if line_indent == indent && @lines[i].lstrip.match?(/\A-(\s|\z)/)
+          last = i
+          next
+        end
         break if line_indent <= indent
 
         last = i

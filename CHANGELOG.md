@@ -587,6 +587,29 @@ prints what an installation is running.
     Two "leave it alone" keystrokes were enough to switch the install and
     rebuild the public site in the other language.
 
+- **Four more the same audit found, none of which a user could work
+  around.**
+  - **Reordering the queue could leave half the move applied.** Swapping
+    two posts is two writes, and if the second refused — a slug already
+    taken in the year it would move into — the first stayed: two posts
+    on one slot, both published by the cron, or one published months
+    early. Both halves are now checked before either is written.
+  - **`./style.sh` threw away the whole session on an ordinary config.**
+    A list written level with its key — valid YAML, and what most tools
+    emit — was misread as belonging to nobody, so the footer links were
+    written twice over. The result did not parse, the file was rolled
+    back, and every other answer given in that run went with it.
+  - **A local deploy reported every file as failed while copying it
+    fine.** Under cron, where the language settings are unset, a target
+    path containing accented characters broke the log line rather than
+    the copy — and the failure was recorded, not the success. The site
+    was on disk, the deploy said it was not, and every following run
+    warned about a deploy that had already happened.
+  - **`help` and `version` died on the very install they exist for.**
+    Both are meant to answer when the configuration is broken; both
+    loaded the configuration on the way in and aborted. They now have
+    their own entry point, as `doctor` already did.
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed

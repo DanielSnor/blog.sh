@@ -1372,6 +1372,23 @@ def queue_swap(entries, index, other_index)
     return false
   end
 
+  # Both halves are checked BEFORE either is written. write_scheduled_date
+  # aborts the process on a stale file or a target path that is taken, and
+  # a swap is two independent writes -- so an abort on the second left the
+  # first applied: the moved post sat on a slot the un-moved post still
+  # held, and the cron published both. In the [u] direction the surviving
+  # half moved the picked post EARLIER, publishing it months before the
+  # date that had just been confirmed, with nothing on screen but the
+  # abort. A same-slug-in-two-years collision makes that deterministic,
+  # and the engine treats those as ordinary.
+  [[entry, other[:time]], [other, entry[:time]]].each do |e, target|
+    abort_if_post_changed(e[:path], e[:raw], e[:post]['slug']) if e[:raw]
+    target_path = File.join(CONTENT_DIR, target.year.to_s, "#{e[:post]['slug']}.json")
+    next if File.expand_path(target_path) == File.expand_path(e[:path])
+
+    abort t('cli.post_already_exists', slug: e[:post]['slug'], path: target_path) if File.exist?(target_path)
+  end
+
   write_scheduled_date(entry[:path], entry[:post], other[:time], raw: entry[:raw])
   write_scheduled_date(other[:path], other[:post], entry[:time], raw: other[:raw])
   puts Tui.paint(t('cli.queue_swapped', slug: entry[:slug],

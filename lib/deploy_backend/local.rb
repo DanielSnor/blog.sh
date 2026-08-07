@@ -34,8 +34,18 @@ module DeployBackend
     end
 
     class Session
+      # The target path arrives from ENV, and ENV strings carry the
+      # LOCALE's encoding -- which under cron, where LANG is unset, is
+      # ASCII-8BIT. Interpolating those bytes into the UTF-8 log lines
+      # below raised Encoding::CompatibilityError AFTER the copy had
+      # already succeeded, so the blanket rescue reported every file as
+      # failed: files on disk, an empty manifest, exit 1, and a pending
+      # deploy warned about on every tick from then on. Setting
+      # Encoding.default_external does not reach ENV, so the label has to
+      # be fixed here.
       def initialize(root)
-        @root = root
+        @root = root.dup.force_encoding(Encoding::UTF_8)
+        @root = root.dup.force_encoding(Encoding::ASCII_8BIT) unless @root.valid_encoding?
       end
 
       def upload(path, logger: nil, remote_name: nil)

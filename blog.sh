@@ -41,13 +41,18 @@ fi
 # or the usage would scroll away. Same arrangement as import.sh.
 case "${1:-}" in
   help | --help | -h)
-    exec ruby scripts/manage_post.rb help
+    exec ruby scripts/info.rb help
     ;;
   # Same reasoning as help, plus one of its own: "which version is this
   # install running?" is a question asked of a machine that is already
   # misbehaving -- it must not depend on env.sh or config being right.
+  # Both go to scripts/info.rb rather than manage_post.rb, for the reason
+  # its header gives: requiring manage_post.rb reads config/site.yml at
+  # load time through half a dozen libraries, so on a config that will not
+  # parse these two died before they could answer -- exactly the install
+  # whose owner is asking.
   version | --version | -v)
-    exec ruby scripts/manage_post.rb version
+    exec ruby scripts/info.rb version
     ;;
   # Doctor takes that furthest: it exists to explain an install with no
   # env.sh, no config, or a config that won't parse, so the "Missing
