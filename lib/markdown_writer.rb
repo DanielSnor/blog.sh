@@ -21,7 +21,13 @@ module MarkdownWriter
   # where they would mean something: the start of a line (see
   # escape_block_starts) and inside table cells -- escaping every hashtag
   # in a tweet archive would bury the text in backslashes.
-  ESCAPABLE = '*`~[]!\\#>|.+_-'
+  # ")" is here for the backslash rule only: escape_block_starts writes
+  # "1\\)" so a line-leading "1) " cannot become a list, and the parser
+  # therefore unescapes \\) -- which meant an author's own "\\)" lost its
+  # backslash on the next save. Listed here, escape_markdown doubles that
+  # backslash on the way out and the two directions agree again. ")" itself
+  # is never escaped; only a backslash before it is.
+  ESCAPABLE = '*`~[]!\\#>|.+_-)'
 
   # Higher number = renders further out when two spans cover the exact same
   # range (e.g. "**[text](url)**", where the bold and the link entries end up
@@ -228,7 +234,14 @@ module MarkdownWriter
         next false if o.equal?(e)
 
         if o['start'] == e['start'] && o['end'] == e['end']
-          WRAP_PRIORITY.fetch(o['type'], 0) > WRAP_PRIORITY.fetch(e['type'], 0)
+          # The type NAME breaks a remaining tie, so the order is total for
+          # types WRAP_PRIORITY has never heard of too. Without it every
+          # unknown type (an importer's own span, a future block kind) fell
+          # back to 0 -- the same value as 'code' -- and the pair was written
+          # twice over, which is the duplication this table was fixed for.
+          po = WRAP_PRIORITY.fetch(o['type'], 0)
+          pe = WRAP_PRIORITY.fetch(e['type'], 0)
+          po == pe ? o['type'].to_s > e['type'].to_s : po > pe
         else
           o['start'] <= e['start'] && o['end'] >= e['end']
         end

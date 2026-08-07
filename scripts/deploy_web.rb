@@ -29,6 +29,14 @@
 #   ./scripts/deploy-web.sh --prune             # also deletes orphaned files on Surfer
 #   ./scripts/deploy-web.sh --dry-run           # only prints what it would do (doesn't need Surfer)
 
+# Every other entry point inherits this from lib/site_config.rb; this one
+# does not load it. Without it a cron run -- where LANG is unset -- reads
+# the manifest and the paths inside it as US-ASCII, so a single accented
+# filename raises out of JSON.parse or out of a path comparison and BOTH
+# crons die on every tick, with the deploy never completing again.
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = nil
+
 require 'digest'
 require 'json'
 require 'time'

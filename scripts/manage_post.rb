@@ -2673,7 +2673,15 @@ def pick_published_interactively
 end
 
 def trash_summary
-  Dir.glob(File.join(TRASH_DIR, '*', 'post.json')).filter_map { |f| post_summary(f) }
+  # Both layouts, the way restore_post's own lookup already does: posts have
+  # been keyed by year inside the trash since the content tree was, and this
+  # glob still described the flat one -- so `./blog.sh restore` with no slug,
+  # and the wizard's whole Trash entry, answered "Trash is empty" over a full
+  # trash. The engine's only undo, unreachable except by typing a slug the
+  # author would have to remember.
+  (Dir.glob(File.join(TRASH_DIR, '*', '*', 'post.json')) +
+   Dir.glob(File.join(TRASH_DIR, '*', 'post.json')))
+    .uniq.sort.filter_map { |f| post_summary(f) }
 end
 
 # Lets `restore` be called with no slug: offers the trash's contents, same

@@ -610,6 +610,32 @@ prints what an installation is running.
     loaded the configuration on the way in and aborted. They now have
     their own entry point, as `doctor` already did.
 
+- **Six the second audit found, three of them in the first audit's own
+  fixes.**
+  - **The trash was unreachable without typing a slug from memory.**
+    `./blog.sh restore` with no argument, and the wizard's whole Trash
+    entry, reported an empty trash over a full one — they were still
+    looking for the layout used before posts were filed by year. The
+    engine's only undo, effectively dead.
+  - **Both crons died on every tick once an accented filename reached the
+    deploy.** The deploy is the one entry point that does not load the
+    site config, and with it the rule that files are read as UTF-8 — so
+    under cron, where the language settings are unset, the manifest
+    raised instead of parsing, and the site stopped updating.
+  - **A post could render a completely blank page.** The structured-data
+    block escaped one of the two sequences that can end a script from
+    inside it. Text containing an unterminated HTML comment followed by
+    another script tag swallowed the rest of the page.
+  - **The fix for "1) " broke a backslash an author typed themselves.**
+    Teaching the reader to undo the escape without teaching the writer to
+    double it meant `:\)` quietly lost its backslash on the next save.
+  - **Span types the engine does not know still duplicated their text.**
+    The ordering fixed the five known kinds; anything an importer invents
+    shared a rank with inline code and was written twice.
+  - **A fence with a language written after a space ("``` ruby") was not
+    recognised**, so the code became prose and the rest of the post was
+    swallowed into a code block.
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed

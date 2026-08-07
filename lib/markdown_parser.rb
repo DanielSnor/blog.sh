@@ -500,7 +500,7 @@ module MarkdownParser
     text.gsub(/\\(.)/) { Regexp.last_match(1) }
   end
 
-  CODE_FENCE_LINE_RE = /\A(`{3,})(\S*)\z/
+  CODE_FENCE_LINE_RE = %r{\A(`{3,})[ \t]*([^\n`]*?)[ \t]*\z}
 
   # Splits raw body text into alternating :prose / :code segments on lines of
   # exactly ``` (optionally followed by a language hint, e.g. ```ruby). A code

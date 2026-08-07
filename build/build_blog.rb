@@ -865,7 +865,13 @@ def post_structured_head(post)
     'description' => post_description(post)
   }
   data['keywords'] = tags.join(', ') unless tags.empty?
-  lines << %(<script type="application/ld+json">#{JSON.generate(data).gsub('</', '<\/')}</script>)
+  # Both sequences that can end a script block from inside a JSON string:
+  # "</" closes it, and "<!--" opens an HTML comment whose scope runs to the
+  # next "-->" -- so a post whose text held an unterminated comment followed
+  # by another "<script" swallowed the rest of the page and rendered blank.
+  # Escaping the "<" is invisible once the JSON is parsed and stops both.
+  json_ld = JSON.generate(data).gsub('</', '<\/').gsub('<!--', '<\u0021--')
+  lines << %(<script type="application/ld+json">#{json_ld}</script>)
   lines.map { |line| "\n  #{line}" }.join
 end
 
