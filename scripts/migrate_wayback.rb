@@ -10,6 +10,12 @@
 #   LIMIT=20 ruby scripts/migrate_wayback.rb <url>           # trial run
 #   WAYBACK_DELAY=2 ruby scripts/migrate_wayback.rb <url>    # gentler pace
 #   WAYBACK_MODE=pages ruby scripts/migrate_wayback.rb <url> # skip feeds
+#   WAYBACK_FROM=2013-01 WAYBACK_TO=2013-06 ...              # capture window
+#     (the Wayback calendar's year/month picker as parameters: only
+#      captures inside the window are read. Filters CAPTURES, not posts --
+#      a late window is how you reach a blog's end without replaying its
+#      whole history, but posts the feed no longer carried by then are
+#      not in the run.)
 #   POST_PATTERN='^/\d{4}/\d{2}/' ruby scripts/migrate_wayback.rb <url>
 #   WAYBACK_PACK=b2evolution ruby scripts/migrate_wayback.rb <url>
 #
@@ -44,5 +50,6 @@ mode = ENV['WAYBACK_MODE'] == 'pages' ? :pages : :auto
 Import::Cli.run(Import::Wayback.new(url, delay: delay, mode: mode,
                                          post_pattern: ENV['POST_PATTERN'],
                                          pack: ENV['WAYBACK_PACK'],
+                                         from: ENV['WAYBACK_FROM'], to: ENV['WAYBACK_TO'],
                                          keep_permalinks: Import::Cli.keep_permalinks_from_env),
                 limit: Import::Cli.limit_from_env)

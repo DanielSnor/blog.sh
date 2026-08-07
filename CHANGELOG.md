@@ -14,6 +14,19 @@ prints what an installation is running.
 
 ### New
 
+- **A Wayback rescue can take the calendar's window.** The Archive's own
+  site lets you pick a year and month; `WAYBACK_FROM` and `WAYBACK_TO`
+  are that picker as parameters (`2013`, `2013-01`, `2013-01-15`), and a
+  typo aborts rather than silently meaning "everything" -- a window
+  quietly dropped would read as a blog the Archive never captured. The
+  window filters CAPTURES, not posts: a late window is how you reach a
+  blog's end without replaying its whole history, and the summary says
+  the run was windowed, because posts the feed no longer carried by then
+  are missing from the run, not from the blog. Reading stays
+  oldest-first inside the window, so overlapping captures still merge
+  with the newest version of a post winning. The image probe ignores the
+  window on purpose -- it is the map you pick the window from.
+
 - **`./setup.sh` -- setting a site up is now a conversation.** The
   documented path was to copy two files and edit 277 lines of commented
   YAML; this asks instead, and checks every answer as it arrives. The
@@ -510,6 +523,23 @@ prints what an installation is running.
   not banner lines.
 
 ### Fixes
+
+- **A feed whose CDATA sits on its own line no longer reads as twenty
+  posts with no body.** `Feed#text_of` read an element through REXML's
+  `element.text`, which returns only the FIRST text child -- and a feed
+  generator that writes a newline before its CDATA section makes that
+  first child pure whitespace. Every item in such a feed imported as
+  `:empty`; the posts were there the whole time, one indentation away.
+  All text children are read now. Found on the final capture of a dead
+  blog whose 2008-era feeds had the CDATA flush against the tag -- the
+  same blog, readable for years, became unreadable the day its
+  generator started indenting.
+
+  The teaser probe learned the same lesson twice over: it now reads all
+  text children too, and a trailing self-link whose anchor text is the
+  literal word "Permalink" no longer counts as a "read more" -- some
+  generators append that footer to every item, complete posts included,
+  and one such feed read as 20 truncations out of 20 full posts.
 
 - **A throttling server no longer reads as a blog that was never
   archived, or as pictures that were never kept.** Two places gave up

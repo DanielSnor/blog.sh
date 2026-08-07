@@ -51,8 +51,11 @@ module Import
     # are posts (as opposed to listings, tag pages, calendars). A
     # platform pack supplies it for hosts it knows; anywhere else the
     # user does, or page mode refuses with samples to build one from.
-    def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false, pack: nil)
+    def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false, pack: nil,
+                   from: nil, to: nil)
       @url = url.sub(%r{/+\z}, '')
+      @from = stamp(from, 'WAYBACK_FROM')
+      @to = stamp(to, 'WAYBACK_TO')
       @delay = delay
       @post_pattern = post_pattern && Regexp.new(post_pattern)
       @mode = mode
@@ -151,6 +154,7 @@ module Import
     def postscript
       notes = []
       notes << I18n.t('import.note.wayback_pack_detected', platform: @pack.key) if @sniffed
+      notes << I18n.t('import.note.wayback_window', range: human_window) if @from || @to
       notes << I18n.t('import.note.wayback_snapshots', count: @snapshots_read) if @snapshots_read.positive?
       notes << I18n.t('import.note.wayback_unreadable', count: @unreadable) if @unreadable.positive?
       if @unanswered_captures.positive?
@@ -521,10 +525,21 @@ module Import
       link = item_link(item)
       return false if link.empty?
 
+      # All text children, same as Feed#text_of: `.text` alone returns the
+      # first text node, and a newline before a CDATA section makes that
+      # node whitespace -- the body would read as absent.
       body = %w[content:encoded description content summary]
-             .filter_map { |name| item.elements[name]&.text }.max_by(&:length).to_s
-      last = body.scan(/<a[^>]+href="([^"]+)"/im).last
-      !last.nil? && last[0].split('#').first == link
+             .filter_map { |name| item.elements[name]&.texts&.map(&:value)&.join }
+             .max_by(&:length).to_s
+      last = body.scan(%r{<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>}im).last
+      return false if last.nil? || last[0].split('#').first != link
+
+      # A trailing self-link is not always a teaser: some generators append
+      # a "Permalink" footer to EVERY item, complete posts included -- one
+      # such feed made this claim 20 truncations out of 20 full posts.
+      # "Permalink" is the generator's word, not the blogger's, so the
+      # literal match is not a language guess the way "read more" would be.
+      !last[1].gsub(/<[^>]+>/, '').strip.match?(/\Apermalink\z/i)
     end
 
     def item_link(item)
@@ -543,7 +558,7 @@ module Import
     def probe_images
       asked = @cdx_failures.size
       rows = cdx_rows("#{host}/*", extra: { 'filter' => ['statuscode:200', 'mimetype:image/.*'],
-                                            'collapse' => 'urlkey' })
+                                            'collapse' => 'urlkey' }, windowed: false)
       # Unanswered is not empty -- say nothing rather than something wrong.
       return if @cdx_failures.size > asked
 
@@ -561,10 +576,39 @@ module Import
             'WAYBACK_DELAY (seconds between queries) to keep under the limit.')
     end
 
-    def cdx_rows(candidate, extra: nil)
+    # "2013", "2013-01", "2013-01-15" -> the digits CDX wants. A typo is
+    # worth stopping for rather than ignoring: a window silently dropped
+    # would read as a blog the Archive never captured, which is the one
+    # mistake this file has already made twice.
+    def human_window
+      [@from || '…', @to || '…'].join(' .. ')
+    end
+
+    def stamp(value, name)
+      return nil if value.nil? || value.to_s.strip.empty?
+
+      digits = value.to_s.gsub(/\D/, '')
+      return digits if digits.length.between?(4, 14) && digits.length.even?
+
+      abort("❌ #{name} takes a year, year-month or date (2013, 2013-01, 2013-01-15) -- " \
+            "got #{value.inspect}")
+    end
+
+    # The window the Wayback Machine's own calendar offers, as CDX
+    # parameters. It filters CAPTURES, not posts: a capture from August
+    # holds whatever the feed carried that day. Reading late captures is
+    # how you reach the end of a blog -- the alternative, reading newest
+    # first, would break the rule that makes overlapping captures merge
+    # correctly (oldest first, so the newest version of a post wins).
+    def window
+      { from: @from, to: @to }.compact
+    end
+
+    def cdx_rows(candidate, extra: nil, windowed: true)
       params = { url: candidate, output: 'json', limit: 1000,
                  filter: 'statuscode:200', collapse: 'digest' }
       params = params.merge(limit: 15_000).merge(extra) if extra
+      params = params.merge(window) if windowed
       query = URI.encode_www_form(params)
       body = http_get("#{CDX}?#{query}")
       rows = JSON.parse(body)

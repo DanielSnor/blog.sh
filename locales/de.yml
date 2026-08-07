@@ -518,6 +518,7 @@ import:
     threads_html_replies: "Die HTML-Seite markiert Antworten nicht, dieser Import konnte sie also nicht unterscheiden -- ein Konto mit Antworten importiert man besser aus dem JSON, das sie markiert und überspringt."
     tumblr_unmapped: "%{count} Beitrag/Beiträge hatten keine brauchbare Originaladresse -- ohne Weiterleitung importiert."
     wayback_pack_detected: "%{platform}-Markup erkannt und die Seiten mit dessen Leser gelesen."
+    wayback_window: "Nur Schnappschüsse aus %{range} wurden gelesen -- das angefragte Fenster. Beiträge, die der Feed bis dahin nicht mehr trug, fehlen in diesem Lauf."
     wayback_snapshots: "%{count} Feed-Schnappschüsse aus der Wayback Machine gelesen."
     wayback_unreadable: "%{count} Schnappschüsse waren keine lesbaren Feeds -- übersprungen."
     wayback_unanswered_captures: "Bei %{count} Schnappschüssen hörte das Archiv auf zu antworten -- deren Beiträge fehlen in diesem Lauf, nicht im Blog. Ein neuer Lauf holt sie nach; ein größeres WAYBACK_DELAY verhindert es."

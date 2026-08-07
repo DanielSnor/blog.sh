@@ -525,6 +525,7 @@ import:
     threads_html_replies: "The HTML page does not mark replies, so this import could not tell them apart -- an account with replies is better imported from JSON, which marks and skips them."
     tumblr_unmapped: "%{count} post(s) had no usable original address -- imported without a redirect."
     wayback_pack_detected: "Recognized %{platform} markup and read the pages with its reader."
+    wayback_window: "Only captures from %{range} were read -- the window you asked for. Posts the feed no longer carried by then are not in this run."
     wayback_snapshots: "%{count} feed capture(s) read from the Wayback Machine."
     wayback_unreadable: "%{count} capture(s) were not readable feeds and were skipped."
     wayback_unanswered_captures: "%{count} capture(s) the Archive stopped answering for -- their posts are missing from this run, not from the blog. Re-running picks them up; a larger WAYBACK_DELAY stops it happening."

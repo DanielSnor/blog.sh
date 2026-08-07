@@ -340,7 +340,14 @@ module Import
       return '' unless element
 
       node = path == 'title' && element.name == 'feed' ? element.elements['title'] : element.elements[path]
-      node&.text.to_s.strip
+      return '' unless node
+
+      # ALL text children, not the first. `element.text` returns only the
+      # first text node -- and a feed generator that writes a newline
+      # before its CDATA section makes that first node pure whitespace,
+      # which read as "this item has no body" for every item in the feed.
+      # The posts were there the whole time, one indentation away.
+      node.texts.map(&:value).join.strip
     end
 
     # --- media ----------------------------------------------------------
