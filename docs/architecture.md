@@ -359,3 +359,19 @@ origins:
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.
+
+## Known limitations
+
+**A bold span that ends exactly where an italic one begins loses its
+formatting on the next edit.** The writer emits `**abcd***efgh*` for that
+adjacency, and three touching stars do not read back as the two spans
+that produced them -- the visible text keeps stray asterisks. Four of the
+150 combinations in `tests/test_markdown_roundtrip.rb`'s span matrix are
+this shape, and the test pins that number so it cannot grow unnoticed.
+
+The obvious repair is to write italics as `_text_`, which never collides
+with `**`. It is not done because the parser would then have to read `_`
+as emphasis in every existing post, and `_` is ordinary inside imported
+text -- snake_case identifiers, URLs, filenames. Trading a live archive's
+correctness for four rare shapes is the wrong way round; it needs a
+considered pass over the inline grammar instead.
