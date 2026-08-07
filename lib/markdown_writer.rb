@@ -81,7 +81,12 @@ module MarkdownWriter
         "#{fence}chat\n#{body}\n#{fence}"
       when 'code'
         fence = fence_for(b['text'])
-        "#{fence}#{b['lang']}\n#{b['text']}\n#{fence}"
+        # The hint shares the fence line, and the parser's fence-line
+        # grammar has no room for a backtick in it at ANY fence length --
+        # "```ru`by" is not a fence at all, so the block fell apart into
+        # prose plus an empty code block on the next edit. A language hint
+        # is a short identifier; the backtick is dropped, not the block.
+        "#{fence}#{b['lang'].to_s.delete('`')}\n#{b['text']}\n#{fence}"
       when 'image'
         media = (b['media'] || []).first || {}
         path = File.join(media_dir, media['url'].to_s)

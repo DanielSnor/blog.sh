@@ -28,8 +28,14 @@ module Import
     # the report has to say: the old behaviour was a raw backtrace and no
     # summary at all, so a three-hour run that died at item 900 of 2000
     # told the operator nothing about what it had done.
-    Result = Struct.new(:written, :scanned, :skipped, :media, :media_failures, :samples, :interrupted,
-                        keyword_init: true)
+    #
+    # `skipped_media_failures` is the subset of `media_failures` harvested
+    # from posts that were skipped. Kept apart because a reporter that says
+    # a failure cost a WRITTEN post its file has to be able to leave these
+    # out -- lumped together, the summary claimed media were lost from
+    # posts that were never written at all.
+    Result = Struct.new(:written, :scanned, :skipped, :media, :media_failures, :skipped_media_failures,
+                        :samples, :interrupted, keyword_init: true)
 
     def initialize(adapter, dry_run: false, limit: nil, on_post: nil, on_scan: nil)
       @adapter = adapter
@@ -55,6 +61,7 @@ module Import
       skipped = Hash.new(0)
       media_count = 0
       media_failures = []
+      skipped_media_failures = []
       samples = []
 
       interrupted = nil
@@ -91,8 +98,12 @@ module Import
                 # file is missing from the export maps to :empty, and its
                 # missing file used to be forgotten with it -- so the run
                 # said "1 skipped (no usable content)" and never named the
-                # file the archive was actually missing.
+                # file the archive was actually missing. Recorded in the
+                # skipped ledger too, so the summary can attribute these
+                # losses to posts that were never written -- otherwise it
+                # claims a skipped post was "written without" its file.
                 media_failures.concat(media.failures)
+                skipped_media_failures.concat(media.failures)
                 next
               end
 
@@ -115,7 +126,8 @@ module Import
       end
 
       Result.new(written: written, scanned: scanned, skipped: skipped, media: media_count,
-                 media_failures: media_failures, samples: samples, interrupted: interrupted)
+                 media_failures: media_failures, skipped_media_failures: skipped_media_failures,
+                 samples: samples, interrupted: interrupted)
     end
 
     private

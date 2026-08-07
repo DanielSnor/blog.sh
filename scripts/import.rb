@@ -478,8 +478,21 @@ def report(result, dry_run:)
 
   return if result.media_failures.empty?
 
-  puts Tui.paint(t('import.media_failed', count: result.media_failures.size), :yellow)
-  result.media_failures.first(3).each { |url| puts "  #{url}" }
+  # Two different losses, said separately: a file missing from a post that
+  # WAS written, and one from a post the run skipped entirely (a photo-only
+  # post whose only image is gone maps to :empty). One line for both told
+  # the author their skipped posts had been "written without" the file.
+  skipped_failures = Array(result.skipped_media_failures)
+  from_written = result.media_failures - skipped_failures
+  unless from_written.empty?
+    puts Tui.paint(t('import.media_failed', count: from_written.size), :yellow)
+    from_written.first(3).each { |url| puts "  #{url}" }
+  end
+  unless skipped_failures.empty?
+    puts Tui.paint(t('import.media_failed_skipped', count: skipped_failures.size), :yellow)
+    skipped_failures.first(3).each { |url| puts "  #{url}" }
+  end
+  return
 end
 
 # The reading pass has no per-post output to show -- it deliberately writes

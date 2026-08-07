@@ -452,6 +452,7 @@ import:
   sample_slugs: "Die ersten Slugs:"
   skipped: "  %{count} übersprungen (%{reason})"
   media_failed: "%{count} Mediendatei(en) ließen sich nicht herunterladen -- ihre Beiträge wurden ohne sie geschrieben:"
+  media_failed_skipped: "%{count} Mediendatei(en) ließen sich bei übersprungenen Beiträgen nicht herunterladen:"
   nothing_to_import: "Nichts zu importieren."
   confirm_prompt: "Diese %{count} Beiträge schreiben? Zur Bestätigung %{count} eintippen (alles andere bricht ab): "
   running: "Importiere %{label} -- Medien werden heruntergeladen, das kann dauern…"

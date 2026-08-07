@@ -459,6 +459,7 @@ import:
   sample_slugs: "First few slugs:"
   skipped: "  %{count} skipped (%{reason})"
   media_failed: "%{count} media file(s) could not be downloaded -- their posts were written without them:"
+  media_failed_skipped: "%{count} media file(s) could not be downloaded from post(s) that were skipped:"
   nothing_to_import: "Nothing to import."
   confirm_prompt: "Write these %{count} post(s)? Type %{count} to confirm (anything else cancels): "
   running: "Importing %{label} -- downloading media, this can take a while…"

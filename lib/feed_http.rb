@@ -55,17 +55,30 @@ module FeedHttp
     req['User-Agent'] = USER_AGENT
     req['Accept'] = 'application/json, application/atom+xml, */*'
 
+    body = nil
     res = Timeout.timeout(remaining, nil, "timed out after #{TOTAL_TIMEOUT}s (#{url})") do
       Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',
                                           open_timeout: [OPEN_TIMEOUT, remaining].min,
-                                          read_timeout: [READ_TIMEOUT, remaining].min) { |http| http.request(req) }
+                                          read_timeout: [READ_TIMEOUT, remaining].min) do |http|
+        http.request(req) do |response|
+          # The ceiling has to bind while the bytes arrive: letting
+          # Net::HTTP buffer the whole response and measuring afterwards
+          # meant the remote had already made this process allocate the
+          # entire oversized body before the check ever ran. Streaming
+          # chunks caps the damage at the ceiling plus one read.
+          if response.is_a?(Net::HTTPSuccess)
+            body = +''
+            response.read_body do |chunk|
+              body << chunk
+              raise "response too large (#{body.bytesize} bytes, #{url})" if max_body && body.bytesize > max_body
+            end
+          end
+        end
+      end
     end
 
     case res
     when Net::HTTPSuccess
-      body = res.body.to_s
-      raise "response too large (#{body.bytesize} bytes, #{url})" if max_body && body.bytesize > max_body
-
       body
     when Net::HTTPRedirection
       raise "too many redirects (#{url})" if redirects_left.zero?

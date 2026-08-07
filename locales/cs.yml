@@ -447,6 +447,7 @@ import:
   sample_slugs: "Prvních několik slugů:"
   skipped: "  přeskočeno (%{reason}): %{count}"
   media_failed: "Nestažených souborů médií: %{count} — jejich posty se zapsaly bez nich:"
+  media_failed_skipped: "Nestažených souborů médií u přeskočených postů: %{count} — ty posty nevznikly:"
   nothing_to_import: "Není co importovat."
   confirm_prompt: "Zapsat vše (postů: %{count})? Potvrď napsáním %{count} (cokoli jiného ruší): "
   running: "Importuji %{label} — stahuji média, může to chvíli trvat…"

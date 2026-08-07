@@ -179,8 +179,8 @@ CLIENT_I18N_SCRIPT_HASH = "'sha256-#{Digest::SHA256.base64digest(CLIENT_I18N_SCR
 # a site that embeds nothing keeps exactly the policy it had, and a PeerTube
 # instance -- whose host is a property of the post, not of the engine -- can
 # be allowed for the one page that plays a video from it.
-# comment_origins is the same idea for connect-src: the stats row and the
-# comment thread are fetched from whichever network each post was
+# comment_origins is the same idea for connect-src: the comment thread is
+# fetched from whichever network each post was
 # ANNOUNCED on, which is stored on the post -- while this policy was built
 # from the network configured right now. After a switch from Mastodon to
 # Bluesky (or back), every older post kept its thread in the markup and was
@@ -1132,18 +1132,22 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     main_html = template.result_with_hash(list_html: list_html, pagination: pagination, heading: heading)
     # A listing renders the same blocks the post page does, players
-    # included, so it needs the same permissions. The pinned post counts as
-    # one of them wherever it is lifted onto the landing page: once it has
-    # aged onto /page/2/ it is no longer in this page's own slice, and
-    # computing the policy from the slice alone left its player on the
-    # front page with nothing allowing it.
+    # included, so it needs the same frame permissions. The pinned post
+    # counts as one of them wherever it is lifted onto the landing page:
+    # once it has aged onto /page/2/ it is no longer in this page's own
+    # slice, and computing the policy from the slice alone left its player
+    # on the front page with nothing allowing it.
+    # No comment_origins, though: a thread is only fetched on the post's
+    # own page (#comments exists nowhere else), and the stats row on a
+    # card reads /stats.json from this origin -- so passing them here
+    # handed every listing a connect-src grant to each instance its posts
+    # were announced on, hosts the page never actually contacts.
     shown = page_posts
     shown = ([pinned] + page_posts).uniq if pinned && number > fixed
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
-                           frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] }),
-                           comment_origins: comment_origins_for(shown)))
+                           frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] })))
   end
   pages.size
 end

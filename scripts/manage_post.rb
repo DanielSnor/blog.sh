@@ -1378,6 +1378,39 @@ def queue_act(entries, index)
   end
 end
 
+# Runs a queue's writes in order and, when one dies partway, names what
+# did and did not move before the failure travels on. The pre-flights in
+# queue_swap and queue_offer_compact catch what they can SEE -- a stale
+# file, a taken path -- but a full disk, a permission error or a Ctrl-C
+# BETWEEN the writes is invisible to them, and the half-moved queue it
+# leaves behind was only ever discovered by the cron publishing the
+# wrong post. Nothing is rolled back: the disk that just refused one
+# write is not owed a second chance with another, and a wrong guess
+# here doubles the damage. rescue Exception, not StandardError, because
+# the deaths this must outlive long enough to speak are exactly the
+# other kinds: abort is SystemExit, Ctrl-C is Interrupt. Plain English
+# rather than t() on purpose -- a report that only exists mid-crash
+# must not itself be able to abort on a missing locale key -- and the
+# times are the ISO form the JSON carries, since repairing that file by
+# hand is what the report is for.
+def apply_queue_moves(moves)
+  done = 0
+  moves.each do |entry, target|
+    yield entry, target
+    done += 1
+  end
+rescue Exception
+  if done.positive?
+    warn ''
+    warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
+    moves.each_with_index do |(entry, target), i|
+      warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+    end
+    warn ''
+  end
+  raise
+end
+
 # Moving a post earlier or later means exchanging times with its
 # neighbour: the set of occupied slots never changes, only which post
 # sits in which -- so a hand-picked 14:17 stays a 14:17, it just gets a
@@ -1407,7 +1440,8 @@ def queue_swap(entries, index, other_index)
   # date that had just been confirmed, with nothing on screen but the
   # abort. A same-slug-in-two-years collision makes that deterministic,
   # and the engine treats those as ordinary.
-  [[entry, other[:time]], [other, entry[:time]]].each do |e, target|
+  moves = [[entry, other[:time]], [other, entry[:time]]]
+  moves.each do |e, target|
     abort_if_post_changed(e[:path], e[:raw], e[:post]['slug']) if e[:raw]
     target_path = File.join(CONTENT_DIR, target.year.to_s, "#{e[:post]['slug']}.json")
     next if File.expand_path(target_path) == File.expand_path(e[:path])
@@ -1415,8 +1449,9 @@ def queue_swap(entries, index, other_index)
     abort t('cli.post_already_exists', slug: e[:post]['slug'], path: target_path) if File.exist?(target_path)
   end
 
-  write_scheduled_date(entry[:path], entry[:post], other[:time], raw: entry[:raw])
-  write_scheduled_date(other[:path], other[:post], entry[:time], raw: other[:raw])
+  apply_queue_moves(moves) do |e, target|
+    write_scheduled_date(e[:path], e[:post], target, raw: e[:raw])
+  end
   puts Tui.paint(t('cli.queue_swapped', slug: entry[:slug],
                                         date: other[:time].getlocal.strftime(t('date_time_format'))), :green)
   puts
@@ -1450,8 +1485,8 @@ def queue_offer_compact(freed_time, rest)
 
     abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target) if File.exist?(target)
   end
-  rest.each_with_index do |entry, i|
-    entry[:path] = write_scheduled_date(entry[:path], entry[:post], times[i], raw: entry[:raw])
+  apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
+    entry[:path] = write_scheduled_date(entry[:path], entry[:post], target, raw: entry[:raw])
   end
   puts Tui.paint(t('cli.queue_compacted'), :green)
   puts

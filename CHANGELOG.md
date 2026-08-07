@@ -693,6 +693,29 @@ prints what an installation is running.
   - **Importing a large archive over the network works again**, after a
     size ceiling meant for a sidebar widget was applied to it.
 
+- **The last small ones, done before the tag rather than after.**
+  - **A fetched feed is now capped while it arrives**, not measured once
+    it is already in memory — a remote could previously make the process
+    hold the whole oversized response before the limit noticed.
+  - **A code block whose language is written with a backtick stays a code
+    block.** The hint shares the fence line, and a backtick in it made
+    that line stop being a fence at all.
+  - **A link title containing a line break comes back as itself**, rather
+    than carrying an invisible placeholder character into the published
+    page.
+  - **Imported inline images no longer count as missing files.** A
+    `data:` image is the picture itself and is skipped quietly; a
+    protocol-relative address is fetched like the remote image it is.
+  - **The import summary separates two different losses**: a file missing
+    from a post that was written, and one from a post that was skipped
+    entirely. One line for both claimed posts had been written that never
+    were.
+  - **A listing page is no longer granted network permissions it never
+    uses** — comment threads are only ever fetched on a post's own page.
+  - **A queue reorder that dies partway now says which posts moved and
+    which did not**, so the times can be repaired by hand before the cron
+    runs on them.
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed

@@ -260,6 +260,13 @@ module Import
         text_of(parent, 'link') || text_of(parent, 'id')
     end
 
+    # Pinned rather than DEFAULT_PARSER, because Ruby 3.4 rewired that
+    # constant to the RFC3986 parser, whose escape calls itself obsolete
+    # on every internationalised feed. The pin is the same one
+    # Media.parse_url holds, so the host escaped here and the media URLs
+    # escaped there can never drift apart between Ruby versions.
+    ESCAPER = defined?(URI::RFC2396_PARSER) ? URI::RFC2396_PARSER : URI::DEFAULT_PARSER
+
     def host_of(link)
       value = link.to_s.strip
       return nil if value.empty?
@@ -273,7 +280,7 @@ module Import
       # Non-ASCII (internationalised) domains raise; escape and retry the
       # way Media.parse_url already does.
       begin
-        host = URI.parse(URI::DEFAULT_PARSER.escape(value)).host
+        host = URI.parse(ESCAPER.escape(value)).host
         host && !host.empty? ? host : nil
       rescue StandardError
         nil

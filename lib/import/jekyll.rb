@@ -165,7 +165,21 @@ module Import
     # to the post, an absolute URL downloaded -- in that order of
     # likelihood for a static site's own images.
     def image_block(src, alt, media, post_path)
-      filename = if src.start_with?('http://', 'https://')
+      # A data: URI is the image itself, inline -- nothing to fetch,
+      # nothing on disk, and no block form for inline bytes here. Dropped
+      # quietly and without a number: handed to from_file it showed up in
+      # the summary as a missing file, base64 body and all.
+      return nil if src.start_with?('data:')
+
+      # Protocol-relative means "the page's scheme", and the page is
+      # long gone -- assume https, as a browser on an https page does.
+      src = "https:#{src}" if src.start_with?('//')
+
+      # Any scheme, not just http(s): an ftp: or mailto: src is no path
+      # in this tree, and joining it onto @dir named a local file the
+      # archive never had. from_url's failure line tells the real story
+      # -- a remote resource that could not be fetched.
+      filename = if src.match?(/\A[A-Za-z][A-Za-z0-9+.-]*:/)
                    media.from_url(src)
                  else
                    local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, File.dirname(post_path))

@@ -672,6 +672,12 @@ module MarkdownParser
     else
       text, formatting = parse_inline(collapse_soft_breaks(para))
       block = { 'type' => 'text', 'text' => text.gsub(BREAK_SENTINEL, "\n") }
+      # A quoted link title rides through parse_inline too, so a hard
+      # break inside one arrives here as the sentinel -- but in the
+      # formatting entry, which the swap on `text` above cannot reach.
+      # Left alone, the private-use character was stored in the title
+      # and published.
+      formatting.each { |f| f['title'] = f['title'].gsub(BREAK_SENTINEL, "\n") if f['title'] }
       block['formatting'] = formatting unless formatting.empty?
       return [block, counter]
     end

@@ -104,7 +104,16 @@ module Import
       end
       return if result.media_failures.empty?
 
-      puts "  #{result.media_failures.size} media file(s) could not be downloaded; their posts were written without them."
+      # Split, because these are two different losses: a written post
+      # missing one of its files, and a post never written at all (a
+      # photo-only post whose file is gone skips as :empty). One line for
+      # both claimed every such post was "written without them" -- media
+      # lost from posts that never landed on disk.
+      from_written = result.media_failures.size - result.skipped_media_failures.size
+      puts "  #{from_written} media file(s) could not be downloaded; their posts were written without them." if from_written.positive?
+      unless result.skipped_media_failures.empty?
+        puts "  #{result.skipped_media_failures.size} media file(s) could not be downloaded from post(s) that were skipped."
+      end
     end
   end
 end
