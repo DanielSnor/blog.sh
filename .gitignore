@@ -26,3 +26,5 @@ public.nosync/
 # Per-install graphics dropped into the working copy must never ride
 # an unrelated commit into the public engine repo again.
 assets/images/daniel.png
+# Local regression suite -- deliberately outside the public repo.
+tests/
