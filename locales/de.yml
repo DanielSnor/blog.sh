@@ -520,6 +520,7 @@ import:
     wayback_pack_detected: "%{platform}-Markup erkannt und die Seiten mit dessen Leser gelesen."
     wayback_snapshots: "%{count} Feed-Schnappschüsse aus der Wayback Machine gelesen."
     wayback_unreadable: "%{count} Schnappschüsse waren keine lesbaren Feeds -- übersprungen."
+    wayback_unanswered_captures: "Bei %{count} Schnappschüssen hörte das Archiv auf zu antworten -- deren Beiträge fehlen in diesem Lauf, nicht im Blog. Ein neuer Lauf holt sie nach; ein größeres WAYBACK_DELAY verhindert es."
     wayback_unparsed: "%{count} archivierte Seiten ließen sich nicht als Beiträge lesen -- siehe die Zähler der Übersprungenen."
     wayback_dated_by_capture: "%{count} Beitrag/Beiträge tragen das Datum des Schnappschusses -- die Seite selbst wusste nichts Besseres."
     wayback_lost_images: "%{count} Bild(er) hat das Archiv nie gespeichert -- ihre Beiträge kamen ohne sie an."

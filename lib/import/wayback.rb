@@ -33,9 +33,13 @@ module Import
     RETRIES = 4
     RETRY_BACKOFF = 15
     # The network failures worth a second try: a connection the Archive
-    # dropped or never completed. A refused DNS lookup or a bad
-    # certificate is not going to fix itself in fifteen seconds.
-    TRANSIENT = [Errno::ECONNRESET, Errno::EPIPE, Net::OpenTimeout, Net::ReadTimeout].freeze
+    # dropped, never completed, or REFUSED. Refusal belongs here -- under
+    # load the Archive stops answering at the TCP level rather than with a
+    # status, and a rescue that downloads images meets that long before it
+    # meets a 503. A bad certificate is not going to fix itself in fifteen
+    # seconds; a refused connection routinely does.
+    TRANSIENT = [Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, Errno::EHOSTUNREACH,
+                 Errno::ETIMEDOUT, SocketError, Net::OpenTimeout, Net::ReadTimeout].freeze
 
     # Raised for a failure that may pass on its own, and caught by the
     # retry in http_get. Anything else stays what it was.
@@ -56,6 +60,7 @@ module Import
       @pack_name = pack.to_s.empty? ? nil : pack.to_s
       @snapshots_read = 0
       @unreadable = 0
+      @unanswered_captures = 0
       @lost_images = 0
       @unparsed = 0
       @dated_by_capture = 0
@@ -148,6 +153,9 @@ module Import
       notes << I18n.t('import.note.wayback_pack_detected', platform: @pack.key) if @sniffed
       notes << I18n.t('import.note.wayback_snapshots', count: @snapshots_read) if @snapshots_read.positive?
       notes << I18n.t('import.note.wayback_unreadable', count: @unreadable) if @unreadable.positive?
+      if @unanswered_captures.positive?
+        notes << I18n.t('import.note.wayback_unanswered_captures', count: @unanswered_captures)
+      end
       notes << I18n.t('import.note.wayback_unparsed', count: @unparsed) if @unparsed.positive?
       notes << I18n.t('import.note.wayback_dated_by_capture', count: @dated_by_capture) if @dated_by_capture.positive?
       notes << I18n.t('import.note.wayback_lost_images', count: @lost_images) if @lost_images.positive?
@@ -589,6 +597,14 @@ module Import
       file.write(body)
       file.close
       SnapshotFeed.new(file.path, timestamp: capture[:timestamp], keep_permalinks: @keep_permalinks)
+    rescue Busy, *TRANSIENT
+      # The Archive stopped answering for this one. Counted apart from a
+      # capture that came back and was not a feed: calling a refused
+      # connection "not a readable feed" once made a rescue report 81 of
+      # 82 captures unreadable, when every one of them was a clean RSS
+      # file the moment it was asked for on its own.
+      @unanswered_captures += 1
+      nil
     rescue StandardError
       @unreadable += 1
       nil

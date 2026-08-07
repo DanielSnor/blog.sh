@@ -515,6 +515,7 @@ import:
     wayback_pack_detected: "Poznal jsem značkování platformy %{platform} a četl stránky podle něj."
     wayback_snapshots: "Snímků feedu přečteno z Wayback Machine: %{count}."
     wayback_unreadable: "Snímků, které nebyly čitelné feedy: %{count} — přeskočeny."
+    wayback_unanswered_captures: "Snímků, u kterých Archiv přestal odpovídat: %{count} — jejich posty chybí v tomhle běhu, ne na blogu. Opakovaný běh je dobere; větší WAYBACK_DELAY tomu předejde."
     wayback_unparsed: "Archivovaných stránek, které nešlo přečíst jako posty: %{count} — viz počty přeskočených."
     wayback_dated_by_capture: "Postů s datem snímku: %{count} — stránka sama nic lepšího neřekla."
     wayback_lost_images: "Obrázků, které Archiv nikdy neuložil: %{count} — jejich posty dorazily bez nich."

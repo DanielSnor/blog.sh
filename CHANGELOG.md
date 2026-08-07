@@ -511,6 +511,34 @@ prints what an installation is running.
 
 ### Fixes
 
+- **A throttling server no longer reads as a blog that was never
+  archived, or as pictures that were never kept.** Two places gave up
+  far too early, and both blamed the source for it.
+
+  A rescue that downloads images is exactly the traffic the Wayback
+  Machine throttles, and it throttles by REFUSING connections rather
+  than answering with a status. That refusal was not among the failures
+  worth retrying, so it fell straight through to the handler that counts
+  captures which are not feeds: one real run reported 81 of 82 captures
+  unreadable, and every one of them was a clean RSS file the moment it
+  was asked for on its own. Refused, unreachable and timed-out
+  connections now wait the same way a 5xx does, and a capture the
+  Archive stopped answering for is counted and named separately from one
+  that came back and was not a feed -- the first is missing from the
+  run, the second from the blog.
+
+  The media downloader had the same gap for a different reason: it did
+  retry, but three times with a one-second pause, which is nothing
+  against a door held shut for tens of seconds. The same run lost 36 of
+  37 pictures, every failure a refused connection, while the rescue code
+  beside it waited fifteen, thirty, forty-five and sixty seconds and got
+  everything it asked for. The downloader now waits on that scale too --
+  but only for a server that is there and saying "not now". A name that
+  does not resolve is a host that has been gone for years, routine in
+  these archives, and those keep the brief pause they had: waiting two
+  minutes for each of a dead host's images would turn an import into an
+  overnight job.
+
 - **Eighteen smaller corrections from the same review round.** Among
   them: a hand-typed frontmatter date that will not parse is a sentence
   naming the buffer, not a backtrace; a draft whose JSON lost its

@@ -24,6 +24,26 @@ module Import
   # bytes -- take image dimensions from the platform's metadata, which
   # every API and export provides anyway.
   class Media
+    # How long to wait out a server that is throttling rather than
+    # answering. Three one-second naps -- what this used to do -- walk
+    # away from an archive that would have answered: a host that
+    # rate-limits by REFUSING connections holds the door shut for tens of
+    # seconds, and a rescue downloading hundreds of images is exactly the
+    # traffic that provokes it. One run lost 36 of 37 pictures that way,
+    # every failure a refused connection, while the code alongside it in
+    # wayback.rb waited 15, 30, 45, 60 seconds and got everything it
+    # asked for. Same shape here.
+    RETRIES = 4
+    RETRY_BACKOFF = 15
+
+    # The failures worth waiting that long for: the server is there and
+    # saying "not now". A name that does not resolve is a host that has
+    # been gone for years -- routine in these archives -- and waiting two
+    # minutes for each of its images would turn an import into an
+    # overnight job, so those keep the old brief pause.
+    THROTTLED = [Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, Errno::ETIMEDOUT,
+                 Net::OpenTimeout, Net::ReadTimeout].freeze
+
     attr_reader :files, :failures
 
     def initialize(tmpdir, dry_run: false)
@@ -165,7 +185,7 @@ module Import
     # archive of a few thousand posts hits connection resets often enough
     # that a single one must not end an hours-long run -- so this returns
     # nil and lets the caller record a failure instead of raising.
-    def self.fetch(url, redirects: 5, retries: 3)
+    def self.fetch(url, redirects: 5, retries: RETRIES)
       # Exhaustion says so: this was the one failure path with no line at
       # all, so a redirect loop read as media that silently never came.
       if redirects.negative?
@@ -190,7 +210,7 @@ module Import
           Net::HTTP.get_response(uri)
         rescue StandardError => e
           if retries.positive?
-            sleep 1
+            sleep backoff(retries, throttled: THROTTLED.any? { |kind| e.is_a?(kind) })
             return fetch(url, redirects: redirects, retries: retries - 1)
           end
           warn "  fetch gave up on #{url}: #{e.message}"
@@ -215,7 +235,7 @@ module Import
         # status became a bare nil, no retry, no line saying why, and an
         # hours-long import ended with media quietly missing.
         if retries.positive?
-          sleep 1
+          sleep backoff(retries, throttled: true)
           return fetch(url, redirects: redirects, retries: retries - 1)
         end
         warn "  fetch gave up on #{url}: HTTP #{res.code}"
@@ -226,6 +246,14 @@ module Import
         warn "  fetch failed on #{url}: HTTP #{res.code}"
         nil
       end
+    end
+
+    # Waits grow with each attempt, so the last one outlasts a throttling
+    # window rather than four times the first one's guess.
+    def self.backoff(retries, throttled:)
+      return 1 unless throttled
+
+      RETRY_BACKOFF * (RETRIES - retries + 1)
     end
 
     ESCAPER = defined?(URI::RFC2396_PARSER) ? URI::RFC2396_PARSER : URI::DEFAULT_PARSER
