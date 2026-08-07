@@ -26,6 +26,11 @@ cd "$(dirname "$0")"
 
 case "${1:-}" in
   help | --help | -h)
+    # The same identity block the wizard opens with, so "which install's
+    # help am I reading" has an answer. Ruby may be missing or ancient
+    # here (its check comes later) -- then the banner is skipped and the
+    # help still prints.
+    ruby -r./lib/site_header -e "puts SiteHeader.render(tool: './setup.sh')" 2>/dev/null && echo || true
     cat <<'USAGE'
 usage: ./setup.sh
 
