@@ -502,6 +502,18 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Four archive-browser corrections.** Opening a post from search
+  results and coming back showed "(nothing matches)" for the query that
+  had just matched -- the text index is rebuilt on return now (rebuilt,
+  not kept: the edit may have changed the very text being searched). The
+  index was keyed by slug, so two posts sharing a slug across years
+  answered searches with each other's text; it keys by year/slug. The
+  screen holds the terminal in raw mode for its whole life instead of
+  per keystroke, so fast typing during a repaint no longer echoes stray
+  characters into the frame. And rows are measured in display columns --
+  emoji and CJK count two -- so an emoji-heavy row no longer wraps and
+  corrupts the repaint one line at a time.
+
 - **Editing a post can no longer silently corrupt it -- eight round-trip
   defects in the markdown writer and parser are gone.** `edit` turns
   stored blocks into markdown and back, and on a real 4840-post archive

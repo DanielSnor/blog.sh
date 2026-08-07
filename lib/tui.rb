@@ -62,15 +62,49 @@ module Tui
     24
   end
 
+  # A codepoint is not a column: emoji and CJK render two columns wide,
+  # and a row measured in characters wraps on a terminal that measured
+  # it in columns -- which breaks the cursor-up repaint math one line at
+  # a time (the Mastodon-roster posts are 🐘-separated lists, so this is
+  # not exotic). Zero-width: combining marks, the variation selector,
+  # ZWJ. An approximation of wcwidth, deliberately small.
+  def char_width(ch)
+    o = ch.ord
+    return 0 if o == 0x200D || o == 0xFE0F || (o >= 0x0300 && o <= 0x036F) || (o >= 0x20D0 && o <= 0x20FF)
+    if (o >= 0x1100 && o <= 0x115F) || (o >= 0x2E80 && o <= 0xA4CF) ||
+       (o >= 0xAC00 && o <= 0xD7A3) || (o >= 0xF900 && o <= 0xFAFF) ||
+       (o >= 0xFE30 && o <= 0xFE4F) || (o >= 0xFF00 && o <= 0xFF60) ||
+       (o >= 0xFFE0 && o <= 0xFFE6) || (o >= 0x2600 && o <= 0x27BF) ||
+       (o >= 0x1F000 && o <= 0x1FAFF)
+      2
+    else
+      1
+    end
+  end
+
+  def display_width(text)
+    text.each_char.sum { |ch| char_width(ch) }
+  end
+
   # Truncates rather than wraps -- `menu` below repaints by moving the
   # cursor up exactly one line per item, so every item MUST render as
   # exactly one physical terminal row. On a narrow terminal (an SSH
   # client on a phone is the whole reason this matters) a wrapped line
-  # would silently break that math and corrupt the repaint.
+  # would silently break that math and corrupt the repaint. Measured in
+  # display COLUMNS (see char_width), not codepoints.
   def truncate_to_width(text, width)
-    return text if width <= 1 || text.length <= width
+    return text if width <= 1 || display_width(text) <= width
 
-    "#{text[0, width - 1]}…"
+    out = +''
+    used = 0
+    text.each_char do |ch|
+      w = char_width(ch)
+      break if used + w > width - 1
+
+      out << ch
+      used += w
+    end
+    "#{out}…"
   end
 
   # The same, for text that carries colour: an ANSI string's length is not
@@ -82,20 +116,21 @@ module Tui
   # [SCHEDULED] / [PINNED] markers -- and measuring them used to mean
   # stripping them.
   def truncate_ansi(text, width)
-    return text if width <= 1 || strip_ansi(text).length <= width
+    return text if width <= 1 || display_width(strip_ansi(text)) <= width
 
     out = +''
     visible = 0
     coloured = false
-    text.scan(/\e\[[0-9;]*m|./) do |token|
+    text.scan(/\e\[[0-9;]*m|./m) do |token|
       if token.start_with?("\e")
         out << token
         coloured = true
       else
-        break if visible >= width - 1
+        w = char_width(token)
+        break if visible + w > width - 1
 
         out << token
-        visible += 1
+        visible += w
       end
     end
     "#{out}…#{coloured ? "\e[0m" : ''}"
@@ -315,7 +350,7 @@ module Tui
   # `browse` below, where the left half says what is being shown and the
   # right half says where in it you are.
   def pad_between(left, right, width)
-    gap = width - strip_ansi(left).length - strip_ansi(right).length
+    gap = width - display_width(strip_ansi(left)) - display_width(strip_ansi(right))
     return truncate_to_width(left, width) if gap < 1
 
     "#{left}#{' ' * gap}#{right}"
@@ -357,6 +392,14 @@ module Tui
     painted = false
 
     print "\e[?25l"
+    # Raw for the WHOLE screen, not per keystroke: between two getch
+    # calls the terminal used to fall back to cooked mode with echo on,
+    # and on a large archive each search keystroke re-filters thousands
+    # of rows -- keys arriving in that window were echoed into the frame
+    # by the kernel, and a held-down Backspace was eaten as line editing.
+    # The ensure (and getch's own per-key raw) keep a crash from leaving
+    # the shell raw.
+    raw_screen do
     loop do
       state[:selected] = 0 if state[:selected].to_i >= rows.size
       ctx = rows.empty? || context.nil? ? nil : context.call(state[:selected])
@@ -451,8 +494,18 @@ module Tui
         end
       end
     end
+    end
   ensure
     print "\e[?25h"
+  end
+
+  # $stdin.raw with a floor: a stdin that cannot do raw (not a real
+  # terminal) just runs the block -- getch then does its own per-key raw
+  # exactly as before.
+  def raw_screen(&block)
+    $stdin.raw(&block)
+  rescue StandardError
+    yield
   end
 
   # The keys line, trimmed to fit rather than cut off: the first entry
@@ -462,7 +515,7 @@ module Tui
   # the edge of an 80-column window is how a screen becomes a trap.
   def fit_keys(text, width)
     parts = text.to_s.split(' · ')
-    parts.delete_at(parts.size - 2) while parts.size > 2 && parts.join(' · ').length > width
+    parts.delete_at(parts.size - 2) while parts.size > 2 && display_width(parts.join(' · ')) > width
     truncate_to_width(parts.join(' · '), width)
   end
 

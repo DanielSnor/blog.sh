@@ -2248,7 +2248,10 @@ end
 def browse_posts
   Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
     summary = post_summary(file)
-    summary&.merge(path: file)
+    # Keyed by year/slug, not slug: backdating makes the same slug in two
+    # years easy (the archive really has such pairs), and a slug-keyed
+    # index let one post's text answer searches for the other.
+    summary&.merge(path: file, key: "#{File.basename(File.dirname(file))}/#{summary[:slug]}")
   end.sort_by { |post| post[:date].to_s }.reverse
 end
 
@@ -2263,11 +2266,11 @@ def browse_index(posts)
       begin
         post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
         text = PostText.plain(post).gsub(/\s+/, ' ').strip
-        index[summary[:slug]] = { text: text, folded: PostText.searchable(post, text) }
+        index[summary[:key]] = { text: text, folded: PostText.searchable(post, text) }
       rescue JSON::ParserError, SystemCallError
         # post_summary already warned about this file; a post that cannot
         # be read simply matches nothing.
-        index[summary[:slug]] = { text: '', folded: '' }
+        index[summary[:key]] = { text: '', folded: '' }
       end
     end
   end
@@ -2289,7 +2292,7 @@ def browse_filtered(posts, filters, index, tokens)
     next false if filters[:tag] && post[:tags].none? { |tag| Slug.fold(tag) == Slug.fold(filters[:tag]) }
     next true if tokens.empty?
 
-    SearchQuery.match?(index.to_h.dig(post[:slug], :folded).to_s, tokens)
+    SearchQuery.match?(index.to_h.dig(post[:key], :folded).to_s, tokens)
   end
 end
 
@@ -2481,8 +2484,8 @@ def cmd_browse(filters = {})
                         search_hint: t('cli.browse_search_keys'),
                         context: lambda { |row|
                           post = view[row]
-                          post && browse_context(index.to_h[post[:slug]], SearchQuery.parse(state[:query]),
-                                                 [Tui.term_width - 12, 40].max, contexts, post[:slug])
+                          post && browse_context(index.to_h[post[:key]], SearchQuery.parse(state[:query]),
+                                                 [Tui.term_width - 12, 40].max, contexts, post[:key])
                         }) do |query, searching|
       tokens = SearchQuery.parse(query)
       view = browse_filtered(posts, active, index, tokens)
@@ -2503,7 +2506,12 @@ def cmd_browse(filters = {})
       post_crossroads(selected[:slug])
       Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
       posts = browse_posts
-      index = nil
+      # The screen comes back with the query still active, so the index
+      # must come back with it -- nilling it made every post match
+      # nothing and the archive showed "(nothing matches)" for a query
+      # that had results a moment earlier. Rebuilt, not kept: the edit
+      # may have changed exactly the text being searched.
+      index = state[:query].to_s.strip.empty? ? nil : browse_index(posts)
       contexts.clear
       next
     end
