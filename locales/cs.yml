@@ -498,11 +498,11 @@ import:
   # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
   # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.
   note:
-    facebook_crossposts: "Postů z jiných platforem (crossposty): %{count} — byly crossposty z jiných platforem (Twitter, Posterous, …) — přeskočeny, ať nezdvojují importy těch platforem. FACEBOOK_CROSSPOSTS=1 je vezme."
+    facebook_crossposts: "Crosspostů z jiných platforem (Twitter, Posterous, …): %{count} — přeskočeny, ať nezdvojují importy těch platforem. FACEBOOK_CROSSPOSTS=1 je vezme."
     feed_unmapped: "Postů bez použitelné původní adresy: %{count} (holé permalinky „?p=123“ mají identitu v query stringu) — naimportovány bez přesměrování."
-    ghost_scheduled: "Postů v Ghostu naplánovaných: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
+    ghost_scheduled: "Postů naplánovaných v Ghostu: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
     livejournal_nonpublic: "Zápisků jen pro přátele nebo soukromých: %{count} — dorazily jako drafty, veřejné nikdy nebyly."
-    medium_responses: "Postů vypadajících jako reakce: %{count} — reakce pod cizími články — dorazily jako drafty k revizi."
+    medium_responses: "Postů vypadajících jako reakce pod cizími články: %{count} — dorazily jako drafty k revizi."
     medium_untagged: "Publikovaných postů bez štítků: %{count} — novější exporty z Media je prostě nenesou."
     movabletype_comments: "komentáře (%{count})"
     movabletype_pings: "trackbacky (%{count})"
@@ -513,7 +513,7 @@ import:
     threads_html_replies: "HTML stránka odpovědi nijak neznačí, takže tenhle import je neuměl odlišit — účet s odpověďmi je lepší importovat z JSONu, který je značí a přeskakuje."
     tumblr_unmapped: "Postů bez použitelné původní adresy: %{count} — naimportovány bez přesměrování."
     wayback_pack_detected: "Poznal jsem značkování platformy %{platform} a četl stránky podle něj."
-    wayback_snapshots: "Snímků feedu přečteno z archivu: %{count} z Wayback Machine."
+    wayback_snapshots: "Snímků feedu přečteno z Wayback Machine: %{count}."
     wayback_unreadable: "Snímků, které nebyly čitelné feedy: %{count} — přeskočeny."
     wayback_unparsed: "Archivovaných stránek, které nešlo přečíst jako posty: %{count} — viz počty přeskočených."
     wayback_dated_by_capture: "Postů s datem snímku: %{count} — stránka sama nic lepšího neřekla."
