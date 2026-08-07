@@ -26,6 +26,13 @@ module FeedHttp
   # whole call including redirects, which is why it is threaded through.
   TOTAL_TIMEOUT = 30
   MAX_REDIRECTS = 3
+  # A sidebar widget is a handful of items. Without a ceiling, a remote
+  # that answers with an endless (or merely enormous) body turned ~200 KB
+  # on the wire into a String of any size the sender liked -- and the
+  # failure path then echoed the whole thing through `warn` into the cron
+  # mail. Cheap insurance on a path that talks to hosts nobody here
+  # controls.
+  MAX_BODY = 8 * 1024 * 1024
 
   module_function
 
@@ -51,11 +58,21 @@ module FeedHttp
     end
 
     case res
-    when Net::HTTPSuccess then res.body
+    when Net::HTTPSuccess
+      body = res.body.to_s
+      raise "response too large (#{body.bytesize} bytes, #{url})" if body.bytesize > MAX_BODY
+
+      body
     when Net::HTTPRedirection
       raise "too many redirects (#{url})" if redirects_left.zero?
 
-      get(URI.join(url, res['location']).to_s, redirects_left - 1, deadline)
+      # http:// and https:// only. Net::HTTP will not follow a file:// or
+      # ftp:// Location itself, but URI.join accepts one, and the address
+      # a redirect names is chosen by the remote host, not by this site.
+      target = URI.join(url, res['location'])
+      raise "refusing a #{target.scheme.inspect} redirect (#{url})" unless %w[http https].include?(target.scheme)
+
+      get(target.to_s, redirects_left - 1, deadline)
     else
       raise "HTTP #{res.code} (#{url})"
     end

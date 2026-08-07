@@ -44,12 +44,20 @@ module PostStats
   def entries
     Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8'))
+      raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
+
       if post['mastodon_url']
         { kind: :mastodon, key: post['mastodon_url'], date: post['date'] }
       elsif post['bluesky_uri']
         { kind: :bluesky, key: post['bluesky_uri'], date: post['date'] }
       end
-    rescue JSON::ParserError
+    rescue StandardError => e
+      # Every failure this file can produce, not just an unparseable one --
+      # the same guard the publish cron carries. A post file holding an
+      # array raised TypeError and killed the sidebar cron on every tick,
+      # AFTER the widgets had been written locally: the local build looked
+      # current while the live site stayed frozen.
+      warn "Skipping unreadable post file #{file}: #{e.class}: #{e.message.lines.first.to_s.strip[0, 80]}"
       nil
     end
   end

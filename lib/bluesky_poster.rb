@@ -22,7 +22,12 @@ module BlueskyPoster
   HANDLE = SiteConfig.get('bluesky', 'handle')
   PDS = (SiteConfig.get('bluesky', 'pds') || 'https://bsky.social').chomp('/')
 
-  URL_RE = %r{https?://[^\s]+}
+  # Trailing punctuation is not part of the address, the way Bluesky's own
+  # detectFacets treats it: a URL that ends a sentence used to carry the
+  # full stop (or the closing bracket of a parenthesised aside) into the
+  # facet, and the link in the announcement was dead. A closing bracket is
+  # kept when the URL opened one, so /Page(ID-1) still works.
+  URL_RE = %r{https?://[^\s]*[^\s.,;:!?'")\]]}
   # [[:word:]] is Unicode-aware, so Czech (and any other) diacritics in a
   # tag survive into the facet.
   TAG_RE = /(?:\A|(?<=\s))#([[:word:]]+)/

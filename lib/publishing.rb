@@ -109,7 +109,13 @@ module Publishing
     return plain if plain.length <= limit
     return '' if limit <= 0
 
-    "#{plain[0, limit].sub(/\s+\S*\z/, '')}…"
+    # limit - 1, because the ellipsis is a character too: budgeted at the
+    # full limit, a perex that had to be cut came out exactly one unit
+    # over the network's maximum and the whole announcement was rejected.
+    # The word boundary is [[:space:]], not \s, so a non-breaking space --
+    # which Czech typography puts after single-letter prepositions, and
+    # which \s does not match -- still counts as one.
+    "#{plain[0, limit - 1].sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
   end
 
   def hashtags_for(tags)

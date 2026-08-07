@@ -53,7 +53,12 @@ module PreviewServer
   # blank line on shutdown.
   def serve(root, port, logger: method(:puts))
     root = File.expand_path(root)
-    server = TCPServer.new(port)
+    # Loopback only. TCPServer.new(port) binds every interface, so the
+    # whole build -- which after an import is a personal archive that has
+    # never been public -- was served to the LAN while the CLI printed
+    # "http://localhost:<port>/". A default that cannot be walked back
+    # once someone has shipped on it.
+    server = TCPServer.new('127.0.0.1', port)
 
     loop do
       client = server.accept

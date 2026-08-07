@@ -636,6 +636,38 @@ prints what an installation is running.
     recognised**, so the code became prose and the rest of the post was
     swallowed into a code block.
 
+- **The rest of what the second audit found, fixed rather than deferred.**
+  - **A feed that names its address in an unusual way no longer duplicates
+    the archive.** Re-import matches posts by their source, and the
+    source's identity starts with the site's host — which came out empty
+    for an Atom feed linking only to itself, for a bare domain, for an
+    internationalised one, and for a channel with no address at all. Every
+    re-run then wrote the whole archive again, which is the opposite of
+    what this engine promises.
+  - **`./blog.sh preview` no longer serves the site to the local
+    network.** It bound every interface while printing "localhost" — and
+    what it exposed was the built archive, which after an import is a
+    personal history that has never been public.
+  - **Comment threads survive changing networks.** The page's security
+    policy was built from the network configured today, so posts announced
+    on the previous one had their comments blocked by the browser. It is
+    now built from what each post actually carries.
+  - **The queue publishes the post you picked.** With the same slug in two
+    years, `[p]` looked the post up by name again and could publish — and
+    announce — the other one. Compacting the queue is also checked as a
+    whole now, instead of stopping halfway and reporting that nothing was
+    saved.
+  - **A first post whose opening words are a long address no longer dies
+    with a filesystem error**, and restoring from trash no longer buries
+    the restored media inside an older directory of the same name.
+  - **One unreadable post file no longer stops the sidebar from ever
+    refreshing again**, a fetched feed cannot grow without limit or be
+    redirected off the web, an announcement that has to be trimmed fits
+    the limit including its ellipsis, and a link ending a sentence keeps
+    the sentence's punctuation out of the link.
+  - **A post title containing a line break no longer walks the archive
+    browser's screen down the terminal.**
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed

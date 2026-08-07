@@ -179,7 +179,15 @@ CLIENT_I18N_SCRIPT_HASH = "'sha256-#{Digest::SHA256.base64digest(CLIENT_I18N_SCR
 # a site that embeds nothing keeps exactly the policy it had, and a PeerTube
 # instance -- whose host is a property of the post, not of the engine -- can
 # be allowed for the one page that plays a video from it.
-def csp_content(frame_origins = [])
+# comment_origins is the same idea for connect-src: the stats row and the
+# comment thread are fetched from whichever network each post was
+# ANNOUNCED on, which is stored on the post -- while this policy was built
+# from the network configured right now. After a switch from Mastodon to
+# Bluesky (or back), every older post kept its thread in the markup and was
+# refused by the browser: comments silently gone, with nothing in the build
+# to say so. The comment at post_stats_html claims posts survive a switch;
+# this is what makes that true.
+def csp_content(frame_origins = [], comment_origins = [])
   analytics_origin = ANALYTICS && ANALYTICS['src'] ? URI.parse(ANALYTICS['src']) : nil
   analytics_origin &&= "#{analytics_origin.scheme}://#{analytics_origin.host}"
   mastodon_origin = MASTODON_INSTANCE ? "https://#{MASTODON_INSTANCE}" : nil
@@ -187,7 +195,8 @@ def csp_content(frame_origins = [])
   bluesky_origin = COMMENT_NETWORK == :bluesky ? 'https://public.api.bsky.app' : nil
 
   script_src = ["'self'", CLIENT_I18N_SCRIPT_HASH, analytics_origin].compact.join(' ')
-  connect_src = ["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact.join(' ')
+  connect_src = (["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact +
+                 Array(comment_origins)).uniq.join(' ')
 
   frame_src = (%w[https://www.youtube.com https://www.youtube-nocookie.com] + Array(frame_origins)).uniq.join(' ')
 
@@ -886,7 +895,8 @@ def render_post_html(post, template)
          og_type: 'article',
          # Drafts must never end up in search engines or link previews.
          extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : post_structured_head(post),
-         frame_origins: Embed.frame_origins_for(post['content']))
+         frame_origins: Embed.frame_origins_for(post['content']),
+         comment_origins: comment_origins_for([post]))
 end
 
 def rss_item(post)
@@ -1046,8 +1056,30 @@ def nav_current(href, active)
   href == active ? ' aria-current="page"' : ''
 end
 
+# The origins a set of posts needs for their comment threads: the instance
+# each post was announced on (its own stored URL), plus the public Bluesky
+# AppView for any post with a Bluesky record. Same shape as
+# Embed.frame_origins_for -- a property of the posts on the page, not of
+# the engine's current configuration.
+def comment_origins_for(posts)
+  Array(posts).filter_map do |post|
+    next unless post.is_a?(Hash)
+
+    if post['mastodon_url']
+      uri = begin
+        URI.parse(post['mastodon_url'])
+      rescue StandardError
+        nil
+      end
+      "#{uri.scheme}://#{uri.host}" if uri&.host
+    elsif post['bluesky_uri']
+      'https://public.api.bsky.app'
+    end
+  end.uniq
+end
+
 def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website',
-           extra_head: '', frame_origins: [])
+           extra_head: '', frame_origins: [], comment_origins: [])
   LAYOUT.result_with_hash(
     main_html: main_html,
     page_title: title,
@@ -1059,7 +1091,8 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     extra_head: extra_head,
     # The players a page carries decide its frame-src, so the policy is
     # computed here rather than widened for the whole site (csp_content).
-    page_frame_origins: frame_origins
+    page_frame_origins: frame_origins,
+    page_comment_origins: comment_origins
   )
 end
 
@@ -1098,7 +1131,8 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
-                           frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] })))
+                           frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] }),
+                           comment_origins: comment_origins_for(shown)))
   end
   pages.size
 end

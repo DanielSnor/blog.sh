@@ -18,7 +18,7 @@
        those integrations are actually configured (see csp_content in
        build/build_blog.rb) -- a site with neither configured gets a tighter
        policy for free. -->
-  <meta http-equiv="Content-Security-Policy" content="<%= csp_content(page_frame_origins) %>">
+  <meta http-equiv="Content-Security-Policy" content="<%= csp_content(page_frame_origins, page_comment_origins) %>">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="<%= h(THEME_COLOR_LIGHT) %>" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="<%= h(THEME_COLOR_DARK) %>" media="(prefers-color-scheme: dark)">

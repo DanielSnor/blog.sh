@@ -564,7 +564,11 @@ module ConfigWriter
         # them, which is invalid YAML, so verify! rolled the file back and
         # ./style.sh abandoned every other answer in the session and
         # blamed the user's file.
-        if line_indent == indent && @lines[i].lstrip.match?(/\A-(\s|\z)/)
+        # The uncommented form, so a commented-out sequence entry sitting at
+        # the key's own indent ("# - title: ...", which is how the template
+        # shows optional entries) stays INSIDE the key's body instead of
+        # ending it.
+        if line_indent == indent && ConfigWriter.uncomment(@lines[i]).lstrip.match?(/\A-(\s|\z)/)
           last = i
           next
         end

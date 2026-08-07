@@ -217,9 +217,47 @@ module Import
                # fixed for item bodies, one screen above.
                text_of(document.elements['rss/channel'], 'link')
              end
-      URI.parse(link.to_s).host
+      host_of(link) || host_of(fallback_channel_link) || host_of(@source)
+    end
+
+    # The host is the account half of every post's source key, and a nil
+    # account switches re-import matching OFF -- so the run that the
+    # engine advertises as safe writes the entire archive a second time,
+    # with no undo but deleting the files by hand. Four shapes reached
+    # nil before this: an Atom feed whose only <link> is rel="self", an
+    # RSS channel whose link is relative or absent, a bare domain
+    # ("example.com" parses with a nil host), and an internationalised
+    # domain (URI::InvalidURIError). Each of them is an ordinary feed.
+    # ...and if the feed names no address anywhere, the address it was
+    # fetched FROM is still a stable identity for it -- better than nil,
+    # which turns re-import matching off entirely. A feed read from a local
+    # file has no host and stays nil; that case cannot be helped from here.
+    def fallback_channel_link
+      parent = atom? ? document.elements['feed'] : document.elements['rss/channel']
+      return nil unless parent
+
+      any_link = parent.get_elements('link').filter_map { |l| l.attribute('href')&.value }.first
+      any_link || text_of(parent, 'link') || text_of(parent, 'id')
+    end
+
+    def host_of(link)
+      value = link.to_s.strip
+      return nil if value.empty?
+
+      # A bare domain has no scheme, so URI.parse puts it in `path` and
+      # `host` is nil; assume https, which is what the address means.
+      value = "https://#{value}" unless value.match?(%r{\A[a-z][a-z0-9+.-]*://}i)
+      host = URI.parse(value).host
+      host && !host.empty? ? host : nil
     rescue URI::InvalidURIError
-      nil
+      # Non-ASCII (internationalised) domains raise; escape and retry the
+      # way Media.parse_url already does.
+      begin
+        host = URI.parse(URI::DEFAULT_PARSER.escape(value)).host
+        host && !host.empty? ? host : nil
+      rescue StandardError
+        nil
+      end
     end
 
     def atom_alternate(parent)

@@ -87,6 +87,12 @@ module Import
 
               if post.is_a?(Symbol)
                 skipped[post] += 1
+                # Harvested BEFORE the early return: a photo-only post whose
+                # file is missing from the export maps to :empty, and its
+                # missing file used to be forgotten with it -- so the run
+                # said "1 skipped (no usable content)" and never named the
+                # file the archive was actually missing.
+                media_failures.concat(media.failures)
                 next
               end
 

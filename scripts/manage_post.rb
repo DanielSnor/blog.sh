@@ -695,6 +695,17 @@ def cmd_add
 
   slug_source = title || (blocks.find { |b| b['type'] == 'text' } || {})['text']
   slug = Slug.slugify(slug_source.to_s.split(/\s+/).first(8).join(' '))
+  # Eight words is a readability cap, not a length one: a post whose first
+  # words are a long URL slugifies into a single enormous token, and the
+  # write then died with a raw ENAMETOOLONG backtrace -- after the media
+  # directory had been created, leaving it orphaned. rename_post has
+  # capped by bytes all along; this is the same limit, cut on a word
+  # boundary where there is one.
+  if slug.bytesize > 200
+    slug = slug[0, 200]
+    slug = slug.sub(/-[^-]*\z/, '') if slug.rindex('-')&.>(120)
+    slug = slug.sub(/-+\z/, '')
+  end
   slug = "post-#{date.to_i}" if slug.empty?
 
   # An existing <year>/<slug>.json would be replaced wholesale by
@@ -748,13 +759,14 @@ def cmd_add
     return
   end
 
-  draft_decision_loop(final_slug)
+  draft_decision_loop(final_slug, path: path)
 end
 
 # After every draft change, it builds and deploys without asking -- the
 # preview has to be on the live site, or it couldn't be opened from an iPad,
 # which is the whole point.
-def draft_decision_loop(slug)
+def draft_decision_loop(slug, path: nil)
+  known_path = path
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_preview')
     warn ''
@@ -762,7 +774,12 @@ def draft_decision_loop(slug)
   end
 
   loop do
-    path = find_post_path(slug)
+    # The caller's own path when it still exists: `add` and `unpublish`
+    # have the file in hand, and a second post sharing the slug in another
+    # year would otherwise drop the author into the ambiguous-slug picker
+    # -- over a post they did not choose and have not seen yet, which for
+    # `add` ended the command with exit 1 instead of the draft dialog.
+    path = known_path && File.exist?(known_path) ? known_path : find_post_path(slug)
     return unless path
 
     # The bytes are kept, not just the parsed post: this dialog then waits
@@ -1476,7 +1493,7 @@ def cmd_unpublish(slug)
     return
   end
 
-  draft_decision_loop(final_slug)
+  draft_decision_loop(final_slug, path: path)
 end
 
 # --- properties and actions ------------------------------------------
@@ -2149,8 +2166,12 @@ def cmd_restore(slug)
 
   trash_media = File.join(trash_dir, 'media')
   if Dir.exist?(trash_media)
-    FileUtils.mkdir_p(File.join(MEDIA_DIR, year))
-    FileUtils.mv(trash_media, File.join(MEDIA_DIR, year, slug))
+    # move_media_dir, not a bare mv: with an orphan media directory already
+    # at the target (a post deleted and re-created under the same slug),
+    # mv puts the restored one INSIDE it -- media.nosync/2026/slug/slug/ --
+    # and every image in the restored post is a broken link. That is the
+    # exact nesting move_media_dir exists to prevent.
+    PostWriter.move_media_dir(trash_media, File.join(MEDIA_DIR, year, slug))
   end
   FileUtils.rm_rf(trash_dir)
 

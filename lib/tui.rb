@@ -438,7 +438,14 @@ module Tui
       # carriage-return + newline. With a bare LF every row starts where
       # the previous one ended and the screen reads as a diagonal
       # staircase. The carriage return has to be written by hand here.
-      out.each { |line| print "\e[2K#{line}\r\n" }
+      # Control characters are stripped at the last moment, not at every
+      # call site that builds a row: a post title (or an imported feed
+      # title, which keeps newlines inside a wrapped <title>) carrying a
+      # newline or a tab painted its own line break inside the frame, so
+      # the screen ended up taller than the cursor-up count and drifted
+      # further with every keystroke. ESC is kept -- the rows carry the
+      # colour sequences this file wrote itself.
+      out.each { |line| print "\e[2K#{line.to_s.gsub(/[\u0000-\u0008\u000A-\u001A\u001C-\u001F\u007F]/, ' ')}\r\n" }
       painted = true
 
       move = lambda do |delta|
