@@ -147,7 +147,13 @@ module Publishing
     return plain if grapheme_length(plain) <= limit
     return '' if limit <= 0
 
-    "#{plain.scan(/\X/).first(limit).join.sub(/\s+\S*\z/, '')}…"
+    # limit - 1 and a [[:space:]] boundary, exactly as perex_for above:
+    # its structural twin got this and this one did not, so when the cut
+    # fell inside a run with no ASCII space (a long URL, an NBSP-joined
+    # Czech line) the sub removed nothing and the perex came back one
+    # grapheme over. Bluesky then rejected the whole record, the post went
+    # live with no announcement and no comment thread, and nothing said so.
+    "#{plain.scan(/\X/).first(limit - 1).join.sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
   end
 
   # The Bluesky counterpart of compose_toot: same never-truncate rule for
