@@ -16,8 +16,12 @@ module MarkdownWriter
   # Characters that mean something and can therefore be escaped with a
   # backslash. Deliberately only these: a backslash before anything else is
   # left as-is -- otherwise emoticons like `d8-\` in older imported posts
-  # would get mangled.
-  ESCAPABLE = '*`~[]!\\'
+  # would get mangled. The block sigils (# > - + . _ |) are in the class so
+  # the parser unescapes them, but they are only ever ESCAPED at the spots
+  # where they would mean something: the start of a line (see
+  # escape_block_starts) and inside table cells -- escaping every hashtag
+  # in a tweet archive would bury the text in backslashes.
+  ESCAPABLE = '*`~[]!\\#>|.+_-'
 
   # Higher number = renders further out when two spans cover the exact same
   # range (only possible for e.g. "**[text](url)**", where the bold and the
@@ -37,12 +41,14 @@ module MarkdownWriter
         case b['subtype']
         when /\Aheading([1-6])\z/ then "#{'#' * Regexp.last_match(1).to_i} #{rendered}"
         when 'quote'
-          quoted = rendered.split("\n").map { |l| l.empty? ? '>' : "> #{l}" }.join("\n")
+          # Quote content gets the same line-start protection as prose: a
+          # quoted line beginning ">" would nest a level deeper each edit.
+          quoted = escape_block_starts(rendered).split("\n").map { |l| l.empty? ? '>' : "> #{l}" }.join("\n")
           b['cite'] ? "#{quoted}\n> — #{b['cite']}" : quoted
         # A newline stored in a paragraph is a hard break and writes back as
         # the visible backslash marker -- without this, re-saving would
         # collapse it into a space via the parser's prose-wrapping rule.
-        else rendered.gsub("\n", "\\\n")
+        else escape_block_starts(rendered).gsub("\n", "\\\n")
         end
       when 'table'
         table_to_markdown(b)
@@ -114,15 +120,61 @@ module MarkdownWriter
     raw.gsub(/\\(?=[#{Regexp.escape(ESCAPABLE)}])|!(?=\[)|[*`~\[\]]/) { |c| "\\#{c}" }
   end
 
+  # Line-start escaping for rendered prose: a stored paragraph whose line
+  # begins with a block sigil must not change block type on the next
+  # edit. ">50 % of users" round-tripped into a QUOTE with the ">" eaten;
+  # "# tohle je tweet" became a heading; "1990. To byl rok..." a list.
+  # Only the first character of a line is at stake, so only it is
+  # escaped -- the ordered-list case escapes its dot ("1\. text"),
+  # because "\1" means nothing to the parser.
+  BLOCK_START_RES = [
+    /\A\#{1,6}[ \t]/,        # heading
+    /\A>/,                   # quote (the bare ">" swallows the sign)
+    /\A[-+][ \t]/,           # unordered list ("*" is escaped globally)
+    /\A(?:-{3,}|_{3,})[ \t]*\z/ # horizontal rule
+  ].freeze
+
+  def escape_block_starts(rendered)
+    rendered.split("\n", -1).map do |line|
+      if BLOCK_START_RES.any? { |re| re.match?(line) }
+        "\\#{line}"
+      elsif (m = line.match(/\A(\d{1,9})([.)])[ \t]/))
+        "#{m[1]}\\#{m[2]}#{line[m.end(2)..]}"
+      else
+        line
+      end
+    end.join("\n")
+  end
+
   def wrap_markdown(chunk, f)
     case f['type']
     when 'bold' then "**#{chunk}**"
     when 'italic' then "*#{chunk}*"
     when 'strikethrough' then "~~#{chunk}~~"
     when 'code' then "`#{chunk}`"
-    when 'link' then f['title'] ? %([#{chunk}](#{f['url']} "#{f['title']}")) : "[#{chunk}](#{f['url']})"
+    when 'link'
+      url = link_url_for_markdown(f['url'].to_s)
+      f['title'] ? %([#{chunk}](#{url} "#{f['title']}")) : "[#{chunk}](#{url})"
     else chunk
     end
+  end
+
+  # The parser's link target reads one level of balanced parentheses --
+  # "/Page(ID-123).aspx" round-trips as it is. Anything beyond that
+  # (unbalanced, or nested two deep) is percent-encoded, which every
+  # server reads as the same address; before this, such a URL was
+  # truncated at its first ")" and the tail spilled into the visible
+  # text.
+  def link_url_for_markdown(url)
+    depth = 0
+    balanced = url.each_char.all? do |ch|
+      depth += 1 if ch == '('
+      depth -= 1 if ch == ')'
+      depth.between?(0, 1)
+    end
+    return url if balanced && depth.zero?
+
+    url.gsub('(', '%28').gsub(')', '%29')
   end
 
   # Renders `text[start...finish]` back to markdown given a (possibly nested/
@@ -151,7 +203,23 @@ module MarkdownWriter
     top.each do |e|
       result << escape_markdown(text[pos...e['start']]) if e['start'] > pos
       inner = entries.reject { |o| o.equal?(e) }.select { |o| o['start'] >= e['start'] && o['end'] <= e['end'] }
-      result << wrap_markdown(render_markdown_range(text, inner, e['start'], e['end']), e)
+      # A code span's content is literal in markdown -- escaping inside it
+      # would put the backslashes on the published page, and a paragraph
+      # demonstrating markdown ("`**tučně**`") grew a new layer of
+      # backslashes with every edit. Raw, unless the content itself has a
+      # backtick, which the fence could not hold.
+      wrapped = if e['type'] == 'code' && !text[e['start']...e['end']].include?('`')
+                  "`#{text[e['start']...e['end']]}`"
+                else
+                  wrap_markdown(render_markdown_range(text, inner, e['start'], e['end']), e)
+                end
+      # escape_markdown escapes "!" only when IT can see the "[" -- and
+      # across a segment boundary it cannot: "come!" + "[crew](url)"
+      # reassembled into image syntax, which the mid-paragraph guard
+      # then rejected, leaving the post uneditable. The join is the only
+      # place that knows both halves.
+      result.sub!(/(?<!\\)!\z/, '\\!') if wrapped.start_with?('[')
+      result << wrapped
       pos = e['end']
     end
     result << escape_markdown(text[pos...finish]) if pos < finish
@@ -161,7 +229,64 @@ module MarkdownWriter
   def render_text_markdown(text, formatting)
     return escape_markdown(text) if formatting.nil? || formatting.empty?
 
-    render_markdown_range(text, formatting, 0, text.length)
+    render_markdown_range(text, normalize_spans(formatting), 0, text.length)
+  end
+
+  # Markdown can say "nested" and it can say "disjoint"; it cannot say
+  # "partially overlapping" -- but imported NPF formatting legitimately
+  # can (bold 26-40 with italic 26-44). render_markdown_range treated
+  # both spans of such a pair as top-level and re-emitted the shared
+  # range twice: duplicated words and stray asterisks in the visible
+  # text of ~80 real posts, silently, because the block type never
+  # changed. So the entries are normalized first: the span that sticks
+  # out past its partner is split at the boundary, which renders as the
+  # same formatting in two adjacent pieces -- something markdown CAN say.
+  STARRED = %w[bold italic strikethrough].freeze
+
+  def normalize_spans(entries)
+    spans = entries.map(&:dup)
+    # Zero-length spans render as empty syntax -- "[](url)" -- that no
+    # parser reads back as a span; imported archives carry them.
+    spans.reject! { |f| f['start'].to_i >= f['end'].to_i }
+    # Imported formatting carries literal duplicates (the same bold twice
+    # over the same range) -- rendering both made "****", which reads
+    # back as garbage. One of each is enough.
+    spans.uniq! { |f| [f['type'], f['start'], f['end'], f['url']] }
+    # Adjacent spans of the same star-delimited type merge: "**A****B**"
+    # puts four stars at the junction, and no parser reads that back as
+    # two bold runs. One span over both halves renders identically.
+    loop do
+      pair = nil
+      spans.combination(2).each do |a, b|
+        a, b = b, a if a['start'] > b['start']
+        next unless STARRED.include?(a['type']) && a['type'] == b['type'] && a['end'] == b['start']
+
+        pair = [a, b]
+        break
+      end
+      break unless pair
+
+      a, b = pair
+      spans.delete(b)
+      a['end'] = b['end']
+    end
+    loop do
+      splittable = nil
+      spans.combination(2).each do |a, b|
+        a, b = b, a if a['start'] > b['start']
+        next unless a['start'] < b['start'] && b['start'] < a['end'] && a['end'] < b['end']
+
+        splittable = [a, b]
+        break
+      end
+      break unless splittable
+
+      a, b = splittable
+      spans.delete(b)
+      spans << b.merge('start' => b['start'], 'end' => a['end'])
+      spans << b.merge('start' => a['end'], 'end' => b['end'])
+    end
+    spans
   end
 
   # Renders a (possibly nested) list block back to markdown -- each level of
@@ -178,7 +303,10 @@ module MarkdownWriter
   end
 
   def table_to_markdown(block)
-    cells = lambda { |row| "| #{row.map { |c| render_text_markdown(c['text'], c['formatting']) }.join(' | ')} |" }
+    # An unescaped "|" inside a cell would be read as a column break on
+    # the way back -- the cell got truncated and the rest of the row
+    # silently vanished (7 real posts in one archive).
+    cells = lambda { |row| "| #{row.map { |c| render_text_markdown(c['text'], c['formatting']).gsub('|', '\\|') }.join(' | ')} |" }
     separator = (block['align'] || []).map do |a|
       case a
       when 'center' then ':---:'

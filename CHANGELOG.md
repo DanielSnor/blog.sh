@@ -502,6 +502,26 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Editing a post can no longer silently corrupt it -- eight round-trip
+  defects in the markdown writer and parser are gone.** `edit` turns
+  stored blocks into markdown and back, and on a real 4840-post archive
+  that trip quietly damaged 147 posts: partially-overlapping bold/italic
+  (ordinary in imported Tumblr formatting) duplicated text and left stray
+  asterisks; a `|` inside a table cell truncated the row; a `!` right
+  before a link reassembled into image syntax and made the post
+  uneditable; a URL with parentheses lost its tail into the visible text;
+  a paragraph starting with `>`, `#`, `- ` or `1. ` changed block type
+  (the `>` was eaten outright); a table with more cells than its header
+  lost the extras; code spans gained a layer of backslashes per edit (and
+  a code span demonstrating image syntax aborted the editor); a link
+  whose text contains brackets fell apart. The writer now normalizes
+  spans (splits partial overlaps, merges adjacent same-type runs, drops
+  zero-length ones), escapes block sigils only at line starts, keeps code
+  spans literal and reads balanced parentheses in URLs; the parser learned
+  the boundary-sharing bold/italic shapes CommonMark reads. Verified over
+  the whole real archive: every post now round-trips with its text intact
+  and is byte-stable from the second write on.
+
 - **A re-import after a media failure can no longer publish the wrong
   image.** A failed download used to give its filename number back to
   the next image, so what a post's images were CALLED depended on which

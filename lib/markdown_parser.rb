@@ -43,7 +43,29 @@ module MarkdownParser
   # Alternation order matters: escape must come first, so `\*` never opens
   # italics. A link also accepts an optional quoted title -- without this
   # the title used to get shoved into the address and the link ended up dead.
-  INLINE_RE = /\\([*`~\[\]!\\])|\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|`([^`]+?)`|\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/m
+  # The escape class and the writer's ESCAPABLE change together: every
+  # character the writer may put a backslash before must lose it here, or
+  # the backslash becomes visible text on the next edit. The block sigils
+  # (# > - + . _ |) joined for the writer's line-start escaping -- a
+  # paragraph beginning ">50 %" must not round-trip into a quote.
+  #
+  # The link target allows one level of balanced parentheses
+  # ("/Page(ID-123).aspx"), matching what CommonMark does; the writer
+  # percent-encodes the pathological rest.
+  # Three extra alternatives ahead of plain bold handle the star
+  # collisions the writer legitimately produces when bold and italic
+  # share a boundary -- "***both***", "***head*rest**" (italic on the
+  # head of a bold span) and "**pre*tail***" (italic on its tail).
+  # Without them "***" swallowed a star and shed the italic; with them
+  # the reading matches what CommonMark does with the same bytes.
+  # The collision shapes use a tempered dot -- (?:(?!\*\*).) -- so their
+  # halves can never reach ACROSS an ordinary bold boundary to a "***"
+  # further down the paragraph; without it, "**A** ... ***x***" read as
+  # one giant span from A to x.
+  # Alternative order is load-bearing: plain bold -- whose closer is
+  # exactly two stars, the (?!\*) guard -- comes before the tail-collision
+  # shapes, or "**F** dál ... ***v***" would read as one span from F to v.
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:(?!\*\*).)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:(?!\*\*).)*?)\*|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:(?!\*\*).)+?)\*\*\*|\*(?<italic>.+?)\*|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>[^"]*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -63,35 +85,46 @@ module MarkdownParser
     result = +''
     formatting = []
     pos = 0
-    text.scan(INLINE_RE) do |escaped, bold, italic, strike, code, link_text, link_url, link_title|
-      m = Regexp.last_match
+    while (m = INLINE_RE.match(text, pos))
       result << text[pos...m.begin(0)]
       start = result.length
-      if escaped
-        result << escaped
-      elsif bold
-        inner_text, inner_formatting = parse_inline(bold)
-        result << inner_text
+      if m[:esc]
+        result << m[:esc]
+      elsif m[:bi]
+        append_span(result, formatting, m[:bi], 'italic', start)
         formatting << { 'type' => 'bold', 'start' => start, 'end' => result.length }
-        formatting.concat(shift_formatting(inner_formatting, start))
-      elsif italic
-        inner_text, inner_formatting = parse_inline(italic)
-        result << inner_text
+      elsif m[:ihead]
+        # bold across both parts, italic on the head only.
+        append_span(result, formatting, m[:ihead], 'italic', start)
+        append_plain(result, formatting, m[:irest])
+        formatting << { 'type' => 'bold', 'start' => start, 'end' => result.length }
+      elsif m[:bhead]
+        # italic across both parts, bold on the head only.
+        append_span(result, formatting, m[:bhead], 'bold', start)
+        append_plain(result, formatting, m[:brest])
         formatting << { 'type' => 'italic', 'start' => start, 'end' => result.length }
-        formatting.concat(shift_formatting(inner_formatting, start))
-      elsif strike
-        inner_text, inner_formatting = parse_inline(strike)
-        result << inner_text
-        formatting << { 'type' => 'strikethrough', 'start' => start, 'end' => result.length }
-        formatting.concat(shift_formatting(inner_formatting, start))
-      elsif code
-        result << code
+      elsif m[:itail]
+        append_plain(result, formatting, m[:bpre])
+        append_span(result, formatting, m[:itail], 'italic', result.length)
+        formatting << { 'type' => 'bold', 'start' => start, 'end' => result.length }
+      elsif m[:btail]
+        append_plain(result, formatting, m[:ipre])
+        append_span(result, formatting, m[:btail], 'bold', result.length)
+        formatting << { 'type' => 'italic', 'start' => start, 'end' => result.length }
+      elsif m[:bold]
+        append_span(result, formatting, m[:bold], 'bold', start)
+      elsif m[:italic]
+        append_span(result, formatting, m[:italic], 'italic', start)
+      elsif m[:strike]
+        append_span(result, formatting, m[:strike], 'strikethrough', start)
+      elsif m[:code]
+        result << m[:code]
         formatting << { 'type' => 'code', 'start' => start, 'end' => result.length }
-      elsif link_text
-        inner_text, inner_formatting = parse_inline(link_text)
+      elsif m[:ltext]
+        inner_text, inner_formatting = parse_inline(m[:ltext])
         result << inner_text
-        entry = { 'type' => 'link', 'url' => link_url, 'start' => start, 'end' => result.length }
-        entry['title'] = link_title if link_title && !link_title.empty?
+        entry = { 'type' => 'link', 'url' => m[:lurl], 'start' => start, 'end' => result.length }
+        entry['title'] = m[:ltitle] if m[:ltitle] && !m[:ltitle].empty?
         formatting << entry
         formatting.concat(shift_formatting(inner_formatting, start))
       end
@@ -99,6 +132,25 @@ module MarkdownParser
     end
     result << text[pos..]
     [result, formatting]
+  end
+
+  # Recursively parses `chunk`, appends its text to result and wraps it
+  # in one formatting entry of `type`.
+  def append_span(result, formatting, chunk, type, start)
+    inner_text, inner_formatting = parse_inline(chunk)
+    result << inner_text
+    formatting << { 'type' => type, 'start' => start, 'end' => result.length }
+    formatting.concat(shift_formatting(inner_formatting, start))
+  end
+
+  # The same, without a wrapping entry of its own.
+  def append_plain(result, formatting, chunk)
+    return if chunk.to_s.empty?
+
+    start = result.length
+    inner_text, inner_formatting = parse_inline(chunk)
+    result << inner_text
+    formatting.concat(shift_formatting(inner_formatting, start))
   end
 
   def shift_formatting(formatting, offset)
@@ -195,8 +247,12 @@ module MarkdownParser
   # A GFM-style table: first line is the header, second is a dash separator,
   # the rest is data. Alignment comes from colons in the separator (:---
   # left, ---: right, :---: center).
+  # Splits on unescaped pipes only: a cell whose text contains "|" is
+  # written back as "\|" (see table_to_markdown), and splitting on that
+  # used to silently truncate the cell and drop everything after it.
+  # The backslash itself is removed by parse_inline's escape handling.
   def split_table_row(line)
-    line.strip.sub(/\A\|/, '').sub(/\|\z/, '').split('|').map(&:strip)
+    line.strip.sub(/\A\|/, '').sub(/(?<!\\)\|\z/, '').split(/(?<!\\)\|/).map(&:strip)
   end
 
   def parse_table(para)
@@ -223,9 +279,12 @@ module MarkdownParser
 
     rows = lines.drop(2).map do |line|
       values = split_table_row(line)
-      # Missing cells are padded with empty ones, extra ones are discarded --
-      # so a short or stray row doesn't break the whole table.
-      Array.new(header.size) { |i| cell.call(values[i].to_s) }
+      # Missing cells are padded with empty ones so a short row doesn't
+      # break the table. Extra cells are KEPT: imported archives carry
+      # single-column headers over two-column rows, and discarding the
+      # overflow silently ate the second cell of every row on each edit.
+      # HTML renders a jagged table fine.
+      Array.new([header.size, values.size].max) { |i| cell.call(values[i].to_s) }
     end
 
     { 'type' => 'table', 'align' => align, 'header' => header.map { |h| cell.call(h) }, 'rows' => rows }
@@ -547,7 +606,10 @@ module MarkdownParser
       file['size'] = size if size&.positive?
       return [{ 'type' => 'file', 'media' => [file],
                 'label' => (label.empty? ? File.basename(target) : label) }, counter]
-    elsif para.match?(/(?<!\\)!\[[^\]]*\]\([^)]+\)/)
+    elsif para.gsub(/`[^`]*`/m, '`x`').match?(/(?<!\\)!\[[^\]]*\]\([^)]+\)/)
+      # Code spans are masked first: "`![popisek](foto.jpg)`" is a code
+      # EXAMPLE of image syntax, not an image, and aborting on it made the
+      # post uneditable.
       # An image in the middle of a paragraph can't be rendered -- the
       # schema only knows image blocks. This used to silently turn into a
       # link to the file plus a stray exclamation mark.
