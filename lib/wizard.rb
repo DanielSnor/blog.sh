@@ -141,7 +141,8 @@ module Wizard
       return options[index].first
     end
 
-    index = Tui.menu(options.map { |(_, desc)| desc }, hint: t('menu_hint'),
+    index = Tui.menu(options.map { |(_, desc)| desc },
+                     hint: t('menu_hint', count: [options.size, 9].min),
                      initial: current_index)
     puts
     index.nil? ? options[current_index].first : options[index].first
@@ -167,7 +168,7 @@ module Wizard
       return options[index].first
     end
 
-    index = Tui.menu(rows, hint: t('menu_hint_exit'))
+    index = Tui.menu(rows, hint: t('menu_hint_exit', count: [rows.size, 9].min))
     puts
     return nil if index.nil? || index >= options.size
 

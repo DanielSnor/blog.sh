@@ -67,11 +67,10 @@ case "${1:-}" in
     ;;
 esac
 
+# No banner here: the identity block (which engine, which site, which
+# mode) is printed by the Ruby side via SiteHeader, which knows the
+# version and the site's name -- this wrapper knows neither.
 [ -t 1 ] && clear
-mode="${1:-}"
-echo "== blog.sh =="
-echo "Mode: ${mode:-wizard}"
-echo
 
 if [ ! -f env.sh ]; then
   echo "Missing env.sh -- copy the documented template first:"

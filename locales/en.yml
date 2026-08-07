@@ -30,7 +30,7 @@ post:
   video_unavailable: "[video unavailable]"
   audio_unavailable: "[audio unavailable]"
   draft_title_prefix: "[PREVIEW] "
-  draft_banner_heading: "Preview of an unpublished post!!!"
+  draft_banner_heading: "Preview of an unpublished post!"
   draft_banner_notice: "Not visible anywhere on the blog and can't be reached except through this URL:"
 
 pagination:
@@ -79,7 +79,7 @@ ui:
 # read locales/*.yml directly since it runs in the browser, not at build time.
 js:
   date_locale: "en-US"
-  stats_favourited: "Favorited"
+  stats_favourited: "Favourited"
   stats_boosted: "Boosted"
   stats_comments: "Comments"
   reply_on_mastodon: "Reply on Mastodon"
@@ -200,7 +200,7 @@ cli:
   queue_compact_prompt: "Shift the rest of the queue (%{count}) a slot earlier? [y/N] "
   queue_compacted: "Queue shifted: every following post took over the earlier slot."
   menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
-  menu_hint_plain: "↑↓ move · Enter select · 1-9 quick pick · Esc cancel"
+  menu_hint_plain: "↑↓ move · Enter select · 1-%{count} quick pick · Esc cancel"
   wizard_menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc quit"
   wizard_continue_prompt: "Press any key to continue…"
   qr_hint: "Scan with your phone to open the preview."
@@ -279,6 +279,7 @@ cli:
 
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
 
+  header_mode: "Mode: %{mode}"
   usage: |
     usage:
       ./blog.sh add                  creates a draft, shows a preview and asks what's next
@@ -295,6 +296,7 @@ cli:
       ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+                                     prints the posts one per line, newest first -- plain text for pipes and scripts
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online]    reads the configuration and says what is wrong with it
@@ -310,7 +312,7 @@ cli:
   wizard_menu_post: "A post -- edit the text, its properties and the actions on it"
   wizard_menu_queue: "The scheduled-post queue -- reorder, publish now, remove"
   wizard_menu_restore: "Trash -- restore a deleted post"
-  wizard_menu_browse: "The archive -- filters, search, preview; Enter opens the post"
+  wizard_menu_browse: "The archive -- filters, search, preview"
   wizard_menu_rebuild: "The site -- rebuild and deploy after a settings change"
   browse_keys: "↑↓ move · Enter open · / search · Space preview · t type · s state · g tag · z clear filters · Esc back"
   browse_search_keys: "type to search · Enter keep it · \"a quoted phrase\" · -without this word · Esc drop the search"
@@ -336,8 +338,8 @@ cli:
   browse_preview_keys: "↑↓ scroll · Space or PgDn by pages · Esc back to the list"
   browse_preview_empty: "(the post has no text)"
   browse_preview_status: "preview"
-  browse_preview_image: "[image: %{file} — %{alt}]"
-  browse_preview_media: "[media: %{file} — %{caption}]"
+  browse_preview_image: "[image: %{file} -- %{alt}]"
+  browse_preview_media: "[media: %{file} -- %{caption}]"
   browse_preview_no_caption: "no caption"
   browse_preview_tags: "tags: %{tags}"
   edit_what_prompt: "Edit what? [Enter] the text  [v] properties and actions  [anything else] back: "
@@ -366,8 +368,8 @@ cli:
   addresses_heading: "Addresses redirecting to this post (%{count}):"
   addresses_menu_hint: "↑↓ move · Enter drop the address · Esc back"
   addresses_pick_prompt: "Number of the address to drop (anything else goes back): "
-  addresses_taken: "— taken by another post, this redirect never happens"
-  addresses_unusable: "— unusable, expected \"year/slug\""
+  addresses_taken: "-- taken by another post, this redirect never happens"
+  addresses_unusable: "-- unusable, expected \"year/slug\""
   addresses_drop_confirm: "Drop %{address}? That link stops working for good. [y/N] "
   addresses_dropped: "🔗 %{address} dropped -- it no longer redirects anywhere."
   addresses_none: "This post has no old addresses."
@@ -382,7 +384,7 @@ cli:
   rename_confirm: "%{old_url}\n  -> %{new_url}\n  The old address keeps working: it will permanently redirect to the new one."
   rename_confirm_draft: "%{old} -> %{new} -- the draft's preview address changes with it (share the new link)."
   rename_go: "Rename? [y/N] "
-  renamed_label: "✅ Renamed: %{slug}"
+  renamed_label: "Renamed: %{slug}"
 
 # The one line on a renamed post's redirect stub -- the page a reader sees
 # for a fraction of a second (or with meta-refresh disabled) at an old
@@ -401,7 +403,7 @@ cron:
 
 # ./import.sh -- the import wizard (scripts/import.rb).
 import:
-  menu_hint: "↑↓ move · Enter select · 1-9 quick pick · Esc back"
+  menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc back"
   enter_number: "Number of the source to import from: "
   tumblr_blog_prompt: "Tumblr blog (e.g. yourname.tumblr.com, empty = cancel): "
   tumblr_key_missing: "TUMBLR_API_KEY is not set -- add it to env.sh first (the Tumblr API needs a key even for public blogs)."
@@ -413,22 +415,22 @@ import:
   instagram_dir_invalid: "No posts found under %{dir} -- point this at the unpacked export directory itself, the one holding your_instagram_activity/."
   feed_source_prompt: "Feed URL or path to a WordPress export file (empty = cancel): "
   facebook_dir_prompt: "Path to the unpacked Facebook export, HTML or JSON (empty = cancel): "
-  facebook_dir_invalid: "%{dir} has no your_posts*.json or your_posts*.html — point this at the unpacked export directory."
+  facebook_dir_invalid: "%{dir} has no your_posts*.json or your_posts*.html -- point this at the unpacked export directory."
   ghost_path_prompt: "Path to the Ghost JSON export (empty = cancel): "
   ghost_path_invalid: "%{path} does not exist."
-  ghost_url_prompt: "URL of the (still running) Ghost site — its images only exist there (empty = cancel): "
-  ghost_url_invalid: "%{url} is not a URL — it has to start with http:// or https://."
+  ghost_url_prompt: "URL of the (still running) Ghost site -- its images only exist there (empty = cancel): "
+  ghost_url_invalid: "%{url} is not a URL -- it has to start with http:// or https://."
   beehiiv_path_prompt: "Path to the beehiiv posts CSV (empty = cancel): "
   beehiiv_path_invalid: "%{path} does not exist."
   blogger_path_prompt: "Path to the Blogger backup XML (empty = cancel): "
   blogger_path_invalid: "%{path} does not exist."
-  livejournal_password_missing: "Set LJ_PASSWORD in env.sh first — LiveJournal has no export file, the API needs the account password (sent only as a challenge digest)."
+  livejournal_password_missing: "Set LJ_PASSWORD in env.sh first -- LiveJournal has no export file, the API needs the account password (sent only as a challenge digest)."
   livejournal_user_prompt: "LiveJournal username (empty = cancel): "
   movabletype_path_prompt: "Path to the MT export file (empty = cancel): "
   movabletype_path_invalid: "%{path} does not exist."
   movabletype_pattern_prompt: "Old site's URL pattern, e.g. /%Y/%m/{basename}.html (empty = redirects only from UNIQUE URL lines): "
   wayback_url_prompt: "The dead blog's old URL, or straight its feed URL (empty = cancel): "
-  wayback_url_invalid: "%{url} is not a URL — it has to start with http:// or https://."
+  wayback_url_invalid: "%{url} is not a URL -- it has to start with http:// or https://."
   wix_path_prompt: "Path to the Wix blog CSV (empty = cancel): "
   wix_path_invalid: "%{path} does not exist."
   jekyll_dir_prompt: "Path to the site tree or markdown folder (empty = cancel): "
@@ -436,35 +438,35 @@ import:
   jekyll_permalink_prompt: "Old site's permalink pattern, e.g. /:year/:month/:day/:title/ (empty = redirects only from explicit front matter permalinks): "
   podcast_source_prompt: "Podcast feed URL or path to a saved feed file (empty = cancel): "
   medium_dir_prompt: "Path to the unpacked Medium export (the directory with posts/; empty = cancel): "
-  medium_dir_invalid: "%{dir} has no posts/ directory — point this at the unpacked export."
+  medium_dir_invalid: "%{dir} has no posts/ directory -- point this at the unpacked export."
   squarespace_path_prompt: "Path to the Squarespace XML export (empty = cancel): "
   squarespace_path_invalid: "%{path} does not exist."
   threads_dir_prompt: "Path to the unpacked Threads export, HTML or JSON (empty = cancel): "
-  threads_dir_invalid: "%{dir} has no threads_and_replies.json or .html — point this at the unpacked export directory."
+  threads_dir_invalid: "%{dir} has no threads_and_replies.json or .html -- point this at the unpacked export directory."
   substack_dir_prompt: "Path to the unpacked Substack export (the directory with posts.csv; empty = cancel): "
-  substack_dir_invalid: "%{dir} has no posts.csv — point this at the unpacked export directory."
-  substack_url_prompt: "URL the publication ran at (optional, just for the record — empty = skip): "
+  substack_dir_invalid: "%{dir} has no posts.csv -- point this at the unpacked export directory."
+  substack_url_prompt: "URL the publication ran at (optional, just for the record -- empty = skip): "
   feed_source_invalid: "%{source} is neither a file that exists nor an http(s) URL."
   twitter_dir_prompt: "Path to the extracted Twitter/X export (empty = cancel): "
   twitter_dir_invalid: "No data/tweets.js under %{dir} -- point this at the extracted export directory itself."
   bluesky_handle_prompt: "Bluesky handle (empty = cancel): "
   scanned: "read %{count} item(s)…"
-  dry_run_running: "Reading %{label} — nothing is written yet…"
+  dry_run_running: "Reading %{label} -- nothing is written yet…"
   keep_permalinks_prompt: "Will this site answer on the SAME domain the old blog did? If so, every post keeps its old address as a redirect. [y/N] "
   would_write: "Would write %{count} post(s); media files to fetch: %{media}."
   media_not_verified: "A preview downloads nothing -- the real run reports how many of those actually arrive."
   written: "Wrote %{count} post(s) and %{media} media file(s)."
   sample_slugs: "First few slugs:"
   skipped: "  %{count} skipped (%{reason})"
-  media_failed: "%{count} media file(s) could not be downloaded — their posts were written without them:"
+  media_failed: "%{count} media file(s) could not be downloaded -- their posts were written without them:"
   nothing_to_import: "Nothing to import."
   confirm_prompt: "Write these %{count} post(s)? Type %{count} to confirm (anything else cancels): "
-  running: "Importing %{label} — downloading media, this can take a while…"
+  running: "Importing %{label} -- downloading media, this can take a while…"
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
   rebuilding: "Rebuilding and deploying"
   cancelled: "Cancelled, nothing was written."
-  interrupted: "Interrupted. Posts written so far are already in content.nosync/ — re-running the import is safe, it overwrites them in place."
-  source_died: "⚠️  The source stopped answering after %{count} item(s): %{error}. The counts below are a partial tally, not the whole source. Posts already written are saved — re-running is safe, they are matched on their source id and never duplicated."
+  interrupted: "Interrupted. Posts written so far are already in content.nosync/ -- re-running the import is safe, it overwrites them in place."
+  source_died: "⚠️  The source stopped answering after %{count} item(s): %{error}. The counts below are a partial tally, not the whole source. Posts already written are saved -- re-running is safe, they are matched on their source id and never duplicated."
   group:
     blogs: "Blog / publishing platform"
     social: "Social network"
@@ -753,7 +755,7 @@ wizard:
   prompt_with_suggestion: "Suggested: %{current}\n> "
   empty_value: "(not set)"
   choice_prompt: "Choice: "
-  menu_hint: "↑↓ move · Enter select · 1-9 quick pick · Esc keep current"
+  menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc keep current"
   interrupted: "Stopped. Nothing was written -- the config is exactly as it was."
   nothing_changed: "Nothing changed -- every answer matched what was already there."
   q_write: "Write these changes? [y/N] "
@@ -761,7 +763,7 @@ wizard:
   write_failed: "The result did not read back the way it was asked for, so nothing was changed: %{message}"
   section_review: "What this would change"
   done: "Done -- review and write"
-  menu_hint_exit: "↑↓ move · Enter select · Esc finish"
+  menu_hint_exit: "↑↓ move · Enter select · 1-%{count} quick pick · Esc finish"
   written: "✅ Wrote %{path}"
   edit_in_editor: "Open it in your editor? [y/N] "
   editor_failed: "The editor could not be opened (%{message}), so this was left as it was."

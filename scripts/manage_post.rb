@@ -1044,7 +1044,7 @@ def pick_among_years(slug, paths)
   puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain'))
+    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
@@ -2089,7 +2089,7 @@ def pick_among_trashed(slug, paths)
   puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain'))
+    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
@@ -2785,6 +2785,11 @@ def cmd_rebuild
 end
 
 def print_usage
+  # The identity block above the usage: "what am I even running, and
+  # where" is the first question of someone reading help on a server
+  # with more than one install on it.
+  puts SiteHeader.render
+  puts
   puts t('cli.usage', recent_count: RECENT_LIST_COUNT)
 end
 
@@ -2926,6 +2931,18 @@ command = ARGV.shift
 # wizard included -- still requires config/site.yml, and asking for it here
 # keeps the abort message as the first thing said.
 SiteConfig.data unless ['help', '--help', '-h', 'version', '--version', '-v'].include?(command)
+
+# Every screen-bound command opens with the identity block -- which
+# engine, which site, which mode. The wizard prints (and after every
+# clear reprints) its own copy, `version`'s output IS the identity,
+# help puts it above the usage, and a piped stdout gets data only:
+# `./blog.sh list | wc -l` must keep counting posts, not banner lines.
+HEADER_MODES = %w[add edit props publish unpublish schedule queue delete
+                  restore toot bluesky rebuild preview list browse].freeze
+if HEADER_MODES.include?(command) && $stdout.tty?
+  puts SiteHeader.render(extra: t('cli.header_mode', mode: command))
+  puts
+end
 
 if command.nil?
   run_wizard

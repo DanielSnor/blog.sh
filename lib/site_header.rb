@@ -23,7 +23,9 @@ module SiteHeader
   # The tool name is written the way it is typed -- "./blog.sh", not
   # "blog.sh" -- and carries the version, because the wizard's first screen
   # is where someone about to report a problem is already looking.
-  def render(tool: './blog.sh')
+  # `extra:` is one more line under the identity, barred like the rest --
+  # the CLI commands put their mode there.
+  def render(tool: './blog.sh', extra: nil)
     bar = Tui.paint('▍', :cyan)
     short_name = SiteConfig.get('site', 'short_name')
     base_url = ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')
@@ -56,12 +58,14 @@ module SiteHeader
     lines = ["#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}"]
     lines << claim unless claim.empty?
     lines << Tui.paint(url, :dim) unless url.empty?
+    lines << extra if extra
     lines.map { |line| "#{bar}#{line}" }.join("\n")
   rescue StandardError, SystemExit
     # ./setup.sh and ./style.sh print this banner too, and they run on
     # configs too broken for SiteConfig to load -- which is exactly when
     # somebody reaches for a wizard. The identity lines are a courtesy;
-    # the tool line alone is still true.
-    "#{Tui.paint('▍', :cyan)}#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}"
+    # the tool line (and the caller's mode line) alone are still true.
+    ["#{Tui.paint('▍', :cyan)}#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}",
+     *(extra ? ["#{Tui.paint('▍', :cyan)}#{extra}"] : [])].join("\n")
   end
 end

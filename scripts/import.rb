@@ -400,7 +400,7 @@ def ask_source
   if Tui.interactive?
     loop do
       group_index = Tui.menu(GROUPS.map { |key, _| t("import.group.#{key}") },
-                             hint: t('import.menu_hint'))
+                             hint: t('import.menu_hint', count: GROUPS.size))
       return nil if group_index.nil?
 
       key, members = GROUPS[group_index]
@@ -413,7 +413,10 @@ def ask_source
 
       puts
       puts t("import.group.#{key}")
-      index = Tui.menu(choices.map { |k, _| source_name(k) }, hint: t('import.menu_hint'))
+      # Single-key pick reaches row 9 at most -- with more rows (blogs has
+      # 13) the hint stops at 9 rather than promising keys that don't exist.
+      index = Tui.menu(choices.map { |k, _| source_name(k) },
+                       hint: t('import.menu_hint', count: [choices.size, 9].min))
       # Backing out of a group is not backing out of the import --
       # return to the group question instead of quitting the wizard.
       next if index.nil?

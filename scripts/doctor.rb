@@ -34,6 +34,7 @@ require_relative '../lib/i18n'
 I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)
 
 require_relative '../lib/tui'
+require_relative '../lib/site_header'
 require_relative '../lib/doctor'
 
 online = ARGV.include?('--online')
@@ -46,6 +47,12 @@ def paint_level(level)
   end
 end
 
+# The identity block first -- doctor output gets pasted into issues and
+# read in logs, where "which install said this" matters most. On a config
+# too broken to name the site, SiteHeader degrades to the version line,
+# which is exactly the case doctor exists for.
+puts SiteHeader.render
+puts
 puts Tui.paint(I18n.t('doctor.heading'), :bold)
 puts Tui.paint(I18n.t('doctor.running_online'), :dim) if online
 puts

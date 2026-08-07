@@ -500,6 +500,15 @@ prints what an installation is running.
   the states a post moves through, rather than most-frequent-first. The
   keys are unchanged.
 
+- **Every command now opens with the identity block.** The wizard's
+  "which engine, which site" header -- version, site name, address --
+  now also tops `help`, `doctor` and every other screen-bound command,
+  with the mode on its own line under it: on a machine with more than
+  one install, "which blog am I in" is the first thing help and doctor
+  should answer. The wrapper's bare `== blog.sh ==` banner is gone, and
+  piped output stays data-only -- `./blog.sh list | wc -l` counts posts,
+  not banner lines.
+
 ### Fixes
 
 - **Eighteen smaller corrections from the same review round.** Among
@@ -894,6 +903,17 @@ prints what an installation is running.
   upload, an unchanged re-run stops the same way, every time. It now says
   to read the reason above first, and distinguishes a transfer that broke
   off from a guard waiting to be answered.
+
+- **A consistency pass over everything the interface says, in all three
+  languages.** Czech counts now read correctly for every number
+  ("Publikačních slotů: 4", not "4 publikačních slotů"), Czech quotes
+  close typographically („…“), four import prompts stop addressing the
+  author formally, dashes follow each file's convention, the public
+  pages call posts "příspěvky" consistently, quick-pick menu hints show
+  the real row range instead of a fixed 1-9 (and the section menus of
+  ./setup.sh and ./style.sh finally admit digits work), `./blog.sh list`
+  has a help line, the draft-preview banner keeps one exclamation mark
+  instead of three, and English spelling settles on Favourited.
 
 ### Upgrading
 
