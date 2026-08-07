@@ -901,13 +901,19 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
   else
     print t('cli.schedule_date_prompt')
   end
-  raw = $stdin.gets
+  # NOT `raw = ...`: this method's raw: keyword is the file's bytes as
+  # they looked before the dialog opened -- the staleness guard's whole
+  # evidence. Reusing the name here once overwrote that capture with the
+  # typed date line, and the guard then compared the post file against
+  # the answer "2026-12-24 08:00", failed by construction, and every
+  # scheduling path in the CLI aborted with "changed on disk".
+  answer = $stdin.gets
   # EOF is not Enter. With an offer on screen an empty line accepts, and
   # Ctrl-D (or a piped run whose input ran out) would otherwise schedule,
   # rebuild and deploy a post nobody confirmed.
-  return false if raw.nil?
+  return false if answer.nil?
 
-  input = raw.strip
+  input = answer.strip
   return false if input.empty? && slot.nil?
   return false if input.downcase == t('cli.cancel_word')
 
@@ -1168,7 +1174,8 @@ def cmd_schedule(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
-  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(raw)
   unless draft?(post)
     puts t('cli.schedule_only_drafts', slug: slug)
     puts
@@ -1176,11 +1183,14 @@ def cmd_schedule(slug)
   end
 
   if post['scheduled']
-    unschedule_post(path, post, slug)
+    unschedule_post(path, post, slug, raw: raw)
     return
   end
 
-  prompt_and_schedule(path, post)
+  # The bytes from before the prompt ride along, so the cron publishing
+  # this exact post mid-dialog is caught -- the same guard every other
+  # path into scheduling already carries.
+  prompt_and_schedule(path, post, raw: raw)
 end
 
 # Shared by the CLI toggle above and the [n] action in the properties

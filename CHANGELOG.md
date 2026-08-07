@@ -502,6 +502,17 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Scheduling works again.** A fix in the previous round gave the
+  scheduling dialog a parameter carrying the post file's bytes from
+  before the prompt -- evidence for the are-you-editing-a-stale-file
+  guard -- and the dialog's own variable holding the typed date happened
+  to bear the same name. The typed line overwrote the capture, the guard
+  compared the post against the date string, and every path into
+  scheduling (the command, [s] on a draft, [s] in properties, the queue)
+  aborted with "changed on disk". The variable is renamed, the guard gets
+  its real evidence -- and the standalone `schedule` command now carries
+  the same protection the other paths already had.
+
 - **An image a post uses twice no longer goes missing from the media
   folder.** Every importer collects a post's media into a source-keyed
   map, so registering the same file or URL a second time overwrote the
