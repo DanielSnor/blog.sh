@@ -1266,6 +1266,16 @@ posts.reverse!
 # RSS, the sitemap and the search index all draw from it unchanged. Drafts
 # only get their own page at a hidden address.
 drafts, posts = posts.partition { |p| draft?(p) }
+# A draft without its token would build at the GUESSABLE /draft//slug/ --
+# every writer in the engine guarantees the token, so a missing one means
+# a hand-copied or hand-edited JSON, and the unguessable-URL design must
+# not quietly fail for it. Skipped and named, not built.
+drafts.reject! do |post|
+  next false unless post['draft_token'].to_s.strip.empty?
+
+  warn "⚠️  Draft '#{post['slug']}' has no draft_token -- its preview would be at a guessable address, so it is not built. Re-save it with ./blog.sh edit."
+  true
+end
 
 CONTENT_TYPES = %w[text quote chat image video audio link document].freeze
 CONTENT_TYPE_LABELS = {

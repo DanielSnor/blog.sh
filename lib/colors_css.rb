@@ -109,7 +109,10 @@ module ColorsCss
   end
 
   def color_for(colors, mode, key)
-    per_mode = colors[mode]
+    # Shape-guarded like generate() itself: a `colors:` written as a list
+    # must degrade to the default palette everywhere, not TypeError in
+    # whichever caller asked first (theme-color did).
+    per_mode = colors.is_a?(Hash) ? colors[mode] : nil
     (per_mode.is_a?(Hash) ? per_mode[key] : nil) || DEFAULT_COLORS[mode][key]
   end
 

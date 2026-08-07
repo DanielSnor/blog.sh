@@ -268,7 +268,7 @@ module Tui
   # promise that Enter keeps the current value was false: Enter on the
   # language menu switched an English site to Czech, because cs sorts
   # first.
-  def menu(items, hint: nil, allow_text: false, text_prompt: nil, initial: 0)
+  def menu(items, hint: nil, allow_text: false, text_prompt: nil, initial: 0, numeric_pick: true)
     selected = initial.to_i.clamp(0, [items.size - 1, 0].max)
     offset = clamp_offset(selected, 0, [items.size, [term_height - 2 - (hint ? 2 : 0), 5].max].min, items.size)
     # Leave a couple of rows above the menu for whatever's already on
@@ -341,7 +341,10 @@ module Tui
           print "\e[?25h#{text_prompt}#{key}"
           rest = $stdin.gets.to_s.strip
           line = "#{key}#{rest}"
-          return line.to_i - 1 if line =~ /\A\d+\z/ && (1..items.size).cover?(line.to_i)
+          # numeric_pick: false for menus whose rows carry no numbers and
+          # whose VALUES can be numbers (tag names like "365") -- there a
+          # typed number must mean the text, not a row.
+          return line.to_i - 1 if numeric_pick && line =~ /\A\d+\z/ && (1..items.size).cover?(line.to_i)
 
           return line
         end

@@ -278,6 +278,21 @@ module ConfigWriter
     # of uncommenting a section wholesale.
     def set(key_path, value)
       line_no = resolve!(key_path)
+      # An unchanged value leaves the line untouched. Rewriting it
+      # normalized quoting and comment spacing, so an Enter-through
+      # re-run over a hand-edited config presented a diff and churned
+      # the file's VCS history while claiming nothing changed.
+      begin
+        existing = YAML.safe_load("v:#{@lines[line_no].sub(/\A\s*[A-Za-z_][A-Za-z0-9_-]*:/, '').sub(/\s#.*$/, '')}")
+        existing = existing && existing['v']
+      rescue StandardError
+        existing = nil
+      end
+      if existing == value && !ConfigWriter.comment?(@lines[line_no])
+        @intended[key_path] = value
+        return self
+      end
+
       replace_value(line_no, ConfigWriter.scalar(value))
       @intended[key_path] = value
       self

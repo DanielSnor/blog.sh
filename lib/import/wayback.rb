@@ -281,7 +281,13 @@ module Import
       date = parsed[:date]
       unless date
         @dated_by_capture += 1
-        date = Time.strptime(page[:timestamp], '%Y%m%d%H%M%S')
+        # Archive timestamps are UTC by definition; strptime without a
+        # zone read the digits in the site's local zone and shifted every
+        # capture-dated post by the UTC offset -- across midnight, into
+        # the wrong day and the wrong publish order.
+        ts = page[:timestamp]
+        date = Time.utc(ts[0, 4].to_i, ts[4, 2].to_i, ts[6, 2].to_i,
+                        ts[8, 2].to_i, ts[10, 2].to_i, ts[12, 2].to_i).getlocal
       end
 
       slug = Slug.slugify(File.basename(page[:path]))
@@ -607,12 +613,17 @@ module Import
       module_function
 
       def balanced_div(html, opening)
-        m = html.match(opening)
+        # Comments are masked (same length, so every index still points
+        # into the original) before counting: a commented-out unmatched
+        # <div> -- an ad placeholder, a disabled widget, period-typical --
+        # inflated the depth and made the whole page unparseable.
+        masked = html.gsub(/<!--.*?-->/m) { |c| ' ' * c.length }
+        m = masked.match(opening)
         return nil unless m
 
         index = m.end(0)
         depth = 1
-        while depth.positive? && (nxt = html.match(%r{<div\b|</div>}i, index))
+        while depth.positive? && (nxt = masked.match(%r{<div\b|</div>}i, index))
           depth += nxt[0].start_with?('</') ? -1 : 1
           index = nxt.end(0)
         end

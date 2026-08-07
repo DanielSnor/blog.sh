@@ -502,6 +502,27 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Eighteen smaller corrections from the same review round.** Among
+  them: a hand-typed frontmatter date that will not parse is a sentence
+  naming the buffer, not a backtrace; a draft whose JSON lost its
+  draft_token (hand-copied files) is skipped and named instead of built
+  at a guessable address; the archive browser's "why it matched" line
+  answers the current query, not the previous one, and a tag named
+  "365" can actually be typed; a `colors:` section written as a list
+  degrades to the default palette instead of a TypeError; a redirect
+  chain that never lands is reported; an unterminated `<script>` in a
+  truncated capture no longer leaks code into a post; a dateless
+  Substack row imports by its send time or skips under its own name;
+  Wayback capture dates read as the UTC they are; a commented-out `<div>`
+  no longer unbalances the b2evolution reader; the setup diff masks a
+  commented-out token like an active one; the doctor accepts `9:30`
+  slots the engine accepts and stops calling empty titles "filled in";
+  re-running a wizard over a hand-edited config stops rewriting lines
+  whose values did not change; an unusable lock path says it is running
+  unlocked; the palette preview never QR-encodes example.com; and the
+  Czech strings say "postů: 2" instead of "2 postů" and finish
+  translating the two oldest palette descriptions.
+
 - **The sidebar cron stops turning a quiet skip into a failure.** The
   wrapper is two processes: the refresh (which skips silently when a
   build holds the run lock) and the deploy it then execs -- whose own

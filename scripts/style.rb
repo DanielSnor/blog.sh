@@ -219,7 +219,10 @@ def preview_site_url
   return nil unless DeployBackend.pick.configured?
 
   base = (ENV['SITE_BASE_URL'] || current.dig('site', 'base_url')).to_s.chomp('/')
-  return nil if base.empty?
+  # The template's own placeholder is not this site's address: printing
+  # (and QR-encoding) https://example.com/... pointed the user at a
+  # domain they do not own while the upload went to the real target.
+  return nil if base.empty? || base.include?('example.com')
 
   "#{base}/palette-preview.html"
 end

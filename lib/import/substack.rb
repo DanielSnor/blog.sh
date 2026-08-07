@@ -73,11 +73,18 @@ module Import
       return :empty if blocks.empty?
 
       state = item['is_published'].to_s.casecmp('true').zero? ? 'published' : 'draft'
+      # A row without a date -- most plausibly a never-published draft --
+      # used to TypeError out of the whole item and count as a nameless
+      # :error. The send timestamp stands in when there is one; a post
+      # with neither is skipped under a name the summary can print.
+      raw_date = [item['post_date'], item['email_sent_at']].find { |v| !v.to_s.strip.empty? }
+      return :undated unless raw_date
+
       slug = slug_of(item)
       post = {
         'slug' => slug,
         'title' => item['title'].to_s.empty? ? slug : CGI.unescapeHTML(item['title'].to_s),
-        'date' => Time.parse(item['post_date']).iso8601,
+        'date' => Time.parse(raw_date).iso8601,
         'state' => state,
         'tags' => [],
         'content' => blocks,

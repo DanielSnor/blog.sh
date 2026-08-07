@@ -117,10 +117,18 @@ module RunLock
   rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
     begin
       File.open(path(root), File::RDONLY)
-    rescue SystemCallError
-      nil
+    rescue SystemCallError => e
+      unlocked_warning(root, e)
     end
-  rescue SystemCallError
+  rescue SystemCallError => e
+    # A directory sitting at the lock path, a vanished root -- running
+    # unlocked is the compatible floor, but doing it SILENTLY is how two
+    # publishes end up interleaved with nobody told why.
+    unlocked_warning(root, e)
+  end
+
+  def unlocked_warning(root, error)
+    warn("⚠️  Cannot use the run lock at #{path(root)} (#{error.class}) -- running without it.")
     nil
   end
 

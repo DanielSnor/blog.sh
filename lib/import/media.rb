@@ -166,7 +166,12 @@ module Import
     # that a single one must not end an hours-long run -- so this returns
     # nil and lets the caller record a failure instead of raising.
     def self.fetch(url, redirects: 5, retries: 3)
-      return nil if redirects.zero?
+      # Exhaustion says so: this was the one failure path with no line at
+      # all, so a redirect loop read as media that silently never came.
+      if redirects.negative?
+        warn "  fetch gave up on #{url}: too many redirects"
+        return nil
+      end
 
       # Parsed before the request, and separately: a URL that cannot parse
       # is a permanent answer, and burning three retries with sleeps on it

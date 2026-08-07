@@ -118,6 +118,11 @@ module Import
         # Script and style contents are code, not prose -- dropped whole so
         # their bodies never leak into a post as text.
         html = html.gsub(%r{<(script|style)\b.*?</\1>}mi, '')
+        # A capture truncated INSIDE a script (routine in Wayback
+        # snapshots) leaves the pair regex above without a close -- and
+        # raw JavaScript then walked into the post as a paragraph. An
+        # unterminated script or style eats to the end.
+        html = html.gsub(%r{<(script|style)\b.*\z}mi, '')
         html = html.gsub(/<!--.*?-->/m, '')
         html = html.gsub(/<![^>]*>/, '')
 

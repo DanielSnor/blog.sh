@@ -407,8 +407,15 @@ module MarkdownParser
   # gets copied.
   def resolve_image(path, media_dir, counter, media_files = {}, incoming_dir: nil)
     expanded = File.expand_path(path)
-    if media_dir && expanded.start_with?("#{File.expand_path(media_dir)}/")
-      return [File.basename(expanded), nil]
+    # realpath, not just expand_path: /tmp vs /private/tmp (macOS) or any
+    # symlinked path names the same file two ways, and classifying the
+    # post's OWN media file as a new external attachment made a
+    # year-moving edit copy from a source the move had just relocated --
+    # ENOENT mid-save, media moved, JSON left behind.
+    if media_dir
+      real = (File.realpath(expanded) rescue expanded)
+      real_dir = (File.realpath(File.expand_path(media_dir)) rescue File.expand_path(media_dir))
+      return [File.basename(expanded), nil] if real.start_with?("#{real_dir}/") || expanded.start_with?("#{File.expand_path(media_dir)}/")
     end
 
     # A bare filename (no directory component) is looked up in two places, in

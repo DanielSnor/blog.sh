@@ -244,7 +244,11 @@ module Wizard
   # newline, and `.*` never crosses one -- so the anchored form could not
   # match a single real line, and every token in the review diff was printed
   # in the clear, in the one place the comment above promises it is not.
-  MASKED = /\A([-+]\s*(?:export\s+)?(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*$/.freeze
+  # The optional "#" matters: EnvFile falls back to a commented line when
+  # no active one exists, so the "-" side of a diff replacing a
+  # commented-out credential carries the old token too -- and used to
+  # print it in the clear, in the one place this promises it will not.
+  MASKED = /\A([-+]\s*(?:#\s*)?(?:export\s+)?(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*$/.freeze
 
   def mask(line)
     line.sub(MASKED) { "#{Regexp.last_match(1)}••••••••" }

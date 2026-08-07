@@ -186,7 +186,9 @@ module Doctor
   ].freeze
 
   def check_identity(data)
-    missing = REQUIRED.reject { |path| dig(data, *path) }
+    # .to_s.strip: a key present but EMPTY ('title: ""') builds an empty
+    # <title> on every page -- "present" is not "filled in".
+    missing = REQUIRED.reject { |path| !dig(data, *path).to_s.strip.empty? }
     findings = missing.map { |path| error(t('key_missing', key: path.join('.'))) }
 
     base = ENV['SITE_BASE_URL'].to_s.empty? ? dig(data, 'site', 'base_url').to_s : ENV['SITE_BASE_URL'].to_s
@@ -397,7 +399,7 @@ module Doctor
       return [error(t('slots_shape'))]
     end
 
-    bad = slots.reject { |s| s.to_s.match?(/\A(mon|tue|wed|thu|fri|sat|sun|daily)\s+([01]\d|2[0-3]):[0-5]\d\z/i) }
+    bad = slots.reject { |s| s.to_s.match?(/\A(mon|tue|wed|thu|fri|sat|sun|daily)\s+([01]?\d|2[0-3]):[0-5]\d\z/i) }
     return [ok(t('slots_ok', count: slots.size))] if bad.empty?
 
     [error(t('slots_bad', values: bad.map(&:inspect).join(', ')), t('slots_bad_fix'))]

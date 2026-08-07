@@ -440,7 +440,7 @@ end
 # engine ships -- but a skip reason comes from an adapter, and a new adapter
 # inventing one must not take the wizard down mid-summary. Translated when
 # known, printed raw when not.
-TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed boost reblog error].freeze
+TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed boost reblog error undated comment].freeze
 
 def reason_label(reason)
   TRANSLATED_REASONS.include?(reason.to_s) ? t("import.reason.#{reason}") : reason.to_s

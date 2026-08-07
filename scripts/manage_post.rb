@@ -680,7 +680,7 @@ def cmd_add
     return
   end
 
-  date = meta['date'].to_s.empty? ? Time.now : Time.parse(meta['date'])
+  date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'])
   title = meta['title'].to_s.empty? ? nil : meta['title']
   tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
   type = meta['type'].to_s.empty? ? nil : meta['type']
@@ -1866,7 +1866,7 @@ def edit_post(slug)
   abort_on_double_frontmatter(new_body)
   abort_on_unknown_frontmatter(meta)
 
-  new_date = meta['date'].to_s.empty? ? date : Time.parse(meta['date'])
+  new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
   new_tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
   new_type = meta['type'].to_s.empty? ? nil : meta['type']
@@ -2338,7 +2338,11 @@ end
 def browse_context(entry, tokens, width, cache, slug)
   return nil if entry.nil? || tokens.empty?
 
-  cache[slug] ||= begin
+  # Keyed by the query too: the one line whose whole job is explaining
+  # the CURRENT match must not answer with the fragment that matched the
+  # previous one after the user backspaces and types something else.
+  cache_key = [slug, tokens.map(&:text).join(' ')]
+  cache[cache_key] ||= begin
     text = entry[:text].to_s
     folded, offsets = fold_with_offsets(text)
     token = tokens.reject(&:negated).find { |candidate| folded.include?(candidate.text) }
@@ -2351,7 +2355,7 @@ def browse_context(entry, tokens, width, cache, slug)
       "#{start.positive? ? '…' : ''}#{fragment}#{start + width < text.length ? '…' : ''}"
     end
   end
-  cache[slug].empty? ? nil : cache[slug]
+  cache[cache_key].empty? ? nil : cache[cache_key]
 end
 
 def browse_pick_type(posts)
@@ -2388,7 +2392,12 @@ def browse_pick_tag(posts)
   width = entries.map { |tag, _| tag.length }.max.clamp(8, 32)
   rows = [format("%-#{width}s %d", t('cli.browse_filter_none'), posts.size)] +
          entries.map { |tag, count| format("%-#{width}s %d", tag, count) }
+  # numeric_pick: false -- the rows carry no visible numbers, and real
+  # archives have tags NAMED "365" or "5800"; resolving a typed number as
+  # a row index silently filtered on whatever sat on that row and made
+  # the numeric tag unreachable by typing.
   choice = Tui.menu(rows, hint: t('cli.browse_tag_menu_hint'), allow_text: true,
+                          numeric_pick: false,
                           text_prompt: t('cli.browse_tag_prompt'))
   return :cancel if choice.nil?
   return choice.strip if choice.is_a?(String)
@@ -2456,6 +2465,15 @@ def browse_preview(summary)
 rescue JSON::ParserError, SystemCallError => e
   puts t('cli.unreadable_post', path: summary[:path], error: e.message.lines.first.to_s.strip[0, 100])
   puts
+end
+
+# Time.parse with the file's own sentence instead of a backtrace -- a
+# hand-typed frontmatter date ("za tyden nekdy") used to end the run as
+# an uncaught ArgumentError while the editor buffer sat recoverable.
+def parse_frontmatter_date!(raw_value)
+  Time.parse(raw_value)
+rescue ArgumentError
+  abort t('cli.frontmatter_date_invalid', value: raw_value)
 end
 
 def cmd_browse(filters = {})
