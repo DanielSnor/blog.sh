@@ -12,6 +12,18 @@ prints what an installation is running.
 
 ## 1.2 -- unreleased
 
+The import release. Eight sources became twenty-two -- every blog platform
+worth naming, the whole social roster, podcasts, a plain markdown tree, and
+the Wayback Machine for blogs whose platform no longer exists at all. Two
+wizards arrived with it: `./setup.sh` walks a new install through the
+settings it cannot run without, and `./style.sh` covers everything about how
+the site looks, both writing your config as text so its comments survive.
+Around those: a queue for scheduled posts, a searchable archive browser in
+the terminal, a document post type, pinned posts, redirects from a blog's
+old addresses, and `./blog.sh doctor` to say what an install is missing.
+
+Nothing to migrate -- see Upgrading at the end.
+
 ### New
 
 - **A Wayback rescue can take the calendar's window.** The Archive's own
@@ -715,6 +727,15 @@ prints what an installation is running.
   - **A queue reorder that dies partway now says which posts moved and
     which did not**, so the times can be repaired by hand before the cron
     runs on them.
+
+- **The two unattended scripts check the Ruby version like everything
+  else does.** `./blog.sh`, `./setup.sh` and `./style.sh` all refuse an
+  ancient Ruby with a sentence; the publish and sidebar crons did not --
+  and cron's minimal PATH is exactly where a system Ruby 2.6 gets picked
+  up, dying mid-run with an error nobody reads.
+
+- **A post's text no longer runs into the date badge.** The right-hand
+  padding was sized for a card without one.
 
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
