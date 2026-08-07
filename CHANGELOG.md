@@ -502,6 +502,19 @@ prints what an installation is running.
 
 ### Fixes
 
+- **The sidebar cron stops turning a quiet skip into a failure.** The
+  wrapper is two processes: the refresh (which skips silently when a
+  build holds the run lock) and the deploy it then execs -- whose own
+  lock check exited 1, so the whole cron job failed and mailed about a
+  collision that was handled correctly one line earlier. The refresh's
+  busy skip is now a distinct exit the wrapper maps back to 0, the
+  upload is skipped with it (nothing was regenerated, so there was
+  nothing to send), and the deploy accepts `--busy-ok` for cron wrappers
+  while a hand-run deploy keeps failing loudly. And a half-written
+  palette in `config/palettes.yml` -- documented as user-editable -- no
+  longer crashes `style.sh` with a backtrace: the malformed entry is
+  named once and left out, the rest keep working.
+
 - **Three setup-wizard corrections.** Menus now open with the cursor on
   the CURRENT value, so pressing Enter keeps it -- exactly what the
   wizard's own help promises; before, every menu opened on its first row,

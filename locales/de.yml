@@ -778,6 +778,7 @@ style:
   palette_custom: "Werte von Hand eingeben (es sind vierzehn)"
   palette_set: "✅ %{name}."
   palettes_unreadable: "config/palettes.yml war nicht lesbar (%{message}), es bleibt also nur die Eingabe von Hand."
+  palette_malformed: "⚠️  Palette '%{name}' in config/palettes.yml fehlen die Abschnitte light und dark — übersprungen."
   q_palette_preview: "Eine Vorschau der Website in dieser Palette zeigen? [J/n] "
   pv_building: "Baue die Vorschau"
   pv_title: "Paletten-Vorschau: %{name}"

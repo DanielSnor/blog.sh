@@ -18,7 +18,14 @@ fi
 set -a
 source env.sh
 set +a
-ruby scripts/refresh_sidebar.rb
+# Exit 3 = another run holds the build lock. That is a quiet skip, not a
+# failure: nothing was regenerated, so there is nothing to upload, and
+# cron is back in half an hour. Anything else non-zero is real.
+if ! ruby scripts/refresh_sidebar.rb; then
+  code=$?
+  [ "$code" -eq 3 ] && exit 0
+  exit "$code"
+fi
 
 # Upload whichever widget files this site actually has -- Sidebar.FEEDS
 # only writes JSONs for configured widgets, so a hardcoded list makes
@@ -41,4 +48,7 @@ if [ -z "$only" ]; then
   exit 0
 fi
 
-exec ./scripts/deploy-web.sh "--only=$only"
+# --busy-ok: if a build or publish took the lock between the refresh and
+# here, skipping the upload quietly is right for a cron tick -- the next
+# one re-does the whole thing anyway.
+exec ./scripts/deploy-web.sh "--only=$only" --busy-ok

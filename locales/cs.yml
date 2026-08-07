@@ -770,6 +770,7 @@ style:
   palette_custom: "Zadat hodnoty ručně (je jich čtrnáct)"
   palette_set: "✅ %{name}."
   palettes_unreadable: "config/palettes.yml se nepodařilo přečíst (%{message}), takže zbývá jen ruční zadání."
+  palette_malformed: "⚠️  Paleta '%{name}' v config/palettes.yml nemá sekce light a dark — přeskočena."
   q_palette_preview: "Ukázat náhled, jak s touhle paletou vypadá web? [A/n] "
   pv_building: "Sestavuji náhled"
   pv_title: "Náhled palety: %{name}"

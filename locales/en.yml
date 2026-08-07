@@ -783,6 +783,7 @@ style:
   palette_custom: "Enter the values by hand (fourteen of them)"
   palette_set: "✅ %{name}."
   palettes_unreadable: "config/palettes.yml could not be read (%{message}), so only the by-hand route is available."
+  palette_malformed: "⚠️  Palette '%{name}' in config/palettes.yml is missing its light and dark sections -- skipped."
   q_palette_preview: "Show a preview of the site in this palette? [Y/n] "
   pv_building: "Building the preview"
   pv_title: "Palette preview: %{name}"

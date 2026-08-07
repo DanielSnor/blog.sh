@@ -95,7 +95,18 @@ end
 
 def palettes
   @palettes ||= begin
-    YAML.load_file(PALETTES_YML) || {}
+    loaded = YAML.load_file(PALETTES_YML) || {}
+    loaded = {} unless loaded.is_a?(Hash)
+    # config/palettes.yml is documented as user-editable, and the natural
+    # half-finished states -- only `light:` written so far, or a value
+    # that is not a mapping at all -- used to crash the wizard with a
+    # bare backtrace the moment the menu opened or the entry was chosen.
+    # A malformed palette is named once and left out; the rest still work.
+    loaded.select do |slug, data|
+      ok = data.is_a?(Hash) && %w[light dark].all? { |m| data[m].is_a?(Hash) }
+      puts Tui.paint(t('palette_malformed', name: slug), :yellow) unless ok
+      ok
+    end
   rescue StandardError => e
     puts Tui.paint(t('palettes_unreadable', message: e.message), :red)
     {}
