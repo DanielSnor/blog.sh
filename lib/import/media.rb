@@ -81,7 +81,11 @@ module Import
       body = self.class.fetch(url)
       if body.nil?
         @failures << url
-        release
+        # Remembered as a failure, not forgotten: a second reference to
+        # the same dead URL in this post answers nil at once instead of
+        # re-burning the retries and double-counting the loss.
+        @by_source[url] = nil
+        uncount
         return nil
       end
 
@@ -206,10 +210,18 @@ module Import
       format('%02d%s', @counter, ext)
     end
 
-    # A failed fetch gives its number back, so numbering stays contiguous
-    # and a later retry of the same post produces the same filenames.
-    def release
-      @counter -= 1
+    # A failed fetch is uncounted but its NUMBER stays spent. Giving the
+    # number back read as tidiness and was a re-import bug with teeth:
+    # numbering then depended on WHICH fetches succeeded, so a post whose
+    # first image failed handed 01.jpg to its second image -- and when
+    # the source recovered, the re-run (advertised as safe) assigned the
+    # names the other way around while PostWriter's copy skips files that
+    # already exist. Old bytes under a new name, the wrong image
+    # published. With the number spent, registration ORDER is the only
+    # thing filenames depend on, and every run of the same post agrees
+    # with every other. The gap in the sequence on disk is the honest
+    # trace of a fetch that failed.
+    def uncount
       @registered -= 1
     end
 

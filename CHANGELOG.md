@@ -502,6 +502,19 @@ prints what an installation is running.
 
 ### Fixes
 
+- **A re-import after a media failure can no longer publish the wrong
+  image.** A failed download used to give its filename number back to
+  the next image, so what a post's images were CALLED depended on which
+  downloads succeeded. When the source recovered, the re-import -- the
+  exact flow the engine advertises as safe -- assigned the names the
+  other way around, and since existing files are never overwritten, the
+  post ended up showing its second image where its first belongs. A
+  failed fetch's number now stays spent: filenames depend only on the
+  order the post references its media, every run agrees with every
+  other, and the gap in the numbering on disk is the honest trace of the
+  download that failed. A dead URL referenced twice in one post is also
+  counted as one loss now, not two.
+
 - **The wizards work on Ruby 2.7 and 3.0 again.** `YAML.load_file(path,
   aliases: true)` is Psych 4 (Ruby 3.1+); Psych 3 -- the system Ruby of
   Debian 11, squarely inside the "Ruby 2.7 or newer" this engine
