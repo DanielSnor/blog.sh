@@ -168,9 +168,21 @@ module Import
     def self.fetch(url, redirects: 5, retries: 3)
       return nil if redirects.zero?
 
+      # Parsed before the request, and separately: a URL that cannot parse
+      # is a permanent answer, and burning three retries with sleeps on it
+      # (as the generic rescue below used to) only slowed the run down.
+      # Non-ASCII paths -- image filenames with diacritics are routine in
+      # the very archives this engine imports -- are percent-encoded,
+      # which is the same address.
+      uri = parse_url(url)
+      if uri.nil?
+        warn "  fetch failed on #{url}: not a fetchable URL"
+        return nil
+      end
+
       res =
         begin
-          Net::HTTP.get_response(URI(url))
+          Net::HTTP.get_response(uri)
         rescue StandardError => e
           if retries.positive?
             sleep 1
@@ -181,7 +193,16 @@ module Import
         end
 
       case res
-      when Net::HTTPRedirection then fetch(res['location'], redirects: redirects - 1, retries: retries)
+      when Net::HTTPRedirection
+        # A relative Location ("/img/x.jpg") is legal and common; handing
+        # it to the next round verbatim used to dial host "" and lose the
+        # media after three pointless retries.
+        target = begin
+          URI.join(uri.to_s, res['location'].to_s).to_s
+        rescue StandardError
+          res['location']
+        end
+        fetch(target, redirects: redirects - 1, retries: retries)
       when Net::HTTPSuccess then res.body
       when Net::HTTPServerError, Net::HTTPTooManyRequests
         # "Not now", not "not there" -- the same distinction wayback.rb
@@ -198,6 +219,18 @@ module Import
         # 404 and friends are answers, not weather -- retrying won't
         # change them, but the run report must say what happened.
         warn "  fetch failed on #{url}: HTTP #{res.code}"
+        nil
+      end
+    end
+
+    ESCAPER = defined?(URI::RFC2396_PARSER) ? URI::RFC2396_PARSER : URI::DEFAULT_PARSER
+
+    def self.parse_url(url)
+      URI(url)
+    rescue URI::InvalidURIError
+      begin
+        URI(ESCAPER.escape(url))
+      rescue URI::InvalidURIError
         nil
       end
     end

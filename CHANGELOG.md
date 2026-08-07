@@ -502,6 +502,20 @@ prints what an installation is running.
 
 ### Fixes
 
+- **One build guard and three import fixes.** A pair of imported
+  `redirect_from` entries where one address is a directory of the other
+  ("/x.html/sub/" then "/x.html") crashed the whole build with EISDIR;
+  the second stub now skips out loud like every other collision. A
+  redirect whose `Location` is relative -- legal and common -- used to
+  dial an empty host three times and lose the media; it resolves against
+  the request URL. A media URL with diacritics in the filename (routine
+  in the Czech archives the importers target) always failed as "URI must
+  be ascii only" after three pointless retries; it is percent-encoded,
+  and a URL that cannot parse at all fails once, with a line saying so.
+  And tables written with HTML5's optional end tags -- no `</td>`, no
+  `</tr>`, the house style of hand-written archives -- no longer nest
+  every cell inside the previous one and emit each row twice.
+
 - **Four archive-browser corrections.** Opening a post from search
   results and coming back showed "(nothing matches)" for the query that
   had just matched -- the text index is rebuilt on return now (rebuilt,

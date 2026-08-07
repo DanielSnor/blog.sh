@@ -503,6 +503,19 @@ module Import
 
         close(stack, 'p') if open == 'p' && CLOSES_P.include?(name)
         close(stack, 'li') if stack.last.name == 'li' && name == 'li'
+        # Omitting </td> and </tr> is valid HTML5 and the house style of
+        # the hand-written archives page mode imports. Without these, each
+        # next cell NESTED inside the previous one, and the recursive cell
+        # collector then emitted every row twice: once concatenated into
+        # the first cell, once as itself.
+        if %w[td th].include?(name)
+          close(stack, 'td') if stack.any? { |n| n.name == 'td' }
+          close(stack, 'th') if stack.any? { |n| n.name == 'th' }
+        elsif name == 'tr'
+          close(stack, 'td') if stack.any? { |n| n.name == 'td' }
+          close(stack, 'th') if stack.any? { |n| n.name == 'th' }
+          close(stack, 'tr') if stack.any? { |n| n.name == 'tr' }
+        end
       end
 
       # An unmatched </div> must not pop the world: only unwind if the tag

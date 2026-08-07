@@ -1520,6 +1520,15 @@ posts.each do |post|
       warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
       next
     end
+    # The third collision: the destination is a DIRECTORY an earlier stub
+    # created (entries "/x.html/sub/" and "/x.html", in that order --
+    # WRITTEN knows the file inside, not the directory itself). Writing a
+    # file over a directory is EISDIR, and one bad pair of imported
+    # entries must not kill the whole build.
+    if File.directory?(dest)
+      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- an earlier redirect already made a directory of that address."
+      next
+    end
 
     emit(dest, redirect_stub_html(post))
   end
