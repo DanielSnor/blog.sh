@@ -1195,7 +1195,7 @@ def cmd_publish(slug)
     return
   end
 
-  draft_decision_loop(slug)
+  draft_decision_loop(slug, path: path)
 end
 
 # Marks a draft for automatic publishing by cron
@@ -1869,10 +1869,13 @@ end
 
 def cmd_edit(slug)
   edit_post(slug)
+  # Re-resolved AFTER the edit on purpose: a rename inside the editor moves
+  # the file, so the path captured before it would be stale. Everything
+  # downstream then works from this one.
   path = find_post_path(slug)
   return unless path
 
-  draft_decision_loop(slug) if draft?(JSON.parse(File.read(path, encoding: 'utf-8')))
+  draft_decision_loop(slug, path: path) if draft?(JSON.parse(File.read(path, encoding: 'utf-8')))
 end
 
 def edit_post(slug, path: nil)
@@ -2204,7 +2207,7 @@ def cmd_restore(slug)
       warn ''
       return
     end
-    draft_decision_loop(slug)
+    draft_decision_loop(slug, path: new_path)
   else
     maybe_rebuild
   end

@@ -86,6 +86,19 @@ module Tui
     text.each_char.sum { |ch| char_width(ch) }
   end
 
+  # Control characters never reach the screen: a tab expands to whatever
+  # stop width the terminal keeps and a newline paints its own row, either
+  # of which breaks the cursor-up arithmetic that every repaint depends on
+  # -- and post titles come from feeds and exports, which carry both. ESC
+  # is the exception: the rows carry the colour sequences this file wrote
+  # itself. Applied in the two measuring helpers rather than at each call
+  # site, so a row cannot reach the frame uncleaned.
+  CONTROL_RE = /[\u0000-\u001A\u001C-\u001F\u007F]/.freeze
+
+  def sanitize_row(text)
+    text.to_s.gsub(CONTROL_RE, ' ')
+  end
+
   # Truncates rather than wraps -- `menu` below repaints by moving the
   # cursor up exactly one line per item, so every item MUST render as
   # exactly one physical terminal row. On a narrow terminal (an SSH
@@ -93,6 +106,7 @@ module Tui
   # would silently break that math and corrupt the repaint. Measured in
   # display COLUMNS (see char_width), not codepoints.
   def truncate_to_width(text, width)
+    text = sanitize_row(text)
     return text if width <= 1 || display_width(text) <= width
 
     out = +''
@@ -116,6 +130,7 @@ module Tui
   # [SCHEDULED] / [PINNED] markers -- and measuring them used to mean
   # stripping them.
   def truncate_ansi(text, width)
+    text = sanitize_row(text)
     return text if width <= 1 || display_width(strip_ansi(text)) <= width
 
     out = +''
@@ -448,7 +463,7 @@ module Tui
       # stop width the terminal keeps, which no column arithmetic here
       # can predict. ESC is the one exception: the rows carry the colour
       # sequences this file wrote itself.
-      out.each { |line| print "\e[2K#{line.to_s.gsub(/[\u0000-\u001A\u001C-\u001F\u007F]/, ' ')}\r\n" }
+      out.each { |line| print "\e[2K#{sanitize_row(line)}\r\n" }
       painted = true
 
       move = lambda do |delta|

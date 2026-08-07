@@ -1071,7 +1071,18 @@ def comment_origins_for(posts)
       rescue StandardError
         nil
       end
-      "#{uri.scheme}://#{uri.host}" if uri&.host
+      # The port is part of the origin: an instance on a non-default port
+      # would otherwise be granted an origin the browser never matches, so
+      # the very policy meant to allow its thread refuses it.
+      next unless uri&.host
+
+      origin = "#{uri.scheme}://#{uri.host}#{":#{uri.port}" if uri.port && uri.port != uri.default_port}"
+      # A stored host is data, and this string ends up inside a policy
+      # whose directives are separated by ";" and whose value sits in an
+      # HTML attribute. Anything outside the shape of an origin is dropped
+      # rather than escaped -- a host that needs escaping here is not a
+      # host worth trusting with a connect-src grant.
+      origin if origin.match?(%r{\Ahttps?://[A-Za-z0-9.-]+(?::\d+)?\z})
     elsif post['bluesky_uri']
       'https://public.api.bsky.app'
     end

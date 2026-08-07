@@ -83,6 +83,12 @@ immediately, with no preview pass:
 LIMIT=n works on all of them and imports only the first n posts -- the way to
 sample a large archive before committing hours to it.
 
+A Wayback rescue can be narrowed to a stretch of time with WAYBACK_FROM and
+WAYBACK_TO (2013, 2013-01 or 2013-01-15). They filter the Archive's captures,
+not the posts, so a late window reaches a blog's end without replaying its
+whole history -- and a date that cannot be read stops the run rather than
+quietly meaning "everything".
+
 When the new site keeps the old blog's domain, imports from sources that
 know their original URLs (beehiiv, Blogger, Ghost, Jekyll/Hugo with a
 PERMALINK pattern, Medium, Movable Type/TypePad with URL_PATTERN,

@@ -566,6 +566,26 @@ outright. Pages that refuse to parse as posts are skipped and counted
 (`unparsed`); posts whose page names no date carry their capture date,
 also counted.
 
+A rescue can also be limited to a stretch of time, the way the
+Archive's own site lets you pick a year and a month: `WAYBACK_FROM` and
+`WAYBACK_TO` take `2013`, `2013-01` or `2013-01-15`, and a date the
+importer cannot read aborts the run rather than quietly meaning
+"everything" -- a window dropped in silence would read as a blog the
+Archive never captured.
+
+```bash
+WAYBACK_FROM=2013-01 WAYBACK_TO=2013-06 ruby scripts/migrate_wayback.rb <url>
+```
+
+The window filters CAPTURES, not posts, and that distinction is worth
+holding on to: a late window is how you reach the end of a blog without
+replaying its whole history, but posts the feed had already dropped by
+then are missing from the run rather than from the blog -- so the
+summary says the run was windowed. Reading stays oldest-first inside
+the window, so overlapping captures still merge with the newest version
+of a post winning. The image survey ignores the window on purpose: it
+is the map you pick the window from.
+
 Honesty is the whole design here. The Archive only has what its
 crawler met: posts it never saw stay lost, images it never saved are
 dropped and **counted** (it answers a missing image with an HTML page
