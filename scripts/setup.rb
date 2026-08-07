@@ -434,6 +434,13 @@ def ask_deploy(env, _current)
   chosen = choose(t('q_backend'), options, current_index: index)
 
   if chosen == 'none'
+    # An explicit "nowhere" must also STICK on a site that already
+    # deploys somewhere -- leaving DEPLOY_BACKEND set meant the user's
+    # choice to stop deploying changed nothing and ./blog.sh rebuild
+    # kept shipping to the old target. The backend's values (tokens,
+    # URLs) stay, commented out by unset's convention, so choosing the
+    # backend again later finds them.
+    env.unset('DEPLOY_BACKEND')
     puts t('backend_skipped')
     puts
     return

@@ -263,9 +263,14 @@ module Tui
   # the table. The window size is fixed for the life of one menu call
   # (no SIGWINCH handling, same as term_width already assumes elsewhere
   # in this file) so the cursor-up repaint math stays valid.
-  def menu(items, hint: nil, allow_text: false, text_prompt: nil)
-    selected = 0
-    offset = 0
+  # `initial:` is where the cursor STARTS -- the current value in a
+  # settings menu. Without it every menu opened on row 0, and setup.sh's
+  # promise that Enter keeps the current value was false: Enter on the
+  # language menu switched an English site to Czech, because cs sorts
+  # first.
+  def menu(items, hint: nil, allow_text: false, text_prompt: nil, initial: 0)
+    selected = initial.to_i.clamp(0, [items.size - 1, 0].max)
+    offset = clamp_offset(selected, 0, [items.size, [term_height - 2 - (hint ? 2 : 0), 5].max].min, items.size)
     # Leave a couple of rows above the menu for whatever's already on
     # screen (the prompt that preceded it) plus the hint block, so the
     # menu doesn't try to claim the entire terminal height for itself.

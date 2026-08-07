@@ -502,6 +502,19 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Three setup-wizard corrections.** Menus now open with the cursor on
+  the CURRENT value, so pressing Enter keeps it -- exactly what the
+  wizard's own help promises; before, every menu opened on its first row,
+  and on the language menu (Czech sorts first) Enter silently switched an
+  English site to Czech. Choosing "Nowhere yet" as the deploy target now
+  actually unsets the configured backend instead of printing "builds stay
+  local" while `./blog.sh rebuild` kept shipping to the old target -- the
+  backend's tokens survive as comments for a later re-enable. And prose
+  answers keep their whitespace: two spaces after a period or a tab used
+  to fail the write's own verification and roll back every answer of the
+  run, because the folded YAML style collapses whitespace runs; such text
+  is stored as a quoted or literal scalar now, byte for byte.
+
 - **One build guard and three import fixes.** A pair of imported
   `redirect_from` entries where one address is a directory of the other
   ("/x.html/sub/" then "/x.html") crashed the whole build with EISDIR;

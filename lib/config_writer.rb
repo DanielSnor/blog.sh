@@ -293,11 +293,26 @@ module ConfigWriter
       indent = ConfigWriter.indent_of(@lines[line_no])
       key = key_path.last
       body_indent = indent + ConfigWriter::INDENT
-      style = value.include?("\n") ? '|-' : '>-'
 
-      body = wrap(value, body_indent)
-      extent = value_extent(line_no)
-      @lines[line_no..extent] = ["#{' ' * indent}#{key}: #{style}\n", *body]
+      # The folded scalar ('>-') re-wraps prose nicely but collapses every
+      # run of whitespace to one space -- and verify! then compares the
+      # reloaded value against the original, fails, and rolls back the
+      # WHOLE run's answers. Two spaces after a period was enough. Such
+      # text goes out as a quoted scalar instead, which YAML reads back
+      # byte for byte; multiline text whose first line is indented gets
+      # the literal style with an explicit indentation indicator, for the
+      # same reason.
+      if value.include?("\n")
+        first_indented = value.split("\n", 2).first.to_s.start_with?(' ', "\t")
+        style = first_indented ? "|#{ConfigWriter::INDENT}-" : '|-'
+        body = wrap(value, body_indent)
+        @lines[line_no..value_extent(line_no)] = ["#{' ' * indent}#{key}: #{style}\n", *body]
+      elsif value.match?(/\s\s|\t/)
+        @lines[line_no..value_extent(line_no)] = ["#{' ' * indent}#{key}: #{value.to_json}\n"]
+      else
+        body = wrap(value, body_indent)
+        @lines[line_no..value_extent(line_no)] = ["#{' ' * indent}#{key}: >-\n", *body]
+      end
       @intended[key_path] = value
       self
     end

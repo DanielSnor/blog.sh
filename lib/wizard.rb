@@ -141,7 +141,8 @@ module Wizard
       return options[index].first
     end
 
-    index = Tui.menu(options.map { |(_, desc)| desc }, hint: t('menu_hint'))
+    index = Tui.menu(options.map { |(_, desc)| desc }, hint: t('menu_hint'),
+                     initial: current_index)
     puts
     index.nil? ? options[current_index].first : options[index].first
   end
