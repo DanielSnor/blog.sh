@@ -746,6 +746,15 @@ Nothing to migrate -- see Upgrading at the end.
   round-trip matrix — every combination of up to three overlapping spans,
   saved three times over — is clean for the first time.
 
+- **`help` on a broken install prints help, and nothing else.** The
+  identity line above it wanted the site's name, and asking for it on a
+  configuration that will not parse produced a YAML error before the
+  first line of the help text — a complaint nobody had asked for, from a
+  command that exists precisely for when things are broken. The banner
+  now reads the configuration quietly and simply leaves out what it
+  cannot find. `doctor` still reports the problem in full, with the line
+  and column to look at, because that is the one command whose job it is.
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed
