@@ -1270,13 +1270,36 @@ Nothing to migrate -- see Upgrading at the end.
   comes out, page for page, with no warnings -- every new config section
   (`fonts`, palettes, the wizards) is optional, and `doctor` runs on a 1.1
   config without complaining about their absence.
-- **Going back works too**, which is worth knowing before you tag: the 1.1
-  engine builds posts that 1.2 has written since. `former_slugs`
-  redirects still come out, and the fields 1.1 has no notion of
-  (`redirect_from`, a resolved `embed_src`) are ignored rather than fatal
-  -- the only difference is that the redirect stubs `redirect_from` would
-  have produced are not emitted, because that feature does not exist
-  there.
+- **Going back builds, but it is not free**, which is worth knowing
+  before you tag. The 1.1 engine reads everything 1.2 has written without
+  choking: no build fails, no post is dropped, `former_slugs` redirects
+  still come out byte for byte, and fields 1.1 has no notion of are
+  ignored rather than fatal. What it cannot do is render what it never
+  knew about, and three of those are worth naming.
+  - **Audio posts lose the recording's address, not just its player.**
+    1.2 renders a player for bandcamp, spotify, soundcloud, mixcloud,
+    funkwhale and archive.org, and where it cannot it at least prints the
+    link. 1.1 has neither branch, so the page and the feed item both come
+    out as a bare "[audio unavailable]" with nothing to click. Video does
+    not do this -- 1.1 keeps the address there -- which makes audio the
+    one block type where going back loses something a reader could have
+    followed.
+  - **Comment threads go quiet on posts announced somewhere other than
+    the network your config names now.** 1.2 opens `connect-src` per post,
+    from the address each post was actually announced at; 1.1 builds it
+    from the configured network alone. The thread stays in the markup and
+    the browser silently refuses to fetch it. This bites hardest if you
+    have ever switched instances or moved between Mastodon and Bluesky.
+  - **Editing a 1.2-written post under 1.1 can lose text.** Rebuilding is
+    safe; re-saving is not. 1.1 does not escape a `|` inside a table cell
+    (everything after it is dropped), a `"` in a link title (the link is
+    destroyed and its raw markdown published as body text), or `*` inside
+    inline code (a backslash appears, and multiplies with every further
+    edit), and it truncates a link address containing brackets. If you
+    roll back, treat the archive as read-only until you come forward
+    again.
+  These are 1.1 behaving like 1.1; nothing about 1.2 has to be undone
+  first. Coming back forward re-renders every one of them correctly.
 - **Two more working files** sit next to the ones from 1.1:
   `.last-edit.meta` (which command wrote the editor buffer) and
   `.blog-sh.lock` (the build/deploy lock below). Both are gitignored, and
