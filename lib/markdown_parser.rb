@@ -71,7 +71,7 @@ module MarkdownParser
   # Alternative order is load-bearing: plain bold -- whose closer is
   # exactly two stars, the (?!\*) guard -- comes before the tail-collision
   # shapes, or "**F** dál ... ***v***" would read as one span from F to v.
-  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:(?!\*\*).)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:(?!\*\*).)*?)\*|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:(?!\*\*).)+?)\*\*\*|\*(?<italic>.+?)\*|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:(?!\*\*).)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:(?!\*\*).)*?)\*|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:(?!\*\*).)+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?!\*)|\*(?<italic>.+?)\*|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -119,6 +119,17 @@ module MarkdownParser
         formatting << { 'type' => 'italic', 'start' => start, 'end' => result.length }
       elsif m[:bold]
         append_span(result, formatting, m[:bold], 'bold', start)
+      elsif m[:badj]
+        # A bold span ending exactly where an italic one begins: the writer
+        # renders that as "**abcd***efgh*", and the run of three stars in
+        # the middle splits 2 + 1 -- the closer for the bold, the opener
+        # for the italic. Plain bold cannot take it (its closer is exactly
+        # two stars, the (?!\*) guard), so without this shape the whole
+        # paragraph fell through to plain italic and came back with stray
+        # asterisks in the visible text. Matches what CommonMark's
+        # delimiter runs do with the same bytes.
+        append_span(result, formatting, m[:badj], 'bold', start)
+        append_span(result, formatting, m[:iadj], 'italic', result.length)
       elsif m[:italic]
         append_span(result, formatting, m[:italic], 'italic', start)
       elsif m[:strike]

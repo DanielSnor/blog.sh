@@ -737,6 +737,15 @@ Nothing to migrate -- see Upgrading at the end.
 - **A post's text no longer runs into the date badge.** The right-hand
   padding was sized for a card without one.
 
+- **Bold running straight into italic keeps both.** Written out, that
+  adjacency is `**bold***italic*` — and the run of three stars in the
+  middle is not one delimiter but two: the closer for the bold, the
+  opener for the italic. Read as a single run, the whole paragraph fell
+  through to italic and came back with stray asterisks in the text. The
+  reading now splits the run the way CommonMark's own rules do, and the
+  round-trip matrix — every combination of up to three overlapping spans,
+  saved three times over — is clean for the first time.
+
 - **A feed whose CDATA sits on its own line no longer reads as twenty
   posts with no body.** `Feed#text_of` read an element through REXML's
   `element.text`, which returns only the FIRST text child -- and a feed
