@@ -63,10 +63,11 @@ duplicated.
 - **Old addresses can survive the move.** When the new site answers on the
   same domain the old blog did, sources that know their original URLs
   (beehiiv, Blogger, Ghost, Jekyll/Hugo and Movable Type/TypePad with a
-  pattern, Medium, Squarespace, Substack, Wix, WordPress/feed and
-  Tumblr today) can record each published post's old path as
-  `redirect_from` -- the build then serves a redirect at every one
-  of them, so nothing anyone ever linked goes dark. The wizard asks; the
+  pattern, LiveJournal, Medium, Squarespace, Substack, the Wayback
+  Machine, Wix, WordPress/feed and Tumblr today) can record each
+  published post's old path as `redirect_from` -- the build then serves
+  a redirect at every one of them, so nothing anyone ever linked goes
+  dark. The wizard asks; the
   scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
   other, the old paths were never yours to answer. Posts with no usable
   path (WordPress "plain" `?p=123` permalinks live in the query string,
@@ -565,6 +566,10 @@ still need `POST_PATTERN`. `WAYBACK_MODE=pages` skips the feed attempt
 outright. Pages that refuse to parse as posts are skipped and counted
 (`unparsed`); posts whose page names no date carry their capture date,
 also counted.
+
+Kept permalinks (`KEEP_PERMALINKS=1`, or the wizard's question) record
+the dead blog's own paths -- the feed item's link in feed mode, the
+archived page's address in page mode.
 
 A rescue can also be limited to a stretch of time, the way the
 Archive's own site lets you pick a year and a month: `WAYBACK_FROM` and

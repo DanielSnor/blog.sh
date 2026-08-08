@@ -18,6 +18,7 @@ Odkaz na tuhle stránku je i v nápovědě v editoru, takže ji máte při psan�
 - [Obrázky](#obrazky)
 - [Video](#video)
 - [Audio](#audio)
+- [Přílohy](#prilohy)
 - [Escapování](#escapovani)
 - [Záměrně nepodporované](#zamerne-nepodporovane)
 
@@ -332,7 +333,7 @@ by její cena dopadla na všechny, kdo ji *nepoužívají*:
 - podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu
   (názvy_souborů, snake_case); používejte hvězdičky
 - blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů;
-  používejte tři apostrofy
+  používejte tři zpětné apostrofy
 - nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici
   frontmatteru
 - vnořené citace `>>`

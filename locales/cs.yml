@@ -236,6 +236,7 @@ cli:
   cancelled: "Zrušeno."
   deleting_toot: "Mažu toot na Mastodonu: %{url}"
   delete_toot_failed: "Smazání selhalo (viz výš) — toot zůstává, jen teď odkazuje na dočasně mrtvou stránku."
+  announcement_kept: "Post si adresu %{url} nechává, aby šlo oznámení smazat později — a aby publikováním nevzniklo druhé."
   reverted_to_draft: "Vráceno do draftu: %{path}"
   updating_preview: "Aktualizuji náhled"
 

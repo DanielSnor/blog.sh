@@ -18,6 +18,7 @@ Ein Link auf diese Seite steht auch in der Editor-Hilfe, sie ist beim Schreiben 
 - [Bilder](#bilder)
 - [Video](#video)
 - [Audio](#audio)
+- [Anhänge](#anhange)
 - [Escaping](#escaping)
 - [Bewusst nicht unterstützt](#bewusst-nicht-unterstutzt)
 

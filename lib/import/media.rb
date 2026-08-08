@@ -295,9 +295,25 @@ module Import
 
     private
 
+    # An extension is whatever followed the last dot in a name somebody
+    # else chose, and File.extname hands it over verbatim -- quotes,
+    # angle brackets and slashes included. The build escapes it now, but
+    # a filename is the wrong place to carry markup in the first place,
+    # so nothing but letters and digits survives here. Anything else
+    # means the archive was not describing a file type, and .bin says
+    # what we actually know.
+    # Deliberately narrow: an extension that is already harmless is kept
+    # EXACTLY as it was, case and all, and a missing one stays missing.
+    # Tidying those would rename media on re-import -- the one thing
+    # numbering is careful about -- for no security gain. Only a name that
+    # could not be a file type gets replaced.
+    SAFE_EXT = /\A\.[A-Za-z0-9]{1,12}\z/.freeze
+
     def allocate(ext)
       @counter += 1
       @registered += 1
+      ext = ext.to_s
+      ext = '.bin' unless ext.empty? || SAFE_EXT.match?(ext)
       format('%02d%s', @counter, ext)
     end
 

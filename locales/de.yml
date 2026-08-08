@@ -242,6 +242,7 @@ cli:
   cancelled: "Abgebrochen."
   deleting_toot: "Lösche den Mastodon-Toot: %{url}"
   delete_toot_failed: "Löschen fehlgeschlagen (siehe oben) -- der Toot bleibt und zeigt vorerst auf eine tote Seite."
+  announcement_kept: "Der Beitrag behält die Adresse %{url}, damit die Ankündigung später gelöscht werden kann -- und damit ein erneutes Veröffentlichen keine zweite erzeugt."
   reverted_to_draft: "Auf Entwurf zurückgesetzt: %{path}"
   updating_preview: "Aktualisiere Vorschau"
 

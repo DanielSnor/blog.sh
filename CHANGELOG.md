@@ -1203,6 +1203,14 @@ Nothing to migrate -- see Upgrading at the end.
   ./setup.sh and ./style.sh finally admit digits work), `./blog.sh list`
   has a help line, the draft-preview banner keeps one exclamation mark
   instead of three, and English spelling settles on Favourited.
+  The wizard's six menu entries lead with the thing rather than the verb
+  ("The archive -- filters, search, preview"), the hints under them stop
+  offering to type a slug at menus that ignore letters and the top-level
+  one says Esc leaves the program rather than goes back, Czech settles on
+  one word for building a site where it had three, its yes/no prompts
+  read [a/N], its notes under an import preview stop saying the count
+  twice, and `config/site.yml.example` explains what the `rel: "me"` key
+  on a social link is for.
 
 - **Three last ways bold and italic could corrupt each other, found by
   widening the round-trip net from 150 span combinations to all 1,085
@@ -1228,6 +1236,41 @@ Nothing to migrate -- see Upgrading at the end.
     head-collision shapes also stopped stealing closers from spans
     further right: their rest halves may hold complete nested runs, but
     never a lone star.
+- **An imported archive cannot put markup on your site.** A media file's
+  name is chosen by whoever wrote the archive, and an extension is only
+  "everything after the last dot" -- so a file named with a quote and an
+  angle bracket closed the `src="..."` it was written into and opened a
+  tag of its own, on the author's own domain, where the site's own
+  Content-Security-Policy trusts it. The attribute beside it had been
+  escaped all along; this one was not. Media addresses are escaped now
+  wherever they are written (the image, the video, the audio, the
+  download card, `og:image` and the JSON-LD), and an extension that could
+  not be a file type is stored as `.bin` instead. Extensions that were
+  already harmless are kept exactly as they were, because renaming media
+  is what breaks a re-import.
+- **A media name is a name, not a path.** One carrying `../` pointed the
+  page outside the post's own directory and, during the build, wrote
+  there too -- somewhere `--prune` could never clean up again. Both ends
+  take the basename now.
+- **A post cannot forge an entry in your feed.** The rendered post goes
+  into RSS inside CDATA, and CDATA has exactly one way to end: a post
+  carrying `]]>` -- which an imported `embed_html` can, since it is
+  stored verbatim -- closed the section early, and everything after it
+  was read as feed markup. A reader could be handed a headline and a link
+  of the post's choosing, in an item that still parsed. The sequence is
+  split across two sections now, the standard way, and survives as text.
+- **A failed announcement deletion no longer loses the announcement.**
+  `unpublish` dropped the toot's address whether or not the delete had
+  worked, so an expired token left the announcement hanging in public
+  with nothing pointing at it -- no retry, no record, and publishing
+  again simply added a second one alongside the first. The address is
+  kept when the deletion fails, and the run says so.
+- **An import interrupted mid-copy no longer publishes half a photo.**
+  Media was copied straight to its destination, and "skip what already
+  exists" -- the rule that makes re-importing safe -- then skipped the
+  truncated file forever. Ctrl-C, a full disk or a container going away
+  was enough. Files are copied beside their destination and renamed into
+  place, so the only file under the real name is a complete one.
 - **A Medium export imports at all.** Every published post was skipped as
   "no id to tell which post it is". The adapter read the canonical
   address with a pattern that required the anchor's `class` attribute

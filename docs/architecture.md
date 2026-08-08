@@ -123,8 +123,8 @@ see it:
 ## Importing
 
 An import splits along the line between what every platform needs and what
-only one does, so that adding the fifth source doesn't mean a fifth copy of
-the first four's plumbing:
+only one does, so that adding a source means writing its mapping, not
+another copy of the plumbing every existing adapter shares:
 
 - **`Import::Media`** collects one post's media for `PostWriter`, from
   either a URL (download, following redirects, retrying transient failures)
@@ -140,10 +140,16 @@ the first four's plumbing:
   posts arrived than the source has. Two callbacks, `on_scan` and `on_post`,
   let a wizard show progress without this layer knowing what a terminal is.
 - **An adapter** implements only `label`, `each_item` (paging the source)
-  and `map(item, media)`, returning a post hash or a skip reason. Two
+  and `map(item, media)`, returning a post hash or a skip reason. Five
   optional hooks cover what sources differ on: `preamble` (a line to print
-  before a slow read) and `total` (the source's size, often knowable only
-  once the first page arrives).
+  before a slow read), `total` (the source's size, often knowable only
+  once the first page arrives), `postscript` (a one-line note after a run
+  or preview -- scheduled posts becoming drafts, posts with no usable
+  original address), `platform_tag` (the tag posts are filed under when
+  the platform's name makes a poor one -- "medium.com" says more than
+  "feed") and `keep_permalinks=` (a setter whose presence tells the
+  wizard this adapter can record old addresses as `redirect_from`, so the
+  question is asked per capability and defaults to no).
 - **`Import::HtmlBlocks`** converts a post body that arrives as markup into
   blocks, for the sources that hand over HTML rather than structured data.
   A tolerant tokenizer and a stack-based tree (an XML parser refuses real
@@ -166,9 +172,11 @@ site.timezone and shift by hours. Images referenced in the markup are
 downloaded and then *measured*: HTML rarely states dimensions, and a block
 without them is dropped at build time by `degenerate_image?`.
 
-An adapter judges items rather than pre-filtering them: `map` returns
-`:reply`/`:retweet`/`:quote`/`:empty` instead of the adapter quietly dropping
-them, so the run's summary can account for every item the source held. That
+An adapter judges items rather than pre-filtering them: `map` returns the
+reason as a Symbol -- `:reply`, `:retweet`, `:quote`, `:empty` and their kin;
+the wizard's `TRANSLATED_REASONS` in `scripts/import.rb` names two dozen
+across the adapters -- instead of quietly dropping the item, so the run's
+summary can account for every item the source held. That
 also means a written-post counter is not a progress fraction -- a source that
 skips half its items never writes as many posts as it has -- so both counters
 are reported and the caller picks: against a `LIMIT` the goal is posts
@@ -233,8 +241,9 @@ A single linear pass, no framework:
    overwritten; `defaults/` itself is not published. `config/site.yml`'s 7-key palettes
    compile into `assets/css/colors.css`, together with the header's font
    stacks and sizes and any `@font-face` a site declared for its own files
-   in `assets/fonts/`; `site.css` itself contains zero color values and no
-   site-specific typography. One generated stylesheet rather than two on
+   in `assets/fonts/`; `site.css` itself contains no palette values -- its
+   only color literals are palette-independent neutrals (white, two fixed
+   grays, black/white alpha overlays) -- and no site-specific typography. One generated stylesheet rather than two on
    purpose: it is already linked from the layout, so adding fonts to it
    changes two files on a deploy instead of every page in the archive. `build_favicon_ico` wraps `assets/images/favicon.png` in
    an ICO container (a 22-byte header, then the PNG verbatim) and emits

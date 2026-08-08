@@ -18,6 +18,7 @@ A link to this page is also in the in-editor help, so it's at hand while you wri
 - [Images](#images)
 - [Video](#video)
 - [Audio](#audio)
+- [Attachments](#attachments)
 - [Escaping](#escaping)
 - [Deliberately not supported](#deliberately-not-supported)
 

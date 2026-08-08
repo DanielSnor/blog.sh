@@ -137,11 +137,13 @@ says so on every build. The entry can never do anything again, and `[a]`
 marks exactly that entry as "taken by another post". Dropping any other
 one is a decision, not a repair: that link stops working for good.
 
-The wizard menu lists five activities, not every command: publish,
-schedule, unpublish, delete and the announcement live in this dialog
-(and the draft dialog) instead of being menu items. Every CLI command
-still exists unchanged -- `./blog.sh unpublish <slug>` works exactly as
-before; only the menu stopped listing it.
+The wizard menu lists six activities -- a new post, a post in hand, the
+scheduled-post queue, the archive browser, the trash and a rebuild --
+not every command: publish, schedule, unpublish, delete and the
+announcement live in this dialog (and the draft dialog) instead of
+being menu items. Every CLI command still exists unchanged --
+`./blog.sh unpublish <slug>` works exactly as before; only the menu
+stopped listing it.
 
 ## Writing from a phone
 
@@ -287,16 +289,18 @@ longer article that attaches its data stays an article with a file on it.
 `./import.sh` opens its own wizard: pick a source, and it reads the whole
 thing in dry-run first and tells you what *would* be written -- how many
 posts and media files, the first few slugs, and how many items it skipped
-and why. Nothing is written until you confirm, and confirming means typing the number of posts rather than pressing a key -- an answer you can't give without having read the preview. Sources are Bluesky and Tumblr over their
-APIs, and five exports you already have on disk: Twitter/X, Mastodon,
-Pixelfed, Instagram, and WordPress or any RSS/Atom feed -- those last two
-are one option, since a WXR export is RSS with extra elements and the file
-says which it is.
+and why. Nothing is written until you confirm, and confirming means typing the number of posts rather than pressing a key -- an answer you can't give without having read the preview. Sources are twenty-two: blog and newsletter
+platforms (WordPress, Blogger, Ghost, Medium, Substack, a Jekyll/Hugo
+tree, ...), the social networks (Twitter/X, Mastodon, Bluesky, Instagram,
+...), podcast feeds, and the Wayback Machine for a blog whose platform no
+longer exists at all. The wizard groups them by that question -- a blog
+you published, a network you posted to, a dead site -- and the full list
+lives in [importing.md](importing.md).
 
 Every source also runs without the wizard, for cron or a scripted
 migration -- one `scripts/migrate_<source>.rb` each, e.g.
 `scripts/migrate_bluesky.rb <handle>`, `scripts/migrate_instagram.rb <export-dir>`,
-`scripts/migrate_twitter.rb <export-dir>`,
+`scripts/migrate_wayback.rb <https://dead-blog.example>`,
 `scripts/migrate_feed.rb <export.xml | feed-url>`.
 Those skip the preview and write immediately; see
 [the README](../README.md#importing-existing-content).
@@ -307,9 +311,9 @@ Two things to expect on a real archive:
   thousand posts run for hours. Every phase reports progress -- what it's
   reading, how many items it found, then a `12/847` counter -- so a quiet
   terminal means something is wrong, not that it's working. Sample before
-  committing to that: the Tumblr and Twitter scripts take `LIMIT=20` to
-  import only the first twenty, which is enough to see whether the mapping
-  does what you expect. A second full run then overwrites them in place.
+  committing to that: every script takes `LIMIT=20` to import only the
+  first twenty, which is enough to see whether the mapping does what you
+  expect. A second full run then overwrites them in place.
 - **The deploy guard will stop you afterwards**, because a bulk import is
   exactly the "file count swung wildly" shape it watches for. That's
   working as intended: check the numbers, then re-run with `--force`.
@@ -418,7 +422,8 @@ wrong:
 | Add one 60 MB file | pass, with a notice |
 | Add one 120 MB file | stop, naming the file |
 | Empty `public.nosync/` | stop |
-| Delete `.deploy_baseline.json` | pass, saying the growth guard stands down once |
+| Delete `.deploy_baseline.json` | pass, with no stand-down notice -- the growth guard borrows the file count from the manifest |
+| Delete the manifest too | pass, saying the growth guard stands down once |
 | Any of the above | leave `.deploy_baseline.json` untouched -- a dry run is read-only |
 
 Two things make this easier to reason about: the failure state is anything

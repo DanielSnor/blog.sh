@@ -1520,13 +1520,22 @@ def cmd_unpublish(slug)
     return
   end
 
+  # Whether the announcement is really gone decides whether the post may
+  # forget it. Dropping the address after a FAILED delete left the toot
+  # hanging in public with nothing left pointing at it -- no retry, no
+  # record, and a later re-publish simply announced the post a second
+  # time alongside the first. An expired token is enough to get there.
+  toot_gone = true
   if post['mastodon_url']
     puts t('cli.deleting_toot', url: post['mastodon_url'])
-    warn t('cli.delete_toot_failed') unless MastodonPoster.delete(post['mastodon_url'])
+    toot_gone = MastodonPoster.delete(post['mastodon_url'])
+    warn t('cli.delete_toot_failed') unless toot_gone
   end
+  skeet_gone = true
   if post['bluesky_uri']
     puts t('cli.deleting_bluesky', url: post['bluesky_url'])
-    warn t('cli.delete_bluesky_failed') unless BlueskyPoster.delete(post['bluesky_uri'])
+    skeet_gone = BlueskyPoster.delete(post['bluesky_uri'])
+    warn t('cli.delete_bluesky_failed') unless skeet_gone
   end
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
@@ -1536,9 +1545,19 @@ def cmd_unpublish(slug)
                        # would 404 with no trace, exactly what renames promise not to do.
                        # Publishing back under the same address just consumes the marker.
                        'unpublished_from' => "#{File.basename(File.dirname(path))}/#{slug}")
-  updated.delete('mastodon_url')
-  updated.delete('bluesky_url')
-  updated.delete('bluesky_uri')
+  # Kept when the delete failed, so the address survives to be retried --
+  # and so a re-publish can see there is already an announcement out there.
+  if toot_gone
+    updated.delete('mastodon_url')
+  else
+    warn t('cli.announcement_kept', url: post['mastodon_url'])
+  end
+  if skeet_gone
+    updated.delete('bluesky_url')
+    updated.delete('bluesky_uri')
+  else
+    warn t('cli.announcement_kept', url: post['bluesky_url'])
+  end
   AtomicWrite.write_json(path, updated)
   puts t('cli.reverted_to_draft', path: path)
 

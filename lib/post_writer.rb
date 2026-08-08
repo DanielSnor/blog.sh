@@ -51,7 +51,27 @@ module PostWriter
     FileUtils.mkdir_p(media_dir)
     media_files.each do |src_path, filename|
       dest = File.join(media_dir, filename)
-      FileUtils.cp(src_path, dest) unless File.exist?(dest)
+      next if File.exist?(dest)
+
+      # Copied beside the destination and renamed into place, rather than
+      # written straight to it. "Skip what already exists" is what makes a
+      # re-import safe, and a copy interrupted halfway -- Ctrl-C, a full
+      # disk, a container that went away -- leaves a truncated file that
+      # every later run then skips, so the half-image publishes and no
+      # amount of re-importing replaces it. A rename either happened or it
+      # did not, so the only file under the real name is a complete one.
+      tmp = File.join(media_dir, ".#{filename}.part")
+      begin
+        FileUtils.cp(src_path, tmp)
+        File.rename(tmp, dest)
+      rescue StandardError
+        begin
+          File.delete(tmp)
+        rescue StandardError
+          nil
+        end
+        raise
+      end
     end
   end
 

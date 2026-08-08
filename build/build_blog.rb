@@ -356,7 +356,7 @@ end
 def render_audio(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
-    %(<audio controls preload="metadata" src="#{media_prefix}#{local_media['url']}"></audio>)
+    %(<audio controls preload="metadata" src="#{media_src(media_prefix, local_media['url'])}"></audio>)
   elsif (src = Embed.src(block))
     embed_iframe(src, block)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
@@ -390,7 +390,7 @@ end
 def render_video(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
-    %(<video controls preload="metadata"#{size_attrs(local_media)} src="#{media_prefix}#{local_media['url']}"></video>)
+    %(<video controls preload="metadata"#{size_attrs(local_media)} src="#{media_src(media_prefix, local_media['url'])}"></video>)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
     # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
     # other providers (e.g. Instagram) ship their own responsive blockquote/script.
@@ -479,7 +479,7 @@ def render_block(block, media_prefix, seen = {})
     ext = 'FILE' if ext.empty?
     size = human_size(file['size'])
     sub = [ext, size].compact.reject(&:empty?).join(' · ')
-    %(<a class="file-card" href="#{media_prefix}#{file['url']}" download>) +
+    %(<a class="file-card" href="#{media_src(media_prefix, file['url'])}" download>) +
       %(<span class="file-icon">#{h(ext[0, 4])}</span>) +
       %(<span class="file-meta"><span class="file-label">#{h(label)}</span>) +
       %(<span class="file-sub">#{h(sub)}</span></span>) +
@@ -495,7 +495,7 @@ def render_block(block, media_prefix, seen = {})
     # Omitted rather than empty when the size is unknown: width="" is not a
     # valid HTML integer attribute, and an image that can't reserve space is
     # better off saying nothing than saying nothing-shaped-like-a-number.
-    %(<figure><img src="#{media_prefix}#{media['url']}"#{size_attrs(media)} alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
+    %(<figure><img src="#{media_src(media_prefix, media['url'])}"#{size_attrs(media)} alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
   when 'video'
     # <figure> is only added when a caption exists, so imported videos
     # without one don't get an unwanted layout change.
@@ -837,7 +837,10 @@ def post_og_image(post)
   media = block && (block['media'] || []).first
   return DEFAULT_OG_IMAGE unless media && media['url']
 
-  "#{SITE_BASE_URL}#{post_path(post)}#{media['url']}"
+  # Basename, the same as the page's own <img> uses: this address goes into
+  # og:image and into the JSON-LD, and a name carrying "../" pointed both
+  # of them outside the post -- at whatever happens to sit there.
+  "#{SITE_BASE_URL}#{post_path(post)}#{File.basename(media['url'].to_s)}"
 end
 
 def post_description(post)
@@ -904,6 +907,13 @@ def rss_item(post)
   title = CGI.escapeHTML((post['title'] || post['slug']).to_s)
   pub_date = post_time(post).rfc2822
   description = render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}")
+  # A post's rendered HTML goes into the feed inside CDATA, and CDATA has
+  # exactly one way to end. A post carrying "]]>" -- which an imported
+  # embed_html can, since it is stored verbatim -- closed the section
+  # early and the rest of it was read as feed markup: a reader could be
+  # handed a <title> and <link> of the post's choosing, in an item that
+  # still validated. The sequence is split across two CDATA sections, the
+  # standard way, so it survives as text.
   categories = (post['tags'] || []).map { |t| "<category>#{CGI.escapeHTML(t)}</category>" }.join
   <<~ITEM
     <item>
@@ -911,7 +921,7 @@ def rss_item(post)
       <link>#{url}</link>
       <guid isPermaLink="true">#{url}</guid>
       <pubDate>#{pub_date}</pubDate>
-      <description><![CDATA[#{description}]]></description>
+      <description><![CDATA[#{cdata_safe(description)}]]></description>
       #{categories}
     </item>
   ITEM
@@ -1359,6 +1369,30 @@ NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   ["/type/#{type}/", t("nav.#{key}")]
 end.freeze
 
+# A media file's own name, ready to be put in an attribute. Two things go
+# wrong without this, and both arrive through an ordinary import of
+# somebody else's archive rather than through anything the author typed.
+#
+# The name is attacker-controlled: Import::Media#allocate numbers the file
+# but keeps File.extname verbatim, and an extension is only "everything
+# after the last dot" -- quotes and angle brackets included. Unescaped in
+# src="..." that closes the attribute and opens a tag, which is stored XSS
+# on the author's own domain. (The alt attribute one line over has been
+# escaped all along; this is the asymmetry, not a new requirement.)
+#
+# And a name is not a path: "../" in it walks out of the post's directory,
+# both when the page links it and when the build copies it. The name is
+# taken as a basename, so a crafted one lands beside the post or nowhere.
+def media_src(prefix, name)
+  "#{prefix}#{h(File.basename(name.to_s))}"
+end
+
+# "]]>" cannot appear inside a CDATA section at all -- the only escape is
+# to end the section and start another around the ">".
+def cdata_safe(text)
+  text.to_s.gsub(']]>', ']]]]><![CDATA[>')
+end
+
 def referenced_media_filenames(post)
   post['content'].flat_map do |block|
     [(block['media'] || []).first, (block['poster'] || []).first].compact.map { |m| m['url'] }
@@ -1372,7 +1406,14 @@ end
   # Media stays in media/<year>/<slug>/ even for drafts -- publishing
   # doesn't move files, it just moves the output page.
   source_media_dir = File.join(MEDIA_DIR, year.to_s, post['slug'])
-  referenced_media_filenames(post).each do |filename|
+  referenced_media_filenames(post).each do |name|
+    # Basename for the same reason the page uses one: a "filename" carrying
+    # "../" is a path, and File.join would honour it -- on the way in it
+    # reads a file the post has no business reading, and on the way out it
+    # writes outside public.nosync/, where prune can never clean it up.
+    filename = File.basename(name.to_s)
+    next if filename.empty? || filename == '.' || filename == '..'
+
     src = File.join(source_media_dir, filename)
     dest = File.join(dir, filename)
     if File.exist?(src)

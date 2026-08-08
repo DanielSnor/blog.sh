@@ -142,15 +142,17 @@ deploy step around exactly that. A few of the choices that came out of it:
 - A platform's own address turns into its player, from the address alone:
   YouTube, Vimeo, PeerTube and archive.org as video, Spotify, SoundCloud
   and Mixcloud as audio. The engine stores a provider and an id, never the
-  platform's embed code, and each page asks its Content-Security-Policy
-  for exactly the players it carries. Funkwhale and Bandcamp keep no id in
+  platform's embed code, and a page's Content-Security-Policy admits a
+  player's origin only when the page carries it -- except YouTube's two
+  origins, which every page allows. Funkwhale and Bandcamp keep no id in
   their address, so those two are looked up once when the post is saved --
   the only moment writing a post touches the network
-- The full syntax reference at `/markdown/` is generated directly from
-  this parser, so it can't drift out of sync with what's actually supported;
-  its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the
-  same way as `locales/*.yml` -- picked by `site.lang` (en, cs and de ship
-  with the engine), English fallback.
+- The full syntax reference at `/markdown/` is rendered through this
+  same parser, so every example on it displays exactly as it would in a
+  post; the page itself is a hand-maintained document
+  (`templates/markdown-cheat-sheet.<lang>.md`), localized the same way
+  as `locales/*.yml` -- picked by `site.lang` (en, cs and de ship with
+  the engine), English fallback.
   Adding a language is data, not code -- see
   [docs/localization.md](docs/localization.md)
 
@@ -226,7 +228,9 @@ deploy step around exactly that. A few of the choices that came out of it:
   auto-assembled from adjacent image blocks
 - No framework -- vanilla JS in small, single-purpose files
 - Color scheme is config-driven, not a file to swap: `assets/css/site.css`
-  holds only layout/structure, no color values; `config/site.yml`'s
+  holds layout/structure and only the fixed colors that fit any palette
+  (white on accent surfaces, the dark scrims of the banner overlays and
+  the lightbox, the search field's grey text); `config/site.yml`'s
   `colors.light`/`colors.dark` (7 keys each -- bg/text/meta_text/accent/
   nav_bg/border/pill_bg) are compiled at build time into
   `assets/css/colors.css` (see `build_colors_css` in `build/build_blog.rb`).
@@ -234,11 +238,11 @@ deploy step around exactly that. A few of the choices that came out of it:
   badge hover, search input background) is derived from those 7, not
   separately configurable. Defaults to blog.sh's own blue palette
   (`DEFAULT_COLORS`) if `colors:` is omitted
-- Four whole palettes ship in `config/palettes.yml` -- default blue,
-  warm, monochrome, high contrast, each in both modes -- so `./style.sh`
-  can set a palette in one keystroke instead of asking for fourteen hex
-  values. Add your own by adding an entry; the wizard lists what's in
-  the file
+- Seven whole palettes ship in `config/palettes.yml` -- default blue,
+  warm, monochrome, high contrast, sunflower, garden, ocean, each in
+  both modes -- so `./style.sh` can set a palette in one keystroke
+  instead of asking for fourteen hex values. Add your own by adding an
+  entry; the wizard lists what's in the file
 - Banner overlay: `site.short_name` (top-left) and `site.description`
   (bottom-right, wraps to multiple lines) render on top of the banner
   image. Each overlay darkens the corner it sits in so it stays readable
@@ -276,11 +280,12 @@ deploy step around exactly that. A few of the choices that came out of it:
   archive (2008-2022); and the Wayback Machine, for a blog whose
   platform no longer exists at all
 - A blog that keeps its domain keeps its addresses: sources that know
-  their posts' original URLs (beehiiv, Blogger, Ghost, Medium, Movable
-  Type/TypePad, Squarespace, Substack, WordPress, Tumblr, Wix) can record each
-  one as a `redirect_from` (Substack's `/p/<slug>` comes straight from
-  the export), and the built site answers at every old path with a
-  redirect
+  their posts' original URLs (beehiiv, Blogger, Ghost, Jekyll/Hugo,
+  LiveJournal, Medium, Movable Type/TypePad, Squarespace, Substack,
+  WordPress, Tumblr, Wix, the Wayback Machine and any RSS/Atom feed) can
+  record each one as a `redirect_from` (Substack's `/p/<slug>` comes
+  straight from the export), and the built site answers at every old
+  path with a redirect
 - `lib/import/` holds what every source shares -- media download or copy,
   filename numbering, skip accounting, progress callbacks -- so an adapter
   only has to page a source and shape one item
@@ -302,9 +307,9 @@ deploy step around exactly that. A few of the choices that came out of it:
 - **Build:** Ruby (`build/build_blog.rb`)
 - **Authoring:** a Ruby CLI/wizard (`scripts/manage_post.rb`, run via `./blog.sh`)
 - **Templates:** ERB (`templates/`)
-- **i18n:** `locales/*.yml` + `lib/i18n.rb` -- ships with English (default)
-  and Czech; add another `locales/<code>.yml` for a different language,
-  missing keys fall back to English
+- **i18n:** `locales/*.yml` + `lib/i18n.rb` -- ships with English (default),
+  Czech and German; add another `locales/<code>.yml` for a different
+  language, missing keys fall back to English
 - **Deploy:** pluggable backends (`lib/deploy_backend/`) -- Cloudron
   Surfer (Files API), a local directory, rsync, git-pages, rclone, or
   SFTP; `scripts/deploy_web.rb`
@@ -324,7 +329,7 @@ scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers
                            migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
 lib/import/              Import adapters plus the layer they share (media, run, CLI)
-locales/                 UI strings for the generated site and the CLI (en.yml, cs.yml)
+locales/                 UI strings for the generated site and the CLI (en.yml, cs.yml, de.yml)
 templates/               ERB templates (layout, post, index, search, partials)
                          + markdown-cheat-sheet.<lang>.md, the /markdown/ page's source
 assets/                  CSS/JS/fonts (drop your own images into assets/images/)
@@ -384,7 +389,7 @@ below assume Ruby 2.7+ is already on the machine:
    already a working local site, and the wizard writes the same files
    without disturbing a line you wrote yourself.
 2. `./style.sh` for how it looks and what it says about itself: the
-   palette (four ship with the engine, so it is one keystroke rather
+   palette (seven ship with the engine, so it is one keystroke rather
    than fourteen hex values), the banner image (copied into place and
    measured, so its declared size can't drift from the file), your bio,
    the footer, the social icons and the sidebar widgets. A menu, so you
@@ -567,8 +572,9 @@ ruby build/build_blog.rb   # rebuild into public.nosync/
 
 The sidebar widgets and per-post stats are refreshed by
 `scripts/refresh-sidebar.sh` -- it fetches the data, rewrites only the
-four JSON files and uploads just those, no site rebuild. Run it from cron
-wherever the site is built:
+JSON files (six at most: toots, Pixelfed, commits, Bluesky, RSS, stats)
+and uploads just the ones the site's configured widgets produce, no site
+rebuild. Run it from cron wherever the site is built:
 
 ```
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh
@@ -590,12 +596,13 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Imports** -- Bluesky, Tumblr, Mastodon, Pixelfed, Instagram, a
-  Twitter/X archive, WordPress and any RSS/Atom feed are covered. Two of
-  those are one adapter each covering two things: WordPress and feeds,
-  because they are one format (a WXR export *is* RSS 2.0, with `wp:`
-  elements layered on for what a feed has no room for), and Instagram's
-  HTML and JSON exports, because they are one archive serialised twice.
+- **Imports** -- twenty-two sources are covered (the table under
+  [Importing existing content](#importing-existing-content)). Some of
+  those share an adapter: WordPress and feeds, because they are one
+  format (a WXR export *is* RSS 2.0, with `wp:` elements layered on for
+  what a feed has no room for), and the HTML and JSON variants of the
+  Facebook, Instagram and Threads exports, because each pair is one
+  archive serialised twice.
   What a new source needs is an adapter with three methods -- everything
   else (media, dedup, dry-run, reporting, HTML → blocks) is already
   shared.

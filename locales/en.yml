@@ -245,6 +245,7 @@ cli:
   cancelled: "Cancelled."
   deleting_toot: "Deleting the Mastodon toot: %{url}"
   delete_toot_failed: "Deletion failed (see above) -- the toot stays, just pointing at a temporarily dead page for now."
+  announcement_kept: "The post keeps the address %{url}, so the announcement can still be deleted later -- and so publishing again does not add a second one."
   reverted_to_draft: "Reverted to draft: %{path}"
   updating_preview: "Updating preview"
 
