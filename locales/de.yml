@@ -508,7 +508,7 @@ import:
     thread: "Diskussions-Thread, kein Beitrag"
     missing_html: "der Export enthält dafür keine HTML-Datei"
     bad_frontmatter: "das Frontmatter ließ sich nicht lesen"
-    no_identity: "keine Medium-ID -- nicht zu erkennen, welcher Beitrag es ist"
+    no_identity: "keine Medium-ID -- Beitrag nicht zuzuordnen"
     no_audio: "ein Feed-Eintrag ohne Audio -- keine Episode"
     audio_unfetchable: "die Audiodatei ließ sich nicht herunterladen"
     unparsed: "die archivierte Seite ließ sich nicht als Beitrag lesen"
