@@ -58,19 +58,30 @@ module MarkdownParser
   # The link target allows one level of balanced parentheses
   # ("/Page(ID-123).aspx"), matching what CommonMark does; the writer
   # percent-encodes the pathological rest.
-  # Three extra alternatives ahead of plain bold handle the star
-  # collisions the writer legitimately produces when bold and italic
-  # share a boundary -- "***both***", "***head*rest**" (italic on the
-  # head of a bold span) and "**pre*tail***" (italic on its tail).
-  # Without them "***" swallowed a star and shed the italic; with them
-  # the reading matches what CommonMark does with the same bytes.
+  # Four extra alternatives carry the star collisions the writer
+  # legitimately produces when bold and italic meet. A run of stars is
+  # not one delimiter: three of them between two letters can close one
+  # span and open another, which is what CommonMark's delimiter runs say
+  # and what an author means. The four shapes are "***both***",
+  # "***head*rest**" (italic on the head of a bold span),
+  # "**pre*tail***" (italic on its tail), and "**bold***italic*" --
+  # adjacency, where the middle run splits two-plus-one.
   # The collision shapes use a tempered dot -- (?:(?!\*\*).) -- so their
   # halves can never reach ACROSS an ordinary bold boundary to a "***"
   # further down the paragraph; without it, "**A** ... ***x***" read as
   # one giant span from A to x.
-  # Alternative order is load-bearing: plain bold -- whose closer is
-  # exactly two stars, the (?!\*) guard -- comes before the tail-collision
-  # shapes, or "**F** dál ... ***v***" would read as one span from F to v.
+  #
+  # Alternative order is load-bearing, in both directions. Plain bold --
+  # whose closer is exactly two stars, the (?!\*) guard -- comes BEFORE
+  # the tail-collision shapes, or "**F** dál ... ***v***" reads as one
+  # span from F to v. The adjacency shape comes AFTER them and last of
+  # the four, immediately before plain italic: placed any earlier it
+  # takes matches that belong to the tail collisions, and partially
+  # overlapping spans -- what every NPF import produces -- come back with
+  # stray asterisks in the text. It may only have what nothing else can
+  # read. tests/test_markdown_roundtrip.rb walks all 150 combinations of
+  # up to three spans; that matrix is what these positions were settled
+  # against, and what will notice if they move.
   INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:(?!\*\*).)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:(?!\*\*).)*?)\*|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:(?!\*\*).)+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?!\*)|\*(?<italic>.+?)\*|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into

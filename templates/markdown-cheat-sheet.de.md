@@ -80,6 +80,16 @@ Hervorhebungen lassen sich kombinieren und verschachteln:
 
 **fetter Text mit *Kursivem* darin**
 
+Sie dürfen auch unmittelbar nebeneinander stehen, ohne Leerzeichen. Die
+drei Sterne in der Mitte werden als zwei gelesen: das schließende Paar
+des Fettdrucks und der einzelne, der das Kursive öffnet.
+
+```
+**fett***kursiv*
+```
+
+**fett***kursiv*
+
 ## Links
 
 Text in eckigen Klammern, Adresse in runden. Nach der Adresse kann ein Titel in Anführungszeichen stehen — er erscheint beim Überfahren als Tooltip.

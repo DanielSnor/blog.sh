@@ -80,6 +80,16 @@ Emphasis can be combined and nested:
 
 **bold text with *italics* inside**
 
+They can also sit straight next to each other, with no space between. The
+three stars in the middle are read as two: the closing pair for the bold,
+and the single one that opens the italic.
+
+```
+**bold***italic*
+```
+
+**bold***italic*
+
 ## Links
 
 Text in square brackets, address in round ones. A title in quotes can follow the address — it shows up as a tooltip on hover.

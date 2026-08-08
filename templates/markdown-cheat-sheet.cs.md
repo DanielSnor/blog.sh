@@ -80,6 +80,15 @@ Zvýraznění jde kombinovat a vnořovat do sebe:
 
 **tučný text s *kurzívou* uvnitř**
 
+Můžou taky stát hned vedle sebe, bez mezery. Trojice hvězdiček uprostřed
+se čte jako dvě: zavírací pár tučného a jedna, která otevírá kurzívu.
+
+```
+**tučně***kurzívou*
+```
+
+**tučně***kurzívou*
+
 ## Odkazy
 
 Text v hranatých závorkách, adresa v kulatých. Za adresu se dá přidat titulek v uvozovkách — ten se ukáže jako bublina po najetí myší.
