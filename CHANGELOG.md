@@ -1228,6 +1228,19 @@ Nothing to migrate -- see Upgrading at the end.
     head-collision shapes also stopped stealing closers from spans
     further right: their rest halves may hold complete nested runs, but
     never a lone star.
+- **The import summary is in your language again, all of it.** Eleven of
+  the reasons a source can give for skipping something were printed as
+  their internal English names in the middle of a Czech or German
+  summary -- `crosspost`, `checkin`, `no_content`, `retweet`, `thread`,
+  `missing_html`, `bad_frontmatter`, `no_identity`, `no_audio`,
+  `audio_unfetchable` and `unparsed`. Every source added in this release
+  brought its own vocabulary, and the list of translated reasons stayed
+  where the first four sources had left it. It showed worst on a
+  Facebook export, where the skipped crossposts are usually the largest
+  number in the run: three of the four lines read in English, one line
+  above a translated sentence reporting the same count. The engine's
+  own reasons are all translated now, and a test walks every adapter and
+  fails if a new one arrives without wording in all three languages.
 - **`doctor` on a config file it cannot read says so.** A `site.yml`
   owned by root after a wizard ran under sudo -- exactly the install
   that needs diagnosing -- crashed the diagnosis with a raw Psych

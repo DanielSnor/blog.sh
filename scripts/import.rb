@@ -443,7 +443,22 @@ end
 # engine ships -- but a skip reason comes from an adapter, and a new adapter
 # inventing one must not take the wizard down mid-summary. Translated when
 # known, printed raw when not.
-TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed boost reblog error undated comment].freeze
+#
+# The safety net is for adapters the engine does NOT ship. Every reason our
+# own adapters return belongs here, and for a long time eleven of them did
+# not: each source added during 1.2 brought its own vocabulary and this list
+# stayed where the first four sources had left it. The wizard then printed
+# "skipped (crosspost): 1598" in Czech, one line above a Czech sentence
+# reporting the same number -- and nobody noticed, because the big
+# migrations run through migrate_*.rb, whose summary is English by design
+# (lib/import/cli.rb). tests/test_gaps.rb now walks every adapter and fails
+# if a reason it can return is missing here or from any of the three
+# locales, so the next source cannot repeat it.
+TRANSLATED_REASONS = %w[
+  reply repost quote empty attachment page not_a_post trashed boost reblog error undated comment
+  retweet crosspost checkin no_content thread missing_html bad_frontmatter no_identity
+  no_audio audio_unfetchable unparsed
+].freeze
 
 def reason_label(reason)
   TRANSLATED_REASONS.include?(reason.to_s) ? t("import.reason.#{reason}") : reason.to_s

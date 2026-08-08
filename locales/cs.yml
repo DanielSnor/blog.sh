@@ -496,6 +496,17 @@ import:
     error: "převod selhal — viz řádky výše"
     undated: "bez data — v exportu chybí post_date i čas rozeslání"
     comment: "komentář — cizí text pod postem, ne post"
+    retweet: "retweet"
+    crosspost: "crosspost z jiné platformy"
+    checkin: "check-in beze slova — bod na mapě, ne post"
+    no_content: "žádný text, žádná média, žádný odkaz"
+    thread: "diskusní vlákno, ne post"
+    missing_html: "v exportu k němu chybí HTML soubor"
+    bad_frontmatter: "nepodařilo se přečíst front matter"
+    no_identity: "chybí id z Media — nejde určit, o který post jde"
+    no_audio: "položka feedu bez zvuku — není to epizoda"
+    audio_unfetchable: "zvukový soubor se nepodařilo stáhnout"
+    unparsed: "archivovanou stránku nešlo přečíst jako post"
   # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
   # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.
   note:

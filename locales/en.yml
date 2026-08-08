@@ -508,6 +508,17 @@ import:
     error: "failed to convert -- see the lines above"
     undated: "no date -- the export carries neither post_date nor a send time"
     comment: "a comment -- someone else's text under a post, not a post"
+    retweet: "retweet"
+    crosspost: "crosspost from another platform"
+    checkin: "a check-in with nothing said -- a dot on a map, not a post"
+    no_content: "no text, no media, no link"
+    thread: "a discussion thread, not a post"
+    missing_html: "the export carries no HTML file for it"
+    bad_frontmatter: "the front matter could not be read"
+    no_identity: "no Medium id -- no way to tell which post it is"
+    no_audio: "a feed item with no audio -- not an episode"
+    audio_unfetchable: "the audio file could not be downloaded"
+    unparsed: "the archived page could not be read as a post"
   # Adapter postscripts -- the notes under the preview and the summary. The
   # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.
   note:
