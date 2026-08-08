@@ -194,9 +194,23 @@ abort('❌ public.nosync/ does not exist -- run the build first (ruby build/buil
 # would otherwise get a red ❌ on its very first post. Logged loudly so a
 # server whose env.sh lost its values doesn't look like a clean deploy.
 unless DRY || BACKEND.configured?
-  puts "ℹ️  Deploy backend '#{BACKEND.label}' is not configured -- skipping the upload. " \
-       'The build in public.nosync/ is complete; view it with ./blog.sh preview. ' \
-       'To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example).'
+  # "Nowhere yet" is an answer, not a half-finished setup. An unset
+  # DEPLOY_BACKEND resolves to Surfer for compatibility (see
+  # DeployBackend.pick), so naming that backend here told somebody who
+  # had just declined a deploy target in ./setup.sh that a product they
+  # have never heard of is misconfigured -- on their very first post.
+  # doctor already draws this line and says "No deploy target chosen";
+  # these two describe the same install and have to agree.
+  message =
+    if ENV['DEPLOY_BACKEND'].to_s.strip.empty?
+      'ℹ️  No deploy target chosen, so the site is built locally and goes nowhere. ' \
+      'View it with ./blog.sh preview; run ./setup.sh when you want it online.'
+    else
+      "ℹ️  Deploy backend '#{BACKEND.label}' is not configured -- skipping the upload. " \
+      'The build in public.nosync/ is complete; view it with ./blog.sh preview. ' \
+      'To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example).'
+    end
+  puts message
   exit 0
 end
 

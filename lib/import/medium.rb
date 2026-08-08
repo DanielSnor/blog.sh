@@ -53,7 +53,7 @@ module Import
     def map(path, media)
       html = File.read(path, encoding: 'utf-8')
       draft = File.basename(path).start_with?('draft_')
-      canonical = html[%r{<a[^>]*class="[^"]*p-canonical[^"]*"[^>]*href="([^"]+)"}, 1].to_s
+      canonical = anchor_href(html, 'p-canonical')
 
       slug, hash = identity(path, canonical, draft)
       return :no_identity if hash.nil?
@@ -144,8 +144,26 @@ module Import
     end
 
     def account_of(html)
-      href = html[%r{<a[^>]*class="[^"]*p-author[^"]*"[^>]*href="([^"]+)"}, 1].to_s
+      href = anchor_href(html, 'p-author')
       href[%r{/(@[^/"]+)}, 1] || href[%r{https?://([^/"]+)}, 1]
+    end
+
+    # The anchor is found first and its address read second, rather than
+    # both in one pattern. HTML does not promise an attribute order, and
+    # Medium's own exports write href BEFORE class -- so a pattern that
+    # demanded class first matched nothing at all. That cost every
+    # PUBLISHED post: no canonical address meant no id, and the post was
+    # skipped as :no_identity. Drafts came through, because their id is
+    # read from the file name, which is exactly why an export could look
+    # like it half-worked. Verified against the fixture Ghost's own
+    # medium-export tool ships:
+    #   <a href="https://medium.com/@JoeBloggs/testpost-efefef12121212"
+    #      class="p-canonical">
+    # The class attribute carries more than one name ("p-author h-card"),
+    # so the name is matched inside it rather than against the whole.
+    def anchor_href(html, name)
+      tag = html[/<a\b[^>]*class="[^"]*#{Regexp.escape(name)}[^"]*"[^>]*>/]
+      tag ? tag[/href="([^"]*)"/, 1].to_s : ''
     end
 
     def tags_of(html)

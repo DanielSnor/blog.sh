@@ -1228,6 +1228,22 @@ Nothing to migrate -- see Upgrading at the end.
     head-collision shapes also stopped stealing closers from spans
     further right: their rest halves may hold complete nested runs, but
     never a lone star.
+- **A Medium export imports at all.** Every published post was skipped as
+  "no id to tell which post it is". The adapter read the canonical
+  address with a pattern that required the anchor's `class` attribute
+  before its `href` -- and Medium's exports write them the other way
+  round, so the address came back empty and the post lost the id that
+  names it. Drafts were unaffected, because their id is read from the
+  file name, which is exactly why an export could look like it half
+  worked. The anchor is now found first and its address read second, so
+  neither order matters.
+- **A site with no deploy target says so, instead of naming one you
+  declined.** Answer "nowhere yet" in `./setup.sh` and the very first
+  post reported that the Surfer backend was not configured -- a product
+  that install had never heard of. An unset backend resolves to Surfer
+  for compatibility, and the build had no notion of the difference
+  between "not chosen" and "chosen but unconfigured". `doctor` has drawn
+  that line all along; now they agree.
 - **The import summary is in your language again, all of it.** Eleven of
   the reasons a source can give for skipping something were printed as
   their internal English names in the middle of a Czech or German
