@@ -30,10 +30,10 @@ module SiteHeader
   # the config. `doctor` still says it, at length, because that is the one
   # command whose whole job is to.
   #
-  # Deliberately not memoised: ./style.sh prints this again after writing
-  # the config, and a cached copy would show the author the values they
-  # just changed away from. It is one small file, read a handful of times
-  # per run.
+  # Deliberately not memoised. The wizards render this banner repeatedly
+  # in one process -- after every screen clear -- and a config written
+  # mid-session should show through on the next render rather than at the
+  # next launch. It is one small file, read a handful of times per run.
   def config
     data = YamlCompat.load_file(SiteConfig::PATH)
     data.is_a?(Hash) ? data : {}

@@ -91,6 +91,19 @@ module Import
     def from_url(url)
       return nil if url.to_s.empty?
       return @by_source[url] if @by_source.key?(url)
+      # Only what an HTTP fetch could ever answer. A "cid:", "file:" or
+      # "about:" reference has no host, so every attempt fails the same way
+      # -- and the throttle backoff (15/30/45/60s) then spends minutes per
+      # image on an address that was never fetchable. Recorded as a failure
+      # so the summary still names it, and the number is spent so the
+      # remaining files keep their places.
+      unless url.to_s.match?(%r{\Ahttps?://[^/\s]}i)
+        filename = allocate(extension_for(url))
+        @failures << url
+        @by_source[url] = nil
+        uncount
+        return nil
+      end
 
       filename = allocate(extension_for(url))
       if @dry_run

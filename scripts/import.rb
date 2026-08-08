@@ -483,7 +483,15 @@ def report(result, dry_run:)
   # post whose only image is gone maps to :empty). One line for both told
   # the author their skipped posts had been "written without" the file.
   skipped_failures = Array(result.skipped_media_failures)
-  from_written = result.media_failures - skipped_failures
+  # Counted off one by one, not with Array#- : the same missing file can be
+  # referenced by a post that WAS written and by one that was skipped, and
+  # the set difference removes every occurrence -- so one shared file
+  # erased the written post's loss from the report entirely.
+  from_written = result.media_failures.dup
+  skipped_failures.each do |path|
+    i = from_written.index(path)
+    from_written.delete_at(i) if i
+  end
   unless from_written.empty?
     puts Tui.paint(t('import.media_failed', count: from_written.size), :yellow)
     from_written.first(3).each { |url| puts "  #{url}" }
