@@ -308,6 +308,33 @@ module MarkdownWriter
     # over the same range) -- rendering both made "****", which reads
     # back as garbage. One of each is enough.
     spans.uniq! { |f| [f['type'], f['start'], f['end'], f['url']] }
+    # Same-type spans that overlap or nest become ONE span over the union:
+    # markdown cannot say "bold inside bold" (the delimiters cancel at the
+    # junction into "****"), and there is nothing to say anyway -- bold
+    # over 0-10 plus bold over 0-6 IS bold over 0-10. Two links only union
+    # when they point the same way; different addresses instead cede the
+    # shared range to the span that starts first, and a link wholly inside
+    # a different link cuts its host in two around itself -- both of which
+    # markdown CAN say, unlike an <a> inside an <a>.
+    loop do
+      pair = spans.combination(2).find do |a, b|
+        a['type'] == b['type'] && a['start'] < b['end'] && b['start'] < a['end']
+      end
+      break unless pair
+
+      a, b = pair.sort_by { |s| [s['start'].to_i, s['end'].to_i] }
+      attrs = ->(s) { s.reject { |k, _| k == 'start' || k == 'end' } }
+      if attrs.call(a) == attrs.call(b)
+        a['end'] = [a['end'], b['end']].max
+        spans.delete(b)
+      elsif b['end'] <= a['end']
+        spans.delete(a)
+        spans << a.merge('end' => b['start']) if a['start'] < b['start']
+        spans << a.merge('start' => b['end']) if b['end'] < a['end']
+      else
+        b['start'] = a['end']
+      end
+    end
     # Adjacent spans of the same star-delimited type merge: "**A****B**"
     # puts four stars at the junction, and no parser reads that back as
     # two bold runs. One span over both halves renders identically.

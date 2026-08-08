@@ -82,13 +82,16 @@ Hervorhebungen lassen sich kombinieren und verschachteln:
 
 Sie dürfen auch unmittelbar nebeneinander stehen, ohne Leerzeichen. Die
 drei Sterne in der Mitte werden als zwei gelesen: das schließende Paar
-des Fettdrucks und der einzelne, der das Kursive öffnet.
+des Fettdrucks und der einzelne, der das Kursive öffnet. Umgekehrt geht
+es auch — einer schließt das Kursive, das Paar öffnet den Fettdruck.
 
 ```
 **fett***kursiv*
+*kursiv***fett**
 ```
 
 **fett***kursiv*
+*kursiv***fett**
 
 ## Links
 

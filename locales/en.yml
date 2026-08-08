@@ -563,6 +563,8 @@ doctor:
   site_yml_missing_fix: "Run ./setup.sh, or copy the documented template: cp config/site.yml.example config/site.yml"
   site_yml_empty: "config/site.yml is empty, or is not a set of settings."
   site_yml_syntax: "config/site.yml is not valid YAML: %{message}."
+  site_yml_unreadable: "config/site.yml exists but cannot be read: %{message}."
+  site_yml_unreadable_fix: "Check the file's owner and permissions (ls -l config/site.yml). Usually: chmod 644 config/site.yml — and if the file is owned by root after a wizard ran under sudo, chown it too."
   site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value."
 
   identity_ok: "The site's identity is filled in."

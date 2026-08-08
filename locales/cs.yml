@@ -551,6 +551,8 @@ doctor:
   site_yml_missing_fix: "Spusť ./setup.sh, nebo zkopíruj okomentovanou šablonu: cp config/site.yml.example config/site.yml"
   site_yml_empty: "config/site.yml je prázdný, nebo to není sada nastavení."
   site_yml_syntax: "config/site.yml není platné YAML: %{message}."
+  site_yml_unreadable: "config/site.yml existuje, ale nejde přečíst: %{message}."
+  site_yml_unreadable_fix: "Zkontroluj vlastníka a práva souboru (ls -l config/site.yml). Obvykle pomůže: chmod 644 config/site.yml — a pokud soubor vlastní root po průvodci spuštěném přes sudo, taky chown."
   site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek."
 
   identity_ok: "Identita webu je vyplněná."

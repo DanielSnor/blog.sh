@@ -82,13 +82,16 @@ Emphasis can be combined and nested:
 
 They can also sit straight next to each other, with no space between. The
 three stars in the middle are read as two: the closing pair for the bold,
-and the single one that opens the italic.
+and the single one that opens the italic. It works the other way round
+too — one closes the italic, the pair opens the bold.
 
 ```
 **bold***italic*
+*italic***bold**
 ```
 
 **bold***italic*
+*italic***bold**
 
 ## Links
 

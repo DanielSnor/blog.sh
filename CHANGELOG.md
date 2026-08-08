@@ -1204,6 +1204,36 @@ Nothing to migrate -- see Upgrading at the end.
   has a help line, the draft-preview banner keeps one exclamation mark
   instead of three, and English spelling settles on Favourited.
 
+- **Three last ways bold and italic could corrupt each other, found by
+  widening the round-trip net from 150 span combinations to all 1,085
+  assignments -- permutations and repeated types included -- and
+  verified against every post of a 4,400-post production site.**
+  - **The same formatting twice over overlapping words came back as
+    garbage.** Markdown has no way to say "bold inside bold" -- the
+    delimiters cancel into `****` at the junction -- so imported
+    formatting that stacked a span on itself published stray asterisks.
+    The writer now folds same-type overlaps into the one span they mean;
+    two links pointing different ways instead split at the boundary,
+    which markdown can say.
+  - **An italic wrapped around a complete bold (or strikethrough, or
+    link) ended at the bold's first star.** `*ab~~c**de**f~~ghij*` closed
+    the italic against the opener of `**de**` -- half the paragraph fell
+    out of the span and delimiters surfaced as text. An italic's closer
+    now refuses a star that touches other stars, which is the CommonMark
+    reading: that star is the bold's opener, not the italic's closer.
+  - **An italic ending exactly where a bold begins read as neither.**
+    `*kurzívou***tučně**` -- the mirror of the `**tučně***kurzívou*`
+    adjacency 1.2 already handles -- splits its middle run one-plus-two
+    now, and chains (`**a***b***c**`) resolve link by link. The
+    head-collision shapes also stopped stealing closers from spans
+    further right: their rest halves may hold complete nested runs, but
+    never a lone star.
+- **`doctor` on a config file it cannot read says so.** A `site.yml`
+  owned by root after a wizard ran under sudo -- exactly the install
+  that needs diagnosing -- crashed the diagnosis with a raw Psych
+  backtrace before the first finding. It is now finding number one, with
+  the `chmod`/`chown` to run, and the rest of the checkup still happens.
+
 ### Upgrading
 
 - **Nothing to migrate.** `git pull`, rebuild, deploy. Verified against a
@@ -1241,6 +1271,17 @@ Nothing to migrate -- see Upgrading at the end.
   `printf "N\n" | ./import.sh`. The non-interactive path is unchanged: a
   piped run still gets one flat numbered list, and `migrate_*.rb` scripts
   are unaffected.
+- **Media numbering changed for posts with failed downloads.** 1.1 gave a
+  failed fetch's number to the next image; 1.2 leaves it spent, so
+  filenames depend only on the order a post references its media, never
+  on which downloads happened to succeed. Re-importing over a tree the
+  1.1 importer wrote is therefore the one upgrade path with a caveat: if
+  a post reported failed media back then, its numbering shifts, and the
+  copy step's "skip files that already exist" can leave such a post
+  showing the neighbouring image. Before re-importing those posts --
+  the 1.1 run's summary named them -- delete their media directories, or
+  import into a fresh tree. Trees both written and re-imported by the
+  same engine version are unaffected either way.
 
 ## 1.1 -- 2026-08-05
 

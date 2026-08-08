@@ -58,31 +58,41 @@ module MarkdownParser
   # The link target allows one level of balanced parentheses
   # ("/Page(ID-123).aspx"), matching what CommonMark does; the writer
   # percent-encodes the pathological rest.
-  # Four extra alternatives carry the star collisions the writer
+  # Six extra alternatives carry the star collisions the writer
   # legitimately produces when bold and italic meet. A run of stars is
   # not one delimiter: three of them between two letters can close one
   # span and open another, which is what CommonMark's delimiter runs say
-  # and what an author means. The four shapes are "***both***",
+  # and what an author means. The shapes are "***both***",
   # "***head*rest**" (italic on the head of a bold span),
-  # "**pre*tail***" (italic on its tail), and "**bold***italic*" --
-  # adjacency, where the middle run splits two-plus-one.
+  # "***head**rest*" (bold on the head of an italic one),
+  # "**pre*tail***" (italic on its tail), "**bold***italic*" --
+  # adjacency, the middle run splitting two-plus-one -- and its mirror
+  # "*italic***bold**", splitting one-plus-two.
   # The collision shapes use a tempered dot -- (?:(?!\*\*).) -- so their
   # halves can never reach ACROSS an ordinary bold boundary to a "***"
   # further down the paragraph; without it, "**A** ... ***x***" read as
-  # one giant span from A to x.
+  # one giant span from A to x. The head shapes' REST halves and btail
+  # are tighter still: a rest may hold complete nested runs ("**x**"
+  # inside an italic's rest, "*x*" inside a bold's) but never a lone
+  # star, and btail no stars at all -- a lone star there is always a
+  # closer being stolen from a span further right, which surfaced as
+  # stray asterisks in the text. Plain italic refuses a closer that
+  # touches other stars for the same reason: the star before "**de**"
+  # inside "*ab~~c**de**f~~ghij*" is bold's opener, not italic's closer.
   #
   # Alternative order is load-bearing, in both directions. Plain bold --
   # whose closer is exactly two stars, the (?!\*) guard -- comes BEFORE
   # the tail-collision shapes, or "**F** dál ... ***v***" reads as one
-  # span from F to v. The adjacency shape comes AFTER them and last of
-  # the four, immediately before plain italic: placed any earlier it
-  # takes matches that belong to the tail collisions, and partially
-  # overlapping spans -- what every NPF import produces -- come back with
-  # stray asterisks in the text. It may only have what nothing else can
-  # read. tests/test_markdown_roundtrip.rb walks all 150 combinations of
-  # up to three spans; that matrix is what these positions were settled
-  # against, and what will notice if they move.
-  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:(?!\*\*).)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:(?!\*\*).)*?)\*|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:(?!\*\*).)+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?!\*)|\*(?<italic>.+?)\*|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
+  # span from F to v. The adjacency shapes come AFTER them, immediately
+  # before plain italic: placed any earlier they take matches that
+  # belong to the tail collisions, and partially overlapping spans --
+  # what every NPF import produces -- come back with stray asterisks in
+  # the text. They may only have what nothing else can read.
+  # tests/test_markdown_roundtrip.rb walks all 1085 assignments of up to
+  # three spans -- permutations and repeated types included; that matrix
+  # is what these positions were settled against, and what will notice
+  # if they move.
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\*)\*(?!\*)|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -141,6 +151,13 @@ module MarkdownParser
         # delimiter runs do with the same bytes.
         append_span(result, formatting, m[:badj], 'bold', start)
         append_span(result, formatting, m[:iadj], 'italic', result.length)
+      elsif m[:ileft]
+        # The mirror image: "*italic***bold**", the middle run splitting
+        # one-plus-one-plus-one... no -- one for the italic's closer, two
+        # for the bold's opener. Same delimiter-run arithmetic as badj,
+        # read from the other side.
+        append_span(result, formatting, m[:ileft], 'italic', start)
+        append_span(result, formatting, m[:bright], 'bold', result.length)
       elsif m[:italic]
         append_span(result, formatting, m[:italic], 'italic', start)
       elsif m[:strike]

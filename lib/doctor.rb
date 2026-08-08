@@ -168,9 +168,16 @@ module Doctor
         YAML.load_file(path)
       rescue Psych::SyntaxError => e
         return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), t('site_yml_syntax_fix', line: e.line, column: e.column))]]
+      rescue SystemCallError => e
+        return [nil, [error(t('site_yml_unreadable', message: e.message), t('site_yml_unreadable_fix'))]]
       end
     rescue Psych::SyntaxError => e
       return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), t('site_yml_syntax_fix', line: e.line, column: e.column))]]
+    rescue SystemCallError => e
+      # A file that exists but cannot be OPENED -- wrong permissions after
+      # a root-run wizard is the usual story. The one command whose whole
+      # job is diagnosis must say that, not die with Psych's backtrace.
+      return [nil, [error(t('site_yml_unreadable', message: e.message), t('site_yml_unreadable_fix'))]]
     end
 
     return [nil, [error(t('site_yml_empty'), t('site_yml_missing_fix'))]] unless data.is_a?(Hash)

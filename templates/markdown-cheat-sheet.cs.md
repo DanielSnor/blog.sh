@@ -82,12 +82,15 @@ Zvýraznění jde kombinovat a vnořovat do sebe:
 
 Můžou taky stát hned vedle sebe, bez mezery. Trojice hvězdiček uprostřed
 se čte jako dvě: zavírací pár tučného a jedna, která otevírá kurzívu.
+Funguje to i obráceně — jedna zavírá kurzívu, pár otevírá tučné.
 
 ```
 **tučně***kurzívou*
+*kurzívou***tučně**
 ```
 
 **tučně***kurzívou*
+*kurzívou***tučně**
 
 ## Odkazy
 

@@ -557,6 +557,8 @@ doctor:
   site_yml_missing_fix: "Führe ./setup.sh aus, oder kopiere die kommentierte Vorlage: cp config/site.yml.example config/site.yml"
   site_yml_empty: "config/site.yml ist leer oder enthält keine Einstellungen."
   site_yml_syntax: "config/site.yml ist kein gültiges YAML: %{message}."
+  site_yml_unreadable: "config/site.yml existiert, lässt sich aber nicht lesen: %{message}."
+  site_yml_unreadable_fix: "Prüfe Eigentümer und Rechte der Datei (ls -l config/site.yml). Meist hilft: chmod 644 config/site.yml — und wenn die Datei nach einem mit sudo gestarteten Assistenten root gehört, auch chown."
   site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen."
 
   identity_ok: "Die Identität der Website ist ausgefüllt."
