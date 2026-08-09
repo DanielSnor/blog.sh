@@ -522,6 +522,8 @@ import:
     ssg_liquid_links_dropped: "Odkazů adresovaných přes Liquid ({{ site.repository }}, {% link %}, {% post_url %}): %{count} — taková adresa mimo Jekyll nic neznamená. Slova zůstala, adresa šla pryč; lepší než odkaz mířící na stránku tohohle blogu, která tu nikdy nebyla."
     substack_paid: "Postů jen pro předplatitele Substacku: %{count} — naimportovány celé (export je tvůj) a označené štítkem „substack-paid“, ať je před publikací najdeš."
     facebook_crossposts: "Crosspostů z jiných platforem (Twitter, Posterous, …): %{count} — přeskočeny, ať nezdvojují importy těch platforem. FACEBOOK_CROSSPOSTS=1 je vezme."
+    feed_ampersands_escaped: "Samostatných znaků „&“, kvůli kterým soubor nebyl platné XML: %{count} — doplněny na &amp;, aby šel vůbec přečíst. Text uvnitř CDATA, kde jsou těla postů, zůstal přesně tak, jak byl vyexportovaný."
+    feed_controls_dropped: "Řídicích znaků, které XML nepřipouští: %{count} — vypuštěny, aby šel soubor přečíst."
     feed_unmapped: "Postů bez použitelné původní adresy: %{count} (holé permalinky „?p=123“ mají identitu v query stringu) — naimportovány bez přesměrování."
     ghost_scheduled: "Postů naplánovaných v Ghostu: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
     livejournal_nonpublic: "Zápisků jen pro přátele nebo soukromých: %{count} — dorazily jako drafty, veřejné nikdy nebyly."

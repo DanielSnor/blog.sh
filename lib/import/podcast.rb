@@ -71,15 +71,21 @@ module Import
       post
     end
 
+    # super first: everything Feed has to say about the file it read --
+    # a feed it had to patch to read at all -- is said about this import
+    # too, and overriding without it made those notes vanish for podcasts
+    # alone.
     def postscript
-      return nil if @bytes.zero?
-
-      size = if @bytes >= 1_073_741_824
-               "#{(@bytes / 1_073_741_824.0).round(1)} GB"
-             else
-               "#{(@bytes / 1_048_576.0).round} MB"
-             end
-      I18n.t('import.note.podcast_media_size', size: size)
+      notes = [super].compact
+      unless @bytes.zero?
+        size = if @bytes >= 1_073_741_824
+                 "#{(@bytes / 1_073_741_824.0).round(1)} GB"
+               else
+                 "#{(@bytes / 1_048_576.0).round} MB"
+               end
+        notes << I18n.t('import.note.podcast_media_size', size: size)
+      end
+      notes.empty? ? nil : notes.join("\n  ")
     end
 
     private

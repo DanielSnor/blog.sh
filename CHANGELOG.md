@@ -1534,6 +1534,54 @@ Nothing to migrate -- see Upgrading at the end.
     post sharing your own feed, list or starter pack was discarded as a
     quote of somebody else's writing.
 
+- **One unescaped `&` in an export no longer costs the whole archive.**
+  Blog exports are printed by templating engines, not written by XML
+  writers: WordPress puts a raw query string in an element
+  (`?ixlib=rb-1.2.1&ixid=eyJ&w=1268`) and Squarespace prints a bare `&` in
+  a title. A conforming parser refuses such a file outright, so a single
+  character in one item of a thousand ended the run before anything was
+  written -- 4 of the 12 fixtures that Ghost's own migration tools ship
+  are refused this way, while Ghost's parser reads them. A file that fails
+  to parse now gets one more attempt with the characters that had to be
+  escaped escaped, and the summary says how many there were. Control
+  characters XML forbids are dropped the same way, and named for the same
+  reason.
+
+  What this deliberately does not do is guess. Nothing structural is
+  repaired: a missing end tag or a download that stopped halfway still
+  ends the run, because inventing where a tag was meant to close invents
+  an archive rather than rescuing one. When the patched copy still will
+  not parse, the refusal names the defect that SURVIVED rather than the
+  ampersand the engine has just proved it can handle -- a truncated
+  export used to complain about a query string and send the author looking
+  for the wrong thing. A file that is repaired and then turns out to be an
+  HTML error page is refused as not being a feed, with no mention of the
+  repair nobody benefited from.
+
+  Two guarantees are worth stating because getting either wrong is worse
+  than the defect. **Post bodies are not touched.** They live inside
+  CDATA, where `&` is already an ordinary character, so a substitution
+  across the whole file would turn every `href="?a=1&b=2"` in every post
+  into a visible `&amp;` -- silently, because the file parses afterwards.
+  CDATA, comments, processing instructions and the DOCTYPE are found
+  first, by their own markers, and copied through untouched. **And a file
+  that is not UTF-8 is refused rather than read.** An export in UTF-16 is
+  ASCII text with a NUL between every character, which passes as valid
+  UTF-8; stripping those NULs would quietly transcode the document, and it
+  would then parse, which is exactly what would have made it dangerous. A
+  declaration naming some other encoding is left alone for the same
+  reason: the parser reads such a file correctly BY that declaration, and
+  patching its bytes as UTF-8 would turn a loud refusal into a quiet
+  import of mangled text.
+
+  An export that parses today is not read, scanned or rewritten by any of
+  this -- the second attempt only happens after the first has already
+  failed -- so nothing about an import that works can change because of
+  it, and it costs such a file nothing. Verified over 48 files: 17 that
+  ended the run now import, everything that was already readable comes out
+  byte for byte identical, and everything genuinely broken still stops
+  with the same one-line refusal.
+
 ### Upgrading
 
 - **Nothing to migrate.** `git pull`, rebuild, deploy. Verified against a

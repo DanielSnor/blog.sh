@@ -534,6 +534,8 @@ import:
     ssg_liquid_links_dropped: "%{count} link(s) were addressed through Liquid ({{ site.repository }}, {% link %}, {% post_url %}) -- an address that means nothing outside Jekyll. The words were kept and the address dropped, rather than left pointing at a page of this blog that was never there."
     substack_paid: "%{count} post(s) were subscribers-only on Substack -- imported in full (the export is yours) and tagged \"substack-paid\", so you can find them before you publish."
     facebook_crossposts: "%{count} post(s) were crossposts from other platforms (Twitter, Posterous, ...) -- skipped so they don't duplicate those platforms' own imports. FACEBOOK_CROSSPOSTS=1 includes them."
+    feed_ampersands_escaped: "%{count} stray \"&\" character(s) made this file invalid XML -- escaped, so it could be read at all. Text inside CDATA, where the post bodies live, was left exactly as exported."
+    feed_controls_dropped: "%{count} control character(s) XML does not allow were dropped so the file could be read."
     feed_unmapped: "%{count} post(s) had no usable original address (plain \"?p=123\" permalinks have their identity in the query string) -- imported without a redirect."
     ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
     livejournal_nonpublic: "%{count} entr(y/ies) were friends-only or private -- imported as drafts, they were never public."

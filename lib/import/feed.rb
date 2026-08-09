@@ -6,6 +6,7 @@ require_relative '../feed_http'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
+require_relative 'xml_repair'
 require_relative 'permalinks'
 
 module Import
@@ -122,10 +123,19 @@ module Import
       post
     end
 
+    # More than one note is possible now, so this takes the shape the
+    # other adapters already have -- a single-note postscript silently
+    # loses whichever note came second.
     def postscript
-      return nil if @unmapped_permalinks.zero?
-
-      I18n.t('import.note.feed_unmapped', count: @unmapped_permalinks)
+      notes = []
+      if @repaired&.ampersands&.positive?
+        notes << I18n.t('import.note.feed_ampersands_escaped', count: @repaired.ampersands)
+      end
+      if @repaired&.controls&.positive?
+        notes << I18n.t('import.note.feed_controls_dropped', count: @repaired.controls)
+      end
+      notes << I18n.t('import.note.feed_unmapped', count: @unmapped_permalinks) if @unmapped_permalinks.positive?
+      notes.empty? ? nil : notes.join("\n  ")
     end
 
     private
@@ -144,14 +154,16 @@ module Import
           abort('❌ This import needs rexml, which your Ruby install is missing -- `gem install rexml` ' \
                 'or install your distribution\'s fuller Ruby package.')
         end
+        # Read ONCE. The salvage below parses a second time, but never
+        # fetches a second time: for a feed given as a URL that would pull
+        # the whole archive down twice, and a second request that went
+        # worse than the first would report a network problem about a file
+        # that had already arrived intact.
+        raw = read_source
         doc = begin
-          REXML::Document.new(read_source)
+          REXML::Document.new(raw)
         rescue REXML::ParseException => e
-          # label() parses the document before the run even starts, so a
-          # malformed file used to take the wizard down with a raw REXML
-          # backtrace pages long. One line naming the source and the
-          # actual problem is what the author can act on.
-          abort("❌ #{@source} is not readable as XML: #{e.message.lines.find { |l| !l.strip.empty? }.to_s.strip[0, 120]}")
+          salvage(raw, e)
         end
 
         # XML that parses but isn't a feed used to end as "Done. 0 post(s)"
@@ -166,8 +178,41 @@ module Import
                 "(its root element is <#{root || 'nothing'}>).")
         end
 
+        # Only now is a repair worth mentioning. A file that had to be
+        # patched and then turned out to be someone's HTML error page is
+        # refused on the line above, and announcing what was done to it on
+        # the way there would only read as though the export had been
+        # edited on disk.
+        @repaired = @salvage if @salvage&.changed?
         doc
       end
+    end
+
+    # One more attempt, and only ever after REXML has already refused the
+    # file as it stands -- so an export that parses today is not read,
+    # scanned or rewritten by any of this, and cannot change because of it.
+    #
+    # When the patched copy still will not parse, the refusal names the
+    # defect that SURVIVED rather than the ampersand this just proved it
+    # can handle: a truncated export used to complain about a query
+    # string, sending the author looking for the wrong thing.
+    def salvage(raw, original_error)
+      repaired = XmlRepair.call(raw)
+      if repaired&.changed?
+        begin
+          doc = REXML::Document.new(repaired.text)
+          @salvage = repaired
+          return doc
+        rescue REXML::ParseException => e
+          original_error = e
+        end
+      end
+      # label() parses the document before the run even starts, so a
+      # malformed file used to take the wizard down with a raw REXML
+      # backtrace pages long. One line naming the source and the actual
+      # problem is what the author can act on.
+      abort("❌ #{@source} is not readable as XML: " \
+            "#{original_error.message.lines.find { |l| !l.strip.empty? }.to_s.strip[0, 120]}")
     end
 
     def read_source
