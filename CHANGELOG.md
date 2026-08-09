@@ -534,6 +534,18 @@ Nothing to migrate -- see Upgrading at the end.
   piped output stays data-only -- `./blog.sh list | wc -l` counts posts,
   not banner lines.
 
+- **The sidebar is 260px wide, and the post column gets everything
+  else.** The grid used to split the page 2:1; now the sidebar track is
+  fixed at its content width and the post column takes every pixel the
+  viewport gives or takes -- about 40px more text at full width. The
+  gutters are uniform and the tricks behind them are gone: post text
+  ends at its column edge (no compensating padding), sidebar cards carry
+  no horizontal padding and no longer overhang the layout's edge
+  padding, so the space between the columns is the grid gap and both
+  page edges are the layout's own 1rem -- the same 16px the nav already
+  used. On a phone this turns the sidebar's lopsided 40/24 insets into
+  16 on both sides.
+
 ### Fixes
 
 - **Seven defects a pre-release audit found, each of them a way to lose

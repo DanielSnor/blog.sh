@@ -336,7 +336,11 @@ nav a[aria-current="page"]:hover {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  /* The sidebar track is its content width outright -- aside cards carry
+     no horizontal padding (see aside .card below), so every gutter here
+     is layout-level: this padding at the edges, the gap between columns.
+     The post column is the one that grows and shrinks with the viewport. */
+  grid-template-columns: minmax(0, 1fr) 260px;
   gap: 1.5rem;
   padding: 1.5rem 1rem;
 }
@@ -393,7 +397,10 @@ nav a[aria-current="page"]:hover {
 .card { background: var(--card-bg); padding: 1.5rem; border-radius: 4px; }
 
 aside > .card:first-child { margin-top: -1.5rem; }
-aside .card { margin-right: -1rem; }
+/* No horizontal padding: the 260px grid track IS the sidebar's content
+   width. The air on both sides is layout-level -- grid gap on the left,
+   the layout's own edge padding on the right. */
+aside .card { padding-left: 0; padding-right: 0; }
 
 h1 { color: var(--accent); font-size: 1.6rem; margin-top: 0; }
 h2 { color: var(--accent); font-size: 1.75rem; font-weight: 600; line-height: 1.25; margin-top: 0; }
@@ -631,7 +638,7 @@ blockquote {
 .embed-audio { display: block; width: 100%; border: 0; margin: 1rem 0; }
 
 .post-header { display: flex; gap: 1rem; align-items: flex-start; margin: -1.5rem -1.5rem 0 -1.5rem; }
-.post-body { flex: 1 1 auto; min-width: 0; padding-right: 0.25rem; }
+.post-body { flex: 1 1 auto; min-width: 0; }
 
 .date-badge {
   flex: 0 0 auto;
