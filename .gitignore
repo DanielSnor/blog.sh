@@ -9,6 +9,8 @@ env.sh
 .deploy_manifest*.json.incomplete
 .deploy_baseline.json
 .deploy-pending
+# The scheduler's heartbeat -- one line, rewritten every fifteen minutes.
+.last-scheduled-run
 .blog-sh.lock
 .last-edit.md
 .last-edit.meta

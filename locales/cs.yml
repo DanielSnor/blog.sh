@@ -634,6 +634,13 @@ doctor:
   slots_shape: "publishing.slots musí být seznam."
   slots_bad: "Publikační sloty, které se budou ignorovat: %{values}."
   slots_bad_fix: "Formát je \"<den> HH:MM\" — mon, tue, wed, thu, fri, sat, sun nebo daily, pak čas ve 24hodinovém formátu. Plné názvy dnů nefungují."
+  scheduler_ok: "Ve frontě čeká postů: %{count}, a naposledy ji něco spustilo před %{ago}."
+  scheduler_never: "Ve frontě čeká postů: %{count}, ale tady ji nikdy nic nespustilo — samy se nezveřejní."
+  scheduler_stale: "Frontu už %{ago} nic nespustilo a čeká v ní postů: %{count} — přitom má běžet každých patnáct minut."
+  scheduler_fix: "Naplánuj scripts/publish-scheduled.sh — každých patnáct minut, s tím počítají časy z průvodce (*/15 * * * * /cesta/k/blogu/scripts/publish-scheduled.sh). Na hostingu k tomu slouží sekce cron v panelu; zkontroluj, že cesta míří na TENHLE blog, ne na jiný."
+  age_minutes: "%{count} min"
+  age_hours: "%{count} h"
+  age_days: "%{count} dn(í)"
 
   backend_unset: "Není vybraný cíl nasazení, web se tedy staví lokálně a nikam neputuje."
   backend_unset_fix: "Jako začátek to úplně stačí — sestavený web ukáže ./blog.sh preview. Až ho budeš chtít online, spusť ./setup.sh."

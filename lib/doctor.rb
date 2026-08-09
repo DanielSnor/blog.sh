@@ -2,10 +2,22 @@
 
 require 'json'
 require 'yaml'
+# Time.parse, for the queue's dates and the scheduler's heartbeat. Named
+# here rather than inherited: it used to arrive through a require that had
+# to be removed (see below), and without it the queue read as empty --
+# silently, because the rescue that guards a malformed date swallowed the
+# NoMethodError just as happily.
+require 'time'
 require_relative 'site_config'
 require_relative 'i18n'
 require_relative 'media_dimensions'
 require_relative 'deploy_backend'
+# NOT require_relative 'publishing': it pulls in the posters, which read
+# SiteConfig at LOAD time -- and this is the one command that has to run
+# on a config nothing else can load. Requiring it put the raw Psych
+# backtrace back on an unreadable site.yml, which is the failure doctor
+# exists to explain. The two paths it needs are rebuilt from ROOT here
+# instead; they are one File.join each, and this file already owns ROOT.
 
 # lib/doctor.rb -- reads whatever configuration is on disk and says, in
 # whole sentences, what is wrong with it.
@@ -128,6 +140,7 @@ module Doctor
     findings.concat(check_fonts(data, root))
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
+    findings.concat(check_scheduler)
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
     findings
@@ -410,6 +423,84 @@ module Doctor
     return [ok(t('slots_ok', count: slots.size))] if bad.empty?
 
     [error(t('slots_bad', values: bad.map(&:inspect).join(', ')), t('slots_bad_fix'))]
+  end
+
+  # Is anything actually running the queue? A scheduled post that never
+  # publishes looks, from inside, exactly like a scheduled post whose time
+  # has not come -- so the engine could not tell, and neither could the
+  # author: a post sits past its date and nothing anywhere says why. The
+  # cron writes a heartbeat on every tick; this reads it.
+  #
+  # Only ever speaks when there IS a queue. A site that schedules nothing
+  # needs no scheduler, and telling it otherwise would be noise on every
+  # single run.
+  SCHEDULER_STALE_AFTER = 2 * 3600
+
+  def check_scheduler
+    queue = scheduled_posts
+    return [] if queue.empty?
+
+    last = scheduler_last_run
+    overdue = queue.count { |date| date <= Time.now }
+
+    if last.nil?
+      # Nothing has ever run it here. With posts already waiting, that is
+      # the difference between a blog that publishes itself and one that
+      # does not -- said as an error when something is already late.
+      note = t('scheduler_never', count: queue.size)
+      return [overdue.positive? ? error(note, t('scheduler_fix')) : warn(note, t('scheduler_fix'))]
+    end
+
+    age = Time.now - last
+    return [ok(t('scheduler_ok', count: queue.size, ago: humanize_age(age)))] if age <= SCHEDULER_STALE_AFTER
+
+    stale = t('scheduler_stale', ago: humanize_age(age), count: queue.size)
+    [overdue.positive? ? error(stale, t('scheduler_fix')) : warn(stale, t('scheduler_fix'))]
+  end
+
+  # Dates of everything waiting in the queue, read the way the cron reads
+  # it: a scheduled post is a draft carrying the flag, not a state of its
+  # own.
+  # Same two paths Publishing owns, rebuilt from ROOT rather than required
+  # (see the note at the top of this file).
+  def content_dir
+    File.join(ROOT, 'content.nosync', 'posts')
+  end
+
+  def scheduler_last_run
+    path = File.join(ROOT, '.last-scheduled-run')
+    return nil unless File.exist?(path)
+
+    Time.parse(File.read(path).strip)
+  rescue StandardError
+    begin
+      File.mtime(path)
+    rescue StandardError
+      nil
+    end
+  end
+
+  def scheduled_posts
+    Dir.glob(File.join(content_dir, '*', '*.json')).filter_map do |path|
+      post = JSON.parse(File.read(path, encoding: 'utf-8'))
+      next unless post.is_a?(Hash) && post['state'] == 'draft' && post['scheduled']
+
+      Time.parse(post['date'].to_s)
+    rescue JSON::ParserError, ArgumentError, TypeError, SystemCallError
+      # A post that cannot be read or dated is not a scheduling problem
+      # and doctor has other checks for it -- but the rescue stays narrow
+      # on purpose: a broad one here once hid a missing require, and the
+      # queue silently read as empty.
+      next
+    end
+  end
+
+  def humanize_age(seconds)
+    hours = (seconds / 3600).floor
+    return t('age_minutes', count: (seconds / 60).floor) if hours < 1
+    return t('age_hours', count: hours) if hours < 48
+
+    t('age_days', count: (hours / 24).floor)
   end
 
   # --- deploy --------------------------------------------------------

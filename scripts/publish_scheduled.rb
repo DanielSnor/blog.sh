@@ -59,6 +59,15 @@ due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do 
   end
 end
 
+# Written on EVERY tick, before anything is decided -- including the ticks
+# where nothing is due, which are almost all of them. That is the point:
+# a queue that never fires looks exactly like a queue whose time has not
+# come, and the only difference is whether anything is running at all.
+# Without this the engine could not tell the two apart, and neither could
+# anyone else: a post can sit past its date indefinitely with nothing
+# anywhere saying why. `doctor` reads this file.
+Publishing.mark_scheduler_alive
+
 if due.empty? && !File.exist?(DEPLOY_PENDING)
   puts I18n.t('cron.no_scheduled_due')
   exit 0

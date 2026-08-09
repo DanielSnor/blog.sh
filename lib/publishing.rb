@@ -255,6 +255,30 @@ module Publishing
   # and because only one of them is a fault.
   BUSY_EXIT = 3
 
+  # The scheduler's heartbeat. Its MTIME is the whole content -- the file
+  # says nothing except "something ran the queue at this moment".
+  SCHEDULER_HEARTBEAT = File.join(ROOT, '.last-scheduled-run')
+
+  def mark_scheduler_alive
+    File.write(SCHEDULER_HEARTBEAT, Time.now.iso8601)
+  rescue StandardError
+    # A heartbeat that cannot be written must never stop the publishing
+    # it exists to describe.
+    nil
+  end
+
+  def scheduler_last_run
+    return nil unless File.exist?(SCHEDULER_HEARTBEAT)
+
+    Time.parse(File.read(SCHEDULER_HEARTBEAT).strip)
+  rescue StandardError
+    begin
+      File.mtime(SCHEDULER_HEARTBEAT)
+    rescue StandardError
+      nil
+    end
+  end
+
   def mark_deploy_pending
     File.write(DEPLOY_PENDING, Time.now.iso8601)
   rescue StandardError

@@ -1288,6 +1288,18 @@ Nothing to migrate -- see Upgrading at the end.
   the marker was never spent, and after unpublish, rename and re-import
   the old address 404'd with the note to redirect it sitting unread in
   the post's own file.
+- **`doctor` says whether anything is actually publishing the queue.** A
+  scheduled post that never goes out looks, from inside, exactly like one
+  whose time has not come: the post sits there, nothing is wrong with it,
+  and nothing anywhere says that no cron has run in three days. The
+  scheduled-publish run now leaves a heartbeat on every tick -- including
+  the ones with nothing due, which are almost all of them and the only
+  proof that anything is running at all -- and `doctor` reads it. It says
+  nothing on a site that schedules nothing, notes a queue that is waiting
+  on a runner nobody set up, and calls it an error when a post is already
+  late and nothing has run. The fix line names the schedule to add and
+  reminds you to check that its path points at this blog rather than
+  another one on the same machine.
 - **Deleting a post takes its announcement down with it.** `unpublish`
   has always tidied up after itself on Mastodon and Bluesky; `delete`
   never did, so the toot stayed public and pointed at a 404 the moment

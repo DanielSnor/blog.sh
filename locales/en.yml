@@ -646,6 +646,13 @@ doctor:
   slots_shape: "publishing.slots has to be a list."
   slots_bad: "Publishing slots that will be ignored: %{values}."
   slots_bad_fix: "The format is \"<day> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun or daily, then a 24-hour time. Full day names do not work."
+  scheduler_ok: "The queue has %{count} post(s) waiting and something ran it %{ago} ago."
+  scheduler_never: "%{count} post(s) are waiting in the queue, but nothing has ever run it here -- they will not publish on their own."
+  scheduler_stale: "Nothing has run the queue for %{ago}, and %{count} post(s) are waiting -- it runs every fifteen minutes when it runs at all."
+  scheduler_fix: "Schedule scripts/publish-scheduled.sh -- every fifteen minutes is what the wizard's times assume (*/15 * * * * /path/to/blog/scripts/publish-scheduled.sh). On a hosted install the panel's own cron section is the place; check that its path points at THIS blog and not another one."
+  age_minutes: "%{count} minute(s)"
+  age_hours: "%{count} hour(s)"
+  age_days: "%{count} day(s)"
 
   backend_unset: "No deploy target chosen, so the site is built locally and goes nowhere."
   backend_unset_fix: "That is a fine place to start -- ./blog.sh preview shows the build. Run ./setup.sh when you want it online."

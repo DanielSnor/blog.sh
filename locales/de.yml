@@ -640,6 +640,13 @@ doctor:
   slots_shape: "publishing.slots muss eine Liste sein."
   slots_bad: "Veröffentlichungszeiten, die ignoriert werden: %{values}."
   slots_bad_fix: "Das Format ist \"<Tag> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun oder daily, dann eine Uhrzeit im 24-Stunden-Format. Ausgeschriebene Tagesnamen funktionieren nicht."
+  scheduler_ok: "In der Warteschlange warten %{count} Beitrag/Beiträge, und zuletzt hat sie vor %{ago} etwas ausgeführt."
+  scheduler_never: "%{count} Beitrag/Beiträge warten in der Warteschlange, aber hier hat sie noch nie etwas ausgeführt -- von allein erscheinen sie nicht."
+  scheduler_stale: "Seit %{ago} hat nichts die Warteschlange ausgeführt, und %{count} Beitrag/Beiträge warten -- dabei sollte sie alle fünfzehn Minuten laufen."
+  scheduler_fix: "Plane scripts/publish-scheduled.sh ein -- alle fünfzehn Minuten, davon gehen die Zeiten des Assistenten aus (*/15 * * * * /pfad/zum/blog/scripts/publish-scheduled.sh). Bei gehosteten Installationen ist der Cron-Bereich der Verwaltung der richtige Ort; prüfe, dass der Pfad auf DIESES Blog zeigt und nicht auf ein anderes."
+  age_minutes: "%{count} Minute(n)"
+  age_hours: "%{count} Stunde(n)"
+  age_days: "%{count} Tag(e)"
 
   backend_unset: "Kein Deploy-Ziel gewählt, die Website wird also lokal gebaut und geht nirgendwohin."
   backend_unset_fix: "Als Anfang völlig in Ordnung -- ./blog.sh preview zeigt den Build. Führe ./setup.sh aus, wenn sie online soll."
