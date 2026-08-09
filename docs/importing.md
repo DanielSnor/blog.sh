@@ -414,10 +414,11 @@ ruby scripts/migrate_podcast.rb <feed-url | export.xml>
 ```
 
 Any podcast RSS feed works -- Libsyn, Buzzsprout, Anchor, anything whose
-items carry an audio enclosure. A bare `<show>.libsyn.com` URL is
+items carry an enclosure, audio or video. A bare `<show>.libsyn.com` URL is
 expanded to the metadata-carrying feed automatically. Each episode
-becomes a post: artwork, then the audio itself as a native player, then
-the shownotes. **The audio downloads and is hosted locally** -- the
+becomes a post: artwork, then the episode itself -- audio as a native
+player, video as video -- then the shownotes. **The file downloads and is
+hosted locally** -- the
 archive has to outlive the hosting account, which is usually why anyone
 migrates a podcast -- and the preview's size note says what that means
 in gigabytes before anything is written, because a long-running show

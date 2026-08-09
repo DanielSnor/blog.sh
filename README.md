@@ -505,15 +505,15 @@ Available sources:
 | Medium | an unpacked export | posts and drafts; images download from Medium's CDN, likely responses to other articles become drafts for review, newer exports carry no tags |
 | Movable Type/TypePad | the MT export file (gzip ok) | posts and drafts; comments and trackbacks in the file are counted and left behind; the format has no ids or URLs, so identity is minted from date+basename and redirects take a URL pattern |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
-| Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode with audio: the mp3 and artwork download and are hosted locally -- the preview says how many gigabytes that means; items without an enclosure are skipped |
+| Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode: the file and artwork download and are hosted locally, audio as a player and video as video -- the preview says how many gigabytes that means; items without an enclosure are skipped |
 | Squarespace | the "WordPress format" XML export | posts and drafts, feature images included; images, audio and video markup that a plain parse would lose is restored, pages and attachments are counted as skips |
-| Substack | an unpacked export | newsletters and podcasts, drafts included, full text of paid posts (the export is the author's); threads and pages are skipped, tags don't exist in the export |
+| Substack | an unpacked export | newsletters and podcasts, drafts included, full text of subscribers-only posts (the export is the author's), tagged `substack-paid` so you can find them; threads and pages are skipped, tags don't exist in the export |
 | Threads | an unpacked export, HTML or JSON | your own standalone posts with media from the archive; replies to other people's threads are skipped and counted, bare URLs become links |
-| Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
+| Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included; a reblog keeps the trail with each part credited to the blog it came from |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
 | Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN |
 | Wayback Machine | the dead blog's old URL | the Archive's feed captures reassembled oldest-first; blogs with no archived feed fall through to page mode (platform packs — blog.cz built in — or `POST_PATTERN`); what the Archive never saved is counted as lost |
-| WordPress | a WXR export file | every post; pages, attachments and menu items are skipped |
+| WordPress | a WXR export file | every post, with its featured image and its captions; a password-protected post arrives as a draft rather than published; pages, attachments and menu items are skipped |
 | RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 
 Every source is also reachable without the wizard, for a cron job or a

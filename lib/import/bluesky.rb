@@ -20,6 +20,30 @@ module Import
     APPVIEW = 'https://public.api.bsky.app'
     PAGE_SIZE = 100
 
+    # The members of app.bsky.embed.record#view's union that are NOT a
+    # quoted post. A post carrying one of these is the author writing
+    # about something they made or recommend, with nobody else's words in
+    # it -- see quote?.
+    SHARED_RECORDS = %w[
+      app.bsky.feed.defs#generatorView
+      app.bsky.graph.defs#listView
+      app.bsky.labeler.defs#labelerView
+      app.bsky.graph.defs#starterPackViewBasic
+    ].freeze
+
+    # Where those four live on the web, keyed by the collection segment of
+    # their at:// URI. A labeler has no page of its own -- its URI ends in
+    # app.bsky.labeler.service/self -- so it points at the profile running
+    # it. Handles and DIDs both resolve in these paths, which is why the
+    # DID from the URI is a usable fallback when the view carries no
+    # creator.
+    SHARED_PATHS = {
+      'app.bsky.feed.generator' => 'profile/%<handle>s/feed/%<rkey>s',
+      'app.bsky.graph.list' => 'profile/%<handle>s/lists/%<rkey>s',
+      'app.bsky.graph.starterpack' => 'starter-pack/%<handle>s/%<rkey>s',
+      'app.bsky.labeler.service' => 'profile/%<handle>s'
+    }.freeze
+
     def initialize(handle)
       @handle = handle.to_s.sub(/\A@/, '')
     end
@@ -96,9 +120,36 @@ module Import
       fetch_page(cursor, retries - 1)
     end
 
+    # A record embed is not only a quoted post: the same embed shares a
+    # feed generator, a list, a labeler or a starter pack (the lexicon's
+    # union says so, and 4 of the 100 posts on @bsky.app's own timeline
+    # are exactly that -- 5 of 29 on @skyfeed.xyz's). Those used to be
+    # skipped as :quote, which threw the author's own text away under a
+    # reason that was not even true. Anything else stays a quote,
+    # including a record embed we cannot identify: an unrecognised record
+    # is far likelier to be somebody else's post than a fifth kind of
+    # thing, so the old default is the safe one.
     def quote?(embed)
-      type = embed['$type'].to_s
-      type.start_with?('app.bsky.embed.record')
+      return false unless embed['$type'].to_s.start_with?('app.bsky.embed.record')
+
+      shared_record(embed).nil?
+    end
+
+    # The shared feed/list/labeler/starter pack inside a record embed, or
+    # nil when the embed holds a quoted post. recordWithMedia nests one
+    # level deeper -- its `record` is a whole record#view. Unwrapped by
+    # the OUTER type rather than by looking for a nested `record` key,
+    # because the views themselves have one too (starterPackViewBasic
+    # carries the raw starter pack record under exactly that name).
+    def shared_record(embed)
+      record = if embed['$type'].to_s == 'app.bsky.embed.recordWithMedia#view'
+                 embed.dig('record', 'record')
+               else
+                 embed['record']
+               end
+      return nil unless record.is_a?(Hash) && SHARED_RECORDS.include?(record['$type'].to_s)
+
+      record
     end
 
     # Facet offsets are UTF-8 *byte* positions -- the AT Protocol's
@@ -157,10 +208,59 @@ module Import
     def embed_blocks(embed, media)
       case embed['$type'].to_s
       when 'app.bsky.embed.images#view' then image_blocks(embed['images'], media)
+      # The carousel embed that arrived with the 10-photos-per-post
+      # change. It is a separate lexicon, not a longer images#view, and it
+      # keeps its pictures under `items` -- so it fell through to the
+      # empty default and every photo vanished without even a media
+      # failure to show for it. #viewImage carries the same fullsize/alt/
+      # aspectRatio fields as an images#view image, hence no new mapper.
+      when 'app.bsky.embed.gallery#view' then image_blocks(embed['items'], media)
       when 'app.bsky.embed.video#view' then video_blocks(embed, media)
       when 'app.bsky.embed.external#view' then external_blocks(embed['external'], media)
+      when 'app.bsky.embed.record#view' then shared_blocks(embed)
+      when 'app.bsky.embed.recordWithMedia#view'
+        shared_blocks(embed) + embed_blocks(embed['media'] || {}, media)
       else []
       end
+    end
+
+    # What a shared feed, list, labeler or starter pack becomes: a link
+    # block, the same shape an external embed gets, so the archive records
+    # WHAT was shared and still points at it. Not optional decoration --
+    # without it a post that shared a feed and wrote no text of its own
+    # would carry no blocks at all and disappear as :empty, which is the
+    # loss quote? was just fixed to prevent. Nothing is downloaded: the
+    # only picture on offer is the maker's avatar, which is not this
+    # post's content.
+    def shared_blocks(embed)
+      record = shared_record(embed)
+      return [] unless record
+
+      url = shared_url(record)
+      return [] unless url
+
+      block = { 'type' => 'link', 'url' => url }
+      title = record['displayName'] || record['name'] ||
+              record.dig('record', 'name') || record.dig('creator', 'displayName')
+      description = record['description'] || record.dig('record', 'description') ||
+                    record.dig('creator', 'description')
+      block['title'] = title unless title.to_s.empty?
+      block['description'] = description unless description.to_s.empty?
+      [block]
+    end
+
+    def shared_url(record)
+      # at://{authority}/{collection}/{rkey}
+      parts = record['uri'].to_s.split('/')
+      pattern = SHARED_PATHS[parts[3].to_s]
+      rkey = parts[4].to_s
+      return nil if pattern.nil? || (rkey.empty? && pattern.include?('rkey'))
+
+      handle = record.dig('creator', 'handle').to_s
+      handle = parts[2].to_s if handle.empty?
+      return nil if handle.empty?
+
+      "https://bsky.app/#{format(pattern, handle: handle, rkey: rkey)}"
     end
 
     def image_blocks(images, media)

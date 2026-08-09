@@ -5,6 +5,7 @@ require 'cgi'
 require 'json'
 require 'time'
 require 'uri'
+require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
 require_relative 'permalinks'
@@ -14,18 +15,32 @@ module Import
   # which is posts.csv (metadata) plus posts/<id>.<slug>.html (bodies as
   # web HTML). The export is the author's, so it carries the FULL text of
   # paid posts too; they import like any other, with the paywall marker
-  # removed.
+  # removed -- but tagged and counted, so an operator can still find them
+  # (see PAID_TAG).
   #
   # Two things the export honestly does not have: tags (Substack keeps
   # them only on the live site) and, occasionally, the HTML of the newest
   # posts -- those are skipped and counted rather than imported empty.
   class Substack
+    # posts.csv's `audience` column. `only_free` and `everyone` are both
+    # public; these two are the ones whose text nobody could read without
+    # paying, which is what makes them worth marking.
+    PAID_AUDIENCES = %w[only_paid founding].freeze
+
+    # Marks a post whose Substack version was subscribers-only. A tag
+    # rather than a draft, because the export is the author's own archive
+    # and re-publishing it is the normal case -- but "which of these 300
+    # posts were behind the paywall?" used to have no answer anywhere in
+    # the run, so the operator could not sort them out before the build.
+    PAID_TAG = 'substack-paid'
+
     attr_accessor :keep_permalinks
 
     def initialize(dir, site_url: nil, keep_permalinks: false)
       @dir = dir
       @site_url = site_url.to_s.sub(%r{/+\z}, '')
       @keep_permalinks = keep_permalinks
+      @paid = 0
     end
 
     def label
@@ -45,7 +60,19 @@ module Import
     end
 
     def each_item(&block)
-      rows = CSV.read(File.join(@dir, 'posts.csv'), headers: true)
+      # The encoding is named for the same reason it is named on the HTML
+      # read below: without it CSV follows Encoding.default_external, and
+      # a cron or a launchd job runs without a UTF-8 locale. Then an
+      # export with one accented title died as
+      # CSV::InvalidEncodingError before the first post was written --
+      # and even an all-ASCII export lost the &#x2019;-style entities
+      # Substack writes into titles and subtitles, because
+      # CGI.unescapeHTML only decodes those into a UTF-8 string.
+      rows = CSV.read(File.join(@dir, 'posts.csv'), headers: true, encoding: 'utf-8')
+      # Counted per run, not per adapter: the wizard previews with the
+      # same instance it then imports with, and a counter that only grows
+      # reported every paid post twice.
+      @paid = 0
       # Oldest first, numeric id as the tiebreaker -- the export's own
       # order is not guaranteed, and imported slugs collide less
       # confusingly when the earlier post got there first.
@@ -80,13 +107,16 @@ module Import
       raw_date = [item['post_date'], item['email_sent_at']].find { |v| !v.to_s.strip.empty? }
       return :undated unless raw_date
 
+      paid = PAID_AUDIENCES.include?(item['audience'].to_s.strip.downcase)
+      @paid += 1 if paid
+
       slug = slug_of(item)
       post = {
         'slug' => slug,
-        'title' => item['title'].to_s.empty? ? slug : CGI.unescapeHTML(item['title'].to_s),
+        'title' => item['title'].to_s.empty? ? slug : HtmlBlocks.decode_entities(item['title'].to_s),
         'date' => Time.parse(raw_date).iso8601,
         'state' => state,
-        'tags' => [],
+        'tags' => paid ? [PAID_TAG] : [],
         'content' => blocks,
         'source' => {
           'platform' => 'substack',
@@ -97,6 +127,15 @@ module Import
       }
       post['redirect_from'] = ["/p/#{slug}"] if @keep_permalinks && state == 'published'
       post
+    end
+
+    def postscript
+      return nil if @paid.zero?
+
+      # lookup rather than t: a missing key aborts, and no summary line is
+      # worth failing an import that has already written everything. The
+      # posts carry PAID_TAG either way, so the fact is never lost.
+      I18n.t('import.note.substack_paid', count: @paid)
     end
 
     private
@@ -131,7 +170,7 @@ module Import
         filename = media.from_url(podcast)
         blocks << { 'type' => 'audio', 'media' => [{ 'url' => filename }] } if filename
       end
-      subtitle = CGI.unescapeHTML(item['subtitle'].to_s).strip
+      subtitle = HtmlBlocks.decode_entities(item['subtitle'].to_s).strip
       blocks << { 'type' => 'text', 'text' => subtitle } unless subtitle.empty?
       blocks
     end
@@ -141,29 +180,81 @@ module Import
     # is the author's), subscribe/share/comment furniture, widgets that
     # only worked on Substack, and comment threads. Removed BEFORE
     # HtmlBlocks so none of it can leak through as stray text.
-    STRIP = [
-      %r{<div[^>]*class="[^"]*paywall-jump[^"]*"[^>]*>.*?</div>}m,
-      %r{<div[^>]*class="[^"]*subscription-widget-wrap[^"]*"[^>]*>.*?</div>}m,
-      %r{<p[^>]*class="[^"]*button-wrapper[^"]*"[^>]*>.*?</p>}m,
-      %r{<div[^>]*class="[^"]*poll-embed[^"]*"[^>]*>.*?</div>}m,
-      %r{<div[^>]*class="[^"]*native-video-embed[^"]*"[^>]*>.*?</div>}m,
-      %r{<div[^>]*class="[^"]*comment\b[^"]*"[^>]*>.*?</div>}m
+    #
+    # Only the OPENING tag is matched; where the element ends is decided
+    # by counting (see rewrite_divs), because all of these nest.
+    STRIP_DIVS = [
+      %r{<div[^>]*class="[^"]*paywall-jump[^"]*"[^>]*>}m,
+      %r{<div[^>]*class="[^"]*subscription-widget-wrap[^"]*"[^>]*>}m,
+      %r{<div[^>]*class="[^"]*poll-embed[^"]*"[^>]*>}m,
+      %r{<div[^>]*class="[^"]*native-video-embed[^"]*"[^>]*>}m,
+      %r{<div[^>]*class="[^"]*comment\b[^"]*"[^>]*>}m
     ].freeze
+
+    # The one piece of furniture that is not a <div>: a subscribe/share
+    # button is a single <p> with a link in it and never nests, so the
+    # plain non-greedy match is still right for it.
+    STRIP_BUTTON = %r{<p[^>]*class="[^"]*button-wrapper[^"]*"[^>]*>.*?</p>}m
 
     # An embedded/digest post card carries its target in a data-attrs JSON
     # attribute (sometimes entity-encoded twice); the durable part is the
     # link, so that is what it becomes.
-    CARD = %r{<div[^>]*class="[^"]*(?:digest-post-embed|embedded-post-wrap)[^"]*"[^>]*data-attrs="([^"]*)"[^>]*>.*?</div>}m
+    CARD = %r{<div[^>]*class="[^"]*(?:digest-post-embed|embedded-post-wrap)[^"]*"[^>]*>}m
+    CARD_ATTRS = /data-attrs="([^"]*)"/
 
     def preprocess(html)
-      html = STRIP.reduce(html) { |acc, re| acc.gsub(re, '') }
-      html = html.gsub(CARD) do
-        attrs = decode_attrs(Regexp.last_match(1))
-        url = attrs['canonical_url'].to_s
+      html = STRIP_DIVS.reduce(html) { |acc, re| rewrite_divs(acc, re) { '' } }
+      html = html.gsub(STRIP_BUTTON, '')
+      html = rewrite_divs(html, CARD) do |open_tag|
+        attrs = decode_attrs(open_tag[CARD_ATTRS, 1].to_s)
+        # Two cards, two names for one thing: digest-post-embed calls the
+        # target canonical_url, embedded-post-wrap calls it url. Reading
+        # only the first left every embedded card as a linkless husk.
+        url = (attrs['canonical_url'] || attrs['url']).to_s
         title = attrs['title'].to_s
         url.empty? ? '' : %(<p><a href="#{CGI.escapeHTML(url)}">#{CGI.escapeHTML(title.empty? ? url : title)}</a></p>)
       end
       rewrite_cdn(html)
+    end
+
+    # Replaces every <div> whose opening tag matches `opening` with what
+    # the block makes of it -- the WHOLE element, opening tag to balanced
+    # close.
+    #
+    # Depth counting rather than `.*?</div>`, because Substack's furniture
+    # nests: a subscribe widget is four divs deep, an embedded-post card
+    # five. The non-greedy match stopped at the first inner close, so the
+    # wrapper disappeared and its insides stayed behind -- a quoted post
+    # arrived as four stray paragraphs (its title, 400 characters of
+    # somebody else's body, "Read more", "2 years ago · 8 likes").
+    #
+    # Comments are masked before counting, same length so every index
+    # still points into the original: a commented-out <div> would
+    # otherwise inflate the depth. A div that never closes is left alone,
+    # for the same reason the count exists at all -- furniture leaking as
+    # text is a smaller loss than deleting everything after it.
+    def rewrite_divs(html, opening)
+      masked = html.gsub(/<!--.*?-->/m) { |c| ' ' * c.length }
+      out = +''
+      pos = 0
+      while (m = masked.match(opening, pos))
+        stop = div_end(masked, m.end(0))
+        out << html[pos...m.begin(0)]
+        out << (stop ? yield(html[m.begin(0)...m.end(0)]).to_s : html[m.begin(0)...m.end(0)])
+        pos = stop || m.end(0)
+      end
+      out << html[pos..]
+    end
+
+    # Index just past the </div> closing the div whose opening tag ended
+    # at `index`, or nil when it never closes.
+    def div_end(html, index)
+      depth = 1
+      while depth.positive? && (nxt = html.match(%r{<div\b|</div>}i, index))
+        depth += nxt[0].start_with?('</') ? -1 : 1
+        index = nxt.end(0)
+      end
+      depth.zero? ? index : nil
     end
 
     def decode_attrs(raw)
@@ -180,13 +271,20 @@ module Import
     # Substack serves every image through a resizing CDN wrapper whose
     # last path segment is the URL-encoded original -- unwrap it and the
     # full-size file downloads from the source. The old bucketeer S3
-    # bucket is dead; its files moved to substack-post-media wholesale.
+    # buckets are dead; their files moved to substack-post-media
+    # wholesale.
     FETCH_URL = %r{https://substackcdn\.com/image/fetch/[^"'\s)]*?/(https?%3A[^"'\s)]+)}
+
+    # A family of hosts, not one address: the bucket id differs per
+    # publication (bucketeer-abcd1234-…, bucketeer-e05bbc84-…), so the one
+    # literal this used to carry rewrote one export's images and left
+    # everybody else's pointing at a bucket that no longer answers -- and
+    # an image that will not download costs its whole block.
+    BUCKETEER = %r{https://bucketeer-[^/"'\s]*\.s3\.amazonaws\.com}
 
     def rewrite_cdn(html)
       html.gsub(FETCH_URL) { CGI.unescape(Regexp.last_match(1)) }
-          .gsub('https://bucketeer-e05bbc84-baa3-437e-9518-adb32be77984.s3.amazonaws.com',
-                'https://substack-post-media.s3.amazonaws.com')
+          .gsub(BUCKETEER, 'https://substack-post-media.s3.amazonaws.com')
     end
 
     # Same contract as the other importers: download, measure, or lose the

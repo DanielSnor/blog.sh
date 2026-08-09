@@ -114,14 +114,32 @@ module Import
     # slug-and-hash come from the canonical URL's last segment; a draft
     # has no canonical, but its filename carries the same pair.
     def identity(path, canonical, draft)
+      name = File.basename(path)
       if draft
-        m = File.basename(path).match(/\Adraft_(.*)-([0-9a-f]+)\.html\z/)
+        m = name.match(/\Adraft_(.*)-([0-9a-f]+)\.html\z/)
         return [m[1], m[2]] if m
       end
-      m = URI.parse(canonical).path.to_s.match(%r{([^/]*?)-([0-9a-f]+)\z})
+      pair = canonical_pair(canonical)
+      return pair if pair
+
+      # The canonical address is not always profile-slug-hash. Medium
+      # writes some posts as plain profile and id (.../@user/1234567890),
+      # and then there is no slug in the address to read. The file name
+      # still carries the pair -- published files are named
+      # 2018-08-11_slug-hash.html -- so it stands in, the same way it
+      # already does for drafts. Without this the post was dropped as
+      # :no_identity: a PUBLISHED post, gone from the archive with no
+      # sign it had ever been there. Ghost's own Medium tool falls back
+      # to the file name here for the same reason.
+      m = name.match(/_(.*)-([0-9a-f]+)\.html\z/)
       m ? [m[1], m[2]] : [nil, nil]
+    end
+
+    def canonical_pair(canonical)
+      m = URI.parse(canonical).path.to_s.match(%r{([^/]*?)-([0-9a-f]+)\z})
+      m && [m[1], m[2]]
     rescue URI::InvalidURIError
-      [nil, nil]
+      nil
     end
 
     def content_of(html)
@@ -166,8 +184,14 @@ module Import
       tag ? tag[/href="([^"]*)"/, 1].to_s : ''
     end
 
+    # The tag list is whatever element in the footer carries class
+    # p-tags. Real exports write it as a paragraph ("<p class="p-tags">
+    # Tagged in <a class="p-tag">Things</a>"), so a pattern that demanded
+    # a <div> found nothing at all and every tag was lost -- silently,
+    # because "no tags" is a legitimate answer. The element is therefore
+    # matched by its class and closed by a backreference, not by name.
     def tags_of(html)
-      section = html[%r{<div[^>]*class="[^"]*p-tags[^"]*"[^>]*>(.*?)</div>}m, 1].to_s
+      section = html[%r{<(div|p)[^>]*class="[^"]*p-tags[^"]*"[^>]*>(.*?)</\1>}m, 2].to_s
       section.scan(%r{<a[^>]*>(.*?)</a>}m).flatten.map { |t| text_of(t) }.reject(&:empty?)
     end
 
@@ -175,8 +199,8 @@ module Import
     # title again as the first heading, the summary again as a subtitle
     # heading, and the decorative divider that opens every post. Bookmark
     # cards (mixtapeEmbed) keep their durable part, the link. Code blocks
-    # arrive as pre with the language in a data attribute and lines as
-    # <br> -- normalized to what HtmlBlocks already reads.
+    # arrive as pre with the lines as <br> and the language, if any, in a
+    # data attribute -- normalized to what HtmlBlocks already reads.
     def preprocess(body, title, summary)
       body = body.gsub(%r{<div[^>]*class="[^"]*graf--mixtapeEmbed[^"]*"[^>]*>.*?</div>}m) do |card|
         url = card[%r{<a[^>]*href="([^"]+)"}, 1].to_s
@@ -188,10 +212,28 @@ module Import
       body = body.gsub(%r{<(h[1-6]|blockquote)[^>]*>(.*?)</\1>}m) do |match|
         same_text?(text_of(Regexp.last_match(2)), title) || same_text?(text_of(Regexp.last_match(2)), summary) ? '' : match
       end
-      body.gsub(%r{<pre[^>]*data-code-block-lang="([^"]+)"[^>]*>(.*?)</pre>}m) do
-        lang = Regexp.last_match(1)
-        code = Regexp.last_match(2).gsub(%r{<br\s*/?>}, "\n")
-        %(<pre><code class="language-#{CGI.escapeHTML(lang)}">#{code}</code></pre>)
+      # Every <pre> is normalized, not just the ones announcing a
+      # language. The export from the ZIP writes plain
+      #   <pre class="graf--pre">
+      #     <code class="markup--pre-code">line<br>line<br>line</code>
+      #   </pre>
+      # with no data attribute, and HtmlBlocks reads <pre> verbatim --
+      # which drops <br> entirely. A nine-line install script arrived as
+      # one line with its words welded together ("updatesudo apt-get")
+      # and the markup's own indentation still stuck to the front. So:
+      # <br> becomes a newline, the <code> wrapper is unwrapped so the
+      # edges of the real text can be trimmed, and the language is taken
+      # from wherever it is offered.
+      body.gsub(%r{<pre\b([^>]*)>(.*?)</pre>}m) do
+        attrs = Regexp.last_match(1)
+        inner = Regexp.last_match(2)
+        code_attrs = inner[/\A\s*<code\b([^>]*)>/, 1]
+        inner = inner.sub(/\A\s*<code\b[^>]*>/, '').sub(%r{</code>\s*\z}, '') if code_attrs
+        lang = attrs[/data-code-block-lang="([^"]+)"/, 1] ||
+               code_attrs.to_s[/(?:language|lang)-([\w+#-]+)/, 1]
+        code = inner.gsub(%r{<br\s*/?>}, "\n").strip
+        open = lang ? %(<code class="language-#{CGI.escapeHTML(lang)}">) : '<code>'
+        "<pre>#{open}#{code}</code></pre>"
       end
     end
 

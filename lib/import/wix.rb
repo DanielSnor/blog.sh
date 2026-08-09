@@ -183,6 +183,31 @@ module Import
           { 'type' => 'list',
             'style' => node['type'] == 'ORDERED_LIST' ? 'ol' : 'ul',
             'items' => list_items(node['nodes'], unknown) }
+        when 'BLOCKQUOTE'
+          # Ricos wraps the quoted PARAGRAPHs in a node of their own, and
+          # a node type nobody claimed used to be dropped whole -- so a
+          # quotation left the import with its text, not just its
+          # indentation. blog.sh has had a quote block all along; like
+          # HtmlBlocks does with <blockquote>, each paragraph becomes one,
+          # since the schema's quote is a single text block.
+          quotes = (node['nodes'] || []).filter_map do |child|
+            next convert(child, unknown) unless child['type'] == 'PARAGRAPH'
+
+            text, formatting = rich_text(child['nodes'])
+            next if text.strip.empty?
+
+            block = { 'type' => 'text', 'subtype' => 'quote', 'text' => text }
+            block['formatting'] = formatting unless formatting.empty?
+            block
+          end
+          quotes.empty? ? nil : quotes
+        when 'CODE_BLOCK'
+          # Children are bare TEXT nodes; decorations inside code would be
+          # styling we have nowhere to put anyway.
+          text, = rich_text(node['nodes'])
+          return nil if text.strip.empty?
+
+          { 'type' => 'code', 'text' => text }
         when 'DIVIDER'
           { 'type' => 'hr' }
         when 'IMAGE'
@@ -201,13 +226,34 @@ module Import
           { 'type' => 'table', 'header' => rows.first, 'rows' => rows.drop(1) }
         when 'BUTTON'
           text = node.dig('buttonData', 'text').to_s
+          return nil if text.empty?
+
+          # Wix stores button links without a scheme ("www.wix.com"), and
+          # a button of type ACTION carries no link key at all. Neither is
+          # a reason to lose the label -- often the one thing the post
+          # actually asks the reader to do -- and the loss was invisible
+          # on top of that, since a handled type never reaches the count
+          # below. The label stays as plain text, which is what Ghost's
+          # own Wix importer does with the same two shapes.
           url = node.dig('buttonData', 'link', 'url').to_s
-          return nil if text.empty? || !safe_href?(url)
+          return { 'type' => 'text', 'text' => text } unless safe_href?(url)
 
           { 'type' => 'text', 'text' => text,
             'formatting' => [{ 'type' => 'link', 'url' => url, 'start' => 0, 'end' => text.length }] }
         else
-          unknown[node['type'] || 'UNKNOWN'] += 1
+          # An unclaimed type with children is a CONTAINER, not a payload:
+          # COLLAPSIBLE_LIST holds COLLAPSIBLE_ITEMs holding ordinary
+          # PARAGRAPHs, and dropping the node whole threw away readable
+          # text that maps onto blocks perfectly well one level down. Only
+          # the fold-out structure is lost, which a static page has no use
+          # for. Counted -- and named in the summary -- are the leaves:
+          # VIDEO, POLL, GALLERY and the like carry their payload outside
+          # `nodes`, so for those the node really is what disappears.
+          nested = node['nodes'] || []
+          children = nested.filter_map { |child| convert(child, unknown) }.flatten
+          return children unless children.empty?
+
+          unknown[node['type'] || 'UNKNOWN'] += 1 if nested.empty?
           nil
         end
       end

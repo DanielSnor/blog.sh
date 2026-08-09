@@ -78,6 +78,16 @@ module Import
       return :empty if blocks.empty?
 
       state = item['status'].to_s == 'confirmed' ? 'published' : 'draft'
+      tags = item['content_tags'].to_s.split(';').map(&:strip).reject(&:empty?)
+      # An issue only paying subscribers ever saw does not walk out of
+      # the paywall by itself: it arrives as a draft carrying a tag, so
+      # a person decides whether the public archive gets it. Without
+      # this the CSV's audience column was read by nobody and a premium
+      # issue published exactly like a free one.
+      if premium?(item)
+        state = 'draft'
+        tags << PREMIUM_TAG
+      end
       url = item['url'].to_s
       slug = Slug.slugify(url[%r{/p/([^/?#]+)}, 1].to_s)
       slug = Slug.slugify(title) if slug.empty?
@@ -87,7 +97,7 @@ module Import
         'title' => title.empty? ? slug : title,
         'date' => (Time.parse(item['created_at'].to_s) rescue Time.now).iso8601,
         'state' => state,
-        'tags' => item['content_tags'].to_s.split(';').map(&:strip).reject(&:empty?),
+        'tags' => tags,
         'content' => blocks,
         'source' => {
           'platform' => 'beehiiv',
@@ -101,6 +111,19 @@ module Import
     end
 
     private
+
+    # Which audiences were behind the paywall. Exports name the column
+    # `audience`, older ones `web_audiences` -- Ghost's migrator reads
+    # both, and so must we. 'both' is deliberately absent: it means the
+    # issue went to the free segment as well, so it was never paid-only
+    # and drafting it would hold back most of a normal archive.
+    PREMIUM_AUDIENCES = ['premium', 'all premium subscribers', 'all paid subscribers'].freeze
+    PREMIUM_TAG = 'beehiiv-premium'
+
+    def premium?(item)
+      audience = item['audience'] || item['web_audiences']
+      PREMIUM_AUDIENCES.include?(audience.to_s.strip.downcase)
+    end
 
     # beehiiv serves images through a Cloudflare transform whose
     # parameters bake in the email's quality=80 -- rewritten to
@@ -116,6 +139,7 @@ module Import
     YOUTUBE_THUMB = %r{<a[^>]*href="([^"]*(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{6,})[^"]*)"[^>]*>(?:(?!</a>).)*ytimg(?:(?!</a>).)*</a>}m
 
     def preprocess(html, title)
+      html = drop_email_furniture(html)
       html = slice_content(html)
       html = html.gsub(/\{\{[^}]+\}\}/, '')
                  .gsub(%r{<div[^>]*data-open-tracking="true"[^>]*>.*?</div>}m, '')
@@ -134,8 +158,80 @@ module Import
       html.gsub(%r{</?(?:table|thead|tbody|tfoot|tr|td|th)[^>]*>}m, ' ')
     end
 
+    # Email furniture beehiiv marks with one-letter cell classes. The
+    # words inside those cells differ per publication and per locale, so
+    # the cut goes by structure -- the same selectors Ghost's own
+    # migrator removes (mg-beehiiv process.ts): `td.b` is the footer,
+    # `td[class="e"]` plus `td[class="ee e "]` are the question and the
+    # answers of a beehiiv poll.
+    #
+    # Both were riding into the archive whole. A real ASOTU issue landed
+    # with six 22px social icons as image blocks (6 of its 14 media
+    # files), "Follow …", "Sign up here" and an ad slot as text, plus a
+    # dead poll whose answers linked back to beehiiv to vote. The text
+    # heuristic in slice_content could not have saved it: that email
+    # says "unsubscribe" nowhere, and where it is said, the icons stand
+    # before the word anyway.
+    #
+    # The class match is asymmetric on purpose. The footer is one class
+    # among others, but the poll cells must match the WHOLE attribute:
+    # `class="ee"` alone is ordinary bulleted content and appeared 13
+    # times in that same issue.
+    FOOTER_CELL_CLASS = 'b'
+    POLL_CELL_CLASSES = [%w[e], %w[e ee]].freeze
+
+    # The walk happens on bytes, not characters. String#match(re, pos)
+    # counts pos in characters, so on a UTF-8 string every one of the
+    # ~1600 cells in an issue re-walks the document from the start to
+    # find its offset -- 5 ms on a 114 KB email, 280 ms on one eight
+    # times that. Cuts only ever fall on ASCII tag boundaries, so the
+    # pieces re-tag as text unharmed.
+    def drop_email_furniture(html)
+      bytes = html.b
+      kept = +''.b
+      index = 0
+      while (opening = bytes.match(/<td\b[^>]*>/im, index))
+        after = furniture_cell?(opening[0]) ? end_of_cell(bytes, opening.end(0)) : nil
+        if after
+          kept << bytes[index...opening.begin(0)]
+          index = after
+        else
+          kept << bytes[index...opening.end(0)]
+          index = opening.end(0)
+        end
+      end
+      kept << bytes[index..]
+      kept.force_encoding(html.encoding)
+    end
+
+    def furniture_cell?(tag)
+      value = tag[/\bclass\s*=\s*"([^"]*)"/i, 1] || tag[/\bclass\s*=\s*'([^']*)'/i, 1]
+      return false unless value
+
+      classes = value.split(/\s+/).reject(&:empty?)
+      classes.include?(FOOTER_CELL_CLASS) || POLL_CELL_CLASSES.include?(classes.sort)
+    end
+
+    # The end of a furniture cell has to be counted, not searched for:
+    # the footer is a nest of tables and the first </td> after it opens
+    # belongs to a social icon. A cell that never closes (a truncated
+    # export) returns nil and is left alone -- the old behaviour, which
+    # keeps too much, rather than a cut that would eat the rest of the
+    # email.
+    def end_of_cell(html, pos)
+      depth = 1
+      while (token = html.match(%r{<td\b|</td\s*>}im, pos))
+        pos = token.end(0)
+        depth += token[0].start_with?('</') ? -1 : 1
+        return pos if depth.zero?
+      end
+      nil
+    end
+
     # The real post lives inside #content-blocks; before it sits the
-    # email chrome, after it the unsubscribe footer. The end marker is a
+    # email chrome, after it the unsubscribe footer. Structure takes the
+    # footer out above; this stays as the net under it for templates
+    # that mark their footer some other way. The end marker is a
     # heuristic and says so: a post genuinely discussing unsubscribing
     # would lose its tail, which the summary's block counts would show.
     def slice_content(html)

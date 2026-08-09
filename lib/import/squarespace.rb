@@ -32,6 +32,14 @@ module Import
       return post unless post.is_a?(Hash)
 
       post['source']['platform'] = 'squarespace'
+      # The export escapes the title TWICE ("&amp;amp;" for a plain "&"),
+      # so what comes out of the XML is still HTML, while the body next to
+      # it went through HtmlBlocks and had its entities decoded. One post
+      # then said "Skillman &amp; Hackett" in the heading and "Skillman &
+      # Hackett" in its own first sentence -- the template escapes on
+      # output, so the reader saw the entity spelled out. Same decoder as
+      # the body, so both agree on what the post is called.
+      post['title'] = HtmlBlocks.decode_entities(post['title'].to_s)
       post['content'] = restore_media(post['content'], media)
       feature = feature_image_for(item, media)
       post['content'] = feature + post['content']

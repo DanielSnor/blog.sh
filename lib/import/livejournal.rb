@@ -24,6 +24,36 @@ module Import
     ENDPOINT = URI('https://www.livejournal.com/interface/xmlrpc')
     EPOCH = '1900-01-01 00:00:00'
 
+    # LJ puts the reason in faultString and the number in faultCode, and
+    # the number appears NOWHERE in the text: the string is assembled as
+    # "Client error: <reason>" (bin/upgrading/en.dat + LJ::Protocol's
+    # error_message). The retry below used to test the message for '406'
+    # and therefore never matched anything at all -- the first fault of
+    # any kind ended the import. So the code travels with the error.
+    class Fault < StandardError
+      attr_reader :code
+
+      def initialize(message, code)
+        super(message)
+        @code = code
+      end
+    end
+
+    # The faults worth waiting out: LJ's own rate limiters (411 action
+    # frequency, 413 rate limit exceeded) and its transient server side
+    # (500/501 internal and database errors, 502 database unavailable,
+    # 503 lock contention, 506 journal sync unavailable). Everything else
+    # -- wrong password, suspended account, unknown method -- says the
+    # same thing on the second try, and sleeping 45 seconds to hear it
+    # again helps nobody.
+    #
+    # 406 is deliberately absent although it reads like throttling. It is
+    # LJ's broken-client detector: ljprotocol.pl returns it once the SAME
+    # lastsync has been asked for a third time, so repeating the identical
+    # call is precisely what provokes it. The cure is not to repeat --
+    # see the window guard in sync_times.
+    RETRY_FAULTS = [411, 413, 500, 501, 502, 503, 506].freeze
+
     attr_accessor :keep_permalinks
 
     def initialize(username, password:, keep_permalinks: false)
@@ -118,6 +148,18 @@ module Import
     # lj-cut dropped (the content behind it stays -- an archive has no
     # fold), lj user/comm mentions become the links they meant.
     def normalize(html)
+      # getevents is asked for 'pc' line endings, which LJ documents as
+      # CRLF -- and CRLF survives the trip: XML-RPC escapes every CR as
+      # &#xd;, a character reference the XML line-ending normalisation is
+      # forbidden to touch, so what arrives really is "\r\n". There are
+      # then no two \n side by side, the paragraph split at the bottom of
+      # this method never fired, and every old bare-text entry -- exactly
+      # the entries that branch exists for -- collapsed into one
+      # paragraph, with stray CRs left inside the text. Dropped here
+      # rather than by asking for a different line-ending mode, so the
+      # shape of the archive never depends on what the server chose to
+      # send.
+      html = html.delete("\r")
       html = html.gsub(%r{<(/?)([A-Z]+)([^>]*)>}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2).downcase}#{Regexp.last_match(3)}>" }
       html = html.gsub(%r{</?lj-cut[^>]*>}i, '')
       html = html.gsub(/<lj\s+(?:user|comm)="?([A-Za-z0-9_-]+)"?[^>]*>/i) do
@@ -155,8 +197,17 @@ module Import
         break if items.empty?
 
         items.each { |i| times[i['item']] = i['time'] if i['item'].to_s.start_with?('L-') }
+        previous = lastsync
         lastsync = items.map { |i| i['time'].to_s }.max
         break if data['count'].to_i >= data['total'].to_i
+        # A window that did not move asks the same question again and gets
+        # the same page back, forever -- and LJ breaks that loop for us
+        # with fault 406 ("client is making repeated requests") on the
+        # third identical call, which reads like a server problem and is
+        # ours. syncitems only ever returns items NEWER than lastsync, so
+        # this never fires on a healthy answer; when it does, a short sync
+        # beats a loop.
+        break if lastsync <= previous
       end
       times
     end
@@ -169,10 +220,11 @@ module Import
                'auth_challenge' => challenge,
                'auth_response' => Digest::MD5.hexdigest(challenge + @password_md5) }
       raw_call("LJ.XMLRPC.#{method}", params.merge(auth))
-    rescue StandardError => e
-      # 406 is LJ for "too fast" -- brief patience, then let Run turn the
-      # failure into an honest partial summary a re-run picks up from.
-      raise unless retries.positive? && e.message.include?('406')
+    rescue Fault => e
+      # Brief patience for the faults that mean "not now", then let Run
+      # turn the failure into an honest partial summary a re-run picks up
+      # from.
+      raise unless retries.positive? && RETRY_FAULTS.include?(e.code)
 
       sleep 15
       call(method, params, retries - 1)
@@ -192,7 +244,10 @@ module Import
       require 'rexml/document'
       doc = REXML::Document.new(response.body)
       fault = doc.elements['methodResponse/fault']
-      raise "LiveJournal fault: #{decode(fault.elements['value'])['faultString']}" if fault
+      if fault
+        detail = decode(fault.elements['value'])
+        raise Fault.new("LiveJournal fault: #{detail['faultString']}", detail['faultCode'].to_i)
+      end
 
       decode(doc.elements['methodResponse/params/param/value'])
     end

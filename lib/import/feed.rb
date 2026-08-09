@@ -81,8 +81,17 @@ module Import
       return reason if reason
 
       html = body_html(item)
+      html = expand_shortcodes(html) if wordpress?
       parsed = HtmlBlocks.parse(html)
       blocks = localize_images(parsed.blocks, media, item)
+      # Registered AFTER the body's images, deliberately: media are
+      # numbered in the order an adapter registers them, so registering
+      # the featured image first would move every picture in every post
+      # that has one down a number -- and a re-import then finds 01.jpg
+      # already on disk and keeps the old bytes under the new post's
+      # name. Its block still goes first, where the old site showed it.
+      featured = featured_image(item, media, parsed.blocks)
+      blocks.unshift(featured) if featured
       return :empty if blocks.empty?
 
       date = item_date(item)
@@ -252,7 +261,7 @@ module Import
       # identity and their posts overwrite each other. rel=hub (WebSub) and
       # rel=next (paged feeds) are the same trap.
       own = %w[alternate self]
-      links = parent.get_elements('link').select do |l|
+      links = children_of(parent, 'link').select do |l|
         rel = l.attribute('rel')&.value
         rel.nil? || own.include?(rel)
       end
@@ -290,7 +299,7 @@ module Import
     def atom_alternate(parent)
       return nil unless parent
 
-      links = parent.get_elements('link')
+      links = children_of(parent, 'link')
       picked = links.find { |l| l.attribute('rel')&.value == 'alternate' } ||
                links.find { |l| l.attribute('rel').nil? }
       picked&.attribute('href')&.value
@@ -320,6 +329,16 @@ module Import
     def item_state(item)
       return 'published' unless wordpress?
 
+      # A password-protected post is <wp:status>publish</wp:status> with a
+      # wp:post_password beside it: WordPress publishes the shell and
+      # holds the body back until the password is typed. This engine has
+      # no such gate, so mapping the status alone put the entire body of
+      # a deliberately closed post on the open web (one such item in each
+      # of WordPress's own test exports, 17 in their 10MB one). Draft is
+      # the honest landing place -- the text is kept, behind a token that
+      # cannot be guessed, for the author to decide about.
+      return 'draft' unless text_of(item, 'wp:post_password').empty?
+
       POST_STATES.fetch(text_of(item, 'wp:status'), 'published')
     end
 
@@ -334,6 +353,63 @@ module Import
         return text unless text.empty?
       end
       ''
+    end
+
+    # --- shortcodes ------------------------------------------------------
+
+    # Only a WXR needs this. What a feed carries is what the site RENDERED,
+    # with every shortcode already turned into markup; content:encoded in
+    # an export is the raw editor text, and the classic (pre-Gutenberg)
+    # editor wrote pictures like this:
+    #
+    #   [caption id="attachment_906" align="alignnone" width="580"]<img …> Look at 580x300[/caption]
+    #
+    # HtmlBlocks has no idea what a square bracket is, so that arrived as
+    # three blocks -- a paragraph reading '[caption id="attachment_906" …]',
+    # the image, and a paragraph 'Look at 580x300[/caption]' -- with the
+    # caption detached from what it describes. 7 of 57 posts in WordPress's
+    # own theme test data are affected.
+    CAPTION_SHORTCODE = %r{\[caption\b([^\]]*)\](.*?)\[/caption\]}m
+    # Nothing generic: a rule broad enough to match any [word] would eat
+    # "[citation needed]" and every footnote marker in the archive. This is
+    # WordPress's own core set, the ones that appear in real exports.
+    STRAY_SHORTCODE = %r{\[/?(?:caption|gallery|playlist|audio|video|embed)\b[^\]]*\]}
+
+    def expand_shortcodes(html)
+      # Most bodies have no bracket in them at all, and this walks every
+      # post of an archive that can run to thousands.
+      return html unless html.include?('[')
+
+      html = html.gsub(CAPTION_SHORTCODE) do
+        caption_figure(Regexp.last_match(1), Regexp.last_match(2))
+      end
+      # What is left is a shortcode this engine cannot render either way.
+      # Dropping it loses nothing that was ever going to appear -- and
+      # leaving it printed the raw text in the middle of the post.
+      html.gsub(STRAY_SHORTCODE, '')
+    end
+
+    # <figure>/<figcaption> because HtmlBlocks already reads that pair into
+    # one image block carrying its caption -- the shape the shortcode meant.
+    def caption_figure(attrs, inner)
+      # Two spellings, a decade apart: the older one puts the text in a
+      # caption= attribute, the current one after the image.
+      text = attrs[/\bcaption\s*=\s*(["'])(.*?)\1/m, 2].to_s
+      markup = inner
+      if text.empty?
+        # Up to the FIRST image, plus the </a> that closes a link wrapped
+        # around it -- a shortcode holds one picture. Reaching for the last
+        # </a> instead looked tidier and cut the caption in half: real
+        # captions have links INSIDE them ("getting some <a>caption</a>
+        # love"), and everything before that anchor was thrown away with
+        # the markup.
+        split = inner.match(%r{\A(.*?<img\b[^>]*>(?:\s*</a>)?)(.*)\z}m)
+        markup, text = split[1], split[2] if split
+      end
+      text = text.strip
+      return markup if text.empty?
+
+      "<figure>#{markup}<figcaption>#{text}</figcaption></figure>"
     end
 
     # WordPress already stores the slug it published under, so an import
@@ -361,21 +437,41 @@ module Import
     end
 
     # pubDate over wp:post_date on purpose: the wp: one has no offset, so
-    # it would be read in site.timezone and shift the post by hours.
+    # it would be read in site.timezone and shift the post by hours. It is
+    # still read as the LAST resort -- see the candidates below.
+    #
+    # A date that parses is not a date that is true, and PostWriter turns
+    # the year into a directory name without asking. WordPress gives every
+    # post it never published <pubDate>Wed, 30 Nov -0001 00:00:00 +0000</pubDate>
+    # (export.php formats a zero GMT date), which Time.parse accepts and
+    # returns as year -1: a real export of 46 posts wrote 11 of them into
+    # content/posts/-1/. A Squarespace export supplied a year of
+    # 146140482 by the same route. Both are outside anything an archive
+    # can mean, and the candidate after them knows better.
+    PLAUSIBLE_YEARS = (1000..Time.now.year + 50).freeze
+
     def item_date(item)
       raw = if atom?
               [text_of(item, 'published'), text_of(item, 'updated')]
             else
-              [text_of(item, 'pubDate'), gmt_date(item)]
+              # wp:post_date last: for a draft it is the ONLY field that
+              # holds the day it was written -- pubDate is the -0001
+              # sentinel and post_date_gmt is 0000-00-00 -- and being read
+              # in site.timezone puts it a few hours out at worst, where
+              # the alternative was a year that does not exist.
+              [text_of(item, 'pubDate'), gmt_date(item), text_of(item, 'wp:post_date')]
             end
       raw.each do |value|
         next if value.empty?
 
         begin
-          return Time.parse(value)
+          time = Time.parse(value)
         rescue ArgumentError
           next
         end
+        next unless PLAUSIBLE_YEARS.cover?(time.year)
+
+        return time
       end
       Time.now
     end
@@ -408,10 +504,53 @@ module Import
       end.reject(&:empty?).uniq { |t| t.downcase }
     end
 
+    # REXML matches an unprefixed step against whatever default namespace
+    # is in scope AT THE CANDIDATE ELEMENT, not against "no namespace at
+    # all". Buzzsprout and Simplecast both write
+    #
+    #   <atom:link href="…" rel="hub" xmlns="http://www.w3.org/2005/Atom"/>
+    #
+    # above the channel's own <link>, and that redundant xmlns puts the
+    # element in a default namespace of its own -- so REXML hands it back
+    # for channel.elements['link']. The redeclaration is the whole
+    # trigger: a plain <atom:link rel="self"/>, which those feeds also
+    # carry, is skipped correctly, and the same xmlns on any OTHER sibling
+    # changes nothing. That is why this reads as a phantom until a real
+    # feed is put through it.
+    #
+    # The address of an atom:link lives in an attribute, so the text came
+    # out empty: channel_host was nil, a nil account switches off
+    # PostWriter's re-import matching, and the second run of an import
+    # this engine advertises as safe wrote the whole feed again (2
+    # episodes, then 4, with "-2" slugs) -- re-downloading the show's
+    # audio to do it, which for a podcast is gigabytes.
+    #
+    # Preferring the unprefixed child and only then falling back to
+    # REXML's own answer leaves every prefixed lookup -- wp:post_date,
+    # content:encoded -- exactly as it was. REXML's answer is taken first
+    # and the scan happens only when it came back prefixed: this runs a
+    # dozen times per item, and a 10MB export is 969 of them.
+    def child_of(element, path)
+      return nil unless element
+
+      node = element.elements[path]
+      return node if node.nil? || path.include?(':') || node.prefix.to_s.empty?
+
+      element.elements.find { |child| child.name == path && child.prefix.to_s.empty? } || node
+    end
+
+    def children_of(element, path)
+      nodes = element.get_elements(path)
+      return nodes if path.include?(':')
+
+      unprefixed = nodes.select { |child| child.prefix.to_s.empty? }
+      unprefixed.empty? ? nodes : unprefixed
+    end
+
     def text_of(element, path)
       return '' unless element
 
-      node = path == 'title' && element.name == 'feed' ? element.elements['title'] : element.elements[path]
+      node = path == 'title' && element.name == 'feed' ? child_of(element, 'title') : child_of(element, path)
       return '' unless node
 
       # ALL text children, not the first. `element.text` returns only the
@@ -443,6 +582,75 @@ module Import
         entry['height'] = height if height
         block.merge('media' => [entry])
       end
+    end
+
+    # WordPress's featured image is a property of the post, not part of its
+    # body: the theme paints it above the text, and the export mentions it
+    # only as a _thumbnail_id pointing at an attachment item somewhere else
+    # in the same file. Reading the body alone therefore lost the ONLY
+    # picture some posts have -- 3 of the 6 posts that carry a featured
+    # image in WordPress's own theme test data have no <img> in the body.
+    def featured_image(item, media, body_blocks)
+      return nil unless wordpress?
+
+      entry = attachment_index[postmeta(item, '_thumbnail_id')]
+      return nil unless entry
+      return nil if in_body?(entry['url'], body_blocks, item)
+
+      filename = media.from_url(entry['url'])
+      return nil unless filename
+
+      width, height = media.dimensions(filename)
+      picture = { 'url' => filename }
+      picture['width'] = width if width
+      picture['height'] = height if height
+      block = { 'type' => 'image', 'media' => [picture] }
+      block['alt_text'] = entry['alt'] unless entry['alt'].empty?
+      block
+    end
+
+    # post_id -> the file it stands for, built once from every attachment
+    # item in the export. Attachments are skipped as posts (see
+    # skip_reason), but they are where the addresses live.
+    def attachment_index
+      @attachment_index ||= entries.each_with_object({}) do |item, acc|
+        next unless text_of(item, 'wp:post_type') == 'attachment'
+
+        id = text_of(item, 'wp:post_id')
+        url = text_of(item, 'wp:attachment_url')
+        next if id.empty? || url.empty?
+
+        acc[id] = { 'url' => url, 'alt' => postmeta(item, '_wp_attachment_image_alt') }
+      end
+    end
+
+    def postmeta(item, key)
+      node = item.get_elements('wp:postmeta').find { |meta| text_of(meta, 'wp:meta_key') == key }
+      node ? text_of(node, 'wp:meta_value') : ''
+    end
+
+    # Publishing the same picture twice, once as the featured image and
+    # again where the author put it, is the obvious way to get this wrong.
+    # The two URLs rarely match letter for letter -- the body usually holds
+    # one of WordPress's resized copies, "…-580x300.jpg" of the file the
+    # attachment names -- so the comparison is on the filename with that
+    # suffix taken off.
+    def in_body?(url, body_blocks, item)
+      key = image_key(url)
+      return false unless key
+
+      base = item_link(item)
+      body_blocks.any? do |block|
+        block['type'] == 'image' &&
+          image_key(absolute(block.dig('media', 0, 'url'), base)) == key
+      end
+    end
+
+    def image_key(url)
+      name = File.basename(url.to_s.split('?').first.to_s)
+      return nil if name.empty?
+
+      name.sub(/-\d+x\d+(?=\.[a-z0-9]+\z)/i, '').downcase
     end
 
     def absolute(url, base)

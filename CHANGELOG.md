@@ -1402,7 +1402,7 @@ Nothing to migrate -- see Upgrading at the end.
   their internal English names in the middle of a Czech or German
   summary -- `crosspost`, `checkin`, `no_content`, `retweet`, `thread`,
   `missing_html`, `bad_frontmatter`, `no_identity`, `no_audio`,
-  `audio_unfetchable` and `unparsed`. Every source added in this release
+  `media_unfetchable` and `unparsed`. Every source added in this release
   brought its own vocabulary, and the list of translated reasons stayed
   where the first four sources had left it. It showed worst on a
   Facebook export, where the skipped crossposts are usually the largest
@@ -1415,6 +1415,124 @@ Nothing to migrate -- see Upgrading at the end.
   that needs diagnosing -- crashed the diagnosis with a raw Psych
   backtrace before the first finding. It is now finding number one, with
   the `chmod`/`chown` to run, and the rest of the checkup still happens.
+
+- **Every source was put through a real export from the platform it
+  claims to read, and forty-three defects came out.** The tests until
+  then were written from the adapters: they proved the code did what it
+  said, not that it understood what a platform actually hands you. Run
+  against the fixtures the migration tools ship, public exports, live
+  podcast feeds and this blog's own WordPress archive, most sources lost
+  something -- and the losses were quiet, which is why a green suite had
+  not found them.
+  - **WordPress filed unpublished posts under the year -1.** The export
+    dates a post it never published `Wed, 30 Nov -0001`, which parses
+    without complaint and returns a year that has no business being a
+    directory name: on a 46-post archive, 11 drafts landed in
+    `content/posts/-1/`. `wp:post_date`, the one field that holds the day
+    such a post was written, was never read at all. Dates are now checked
+    for a plausible year and `wp:post_date` is the last resort -- which
+    also catches the Squarespace export that supplied the year 146140482.
+  - **A password-protected WordPress post was published in full.** Its
+    status is `publish`; WordPress holds the body back until the password
+    is typed, and this engine has no such gate. Deliberately closed posts
+    went straight onto the open web -- one in each of WordPress's own test
+    exports, 17 in their large one. They arrive as drafts now: the text is
+    kept, the decision is yours.
+  - **The classic WordPress editor's shortcodes were published as
+    text.** `[caption]`, `[gallery]`, `[audio]` are markup only WordPress
+    expands, so a captioned photo arrived as three blocks -- a paragraph
+    reading `[caption id="attachment_906" …]`, the picture, and the
+    caption with `[/caption]` still on it. 119 posts of a 969-post export
+    carried one. Captions now attach to their picture; the shortcodes
+    that have nothing to render are removed rather than printed.
+  - **A WordPress post's featured image was lost entirely.** It is not
+    part of the body -- the theme paints it from a `_thumbnail_id`
+    pointing at an attachment elsewhere in the file, and attachments were
+    skipped without being read. Half the posts in a large export lost the
+    only picture they had. It now leads the post, registered after the
+    body's own images so no existing filename shifts.
+  - **A Blogger backup arrived gutted.** A captioned image is a
+    `<table class="tr-caption-container">`, and table cells drop pictures:
+    the photo vanished and a one-column table holding its caption stood in
+    its place. Worse, a classic Blogger body has no paragraphs at all --
+    flat text, `<a>`, `<span>` and `<br>` -- and the reader made a block
+    per fragment, losing the address of every link on the way: 29 links
+    down to 8 in one post, and one post split into 105 blocks. Consecutive
+    inline pieces are now gathered into the paragraph they always were,
+    with `<br>` ending the line the way the markup means it to. Every
+    HTML source shares that reader, so every one of them reads run-on
+    bodies better -- this blog's own Posterous-era footers came out as
+    "Shot with:", "Camera+", "for iPhone" on three lines and now read as
+    the sentence they are.
+  - **A picture inside a blockquote disappeared, and a quote holding
+    nothing else disappeared with it.** Paragraphs and figures had always
+    collected their images; quotes were simply forgotten.
+  - **Re-importing a podcast wrote the whole show a second time.**
+    Buzzsprout and Simplecast declare a redundant namespace on one
+    `<atom:link>`, and from that element on, the channel's own `<link>`
+    became invisible to the reader -- so the feed had no identity, and
+    without one nothing matches what is already on disk. The second run
+    duplicated every episode and re-downloaded the audio to do it, which
+    for a podcast is gigabytes. The whole feed family reads addresses
+    correctly now.
+  - **A video podcast was imported as sound.** Video shows use the same
+    `<enclosure>` element, so every episode was stamped audio: an mp4
+    inside an `<audio>` tag plays but never shows a picture, and the post
+    filed itself under the wrong type in the archive.
+  - **Medium dropped published posts on the floor.** When the canonical
+    address carries no slug (`medium.com/@you/1234567890`) the post had no
+    identity and was skipped -- a published article, gone, with nothing in
+    the summary to say it had ever been there. Its tags were looked for in
+    a `<div>` when real exports write a `<p>`, so every tag was lost
+    silently, and code blocks came back as one welded line with the
+    markup's indentation still attached.
+  - **A Substack import could finish having written nothing.** `posts.csv`
+    was read without naming its encoding, so under cron -- where the
+    language settings are unset -- the run died on the first accented
+    character. Paid posts were imported with no mark of any kind: they now
+    carry a `substack-paid` tag and a line in the summary, so you find
+    them before you publish them.
+  - **Movable Type dated posts by the day of the import.** The time in a
+    `DATE` line is only optionally followed by AM/PM, and a line without
+    it was unreadable -- the post was filed under the current year and the
+    run reported it as written. That is now a named skip, so the export can
+    be fixed and run again. `TAGS`, the main taxonomy since MT 3.3, was
+    ignored, and a body written in markdown was fed to the HTML reader
+    with its own syntax published as prose.
+  - **A Tumblr reblog was published as your own writing.** The trail of
+    the post being reblogged was appended with no attribution at all.
+    Each part now carries the blog it came from, as a link.
+  - **A LiveJournal import collapsed every old entry into one
+    paragraph.** The protocol is asked for CRLF line endings, and the
+    paragraph split looked for two newlines side by side, which CRLF never
+    has. Its retry was worse than useless: it tested the error text for
+    "406", a number LiveJournal never puts there, so the first fault of any
+    kind ended the import -- and 406 is the one fault that must not be
+    retried, since it means the same request has already been sent twice.
+  - **A markdown tree gave up its reference links and its line breaks.**
+    Reference-style links (`[text][ref]`) are markdown this engine does not
+    speak and arrived as visible brackets; a list whose items kramdown had
+    wrapped at 120 characters lost every wrapped line; `{% raw %}` blocks
+    had their contents stripped as though they were Liquid. A tree with no
+    `_posts/` directory swept in the repository's readme, its templates and
+    a second copy of the whole site from `_site/`.
+  - **Wix threw away quotes, code and anything it did not recognise.**
+    Blockquote and code blocks were unknown to the reader although this
+    engine has both natively, and an unrecognised node was dropped whole
+    even when it was only a container: a collapsible list holds ordinary
+    paragraphs one level down, and all of them went with it. A button whose
+    link had no scheme -- `www.example.com`, which Wix stores routinely --
+    lost its label too.
+  - **A beehiiv import brought the email with it.** The unsubscribe
+    footer, six social icons as image blocks, "Sign up here" and the ad
+    slot were all imported as post content, and a poll arrived as a heading
+    with its answers as links back to beehiiv to vote. Paid editions were
+    imported with no mark, exactly as Substack's were.
+  - **Bluesky lost photo carousels and quoted feeds.** A gallery of up to
+    twenty pictures fell through the reader unrecognised -- every image
+    gone without a trace, and a picture-only post skipped as empty -- and a
+    post sharing your own feed, list or starter pack was discarded as a
+    quote of somebody else's writing.
 
 ### Upgrading
 

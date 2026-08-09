@@ -90,12 +90,26 @@ module Import
       [/=w[0-9]{2,5}-h[0-9]{2,5}(-[a-z0-9#,*]{1,4})?/, '=w2000-h2000']
     ].freeze
 
+    # Every image the author gave a caption to -- one click on "Add
+    # caption" in the editor -- comes back as a two-row table: the picture
+    # in the first cell, the caption in a td.tr-caption under it. Left
+    # alone, HtmlBlocks sent the whole thing to emit_table, whose cell
+    # renderer drops <img>: the picture vanished with nothing counted or
+    # warned about, and a one-column table with an empty header and the
+    # caption as its only row stood where it had been. Rewritten here to
+    # the figure/figcaption shape emit_figure already reads, before the
+    # self-link unwrap below gets its turn at the picture inside.
+    CAPTION_TABLE = %r{<table[^>]*\bclass="[^"]*\btr-caption-container\b[^"]*"[^>]*>(.*?)</table>}m
+    CAPTION_CELL = %r{<td[^>]*\bclass="[^"]*\btr-caption\b[^"]*"[^>]*>(.*?)</td>}m
+    TABLE_SCAFFOLD = %r{</?(?:table|tbody|thead|tfoot|tr|td|th)\b[^>]*>}
+
     SELF_LINKED_IMG = %r{<a[^>]*href="([^"]+)"[^>]*>\s*(<img[^>]*src="([^"]+)"[^>]*/?>)\s*</a>}m
 
     YOUTUBE_IFRAME = %r{<iframe[^>]*src="[^"]*youtube(?:-nocookie)?\.com/embed/([A-Za-z0-9_-]{6,})[^"]*"[^>]*>\s*</iframe>}m
 
     def body_html(item)
       html = SIZE_TOKENS.reduce(super) { |acc, (re, sub)| acc.gsub(re, sub) }
+      html = html.gsub(CAPTION_TABLE) { caption_figure(Regexp.last_match(1)) }
       html = html.gsub(SELF_LINKED_IMG) do
         href, img, src = Regexp.last_match.captures
         normalize_image_url(href) == normalize_image_url(src) ? img : Regexp.last_match(0)
@@ -105,6 +119,18 @@ module Import
       # through the parse, and map() turns it into the same url+youtube_id
       # block a hand-written post gets.
       html.gsub(YOUTUBE_IFRAME) { "<p>@@blogger-video:#{Regexp.last_match(1)}@@</p>" }
+    end
+
+    # The caption cell is pulled out first and the table scaffolding
+    # thrown away, so what reaches HtmlBlocks is a figure holding the
+    # original picture markup -- the link around it and all. A container
+    # without a caption cell (or with an empty one) still becomes a
+    # figure: the picture is the point, the caption was optional.
+    def caption_figure(inner)
+      caption = inner[CAPTION_CELL, 1].to_s.gsub(TABLE_SCAFFOLD, '').strip
+      picture = inner.sub(CAPTION_CELL, '').gsub(TABLE_SCAFFOLD, '')
+      caption = "<figcaption>#{caption}</figcaption>" unless caption.empty?
+      "<figure>#{picture}#{caption}</figure>"
     end
 
     def normalize_image_url(url)
