@@ -266,7 +266,7 @@ cli:
   trash_empty: "Koš je prázdný."
 
   default_rebuild_reason: "Sestavuji a nasazuji"
-  build_failed: "\n❌ Sestavení selhalo — nenasazuji. Příspěvek je uložený, po opravě spusť ./scripts/deploy-web.sh"
+  build_failed: "\n❌ Sestavení selhalo — nic se nenasazovalo, web tedy pořád ukazuje to, co dosud. Obsah na disku je nedotčený; oprav důvod výše a spusť ./blog.sh rebuild, který postaví i nahraje."
   deploy_failed: "\n❌ Nasazení selhalo. Web je sestavený; důvod je výš. Přerušený přenos stačí spustit znovu (./scripts/deploy-web.sh) — pojistka, která nahrávání zastavila, ho zastaví stejně znovu, dokud neuděláš, co říká."
   build_busy: "\n⏳ Zámek drží jiný běh, web se teď nepřestavěl. Nic není rozbité — potkal se plánovaný běh s tvým."
   deploy_busy: "\n⏳ Zámek drží jiný běh, nahrání se teď nekonalo. Nic není rozbité — potkal se plánovaný běh s tvým."
@@ -550,8 +550,6 @@ import:
 doctor:
   heading: "Kontrola této instalace"
   running_online: "Kontroluju i dostupnost serverů a platnost tokenu (--online)"
-  legend: "❌ něco to rozbíjí · ⚠️  stojí za pohled · ✅ v pořádku"
-  all_good: "Nic špatně."
   summary: "Problémů: %{errors}, ke zvážení: %{warnings}, v pořádku: %{oks}."
   summary_clean: "Bez problémů. Kontrol prošlo: %{oks}."
   hint_online: "S přepínačem --online se navíc ověří, že feedy, měřicí skript a přístupový token pořád odpovídají."

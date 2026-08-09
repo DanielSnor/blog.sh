@@ -141,6 +141,20 @@ module Publishing
     text.scan(/\X/).length
   end
 
+  # How much of the 300 the title is worth keeping room for before tags
+  # start being dropped. A headline cut to nothing announces nothing.
+  MIN_TITLE_GRAPHEMES = 40
+
+  # Cuts a title down to fit, on a word boundary where there is one. Only
+  # ever reached when the address and the tags alone leave no room -- see
+  # compose_bluesky_post.
+  def trim_to_graphemes(text, limit)
+    return text if grapheme_length(text) <= limit
+    return '' if limit <= 1
+
+    "#{text.scan(/\X/).first(limit - 1).join.sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
+  end
+
   # Same word-boundary trimming as perex_for, but budgeted in graphemes --
   # what Bluesky actually counts (an emoji or "ř" is one grapheme, not
   # one-plus bytes or codepoints).
@@ -167,6 +181,30 @@ module Publishing
     hashtags = hashtags_for(tags)
     fixed = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
     budget = BLUESKY_LENGTH - grapheme_length(fixed) - 2
+
+    # A long title plus many tags can fill the 300 graphemes on their own,
+    # and the preview then has nothing left to give up. Bluesky refuses
+    # the whole record at that point, so the post goes out with no
+    # announcement at all -- the one outcome worse than a shortened one.
+    # What yields, in order: the title (trimmed, on a word boundary), then
+    # tags from the end. The address never does -- a cut address is a dead
+    # one -- and no tag is ever half-written, because half a tag is a
+    # different tag.
+    if budget.negative?
+      tag_list = Array(tags).dup
+      loop do
+        hashtags = hashtags_for(tag_list)
+        room = BLUESKY_LENGTH - grapheme_length([url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")) - 2
+        break if room >= MIN_TITLE_GRAPHEMES || tag_list.empty?
+
+        tag_list.pop
+      end
+      hashtags = hashtags_for(tag_list)
+      room = BLUESKY_LENGTH - grapheme_length([url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")) - 2
+      title = trim_to_graphemes(title.to_s, room)
+      fixed = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
+      budget = BLUESKY_LENGTH - grapheme_length(fixed) - 2
+    end
 
     [title, perex_by_graphemes(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
   end

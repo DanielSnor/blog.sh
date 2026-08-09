@@ -32,7 +32,13 @@ module BlueskyPoster
   # (".../Ruby_(programming_language)" is a real Wikipedia URL, and
   # trimming its bracket produced a dead link -- which the first attempt
   # at this did, while the comment claimed otherwise).
-  URL_RE = %r{https?://\S*?\([^\s()]*\)|https?://\S*[^\s.,;:!?'")\]]}
+  # The excluded tail includes "…", which is not decoration here: the
+  # engine appends one itself when it shortens a preview, so an address
+  # that ended the preview came out of this with the ellipsis inside the
+  # link -- a facet pointing at an address that does not exist. Every
+  # other closing mark was already excluded; this one arrives from our
+  # own hand rather than the author's, which is why it was missed.
+  URL_RE = %r{https?://\S*?\([^\s()]*\)|https?://\S*[^\s.,;:!?'")\]…]}
   # [[:word:]] is Unicode-aware, so Czech (and any other) diacritics in a
   # tag survive into the facet.
   TAG_RE = /(?:\A|(?<=\s))#([[:word:]]+)/

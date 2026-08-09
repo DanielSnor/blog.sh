@@ -151,7 +151,33 @@ module RunLock
     rescue SystemCallError
       ''
     end
+    # Only quoted when the process it names is actually alive. The line is
+    # written by whoever holds the lock -- but a run that got only a
+    # read-only handle cannot write it, which is the normal case where
+    # cron runs as root and a person runs as themselves (sean.cz does
+    # exactly this). The line then still describes the run BEFORE, and
+    # naming a pid and a timestamp from an hour ago as "still going" sends
+    # somebody hunting a process that ended long ago. The lock itself is
+    # held either way; that part of the message was never in doubt.
+    holder = '' unless holder_alive?(holder)
     detail = holder.empty? ? '' : " (#{holder})"
     "ℹ️  Another #{label ? "#{label} " : ''}run is still going#{detail} -- skipping this one."
+  end
+
+  # The holder line starts with the pid that wrote it. Signal 0 asks the
+  # kernel whether that process exists without touching it; EPERM means it
+  # exists and belongs to somebody else, which is a yes.
+  def holder_alive?(holder)
+    pid = holder.to_s[/\A\d+/]
+    return false unless pid
+
+    begin
+      Process.kill(0, pid.to_i)
+      true
+    rescue Errno::EPERM
+      true
+    rescue StandardError
+      false
+    end
   end
 end

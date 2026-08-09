@@ -275,7 +275,7 @@ cli:
   trash_empty: "Trash is empty."
 
   default_rebuild_reason: "Rebuilding and deploying"
-  build_failed: "\n❌ Build failed -- not deploying. The post is saved; run ./scripts/deploy-web.sh once it's fixed"
+  build_failed: "\n❌ Build failed -- nothing was deployed, so the site still shows what it showed before. Your content on disk is untouched; fix the reason above and run ./blog.sh rebuild, which builds and uploads in one go."
   deploy_failed: "\n❌ Deploy failed. The site was rebuilt; the reason is above. A transfer that broke off only needs ./scripts/deploy-web.sh again -- a guard that stopped the upload will stop it the same way until you do what it asks."
   build_busy: "\n⏳ Another run holds the lock, so the site was not rebuilt. Nothing is broken -- a scheduled run and yours arrived at the same moment."
   deploy_busy: "\n⏳ Another run holds the lock, so the upload did not happen. Nothing is broken -- a scheduled run and yours arrived at the same moment."
@@ -562,8 +562,6 @@ import:
 doctor:
   heading: "Checking this install"
   running_online: "Checking hosts and tokens too (--online)"
-  legend: "❌ breaks something · ⚠️  worth a look · ✅ fine"
-  all_good: "Nothing wrong here."
   summary: "%{errors} problem(s), %{warnings} worth a look, %{oks} fine."
   summary_clean: "No problems. %{oks} check(s) passed."
   hint_online: "Add --online to also check that the feeds, the analytics script and the access token still answer."

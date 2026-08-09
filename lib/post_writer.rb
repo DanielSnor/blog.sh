@@ -115,6 +115,20 @@ module PostWriter
     post['draft_token'] = old['draft_token'] if old && old['draft_token'] && post['state'] == 'draft' && !post['draft_token']
     post = ensure_draft_token(post)
 
+    # unpublished_from is a promise the engine owes the web: "this post
+    # used to live at that address, and when it is published again the
+    # address must redirect". Publishing.publish keeps that promise and
+    # spends the marker. A re-import publishes a post WITHOUT going
+    # through it -- the source simply says the post is public -- so the
+    # marker survived forever, and after unpublish -> rename -> re-import
+    # the old address 404'd while a marker for it sat in the JSON. Spent
+    # here for the same reason and in the same way.
+    if post['state'] != 'draft' && post['unpublished_from']
+      vacated = post.delete('unpublished_from')
+      former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{year}/#{slug}"]
+      former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
+    end
+
     new_dir = File.join(CONTENT_DIR, year)
     new_path = File.join(new_dir, "#{slug}.json")
 
@@ -182,9 +196,26 @@ module PostWriter
     return unless Dir.exist?(from)
 
     if Dir.exist?(to)
+      # A file already sitting under the name we are moving in is NOT a
+      # reason to leave ours behind. Skipping it -- which is what this did
+      # -- left the post pointing at somebody else's bytes under its own
+      # filename (01.jpg is 01.jpg in every post), while its real file
+      # stayed in the old year where nothing would ever look for it. The
+      # target directory here is an orphan a delete left behind, or the
+      # post's own; either way the arriving file is the one the post
+      # references. The one in the way is moved aside rather than
+      # overwritten, because nothing about a stray file says it is safe
+      # to destroy, and named loudly enough to notice.
       Dir.children(from).each do |f|
         dest = File.join(to, f)
-        FileUtils.mv(File.join(from, f), dest) unless File.exist?(dest)
+        if File.exist?(dest)
+          aside = "#{dest}.displaced"
+          n = 1
+          n += 1 while File.exist?("#{aside}#{n}")
+          FileUtils.mv(dest, "#{aside}#{n}")
+          warn "media: #{File.basename(to)}/#{f} was already taken -- the file that was there is now #{File.basename("#{aside}#{n}")}"
+        end
+        FileUtils.mv(File.join(from, f), dest)
       end
       FileUtils.rmdir(from) if Dir.empty?(from)
     else

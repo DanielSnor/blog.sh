@@ -2338,8 +2338,17 @@ def cmd_list(filters)
   posts.reverse!
   posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
-  puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
-  puts
+  count = t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
+  # The tally is for a person, so it goes where a person is looking. Down
+  # a pipe it would be three more lines that are not posts -- and this
+  # command exists to be piped, so `| wc -l` has to answer the question
+  # it looks like it is answering.
+  if $stdout.tty?
+    puts count
+    puts
+  else
+    warn count
+  end
 end
 
 # --- browsing the archive --------------------------------------------

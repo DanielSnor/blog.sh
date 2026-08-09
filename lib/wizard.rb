@@ -184,9 +184,14 @@ module Wizard
     answer = Tui.key_choice(prompt)
     return default if default != nil && answer.to_s.empty?
 
-    # y English, j German, a Czech ("ano") -- the prompt is translated,
-    # so the key that means yes has to be too.
-    %w[y j a].include?(answer)
+    # The key that means yes comes from the locale, the way the prompt
+    # does. The three shipped languages were listed here by hand, which
+    # worked right up until a fourth one -- localization.md invites
+    # exactly that -- would have had the wizard refuse the answer it had
+    # just offered on screen, and throw the whole run away. The three are
+    # still accepted alongside it, so nobody's habits break.
+    yes = I18n.lookup('cli.confirm_yes_char').to_s.downcase
+    answer == yes || %w[y j a].include?(answer)
   end
 
   # Everything a run collected, shown once and written once.

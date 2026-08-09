@@ -434,7 +434,7 @@ Nothing to migrate -- see Upgrading at the end.
   that means one thing in the browser and another in the terminal is
   worse than no search in the terminal at all. It searches the full text
   of every post, so under the selected row there is a line of that post's
-  own text showing why it matched; `p` opens the whole post read-only
+  own text showing why it matched; the space bar opens the whole post read-only
   (the same markdown `edit` would give you, with media lines shortened to
   their file names); Enter opens it for editing and comes back to the same
   row, same filter. The keys are deliberately none of the letters that
@@ -1273,6 +1273,41 @@ Nothing to migrate -- see Upgrading at the end.
   it and nobody found out. The two are told apart now -- the post still
   publishes, but the run counts a failure, exits non-zero so cron mails
   you, and names the post that is public with nothing pointing at it.
+- **A moved post keeps its own pictures.** Editing a post's date across a
+  year boundary moves its media directory, and a directory already
+  standing at the destination -- what a deleted post leaves behind -- made
+  the move skip every file whose name was taken. Since names are per post
+  (`01.jpg` is `01.jpg` in all of them), the post then served the orphan's
+  bytes under its own filename while its real file stayed in the old year.
+  The arriving file wins now; whatever was in its way is moved aside
+  rather than destroyed, and named so it can be found.
+- **Publishing again after a re-import redirects the old address.** An
+  unpublished post carries the address it vacated, and publishing spends
+  that marker to build the redirect. A re-import publishes without going
+  through publishing -- the export simply says the post is public -- so
+  the marker was never spent, and after unpublish, rename and re-import
+  the old address 404'd with the note to redirect it sitting unread in
+  the post's own file.
+- **A Bluesky announcement that ends in a link is clickable again.** The
+  ellipsis the engine adds when it shortens a preview was swallowed into
+  the address, so the link in the announcement pointed at a page that did
+  not exist. Every other closing mark was already kept out; this one
+  arrives from the engine rather than the author, which is how it was
+  missed.
+- **A long title and a pile of tags cannot silence an announcement.**
+  Together they can fill Bluesky's 300 graphemes on their own, leaving
+  the preview nothing to give up -- and Bluesky then refuses the whole
+  record, so the post went out announced by nothing. The title is
+  shortened first, then tags are dropped from the end; the address is
+  never touched, and no tag is ever cut in half.
+- **`./blog.sh list` down a pipe is only posts.** The tally under it went
+  to the same place as the rows, so `| wc -l` answered three more than
+  there are posts. It goes to the terminal when there is one, and out of
+  the way when the output is being read by something else.
+- **A wizard's yes key comes from the language it is speaking.** It was a
+  list of three letters written by hand, so a fourth translation -- which
+  the localization guide invites -- would have had the wizard refuse the
+  answer it had just offered, and throw away the whole run.
 - **A publish the lock arrived in the middle of finishes itself.**
   `./blog.sh publish` announces the post before it builds the site, so a
   build that did not run left the announcement pointing at a page nobody

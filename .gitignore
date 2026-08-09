@@ -28,3 +28,8 @@ public.nosync/
 assets/images/daniel.png
 # Local regression suite -- deliberately outside the public repo.
 tests/
+# ./style.sh builds a whole sample site here for every palette preview --
+# three dozen files, straight into the working copy. Same reason as the
+# graphics above: nothing generated should be able to ride along on an
+# unrelated commit.
+tmp/
