@@ -170,8 +170,17 @@ module Publishing
 
   # Sends the announcement to whichever network the site configured and
   # returns the post fields to store ('mastodon_url', or 'bluesky_url' +
-  # 'bluesky_uri'), or nil when nothing was sent. The caller decides
-  # WHETHER to announce (recency window, prompts); this decides only how.
+  # 'bluesky_uri'). The caller decides WHETHER to announce (recency
+  # window, prompts); this decides only how.
+  #
+  # Three outcomes, not two. nil means there was nothing to send -- no
+  # comment network is configured, which is a setting, not a fault.
+  # false means the send was ATTEMPTED and failed: an expired token, an
+  # instance that did not answer, a text the network refused. Both used to
+  # be nil, so the scheduled-publish cron could not tell them apart: it
+  # published the post, swallowed the failure, exited 0, and left no trace
+  # on disk that an announcement was ever owed. Nothing retried it, and
+  # nobody found out.
   def announce(post, year:)
     title = post['title']
     slug = post['slug']
@@ -182,11 +191,11 @@ module Publishing
     when :mastodon
       url = MastodonPoster.publish(compose_toot(title: title, slug: slug, year: year,
                                                 blocks: blocks, tags: tags))
-      url ? { 'mastodon_url' => url } : nil
+      url ? { 'mastodon_url' => url } : false
     when :bluesky
       result = BlueskyPoster.publish(compose_bluesky_post(title: title, slug: slug, year: year,
                                                           blocks: blocks, tags: tags))
-      result ? { 'bluesky_url' => result[:url], 'bluesky_uri' => result[:uri] } : nil
+      result ? { 'bluesky_url' => result[:url], 'bluesky_uri' => result[:uri] } : false
     end
   end
 

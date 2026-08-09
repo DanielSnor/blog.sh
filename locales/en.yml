@@ -398,6 +398,7 @@ cron:
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
   publishing_scheduled: "Publishing %{count} scheduled post(s)"
   publish_failed: "❌ '%{slug}' could not be published: %{error}. The other due posts were not affected; fix this one and it will publish on the next run."
+  announce_failed: "⚠️  '%{slug}' is published, but announcing it failed -- the post is public with nothing pointing at it, and nothing will try again. Check the token, then announce it by hand with ./blog.sh toot (or ./blog.sh bluesky)."
   unreadable_post: "⚠️  Skipping unreadable post file %{path}: %{error}"
   retrying_deploy: "Retrying the deploy that did not finish last time"
   deploy_will_retry: "⚠️  The deploy failed. Posts published in this run are announced but not on the site yet -- the next run retries the deploy on its own."
@@ -658,6 +659,7 @@ doctor:
   token_ok: "The access token works -- %{handle}."
   token_invalid: "%{instance} rejected the access token."
   token_invalid_fix: "Nothing has been announced since it stopped working, and nothing will be until it is replaced. Create a new one and put it in env.sh."
+  token_invalid_bluesky_fix: "Make a fresh app password in Bluesky (Settings -> Privacy and security -> App passwords) and put it in env.sh as BLUESKY_APP_PASSWORD."
   token_unchecked: "Could not check the token against %{instance} (%{code})."
 
 # ./setup.sh -- the core setup wizard (scripts/setup.rb). Prompts are a

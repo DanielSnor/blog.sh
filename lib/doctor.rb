@@ -475,6 +475,8 @@ module Doctor
   end
 
   def check_online_network(data)
+    return check_online_bluesky(data) if dig(data, 'bluesky', 'handle')
+
     instance = dig(data, 'mastodon', 'instance')
     token = ENV['MASTODON_ACCESS_TOKEN'].to_s
     return [] if instance.nil? || token.empty?
@@ -500,5 +502,37 @@ module Doctor
     end
   rescue StandardError => e
     [warn(t('token_unchecked', instance: instance, code: e.message.to_s.lines.first.to_s.strip))]
+  end
+
+  # The Bluesky half of the same check. Without it, --online said
+  # "Announcing as <handle>" on the strength of the config alone -- under
+  # a heading that promises the tokens were checked too -- so a revoked
+  # app password read as healthy right up until an announcement silently
+  # stopped going out. The session endpoint is what the poster itself
+  # calls, so this fails exactly when announcing would.
+  def check_online_bluesky(data)
+    handle = dig(data, 'bluesky', 'handle')
+    password = ENV['BLUESKY_APP_PASSWORD'].to_s
+    return [] if handle.nil? || password.empty?
+
+    require 'net/http'
+    pds = (dig(data, 'bluesky', 'pds') || 'https://bsky.social').to_s.chomp('/')
+    uri = URI("#{pds}/xrpc/com.atproto.server.createSession")
+    req = Net::HTTP::Post.new(uri)
+    req['Content-Type'] = 'application/json'
+    req['User-Agent'] = FeedHttp::USER_AGENT
+    req.body = JSON.generate('identifier' => handle, 'password' => password)
+    res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',
+                          open_timeout: 10, read_timeout: 15) { |h| h.request(req) }
+
+    case res
+    when Net::HTTPSuccess then [ok(t('token_ok', handle: "@#{handle}"))]
+    when Net::HTTPUnauthorized, Net::HTTPBadRequest
+      [error(t('token_invalid', instance: handle), t('token_invalid_bluesky_fix'))]
+    else
+      [warn(t('token_unchecked', instance: handle, code: res.code))]
+    end
+  rescue StandardError => e
+    [warn(t('token_unchecked', instance: handle, code: e.message.to_s.lines.first.to_s.strip))]
   end
 end

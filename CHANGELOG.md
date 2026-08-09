@@ -1265,6 +1265,21 @@ Nothing to migrate -- see Upgrading at the end.
   with nothing pointing at it -- no retry, no record, and publishing
   again simply added a second one alongside the first. The address is
   kept when the deletion fails, and the run says so.
+- **A scheduled post whose announcement fails says so.** Announcing
+  answered the same "nothing" whether there had been nothing to send or
+  the send had failed, so the publishing cron treated an expired token
+  like a site with no comment network: it published the post, exited 0,
+  and left no trace that an announcement was ever owed. Nothing retried
+  it and nobody found out. The two are told apart now -- the post still
+  publishes, but the run counts a failure, exits non-zero so cron mails
+  you, and names the post that is public with nothing pointing at it.
+- **`doctor --online` checks a Bluesky app password.** It reported
+  "Announcing as <handle>" from the config alone, under a heading that
+  promises the tokens were checked too, so a revoked app password read as
+  healthy right up until announcements quietly stopped. It now opens a
+  session against the same endpoint the announcement itself uses, and a
+  refusal is an error rather than a note. Mastodon has had this check all
+  along.
 - **An import interrupted mid-copy no longer publishes half a photo.**
   Media was copied straight to its destination, and "skip what already
   exists" -- the rule that makes re-importing safe -- then skipped the

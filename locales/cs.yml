@@ -386,6 +386,7 @@ cron:
   published_scheduled: "Publikován naplánovaný post '%{slug}' (datum %{date})."
   publishing_scheduled: "Publikuji naplánované posty (%{count})"
   publish_failed: "❌ '%{slug}' se nepodařilo publikovat: %{error}. Ostatních postů na řadě se to nedotklo; po opravě se publikuje v dalším běhu."
+  announce_failed: "⚠️  '%{slug}' je publikovaný, ale oznámení selhalo — post je venku a nic na něj neodkazuje, a samo se to znovu nepokusí. Zkontroluj token a oznam ho ručně: ./blog.sh toot (nebo ./blog.sh bluesky)."
   unreadable_post: "⚠️  Přeskakuji nečitelný soubor postu %{path}: %{error}"
   retrying_deploy: "Opakuji deploy, který minule nedoběhl"
   deploy_will_retry: "⚠️  Deploy selhal. Posty publikované v tomto běhu jsou oznámené, ale ještě nejsou na webu — další běh deploy zopakuje sám."
@@ -646,6 +647,7 @@ doctor:
   token_ok: "Přístupový token funguje — %{handle}."
   token_invalid: "%{instance} odmítla přístupový token."
   token_invalid_fix: "Od chvíle, kdy přestal fungovat, se nic neoznámilo a nic se neoznámí, dokud ho nevyměníš. Vytvoř nový a vlož ho do env.sh."
+  token_invalid_bluesky_fix: "Vytvoř na Bluesky nové heslo aplikace (Nastavení → Soukromí a zabezpečení → Hesla aplikací) a zapiš ho do env.sh jako BLUESKY_APP_PASSWORD."
   token_unchecked: "Token se proti %{instance} nepodařilo ověřit (%{code})."
 
 # ./setup.sh — průvodce základním nastavením (scripts/setup.rb). Prompt je

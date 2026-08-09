@@ -72,6 +72,15 @@ due.each do |path, post, date|
   AtomicWrite.write_json(new_path, updated.merge(fields)) if fields
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
+  # The post is published either way -- that part worked, and undoing it
+  # would be worse. But an announcement that was attempted and failed is a
+  # failure of this run: counted, so the exit code is non-zero and cron
+  # mails somebody, and said out loud, because the post is now public with
+  # nothing announcing it and no second attempt coming.
+  if fields == false
+    failures += 1
+    warn I18n.t('cron.announce_failed', slug: updated['slug'])
+  end
 # SystemExit as well as StandardError: the likeliest per-post failure is
 # Publishing.publish's own `abort` when the target year already has a post
 # with this slug, and an abort in a loop over due posts must not take the
