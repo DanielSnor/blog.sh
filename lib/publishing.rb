@@ -231,7 +231,8 @@ module Publishing
     case SiteConfig.comment_network
     when :mastodon
       url = MastodonPoster.publish(compose_toot(title: title, slug: slug, year: year,
-                                                blocks: blocks, tags: tags))
+                                                blocks: blocks, tags: tags),
+                                   idempotency_key: "#{year}/#{slug}")
       url ? { 'mastodon_url' => url } : false
     when :bluesky
       result = BlueskyPoster.publish(compose_bluesky_post(title: title, slug: slug, year: year,

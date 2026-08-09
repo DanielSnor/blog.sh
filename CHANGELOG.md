@@ -1288,6 +1288,16 @@ Nothing to migrate -- see Upgrading at the end.
   the marker was never spent, and after unpublish, rename and re-import
   the old address 404'd with the note to redirect it sitting unread in
   the post's own file.
+- **One post cannot be announced twice.** An announcement can reach the
+  network and be accepted while the reply never makes it back, and the
+  engine then stores nothing: as far as the post's file knows, it was
+  never announced. `./blog.sh toot` and `./blog.sh bluesky` exist for
+  exactly that situation -- and read the missing address as "nothing was
+  sent", so they sent a second one. Bluesky is asked first now whether
+  the announcement is already on the account, and if it is, its address
+  is recorded rather than another posted. A toot carries an
+  idempotency key derived from the post, which is what Mastodon's API
+  offers for this: a repeat comes back as the status that already exists.
 - **A Bluesky announcement that ends in a link is clickable again.** The
   ellipsis the engine adds when it shortens a preview was swallowed into
   the address, so the link in the announcement pointed at a page that did

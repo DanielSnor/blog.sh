@@ -209,6 +209,7 @@ cli:
   already_has_bluesky: "Post už oznámení na Bluesky má: %{url}"
   bluesky_posted: "Oznámeno na Bluesky: %{url}"
   bluesky_failed: "Oznámení na Bluesky se neposlalo."
+  bluesky_recovered: "Ten post už oznámený byl — našel jsem oznámení na účtu a zapsal jeho adresu místo toho, abych poslal druhé: %{url}"
   deleting_bluesky: "Mažu oznámení na Bluesky: %{url}"
   delete_bluesky_failed: "Smazání oznámení na Bluesky selhalo — smaž ho ručně."
   backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), oznámení se neposlalo."

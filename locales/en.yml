@@ -218,6 +218,7 @@ cli:
   already_has_bluesky: "The post already has a Bluesky announcement: %{url}"
   bluesky_posted: "Announced on Bluesky: %{url}"
   bluesky_failed: "The Bluesky announcement was not sent."
+  bluesky_recovered: "That post was already announced -- found it on the account and recorded the address, instead of sending a second one: %{url}"
   deleting_bluesky: "Deleting the Bluesky announcement: %{url}"
   delete_bluesky_failed: "Deleting the Bluesky announcement failed -- delete it by hand."
   backdated_no_toot: "Post date isn't current (a backdated post), the announcement was not sent."

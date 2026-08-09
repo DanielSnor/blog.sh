@@ -1168,6 +1168,19 @@ def cmd_bluesky(slug)
 
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
+
+  # Before sending: is one already out there? This command runs precisely
+  # when the post carries no announcement address -- which means either
+  # none was ever sent, or one was sent and the reply never came back. The
+  # second case used to end with two announcements of the same post.
+  if (found = BlueskyPoster.find_announcement(Publishing.post_url(post['slug'], year)))
+    updated = post.merge('bluesky_url' => found[:url], 'bluesky_uri' => found[:uri])
+    AtomicWrite.write_json(path, updated)
+    puts t('cli.bluesky_recovered', url: found[:url])
+    puts
+    return
+  end
+
   fields = announce_on_publish(post, year, date)
   unless fields
     warn t('cli.bluesky_failed')

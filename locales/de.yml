@@ -215,6 +215,7 @@ cli:
   already_has_bluesky: "Der Beitrag hat schon eine Bluesky-Ankündigung: %{url}"
   bluesky_posted: "Auf Bluesky angekündigt: %{url}"
   bluesky_failed: "Die Bluesky-Ankündigung wurde nicht verschickt."
+  bluesky_recovered: "Dieser Beitrag war bereits angekündigt -- die Ankündigung wurde im Konto gefunden und ihre Adresse eingetragen, statt eine zweite zu senden: %{url}"
   deleting_bluesky: "Lösche die Bluesky-Ankündigung: %{url}"
   delete_bluesky_failed: "Löschen der Bluesky-Ankündigung fehlgeschlagen -- lösch sie von Hand."
   backdated_no_toot: "Das Beitragsdatum ist nicht aktuell (rückdatierter Beitrag), die Ankündigung wurde nicht verschickt."
