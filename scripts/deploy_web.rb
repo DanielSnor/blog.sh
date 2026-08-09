@@ -59,7 +59,7 @@ require_relative '../lib/run_lock'
 # --busy-ok is for cron wrappers: their tick skipping because another
 # run holds the lock is routine, and exit 1 here read as a failure mail.
 # A person's deploy keeps the loud non-zero.
-RunLock.acquire!(ROOT, label: 'deploy', busy_exit: ARGV.include?('--busy-ok') ? 0 : 1)
+RunLock.acquire!(ROOT, label: 'deploy', busy_exit: ARGV.include?('--busy-ok') ? 0 : 3)
 BACKEND = DeployBackend.pick
 # One manifest per backend (the suffix): the manifest records what THIS
 # target already has, so switching DEPLOY_BACKEND must never inherit

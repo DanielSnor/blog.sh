@@ -274,6 +274,9 @@ cli:
   default_rebuild_reason: "Baue neu und deploye"
   build_failed: "\n❌ Build fehlgeschlagen -- es wird nicht deployt. Der Beitrag ist gespeichert; nach der Korrektur ./scripts/deploy-web.sh ausführen"
   deploy_failed: "\n❌ Deploy fehlgeschlagen. Die Seite wurde neu gebaut; der Grund steht oben. Ein abgebrochener Transfer braucht nur ./scripts/deploy-web.sh erneut -- eine Sicherung, die den Upload gestoppt hat, stoppt ihn genauso wieder, bis du tust, was sie verlangt."
+  build_busy: "\n⏳ Ein anderer Lauf hält die Sperre, die Website wurde nicht neu gebaut. Es ist nichts kaputt -- ein geplanter Lauf und deiner sind zusammengetroffen."
+  deploy_busy: "\n⏳ Ein anderer Lauf hält die Sperre, der Upload fand nicht statt. Es ist nichts kaputt -- ein geplanter Lauf und deiner sind zusammengetroffen."
+  deploy_pending_marked: "Die Website ist als ausstehender Deploy vermerkt, der nächste geplante Lauf erledigt ihn. Wer nicht warten will, führt nach dem anderen Lauf ./blog.sh rebuild aus."
 
   rebuild_prompt: "Seite jetzt neu bauen und deployen? [J/n] "
 

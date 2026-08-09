@@ -3,6 +3,9 @@
 require 'json'
 require 'fileutils'
 require 'time'
+# For $CHILD_STATUS -- the exit status of the build and the deploy is what
+# tells "the lock was busy" from "it broke", and $? does not read as either.
+require 'English'
 require_relative 'site_config'
 require_relative 'atomic_write'
 require_relative 'post_writer'
@@ -199,20 +202,63 @@ module Publishing
     end
   end
 
+  # The marker the publishing cron looks for: it means "the site owes the
+  # world a deploy". Written here rather than only by the cron, because
+  # the case that needs it most is the manual one -- ./blog.sh publish
+  # announces the post BEFORE it builds, so a build that does not happen
+  # leaves an announcement pointing at a page nobody will ever upload.
+  # The next cron tick reads this and finishes the job.
+  DEPLOY_PENDING = File.join(ROOT, '.deploy-pending')
+
+  # The exit code build_blog.rb and deploy_web.rb use for "another run
+  # holds the lock". Distinct from 1, because "come back in a minute" and
+  # "your site is broken" want different words and different advice --
+  # and because only one of them is a fault.
+  BUSY_EXIT = 3
+
+  def mark_deploy_pending
+    File.write(DEPLOY_PENDING, Time.now.iso8601)
+  rescue StandardError
+    nil
+  end
+
+  def clear_deploy_pending
+    File.delete(DEPLOY_PENDING) if File.exist?(DEPLOY_PENDING)
+  rescue StandardError
+    nil
+  end
+
   # Build and deploy as one step (--prune included: after a delete or a
   # year-changing edit, live pages remain on the target that the build no
   # longer generates -- without prune, nothing would ever clean them up).
+  #
+  # Answers true or false and nothing else: ten callers read it as a
+  # yes/no and a third state would quietly read as success in half of
+  # them. Which KIND of no it was decides the wording and the marker, not
+  # the return value.
   def rebuild_and_deploy(reason)
     puts
     puts "#{reason}…"
     unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
-      warn I18n.t('cli.build_failed')
+      finish_later('build', $CHILD_STATUS)
       return false
     end
 
-    return true if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
+    if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
+      clear_deploy_pending
+      return true
+    end
 
-    warn I18n.t('cli.deploy_failed')
+    finish_later('deploy', $CHILD_STATUS)
     false
+  end
+
+  # Says which of the two things happened and leaves the marker behind so
+  # the next scheduled run picks the site back up.
+  def finish_later(step, status)
+    busy = status.respond_to?(:exitstatus) && status.exitstatus == BUSY_EXIT
+    warn I18n.t("cli.#{step}_#{busy ? 'busy' : 'failed'}")
+    mark_deploy_pending
+    warn I18n.t('cli.deploy_pending_marked')
   end
 end

@@ -34,7 +34,9 @@ RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0)
 # otherwise leave a live announcement pointing at a page that was never
 # uploaded -- and nothing would retry, because the post is no longer
 # scheduled and the next run has nothing due. This marker is that retry.
-DEPLOY_PENDING = File.join(Publishing::ROOT, '.deploy-pending')
+# One definition, in Publishing, because the manual publish leaves this
+# marker too now -- two copies of the same path is how they drift apart.
+DEPLOY_PENDING = Publishing::DEPLOY_PENDING
 
 due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
   begin
@@ -98,11 +100,9 @@ end
 reason = due.empty? ? I18n.t('cron.retrying_deploy') : I18n.t('cron.publishing_scheduled', count: due.size)
 deployed = Publishing.rebuild_and_deploy(reason)
 
-if deployed
-  File.delete(DEPLOY_PENDING) if File.exist?(DEPLOY_PENDING)
-else
-  File.write(DEPLOY_PENDING, Time.now.iso8601)
-  warn I18n.t('cron.deploy_will_retry')
-end
+# The .deploy-pending marker is written and cleared by rebuild_and_deploy
+# itself now, so every path that can leave the site owing a deploy -- this
+# cron and the manual publish alike -- leaves the same trace behind.
+warn I18n.t('cron.deploy_will_retry') unless deployed
 
 exit(deployed && failures.zero? ? 0 : 1)

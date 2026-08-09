@@ -268,6 +268,9 @@ cli:
   default_rebuild_reason: "Sestavuji a nasazuji"
   build_failed: "\n❌ Sestavení selhalo — nenasazuji. Příspěvek je uložený, po opravě spusť ./scripts/deploy-web.sh"
   deploy_failed: "\n❌ Nasazení selhalo. Web je sestavený; důvod je výš. Přerušený přenos stačí spustit znovu (./scripts/deploy-web.sh) — pojistka, která nahrávání zastavila, ho zastaví stejně znovu, dokud neuděláš, co říká."
+  build_busy: "\n⏳ Zámek drží jiný běh, web se teď nepřestavěl. Nic není rozbité — potkal se plánovaný běh s tvým."
+  deploy_busy: "\n⏳ Zámek drží jiný běh, nahrání se teď nekonalo. Nic není rozbité — potkal se plánovaný běh s tvým."
+  deploy_pending_marked: "Web je označený jako dlužný nasazení, takže to dokončí nejbližší plánovaný běh. Když nechceš čekat, spusť po doběhnutí toho druhého ./blog.sh rebuild."
 
   rebuild_prompt: "Znovu sestavit a nasadit web teď? [A/n] "
 

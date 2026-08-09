@@ -44,7 +44,11 @@ PUBLIC_DIR = ENV['BLOG_SH_PUBLIC_DIR'] || File.join(ROOT, 'public.nosync')
 # elsewhere (the palette preview) neither touches that tree nor should
 # fail because a real build happens to be running.
 require_relative '../lib/run_lock'
-RunLock.acquire!(ROOT, label: 'build') unless ENV['BLOG_SH_PUBLIC_DIR']
+# busy_exit 3, not 1: a build that did not run because a cron holds the
+# lock is not a broken build, and the difference decides whether the
+# caller leaves a .deploy-pending marker behind or tells you to go
+# looking for an error that isn't there.
+RunLock.acquire!(ROOT, label: 'build', busy_exit: 3) unless ENV['BLOG_SH_PUBLIC_DIR']
 # No ?v= cache-buster on site.css on purpose: a static host that serves every
 # file with `Cache-Control: public, max-age=0` plus an ETag (e.g. Cloudron
 # Surfer) makes browsers revalidate on each load and pick up a changed

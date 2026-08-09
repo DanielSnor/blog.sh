@@ -277,6 +277,9 @@ cli:
   default_rebuild_reason: "Rebuilding and deploying"
   build_failed: "\n❌ Build failed -- not deploying. The post is saved; run ./scripts/deploy-web.sh once it's fixed"
   deploy_failed: "\n❌ Deploy failed. The site was rebuilt; the reason is above. A transfer that broke off only needs ./scripts/deploy-web.sh again -- a guard that stopped the upload will stop it the same way until you do what it asks."
+  build_busy: "\n⏳ Another run holds the lock, so the site was not rebuilt. Nothing is broken -- a scheduled run and yours arrived at the same moment."
+  deploy_busy: "\n⏳ Another run holds the lock, so the upload did not happen. Nothing is broken -- a scheduled run and yours arrived at the same moment."
+  deploy_pending_marked: "The site is marked as owing a deploy, so the next scheduled run finishes it. To not wait, run ./blog.sh rebuild once the other run is done."
 
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
 

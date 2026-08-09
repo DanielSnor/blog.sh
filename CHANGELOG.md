@@ -1273,6 +1273,19 @@ Nothing to migrate -- see Upgrading at the end.
   it and nobody found out. The two are told apart now -- the post still
   publishes, but the run counts a failure, exits non-zero so cron mails
   you, and names the post that is public with nothing pointing at it.
+- **A publish the lock arrived in the middle of finishes itself.**
+  `./blog.sh publish` announces the post before it builds the site, so a
+  build that did not run left the announcement pointing at a page nobody
+  would ever upload. It can happen without anything being wrong: the
+  sidebar cron holds the lock for as long as its network fetches take,
+  and a widget host that does not answer stretches that to half a minute.
+  Two things were missing. A skipped build looked exactly like a broken
+  one -- same exit code, same red message telling you to go find an error
+  that was not there. And the marker that makes the next scheduled run
+  pick the site back up was only ever written by the cron, never by the
+  hand. A busy lock now says it is a collision and not a fault, and every
+  path that can leave the site owing a deploy leaves the same marker, so
+  the next run finishes it.
 - **`doctor --online` checks a Bluesky app password.** It reported
   "Announcing as <handle>" from the config alone, under a heading that
   promises the tokens were checked too, so a revoked app password read as
