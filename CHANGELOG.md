@@ -746,9 +746,6 @@ Nothing to migrate -- see Upgrading at the end.
   and cron's minimal PATH is exactly where a system Ruby 2.6 gets picked
   up, dying mid-run with an error nobody reads.
 
-- **A post's text no longer runs into the date badge.** The right-hand
-  padding was sized for a card without one.
-
 - **Bold running straight into italic keeps both.** Written out, that
   adjacency is `**bold***italic*` — and the run of three stars in the
   middle is not one delimiter but two: the closer for the bold, the
