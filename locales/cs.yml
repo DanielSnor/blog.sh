@@ -248,6 +248,7 @@ cli:
   edited_label: "Upraveno: %{path}"
 
   confirm_delete: "Opravdu smazat '%{slug}'? Napiš slug pro potvrzení: "
+  delete_takes_announcement: "Tenhle post byl oznámený na %{url} — smazáním zmizí i to oznámení a všechno, co se pod ním napsalo. Obnova vrátí post, vlákno už ne."
   deleted_label: "Smazáno (v koši, obnovíš přes ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "V koši nic pro '%{slug}' není.\n\n"

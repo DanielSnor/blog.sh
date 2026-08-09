@@ -1533,23 +1533,7 @@ def cmd_unpublish(slug)
     return
   end
 
-  # Whether the announcement is really gone decides whether the post may
-  # forget it. Dropping the address after a FAILED delete left the toot
-  # hanging in public with nothing left pointing at it -- no retry, no
-  # record, and a later re-publish simply announced the post a second
-  # time alongside the first. An expired token is enough to get there.
-  toot_gone = true
-  if post['mastodon_url']
-    puts t('cli.deleting_toot', url: post['mastodon_url'])
-    toot_gone = MastodonPoster.delete(post['mastodon_url'])
-    warn t('cli.delete_toot_failed') unless toot_gone
-  end
-  skeet_gone = true
-  if post['bluesky_uri']
-    puts t('cli.deleting_bluesky', url: post['bluesky_url'])
-    skeet_gone = BlueskyPoster.delete(post['bluesky_uri'])
-    warn t('cli.delete_bluesky_failed') unless skeet_gone
-  end
+  toot_gone, skeet_gone = retract_announcements(post)
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
                        # The address this post just vacated. If it publishes again under a
@@ -2154,6 +2138,30 @@ end
 # true on an actual delete, false when the user cancelled -- callers
 # decide separately whether/how to rebuild (the two call sites want
 # different rebuild behavior, see cmd_delete vs draft_decision_loop).
+# Takes the announcement down on whichever network carries it, and says
+# for each whether it is really gone. Shared by unpublish and delete
+# because they owe the same thing: a page that stops existing must not
+# leave a public post pointing at it. The caller decides what to do with
+# a failure -- both keep the address so it can be retried, rather than
+# forgetting an announcement that is still out there.
+def retract_announcements(post)
+  toot_gone = true
+  if post['mastodon_url']
+    puts t('cli.deleting_toot', url: post['mastodon_url'])
+    toot_gone = MastodonPoster.delete(post['mastodon_url'])
+    warn t('cli.delete_toot_failed') unless toot_gone
+  end
+
+  skeet_gone = true
+  if post['bluesky_uri']
+    puts t('cli.deleting_bluesky', url: post['bluesky_url'])
+    skeet_gone = BlueskyPoster.delete(post['bluesky_uri'])
+    warn t('cli.delete_bluesky_failed') unless skeet_gone
+  end
+
+  [toot_gone, skeet_gone]
+end
+
 def delete_post(slug, path: nil)
   path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
@@ -2161,6 +2169,12 @@ def delete_post(slug, path: nil)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   text = post['content'].find { |b| b['type'] == 'text' }
   puts "#{post['date']}  #{post['title'] || text&.fetch('text', '')&.slice(0, 60)}"
+  # Said BEFORE the confirmation, not after it: deleting the post takes
+  # the announcement down with it, and that part cannot be undone by
+  # `restore` -- the thread and whatever was said under it are gone for
+  # good. One confirmation is enough, as long as it is an informed one.
+  announced = [post['mastodon_url'], post['bluesky_url']].compact
+  puts t('cli.delete_takes_announcement', url: announced.first) unless announced.empty?
   print t('cli.confirm_delete', slug: slug)
   confirmation = $stdin.gets&.strip
   unless confirmation == slug
@@ -2182,10 +2196,28 @@ def delete_post(slug, path: nil)
   # slug alone made deleting the older one destroy the newer one's trashed
   # copy AND its whole media directory -- the undo for a deliberate delete,
   # gone without a word.
+  # The page is about to stop existing, so the announcement pointing at it
+  # has to go too -- the same tidying up unpublish has always done. Left
+  # behind, it stayed public and linked to a 404 the moment the next build
+  # pruned the page, with nothing anywhere to say so.
+  toot_gone, skeet_gone = retract_announcements(post)
+
   trash_dir = File.join(TRASH_DIR, year, slug)
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
-  FileUtils.mv(path, File.join(trash_dir, 'post.json'))
+  # Written rather than moved, because the copy that goes to trash must
+  # not keep an address that no longer resolves: a restored post would
+  # carry a dead announcement and `toot` would refuse to send a new one,
+  # seeing a post that already has one. An address whose deletion FAILED
+  # is kept, so it can still be retried by hand.
+  trashed = post.dup
+  trashed.delete('mastodon_url') if toot_gone
+  if skeet_gone
+    trashed.delete('bluesky_url')
+    trashed.delete('bluesky_uri')
+  end
+  File.write(File.join(trash_dir, 'post.json'), JSON.pretty_generate(trashed))
+  File.delete(path)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)

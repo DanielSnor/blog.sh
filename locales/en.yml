@@ -257,6 +257,7 @@ cli:
   edited_label: "Edited: %{path}"
 
   confirm_delete: "Really delete '%{slug}'? Type the slug to confirm: "
+  delete_takes_announcement: "This post was announced at %{url} -- deleting it takes that announcement down too, along with anything said under it. Restore brings the post back, but not the thread."
   deleted_label: "Deleted (in trash, restore with ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "Nothing in trash for '%{slug}'.\n\n"

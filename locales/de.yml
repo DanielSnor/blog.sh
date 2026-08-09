@@ -254,6 +254,7 @@ cli:
   edited_label: "Bearbeitet: %{path}"
 
   confirm_delete: "'%{slug}' wirklich löschen? Zur Bestätigung den Slug eintippen: "
+  delete_takes_announcement: "Dieser Beitrag wurde unter %{url} angekündigt -- beim Löschen verschwindet auch die Ankündigung und alles, was darunter geschrieben wurde. Das Wiederherstellen bringt den Beitrag zurück, den Thread nicht."
   deleted_label: "Gelöscht (im Papierkorb, zurückholen mit ./blog.sh restore %{slug}): %{path}"
 
   nothing_in_trash: "Im Papierkorb liegt nichts für '%{slug}'.\n\n"

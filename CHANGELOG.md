@@ -1288,6 +1288,16 @@ Nothing to migrate -- see Upgrading at the end.
   the marker was never spent, and after unpublish, rename and re-import
   the old address 404'd with the note to redirect it sitting unread in
   the post's own file.
+- **Deleting a post takes its announcement down with it.** `unpublish`
+  has always tidied up after itself on Mastodon and Bluesky; `delete`
+  never did, so the toot stayed public and pointed at a 404 the moment
+  the next build pruned the page -- with nothing anywhere saying so. Both
+  go through the same retraction now. The confirmation says what is about
+  to happen before you type the slug, because the post can be restored
+  from trash and the thread under the announcement cannot; and the copy
+  that goes to trash forgets an address that is gone, so a restored post
+  can be announced again rather than refusing on the strength of one that
+  no longer exists.
 - **One post cannot be announced twice.** An announcement can reach the
   network and be accepted while the reply never makes it back, and the
   engine then stores nothing: as far as the post's file knows, it was
