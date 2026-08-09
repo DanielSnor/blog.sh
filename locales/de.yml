@@ -522,6 +522,7 @@ import:
   # Adapter-Postscripts -- die Hinweise unter Vorschau und Zusammenfassung. Der
   # Skript-Weg (migrate_*.rb) gibt sie auf Englisch aus, siehe lib/import/cli.rb.
   note:
+    ssg_images_freed: "%{count} Bild(er) standen mitten in einer Textzeile, wo ein Beitrag sie nicht zeigen kann -- jedes bekam eine eigene Zeile, und ein Bild, das nur Zierde eines Links war, wurde zum Linktext."
     facebook_crossposts: "%{count} Beitrag/Beiträge waren Crossposts von anderen Plattformen (Twitter, Posterous, …) -- übersprungen, damit sie die eigenen Importe jener Plattformen nicht doppeln. FACEBOOK_CROSSPOSTS=1 nimmt sie mit."
     feed_unmapped: "%{count} Beitrag/Beiträge hatten keine brauchbare Originaladresse (nackte „?p=123“-Permalinks tragen ihre Identität im Query-String) -- ohne Weiterleitung importiert."
     ghost_scheduled: "%{count} Beitrag/Beiträge waren in Ghost geplant -- als Entwürfe importiert; plane sie hier, wenn du so weit bist."

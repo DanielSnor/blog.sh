@@ -3,6 +3,9 @@
 require 'cgi'
 require 'time'
 require 'yaml'
+# For the run's postscript below -- the other adapters that speak in the
+# summary require it the same way.
+require_relative '../i18n'
 require_relative '../slug'
 require_relative '../markdown_parser'
 require_relative 'html_blocks'
@@ -30,6 +33,15 @@ module Import
       @dir = File.expand_path(dir)
       @permalink = permalink
       @keep_permalinks = keep_permalinks
+      @rearranged = 0
+    end
+
+    # Said out loud when the run rearranged anything -- see
+    # free_inline_images. An import may transform, but not quietly.
+    def postscript
+      return nil if @rearranged.zero?
+
+      I18n.t('import.note.ssg_images_freed', count: @rearranged)
     end
 
     def label
@@ -134,6 +146,7 @@ module Import
         "\n```#{Regexp.last_match(1)}\n#{Regexp.last_match(2).strip}\n```\n"
       end
       body = body.gsub(/\{%[^%]*%\}/, '').gsub(/\{\{[^}]*\}\}/, '')
+      body = free_inline_images(body)
       body = body.gsub(MarkdownParser::IMAGE_RE) do
         "@@ssg-image:#{CGI.escape(Regexp.last_match(2).strip)}:#{CGI.escape(Regexp.last_match(1).to_s)}@@"
       end
@@ -144,6 +157,69 @@ module Import
       end
       blocks, = MarkdownParser.parse_body(body, nil)
       blocks
+    end
+
+    # An image the schema cannot place: one sitting inside a line of text
+    # rather than alone on its own. The parser ABORTS on those, which is
+    # right when you are saving a post you just wrote -- it stops you
+    # losing a picture and points at the line. It is wrong here: nobody
+    # importing somebody else's site wrote that line, cannot fix it in the
+    # archive, and one such paragraph used to take the whole run down with
+    # it. A real Hugo export of 77 posts had 23 of them across 11 files --
+    # 14% of the site, and none of the other 66 posts imported either.
+    #
+    # None of the shapes are exotic. Every WordPress-to-Hugo conversion
+    # writes "![](photo.png)*caption*"; every README puts badges in a list;
+    # screenshots end sentences. So they are rearranged the way a person
+    # would rearrange them, rather than refused:
+    #
+    #   [![alt](img)](href)  ->  [alt](href)      a badge: keep the LINK,
+    #                                             drop the decoration
+    #   [![](img)](href)     ->  ![](img)         a thumbnail: keep the
+    #                                             PICTURE, drop the
+    #                                             click-through
+    #   text ![](img) text   ->  text / img / text, each on its own line
+    #
+    # The count rides back to the caller so the run can say it happened --
+    # a silent rewrite of somebody's archive is exactly what an import
+    # must not do.
+    LINKED_IMAGE = /\[!\[([^\]]*)\]\(([^)\s]+)[^)]*\)\]\(([^)\s]+)[^)]*\)/
+    INLINE_IMAGE = /(?<!\\)!\[[^\]]*\]\([^)\s]+[^)]*\)/
+
+    def free_inline_images(body)
+      body = body.gsub(LINKED_IMAGE) do
+        alt = Regexp.last_match(1).to_s.strip
+        img = Regexp.last_match(2)
+        href = Regexp.last_match(3)
+        @rearranged += 1
+        # With alt text the link can speak for itself ("Google Play");
+        # without it the picture is the only thing there is to keep.
+        alt.empty? ? "\n\n![](#{img})\n\n" : "[#{alt}](#{href})"
+      end
+
+      body.split(/\n[ \t]*\n/).map { |para| split_around_images(para) }.join("\n\n")
+    end
+
+    def split_around_images(para)
+      # Code spans first: "`![x](y)`" is an example of the syntax, not an
+      # image, and the parser masks them for the same reason.
+      return para unless para.gsub(/`[^`]*`/m, '`x`').match?(INLINE_IMAGE)
+      return para if para.strip.match?(/\A#{INLINE_IMAGE.source}\z/)
+
+      pieces = []
+      rest = para
+      while (m = INLINE_IMAGE.match(rest))
+        before = m.pre_match
+        pieces << before unless before.strip.empty?
+        pieces << m[0]
+        rest = m.post_match
+        @rearranged += 1
+      end
+      pieces << rest unless rest.strip.empty?
+      # A list whose item ended in a screenshot keeps its bullet and the
+      # picture follows it -- the image was last in the item anyway, so
+      # nothing changes order.
+      pieces.map(&:strip).join("\n\n")
     end
 
     SENTINEL = /@@ssg-image:([^:@]*):([^@]*)@@/

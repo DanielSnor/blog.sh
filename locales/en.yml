@@ -529,6 +529,7 @@ import:
   # Adapter postscripts -- the notes under the preview and the summary. The
   # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.
   note:
+    ssg_images_freed: "%{count} image(s) sat inside a line of text, where a post cannot show them -- each was moved onto a line of its own, and a picture that was only a link's decoration became the link's text."
     facebook_crossposts: "%{count} post(s) were crossposts from other platforms (Twitter, Posterous, ...) -- skipped so they don't duplicate those platforms' own imports. FACEBOOK_CROSSPOSTS=1 includes them."
     feed_unmapped: "%{count} post(s) had no usable original address (plain \"?p=123\" permalinks have their identity in the query string) -- imported without a redirect."
     ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."

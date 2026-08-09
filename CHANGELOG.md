@@ -1366,6 +1366,21 @@ Nothing to migrate -- see Upgrading at the end.
   truncated file forever. Ctrl-C, a full disk or a container going away
   was enough. Files are copied beside their destination and renamed into
   place, so the only file under the real name is a complete one.
+- **A markdown tree with pictures in it imports at all.** An image
+  sitting inside a line of text is something a post cannot show, and
+  saving one stops with a message pointing at the line -- which is right
+  when you wrote that line, and wrong when it came out of somebody else's
+  site. One such paragraph ended the entire run. A real Hugo export of 77
+  posts had 23 of them across 11 files: none of the 77 imported, and the
+  message named a line the person running the import had never written.
+  None of the shapes were exotic -- every WordPress-to-Hugo conversion
+  writes `![](photo.png)*caption*`, every README puts badges in a list,
+  screenshots end sentences. They are rearranged now the way a person
+  would rearrange them: the picture moves onto a line of its own and the
+  caption follows it; an image that was only a link's decoration gives
+  the link back, keeping its text; a thumbnail with nothing to say keeps
+  the picture instead. The run reports how many it moved, because an
+  import may transform an archive but not quietly.
 - **A Medium export imports at all.** Every published post was skipped as
   "no id to tell which post it is". The adapter read the canonical
   address with a pattern that required the anchor's `class` attribute

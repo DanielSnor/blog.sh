@@ -517,6 +517,7 @@ import:
   # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
   # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.
   note:
+    ssg_images_freed: "Obrázků uvnitř řádku textu, kde je post neumí ukázat: %{count} — každý dostal vlastní řádek, a obrázek, který byl jen ozdobou odkazu, se stal jeho textem."
     facebook_crossposts: "Crosspostů z jiných platforem (Twitter, Posterous, …): %{count} — přeskočeny, ať nezdvojují importy těch platforem. FACEBOOK_CROSSPOSTS=1 je vezme."
     feed_unmapped: "Postů bez použitelné původní adresy: %{count} (holé permalinky „?p=123“ mají identitu v query stringu) — naimportovány bez přesměrování."
     ghost_scheduled: "Postů naplánovaných v Ghostu: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
