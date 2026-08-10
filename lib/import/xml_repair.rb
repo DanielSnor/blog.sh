@@ -44,12 +44,13 @@ module Import
       end
     end
 
-    # Each pair is an opening marker and the closing marker that ends it.
-    # Order matters: <![CDATA[ and <!-- both begin with <!, and DOCTYPE is
-    # tried last because its end is the only one that has to be counted
-    # rather than found.
-    OPAQUE = [['<![CDATA[', ']]>'], ['<!--', '-->'], ['<?', '?>']].freeze
-    DOCTYPE = '<!DOCTYPE'
+    # What opens a region that must survive byte for byte, and what closes
+    # it. The DOCTYPE is the one whose end has to be counted rather than
+    # found, so it has no entry here -- see doctype_end.
+    DOCTYPE = '<!DOCTYPE'.b.freeze
+    CLOSING = { '<![CDATA['.b.freeze => ']]>'.b.freeze, '<!--'.b.freeze => '-->'.b.freeze,
+                '<?'.b.freeze => '?>'.b.freeze }.freeze
+    MARKERS = (CLOSING.keys + [DOCTYPE]).freeze
 
     # The characters XML 1.0 forbids outright. Tab, newline and carriage
     # return are the three control characters it allows, and they are the
@@ -59,14 +60,14 @@ module Import
     # invisible in every editor and does not survive being copied.
     NUL = "\u0000"
 
-    FORBIDDEN = /[\x01-\x08\x0B\x0C\x0E-\x1F]/.freeze
+    FORBIDDEN = /[\x01-\x08\x0B\x0C\x0E-\x1F]/n.freeze
 
     # An & that opens no reference at all. Named references are matched
     # loosely on purpose: &mdash; is not declared by any DTD a blog export
     # carries, but it IS well-formed, REXML accepts it and leaves the text
     # as written -- so escaping it here would change a document that parses
     # perfectly well.
-    BARE_AMPERSAND = /&(?!(?:[A-Za-z_][A-Za-z0-9._-]*|#[0-9]+|#x[0-9A-Fa-f]+);)/.freeze
+    BARE_AMPERSAND = /&(?!(?:[A-Za-z_][A-Za-z0-9._-]*|#[0-9]+|#x[0-9A-Fa-f]+);)/n.freeze
 
     # The declaration's own encoding, read from the declaration alone and
     # not from the first kilobyte -- an export whose <description> merely
@@ -84,25 +85,38 @@ module Import
     def call(raw)
       return nil unless repairable?(raw)
 
-      out = +''
+      # BYTES, not characters, from here down. String#index and String#[]
+      # take CHARACTER offsets, and on a multi-byte string a character
+      # offset has to be walked to from the front -- so every slice costs
+      # the file up to that point. With one CDATA section per post that is
+      # thousands of slices and the whole thing turns quadratic: a 666 kB
+      # archive took 2.6 seconds and a 6 MB one 213. Every marker below is
+      # ASCII and UTF-8 is self-synchronising, so no ASCII byte can occur
+      # inside a multi-byte character and a byte scan finds exactly what a
+      # character scan would. repairable? has already established that
+      # these bytes really are UTF-8.
+      bytes = raw.b
+      out = +''.b
       amps = 0
       controls = 0
       pos = 0
 
-      while (region = next_opaque(raw, pos))
-        start, finish = region
-        text, a, c = repair(raw[pos...start])
-        out << text << raw[start...finish]
+      opaque_spans(bytes).each do |start, finish|
+        text, a, c = repair(bytes[pos...start])
+        out << text << bytes[start...finish]
         amps += a
         controls += c
         pos = finish
       end
-      text, a, c = repair(raw[pos..] || '')
+      text, a, c = repair(bytes[pos..] || ''.b)
       out << text
       amps += a
       controls += c
 
-      result = Result.new(out, amps, controls)
+      # Only ASCII was inserted, and only ASCII control bytes removed --
+      # neither can fall inside a multi-byte character, so what comes out
+      # is UTF-8 exactly as surely as what went in.
+      result = Result.new(out.force_encoding(Encoding::UTF_8), amps, controls)
       # Hand back the very string that came in when nothing was touched,
       # so the caller cannot end up parsing a copy it never asked for.
       result.text = raw unless result.changed?
@@ -140,48 +154,76 @@ module Import
       declared.nil? || OWN_ENCODINGS.include?(declared.downcase)
     end
 
-    # The next region that must survive byte for byte, as [start, end], or
-    # nil when there is none left.
-    def next_opaque(raw, from)
-      best = nil
-      OPAQUE.each do |opening, closing|
-        at = raw.index(opening, from)
-        next if at.nil? || (best && at >= best[0])
+    # Every region that must survive byte for byte, in the order they
+    # appear, as [start, end] pairs.
+    #
+    # Where each marker sits next is REMEMBERED, and looked for again only
+    # once the walk has passed it. Asking for all four from the cursor on
+    # every round is the obvious way to write this and it is quadratic --
+    # not mildly, because a WordPress export puts every post body in its
+    # own CDATA section: a 666 kB archive has 6,414 of them. A marker the
+    # file does not contain at all (no WXR has a DOCTYPE) was then searched
+    # for 6,414 times, each search running to the end of the file, and
+    # escaping a single ampersand in that archive took 8.7 seconds. The
+    # remembered nil is what makes an absent marker free, and a remembered
+    # position is what keeps a distant one from being hunted twice.
+    def opaque_spans(raw)
+      at = {}
+      MARKERS.each { |marker| at[marker] = raw.index(marker) }
 
-        # No closing marker means the rest of the file is inside it. That
-        # is a broken document either way; treating the remainder as
-        # untouchable keeps this from writing into it on the way out.
-        finish = raw.index(closing, at + opening.length)
-        best = [at, finish ? finish + closing.length : raw.length]
+      spans = []
+      pos = 0
+      loop do
+        winner = nil
+        MARKERS.each do |marker|
+          found = at[marker]
+          # Behind the cursor means this one has just been consumed; every
+          # other marker's position still stands.
+          found = at[marker] = raw.index(marker, pos) if found && found < pos
+          next if found.nil?
+
+          winner = marker if winner.nil? || found < at[winner]
+        end
+        break if winner.nil?
+
+        start = at[winner]
+        spans << [start, region_end(raw, winner, start)]
+        pos = spans.last[1]
       end
-      doctype = doctype_span(raw, from)
-      best = doctype if doctype && (best.nil? || doctype[0] < best[0])
-      best
+      spans
+    end
+
+    def region_end(raw, marker, start)
+      return doctype_end(raw, start) if marker == DOCTYPE
+
+      closing = CLOSING.fetch(marker)
+      # No closing marker means the rest of the file is inside this one.
+      # That is a broken document either way, and treating the remainder as
+      # untouchable keeps this from writing into it on the way out.
+      finish = raw.index(closing, start + marker.length)
+      finish ? finish + closing.length : raw.length
     end
 
     # A DOCTYPE ends at the first > that is not inside its internal
     # subset. The subset is what the brackets hold, and it is the reason
     # the end has to be counted instead of searched for: an entity
     # declaration inside it legitimately contains >.
-    def doctype_span(raw, from)
-      at = raw.index(DOCTYPE, from)
-      return nil unless at
-
-      i = at + DOCTYPE.length
+    def doctype_end(raw, start)
+      i = start + DOCTYPE.length
       depth = 0
       while i < raw.length
         case raw[i]
         when '[' then depth += 1
         when ']' then depth -= 1
-        when '>' then return [at, i + 1] if depth <= 0
+        when '>' then return i + 1 if depth <= 0
         end
         i += 1
       end
-      [at, raw.length]
+      raw.length
     end
 
     def repair(chunk)
-      return ['', 0, 0] if chunk.empty?
+      return [''.b, 0, 0] if chunk.empty?
 
       controls = 0
       text = chunk.gsub(FORBIDDEN) do
