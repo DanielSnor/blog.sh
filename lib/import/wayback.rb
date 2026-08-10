@@ -630,7 +630,15 @@ module Import
     # non-feed source normally deserves.
     def snapshot_feed(capture)
       body = http_get("https://web.archive.org/web/#{capture[:timestamp]}id_/#{capture[:original]}")
-      require 'rexml/document'
+      # Same as the feed adapter: rexml is a default gem, and a distro
+      # that split it out of its Ruby package should hear what to install
+      # rather than a backtrace from the middle of an import.
+      begin
+        require 'rexml/document'
+      rescue LoadError
+        abort('❌ This import needs rexml, which your Ruby install is missing -- `gem install rexml` ' \
+              'or install your distribution\'s fuller Ruby package.')
+      end
       root = REXML::Document.new(body).root&.expanded_name
       unless %w[rss feed].include?(root)
         @unreadable += 1

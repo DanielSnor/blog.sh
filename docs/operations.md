@@ -457,6 +457,12 @@ when nothing is due, so a tight interval costs nothing:
 */15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
 ```
 
+Every run of that job touches `.last-scheduled-run` in the project root,
+including the runs with nothing due. That file is the only evidence that
+anything is serving the queue at all, and it is what `./blog.sh doctor`
+reads to tell a queue that is simply waiting from one whose cron was
+never set up.
+
 A post is announced before the site is rebuilt, so the toot and the page
 it links to come from the same build. If the deploy then fails, the job
 leaves a `.deploy-pending` marker and the next run retries the deploy on
@@ -501,6 +507,7 @@ everything generated is rebuildable:
 | `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
 | `env.sh` | tokens (or re-create them; mind the file's 600 mode in backups too) |
 | `trash/` | optional -- deleted-but-recoverable posts |
+| `config/palettes.yml` | only if you added a palette of your own -- the file itself ships with the engine |
 
 Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
 (self-heals with one full re-upload), `.deploy_baseline.json` (the guards'
@@ -508,8 +515,12 @@ reference; losing it costs one deploy with the growth guard standing down,
 and it is rewritten by that same run), `incoming/` (transient staging), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
-from) and `.deploy-pending` (a marker that says a scheduled publish still
-owes the target a deploy; see [Deploying](#deploying)).
+from), `.deploy-pending` (a marker that says a scheduled publish still
+owes the target a deploy; see [Deploying](#deploying)) and
+`.last-scheduled-run` (the scheduled-publish heartbeat above). The
+wizards' `config/site.yml.bak` and `env.sh.bak` are not needed either --
+but the second holds your previous tokens, so delete rather than
+archive it.
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
 

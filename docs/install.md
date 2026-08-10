@@ -141,9 +141,12 @@ ever, for the engine itself to run. The one nuance: the optional
 Pixelfed/RSS sidebar widgets parse XML with `rexml`, which Ruby ships
 as a *default gem* -- bundled with a normal `ruby` install, but some
 Linux distributions split their Ruby package and leave default gems
-out of the minimal one. If `widgets.pixelfed`/`widgets.rss` are unused,
-this never comes up; if you configure either and see a `LoadError`
-about `rexml`, either `gem install rexml` or install your distro's
+out of the minimal one. Importing is not optional about it: every XML
+source reads through `rexml`, which is WordPress, Blogger,
+Squarespace, podcasts, any RSS or Atom feed, the Wayback rescue and
+LiveJournal. If none of that is in your way -- no XML import, no
+`widgets.pixelfed`/`widgets.rss` -- it never comes up; if it is, and
+you see a `LoadError` about `rexml`, either `gem install rexml` or install your distro's
 fuller Ruby package -- e.g. `ruby-full` instead of the bare `ruby` on
 Debian/Ubuntu (Arch's own `ruby` package already includes the full
 standard library, no separate install needed there). `./blog.sh
@@ -466,4 +469,10 @@ Per-deployment files (`content.nosync/`, `media.nosync/`,
 manifests) are gitignored and survive any pull untouched. The one thing
 to watch: if you've **edited engine files in place** (templates, CSS),
 a pull can conflict -- keep such customizations as commits on your own
-branch so git merges them for you.
+branch so git merges them for you. `config/palettes.yml` is one of
+those: it ships with the engine, so a palette of your own added to it
+is an edit in place. The wizards also leave a `.bak` of whatever they
+rewrote -- `config/site.yml.bak`, `env.sh.bak` -- which is how you take
+a wizard run back by hand. Nothing deletes them, and the `env.sh` one
+holds your previous tokens at the same 0600, so remove it once you have
+rotated a token.

@@ -356,7 +356,9 @@ iCloud doesn't exist, it's just a name.
   `rexml`, a Ruby *default gem* (ships with a normal Ruby install, but
   some distro package splits leave it out -- see
   [install.md](docs/install.md#what-you-need) if `gem install rexml`
-  is ever needed)
+  is ever needed). Importing needs it for real: every XML source --
+  WordPress, Blogger, Squarespace, podcasts, any RSS or Atom feed, the
+  Wayback rescue and LiveJournal -- reads through `rexml`
 - **bash** (the thin `blog.sh` / `deploy-web.sh` / `refresh-sidebar.sh` wrappers)
 - Optional, per integration: somewhere to deploy to (a
   [Cloudron Surfer](https://cloudron.io) app, any rsync/SSH host, a
@@ -493,7 +495,7 @@ Available sources:
 
 | Source | Needs | Scope |
 | --- | --- | --- |
-| beehiiv | the posts CSV export | newsletters, drafts included, full text of paid posts; the email chrome is undone, images download at full quality; the CSV has no publish date, only created_at |
+| beehiiv | the posts CSV export | newsletters, drafts included, full text of paid posts -- premium issues arrive as drafts tagged `beehiiv-premium`, so nothing paid-for is published without you looking; the email chrome is undone, images download at full quality; the CSV has no publish date, only created_at |
 | Blogger | the Atom backup file | posts and drafts; the comments and settings the backup mixes in are skipped and counted, images download full-size (the markup only points at thumbnails), YouTube embeds become video blocks |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
 | Facebook | an unpacked export, HTML or JSON | your own posts with photos and videos from the archive; crossposts from Twitter/Posterous are skipped and counted by default (their own imports carry the originals), as are wordless check-ins and app stories |
@@ -545,7 +547,12 @@ ruby scripts/migrate_feed.rb <export.xml | feed-url>
 
 All of them take `LIMIT=n` to import only the first *n* posts, which is the
 way to sample a large archive before committing hours to it -- a later full
-run overwrites those posts in place rather than duplicating them. The full
+run overwrites those posts in place rather than duplicating them. The ones
+that know their posts' original URLs also take `KEEP_PERMALINKS=1`, which
+writes the `redirect_from` list that keeps the old site's links working;
+without it an archive imports with no redirects at all, and the only way
+back is another import. Movable Type/TypePad take `URL_PATTERN` instead and
+a markdown tree a `PERMALINK` pattern, for the same purpose. The full
 per-source guide, including undo and troubleshooting, is
 [docs/importing.md](docs/importing.md).
 They report progress as they go: the size of what they're about to read,

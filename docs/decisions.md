@@ -349,8 +349,8 @@ installed on a Mac by default, so the message says where to get it.
 *Cost:* the engine now knows about codecs, which it did not before; a
 new codec that browsers disagree about would need a line here.
 
-**`rexml` is required lazily, inside the two fetchers that need it, not
-at load time.** `rexml` ships as a Ruby *default gem* -- present in a
+**`rexml` is required lazily, inside each file that needs it, not at
+load time.** `rexml` ships as a Ruby *default gem* -- present in a
 normal install, but some distros split their Ruby package and leave
 default gems out of the minimal one (Debian/Ubuntu's bare `ruby` vs.
 `ruby-full`). A build with no `widgets.pixelfed`/`widgets.rss`

@@ -1,7 +1,8 @@
-# Site configuration. Versioned and synced to the server -- unlike env.sh,
-# which only holds secrets (API tokens). If these values lived in env.sh
-# instead, a local build would render a different site than production, and
-# changes would have no history.
+# Site configuration -- everything about the site except its secrets,
+# which live in env.sh (API tokens). Your own config/site.yml is
+# gitignored, like env.sh: keep it with your backups, not in the engine's
+# repository. Splitting it this way is what lets a local build render the
+# same site as production.
 #
 # Copy this file to config/site.yml (gitignored -- see .gitignore) and fill
 # it in for your own site. After every edit, rebuild: ./blog.sh rebuild, or

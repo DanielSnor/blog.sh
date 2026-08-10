@@ -247,7 +247,15 @@ module Import
       response = Net::HTTP.post(ENDPOINT, body, 'Content-Type' => 'text/xml')
       raise "LiveJournal answered HTTP #{response.code}" unless response.code == '200'
 
-      require 'rexml/document'
+      # Same as the feed adapter: rexml is a default gem, and a distro
+      # that split it out of its Ruby package should hear what to install
+      # rather than a backtrace from the middle of an import.
+      begin
+        require 'rexml/document'
+      rescue LoadError
+        abort('❌ This import needs rexml, which your Ruby install is missing -- `gem install rexml` ' \
+              'or install your distribution\'s fuller Ruby package.')
+      end
       doc = REXML::Document.new(response.body)
       fault = doc.elements['methodResponse/fault']
       if fault

@@ -105,9 +105,12 @@ each row carries the entire EMAIL as HTML, and most of the import is
 undoing that -- slicing out the real content, dropping template
 variables, tracking pixels and the unsubscribe footer, turning the
 layout tables back into prose. The subtitle becomes the first
-paragraph, paid posts import in full, YouTube thumbnails become video
-blocks, and images download from beehiiv's CDN with the email's
-quality=80 rewritten to full quality.
+paragraph, YouTube thumbnails become video blocks, and images download
+from beehiiv's CDN with the email's quality=80 rewritten to full
+quality. Paid posts import in full -- the export is yours -- but a
+premium issue arrives as a **draft** tagged `beehiiv-premium` rather
+than published, so nothing your subscribers paid for goes public
+without you deciding it should.
 
 Two things worth knowing, both the CSV's: **the only date in it is
 `created_at`** -- beehiiv does not export the publish date, so a
@@ -309,6 +312,14 @@ pattern (`PERMALINK='/:year/:month/:day/:title/'`, the wizard asks) to
 keep permalinks; a post's explicit front matter `permalink` always
 wins, and without either, no redirect is guessed at.
 
+The pattern understands `:year`, `:month`, `:day`, `:title` and
+`:slug`, and nothing else -- anything further is left in the address
+exactly as you typed it. That matters because copying Jekyll's own
+default out of `_config.yml` is the natural thing to do, and
+`/:categories/:year/:month/:day/:title.html` would put a literal
+`/:categories/` in front of every redirect. Check one post's
+`redirect_from` after the preview before letting the run write.
+
 ### LiveJournal
 
 ```bash
@@ -393,6 +404,12 @@ pattern (`URL_PATTERN='/%Y/%m/{basename}.html'`, strftime parts plus
 `{basename}`), and a TypePad `UNIQUE URL:` line, where present, always
 wins over it. TypePad has been known to shorten basenames in real
 URLs, so spot-check a few redirects against the old site.
+
+**Decide about the pattern before the first run.** The host in
+`URL_PATTERN` is part of a post's re-import identity here, not just a
+source of addresses -- so importing once without it and again with it
+does not update those posts, it writes the archive a second time. If you
+have already done that, see *Undoing an import* below.
 
 ### Pixelfed
 

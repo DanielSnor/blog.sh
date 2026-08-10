@@ -597,9 +597,11 @@ Nothing to migrate -- see Upgrading at the end.
   reports it and exits non-zero rather than let its caller think a deploy
   happened. On a filesystem that cannot lock, everything behaves exactly as
   it did before.
-- **Two more working files** sit next to the ones from 1.1:
-  `.last-edit.meta` (which command wrote the editor buffer) and
-  `.blog-sh.lock`. Both are gitignored and neither needs backing up.
+- **Three more working files** sit next to the ones from 1.1:
+  `.last-edit.meta` (which command wrote the editor buffer),
+  `.blog-sh.lock`, and `.last-scheduled-run`, the heartbeat that lets
+  `doctor` tell a waiting queue from one nothing is serving. All three
+  are gitignored and none needs backing up.
   `*.bak` is gitignored now as well -- the wizards keep a backup of the file
   they rewrite, and for `env.sh` that copy holds your previous tokens.
 - **Going back to 1.1 builds, but do not write under it.** The 1.1 engine

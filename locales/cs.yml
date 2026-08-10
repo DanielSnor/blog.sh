@@ -731,7 +731,7 @@ setup:
   q_app_password: "Heslo aplikace (Enter přeskočí — při psaní se nezobrazuje): "
   password_skipped: "Bez hesla aplikace. Web funguje, jen nikdy nic neoznámí, dokud ho nedoplníš do env.sh."
 
-  section_deploy_intro: "Hotový web je obyčejná složka souborů; tady se vybírá, kam ji ./blog.sh deploy po každé změně nahraje. Řiď se tím, kde ti web poběží — a jestli to ještě nevíš, nech první možnost. Změnit to jde kdykoli, stačí ./setup.sh spustit znovu."
+  section_deploy_intro: "Hotový web je obyčejná složka souborů; tady se vybírá, kam ji ./blog.sh rebuild po každé změně nahraje. Řiď se tím, kde ti web poběží — a jestli to ještě nevíš, nech první možnost. Změnit to jde kdykoli, stačí ./setup.sh spustit znovu."
   q_backend: "Kam má hotový web putovat?"
   backend_none: "Zatím nikam — psát a prohlížet lokálně, rozhodnout se později"
   backend_surfer: "Cloudron Surfer — máš vlastní Cloudron a v něm appku Surfer"

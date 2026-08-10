@@ -739,7 +739,7 @@ setup:
   q_app_password: "App-Passwort (Enter überspringt -- die Eingabe wird nicht angezeigt): "
   password_skipped: "Kein App-Passwort. Die Website funktioniert, sie kündigt nur nie etwas an, bis du eines in env.sh einträgst."
 
-  section_deploy_intro: "Die fertige Website ist ein gewöhnlicher Ordner voller Dateien; hier wird gewählt, wohin ./blog.sh deploy ihn nach jeder Änderung hochlädt. Richte dich danach, wo die Website laufen wird -- und wenn du es noch nicht weißt, lass die erste Option stehen. Ändern geht jederzeit, ./setup.sh einfach noch einmal starten."
+  section_deploy_intro: "Die fertige Website ist ein gewöhnlicher Ordner voller Dateien; hier wird gewählt, wohin ./blog.sh rebuild ihn nach jeder Änderung hochlädt. Richte dich danach, wo die Website laufen wird -- und wenn du es noch nicht weißt, lass die erste Option stehen. Ändern geht jederzeit, ./setup.sh einfach noch einmal starten."
   q_backend: "Wohin soll die gebaute Website?"
   backend_none: "Noch nirgendwo -- lokal schreiben und ansehen, später entscheiden"
   backend_surfer: "Cloudron Surfer -- du betreibst ein eigenes Cloudron mit der Surfer-App darauf"

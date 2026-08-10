@@ -744,7 +744,7 @@ setup:
   q_app_password: "App password (Enter to skip -- it is not shown as you type): "
   password_skipped: "No app password. The site works; it just never announces anything until you add one to env.sh."
 
-  section_deploy_intro: "The built site is an ordinary folder of files; this picks where ./blog.sh deploy uploads it after every change. Go by where the site will run -- and if you don't know yet, keep the first option. It can be changed any time by running ./setup.sh again."
+  section_deploy_intro: "The built site is an ordinary folder of files; this picks where ./blog.sh rebuild uploads it after every change. Go by where the site will run -- and if you don't know yet, keep the first option. It can be changed any time by running ./setup.sh again."
   q_backend: "Where should the built site go?"
   backend_none: "Nowhere yet -- write and preview locally, decide later"
   backend_surfer: "Cloudron Surfer -- you run your own Cloudron with the Surfer app on it"
