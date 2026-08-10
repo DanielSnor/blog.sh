@@ -1632,6 +1632,15 @@ Nothing to migrate -- see Upgrading at the end.
     lexicon keeps hashtags in two places, and only the facets were read,
     so a post whose tags a client had put in the record's own `tags`
     array arrived with no classification at all.
+  - **A Wix table came apart the first time its post was saved.** The
+    engine builds a table block in three places, and this was the only one
+    that left out the column alignment. The writer draws the separator row
+    from it, so without one the row came out `|  |` -- a single empty cell
+    instead of a dash per column -- which is no longer a table in
+    markdown. Nothing looked wrong until somebody opened the post in the
+    editor and saved it: the parser refused the shape, and the whole table
+    came back as one paragraph of pipes. The same table imported from HTML
+    survived all along, and the two paths now build the same block.
   - **A WordPress post format arrived as a tag.** Categories, tags and the
     format a theme draws a post with all travel as `<category>` in a WXR,
     told apart by an attribute nobody read -- so a blog that used formats

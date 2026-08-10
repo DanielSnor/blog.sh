@@ -264,9 +264,21 @@ module Import
           block
         when 'TABLE'
           rows = (node['nodes'] || []).map { |row| table_cells(row) }
+          rows = rows.reject(&:empty?)
           return nil if rows.empty?
 
-          { 'type' => 'table', 'header' => rows.first, 'rows' => rows.drop(1) }
+          # align is not decoration. MarkdownWriter draws the separator
+          # row from it, and without one the row comes out "|  |" -- a
+          # single empty cell instead of a dash per column, which is no
+          # longer a table in markdown. The post looked right until
+          # somebody opened it in the editor and saved: MarkdownParser
+          # refused the shape, and the whole table came back as one
+          # paragraph of pipes. This was the only place in the engine
+          # building a table block without it; HtmlBlocks has always
+          # written the same left-aligned default, and a table from the
+          # HTML path survived the round trip all along.
+          { 'type' => 'table', 'align' => Array.new(rows.first.size, 'left'),
+            'header' => rows.first, 'rows' => rows.drop(1) }
         when 'BUTTON'
           text = node.dig('buttonData', 'text').to_s
           return nil if text.empty?
