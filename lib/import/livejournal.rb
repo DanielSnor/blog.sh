@@ -164,7 +164,13 @@ module Import
       html = html.gsub(%r{</?lj-cut[^>]*>}i, '')
       html = html.gsub(/<lj\s+(?:user|comm)="?([A-Za-z0-9_-]+)"?[^>]*>/i) do
         name = Regexp.last_match(1)
-        %(<a href="https://#{name.delete('_')}.livejournal.com/">#{name}</a>)
+        # A hostname cannot hold an underscore, so LJ spells it as a hyphen:
+        # james_nicoll.livejournal.com answers 301 to james-nicoll.livejournal.com.
+        # Dropping the underscore instead lands on a DIFFERENT journal that
+        # happens to exist -- jamesnicoll and rutravel are both real, and
+        # neither belongs to the person the entry was talking about. The name
+        # shown to the reader keeps its underscore, only the host loses it.
+        %(<a href="https://#{name.tr('_', '-')}.livejournal.com/">#{name}</a>)
       end
       # LJ auto-formatted at render time, so old bodies are bare text
       # with inline tags and newlines -- fed to an HTML parse as-is they

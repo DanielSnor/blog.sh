@@ -194,15 +194,31 @@ module Import
       prefix.force_encoding(Encoding::UTF_8).scrub.length
     end
 
-    # Both the facet tags and any trailing plain "#word" the author never
-    # facetted, deduplicated case-insensitively the way a tag list should be.
+    # A post keeps its hashtags in two places, and only one of them is the
+    # facets: app.bsky.feed.post also has a `tags` array, which the lexicon
+    # describes as "additional hashtags, in addition to any included in
+    # post text and facets". Clients fill it for tags the author did not
+    # write into the text at all -- at://did:plc:gq4fo3u6tqzzdkjlwzpb23tj/
+    # app.bsky.feed.post/3mqukh4pq6s2k carries tags ["anisota"] with no
+    # facet and no "#" anywhere in its text -- so reading the facets alone
+    # dropped those posts' whole classification on the floor. Merged and
+    # deduplicated case-insensitively the way a tag list should be, since
+    # the same tag may well arrive from both sides.
     def tags_from(record)
-      tags = (record['facets'] || []).flat_map do |facet|
+      facet_tags = (record['facets'] || []).flat_map do |facet|
         (facet['features'] || []).filter_map do |feature|
           feature['tag'] if feature['$type'].to_s == 'app.bsky.richtext.facet#tag'
         end
       end
-      tags.uniq { |tag| tag.downcase }
+      # The tags array is written by clients, not by the engine that
+      # builds facets, so what arrives is whatever an author typed: a
+      # leading "#" they kept out of habit, or the padding left behind by
+      # a text field. Both spellings mean the same tag, and left as they
+      # came they would make two.
+      (facet_tags + Array(record['tags']))
+        .map { |tag| tag.to_s.strip.sub(/\A#+/, '') }
+        .reject(&:empty?)
+        .uniq { |tag| tag.downcase }
     end
 
     def embed_blocks(embed, media)

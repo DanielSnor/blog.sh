@@ -519,6 +519,7 @@ import:
     no_audio: "ein Feed-Eintrag ohne Audio -- keine Episode"
     media_unfetchable: "die Episodendatei ließ sich nicht herunterladen"
     bad_date: "die DATE-Zeile war nicht lesbar -- Movable Type schreibt MM/TT/JJJJ HH:MM:SS, AM/PM optional"
+    misaligned_row: "die Zeile passt nicht zur Kopfzeile -- weiter vorn blieb ein Anführungszeichen offen"
     unparsed: "die archivierte Seite ließ sich nicht als Beitrag lesen"
   # Adapter-Postscripts -- die Hinweise unter Vorschau und Zusammenfassung. Der
   # Skript-Weg (migrate_*.rb) gibt sie auf Englisch aus, siehe lib/import/cli.rb.

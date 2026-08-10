@@ -526,6 +526,7 @@ import:
     no_audio: "a feed item with no audio -- not an episode"
     media_unfetchable: "the episode file could not be downloaded"
     bad_date: "the DATE line could not be read -- Movable Type writes MM/DD/YYYY HH:MM:SS, with AM/PM optional"
+    misaligned_row: "the row does not line up with the header -- a quote left open earlier in the line"
     unparsed: "the archived page could not be read as a post"
   # Adapter postscripts -- the notes under the preview and the summary. The
   # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.

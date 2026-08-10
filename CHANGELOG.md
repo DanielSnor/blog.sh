@@ -1591,6 +1591,52 @@ Nothing to migrate -- see Upgrading at the end.
   byte for byte identical, and everything genuinely broken still stops
   with the same one-line refusal.
 
+- **Six more the real exports found, and one place the docs were wrong.**
+  - **A WordPress custom post type vanished into the menu items.** A blog
+    with a portfolio, a recipe section or book reviews keeps those in
+    their own post type -- with a title, a body and categories like any
+    post -- and every one of them was counted under the same
+    `not a post` as the navigation menu. In an export where the menu
+    contributes four figures, a line reading `1234 skipped (not a post)`
+    hides forty articles inside itself, and the documentation told the
+    reader that number was normal. Each type is now named after itself
+    (`wp:portfolio`), so the summary says what stayed behind. The name is
+    namespaced because a section called `quote` or `comment` would
+    otherwise have been printed as this engine's own wording for
+    something else entirely.
+  - **A Wix export lost every post to one stray quote.** A CSV that has
+    been through Excel or Numbers holds cells like `He said "hi" to me`,
+    and the strict parser stops at the first one -- reported, on top of
+    that, as the source having stopped answering, when the file was on
+    disk all along. The file is now read leniently. A row that slid out
+    of line as a result (a damaged cell containing a comma shifts every
+    column after it) is skipped by name rather than imported with
+    somebody else's body under the wrong date.
+  - **A code sample with two Liquid arguments came out as prose.**
+    `{% highlight ruby linenos %}` is the form Jekyll's own documentation
+    teaches, and only the single-argument spelling was recognized -- so
+    the block fell through to the blanket Liquid strip and arrived with
+    its indentation gone and its line breaks turned into spaces.
+  - **A Medium post published without a timestamp was dated the day of
+    the import.** Medium leaves the publication time out of some exported
+    posts, and the file name carries it (`2018-08-11_slug-hash.html`); it
+    is read from there now rather than from the file's own mtime, which
+    is when the ZIP was unpacked. The post used to sit at the top of the
+    new blog, years out of place.
+  - **A LiveJournal mention linked to somebody else's journal.** An
+    underscore cannot appear in a hostname and LiveJournal spells it as a
+    hyphen; this dropped it instead, so `<lj user="james_nicoll">` pointed
+    at `jamesnicoll.livejournal.com` -- a journal that exists and belongs
+    to another person.
+  - **Bluesky tags written outside the post text were thrown away.** The
+    lexicon keeps hashtags in two places, and only the facets were read,
+    so a post whose tags a client had put in the record's own `tags`
+    array arrived with no classification at all.
+  - **The documentation promised Tumblr drafts that no API key can
+    reach.** Drafts, the queue and private posts sit behind endpoints
+    that want a full OAuth handshake; the import gets the published
+    posts. Said plainly now, in the README and the guide.
+
 ### Upgrading
 
 - **Nothing to migrate.** `git pull`, rebuild, deploy. Verified against a

@@ -150,15 +150,38 @@ module Import
       before_footer[%r{<section[^>]*class="[^"]*e-content[^"]*"[^>]*>(.*)</section>}m, 1].to_s
     end
 
+    # The published time Medium wrote into the post is the best answer,
+    # the day in the file name the second best, the file itself the last.
     def date_of(html, path)
       stamp = html[%r{<time[^>]*class="[^"]*dt-published[^"]*"[^>]*datetime="([^"]+)"}, 1]
       return Time.parse(stamp) if stamp
 
-      # Drafts carry no published time; the file's own mtime is the export's
-      # only honest answer to "when was this last worked on".
-      File.mtime(path)
+      # Drafts carry no published time and no day in the name; the file's
+      # own mtime is the export's only honest answer to "when was this
+      # last worked on".
+      named_date(path) || File.mtime(path)
     rescue StandardError
-      File.mtime(path)
+      named_date(path) || File.mtime(path)
+    end
+
+    # Published files are named 2018-08-11_slug-hash.html, and real
+    # exports do hold published posts with no <time class="dt-published">
+    # in them at all (the fixture Ghost's own medium-export tool ships,
+    # no-date-post.html, is one). Without the name such a post took the
+    # mtime, which after unpacking a ZIP is when the export was made: an
+    # article from 2018 then sat at the top of the archive, filed under
+    # the year of the export and missing from its own -- and every such
+    # post got the same minute, so their order was a coin toss. Drafts
+    # have no day in the name, so they fall through to the mtime.
+    def named_date(path)
+      m = File.basename(path).match(/\A(\d{4})-(\d{2})-(\d{2})_/)
+      return nil unless m
+
+      # Noon, not midnight: a date-only value read at UTC midnight can
+      # land on yesterday in the site's timezone.
+      Time.local(m[1].to_i, m[2].to_i, m[3].to_i, 12)
+    rescue ArgumentError
+      nil
     end
 
     def account_of(html)

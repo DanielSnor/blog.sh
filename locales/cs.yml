@@ -514,6 +514,7 @@ import:
     no_audio: "položka feedu bez zvuku — není to epizoda"
     media_unfetchable: "soubor epizody se nepodařilo stáhnout"
     bad_date: "nepodařilo se přečíst řádek DATE — Movable Type píše MM/DD/RRRR HH:MM:SS, AM/PM volitelně"
+    misaligned_row: "řádek nesedí na hlavičku — dřív na řádku zůstala otevřená uvozovka"
     unparsed: "archivovanou stránku nešlo přečíst jako post"
   # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
   # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.

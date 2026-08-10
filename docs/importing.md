@@ -511,9 +511,11 @@ TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb yourname.tumblr.com
 ```
 
 Get a key at tumblr.com/oauth/apps (the API requires one even for public
-blogs) and keep it in `env.sh`. Every post on the blog is imported --
-drafts stay drafts, reblogged content from the trail is appended to your
-own, and audio posts arrive as players (a self-hosted file is downloaded,
+blogs) and keep it in `env.sh`. Every post the key can reach is imported,
+which means the published ones: drafts, the queue and private posts live
+behind endpoints that want a full OAuth handshake, so an import cannot
+see them. Reblogged content from the trail comes with your own, each part
+credited to the blog it came from, and audio posts arrive as players (a self-hosted file is downloaded,
 a SoundCloud/Spotify embed stays an embed). All media is downloaded; an import of a few thousand posts runs for
 hours, so sample with `LIMIT` first. A wrong key or blog name aborts with
 the API's reason instead of a stack trace.
@@ -684,7 +686,7 @@ working). The same selector is why re-importing later is safe.
 | --- | --- |
 | `N media file(s) could not be downloaded` | The URLs are dead at the source -- old CDNs disappear (every `distilleryimage*.instagram.com` link from 2012 resolves to nothing). The posts were written without those images; nothing to fix on your side. |
 | `Tumblr API returned 401 Unauthorized` | Wrong `TUMBLR_API_KEY` or blog name. |
-| Many `skipped (not a post)` from a WXR | Normal -- menu items, attachments and pages travel in the same export. |
+| Many `skipped (not a post)` from a WXR | Normal -- WordPress's own menu items and revisions travel in the same export. Attachments and pages have their own lines, and so does every custom post type, named after itself (`wp:portfolio`) -- if you recognize one of those as a section of your blog, its posts stayed behind. |
 | `skipped (error)` with stderr lines | Those items were malformed at the source; the rest imported. Re-run after a fix overwrites in place. |
 | `The source stopped answering after N item(s)` | The platform died mid-run. Everything written so far is saved; re-run once the source recovers -- posts are matched on their source id, so nothing duplicates. |
 | `cannot move '<slug>' into <year>: a different post already owns ...` | A re-imported item's date moved into a year where another post has the same slug. That one item is skipped, nothing was touched; rename one of the slugs and re-run. |

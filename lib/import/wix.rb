@@ -44,13 +44,14 @@ module Import
     end
 
     def each_item(&block)
-      rows = CSV.read(@path, headers: true)
       items = rows.sort_by { |r| r['Published Date'].to_s }
       @total = items.size
       items.each(&block)
     end
 
     def map(item, media)
+      return :misaligned_row if misaligned?(item)
+
       blocks = RichContent.blocks(item['Rich Content'], @unknown)
       blocks = plain_blocks(item['Plain Content']) if blocks.empty?
       blocks = cover_block(item['Cover Image']) + blocks
@@ -87,6 +88,48 @@ module Import
     end
 
     private
+
+    # A row whose cells no longer line up with the header. Liberal parsing
+    # keeps a half-quoted cell rather than raising, and while that is the
+    # right trade for the file as a whole, it is not free: if the damaged
+    # cell also contains a comma -- in prose the rule, not the exception --
+    # the quote stops mattering and the comma splits the cell in two, so
+    # every column after it slides one to the left. The date lands in the
+    # Featured column, the body in the date, and CSV hands back one extra
+    # field with no header to sit under.
+    #
+    # That is the shape this looks for. A post published under the wrong
+    # date with somebody else's body is worse than a post that did not
+    # arrive: this one is silent, survives the summary, and is found
+    # months later. So the row is skipped by name and the run says how
+    # many -- the author can open the file at that row and fix the quote.
+    def misaligned?(row)
+      row.respond_to?(:headers) && row.headers.any?(&:nil?)
+    end
+
+    # liberal_parsing, because one odd cell must not cost the whole
+    # export. Wix itself writes RFC 4180, but the file rarely reaches an
+    # import untouched: opened and saved in Excel or Numbers, or patched
+    # by hand, and a cell then holds `He said "hi" to me` or `"" ,` (the
+    # shape in Ghost's own mg-wix-csv fixture, row 3). Ruby's strict
+    # parser raises on the first one, so a thousand sound rows arrived as
+    # zero posts -- reported, on top of that, as the source having
+    # stopped answering, when the file was sitting on disk all along.
+    # A cell that keeps a stray quote is a far smaller loss than the whole
+    # blog; a row that slid out of line is not kept at all, see
+    # misaligned?. The encoding is deliberately NOT named here (unlike
+    # substack.rb): every way in loads site_config, which pins
+    # default_external to UTF-8 before this file is required.
+    def rows
+      CSV.read(@path, headers: true, liberal_parsing: true)
+    rescue CSV::MalformedCSVError => e
+      # A quote opened and never closed still ends here, and rightly so:
+      # it swallows every following row, and no parser can guess where
+      # the cell was meant to end. Name the file and keep the line
+      # number, so the reader looks at their CSV rather than at Wix.
+      raise "#{File.basename(@path)} is not readable as CSV (#{e.message.strip}) -- " \
+            'the damage is in the file on disk, not at Wix'
+    end
 
     # Tags and Categories are JSON arrays serialized INTO a CSV cell --
     # and older exports put 24-hex Wix ids where category names should

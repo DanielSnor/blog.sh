@@ -124,6 +124,14 @@ module Import
     # root: _docs/readme.md is a page about something.
     NOT_A_POST = %w[readme license licence contributing changelog code_of_conduct authors].freeze
 
+    # Markdown only, deliberately, even though a tree WITH _posts/ reads
+    # .html as well. This net is cast over a directory nobody has
+    # vouched for, and an .html file in one is far more often a rendered
+    # page than a post: pointed at a server backup it turned a scan of
+    # nothing into 3,237 items, and pointed at a Jekyll site it made
+    # posts out of 404.html and the feed. The narrower net loses the
+    # rare .html post in a folder with no _posts/; the wider one loses
+    # the author's confidence in the whole import.
     def wider_net
       Dir.glob(File.join(@dir, '**', '*.{md,markdown}')).reject do |path|
         parts = path.delete_prefix("#{@dir}#{File::SEPARATOR}").split(File::SEPARATOR)
@@ -305,8 +313,20 @@ module Import
       out << strip_liquid(rest)
     end
 
+    # The first word after "highlight" is the language; what may follow
+    # it are the tag's other arguments, which Jekyll documents
+    # ({% highlight ruby linenos %}, mark_lines="1 2"). Insisting on the
+    # language alone let those blocks fall through to the blanket strip,
+    # and a code sample came out as prose: indentation gone, the line
+    # breaks turned into spaces, a blank line inside it splitting the
+    # sample into several paragraphs.
+    #
+    # The body may not contain another opening tag, so a block whose
+    # {% endhighlight %} was never written stops at itself instead of
+    # reaching forward to the next block's closing tag and swallowing
+    # everything a reader had in between.
     def strip_liquid(text)
-      text = text.gsub(/\{%\s*highlight\s+(\S+)\s*%\}(.*?)\{%\s*endhighlight\s*%\}/m) do
+      text = text.gsub(%r{\{%\s*highlight\s+(\S+)[^%]*%\}((?:(?!\{%\s*highlight\b).)*?)\{%\s*endhighlight\s*%\}}m) do
         "\n```#{Regexp.last_match(1)}\n#{Regexp.last_match(2).strip}\n```\n"
       end
       text = drop_liquid_addresses(text)

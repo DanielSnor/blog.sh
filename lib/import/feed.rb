@@ -27,6 +27,24 @@ module Import
     POST_STATES = { 'publish' => 'published', 'draft' => 'draft', 'pending' => 'draft',
                     'private' => 'draft', 'future' => 'draft' }.freeze
 
+    # Post types WordPress registers for its own housekeeping: menus, the
+    # site editor's templates and styles, the customizer's drafts. They are
+    # the bulk of the items in a stock export -- 70 nav_menu_item in the
+    # theme unit test data, 1190 in WordPress's 10MB test export, 2 plus one
+    # wp_global_styles in the 681 KB seandotcz export -- and none of them
+    # was ever an article. Everything NOT on this list is a type somebody
+    # registered on purpose (a portfolio, recipes, book reviews), which is
+    # why it gets named separately in the summary; see #skip_reason.
+    # The wp_ prefix is reserved by core for exactly this kind of thing, so
+    # it is matched as a prefix rather than listed member by member.
+    WP_INTERNAL_TYPES = %w[nav_menu_item revision custom_css customize_changeset
+                           oembed_cache user_request].freeze
+
+    # A type name in a WXR is a slug: WordPress allows [a-z0-9_-] and at
+    # most 20 characters. Anything else came from a hand-edited or damaged
+    # file and has no business being printed as a summary line.
+    POST_TYPE_SLUG = /\A[a-z0-9_-]{1,20}\z/.freeze
+
     # keep_permalinks is a writer, not just an option, because the wizard
     # only learns the answer after the adapter exists: the question is
     # asked once the source is chosen, right before the dry-run.
@@ -356,15 +374,49 @@ module Import
     # attachments and pages outnumber them. Attachments are named
     # separately from the rest because their files are what the posts'
     # images point at -- worth seeing in a summary rather than lumped in.
+    #
+    # And a custom post type is named after itself. A blog with a portfolio
+    # or a recipe section keeps those in their own type, with a title, a
+    # body and categories like any post -- TryGhost's mg-wp-xml fixtures
+    # carry two such items ("My CPT Post" as customcpt, a published article
+    # as enmse_message). Under one shared :not_a_post they were counted
+    # beside the menu items, and in an export where the menu contributes
+    # four figures a line reading "1234 skipped (not a post)" hides forty
+    # articles inside itself. Named by type, the summary says "40 skipped
+    # (portfolio)" and the author can see what stayed behind.
+    #
+    # Named, not imported: WordPress exports every registered type that
+    # allows it, so a shop's products and orders travel in the same file,
+    # and importing them -- as posts or as drafts -- would fill the archive
+    # (and the media folder) with things the author never wrote. Whether a
+    # type belongs on the blog is their call; the summary's job is to let
+    # them make it.
     def skip_reason(item)
       return false unless wordpress?
 
-      case text_of(item, 'wp:post_type')
+      type = text_of(item, 'wp:post_type')
+      case type
       when 'post' then trashed?(item) ? :trashed : false
       when 'attachment' then :attachment
       when 'page' then :page
-      else :not_a_post
+      else custom_type_reason(type)
       end
+    end
+
+    # Namespaced with "wp:", and not for tidiness. The reasons an import
+    # can give are a flat set of words, and the summary translates the
+    # ones the engine owns -- so a WordPress site whose custom type is
+    # called quote, comment or reply (all of them ordinary names for a
+    # section of a blog) would have had its type printed as this engine's
+    # own wording for something else entirely: "skipped (quote)" would
+    # come out in Czech as the reason a Bluesky quote-post is skipped.
+    # A colon cannot occur in a type slug, so the prefix is a namespace
+    # nothing can collide with, and the summary prints it as it stands.
+    def custom_type_reason(type)
+      return :not_a_post if WP_INTERNAL_TYPES.include?(type) || type.start_with?('wp_')
+      return :not_a_post unless POST_TYPE_SLUG.match?(type)
+
+      :"wp:#{type}"
     end
 
     def trashed?(item)
