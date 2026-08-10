@@ -1632,14 +1632,6 @@ Nothing to migrate -- see Upgrading at the end.
     lexicon keeps hashtags in two places, and only the facets were read,
     so a post whose tags a client had put in the record's own `tags`
     array arrived with no classification at all.
-  - **A beehiiv issue was dated by the machine that imported it.** The
-    export's only timestamp carries no timezone, so it was read in the
-    site's own -- and the same file landed on a different instant
-    depending on where the import ran: an hour out in Prague, thirteen in
-    Auckland. For an issue written near midnight that is a different day,
-    and since the year is part of a post's address, at the turn of the
-    year a different URL. It is read as UTC now, the way every other
-    naive timestamp in the engine already is.
   - **The documentation promised Tumblr drafts that no API key can
     reach.** Drafts, the queue and private posts sit behind endpoints
     that want a full OAuth handshake; the import gets the published

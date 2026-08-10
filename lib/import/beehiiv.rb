@@ -95,7 +95,7 @@ module Import
       post = {
         'slug' => slug,
         'title' => title.empty? ? slug : title,
-        'date' => item_date(item).iso8601,
+        'date' => (Time.parse(item['created_at'].to_s) rescue Time.now).iso8601,
         'state' => state,
         'tags' => tags,
         'content' => blocks,
@@ -111,33 +111,6 @@ module Import
     end
 
     private
-
-    # created_at carries no zone, and a naive time read as-is is read in
-    # the site's timezone -- the wizard and the migrate scripts both set
-    # it. The same export then landed on a different instant depending on
-    # the machine it was imported from: an hour out in Prague, thirteen in
-    # Auckland, and for anything written near midnight a day out, which
-    # puts the post in a different year folder and so at a different
-    # address, since PostWriter builds the path from the year.
-    #
-    # Read as UTC, which this engine already does for every other naive
-    # stamp it meets -- see the note in wayback.rb and the " UTC" appended
-    # to wp:post_date_gmt in feed.rb. That beehiiv exports UTC is inferred,
-    # not measured: the column is Rails' own created_at, Rails stores
-    # timestamps in UTC, beehiiv's API hands the same field out as a Unix
-    # timestamp, and Ghost's importer reads it the same way. What IS
-    # measured is the defect being fixed -- that the answer used to depend
-    # on where the import ran, which no archive should.
-    def item_date(item)
-      raw = item['created_at'].to_s.strip
-      return Time.now if raw.empty?
-
-      # A value that already names a zone is left to speak for itself.
-      raw.match?(/(?:Z|[+-]\d{2}:?\d{2})\z/) ? Time.parse(raw) : Time.parse("#{raw} UTC")
-    rescue ArgumentError
-      Time.now
-    end
-
 
     # Which audiences were behind the paywall. Exports name the column
     # `audience`, older ones `web_audiences` -- Ghost's migrator reads
