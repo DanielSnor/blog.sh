@@ -131,7 +131,13 @@ module Import
     # A bare uploads/... path (thumbnails) gets the full prefix.
     def full_image_url(url)
       return nil if url.empty?
-      return "https://media.beehiiv.com/cdn-cgi/image/quality=100/#{url}" unless url.start_with?('http')
+      # The leading slash is trimmed because the prefix already ends in
+      # one: joined as they came, the address held // and the CDN answers
+      # that with a 404, so a post whose only picture was its thumbnail
+      # would have been written without one. Every path in the exports
+      # available here begins "uploads/", without the slash -- this is the
+      # other spelling, which Ghost's own beehiiv importer allows for.
+      return "https://media.beehiiv.com/cdn-cgi/image/quality=100/#{url.sub(%r{\A/+}, '')}" unless url.start_with?('http')
 
       url.sub(%r{/cdn-cgi/image/[^/]+/}, '/cdn-cgi/image/quality=100/')
     end

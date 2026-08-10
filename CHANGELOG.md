@@ -1632,6 +1632,22 @@ Nothing to migrate -- see Upgrading at the end.
     lexicon keeps hashtags in two places, and only the facets were read,
     so a post whose tags a client had put in the record's own `tags`
     array arrived with no classification at all.
+  - **A WordPress post format arrived as a tag.** Categories, tags and the
+    format a theme draws a post with all travel as `<category>` in a WXR,
+    told apart by an attribute nobody read -- so a blog that used formats
+    grew a `/tag/aside/`, a `/tag/status/` and a `/tag/quote/` it had
+    never had. 221 of them across WordPress's own test export.
+  - **A beehiiv thumbnail whose path began with a slash was never
+    fetched.** The CDN prefix already ends in one, so the address held
+    `//` and came back a 404: a post whose only picture was its thumbnail
+    was written without it.
+  - **A large export now says what it will cost before it takes it.** A
+    WXR is held in memory whole -- WordPress's own 9.5 MB test export
+    takes 188 MB -- and the line above the run said only how big the file
+    was. Past 20 MB it now says the rest, and deliberately without a
+    multiplier: the cost follows how many elements a file has rather than
+    how many bytes, and a figure that looked precise would be wrong by
+    half in either direction.
   - **The documentation promised Tumblr drafts that no API key can
     reach.** Drafts, the queue and private posts sit behind endpoints
     that want a full OAuth handshake; the import gets the published

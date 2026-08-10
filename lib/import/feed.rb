@@ -62,12 +62,26 @@ module Import
       title.empty? ? kind : "#{kind} (#{title})"
     end
 
+    # Above this, the memory the parse needs is worth saying out loud
+    # before it is taken -- see read_source. Below it, nobody notices.
+    #
+    # No multiplier is quoted with it on purpose. What the parse costs
+    # follows the number of ELEMENTS, not the number of bytes, and the two
+    # do not keep step: WordPress's own 9.5 MB test export takes 188 MB of
+    # memory, and the same file with its items tripled -- 28 MB -- takes
+    # 281. A figure that looked precise would be wrong by half in either
+    # direction, and this line exists to be trusted.
+    LARGE_EXPORT_MB = 20
+
     def preamble
-      if File.exist?(@source.to_s)
-        "Reading #{@source} (#{(File.size(@source) / 1_048_576.0).round(1)} MB)…"
-      else
-        "Fetching #{@source}…"
-      end
+      return "Fetching #{@source}…" unless File.exist?(@source.to_s)
+
+      megabytes = File.size(@source) / 1_048_576.0
+      line = "Reading #{@source} (#{megabytes.round(1)} MB)…"
+      return line if megabytes < LARGE_EXPORT_MB
+
+      "#{line} An export this size is read into memory whole and will take " \
+        'several times its own size in RAM, with no output until that is done.'
     end
 
     def total
@@ -239,6 +253,15 @@ module Import
       begin
         # No body ceiling here: this is a whole archive, not a widget --
         # a WXR export of a few thousand posts is legitimately tens of MB.
+        # The ceiling that does apply is memory, not a number in this
+        # file: REXML builds the whole document before the first item is
+        # read. WordPress's own 9.5 MB test export takes 188 MB to hold,
+        # and 28 MB of the same items takes 281 -- so tens of MB really
+        # does mean hundreds, and the cost follows how many elements the
+        # file has rather than how many bytes. #preamble says so once the
+        # file is big enough for it to matter. Reading items as they
+        # stream would remove the ceiling, and would be a different
+        # adapter.
         FeedHttp.get(@source, max_body: nil)
       rescue StandardError => e
         # A feed URL that 404s, times out or resolves nowhere raised through
@@ -593,9 +616,19 @@ module Import
     end
 
     # Categories and tags both land in the one taxonomy this engine has.
+    # WordPress files three different things under the same <category>
+    # element and tells them apart by a domain attribute: the post's
+    # categories, its tags, and its FORMAT. A format is a property of how
+    # the theme draws a post -- aside, status, quote, gallery -- and never
+    # was a word anyone tagged anything with. Read as one, a blog that
+    # used formats grew a /tag/aside/ and a /tag/status/ it never had:
+    # 221 of them across WordPress's own 10MB test export.
+    NOT_A_TAG_DOMAIN = %w[post_format].freeze
+
     def item_tags(item)
-      nodes = atom? ? item.elements.to_a('category') : item.elements.to_a('category')
-      nodes.filter_map do |node|
+      item.elements.to_a('category').filter_map do |node|
+        next if !atom? && NOT_A_TAG_DOMAIN.include?(node.attribute('domain')&.value)
+
         value = atom? ? node.attribute('term')&.value : node.text
         value&.strip
       end.reject(&:empty?).uniq { |t| t.downcase }
