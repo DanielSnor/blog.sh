@@ -305,7 +305,8 @@ cli:
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      walks the archive on screen: filters, search, preview, Enter opens the post
-      ./blog.sh doctor [--online]    reads the configuration and says what is wrong with it
+      ./blog.sh doctor [--online] [--strip-location]
+                                     reads the configuration and says what is wrong with it
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard

@@ -172,8 +172,11 @@ mobile navigation, and photo galleries assembled from adjacent images.
 The whole palette is seven config keys per mode, compiled into a
 stylesheet at build time -- seven ready-made palettes ship with the
 engine, and the header's typeface and size are configuration too, not a
-file to edit. No framework anywhere; the JavaScript is small
-single-purpose files.
+file to edit. The site's own words -- the bio in the sidebar, the note and
+the copyright line in the footer, the claim over the banner -- are written
+in the same Markdown a post is, and raw HTML still works in them, which is
+how a photo gets into a bio. No framework anywhere; the JavaScript is
+small single-purpose files.
 → [install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)
 
 **Security.** A Content-Security-Policy on every page, self-hosted fonts,
@@ -338,7 +341,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
                                # the same, printed one line per post
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh doctor --strip-location
-                               # removes the place of capture from already-published photos
+                               # removes the place of capture from photos already in the archive
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```

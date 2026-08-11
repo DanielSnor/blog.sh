@@ -296,7 +296,8 @@ cli:
                                      vypíše posty po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře post
-      ./blog.sh doctor [--online]    přečte konfiguraci a řekne, co je s ní špatně
+      ./blog.sh doctor [--online] [--strip-location]
+                                     přečte konfiguraci a řekne, co je s ní špatně
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
