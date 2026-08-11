@@ -1354,13 +1354,26 @@ def build_favicon_ico
   header + entry + png
 end
 
-# Media is content-addressed by the migration/import step and never edited
-# in place, so existence plus size is enough -- hashing every media file on
-# every build would cost more than the copy it saves.
+# Media is content-addressed by the migration/import step, so hashing every
+# file on every build would cost more than the copy it saves. Size alone used
+# to stand in for that -- on the stated grounds that media is never edited in
+# place, which stopped being true the moment `doctor --strip-location`
+# existed. That rewrites a photo where it lies AND keeps its exact byte
+# length on purpose, so the two assumptions met: the build saw the same size,
+# skipped the copy, and public.nosync kept the coordinates the archive had
+# just lost. The deploy then had nothing to upload and doctor reported the
+# site clean while the published photo still carried the place it was taken.
+# mtime costs one more stat of a file already being stat'd, and catches any
+# in-place edit rather than only that one.
 def emit_copy(src, dest, compare_content: false)
   WRITTEN[dest] = true
   if File.exist?(dest)
-    return if compare_content ? File.binread(dest) == File.binread(src) : File.size(dest) == File.size(src)
+    same = if compare_content
+             File.binread(dest) == File.binread(src)
+           else
+             File.size(dest) == File.size(src) && File.mtime(dest) >= File.mtime(src)
+           end
+    return if same
   end
 
   FileUtils.mkdir_p(File.dirname(dest))

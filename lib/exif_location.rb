@@ -43,6 +43,18 @@ module ExifLocation
   # number that was entirely false alarms.
   GPS_VERSION_ID = 0x0000
 
+  # Entries whose value is the offset of another directory, so the walk that
+  # works out which bytes are spoken for can follow them: the Exif sub-IFD
+  # (where the camera settings and the MakerNote live) and the
+  # interoperability block inside it.
+  SUB_IFD_TAGS = [0x8769, 0xA005].freeze
+
+  # The thumbnail's bytes are named by one tag and measured by another, so
+  # they are the one payload a plain "value longer than four bytes" scan
+  # cannot see.
+  THUMBNAIL_OFFSET = 0x0201
+  THUMBNAIL_LENGTH = 0x0202
+
   # Bytes per TIFF type code, indexed by the code itself. Needed to find the
   # data an entry points at: a value of four bytes or fewer sits inside the
   # entry, anything longer is stored elsewhere in the block and referenced.
@@ -237,11 +249,22 @@ module ExifLocation
   # come first so their offsets can still be read, then the block that held
   # them -- a coordinate is a RATIONAL triplet stored outside the entry, so
   # zeroing the entries alone would leave the numbers lying in the file.
+  #
+  # Nothing in the format stops a GPS entry's offset from naming bytes that
+  # belong to somebody else: the camera model, the MakerNote, the thumbnail,
+  # another directory's entries. Written into by a file like that, this used
+  # to damage the photograph AND leave the coordinates where they were. So
+  # the walk works out first which ranges are spoken for, and refuses to
+  # write over any of them -- what that costs, in a file perverse enough to
+  # need it, is coordinate bytes left unreferenced rather than overwritten.
+  # No photograph in a 29,805-file corpus was shaped like this, which is the
+  # reason to have a rule about it rather than a hope.
   def zero_gps_ifd(out, found)
     short, long = found[:short], found[:long]
     base = found[:target]
     return if base < 8 || base + COUNT_SIZE > out.bytesize
 
+    claimed = claimed_ranges(out, found)
     count = out.byteslice(base, COUNT_SIZE).unpack1(short).to_i
     count.times do |i|
       at = base + COUNT_SIZE + (i * ENTRY_SIZE)
@@ -252,9 +275,60 @@ module ExifLocation
              entry.byteslice(4, 4).unpack1(long).to_i
       next unless size > 4
 
-      blank(out, entry.byteslice(8, 4).unpack1(long).to_i, size)
+      blank(out, entry.byteslice(8, 4).unpack1(long).to_i, size, claimed)
     end
-    blank(out, base, COUNT_SIZE + (count * ENTRY_SIZE) + NEXT_IFD_SIZE)
+    blank(out, base, COUNT_SIZE + (count * ENTRY_SIZE) + NEXT_IFD_SIZE, claimed)
+  end
+
+  # Every byte range some other structure in this TIFF block owns: each
+  # directory's own entry array, the out-of-line data of each of its entries,
+  # and the thumbnail. The GPS block is deliberately left out -- it is what
+  # the caller is about to erase.
+  #
+  # Bounded on purpose. A malformed file can point a directory at itself, or
+  # two at each other, and this has to terminate on whatever it is handed.
+  def claimed_ranges(tiff, found)
+    short, long = found[:short], found[:long]
+    ranges = []
+    seen = {}
+    queue = [found[:ifd]]
+
+    until queue.empty? || ranges.size > 4096
+      at = queue.shift.to_i
+      next if at == found[:target] || seen[at] || at < 8 || at + COUNT_SIZE > tiff.bytesize
+
+      seen[at] = true
+      count = tiff.byteslice(at, COUNT_SIZE).unpack1(short).to_i
+      ranges << [at, COUNT_SIZE + (count * ENTRY_SIZE) + NEXT_IFD_SIZE]
+      values = {}
+
+      count.times do |i|
+        entry = tiff.byteslice(at + COUNT_SIZE + (i * ENTRY_SIZE), ENTRY_SIZE)
+        break unless entry && entry.bytesize == ENTRY_SIZE
+
+        tag = entry.byteslice(0, 2).unpack1(short).to_i
+        next if tag == GPS_IFD_POINTER
+
+        value = entry.byteslice(8, 4).unpack1(long).to_i
+        values[tag] = value
+        queue << value if SUB_IFD_TAGS.include?(tag)
+        size = TYPE_SIZES.fetch(entry.byteslice(2, 2).unpack1(short).to_i, 0) *
+               entry.byteslice(4, 4).unpack1(long).to_i
+        ranges << [value, size] if size > 4
+      end
+
+      if values[THUMBNAIL_OFFSET] && values[THUMBNAIL_LENGTH]
+        ranges << [values[THUMBNAIL_OFFSET], values[THUMBNAIL_LENGTH]]
+      end
+
+      nxt = tiff.byteslice(at + COUNT_SIZE + (count * ENTRY_SIZE), NEXT_IFD_SIZE)
+      queue << nxt.unpack1(long).to_i if nxt && nxt.bytesize == NEXT_IFD_SIZE
+    end
+    ranges
+  rescue StandardError
+    # Unreadable structure means unknown ownership, and unknown ownership is
+    # not a licence to write. An empty list would say the opposite.
+    [[0, tiff.bytesize]]
   end
 
   # Takes the pointer out of IFD0 by sliding the entries after it down and
@@ -275,8 +349,9 @@ module ExifLocation
     out[ifd, COUNT_SIZE] = [found[:count] - 1].pack(short)
   end
 
-  def blank(out, at, size)
+  def blank(out, at, size, claimed = [])
     return if size <= 0 || at < 8 || at + size > out.bytesize
+    return if claimed.any? { |(s, n)| n.positive? && at < s + n && s < at + size }
 
     out[at, size] = "\0".b * size
   end

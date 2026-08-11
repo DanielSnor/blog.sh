@@ -62,6 +62,25 @@ prints what an installation is running.
 
 ### Fixes
 
+- **`doctor --strip-location` cleaned the archive and left the published
+  photo alone.** The strip keeps a photo's exact byte length on purpose, and
+  the build skipped copying a media file whenever the sizes matched -- on the
+  stated grounds that media is never edited in place, which is exactly what
+  this new tool does. So the archive went clean, `public.nosync` kept the old
+  bytes, the deploy saw nothing to upload, and the coordinates stayed on the
+  site. Doctor then reported "no published photo carries the place it was
+  taken" while the published one still did, and nothing in the tool could
+  notice, because it only ever looked at the archive. Media copies compare
+  modification time as well as size now (one more stat of a file already
+  being stat'd, no hashing), and doctor reads both directories, so the
+  sentence about published photos is about the published photos.
+- **A GPS entry's data offset was trusted absolutely.** Nothing in the format
+  stops one from naming bytes that belong to the camera model, the MakerNote
+  or the thumbnail, and written into by a file like that the strip damaged
+  the photograph and left the coordinates in it. It now works out which
+  ranges the other directories own and refuses to write over any of them.
+  Nothing in a 29,805-photo corpus was shaped like this; the rule is there so
+  that the answer does not depend on that staying true.
 - **Every imported table handed its first row of data to a `<th>`.** A table
   with no heading row -- a list of keyboard shortcuts, a set of figures, a
   table used for layout -- came out with its first line published as a

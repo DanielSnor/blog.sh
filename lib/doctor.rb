@@ -525,14 +525,24 @@ module Doctor
     [warn(t('media_location', count: found.size), t('media_location_fix'))]
   end
 
-  # nil when there is no media directory to look at -- a fresh install has
-  # nothing to say about it, and a green line claiming otherwise is noise.
+  # nil when there is nothing to look at -- a fresh install has nothing to
+  # say about it, and a green line claiming otherwise is noise.
+  #
+  # BOTH directories, and public.nosync is the one that matters: the finding
+  # says "published photo", and the published photo is the copy in the build,
+  # not the archive it came from. Looking only at media.nosync let this
+  # report a clean site while the coordinates were still on it -- the build
+  # had skipped the copy, so the two directories disagreed and nothing here
+  # could see it.
   def located_media(root)
-    dir = File.join(root, 'media.nosync')
-    return nil unless File.directory?(dir)
+    dirs = [File.join(root, 'media.nosync'), File.join(root, 'public.nosync')]
+           .select { |d| File.directory?(d) }
+    return nil if dirs.empty?
 
-    Dir.glob(File.join(dir, '**', '*.{jpg,jpeg,JPG,JPEG}')).select do |path|
-      ExifLocation.present?(path)
+    dirs.flat_map do |dir|
+      Dir.glob(File.join(dir, '**', '*.{jpg,jpeg,JPG,JPEG}')).select do |path|
+        ExifLocation.present?(path)
+      end
     end
   rescue StandardError
     nil
