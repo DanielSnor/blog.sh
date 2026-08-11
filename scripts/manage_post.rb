@@ -81,7 +81,11 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero].freeze
+
+# What the site does with lead images when a post says nothing. Read here
+# so the header can show a post's effective answer rather than a blank.
+SITE_HERO = SiteConfig.get('layout', 'hero', default: false)
 
 # A key the parser doesn't know is silently dropped -- `pined: true` would
 # do nothing at all and never say so. Every key the author typed is checked
@@ -591,7 +595,20 @@ FRONTMATTER_HINT = t('cli.frontmatter_hint', cheat_sheet_url: CHEAT_SHEET_URL)
 # would just be a confusing extra path to the same decision. The parser
 # still honors a `date:` line if someone types one in by hand (backdating
 # an import, say); this only stops the template from suggesting it.
-def build_frontmatter(title:, tags:, type:, pinned: nil)
+# The value the `hero:` line should show, or nil for "don't offer the key".
+# A post that carries the field keeps it visible whatever the site does:
+# the header is what the save is rebuilt from, so a line left out is a
+# field deleted -- and this one arrived in a release where it was neither
+# in the header nor in the list of fields a save carries over, which meant
+# editing a post silently gave it back the site's answer.
+def hero_frontmatter_value(post)
+  own = post.key?('hero') ? truthy_frontmatter?(post['hero']) : nil
+  return own unless own.nil?
+
+  SITE_HERO ? true : nil
+end
+
+def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
@@ -600,6 +617,11 @@ def build_frontmatter(title:, tags:, type:, pinned: nil)
   # every new post would suggest pinning is part of writing one, when it
   # is a decision about an existing post.
   lines << "pinned: #{pinned}" unless pinned.nil?
+  # Same rule, one reason further: the site-wide layout.hero already
+  # decides this for every post, so the line is worth showing only where
+  # it can actually be acted on -- a site that uses heroes, or a post that
+  # has already said something of its own.
+  lines << "hero: #{hero}" unless hero.nil?
   lines << '---'
   "#{lines.join("\n")}\n\n"
 end
@@ -1956,7 +1978,13 @@ def edit_post(slug, path: nil)
     # otherwise pinning something nobody can see yet has nowhere to show.
     # Offering it when set matters: without the line in the header, saving
     # would drop a pin the post had (unpublish keeps it).
-    pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false')
+    pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false'),
+    # Shown on a site that uses heroes, or on a post that has already said
+    # something of its own -- and it has to be shown in the second case
+    # even when the site doesn't, because a header without the line saves
+    # the post without it, which is exactly how this field went missing
+    # before it was here at all.
+    hero: hero_frontmatter_value(post)
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
@@ -2042,6 +2070,13 @@ def edit_post(slug, path: nil)
   }
   updated['type'] = new_type if new_type
   updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
+  # Stored only when it disagrees with the site, so an ordinary post stays
+  # silent and follows layout.hero if that is ever flipped. Deleting the
+  # line is therefore a way to say "no opinion", not a way to lose one.
+  if meta.key?('hero')
+    hero_wanted = truthy_frontmatter?(meta['hero'])
+    updated['hero'] = hero_wanted unless hero_wanted == SITE_HERO
+  end
   # Same survival rule as the announcement URLs below: former_slugs is not
   # representable in the frontmatter, so a save that forgot to carry it
   # over would silently break every redirect the post has accumulated --
