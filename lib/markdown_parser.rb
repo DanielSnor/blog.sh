@@ -300,14 +300,30 @@ module MarkdownParser
     line.strip.sub(/\A\|/, '').sub(/(?<!\\)\|\z/, '').split(/(?<!\\)\|/).map(&:strip)
   end
 
+  # A table that opens with the separator row has no header: the alignment
+  # comes from that first line and everything after it is data. Markdown
+  # proper has no way to say this -- GFM's grammar starts at the header --
+  # but the shape has to be sayable, because plenty of real tables are
+  # headerless and the importers meet them: a Wix table with
+  # `tableData.rowHeader` false, an HTML table with no <thead>. Without it
+  # they lost their first row of data to a <th>, and once that had happened
+  # nothing in the file remembered it.
+  #
+  # The separator can't be mistaken for a header. A header row of dashes
+  # would have to be written `\-\-\-` to mean it, and the writer escapes it
+  # that way. The cost is one shape this engine reads and other renderers
+  # don't -- deliberate, and the same trade the video and chat blocks make.
   def parse_table(para)
     lines = para.split("\n").map(&:strip).reject(&:empty?)
     return nil if lines.size < 2
     return nil unless lines[0].include?('|')
-    return nil unless lines[1].include?('-') && TABLE_SEPARATOR_RE.match?(lines[1])
 
-    header = split_table_row(lines[0])
-    align = split_table_row(lines[1]).map do |spec|
+    headerless = separator_row?(lines[0])
+    sep = headerless ? 0 : 1
+    return nil unless separator_row?(lines[sep])
+
+    header = headerless ? nil : split_table_row(lines[0])
+    align = split_table_row(lines[sep]).map do |spec|
       left = spec.start_with?(':')
       right = spec.end_with?(':')
       if left && right then 'center'
@@ -315,24 +331,40 @@ module MarkdownParser
       else 'left'
       end
     end
-    return nil if header.empty? || align.size != header.size
+    return nil if align.empty?
+    return nil if header && (header.empty? || align.size != header.size)
 
     cell = lambda do |raw|
       text, formatting = parse_inline(raw)
       formatting.empty? ? { 'text' => text } : { 'text' => text, 'formatting' => formatting }
     end
 
-    rows = lines.drop(2).map do |line|
+    # The separator decides the width when there is no header to do it.
+    width = header ? header.size : align.size
+    rows = lines.drop(sep + 1).map do |line|
       values = split_table_row(line)
       # Missing cells are padded with empty ones so a short row doesn't
       # break the table. Extra cells are KEPT: imported archives carry
       # single-column headers over two-column rows, and discarding the
       # overflow silently ate the second cell of every row on each edit.
       # HTML renders a jagged table fine.
-      Array.new([header.size, values.size].max) { |i| cell.call(values[i].to_s) }
+      Array.new([width, values.size].max) { |i| cell.call(values[i].to_s) }
     end
 
-    { 'type' => 'table', 'align' => align, 'header' => header.map { |h| cell.call(h) }, 'rows' => rows }
+    # Built in this order on purpose: a headed table has to come out with
+    # its keys in exactly the order it has had since the format existed, or
+    # every table in every archive rewrites itself on the next save.
+    block = { 'type' => 'table', 'align' => align }
+    block['header'] = header.map { |h| cell.call(h) } if header
+    block['rows'] = rows
+    block
+  end
+
+  # A row that is nothing but the dashes-and-colons of a separator. Used
+  # twice: to find the separator under a header, and to notice a table that
+  # begins with one and so has no header at all.
+  def separator_row?(line)
+    line.include?('-') && TABLE_SEPARATOR_RE.match?(line)
   end
 
   # --- blockquote -------------------------------------------------------

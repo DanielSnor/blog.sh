@@ -665,11 +665,19 @@ def render_table(block)
     style = align[i] && align[i] != 'left' ? %( style="text-align:#{align[i]}") : ''
     "<#{tag}#{style}>#{apply_formatting(c['text'], c['formatting'])}</#{tag}>"
   end
-  head = (block['header'] || []).each_with_index.map { |c, i| cell.call(c, i, 'th') }.join
+  # No header key, no <thead>: a table that never had one (a Wix table with
+  # rowHeader off, an HTML table with no <thead>) used to hand its first row
+  # of data to a <th>, which is a heading to a screen reader and to anyone
+  # reading the page.
+  thead = if block['header']
+            "<thead><tr>#{block['header'].each_with_index.map { |c, i| cell.call(c, i, 'th') }.join}</tr></thead>"
+          else
+            ''
+          end
   body = (block['rows'] || []).map do |row|
     "<tr>#{row.each_with_index.map { |c, i| cell.call(c, i, 'td') }.join}</tr>"
   end.join
-  %(<div class="table-wrap"><table><thead><tr>#{head}</tr></thead><tbody>#{body}</tbody></table></div>)
+  %(<div class="table-wrap"><table>#{thead}<tbody>#{body}</tbody></table></div>)
 end
 
 def render_photo_grid(images, media_prefix, seen = {})

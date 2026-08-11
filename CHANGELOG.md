@@ -62,6 +62,25 @@ prints what an installation is running.
 
 ### Fixes
 
+- **Every imported table handed its first row of data to a `<th>`.** A table
+  with no heading row -- a list of keyboard shortcuts, a set of figures, a
+  table used for layout -- came out with its first line published as a
+  column heading, which is a heading to a screen reader as much as to a
+  reader. Wix is where it showed, because Ricos states outright whether
+  there is a header (`tableData.rowHeader`) and all three answers -- true,
+  false, absent -- gave the same table; but the same thing happened on the
+  HTML path, which decides for fifteen other sources and did not tell `th`
+  from `td` at all. Both read what their source actually says now: Ricos its
+  flag, HTML its `<thead>` or a first row of `<th>`.
+  A table without a header had no way to exist before this, so the format
+  gained one: **a table may open with the separator row**, and then every
+  line after it is data. Markdown proper cannot say this and neither could
+  the alternative considered -- a header whose cells are all empty -- which
+  real archives rule out, since a genuinely empty header and an empty first
+  cell beside real headings both occur. Existing posts are untouched and
+  round-trip byte for byte; a table already imported keeps its promoted
+  header until it is re-imported or edited by hand.
+
 - **A Tumblr ask post read as if the blog's owner had asked themselves.**
   NPF keeps the question in `layout`, not in the blocks
   (`{"type": "ask", "blocks": [0], "attribution": {...}}`), and the field was

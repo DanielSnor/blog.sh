@@ -277,8 +277,15 @@ module Import
           # building a table block without it; HtmlBlocks has always
           # written the same left-aligned default, and a table from the
           # HTML path survived the round trip all along.
-          { 'type' => 'table', 'align' => Array.new(rows.first.size, 'left'),
-            'header' => rows.first, 'rows' => rows.drop(1) }
+          # Ricos says outright whether the first row is a heading, and this
+          # used to promote it either way -- true, false and absent gave the
+          # same table three times. Absent means false, the way it does
+          # everywhere else in that format: a table only has a header row
+          # when the editor was told to give it one.
+          block = { 'type' => 'table', 'align' => Array.new(rows.first.size, 'left') }
+          block['header'] = rows.shift if node.dig('tableData', 'rowHeader') == true
+          block['rows'] = rows
+          block
         when 'BUTTON'
           text = node.dig('buttonData', 'text').to_s
           return nil if text.empty?

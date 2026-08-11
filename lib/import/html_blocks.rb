@@ -373,22 +373,39 @@ module Import
         @blocks << block
       end
 
+      # Whether the first row is a heading or data is something the HTML
+      # says and this used to ignore: every table handed its first row to a
+      # <th> regardless, so a table with no <thead> and no <th> anywhere --
+      # a keyboard-shortcut list, a layout table, a set of figures --
+      # published its first line of data as a column heading, and after the
+      # import nothing remembered otherwise. td and th were not even told
+      # apart when the cells were read.
       def emit_table(node)
-        rows = collect(node, 'tr').map do |tr|
-          tr.children.select { |c| %w[td th].include?(c.name) }.map do |cell|
+        head_trs = collect(node, 'thead').flat_map { |t| collect(t, 'tr') }
+        pairs = collect(node, 'tr').filter_map do |tr|
+          cells = tr.children.select { |c| %w[td th].include?(c.name) }
+          next if cells.empty?
+
+          [tr, cells]
+        end
+        return if pairs.empty?
+
+        first_tr, first_cells = pairs.first
+        headed = head_trs.any? { |t| t.equal?(first_tr) } || first_cells.all? { |c| c.name == 'th' }
+
+        rows = pairs.map do |(_, cells)|
+          cells.map do |cell|
             text, formatting = normalize_with_spans(*Inline.render(cell))
             out = { 'text' => text }
             out['formatting'] = formatting unless formatting.empty?
             out
           end
         end
-        rows.reject!(&:empty?)
-        return if rows.empty?
 
-        header = rows.first
-        body = rows[1..] || []
-        @blocks << { 'type' => 'table', 'align' => Array.new(header.size, 'left'),
-                     'header' => header, 'rows' => body.map { |r| r } }
+        block = { 'type' => 'table', 'align' => Array.new(rows.first.size, 'left') }
+        block['header'] = rows.shift if headed
+        block['rows'] = rows
+        @blocks << block
       end
 
       # An image's dimensions are required by the build (missing or <= 1px

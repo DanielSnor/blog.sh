@@ -250,6 +250,18 @@ The first line is the header, the second a dash separator, the rest is data. Col
 
 Regular formatting works inside cells, links included. A wide table scrolls within itself, same as a code block.
 
+Start with the separator instead and the table has no header at all -- every line is data. Useful for a list of pairs, or a table used for layout, where a heading would be a lie:
+
+```
+| --- | --- |
+| Ctrl + c | Copy |
+| Ctrl + v | Paste |
+```
+
+| --- | --- |
+| Ctrl + c | Copy |
+| Ctrl + v | Paste |
+
 ## Images
 
 An exclamation mark, alt text in square brackets, path in round ones. A title in quotes can follow the path — it shows as a caption under the photo.

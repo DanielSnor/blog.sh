@@ -66,7 +66,7 @@ dedup by `source`).
 | --- | --- |
 | `text` | `text`; `subtype` (`heading1`-`heading6`, `quote`; absent = paragraph); `formatting`; a quote may carry `cite` (attribution, rendered as a right-aligned line) |
 | `list` | `style` (`"ul"`/`"ol"`); `items` -- each `{text, formatting?, children?}` where `children` is a nested list block |
-| `table` | `align` (array of `left`/`center`/`right`); `header` (array of cells); `rows` (array of cell arrays); a cell is `{text, formatting?}` |
+| `table` | `align` (array of `left`/`center`/`right`); `header` (array of cells, **absent when the table has none** -- written as a table opening with the separator row, rendered without a `<thead>`); `rows` (array of cell arrays); a cell is `{text, formatting?}` |
 | `code` | `text` (verbatim, blank lines preserved); `lang` (cosmetic) |
 | `chat` | `lines` -- array of `{name, text}`; `name` may be nil for a continuation line |
 | `hr` | no fields |
