@@ -642,6 +642,12 @@ doctor:
   fonts_missing: "In der Konfiguration genannt, aber nicht in assets/fonts/: %{files}."
   fonts_missing_fix: "Die Website rendert in der Ersatzschrift, was genau so aussieht, als würde die Konfiguration nicht wirken. Lege die Datei dorthin oder nimm sie aus fonts.faces heraus."
 
+  extra_css_ok: "%{count} zusätzliche(s) Stylesheet(s), jedes ein Pfad auf dieser Website und vorhanden."
+  extra_css_remote: "site.extra_css nennt %{value}, das auf einem anderen Host liegt."
+  extra_css_remote_fix: "Jede Seite trägt style-src 'self', der Browser verwirft es also und die Website rendert ungestylt -- ohne Fehlermeldung an einer Stelle, an der du sie sehen würdest. Kopiere die Datei nach assets/ und nenne sie /assets/css/<name>.css."
+  extra_css_missing: "site.extra_css nennt %{value}, das nicht im Baum liegt."
+  extra_css_missing_fix: "Die Seite fordert es an, bekommt einen 404 und rendert ohne es -- das sieht genau nach einem Stylesheet aus, das nichts bewirkt. Lege die Datei dorthin oder streiche die Zeile."
+
   widgets_ok: "%{count} Seitenleisten-Widget(s), alle ausgefüllt."
   widget_shape: "Das Widget %{name} enthält keine Einstellungen."
   widget_incomplete: "Dem Widget %{name} fehlt %{key}, also kann es nie etwas anzeigen."

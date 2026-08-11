@@ -646,6 +646,12 @@ doctor:
   fonts_missing: "Named in the config but not in assets/fonts/: %{files}."
   fonts_missing_fix: "The site renders in the fallback font, which looks exactly like the config not working. Put the file there, or drop it from fonts.faces."
 
+  extra_css_ok: "Extra stylesheet(s): %{count}, every one a path on this site and present."
+  extra_css_remote: "site.extra_css names %{value}, which lives on another host."
+  extra_css_remote_fix: "Every page carries style-src 'self', so the browser discards it and the site renders undressed -- with no error anywhere you would see one. Copy the file into assets/ and name it /assets/css/<name>.css."
+  extra_css_missing: "site.extra_css names %{value}, which is not in the tree."
+  extra_css_missing_fix: "The page asks for it, gets a 404 and renders without it, which looks exactly like a stylesheet that does nothing. Put the file there, or drop the line."
+
   widgets_ok: "%{count} sidebar widget(s), all filled in."
   widget_shape: "The %{name} widget is not a set of settings."
   widget_incomplete: "The %{name} widget has no %{key}, so it can never show anything."

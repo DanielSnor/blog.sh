@@ -634,6 +634,12 @@ doctor:
   fonts_missing: "Config je jmenuje, ale v assets/fonts/ nejsou: %{files}."
   fonts_missing_fix: "Web se vykreslí náhradním písmem, což vypadá přesně jako nefunkční config. Buď soubor dodej, nebo ho vyhoď z fonts.faces."
 
+  extra_css_ok: "Dalších stylopisů: %{count}, každý je cesta na tomhle webu a existuje."
+  extra_css_remote: "site.extra_css jmenuje %{value}, což je na cizím serveru."
+  extra_css_remote_fix: "Každá stránka nese style-src 'self', takže to prohlížeč zahodí a web se vykreslí neoblečený — bez chyby kdekoli, kde bys ji viděl. Zkopíruj soubor do assets/ a napiš ho jako /assets/css/<jméno>.css."
+  extra_css_missing: "site.extra_css jmenuje %{value}, což ve stromu není."
+  extra_css_missing_fix: "Stránka si o něj řekne, dostane 404 a vykreslí se bez něj — vypadá to přesně jako stylopis, který nic nedělá. Buď soubor dodej, nebo ten řádek vyhoď."
+
   widgets_ok: "Widgetů v postranním panelu: %{count}, všechny vyplněné."
   widget_shape: "Widget %{name} není sada nastavení."
   widget_incomplete: "Widget %{name} nemá %{key}, takže nikdy nic nezobrazí."

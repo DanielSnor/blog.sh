@@ -98,6 +98,44 @@ SITE_TITLE = SiteConfig.fetch('site', 'title')
 SITE_SHORT_NAME = SiteConfig.fetch('site', 'short_name')
 SITE_DESCRIPTION = SiteConfig.fetch('site', 'description')
 SITE_AUTHOR = SiteConfig.fetch('site', 'author')
+# Stylesheets loaded after the site's own, so a skin can live in a file of
+# the site's own rather than in an edited template. Local paths only, and
+# the refusal is loud: every page carries style-src 'self', so a
+# stylesheet on another host is discarded by the browser without an error
+# the author will ever see -- the page just renders undressed. Same trade
+# the HEIC refusal makes, stop where the person can still act rather than
+# hand them a silent half-result.
+def extra_css_hrefs
+  entries = SiteConfig.get('site', 'extra_css', default: nil)
+  entries = [entries] if entries.is_a?(String)
+  return [] unless entries.is_a?(Array)
+
+  entries.filter_map do |raw|
+    href = raw.to_s.strip
+    next if href.empty?
+    # A protocol-relative "//host/x.css" is another origin too, and it is
+    # the one shape that looks local at a glance.
+    next href if href.start_with?('/') && !href.start_with?('//')
+
+    warn "⚠️  site.extra_css: #{raw.inspect} is not a path on this site, so the page's " \
+         'Content-Security-Policy would discard it -- skipped. Copy the file into assets/ ' \
+         'and name it as /assets/css/<name>.css.'
+    nil
+  end
+end
+EXTRA_CSS = extra_css_hrefs.freeze
+
+# Assembled here rather than looped in the template, and the reason is the
+# same one nav.html.erb documents: layout.html.erb compiles without a trim
+# mode, so a block tag sitting on its own line leaves its newlines on every
+# page whether or not the loop ever runs. A site with no extra stylesheet
+# has to come out byte-for-byte as it did before this existed -- otherwise
+# adding the feature would rewrite every page of every existing archive to
+# say exactly what it said yesterday.
+def extra_css_links
+  EXTRA_CSS.map { |href| %(\n  <link rel="stylesheet" href="#{h(href)}">) }.join
+end
+
 SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
 SITE_LOCALE = SiteConfig.get('site', 'locale', default: 'en_US')
 BANNER = SiteConfig.fetch('banner')
