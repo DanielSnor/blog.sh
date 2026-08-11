@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.2.1 -- unreleased
+## 1.2.1 -- 2026-08-12
 
 A bug-fix release with two things added to it: the site's own words are
 Markdown now, and a photo no longer publishes where it was taken. The rest
