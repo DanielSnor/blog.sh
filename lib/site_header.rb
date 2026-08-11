@@ -3,6 +3,7 @@
 require_relative 'site_config'
 require_relative 'tui'
 require_relative 'version'
+require_relative 'yaml_compat'
 
 # lib/site_header.rb -- the "which site am I connected to" banner both
 # wizards (./blog.sh and ./import.sh) print at startup and after every
@@ -20,13 +21,39 @@ require_relative 'version'
 module SiteHeader
   module_function
 
+  # Read here rather than through SiteConfig, and quietly. SiteConfig
+  # ABORTS on a config that will not parse -- and it prints before it
+  # raises, so the rescue at the bottom of this method caught the exit but
+  # not the message. `./blog.sh help` on a broken install therefore opened
+  # with a YAML error nobody had asked it for. This banner is a courtesy
+  # on top of whatever command is running; it has no business speaking for
+  # the config. `doctor` still says it, at length, because that is the one
+  # command whose whole job is to.
+  #
+  # Deliberately not memoised. The wizards render this banner repeatedly
+  # in one process -- after every screen clear -- and a config written
+  # mid-session should show through on the next render rather than at the
+  # next launch. It is one small file, read a handful of times per run.
+  def config
+    data = YamlCompat.load_file(SiteConfig::PATH)
+    data.is_a?(Hash) ? data : {}
+  rescue StandardError
+    {}
+  end
+
+  def setting(*keys)
+    keys.reduce(config) { |acc, key| acc.is_a?(Hash) ? acc[key] : nil }
+  end
+
   # The tool name is written the way it is typed -- "./blog.sh", not
   # "blog.sh" -- and carries the version, because the wizard's first screen
   # is where someone about to report a problem is already looking.
-  def render(tool: './blog.sh')
+  # `extra:` is one more line under the identity, barred like the rest --
+  # the CLI commands put their mode there.
+  def render(tool: './blog.sh', extra: nil)
     bar = Tui.paint('▍', :cyan)
-    short_name = SiteConfig.get('site', 'short_name')
-    base_url = ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')
+    short_name = setting('site', 'short_name')
+    base_url = ENV['SITE_BASE_URL'] || setting('site', 'base_url')
 
     # The same precedence the site's banner overlay uses: banner.claim
     # when set (the key exists precisely because site.description must
@@ -34,8 +61,17 @@ module SiteHeader
     # block here reads like the identity block on the site. The claim may
     # carry <br> line breaks; on one terminal line they become a
     # separator, and any other markup is dropped.
-    claim_text = SiteConfig.get('banner', 'claim') || SiteConfig.get('site', 'description')
-    claim_text = claim_text.to_s.gsub(%r{<br\s*/?>}i, ' · ').gsub(/<[^>]+>/, '').strip
+    #
+    # Built from the pieces between the breaks rather than by replacing the
+    # breaks in place: a claim that is only markup ("<br>", or a stray tag)
+    # left the separator behind with nothing on either side of it, and the
+    # site header greeted the author with a lone middle dot.
+    claim_text = setting('banner', 'claim') || setting('site', 'description')
+    claim_text = claim_text.to_s
+                           .split(%r{<br\s*/?>}i)
+                           .map { |part| part.gsub(/<[^>]+>/, '').strip }
+                           .reject(&:empty?)
+                           .join(' · ')
     claim = [short_name, claim_text].compact.reject(&:empty?).join(' — ')
 
     # The full URL, protocol included, not a bare domain: terminals
@@ -47,6 +83,14 @@ module SiteHeader
     lines = ["#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}"]
     lines << claim unless claim.empty?
     lines << Tui.paint(url, :dim) unless url.empty?
+    lines << extra if extra
     lines.map { |line| "#{bar}#{line}" }.join("\n")
+  rescue StandardError, SystemExit
+    # ./setup.sh and ./style.sh print this banner too, and they run on
+    # configs too broken for SiteConfig to load -- which is exactly when
+    # somebody reaches for a wizard. The identity lines are a courtesy;
+    # the tool line (and the caller's mode line) alone are still true.
+    ["#{Tui.paint('▍', :cyan)}#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}",
+     *(extra ? ["#{Tui.paint('▍', :cyan)}#{extra}"] : [])].join("\n")
   end
 end

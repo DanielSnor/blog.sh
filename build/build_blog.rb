@@ -12,10 +12,13 @@ require 'digest'
 require_relative '../lib/sidebar'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
+require_relative '../lib/embed'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/file_size'
 require_relative '../lib/i18n'
+require_relative '../lib/colors_css'
+require_relative '../lib/post_text'
 
 SiteConfig.use_site_timezone!
 
@@ -24,12 +27,28 @@ ROOT = File.expand_path('..', __dir__)
 # (downloadable again any time from wherever the site is actually deployed).
 # That doesn't lose a local Time Machine backup, it just stops iCloud from
 # mirroring it -- worth nothing for data that can always be re-fetched.
-CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
+# Both content and output are overridable for the one caller that builds
+# somewhere else on purpose: ./style.sh's palette preview renders a
+# bundled sample post into tmp/ through this same script, without
+# touching the real content or the real build (lib/palette_preview.rb).
+CONTENT_DIR = ENV['BLOG_SH_CONTENT_DIR'] || File.join(ROOT, 'content.nosync', 'posts')
 MEDIA_DIR = File.join(ROOT, 'media.nosync')
 # .nosync: a derived artifact (rebuildable any time) gains nothing from being
 # synced -- on a Mac it was also pure I/O overhead. The directory name means
 # nothing to a server, where iCloud doesn't exist anyway.
-PUBLIC_DIR = File.join(ROOT, 'public.nosync')
+PUBLIC_DIR = ENV['BLOG_SH_PUBLIC_DIR'] || File.join(ROOT, 'public.nosync')
+
+# One writer of public.nosync at a time -- a concurrent build and deploy
+# walk the same tree while it is being rewritten (see lib/run_lock.rb).
+# Inherited when the publishing cron already holds it. A build redirected
+# elsewhere (the palette preview) neither touches that tree nor should
+# fail because a real build happens to be running.
+require_relative '../lib/run_lock'
+# busy_exit 3, not 1: a build that did not run because a cron holds the
+# lock is not a broken build, and the difference decides whether the
+# caller leaves a .deploy-pending marker behind or tells you to go
+# looking for an error that isn't there.
+RunLock.acquire!(ROOT, label: 'build', busy_exit: 3) unless ENV['BLOG_SH_PUBLIC_DIR']
 # No ?v= cache-buster on site.css on purpose: a static host that serves every
 # file with `Cache-Control: public, max-age=0` plus an ETag (e.g. Cloudron
 # Surfer) makes browsers revalidate on each load and pick up a changed
@@ -89,6 +108,14 @@ BANNER = SiteConfig.fetch('banner')
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
 ANALYTICS = SiteConfig.get('analytics')
+SITE_COLORS = SiteConfig.get('colors', default: {})
+# The browser chrome around the page (address bar on phones, title bar in
+# installed PWAs) takes its colour from these -- one per scheme, matching
+# the page background exactly, so the frame never bands against the site.
+# Derived through the same resolution colors.css uses, so a palette change
+# moves both in one rebuild.
+THEME_COLOR_LIGHT = ColorsCss.color_for(SITE_COLORS, 'light', 'bg')
+THEME_COLOR_DARK = ColorsCss.color_for(SITE_COLORS, 'dark', 'bg')
 ABOUT = SiteConfig.fetch('about')
 FOOTER = SiteConfig.fetch('footer')
 SOCIAL = SiteConfig.get('social', default: [])
@@ -100,98 +127,10 @@ MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 # Also enforces the mastodon/bluesky exclusivity right at build time.
 COMMENT_NETWORK = SiteConfig.comment_network
 
-# Color palette. Only these 7-per-mode keys (config/site.yml's
-# `colors.light.*`/`colors.dark.*`) are real per-site choices -- everything
-# else the CSS references (--card-bg, --nav-text, --nav-border,
-# --hover-invert, --badge-hover-text, --search-bg) is derived from them in
-# color_properties below, not separately configurable. They never varied
-# independently across every palette this engine has actually shipped, so
-# exposing them as their own config keys would just be more to fill in for
-# no real choice. Defaults to blog.sh's own blue palette when `colors:` is
-# absent (or partial) in config/site.yml.
-DEFAULT_COLORS = {
-  'light' => {
-    'bg' => '#f5f8fa', 'text' => '#444a5a', 'meta_text' => '#657784',
-    'accent' => '#1da1f2', 'nav_bg' => '#eaf5fd', 'border' => '#e1e8ed',
-    'pill_bg' => '#d6ecfc'
-  },
-  'dark' => {
-    'bg' => '#111111', 'text' => '#ffffff', 'meta_text' => '#6a7f8c',
-    'accent' => '#4ab3f4', 'nav_bg' => '#192734', 'border' => '#263340',
-    'pill_bg' => '#16324a'
-  }
-}.freeze
+# The color palette and the generated stylesheet live in
+# lib/colors_css.rb, shared with ./style.sh -- its palette preview must
+# render through the exact code the build uses, or it drifts.
 
-def color_for(mode, key)
-  SiteConfig.get('colors', mode, key) || DEFAULT_COLORS[mode][key]
-end
-
-def color_properties(mode)
-  text = color_for(mode, 'text')
-  meta_text = color_for(mode, 'meta_text')
-  nav_bg = color_for(mode, 'nav_bg')
-  {
-    'bg' => color_for(mode, 'bg'),
-    # White in light mode (a card floating on a tinted page), but in dark
-    # mode it's the same tinted surface as the nav bar, not white -- true
-    # across every palette this engine has shipped (orange/bluebird/garden/
-    # sunflower all set dark card-bg == dark nav-bg exactly).
-    'card-bg' => mode == 'dark' ? nav_bg : '#ffffff',
-    'text' => text,
-    'meta-text' => meta_text,
-    'accent' => color_for(mode, 'accent'),
-    'nav-bg' => nav_bg,
-    'nav-text' => text,
-    'border' => color_for(mode, 'border'),
-    'nav-border' => meta_text,
-    'pill-bg' => color_for(mode, 'pill_bg'),
-    'search-bg' => mode == 'dark' ? '#eeeeee' : '#ffffff',
-    'hover-invert' => mode == 'dark' ? '#ffffff' : meta_text,
-    'badge-hover-text' => mode == 'dark' ? 'var(--accent)' : '#ffffff',
-    # Independently optional (config/site.yml's colors.<mode>.banner_title/
-    # banner_claim) since the banner overlay's title and claim can be shown
-    # or colored independently -- see BANNER_SHOW_TITLE/_CLAIM below. Same
-    # default either falls back to as before this pair existed: nav-bg in
-    # light mode (a readable tone against most banner images without being
-    # pure white), white in dark mode.
-    'banner-title-color' => color_for(mode, 'banner_title') || (mode == 'dark' ? '#ffffff' : nav_bg),
-    'banner-claim-color' => color_for(mode, 'banner_claim') || (mode == 'dark' ? '#ffffff' : nav_bg)
-  }
-end
-
-def color_declarations(mode, indent)
-  color_properties(mode).map { |name, value| "#{indent}--#{name}: #{value};" }.join("\n")
-end
-
-# Generates assets/css/colors.css -- the one file that actually differs
-# between two sites built on this engine. templates/layout.html.erb loads
-# it just before the shared, colorless site.css.
-def build_colors_css
-  <<~CSS
-    /* Generated at build time from config/site.yml's `colors:` section --
-       edit the config and rebuild, don't edit this file by hand. */
-    :root,
-    :root[data-theme="light"] {
-    #{color_declarations('light', '  ')}
-    }
-
-    /* WARNING: the dark values appear twice below and must stay identical.
-       CSS can't share a declaration block across an @media boundary, so
-       "follow the system" and "explicitly switched" can't be written
-       together. (A single declaration would be possible via light-dark(),
-       but that needs Safari 17.5+ / Chrome 123+, and colors would fall
-       apart completely in older browsers.) */
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-    #{color_declarations('dark', '    ')}
-      }
-    }
-
-    :root[data-theme="dark"] {
-    #{color_declarations('dark', '  ')}
-    }
-  CSS
-end
 DEFAULT_OG_IMAGE = "#{SITE_BASE_URL}#{BANNER['src']}"
 
 def t(key, **vars)
@@ -240,7 +179,19 @@ CLIENT_I18N_SCRIPT_HASH = "'sha256-#{Digest::SHA256.base64digest(CLIENT_I18N_SCR
 # those integrations are actually configured -- a site with neither gets a
 # tighter policy for free, instead of a hardcoded allowlist for services it
 # doesn't use.
-def csp_content
+# frame_origins comes from the page's own posts (see Embed.frame_origins_for):
+# a site that embeds nothing keeps exactly the policy it had, and a PeerTube
+# instance -- whose host is a property of the post, not of the engine -- can
+# be allowed for the one page that plays a video from it.
+# comment_origins is the same idea for connect-src: the comment thread is
+# fetched from whichever network each post was
+# ANNOUNCED on, which is stored on the post -- while this policy was built
+# from the network configured right now. After a switch from Mastodon to
+# Bluesky (or back), every older post kept its thread in the markup and was
+# refused by the browser: comments silently gone, with nothing in the build
+# to say so. The comment at post_stats_html claims posts survive a switch;
+# this is what makes that true.
+def csp_content(frame_origins = [], comment_origins = [])
   analytics_origin = ANALYTICS && ANALYTICS['src'] ? URI.parse(ANALYTICS['src']) : nil
   analytics_origin &&= "#{analytics_origin.scheme}://#{analytics_origin.host}"
   mastodon_origin = MASTODON_INSTANCE ? "https://#{MASTODON_INSTANCE}" : nil
@@ -248,11 +199,14 @@ def csp_content
   bluesky_origin = COMMENT_NETWORK == :bluesky ? 'https://public.api.bsky.app' : nil
 
   script_src = ["'self'", CLIENT_I18N_SCRIPT_HASH, analytics_origin].compact.join(' ')
-  connect_src = ["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact.join(' ')
+  connect_src = (["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact +
+                 Array(comment_origins)).uniq.join(' ')
+
+  frame_src = (%w[https://www.youtube.com https://www.youtube-nocookie.com] + Array(frame_origins)).uniq.join(' ')
 
   "default-src 'self'; script-src #{script_src}; style-src 'self' 'unsafe-inline'; " \
     "img-src 'self' https: data:; font-src 'self'; connect-src #{connect_src}; " \
-    "frame-src https://www.youtube.com https://www.youtube-nocookie.com; " \
+    "frame-src #{frame_src}; " \
     "object-src 'none'; base-uri 'self'; form-action 'self'"
 end
 
@@ -267,6 +221,8 @@ SOCIAL_ICONS = {
   'bluesky' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8Z"/></svg>',
   'instagram' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zm0 10.162a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>',
   'threads' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z"/></svg>',
+  'facebook' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>',
+  'x' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>',
   'youtube' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
   'rss' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M19.199 24C19.199 13.467 10.533 4.8 0 4.8V0c13.165 0 24 10.835 24 24h-4.801zM3.291 17.415c1.814 0 3.293 1.479 3.293 3.295 0 1.813-1.485 3.29-3.301 3.29C1.47 24 0 22.526 0 20.71s1.475-3.294 3.291-3.295zM15.909 24h-4.665c0-6.169-5.075-11.245-11.244-11.245V8.09c8.727 0 15.909 7.184 15.909 15.91z"/></svg>',
   'email' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>'
@@ -404,18 +360,41 @@ end
 def render_audio(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
-    %(<audio controls preload="metadata" src="#{media_prefix}#{local_media['url']}"></audio>)
+    %(<audio controls preload="metadata" src="#{media_src(media_prefix, local_media['url'])}"></audio>)
+  elsif (src = Embed.src(block))
+    embed_iframe(src, block)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
     block['embed_html']
+  elsif block['url']
+    # A player that could not be looked up (offline at save time, or a
+    # service with none for that address) still leaves the address, and a
+    # link to it beats a dead end -- the same courtesy the video branch has
+    # always shown.
+    %(<p class="audio-unavailable">#{h(t('post.audio_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
   else
     "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
+  end
+end
+
+# The players the engine builds itself, out of a provider and an id it
+# validated (lib/embed.rb) -- never out of the platform's own embed code.
+# Audio widgets are a fixed-height strip, video is 16:9 in the same
+# responsive box YouTube uses.
+def embed_iframe(src, block)
+  provider = block['provider'].to_s
+  title = h(provider.tr('_', '.'))
+  common = %(loading="lazy" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen)
+  if (height = Embed::AUDIO_HEIGHTS[provider])
+    %(<iframe class="embed-audio" src="#{h(src)}" title="#{title}" width="100%" height="#{height}" #{common}></iframe>)
+  else
+    %(<div class="embed-responsive"><iframe src="#{h(src)}" title="#{title}" #{common}></iframe></div>)
   end
 end
 
 def render_video(block, media_prefix)
   local_media = (block['media'] || []).first
   if local_media
-    %(<video controls preload="metadata"#{size_attrs(local_media)} src="#{media_prefix}#{local_media['url']}"></video>)
+    %(<video controls preload="metadata"#{size_attrs(local_media)} src="#{media_src(media_prefix, local_media['url'])}"></video>)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
     # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
     # other providers (e.g. Instagram) ship their own responsive blockquote/script.
@@ -439,8 +418,15 @@ def render_video(block, media_prefix)
       %(title="YouTube" frameborder="0" loading="lazy" ) +
       %(allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ) +
       %(allowfullscreen></iframe></div>)
+  elsif (src = Embed.src(block))
+    embed_iframe(src, block)
   else
-    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{block['url']}">#{block['url']}</a></p>)
+    # Escaped, both times. The address here comes from an import or a
+    # hand-edited post, which is exactly the input that cannot be trusted:
+    # unescaped it closed the href and wrote markup of its own into every
+    # page the post appears on -- and into the RSS feed, which carries the
+    # same rendered HTML.
+    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
   end
 end
 
@@ -497,7 +483,7 @@ def render_block(block, media_prefix, seen = {})
     ext = 'FILE' if ext.empty?
     size = human_size(file['size'])
     sub = [ext, size].compact.reject(&:empty?).join(' · ')
-    %(<a class="file-card" href="#{media_prefix}#{file['url']}" download>) +
+    %(<a class="file-card" href="#{media_src(media_prefix, file['url'])}" download>) +
       %(<span class="file-icon">#{h(ext[0, 4])}</span>) +
       %(<span class="file-meta"><span class="file-label">#{h(label)}</span>) +
       %(<span class="file-sub">#{h(sub)}</span></span>) +
@@ -513,7 +499,7 @@ def render_block(block, media_prefix, seen = {})
     # Omitted rather than empty when the size is unknown: width="" is not a
     # valid HTML integer attribute, and an image that can't reserve space is
     # better off saying nothing than saying nothing-shaped-like-a-number.
-    %(<figure><img src="#{media_prefix}#{media['url']}"#{size_attrs(media)} alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
+    %(<figure><img src="#{media_src(media_prefix, media['url'])}"#{size_attrs(media)} alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
   when 'video'
     # <figure> is only added when a caption exists, so imported videos
     # without one don't get an unwanted layout change.
@@ -767,18 +753,12 @@ def plain_text_length(post)
   end
 end
 
+# Lives in lib/post_text.rb, shared with the CLI's archive browser -- the
+# terminal searches these same words with no index to consult, so the two
+# must extract the same text or the same query would answer differently
+# in the browser and in the terminal.
 def plain_text_for_search(post)
-  parts = post['content'].flat_map do |block|
-    case block['type']
-    when 'text' then [block['text']]
-    when 'list' then (block['items'] || []).map { |it| it['text'] }
-    when 'table' then ((block['header'] || []) + (block['rows'] || []).flatten).map { |c| c['text'] }
-    when 'image' then [block['alt_text'], block['caption']]
-    when 'link' then [block['title'], block['description']]
-    else []
-    end
-  end
-  parts.compact.join(' ')
+  PostText.plain(post)
 end
 
 def truncate_excerpt(text, len = 200)
@@ -861,7 +841,10 @@ def post_og_image(post)
   media = block && (block['media'] || []).first
   return DEFAULT_OG_IMAGE unless media && media['url']
 
-  "#{SITE_BASE_URL}#{post_path(post)}#{media['url']}"
+  # Basename, the same as the page's own <img> uses: this address goes into
+  # og:image and into the JSON-LD, and a name carrying "../" pointed both
+  # of them outside the post -- at whatever happens to sit there.
+  "#{SITE_BASE_URL}#{post_path(post)}#{File.basename(media['url'].to_s)}"
 end
 
 def post_description(post)
@@ -869,6 +852,43 @@ def post_description(post)
   text = post['title'].to_s if text.strip.empty?
   text = SITE_DESCRIPTION if text.strip.empty?
   truncate_excerpt(text, META_DESCRIPTION_LENGTH)
+end
+
+# What a crawler is told about a post beyond the OG basics: the article's
+# time and tags as og meta, and the same facts once more as schema.org
+# JSON-LD, which is what rich results actually read. Only for published
+# posts -- a draft's date is bookkeeping and the page is noindex anyway.
+#
+# The JSON-LD block is data, not script: CSP's script-src governs
+# execution, and a text/ld+json block never executes, so the strict
+# policy above needs no widening. "</" is escaped so post text can never
+# close the script element from inside the JSON.
+def post_structured_head(post)
+  published = post_display_time(post).iso8601
+  tags = post['tags'] || []
+  lines = [%(<meta property="article:published_time" content="#{h(published)}">)]
+  lines += tags.map { |tag| %(<meta property="article:tag" content="#{h(tag)}">) }
+
+  data = {
+    '@context' => 'https://schema.org',
+    '@type' => 'BlogPosting',
+    'headline' => post['title'].to_s.empty? ? post['slug'] : post['title'],
+    'datePublished' => published,
+    'url' => "#{SITE_BASE_URL}#{post_path(post)}",
+    'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_path(post)}",
+    'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR },
+    'image' => post_og_image(post),
+    'description' => post_description(post)
+  }
+  data['keywords'] = tags.join(', ') unless tags.empty?
+  # Both sequences that can end a script block from inside a JSON string:
+  # "</" closes it, and "<!--" opens an HTML comment whose scope runs to the
+  # next "-->" -- so a post whose text held an unterminated comment followed
+  # by another "<script" swallowed the rest of the page and rendered blank.
+  # Escaping the "<" is invisible once the JSON is parsed and stops both.
+  json_ld = JSON.generate(data).gsub('</', '<\/').gsub('<!--', '<\u0021--')
+  lines << %(<script type="application/ld+json">#{json_ld}</script>)
+  lines.map { |line| "\n  #{line}" }.join
 end
 
 def render_post_html(post, template)
@@ -881,7 +901,9 @@ def render_post_html(post, template)
          image: post_og_image(post),
          og_type: 'article',
          # Drafts must never end up in search engines or link previews.
-         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : '')
+         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : post_structured_head(post),
+         frame_origins: Embed.frame_origins_for(post['content']),
+         comment_origins: comment_origins_for([post]))
 end
 
 def rss_item(post)
@@ -889,6 +911,13 @@ def rss_item(post)
   title = CGI.escapeHTML((post['title'] || post['slug']).to_s)
   pub_date = post_time(post).rfc2822
   description = render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}")
+  # A post's rendered HTML goes into the feed inside CDATA, and CDATA has
+  # exactly one way to end. A post carrying "]]>" -- which an imported
+  # embed_html can, since it is stored verbatim -- closed the section
+  # early and the rest of it was read as feed markup: a reader could be
+  # handed a <title> and <link> of the post's choosing, in an item that
+  # still validated. The sequence is split across two CDATA sections, the
+  # standard way, so it survives as text.
   categories = (post['tags'] || []).map { |t| "<category>#{CGI.escapeHTML(t)}</category>" }.join
   <<~ITEM
     <item>
@@ -896,7 +925,7 @@ def rss_item(post)
       <link>#{url}</link>
       <guid isPermaLink="true">#{url}</guid>
       <pubDate>#{pub_date}</pubDate>
-      <description><![CDATA[#{description}]]></description>
+      <description><![CDATA[#{cdata_safe(description)}]]></description>
       #{categories}
     </item>
   ITEM
@@ -1041,7 +1070,41 @@ def nav_current(href, active)
   href == active ? ' aria-current="page"' : ''
 end
 
-def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website', extra_head: '')
+# The origins a set of posts needs for their comment threads: the instance
+# each post was announced on (its own stored URL), plus the public Bluesky
+# AppView for any post with a Bluesky record. Same shape as
+# Embed.frame_origins_for -- a property of the posts on the page, not of
+# the engine's current configuration.
+def comment_origins_for(posts)
+  Array(posts).filter_map do |post|
+    next unless post.is_a?(Hash)
+
+    if post['mastodon_url']
+      uri = begin
+        URI.parse(post['mastodon_url'])
+      rescue StandardError
+        nil
+      end
+      # The port is part of the origin: an instance on a non-default port
+      # would otherwise be granted an origin the browser never matches, so
+      # the very policy meant to allow its thread refuses it.
+      next unless uri&.host
+
+      origin = "#{uri.scheme}://#{uri.host}#{":#{uri.port}" if uri.port && uri.port != uri.default_port}"
+      # A stored host is data, and this string ends up inside a policy
+      # whose directives are separated by ";" and whose value sits in an
+      # HTML attribute. Anything outside the shape of an origin is dropped
+      # rather than escaped -- a host that needs escaping here is not a
+      # host worth trusting with a connect-src grant.
+      origin if origin.match?(%r{\Ahttps?://[A-Za-z0-9.-]+(?::\d+)?\z})
+    elsif post['bluesky_uri']
+      'https://public.api.bsky.app'
+    end
+  end.uniq
+end
+
+def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website',
+           extra_head: '', frame_origins: [], comment_origins: [])
   LAYOUT.result_with_hash(
     main_html: main_html,
     page_title: title,
@@ -1050,7 +1113,11 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     nav_active: nav_active_for(path),
     og_image: image,
     og_type: og_type,
-    extra_head: extra_head
+    extra_head: extra_head,
+    # The players a page carries decide its frame-src, so the policy is
+    # computed here rather than widened for the whole site (csp_content).
+    page_frame_origins: frame_origins,
+    page_comment_origins: comment_origins
   )
 end
 
@@ -1078,9 +1145,23 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     main_html = template.result_with_hash(list_html: list_html, pagination: pagination, heading: heading)
+    # A listing renders the same blocks the post page does, players
+    # included, so it needs the same frame permissions. The pinned post
+    # counts as one of them wherever it is lifted onto the landing page:
+    # once it has aged onto /page/2/ it is no longer in this page's own
+    # slice, and computing the policy from the slice alone left its player
+    # on the front page with nothing allowing it.
+    # No comment_origins, though: a thread is only fetched on the post's
+    # own page (#comments exists nowhere else), and the stats row on a
+    # card reads /stats.json from this origin -- so passing them here
+    # handed every listing a connect-src grant to each instance its posts
+    # were announced on, hosts the page never actually contacts.
+    shown = page_posts
+    shown = ([pinned] + page_posts).uniq if pinned && number > fixed
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
-                           path: page_url(number, fixed, base_path)))
+                           path: page_url(number, fixed, base_path),
+                           frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] })))
   end
   pages.size
 end
@@ -1197,7 +1278,10 @@ Dir.glob(File.join(ROOT, 'assets', '**', '*')).each do |src|
 
   emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
-emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'), build_colors_css)
+emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
+     ColorsCss.generate(colors: SITE_COLORS,
+                        fonts: SiteConfig.get('fonts', default: {}),
+                        fonts_dir: File.join(ROOT, 'assets', 'fonts')))
 ico = build_favicon_ico
 emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
 
@@ -1251,6 +1335,16 @@ posts.reverse!
 # RSS, the sitemap and the search index all draw from it unchanged. Drafts
 # only get their own page at a hidden address.
 drafts, posts = posts.partition { |p| draft?(p) }
+# A draft without its token would build at the GUESSABLE /draft//slug/ --
+# every writer in the engine guarantees the token, so a missing one means
+# a hand-copied or hand-edited JSON, and the unguessable-URL design must
+# not quietly fail for it. Skipped and named, not built.
+drafts.reject! do |post|
+  next false unless post['draft_token'].to_s.strip.empty?
+
+  warn "⚠️  Draft '#{post['slug']}' has no draft_token -- its preview would be at a guessable address, so it is not built. Re-save it with ./blog.sh edit."
+  true
+end
 
 CONTENT_TYPES = %w[text quote chat image video audio link document].freeze
 CONTENT_TYPE_LABELS = {
@@ -1279,6 +1373,30 @@ NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   ["/type/#{type}/", t("nav.#{key}")]
 end.freeze
 
+# A media file's own name, ready to be put in an attribute. Two things go
+# wrong without this, and both arrive through an ordinary import of
+# somebody else's archive rather than through anything the author typed.
+#
+# The name is attacker-controlled: Import::Media#allocate numbers the file
+# but keeps File.extname verbatim, and an extension is only "everything
+# after the last dot" -- quotes and angle brackets included. Unescaped in
+# src="..." that closes the attribute and opens a tag, which is stored XSS
+# on the author's own domain. (The alt attribute one line over has been
+# escaped all along; this is the asymmetry, not a new requirement.)
+#
+# And a name is not a path: "../" in it walks out of the post's directory,
+# both when the page links it and when the build copies it. The name is
+# taken as a basename, so a crafted one lands beside the post or nowhere.
+def media_src(prefix, name)
+  "#{prefix}#{h(File.basename(name.to_s))}"
+end
+
+# "]]>" cannot appear inside a CDATA section at all -- the only escape is
+# to end the section and start another around the ">".
+def cdata_safe(text)
+  text.to_s.gsub(']]>', ']]]]><![CDATA[>')
+end
+
 def referenced_media_filenames(post)
   post['content'].flat_map do |block|
     [(block['media'] || []).first, (block['poster'] || []).first].compact.map { |m| m['url'] }
@@ -1292,7 +1410,14 @@ end
   # Media stays in media/<year>/<slug>/ even for drafts -- publishing
   # doesn't move files, it just moves the output page.
   source_media_dir = File.join(MEDIA_DIR, year.to_s, post['slug'])
-  referenced_media_filenames(post).each do |filename|
+  referenced_media_filenames(post).each do |name|
+    # Basename for the same reason the page uses one: a "filename" carrying
+    # "../" is a path, and File.join would honour it -- on the way in it
+    # reads a file the post has no business reading, and on the way out it
+    # writes outside public.nosync/, where prune can never clean it up.
+    filename = File.basename(name.to_s)
+    next if filename.empty? || filename == '.' || filename == '..'
+
     src = File.join(source_media_dir, filename)
     dest = File.join(dir, filename)
     if File.exist?(src)
@@ -1412,7 +1537,7 @@ def search_index_entry(post)
     title: post['title'],
     date: post_display_time(post).strftime(t('date_format')),
     excerpt: truncate_excerpt(text),
-    folded: fold([post['title'], text, (post['tags'] || []).join(' ')].compact.join(' '))
+    folded: PostText.searchable(post, text)
   }
 end
 
@@ -1462,6 +1587,62 @@ WRITTEN[STATS_PATH] = true
 emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
 emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts, tags_map, PRESENT_TYPES))
 emit(File.join(PUBLIC_DIR, 'robots.txt'), "User-agent: *\nAllow: /\nSitemap: #{SITE_BASE_URL}/sitemap.xml\n")
+
+# An imported post keeps answering at the addresses its previous platform
+# gave it: redirect_from is a list of site-root paths ("/bitwarden/",
+# "/2020/01/some-post/") an importer writes when the new site lives on the
+# old site's domain. Same stub as former_slugs, different history: that
+# list is machine-managed rename history inside THIS site, this one is
+# where the post lived before it arrived -- the two never mix. The paths
+# are arbitrary, so unlike the former_slugs loop this one runs after
+# EVERYTHING real -- posts, listings, search, feeds, root files -- and a
+# stub yields to whatever the build already produced, out loud.
+REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
+posts.each do |post|
+  Array(post['redirect_from']).each do |origin|
+    parts = origin.to_s.split('/').reject(&:empty?)
+    if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
+      warn "⚠️  #{post['slug']}: unusable redirect_from entry #{origin.inspect} -- expected a site-root path like \"/old-post/\"."
+      next
+    end
+    if REDIRECT_FROM_RESERVED.include?(parts.first)
+      warn "⚠️  #{post['slug']}: redirect_from #{origin.inspect} skipped -- /#{parts.first}/ belongs to the site itself."
+      next
+    end
+
+    # "/2009/05/some-post.html" was a FILE on Blogger, TypePad and
+    # LiveJournal, and a static host answers that request with the literal
+    # path -- a some-post.html/index.html directory would depend on the
+    # server's index fallback for a URL that never had a trailing slash.
+    # Anything else gets the directory-with-index shape former_slugs uses.
+    dest = if parts.last.match?(/\.html?\z/i)
+             File.join(PUBLIC_DIR, *parts)
+           else
+             File.join(PUBLIC_DIR, *parts, 'index.html')
+           end
+
+    # Two lookups, two different collisions: the destination itself, and a
+    # ROOT FILE sitting where the path needs a directory (a stub at
+    # "/rss.xml/whatever/" would need rss.xml to be one). Both end in the
+    # same loud skip -- the build's own output always wins over a stub.
+    prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| WRITTEN[p] }
+    if WRITTEN[dest] || prefix_file
+      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
+      next
+    end
+    # The third collision: the destination is a DIRECTORY an earlier stub
+    # created (entries "/x.html/sub/" and "/x.html", in that order --
+    # WRITTEN knows the file inside, not the directory itself). Writing a
+    # file over a directory is EISDIR, and one bad pair of imported
+    # entries must not kill the whole build.
+    if File.directory?(dest)
+      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- an earlier redirect already made a directory of that address."
+      next
+    end
+
+    emit(dest, redirect_stub_html(post))
+  end
+end
 
 removed = prune_public
 

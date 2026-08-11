@@ -25,13 +25,27 @@ require_relative '../lib/site_header'
 require_relative '../lib/i18n'
 require_relative '../lib/publishing'
 require_relative '../lib/import/run'
+require_relative '../lib/import/beehiiv'
+require_relative '../lib/import/blogger'
 require_relative '../lib/import/bluesky'
+require_relative '../lib/import/threads'
 require_relative '../lib/import/tumblr'
 require_relative '../lib/import/twitter'
+require_relative '../lib/import/wayback'
+require_relative '../lib/import/wix'
+require_relative '../lib/import/facebook'
 require_relative '../lib/import/feed'
+require_relative '../lib/import/ghost'
 require_relative '../lib/import/mastodon'
+require_relative '../lib/import/medium'
+require_relative '../lib/import/movable_type'
 require_relative '../lib/import/pixelfed'
+require_relative '../lib/import/podcast'
 require_relative '../lib/import/instagram'
+require_relative '../lib/import/jekyll'
+require_relative '../lib/import/livejournal'
+require_relative '../lib/import/squarespace'
+require_relative '../lib/import/substack'
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -45,12 +59,26 @@ end
 # cron pipes a number today, but anyone who has scripted one should re-read
 # their script after a change here.
 SOURCES = [
+  ['beehiiv', -> { build_beehiiv }],
+  ['blogger', -> { build_blogger }],
   ['bluesky', -> { build_bluesky }],
+  ['facebook', -> { build_facebook }],
+  ['ghost', -> { build_ghost }],
   ['instagram', -> { build_instagram }],
+  ['jekyll', -> { build_jekyll }],
+  ['livejournal', -> { build_livejournal }],
   ['mastodon', -> { build_mastodon }],
+  ['medium', -> { build_medium }],
+  ['movabletype', -> { build_movabletype }],
   ['pixelfed', -> { build_pixelfed }],
+  ['podcast', -> { build_podcast }],
+  ['squarespace', -> { build_squarespace }],
+  ['substack', -> { build_substack }],
+  ['threads', -> { build_threads }],
   ['tumblr', -> { build_tumblr }],
   ['twitter', -> { build_twitter }],
+  ['wayback', -> { build_wayback }],
+  ['wix', -> { build_wix }],
   ['feed', -> { build_feed }]
 ].freeze
 
@@ -67,6 +95,28 @@ def ask(prompt_key)
   value.empty? ? nil : value
 end
 
+def build_beehiiv
+  path = ask('import.beehiiv_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Beehiiv.new(path) if File.exist?(path)
+
+  puts t('import.beehiiv_path_invalid', path: path)
+  nil
+end
+
+def build_blogger
+  path = ask('import.blogger_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Blogger.new(path) if File.exist?(path)
+
+  puts t('import.blogger_path_invalid', path: path)
+  nil
+end
+
 def build_bluesky
   handle = ask('import.bluesky_handle_prompt')
   handle && Import::Bluesky.new(handle)
@@ -75,6 +125,17 @@ end
 # The key is read from the environment rather than prompted for: it's a
 # credential, it belongs in env.sh next to the other tokens, and a prompt
 # would invite pasting it into shell history.
+def build_threads
+  dir = ask('import.threads_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Threads.new(dir) if Import::Threads.posts_file(dir)
+
+  puts t('import.threads_dir_invalid', dir: dir)
+  nil
+end
+
 def build_tumblr
   api_key = ENV['TUMBLR_API_KEY']
   if api_key.to_s.empty?
@@ -89,6 +150,37 @@ end
 # One prompt for all three inputs it accepts: they are the same format --
 # a WXR export is RSS 2.0 with extra elements -- so asking which kind it is
 # would be asking the user something the file already says.
+# The pattern prompt is the second place empty does not cancel: without
+# a pattern only posts with an explicit front matter permalink get a
+# redirect, which is a valid answer.
+def build_jekyll
+  dir = ask('import.jekyll_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  unless Dir.exist?(dir)
+    puts t('import.jekyll_dir_invalid', dir: dir)
+    return nil
+  end
+
+  print t('import.jekyll_permalink_prompt')
+  pattern = $stdin.gets.to_s.strip
+  Import::Jekyll.new(dir, permalink: pattern.empty? ? nil : pattern)
+end
+
+# The password is a credential and comes from the environment, exactly
+# like the Tumblr key: a prompt would invite pasting it into history.
+def build_livejournal
+  password = ENV['LJ_PASSWORD']
+  if password.to_s.empty?
+    puts t('import.livejournal_password_missing')
+    return nil
+  end
+
+  username = ask('import.livejournal_user_prompt')
+  username && Import::Livejournal.new(username, password: password)
+end
+
 def build_mastodon
   dir = ask('import.mastodon_dir_prompt')
   return nil unless dir
@@ -116,6 +208,35 @@ def build_instagram
   nil
 end
 
+def build_medium
+  dir = ask('import.medium_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Medium.new(dir) if Dir.exist?(File.join(dir, 'posts'))
+
+  puts t('import.medium_dir_invalid', dir: dir)
+  nil
+end
+
+# Same two-prompt shape as Jekyll, for the same reason: the file cannot
+# tell you its old URL shape, and an empty pattern is a valid answer
+# (no redirects, or only TypePad's own UNIQUE URL lines).
+def build_movabletype
+  path = ask('import.movabletype_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  unless File.exist?(path)
+    puts t('import.movabletype_path_invalid', path: path)
+    return nil
+  end
+
+  print t('import.movabletype_pattern_prompt')
+  pattern = $stdin.gets.to_s.strip
+  Import::MovableType.new(path, url_pattern: pattern.empty? ? nil : pattern)
+end
+
 def build_pixelfed
   path = ask('import.pixelfed_path_prompt')
   return nil unless path
@@ -139,6 +260,43 @@ def build_feed
   nil
 end
 
+# Two prompts, because the export genuinely cannot answer the second one:
+# every image in it is a "__GHOST_URL__/..." reference -- the site's own
+# address, deliberately never spelled out -- and the files only exist on
+# the live site. So the URL is required, and importing after the old site
+# goes dark loses exactly the images.
+def build_facebook
+  dir = ask('import.facebook_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  return Import::Facebook.new(dir) if Import::Facebook.posts_dir(dir)
+
+  puts t('import.facebook_dir_invalid', dir: dir)
+  nil
+end
+
+def build_ghost
+  path = ask('import.ghost_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  unless File.exist?(path)
+    puts t('import.ghost_path_invalid', path: path)
+    return nil
+  end
+
+  url = ask('import.ghost_url_prompt')
+  return nil unless url
+
+  unless url.start_with?('http://', 'https://')
+    puts t('import.ghost_url_invalid', url: url)
+    return nil
+  end
+
+  Import::Ghost.new(path, site_url: url)
+end
+
 def build_twitter
   dir = ask('import.twitter_dir_prompt')
   return nil unless dir
@@ -152,14 +310,120 @@ def build_twitter
   Import::Twitter.new(dir)
 end
 
+def build_podcast
+  source = ask('import.podcast_source_prompt')
+  return nil unless source
+
+  local = File.expand_path(source)
+  return Import::Podcast.new(local) if File.exist?(local)
+  return Import::Podcast.new(source) if source.start_with?('http://', 'https://')
+
+  puts t('import.feed_source_invalid', source: source)
+  nil
+end
+
+def build_squarespace
+  path = ask('import.squarespace_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Squarespace.new(path) if File.exist?(path)
+
+  puts t('import.squarespace_path_invalid', path: path)
+  nil
+end
+
+# The URL prompt is the one place empty does NOT cancel: the /p/<slug>
+# paths that redirects need are derivable from the export alone, so the
+# domain is a nice-to-have for provenance, not a requirement worth
+# aborting over.
+def build_substack
+  dir = ask('import.substack_dir_prompt')
+  return nil unless dir
+
+  dir = File.expand_path(dir)
+  unless File.exist?(File.join(dir, 'posts.csv'))
+    puts t('import.substack_dir_invalid', dir: dir)
+    return nil
+  end
+
+  print t('import.substack_url_prompt')
+  url = $stdin.gets.to_s.strip
+  url = nil if url.empty?
+  if url && !url.start_with?('http://', 'https://')
+    puts t('import.ghost_url_invalid', url: url)
+    return nil
+  end
+
+  Import::Substack.new(dir, site_url: url)
+end
+
+def build_wayback
+  url = ask('import.wayback_url_prompt')
+  return nil unless url
+
+  unless url.start_with?('http://', 'https://')
+    puts t('import.wayback_url_invalid', url: url)
+    return nil
+  end
+
+  Import::Wayback.new(url)
+end
+
+def build_wix
+  path = ask('import.wix_path_prompt')
+  return nil unless path
+
+  path = File.expand_path(path)
+  return Import::Wix.new(path) if File.exist?(path)
+
+  puts t('import.wix_path_invalid', path: path)
+  nil
+end
+
+# The interactive menu is two levels -- twenty sources in one column
+# was a kilometre of scrolling. The groups are by what the THING was
+# (a blog you published, a network you posted to, a site that no
+# longer exists), because that is the question the user can answer
+# without reading the whole list. The non-interactive path below stays
+# ONE flat list on purpose: scripted `printf "N\n"` runs keep working
+# across group reshuffles.
+GROUPS = [
+  ['blogs', %w[beehiiv blogger ghost jekyll livejournal medium movabletype
+               podcast squarespace substack tumblr wix feed]],
+  ['social', %w[bluesky facebook instagram mastodon pixelfed threads twitter]],
+  ['wayback', %w[wayback]]
+].freeze
+
 def ask_source
   puts
   if Tui.interactive?
-    index = Tui.menu(SOURCES.map { |key, _| source_name(key) }, hint: t('import.menu_hint'))
-    return nil if index.nil?
+    loop do
+      group_index = Tui.menu(GROUPS.map { |key, _| t("import.group.#{key}") },
+                             hint: t('import.menu_hint', count: GROUPS.size))
+      return nil if group_index.nil?
 
-    puts
-    return SOURCES[index]
+      key, members = GROUPS[group_index]
+      # A group of one needs no second question.
+      choices = members.map { |name| SOURCES.find { |k, _| k == name } }.compact
+      if choices.size == 1
+        puts
+        return choices.first
+      end
+
+      puts
+      puts t("import.group.#{key}")
+      # Single-key pick reaches row 9 at most -- with more rows (blogs has
+      # 13) the hint stops at 9 rather than promising keys that don't exist.
+      index = Tui.menu(choices.map { |k, _| source_name(k) },
+                       hint: t('import.menu_hint', count: [choices.size, 9].min))
+      # Backing out of a group is not backing out of the import --
+      # return to the group question instead of quitting the wizard.
+      next if index.nil?
+
+      puts
+      return choices[index]
+    end
   end
 
   SOURCES.each_with_index { |(key, _), i| puts "#{i + 1}) #{source_name(key)}" }
@@ -179,7 +443,22 @@ end
 # engine ships -- but a skip reason comes from an adapter, and a new adapter
 # inventing one must not take the wizard down mid-summary. Translated when
 # known, printed raw when not.
-TRANSLATED_REASONS = %w[reply repost quote empty attachment page not_a_post trashed boost reblog error].freeze
+#
+# The safety net is for adapters the engine does NOT ship. Every reason our
+# own adapters return belongs here, and for a long time eleven of them did
+# not: each source added during 1.2 brought its own vocabulary and this list
+# stayed where the first four sources had left it. The wizard then printed
+# "skipped (crosspost): 1598" in Czech, one line above a Czech sentence
+# reporting the same number -- and nobody noticed, because the big
+# migrations run through migrate_*.rb, whose summary is English by design
+# (lib/import/cli.rb). tests/test_gaps.rb now walks every adapter and fails
+# if a reason it can return is missing here or from any of the three
+# locales, so the next source cannot repeat it.
+TRANSLATED_REASONS = %w[
+  reply repost quote empty attachment page not_a_post trashed boost reblog error undated comment
+  retweet crosspost checkin no_content thread missing_html bad_frontmatter no_identity
+  no_audio media_unfetchable unparsed bad_date misaligned_row
+].freeze
 
 def reason_label(reason)
   TRANSLATED_REASONS.include?(reason.to_s) ? t("import.reason.#{reason}") : reason.to_s
@@ -197,6 +476,11 @@ def report(result, dry_run:)
   puts Tui.paint(t('import.source_died', count: result.scanned, error: result.interrupted), :yellow) if result.interrupted
   puts Tui.paint(t(dry_run ? 'import.would_write' : 'import.written',
                    count: result.written, media: result.media), dry_run ? :cyan : :green)
+  # A preview counts what the run will go after, not what will arrive --
+  # nothing is downloaded here, and one real archive promised 64 files of
+  # which the source had kept none. Said out loud, or the number above
+  # reads as a delivery.
+  puts Tui.paint(t('import.media_not_verified'), :cyan) if dry_run && result.media.positive?
 
   unless result.samples.empty?
     puts t('import.sample_slugs')
@@ -209,8 +493,29 @@ def report(result, dry_run:)
 
   return if result.media_failures.empty?
 
-  puts Tui.paint(t('import.media_failed', count: result.media_failures.size), :yellow)
-  result.media_failures.first(3).each { |url| puts "  #{url}" }
+  # Two different losses, said separately: a file missing from a post that
+  # WAS written, and one from a post the run skipped entirely (a photo-only
+  # post whose only image is gone maps to :empty). One line for both told
+  # the author their skipped posts had been "written without" the file.
+  skipped_failures = Array(result.skipped_media_failures)
+  # Counted off one by one, not with Array#- : the same missing file can be
+  # referenced by a post that WAS written and by one that was skipped, and
+  # the set difference removes every occurrence -- so one shared file
+  # erased the written post's loss from the report entirely.
+  from_written = result.media_failures.dup
+  skipped_failures.each do |path|
+    i = from_written.index(path)
+    from_written.delete_at(i) if i
+  end
+  unless from_written.empty?
+    puts Tui.paint(t('import.media_failed', count: from_written.size), :yellow)
+    from_written.first(3).each { |url| puts "  #{url}" }
+  end
+  unless skipped_failures.empty?
+    puts Tui.paint(t('import.media_failed_skipped', count: skipped_failures.size), :yellow)
+    skipped_failures.first(3).each { |url| puts "  #{url}" }
+  end
+  return
 end
 
 # The reading pass has no per-post output to show -- it deliberately writes
@@ -243,11 +548,25 @@ def confirmed?(count)
 end
 
 def run_import(adapter)
+  # Asked per adapter capability, not per platform list, so any future
+  # importer that stores original addresses gets the question for free.
+  # The default is no: a wrong yes writes redirects to addresses that were
+  # never this domain's to answer, a wrong no just loses a convenience the
+  # re-import (source-id matched, so safe) can add back later.
+  if adapter.respond_to?(:keep_permalinks=)
+    puts
+    adapter.keep_permalinks = Tui.key_choice(t('import.keep_permalinks_prompt')) == t('cli.confirm_yes_char')
+  end
+
   puts
   puts t('import.dry_run_running', label: adapter.label)
   preview = Import::Run.new(adapter, dry_run: true, on_scan: scan_reporter).call
   print "\r\e[2K" if Tui.interactive?
   report(preview, dry_run: true)
+  # The adapter's own note -- scheduled posts becoming drafts, gigabytes
+  # of podcast audio -- belongs in the preview, where it can still change
+  # the answer to the question below.
+  puts "  #{adapter.postscript}" if adapter.respond_to?(:postscript) && adapter.postscript
 
   if preview.written.zero?
     puts

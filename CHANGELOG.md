@@ -10,6 +10,612 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.2 -- 2026-08-11
+
+The import release. Eight sources became twenty-two -- every blog platform
+worth naming, the whole social roster, podcasts, a plain markdown tree, and
+the Wayback Machine for blogs whose platform no longer exists at all. Two
+wizards arrived with it: `./setup.sh` walks a new install through the
+settings it cannot run without, and `./style.sh` covers everything about how
+the site looks, both writing your config as text so its comments survive.
+Around those: a queue for scheduled posts, a searchable archive browser in
+the terminal, a document post type, pinned posts, redirects from a blog's
+old addresses, and `./blog.sh doctor` to say what an install is missing.
+
+Nothing to migrate -- see Upgrading at the end.
+
+### New
+
+- **Eight import sources became twenty-two.** Ghost, Substack, Medium,
+  Blogger, Squarespace, Wix, beehiiv, Movable Type/TypePad and
+  LiveJournal joined the blog platforms, Facebook and Threads closed the
+  social roster, and podcast feeds and markdown trees (Jekyll, Hugo, any
+  `_posts/`) import too. Ghost's export carries no images at
+  all, only references back to the running site, so import before the old
+  site goes dark; Medium, Wix and beehiiv download theirs from the
+  platform's CDN. Facebook and Threads read both formats Meta offers --
+  Facebook skips with a count the posts it mirrored in from Twitter,
+  Posterous and their era (95 % of the reference export;
+  `FACEBOOK_CROSSPOSTS=1` includes them), Threads skips replies to other
+  people's threads, and a Threads post carrying the crosspost flag is
+  kept, because on real exports that flag marks posts written in the app
+  too; LiveJournal talks to its XML-RPC API, having
+  no export file to read; a markdown tree needs no network at all. Dead
+  platforms are the Wayback Machine's job: it rebuilds a blog from the
+  archived captures of its feed, or from archived post pages where there
+  never was a feed (blog.cz and b2evolution packs built in,
+  `POST_PATTERN` for the rest), and `WAYBACK_FROM`/`WAYBACK_TO` narrow a
+  run to a date window. The source menu is two levels now -- blog
+  platform, social network, dead site -- while scripted runs keep the
+  flat numbered list.
+
+- **`./setup.sh` -- setting a site up is now a conversation.** Instead of
+  copying two files and editing 277 lines of commented YAML, it asks and
+  checks each answer: the timezone against the machine's own zone
+  database, the address written to **both** `config/site.yml` and
+  `env.sh` (env.sh's copy overrides the other, and the shipped example
+  points at `example.com`), the Mastodon token verified against the
+  instance -- which also hands back the numeric account id the sidebar
+  widget needs.
+
+- **`./style.sh` -- the appearance half, and seven palettes to pick
+  from.** The half you come back and fiddle with: palette, banner, about,
+  footer, social icons, sidebar widgets, fonts, analytics. Whole palettes
+  now ship in `config/palettes.yml` -- default blue, warm, monochrome and
+  high contrast, each in both light and dark, and sunflower, garden and
+  ocean from the TangerineUI Classic family the engine's own palette grew
+  out of -- so picking one is a keystroke -- and a candidate can be looked at before it is
+  kept: your own site rendered with the new colors, opened locally, or on
+  a deployed site uploaded to `/palette-preview.html` and answered with a
+  QR code, so a palette picked at an SSH prompt can be judged on a phone.
+  The banner section copies the image into place and measures it, so the
+  declared width and height stop going stale.
+
+  Both wizards open with the same identity banner `./blog.sh` prints, so
+  several installs in one shell never leave you guessing which one is
+  being reconfigured. Every question is skippable, nothing is written
+  until you have seen the diff with secrets masked and confirmed it once,
+  the config keeps every comment it had, and editing it by hand still
+  works.
+
+- **`./blog.sh doctor` -- everything wrong with a configuration, at once.**
+  Engine aborts name only the first problem; doctor reports the lot, each
+  with a fix line, and concentrates on what fails *silently*: an unknown
+  timezone (Ruby quietly falls back to UTC), a widget that can never show
+  anything, a scheduled queue that nothing is publishing -- the
+  scheduled-publish run leaves a heartbeat on every tick, including the
+  ones with nothing due, and doctor reads it: a queue waiting on a runner
+  nobody set up is a note, a post already late with nothing having run is
+  an error. `--online` also
+  checks that the feeds, the analytics script and the access token still
+  answer. It runs on configs too broken for anything else to load,
+  unparseable YAML included, and exits non-zero for errors only.
+
+- **The queue got its own screen.** `./blog.sh queue`, and a matching wizard
+  menu entry, lists every scheduled post in publish order and acts on the one
+  you pick: move it a slot earlier or later, publish it right now, give it a
+  different time, or return it to the drafts. Moving exchanges times with the
+  neighbouring post, so the set of occupied slots never changes -- a
+  hand-picked 14:17 stays a 14:17, it just gets a different post. When a post
+  leaves the queue, the screen offers -- never forces -- to let the rest step
+  one slot forward into the gap.
+
+- **The archive is something you can walk through, not just a list that scrolls
+  past.** `./blog.sh browse` shows the same posts as `list` as a screen you stay
+  in: arrow keys through the whole archive, filters by type, state and tag with
+  counts, and a search that filters as you type in the site's own query language
+  -- words ANDed, `"a quoted phrase"` as one, `-word` excluding, diacritics never
+  deciding a match. The selected row shows the line of full text that matched;
+  space previews the post read-only, Enter edits it and comes back to the same
+  row. `list` is unchanged, and `browse` falls back to it down a pipe.
+
+- **Six more platforms play in a post, from their address alone.** A
+  `!![caption](url)` line -- the gesture YouTube has always used -- now
+  recognises Vimeo, PeerTube and archive.org as video, and Spotify,
+  SoundCloud and Mixcloud as audio; the engine stores a provider and an
+  id, never the platform's own embed code, and each page asks its
+  Content-Security-Policy for exactly the players it carries, which is
+  what lets a PeerTube video work at all. Funkwhale and Bandcamp play by
+  asking once instead: their page address does not contain the player's,
+  so saving a post that embeds one asks the service where its player is
+  -- the only moment writing a post touches the network -- and stores the
+  answer, so editing never asks again and the build stays offline.
+
+- **A migrated blog can keep its old addresses.** Posts carry a
+  `redirect_from` list -- the paths they answered at before -- and the build
+  serves a redirect at each; importers that know their posts' original URLs
+  write it on request -- the wizard asks whether the site will answer on
+  the same domain, `migrate_feed.rb` and `migrate_tumblr.rb` take
+  `KEEP_PERMALINKS=1`, Movable Type/TypePad take `URL_PATTERN`, and a
+  markdown tree takes a `PERMALINK` pattern and `scripts/backfill_redirects.rb
+  <old-domain>` fills it in for archives imported earlier. Blogger-style
+  `.html` addresses become real files, no server configuration needed;
+  WordPress `?p=123` permalinks cannot be kept and are counted in the import
+  summary instead. `[a]` in `./blog.sh props <slug>` gives up an address.
+
+- **More of the look comes from the config: the header's type, and two
+  more social icons.** `fonts.banner_title` and `fonts.banner_claim` take
+  a CSS font stack, the matching `_size` keys any CSS length, and a site's
+  own web font is one `.woff2` in `assets/fonts/` plus an entry under
+  `fonts.faces` away -- the build writes the `@font-face` into the same
+  generated stylesheet the palette uses (see `./style.sh`). Say nothing and
+  nothing changes: JetBrains Mono at 45px/20px, exactly as before.
+  `icon: facebook` and `icon: x` join the built-in footer set in
+  `site.yml`; `icon_svg` remains the escape hatch for everything else.
+
+- **An interrupted post is offered back instead of just kept.** Text from an
+  aborted editor session still survives in `.last-edit.md`, but now the next
+  `add`/`edit` finds it, says when it was written, and offers `[r]` reopen,
+  `[d]` discard, `[c]` continue -- no blank-Enter default, and only back to the
+  command that wrote it, so an interrupted `edit <slug>` stays one post.
+- **A phone video says what it is.** Saving a post with a video reads the codec
+  from the file and warns once about HEVC or a `.mov` container, with the
+  `ffmpeg` command that fixes it -- without refusing the save.
+
+- **Post pages now carry the metadata crawlers and phone browsers look
+  for.** `article:published_time` and one `article:tag` per tag fill out
+  the previously bare `og:type=article`, a schema.org BlogPosting block
+  ships as JSON-LD -- the shape rich results actually read -- and every
+  page names a `theme-color` per colour scheme, taken from the palette's
+  own background, so browser chrome on a phone stops banding against the
+  site. Drafts get none of the article metadata; their pages stay
+  noindex. Theme-color touches the layout, so the first deploy after this
+  rewrites every page once.
+
+- **Builds and deploys take a lock, so two runs can no longer rewrite
+  `public.nosync` at the same time.** The scheduled publish runs every
+  quarter of an hour and the sidebar refresh every half, and on a large
+  archive a build plus a deploy takes longer than a tick -- so a deploy
+  could walk a tree being rewritten under it, or prune as an orphan a page
+  the other run had just published. A run that finds the lock held does not
+  queue: a cron tick says so and leaves without mailing, a run you started
+  reports it and exits non-zero. Where the filesystem cannot lock, nothing
+  changes.
+
+### Changed
+
+- **Configuration the engine writes keeps its comments, and a broken
+  `config/site.yml` now reads as a sentence.** Both wizards substitute
+  values into the documented template at the text level instead of loading
+  the YAML and dumping it back, so the ~200 lines of explanation, the
+  commented-out blocks you uncomment for a widget and the folded scalars
+  real sites keep HTML in all survive the write; every write is read back
+  and restored from its backup if it did not land as asked. The diff shown
+  before writing is a proper LCS diff -- line-for-line comparison made a
+  four-line addition read as "everything from here to the end of the file",
+  which is precisely the impression a tool asking permission to edit your
+  config must not give. A syntax error used to surface as a Psych exception
+  from whichever entry point read the file first; it now names the line and
+  column, the three usual causes (a tab where spaces belong, a missing
+  quote, a colon inside an unquoted value) and points at `doctor`.
+
+- **Every screen says which blog you are in, and the layout gives the width
+  to the text.** The wizard's identity block -- version, site name, address,
+  with the mode on its own line -- now tops `help`, `doctor` and every other
+  screen-bound command, because on a machine with more than one install
+  "which blog am I in" is the first thing they should answer; the wrapper's
+  bare `== blog.sh ==` banner is gone and piped output stays data-only, so
+  `./blog.sh list | wc -l` counts posts, not banner lines. The "what next?"
+  menu after a save reads in flow order -- `[d] keep as draft  [e] edit
+  [p] publish  [s] schedule  [x] delete` -- with the keys unchanged. In the
+  layout the sidebar track is fixed at 260px and the post column takes every
+  pixel the viewport gives or takes, about 40px more text at full width;
+  gutters are uniform and both page edges are the layout's own 1rem, which
+  on a phone turns the sidebar's lopsided 40/24 insets into 16 on both sides.
+
+### Fixes
+
+- **An export could hand over its posts and leave you without them.** Every
+  published Medium article was skipped for want of an id, one stray quote lost
+  a whole Wix CSV, all 77 posts of a Hugo tree died on one image inside a line
+  of text, an Instagram export requested in Czech imported a silent zero, a
+  Substack run under cron wrote nothing, and a feed whose CDATA sits on its own
+  line imported as twenty posts with no body. Forty WordPress portfolio and
+  recipe articles hid in the same `not a post` count as the menu items, a
+  number the docs called normal. Feeds name their own faults now, from a 404
+  to XML that is not a feed at all.
+- **A post that did arrive came without its pictures and its links.** A
+  WordPress featured image sits outside the body and went unread: half the
+  posts in a large export lost their only picture; a picture inside a
+  blockquote was dropped, and a quote holding nothing else went with it;
+  Bluesky carousels of up to twenty images fell through; Wix quotes and code
+  were thrown away; and WordPress's classic editor printed `[caption]`,
+  `[gallery]` and `[audio]` as text, 119 posts of a 969-post export. A classic
+  Blogger body has no paragraphs at all, so the reader made a block per
+  fragment -- one post split into 105 of them, 29 links in it down to 8 --
+  while LiveJournal entries failed the other way, every old one collapsed
+  into a single paragraph.
+- **A post nobody was meant to read went onto the open web.** WordPress gives a
+  password-protected post the status `publish`, so the body it holds back went
+  out in full -- 17 in their own large test export; it arrives as a draft now.
+  A Tumblr reblog was published as your own writing, WordPress drafts landed
+  under the year `-1`, Medium and Movable Type posts under the day of the
+  import, 221 post formats became tags, and a video podcast arrived as sound.
+
+- **One unescaped `&` in an export no longer costs the whole archive.**
+  WordPress prints raw query strings and Squarespace bare ampersands,
+  which a conforming parser refuses outright: one character in one item
+  of a thousand ended the run before anything was written. A failed parse
+  now gets one more attempt with those characters escaped, and says how
+  many there were. Post bodies are never touched, and a file that is not
+  UTF-8 is refused rather than quietly transcoded.
+
+- **A feed whose address the reader could not find had no identity, and
+  every re-import then wrote the whole archive again.** Re-import matches
+  posts by their source, and a source's identity starts with the host in
+  the channel's own address -- which came out empty when the `<link>` sat
+  on its own line, when the feed linked only to itself, for a bare domain,
+  for an internationalised one, for a channel declaring no address at all,
+  and for Buzzsprout and Simplecast, whose redundant namespace on an
+  `<atom:link>` hid every element after it. A fallback that took the first
+  address offered was worse than none: it gave a feed declaring Creative
+  Commons first the licence's identity, so unrelated archives shared one
+  and overwrote each other. A Wayback rescue reading many captures of one
+  feed duplicated every post many times over in a single pass; a podcast's
+  second run duplicated every episode and re-downloaded the audio to do
+  it, gigabytes of it. The whole feed family reads addresses correctly now.
+
+- **Media filenames depend only on the order a post references them.** A
+  failed download used to hand its number to the next image, so filenames
+  depended on which fetches succeeded -- and since the copy step never
+  overwrites an existing name, a re-import after the source recovered
+  could leave a post showing its second image where its first belongs.
+  The number stays spent now, and a file referenced twice keeps its first
+  filename instead of going missing. See *Upgrading*.
+- **A failed download says why, retries when that helps, and never leaves
+  half a file behind.** Any unsuccessful HTTP status used to pass silently
+  as missing media; 5xx and 429 are retried, a 404 reported once. Media is
+  renamed into place after copying, so Ctrl-C or a full disk cannot leave
+  a truncated photo. Diacritics in a filename, a relative redirect
+  `Location`, an inline `data:` image and an oversized archive no longer
+  fail either.
+
+- **A busy or throttling Archive no longer reads as a blog that was never
+  archived.** The Wayback Machine rate-limits exactly the traffic a rescue
+  makes, and refuses connections rather than answering with a status, so
+  every refusal was reported as a fact about the blog -- one run called 81
+  of 82 captures unreadable, every one a clean RSS file, and lost 36 of 37
+  pictures. Requests now wait a busy Archive out (four attempts, fifteen
+  seconds longer between each) for queries, captures and images alike, and
+  an unanswered query is kept apart from one that came back empty.
+
+- **A rescue says up front what it can and cannot recover.** The preview
+  counts truncated feed items -- by where an item's last link points, so a
+  "Permalink" footer is not a truncation -- and reports by year how many
+  images the Archive holds of that host; one rescue promised sixty-four and
+  delivered none. Capture dates read as the UTC they are, and a
+  commented-out `<div>` no longer unbalances the b2evolution reader.
+
+- **The import preview and the summary now tell the truth about what
+  arrived.** A preview downloads nothing, so its media number is what the
+  run will go after, not what it will come back with -- one real archive
+  promised 64 files of which the source had kept none. The preview is
+  worded that way now, and adds, where media are involved at all, that
+  only the real run can say how many actually arrive. In the summary, a
+  file missing from a post that was written is counted apart from one
+  missing from a post that was skipped entirely; the single line for both
+  had been claiming posts had been written that never were. A dateless
+  Substack row imports by its send time or is skipped under its own name
+  instead of vanishing. And every skip reason is translated again: eleven
+  of them -- `crosspost`, `retweet`, `no_content` and the rest -- printed
+  as their internal English names in the middle of a Czech or German
+  summary, worst on a Facebook export, where skipped crossposts are
+  usually the largest number in the run.
+
+- **An imported Wix table came back as a paragraph of pipes the first time
+  its post was saved.** The block was built without column alignment, so the
+  separator row came out `|  |`, which is no longer a table in markdown --
+  the parser refused it on the way back in and returned the lot as one
+  paragraph. Tables written with HTML5's optional end tags nested every cell
+  inside the previous one and emitted each row twice.
+- **A paid post imported looking exactly like a free one.** Substack's now
+  carry a `substack-paid` tag and a line in the summary, so you find them
+  before you publish them; beehiiv's premium editions arrive as drafts with
+  a tag of their own.
+- **A pair of imported redirects could stop the site building at all.** One
+  address being a directory of the other (`/x.html/sub/`, then `/x.html`)
+  crashed the build with EISDIR; the second stub skips out loud now, like
+  every other collision.
+- **A `<lj user>` mention pointed at somebody else's journal.**
+  `<lj user="james_nicoll">` linked to `jamesnicoll.livejournal.com`, which
+  exists and belongs to another person: LiveJournal spells an underscore in
+  a name as a hyphen, and the reader dropped it instead.
+- **A large export says what it will cost before it takes it.** A WXR is
+  held in memory whole -- 188 MB for WordPress's own 9.5 MB test export --
+  so past 20 MB the line above the run says so.
+
+- **Editing a post can no longer silently corrupt it.** `edit` turns stored
+  blocks into markdown and back, and on a real 4840-post archive that trip
+  quietly damaged 147 posts: overlapping bold and italic duplicated text,
+  a code block demonstrating fenced code closed at its own
+  example and lost everything after it, a code span gained a layer of
+  backslashes with every edit -- and one demonstrating image syntax aborted
+  the editor outright -- a URL with parentheses lost its tail into the
+  visible text, a `|` or a quote or a bracket broke
+  the line it sat in, a paragraph starting `>`, `#` or `1) ` changed type, a
+  comment stripper reached inside a ```js fence, and a video's poster image and
+  a Funkwhale player vanished. A post now round-trips with its text intact and
+  is byte-stable from the second write on.
+
+- **The editor holds on to what you typed.** The buffer is written atomically,
+  after a write that ran out of disk truncated it to nothing; a save writes the
+  post before pruning its media; a quotation with nothing above its attribution
+  no longer hangs the save; and a frontmatter date that will not parse is a
+  sentence naming the buffer, not a backtrace.
+
+- **Deleting one post threw away another post's only backup, and the trash
+  it went to could not be opened.** The trash was keyed by slug alone, but the
+  same slug in two years is two posts -- backdating makes that ordinary -- so
+  deleting the older one silently wiped the newer one's trashed copy and its
+  whole media directory. `./blog.sh restore` with no argument, and the wizard's
+  whole Trash entry, reported an empty trash over a full one, still looking for
+  the layout used before posts were filed by year: the engine's only undo,
+  effectively dead. It is keyed by year and slug now, `restore` offers both
+  posts and still finds a flat `trash/<slug>/` from an older install, and
+  restored media no longer land inside an older directory of the same name.
+- **A post that moves across a New Year keeps its old link, and its own
+  pictures.** The address carries the year, so editing a post's date moves it
+  from `/posts/2019/slug/` to `/posts/2020/slug/` -- and the redirect a rename
+  would have left behind was never recorded, so every link to it died. The same
+  went for a re-import that moved a published post across a New Year; a source
+  that starts reporting its dates in another timezone is enough. The media
+  directory moves whole now too: a directory already standing at the
+  destination made the move skip every file whose name was taken, and since
+  `01.jpg` is `01.jpg` in every post, the post then served another post's bytes
+  under its own filename.
+- **Publishing again after a re-import redirects the old address.** A
+  re-import publishes without going through publishing, so the note to
+  redirect the address the post had vacated sat unread in its own file and
+  the old address answered 404.
+
+- **A file you add to a post is measured and identified by what it is.** A
+  video whose header declares an HEVC image *sequence* was taken for an
+  HEIC photo, and the converter would have answered with a single frame
+  and called it the file -- detection now looks for the box that decides
+  it, and a movie box means a movie whatever the brand says. Dimensions
+  came from the frame header and ignored the EXIF orientation every
+  browser obeys, so a portrait phone photo reserved a landscape box and
+  the page jumped exactly where the reservation was meant to stop it.
+  And 99,999,999 bytes printed as "100 MB", so an allowed file and a
+  refused one read identically and the warning contradicted itself out
+  loud -- "(100 MB) -- under the 100 MB limit"; sizes now round down,
+  which also means a printed size is never larger than the file.
+
+- **Scheduling a post works again -- every route into it was dead.** A name
+  collision inside the scheduling dialog fed the "has this file changed
+  underneath you" guard the date you had just typed instead of the post file's
+  bytes, so the comparison could never match: the `schedule` command, `[s]` on
+  a draft, `[s]` in the properties dialog and the queue screen all aborted with
+  "changed on disk". The guard has its real evidence back, and `schedule` now
+  carries the same protection the other paths already had.
+- **A post the cron published while you were deciding can no longer be
+  overwritten by a dialog you left open.** The queue screen, the properties
+  dialog, `[s]` in the draft preview and the `schedule` command read a post
+  and then wait at a prompt, while the scheduled-publish cron runs every
+  fifteen minutes; writing that captured copy back reverted the post to a
+  draft, dropped its announcement URL and let the next tick announce it a
+  second time. The check now runs as the last instruction before each write.
+
+- **The queue acts on the post you picked, and a reorder is all or nothing.**
+  `[p]` and the draft dialog's actions looked the post up by name, so with the
+  same slug in two years they could publish, edit or delete the other one; a
+  reorder whose second write was refused left two posts on one slot, or one
+  published months early. Both halves are checked before either is written,
+  and a reorder that dies anyway says which posts moved. A draft that has lost
+  its `draft_token` is named and skipped, not built at a guessable address.
+
+- **An announcement could be left hanging in public with nothing pointing
+  at it, and nothing said so.** `unpublish` dropped the toot's address
+  whether or not the delete had worked, so an expired token left the
+  announcement standing there, and publishing again simply added a second
+  one alongside it. The cron failed the other way round: announcing answered
+  the same "nothing" whether there had been nothing to send or the send had
+  failed, so the post was published, the run exited 0, and nothing anywhere
+  recorded that an announcement was still owed. The
+  address is kept when the deletion fails, a failed send exits non-zero and
+  names the post, and `toot` and `bluesky` no longer read a missing address
+  as "nothing was sent" and send a second copy. In the text itself a link
+  keeps a bracket that belongs to it while a sentence's full stop stays
+  outside, the ellipsis of a shortened preview stays out of the address and
+  inside the limit, and a long title with a pile of tags -- which between
+  them fill Bluesky's 300 graphemes, and an over-long record is refused
+  whole -- is shortened rather than left to silence the announcement.
+  `delete` retracts its announcement now, the way `unpublish` always has.
+
+- **Enter means "leave it alone", the way the wizards document it.** Menus
+  opened on their first row instead of the current value -- on the language
+  menu, where Czech sorts first, that alone switched an English site to
+  Czech and rebuilt it in the other language -- and `./style.sh`'s banner
+  questions were `[y/N]`, so Enter turned both overlays off. The yes key now
+  comes from the language the wizard is speaking.
+
+- **Nothing is touched before you confirm, and one bad line no longer costs
+  the session.** `./style.sh` copied your new banner the moment you typed its
+  path, overwriting a per-install file that has no backup even when you then
+  declined the write; `env.sh` lost its 0600 on every save, its `*.bak` of the
+  previous live tokens is gitignored now, and the mask over the review diff
+  had never hidden a single token. A footer list written level with its key,
+  or two spaces after a period in a prose answer, used to fail the write and
+  roll back every answer of the run; a half-written palette in
+  `config/palettes.yml` is named and skipped instead of crashing; "Nowhere
+  yet" unsets the deploy backend instead of leaving `rebuild` shipping to the
+  old target; and a re-run stops rewriting hand-edited lines whose values did
+  not change.
+
+- **The wizards work on Ruby 2.7 and 3.0 again.** On Debian 11's system Ruby
+  -- inside the "Ruby 2.7 or newer" the engine promises -- `setup.sh` and
+  `style.sh` could not write a config at all, and blamed the file for it.
+
+- **The archive browser draws and reads the terminal properly now.** In raw
+  mode a newline is not turned into a carriage return plus a newline, so the
+  screen painted as a diagonal staircase, and a line break or a tab in a post
+  title walked the frame down with it. Rows are measured in display columns --
+  emoji and CJK count two -- so such a row no longer wraps and corrupts the
+  repaint, and raw mode is held for the screen's whole life rather than per
+  keystroke, so fast typing during a repaint no longer echoes stray characters
+  into the frame. Search rebuilds its index on return from a post, keys it by
+  year and slug so two posts sharing a slug stop answering with each other's
+  text, and explains the current query rather than the previous one.
+
+- **Page Up (and Home, End, Insert, Delete) left a stray key behind in every
+  menu in the CLI.** Only the first character after the escape bracket was
+  read, so the `~` that ends those sequences arrived a moment later as a
+  keypress of its own -- a `~` in a text box nobody typed. The whole sequence
+  is read now.
+
+- **An imported archive is text somebody else wrote, and several places
+  wrote it into the page unescaped.** A media file's name comes from
+  whoever wrote the archive: one carrying a quote and an angle bracket
+  closed the `src="..."` it sat in and opened a tag of its own, on your
+  own domain, where your own policy trusts it. A video address the engine
+  cannot play printed raw the same way, in the post and in the feed, and
+  a post carrying `]]>` -- an imported `embed_html` can -- ended the
+  feed's CDATA early and could hand a reader a headline and link of its
+  own choosing. All escaped now, a media name is reduced to its basename
+  so `../` cannot write outside the post's directory, the structured-data
+  block no longer renders a post blank, and an unterminated `<script>` in
+  a truncated capture no longer leaks code into a post.
+- **Each page's Content-Security-Policy is computed from what that page
+  actually carries**, so comment threads survive a change of network, a
+  pinned post's player works on the front page, and listing pages get no
+  permissions they never use.
+
+- **The menu no longer runs under the search box.** A site using every
+  content type has nine items in the bar, and nine did not fit in any of
+  the three shipped locales -- Czech overflowed the 908px available
+  outright, English and German had single-digit slack and collided anyway.
+  The bar now sizes itself: it may wrap to a second row, the search box
+  never shrinks or gets overlapped, and tighter gaps between items
+  recovered 80px without shortening a single label.
+- **Nothing empty is drawn any more.** An emptied social list left its
+  heading -- "Find me on", pointing at nothing -- on every page, and the
+  links and note columns had the same habit; each footer block now appears
+  only when it has something to show. A `banner.claim` that is only markup
+  left a lone middle dot in the CLI header. And a plain draft shows no date
+  in listings and pickers, the rule the properties dialog already follows:
+  a draft's time is set by publishing or scheduling, so the timestamp in
+  its file describes bookkeeping, not the post.
+
+- **The crons could not be trusted to say what happened.** The sidebar cron
+  reported every failure as success -- a monitored job saw clean runs for weeks
+  while the sidebar had not refreshed once -- and a busy skip it had handled
+  correctly as a failed job; a local deploy logged every file as failed while
+  copying it fine. Both crons died on every tick once an accented filename
+  reached the deploy, the one entry point that does not load the site config
+  and with it the rule that files are read as UTF-8. They check the Ruby
+  version now, like everything else does, and one unreadable post file no
+  longer stops the sidebar from ever refreshing again.
+
+- **The deploy guards hold, and a busy lock reads as a collision.** `--only`
+  stood them down on git pages, which force-pushes the whole build whatever it
+  is handed -- and `refresh-sidebar.sh` is such a run, every half hour: a build
+  that had lost its content replaced the live site, leaving a branch with no
+  posts. A publish the lock arrived in the middle of now leaves the marker that
+  makes the next run finish it, the "deploy failed" line no longer advises a
+  retry that cannot work, an unusable lock path says it is running unlocked,
+  and a redirect chain that never lands is reported.
+
+- **The commands that exist for a broken install now survive one.**
+  `clear` fails on ghostty, kitty, wezterm and `TERM=dumb`, and took
+  every entry point down with it before a word was printed. `help` and
+  `version` loaded the configuration they exist to explain, and the
+  banner above `help` raised a YAML error on it; both have their own
+  entry point now. `doctor` crashed on a `site.yml` a sudo-run wizard
+  left owned by root; that is finding number one now, with the
+  `chmod`/`chown` to run, and the rest of the checkup still happens.
+- **`doctor` and the engine now agree on what counts as configured.** A
+  revoked Bluesky app password read as healthy; `--online` opens a
+  session now and calls a refusal an error. A site that declined a deploy
+  target was told its Surfer backend was unconfigured -- a product it had
+  never heard of. The schedule check takes the `9:30` slots the engine
+  takes, stops calling empty titles "filled in", and a `colors:` section
+  written as a list falls back to the default palette, not a TypeError.
+
+- **`./blog.sh preview` no longer serves your archive to the local
+  network, and what it does serve now matches the deployed site.** It
+  bound every interface while printing "localhost" -- and what it exposed
+  was the built archive, which after an import is a personal history that
+  has never been public. Two smaller disagreements with the real site are
+  gone as well: a Range request got a 200 back, which Safari reads as
+  "this server cannot stream" and refuses to play the media element at
+  all, and which breaks seeking in a video or audio post everywhere else
+  (the answer is now 206, or 416 past the end of the file, and files are
+  streamed rather than read whole into memory); and audio, `.m4v` and all
+  nine attachment extensions went out as `application/octet-stream`, so
+  the browser downloaded what the deployed site plays or displays.
+
+- **A consistency pass over everything the interface says, in all three
+  languages.** Czech counts now read correctly for every number
+  ("Publikačních slotů: 4", not "4 publikačních slotů"), Czech quotes
+  close typographically („…“), the yes/no prompts read [a/N], and the
+  language settles on one word for building a site where it had three.
+  The wizard's menu entries lead with the thing rather than the verb
+  ("The archive -- filters, search, preview"), and the hints under them
+  stop offering what the menu ignores -- a slug typed at a menu that
+  takes no letters, or a fixed 1-9 range where the real rows differ.
+  Two documentation corrections: the markdown cheat sheet now names the
+  video extensions (`.mp4`, `.mov`, `.m4v`), as its audio and attachment
+  sections already did, and the README and guide stop promising Tumblr
+  drafts, the queue and private posts -- those sit behind endpoints that
+  want a full OAuth handshake, so the import gets the published posts.
+  `config/site.yml.example` also explains what the `rel: "me"` key on a
+  social link is for.
+
+### Upgrading
+
+- **Nothing to migrate.** `git pull`, rebuild, deploy. Verified against a
+  1.1 installation whose config was left exactly as it was: the same site
+  comes out, page for page, with no warnings -- every new config section
+  (`fonts`, palettes, the wizards) is optional, and `doctor` runs on a 1.1
+  config without complaining about their absence. Expect the first deploy
+  to be a long one: every page carries a `theme-color` now, so all of them
+  are rewritten once and the smart sync has the whole site to upload.
+- **The one caveat: media numbering, and only for posts whose downloads
+  failed under 1.1.** 1.1 gave a failed fetch's number to the next image;
+  1.2 leaves it spent, so filenames depend only on the order a post
+  references its media, never on which downloads happened to succeed. That
+  makes re-importing over a tree the 1.1 importer wrote the single upgrade
+  path that needs care: if a post reported failed media back then its
+  numbering shifts, and the copy step's "skip files that already exist" can
+  leave it showing the neighbouring image. Before re-importing those posts
+  -- the 1.1 run's summary named them -- delete their media directories, or
+  import into a fresh tree. Trees both written and re-imported by the same
+  engine version are unaffected either way.
+- **Menu positions moved, so stop piping numbers at them.** The wizard menu
+  grew to six entries with the queue screen, and its fourth entry is the
+  archive browser rather than the flat listing; the import wizard's source
+  menu is two levels now (blogs / social networks / dead sites). A scripted
+  `printf "N\n" | ./blog.sh` or `| ./import.sh` may therefore land somewhere
+  else than it did in 1.1. The CLI commands are the stable interface --
+  `./blog.sh queue`, `./blog.sh list` -- and the non-interactive import path
+  is unchanged: a piped run still gets one flat numbered list, and
+  `migrate_*.rb` scripts are unaffected.
+- **Builds and deploys take a lock now.** The publishing cron, the sidebar
+  cron and a person at the CLI can no longer walk into each other's
+  half-written `public.nosync`. A run that finds the lock held does not
+  queue: a cron tick says so and leaves (exit 0, no mail), a run you started
+  reports it and exits non-zero rather than let its caller think a deploy
+  happened. On a filesystem that cannot lock, everything behaves exactly as
+  it did before.
+- **Three more working files** sit next to the ones from 1.1:
+  `.last-edit.meta` (which command wrote the editor buffer),
+  `.blog-sh.lock`, and `.last-scheduled-run`, the heartbeat that lets
+  `doctor` tell a waiting queue from one nothing is serving. All three
+  are gitignored and none needs backing up.
+  `*.bak` is gitignored now as well -- the wizards keep a backup of the file
+  they rewrite, and for `env.sh` that copy holds your previous tokens.
+- **Going back to 1.1 builds, but do not write under it.** The 1.1 engine
+  reads everything 1.2 has written without choking -- no build fails, no post
+  is dropped, `former_slugs` redirects come out byte for byte -- it simply
+  cannot render what it never knew about. Audio posts lose the recording's
+  address and not just its player, coming out as a bare "[audio unavailable]"
+  with nothing to click; comment threads go quiet on posts announced anywhere
+  but the network your config names now; and re-saving a 1.2-written post
+  under 1.1 can lose text, because it does not escape a `|` in a table cell,
+  a `"` in a link title or a `*` inside inline code. Rebuilding is safe, so
+  treat the archive as read-only until you come forward again -- nothing has
+  to be undone first, and coming forward re-renders all of it correctly.
+
 ## 1.1 -- 2026-08-05
 
 Six things a site can now do that it couldn't, and one class of defect

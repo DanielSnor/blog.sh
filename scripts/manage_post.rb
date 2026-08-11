@@ -21,9 +21,13 @@ require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/heic_converter'
+require_relative '../lib/video_probe'
+require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
+require_relative '../lib/post_text'
+require_relative '../lib/search_query'
 require_relative '../lib/publishing'
 require_relative '../lib/publish_slots'
 require_relative '../lib/tui'
@@ -267,6 +271,80 @@ def check_attachment_sizes(media_files)
   puts t('cli.media_large', files: describe.call(soft), limit: limit.call(FileSize::HARD_LIMIT)) if soft.any?
 end
 
+# Two things about a video decide whether a reader sees it, and neither is
+# visible to the person attaching it: the codec inside, and the container
+# around it. A phone records HEVC in a QuickTime .mov by default, so this
+# is the ordinary case, not an exotic one.
+#
+# Said out loud, never refused. HEVC is not HEIC: a HEIC photo displays in
+# Safari and nowhere else, while HEVC plays in the large majority of
+# browsers -- refusing it would take away a video most readers could
+# watch. The size limit already stops the genuinely undeployable files,
+# and on real phone footage the two overlap almost completely (the one
+# HEVC clip in the sample this was measured on was also the only one over
+# 100 MB). What was missing was a sentence while the author can still act.
+#
+# One message per file, not two: an HEVC .mov is both, and the transcode
+# below lands in .mp4 anyway, so saying "repack it" next to "re-encode it"
+# would only offer a command that keeps the codec.
+def check_video_playback(media_files)
+  hevc = []
+  quicktime = []
+  media_files.each_key do |src|
+    next unless src && File.exist?(src) && MarkdownParser.video_path?(src)
+
+    if VideoProbe.hevc?(src)
+      hevc << File.basename(src)
+    elsif File.extname(src).downcase == '.mov'
+      quicktime << File.basename(src)
+    end
+  end
+  hevc.uniq!
+  quicktime.uniq!
+
+  # The command names a real file, the way the HEIC refusal does -- a
+  # placeholder is one more thing to get wrong at the moment someone is
+  # already annoyed. ffmpeg is not on a Mac by default (unlike sips), so
+  # the message says where to get it.
+  puts t('cli.video_hevc', files: hevc.join(', '), command: transcode_command(hevc.first)) if hevc.any?
+  puts t('cli.video_quicktime', files: quicktime.join(', '), command: remux_command(quicktime.first)) if quicktime.any?
+end
+
+# The one thing writing a post does over the network, and it is asked once
+# per embed: Funkwhale and Bandcamp are the two platforms whose player
+# address their page address does not contain (see lib/embed_lookup.rb).
+# The answer is stored in the post, so an edit never asks again and the
+# build stays offline.
+#
+# A failure is a sentence, not an abort. Writing a post on a train has to
+# end with a saved post: what is missing is a player, and the block still
+# carries the address, so the page links it and re-saving retries.
+def resolve_embed_lookups(blocks)
+  pending = blocks.select { |block| Embed.needs_lookup?(block) }
+  return if pending.empty?
+
+  pending.each do |block|
+    # Said before the call, not after: it can take seconds against a slow
+    # instance, and silence would be indistinguishable from a hang.
+    puts t('cli.embed_lookup_working', url: block['url'])
+    next if EmbedLookup.resolve(block)
+
+    puts t('cli.embed_lookup_failed', url: block['url'])
+  end
+end
+
+def transcode_command(name)
+  "ffmpeg -i #{name.to_s.shellescape} -c:v libx264 -crf 23 -c:a copy #{mp4_name(name).shellescape}"
+end
+
+def remux_command(name)
+  "ffmpeg -i #{name.to_s.shellescape} -c copy #{mp4_name(name).shellescape}"
+end
+
+def mp4_name(name)
+  "#{File.basename(name.to_s, File.extname(name.to_s))}.mp4"
+end
+
 # --- editor round-trip -------------------------------------------------
 
 # Where the text from the last editor session waits until the post it
@@ -277,17 +355,133 @@ end
 # that and aborts. Without this copy those aborts threw the article away.
 EDITOR_BUFFER_PATH = File.join(ROOT, '.last-edit.md')
 
-def keep_editor_buffer(text)
-  File.write(EDITOR_BUFFER_PATH, text)
+# What the buffer was written by, next to the buffer itself rather than
+# inside it. A marker line in the .md would travel with the text into the
+# post if someone recovered the file by hand, and this file has to survive
+# being read by a human with an editor.
+#
+# It is what makes recovery safe rather than merely possible: text from an
+# interrupted `edit <slug>` restored into an `add` would silently create a
+# SECOND post instead of continuing the first, and nothing afterwards could
+# tell the two apart.
+EDITOR_BUFFER_META_PATH = File.join(ROOT, '.last-edit.meta')
+
+def keep_editor_buffer(text, origin = nil)
+  # Atomic, like every post write: this file is the only copy of what was
+  # just typed, and a plain write that runs out of disk truncates the
+  # PREVIOUS buffer to nothing -- while the notice below still says the
+  # text is safe.
+  AtomicWrite.write(EDITOR_BUFFER_PATH, text)
   File.chmod(0o600, EDITOR_BUFFER_PATH)
+  return unless origin
+
+  AtomicWrite.write(EDITOR_BUFFER_META_PATH, JSON.generate(origin.merge('saved_at' => Time.now.iso8601)))
+  File.chmod(0o600, EDITOR_BUFFER_META_PATH)
 rescue SystemCallError
   nil # a buffer we can't write is not a reason to refuse the save
 end
 
 def discard_editor_buffer
-  File.delete(EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
+  [EDITOR_BUFFER_PATH, EDITOR_BUFFER_META_PATH].each { |path| File.delete(path) if File.exist?(path) }
 rescue SystemCallError
   nil
+end
+
+def editor_buffer_origin
+  return nil unless File.exist?(EDITOR_BUFFER_META_PATH)
+
+  JSON.parse(File.read(EDITOR_BUFFER_META_PATH, encoding: 'utf-8'))
+rescue StandardError
+  nil # an unreadable marker means "unknown origin", not a broken CLI
+end
+
+# Asked at the start of `add`/`edit`, before this session's editor can
+# overwrite the buffer. Returns the text to open the editor with, or nil
+# for "start from the usual template".
+#
+# The buffer has been written since the very first version of this file --
+# what was missing was anyone ever offering it back. The engine said "your
+# text is in .last-edit.md", and the author then had to copy it out by
+# hand before the next add/edit overwrote it. Real use found that friction
+# the hard way: a save aborted on a missing attachment, and a whole post
+# had to be reassembled from a file the CLI was about to overwrite.
+#
+# No blank-Enter default anywhere here: every branch is an explicit key, so
+# a stray return can neither restore old text into a new post nor throw
+# away the only copy of something.
+def offer_editor_buffer(kind, slug = nil)
+  text = read_editor_buffer
+  return nil unless text
+
+  origin = editor_buffer_origin
+  matches = origin && origin['kind'] == kind && origin['slug'].to_s == slug.to_s
+
+  puts
+  puts describe_editor_buffer(text, origin)
+  # A buffer from a different operation is NOT offered for restoring: this
+  # is the whole reason the marker file exists. Naming the command that
+  # would restore it turns a refusal into directions.
+  puts t('cli.buffer_belongs_elsewhere', command: buffer_command(origin)) unless matches
+
+  loop do
+    key = Tui.key_choice(t(matches ? 'cli.buffer_prompt' : 'cli.buffer_prompt_foreign'))
+    case key
+    when 'r'
+      next puts(t('cli.buffer_belongs_elsewhere', command: buffer_command(origin))) unless matches
+
+      puts t('cli.buffer_restored')
+      return text
+    when 'd'
+      discard_editor_buffer
+      puts t('cli.buffer_discarded')
+      return nil
+    when 'c'
+      puts t('cli.buffer_kept_for_now', path: EDITOR_BUFFER_PATH)
+      return nil
+    else
+      # A piped run has nothing more to say: continue rather than loop on
+      # an empty stdin forever, and say what that means for the buffer.
+      unless Tui.interactive?
+        puts t('cli.buffer_kept_for_now', path: EDITOR_BUFFER_PATH)
+        return nil
+      end
+    end
+  end
+end
+
+def read_editor_buffer
+  return nil unless File.exist?(EDITOR_BUFFER_PATH)
+
+  text = File.read(EDITOR_BUFFER_PATH, encoding: 'utf-8')
+  text.strip.empty? ? nil : text
+rescue SystemCallError
+  nil
+end
+
+# The first line that isn't frontmatter, so the author recognises the text
+# without having to open the file -- a buffer is identified by what it says,
+# not by its size.
+def describe_editor_buffer(text, origin)
+  lines = text.lines.map(&:chomp)
+  preview = lines.find { |line| !line.strip.empty? && line.strip != '---' && !line.match?(/\A\w+:/) }
+  when_saved = begin
+    Time.parse(origin['saved_at']).getlocal.strftime(t('date_time_format'))
+  rescue StandardError
+    nil
+  end
+  t('cli.buffer_found',
+    what: buffer_command(origin),
+    when: when_saved ? t('cli.buffer_found_when', time: when_saved) : '',
+    lines: lines.size,
+    preview: preview.to_s.strip[0, 60])
+end
+
+def buffer_command(origin)
+  case origin && origin['kind']
+  when 'add' then './blog.sh add'
+  when 'edit' then "./blog.sh edit #{origin['slug']}"
+  else t('cli.buffer_unknown_origin')
+  end
 end
 
 # Says where the text is if the process ends with the buffer still there.
@@ -299,14 +493,22 @@ def arm_editor_buffer_notice
 
   @editor_buffer_notice_armed = true
   at_exit do
-    warn t('cli.editor_buffer_kept', path: EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
+    # Existing is not enough -- an empty file is not a rescued post, and
+    # promising one that isn't there is worse than saying nothing.
+    warn t('cli.editor_buffer_kept', path: EDITOR_BUFFER_PATH) if File.size?(EDITOR_BUFFER_PATH)
   end
 end
 
-def edit_in_editor(initial_content, hint_comment)
+def edit_in_editor(initial_content, hint_comment, origin = nil)
   text = editor_round_trip(initial_content, hint_comment)
-  keep_editor_buffer(text)
-  arm_editor_buffer_notice
+  # An editor closed on an untouched template has nothing worth keeping --
+  # and writing it anyway would overwrite a buffer the author had just been
+  # told was still there. Opening `add` to look at something, changing your
+  # mind and quitting must not be how an interrupted post gets lost.
+  if text != initial_content
+    keep_editor_buffer(text, origin)
+    arm_editor_buffer_notice
+  end
   text
 end
 
@@ -324,10 +526,53 @@ def editor_round_trip(initial_content, hint_comment)
       abort("$EDITOR (#{editor}) failed -- set the EDITOR environment variable " \
             'to an editor that exists here (e.g. export EDITOR=vim) and rerun.')
     end
-    edited = File.read(path, encoding: 'utf-8')
-    edited = edited.gsub(/^<!--.*?-->\n/m, '')
-    edited.gsub(%r{^//.*\n?}, '')
+    strip_editor_notes(File.read(path, encoding: 'utf-8'))
   end
+end
+
+# Removes the guide block and the author's own `//` notes -- OUTSIDE fenced
+# code only.
+#
+# This used to be two gsubs over the whole file. `//` opens a comment in
+# half the languages anyone would paste into a ```js fence, so saving a post
+# deleted those lines from the code sample; the content-loss guard counts
+# block TYPES, so a code block that merely lost lines looked untouched. The
+# `<!--` one was worse: written `/m` and non-greedy, it ate everything up to
+# the next `-->` anywhere in the post, prose and fence boundaries included.
+# Editing such a post -- changing only its title -- was enough to lose them.
+#
+# Line-based rather than regex-based on purpose: every line that is not a
+# note is passed through byte for byte, so nothing else can be reshaped by
+# accident.
+def strip_editor_notes(text)
+  kept = []
+  in_fence = false
+  in_comment = false
+
+  text.each_line do |line|
+    if line.lstrip.start_with?('```')
+      in_fence = !in_fence
+      kept << line
+      next
+    end
+    if in_fence
+      kept << line
+      next
+    end
+    if in_comment
+      in_comment = false if line.include?('-->')
+      next
+    end
+    if line.start_with?('<!--')
+      in_comment = true unless line.include?('-->')
+      next
+    end
+    next if line.start_with?('//')
+
+    kept << line
+  end
+
+  kept.join
 end
 
 # Full syntax reference. The in-editor hint just links to it, so the hint
@@ -398,16 +643,27 @@ def cmd_add
   # post-editor, seconds-precise date could never come out equal -- for a
   # long time every draft published as if hand-dated because of that.)
   suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
-  template = build_frontmatter(title: '', tags: '', type: '') +
-             "First paragraph's text.\n"
-  raw = edit_in_editor(template, FRONTMATTER_HINT)
+  # Offered before the template is built, because restoring means opening
+  # the editor on the recovered text INSTEAD of the template.
+  restored = offer_editor_buffer('add')
+  template = restored || build_frontmatter(title: '', tags: '', type: '') + "First paragraph's text.\n"
+  raw = edit_in_editor(template, FRONTMATTER_HINT, { 'kind' => 'add' })
 
   # Editor closed without saving (or saved untouched) leaves the template
   # byte-identical -- treat that as "nothing happened": no post, no toot,
   # no rebuild question. (This is how an accidental empty-template post once
   # made it all the way to a published Mastodon toot.)
+  #
+  # After a restore the comparison is against the RESTORED text, which is
+  # the honest no-op test for that case: someone who recovers a draft and
+  # closes the editor untouched has changed nothing this session either.
   if raw == template
-    discard_editor_buffer
+    # Nothing is discarded here. An untouched editor wrote no buffer (see
+    # edit_in_editor), so the only thing that could be deleted is text from
+    # an EARLIER session -- recovered a moment ago, or left alone with [c].
+    # Throwing that away would turn the action meant to protect it into the
+    # one that loses it.
+    warn t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
     warn t('cli.template_unchanged')
     warn ''
     return
@@ -424,7 +680,7 @@ def cmd_add
     return
   end
 
-  date = meta['date'].to_s.empty? ? Time.now : Time.parse(meta['date'])
+  date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'])
   title = meta['title'].to_s.empty? ? nil : meta['title']
   tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
   type = meta['type'].to_s.empty? ? nil : meta['type']
@@ -433,10 +689,23 @@ def cmd_add
   wait_for_missing_images(missing)
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
+  check_video_playback(media_files)
+  resolve_embed_lookups(blocks)
   fill_image_dimensions(blocks, media_files)
 
   slug_source = title || (blocks.find { |b| b['type'] == 'text' } || {})['text']
   slug = Slug.slugify(slug_source.to_s.split(/\s+/).first(8).join(' '))
+  # Eight words is a readability cap, not a length one: a post whose first
+  # words are a long URL slugifies into a single enormous token, and the
+  # write then died with a raw ENAMETOOLONG backtrace -- after the media
+  # directory had been created, leaving it orphaned. rename_post has
+  # capped by bytes all along; this is the same limit, cut on a word
+  # boundary where there is one.
+  if slug.bytesize > 200
+    slug = slug[0, 200]
+    slug = slug.sub(/-[^-]*\z/, '') if slug.rindex('-')&.>(120)
+    slug = slug.sub(/-+\z/, '')
+  end
   slug = "post-#{date.to_i}" if slug.empty?
 
   # An existing <year>/<slug>.json would be replaced wholesale by
@@ -490,13 +759,14 @@ def cmd_add
     return
   end
 
-  draft_decision_loop(final_slug)
+  draft_decision_loop(final_slug, path: path)
 end
 
 # After every draft change, it builds and deploys without asking -- the
 # preview has to be on the live site, or it couldn't be opened from an iPad,
 # which is the whole point.
-def draft_decision_loop(slug)
+def draft_decision_loop(slug, path: nil)
+  known_path = path
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_preview')
     warn ''
@@ -504,10 +774,23 @@ def draft_decision_loop(slug)
   end
 
   loop do
-    path = find_post_path(slug)
+    # The caller's own path when it still exists: `add` and `unpublish`
+    # have the file in hand, and a second post sharing the slug in another
+    # year would otherwise drop the author into the ambiguous-slug picker
+    # -- over a post they did not choose and have not seen yet, which for
+    # `add` ended the command with exit 1 instead of the draft dialog.
+    path = known_path && File.exist?(known_path) ? known_path : find_post_path(slug)
     return unless path
 
-    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    # The bytes are kept, not just the parsed post: this dialog then waits
+    # on a keypress, and the scheduled-publish cron runs every 15 minutes.
+    # [s] below hands them to prompt_and_schedule so write_scheduled_date
+    # can refuse to write a capture the cron has already overtaken --
+    # without them it would revert a published post to a draft and drop
+    # the announcement URL. Every other scheduling path passes this; this
+    # was the one that did not.
+    raw = File.read(path, encoding: 'utf-8')
+    post = JSON.parse(raw)
     return unless draft?(post)
 
     # No extra `puts` before "Preview:" -- rebuild_and_deploy (called right
@@ -523,18 +806,22 @@ def draft_decision_loop(slug)
     slot = next_publish_slot(slug)
     prompt = slot ? t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format'))) : t('cli.what_next_prompt')
     case Tui.key_choice(prompt)
-    when 'p' then return publish_draft(slug)
-    when 'e' then edit_post(slug)
+    # Every action gets the path the dialog is SHOWING. Re-resolving by
+    # slug here meant the screen could describe one post while the
+    # keystroke acted on another -- two drafts sharing a slug in different
+    # years is ordinary, and the dialog is where the author decides.
+    when 'p' then return publish_draft(slug, path: path)
+    when 'e' then edit_post(slug, path: path)
     when 's'
       puts
-      return if prompt_and_schedule(path, post)
+      return if prompt_and_schedule(path, post, raw: raw)
     when 'd', ''
       puts
       puts t('cli.left_as_draft', slug: slug)
       puts
       return
     when 'x'
-      next unless delete_post(slug)
+      next unless delete_post(slug, path: path)
 
       rebuild_and_deploy(t('cli.updating_preview'))
       return
@@ -614,7 +901,7 @@ def queue_position(time, entries)
   { count: earlier.size + 1, slug: earlier.last[1], date: earlier.last[0] }
 end
 
-def prompt_and_schedule(path, post)
+def prompt_and_schedule(path, post, rebuild: true, raw: nil)
   # Read once when slots are configured (the offer needs it); a site
   # without slots pays nothing here and reads the archive only after it
   # has actually scheduled something, for the queue line.
@@ -643,13 +930,19 @@ def prompt_and_schedule(path, post)
   else
     print t('cli.schedule_date_prompt')
   end
-  raw = $stdin.gets
+  # NOT `raw = ...`: this method's raw: keyword is the file's bytes as
+  # they looked before the dialog opened -- the staleness guard's whole
+  # evidence. Reusing the name here once overwrote that capture with the
+  # typed date line, and the guard then compared the post file against
+  # the answer "2026-12-24 08:00", failed by construction, and every
+  # scheduling path in the CLI aborted with "changed on disk".
+  answer = $stdin.gets
   # EOF is not Enter. With an offer on screen an empty line accepts, and
   # Ctrl-D (or a piped run whose input ran out) would otherwise schedule,
   # rebuild and deploy a post nobody confirmed.
-  return false if raw.nil?
+  return false if answer.nil?
 
-  input = raw.strip
+  input = answer.strip
   return false if input.empty? && slot.nil?
   return false if input.downcase == t('cli.cancel_word')
 
@@ -671,26 +964,8 @@ def prompt_and_schedule(path, post)
     return false
   end
 
-  updated = post.merge('date' => date.iso8601, 'scheduled' => true)
-
-  # A date in another year moves the post, JSON and media together. Left
-  # in the old year's folder the two disagree: the build derives both the
-  # URL and the media lookup from the date, so the draft preview loses
-  # every image -- and publishing it later hits the same missing media
-  # year that used to abort the cron.
-  new_year = date.year.to_s
-  new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
-  if File.expand_path(new_path) != File.expand_path(path)
-    abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
-
-    FileUtils.mkdir_p(File.dirname(new_path))
-    Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
-    AtomicWrite.write_json(new_path, updated)
-    File.delete(path)
-  else
-    AtomicWrite.write_json(new_path, updated)
-  end
-  rebuild_and_deploy(t('cli.updating_preview'))
+  write_scheduled_date(path, post, date, raw: raw)
+  rebuild_and_deploy(t('cli.updating_preview')) if rebuild
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   position = queue_position(date, entries || scheduled_entries(except_slug: post['slug']))
   if position
@@ -714,8 +989,13 @@ def announce_on_publish(post, year, date)
   announce_post(post, year: year, date: date, force: force)
 end
 
-def publish_draft(slug)
-  path = find_post_path(slug)
+# `path:` names the exact post when the caller already has it. The queue
+# holds one row per scheduled post, and two of them can share a slug in
+# different years -- looking the post up by slug again would publish, and
+# ANNOUNCE, whichever the lookup preferred rather than the row the author
+# picked.
+def publish_draft(slug, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
@@ -798,7 +1078,7 @@ def pick_among_years(slug, paths)
   puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint'))
+    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
@@ -888,6 +1168,19 @@ def cmd_bluesky(slug)
 
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
+
+  # Before sending: is one already out there? This command runs precisely
+  # when the post carries no announcement address -- which means either
+  # none was ever sent, or one was sent and the reply never came back. The
+  # second case used to end with two announcements of the same post.
+  if (found = BlueskyPoster.find_announcement(Publishing.post_url(post['slug'], year)))
+    updated = post.merge('bluesky_url' => found[:url], 'bluesky_uri' => found[:uri])
+    AtomicWrite.write_json(path, updated)
+    puts t('cli.bluesky_recovered', url: found[:url])
+    puts
+    return
+  end
+
   fields = announce_on_publish(post, year, date)
   unless fields
     warn t('cli.bluesky_failed')
@@ -915,7 +1208,7 @@ def cmd_publish(slug)
     return
   end
 
-  draft_decision_loop(slug)
+  draft_decision_loop(slug, path: path)
 end
 
 # Marks a draft for automatic publishing by cron
@@ -928,7 +1221,8 @@ def cmd_schedule(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
-  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(raw)
   unless draft?(post)
     puts t('cli.schedule_only_drafts', slug: slug)
     puts
@@ -936,22 +1230,280 @@ def cmd_schedule(slug)
   end
 
   if post['scheduled']
-    unschedule_post(path, post, slug)
+    unschedule_post(path, post, slug, raw: raw)
     return
   end
 
-  prompt_and_schedule(path, post)
+  # The bytes from before the prompt ride along, so the cron publishing
+  # this exact post mid-dialog is caught -- the same guard every other
+  # path into scheduling already carries.
+  prompt_and_schedule(path, post, raw: raw)
 end
 
 # Shared by the CLI toggle above and the [n] action in the properties
 # dialog -- the wizard lost the standalone `schedule` menu item, so
 # without this the dialog could plan a post but never change its mind.
-def unschedule_post(path, post, slug)
+# `raw:` for the same reason write_scheduled_date takes it: this writes a
+# captured post back after a prompt, and the cron may have published it in
+# the meantime.
+def unschedule_post(path, post, slug, raw: nil)
+  abort_if_post_changed(path, raw, slug) if raw
   updated = post.dup
   updated.delete('scheduled')
   AtomicWrite.write_json(path, updated)
   puts t('cli.unscheduled_label', slug: slug)
   puts
+end
+
+# Writes `date` into a draft as its scheduled publish time. A date in
+# another year moves the post, JSON and media together. Left in the old
+# year's folder the two disagree: the build derives both the URL and the
+# media lookup from the date, so the draft preview loses every image --
+# and publishing it later hits the same missing media year that used to
+# abort the cron. Shared by prompt_and_schedule and the queue screen,
+# which rewrites times too. Returns the (possibly moved) path.
+#
+# `raw:` is the bytes the caller read before it started asking questions.
+# Every caller here writes a captured copy of the post back, and the
+# scheduled-publish cron runs every 15 minutes -- so between that read and
+# this write the post may already be published, announced and live. Writing
+# the capture then reverts it to a draft, drops the announcement URL (so
+# `unpublish` could never delete the toot), lets the next deploy --prune
+# take the live page down, and lets the next cron tick publish and announce
+# it a second time. The check therefore belongs HERE, at the last
+# instruction before the write, not at the top of a dialog that then waits
+# for a keypress.
+def write_scheduled_date(path, post, date, raw: nil, slug: nil)
+  abort_if_post_changed(path, raw, slug || post['slug']) if raw
+  updated = post.merge('date' => date.iso8601, 'scheduled' => true)
+  new_year = date.year.to_s
+  new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
+  if File.expand_path(new_path) != File.expand_path(path)
+    abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
+
+    FileUtils.mkdir_p(File.dirname(new_path))
+    Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
+    AtomicWrite.write_json(new_path, updated)
+    File.delete(path)
+  else
+    AtomicWrite.write_json(new_path, updated)
+  end
+  new_path
+end
+
+# --- the queue screen -------------------------------------------------
+
+# Every scheduled draft in publish order, with everything an action needs
+# in hand. Re-collected before every redraw on purpose: the scheduled-
+# publish cron runs every 15 minutes, and a post it published mid-session
+# must drop out of the list rather than get swapped around as a stale
+# copy.
+def queue_entries
+  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    raw = File.read(file, encoding: 'utf-8') rescue next
+    post = JSON.parse(raw) rescue next
+    next unless post.is_a?(Hash) && post['scheduled']
+
+    time = Time.parse(post['date']) rescue next
+    # The bytes travel with the entry, not just the parsed hash: every
+    # write below happens after a prompt that can sit open for minutes,
+    # and this is what the staleness guard compares against at the last
+    # possible moment (see write_scheduled_date).
+    { time: time, slug: post['slug'], path: file, post: post, raw: raw }
+  end.sort_by { |entry| entry[:time] }
+end
+
+def queue_row(entry, index)
+  time = entry[:time].getlocal.strftime(t('date_time_format'))
+  overdue = entry[:time] <= Time.now ? "  #{t('cli.queue_overdue')}" : ''
+  format('%2d.  %s  %s%s', index + 1, time, entry[:slug], overdue)
+end
+
+# Row selection, in both faces the pickers already have: the arrow-key
+# menu in a terminal, a numbered list plus a read line when piped -- so
+# the queue stays scriptable the same way everything else is.
+def queue_pick(entries)
+  rows = entries.each_with_index.map { |entry, i| queue_row(entry, i) }
+  return Tui.menu(rows, hint: t('cli.queue_menu_hint')) if Tui.interactive?
+
+  rows.each { |row| puts "  #{row}" }
+  puts
+  print t('cli.queue_pick_prompt')
+  line = $stdin.gets&.strip.to_s
+  puts
+  index = line.to_i - 1
+  line =~ /\A\d+\z/ && (0...entries.size).cover?(index) ? index : nil
+end
+
+# The whole queue as one screen: pick a post, act on it, come back to
+# the list. Everything here changes only content JSON; the preview
+# rebuild happens once, on the way out, not after every move -- with a
+# multi-post reshuffle the intermediate states aren't worth a deploy
+# each.
+def cmd_queue
+  dirty = false
+  loop do
+    entries = queue_entries
+    if entries.empty?
+      puts t('cli.queue_empty')
+      puts
+      break
+    end
+
+    puts Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold)
+    puts
+    index = queue_pick(entries)
+    if index.nil?
+      puts
+      break
+    end
+
+    puts
+    dirty = true if queue_act(entries, index)
+  end
+
+  rebuild_and_deploy(t('cli.updating_preview')) if dirty
+end
+
+# Returns true when something changed that the closing rebuild must pick
+# up. "Publish now" rebuilds inside publish_draft as always; only the
+# compaction it may be followed by still needs the closing one.
+def queue_act(entries, index)
+  entry = entries[index]
+  case Tui.key_choice(t('cli.queue_actions', slug: entry[:slug]))
+  when 'u' then queue_swap(entries, index, index - 1)
+  when 'd' then queue_swap(entries, index, index + 1)
+  when 'p'
+    freed = entry[:time]
+    publish_draft(entry[:slug], path: entry[:path])
+    queue_offer_compact(freed, entries[(index + 1)..])
+  when 's'
+    puts
+    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw])
+  when 'n'
+    unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
+    queue_offer_compact(entry[:time], entries[(index + 1)..])
+  when '' then false
+  else
+    puts t('cli.queue_unknown')
+    puts
+    false
+  end
+end
+
+# Runs a queue's writes in order and, when one dies partway, names what
+# did and did not move before the failure travels on. The pre-flights in
+# queue_swap and queue_offer_compact catch what they can SEE -- a stale
+# file, a taken path -- but a full disk, a permission error or a Ctrl-C
+# BETWEEN the writes is invisible to them, and the half-moved queue it
+# leaves behind was only ever discovered by the cron publishing the
+# wrong post. Nothing is rolled back: the disk that just refused one
+# write is not owed a second chance with another, and a wrong guess
+# here doubles the damage. rescue Exception, not StandardError, because
+# the deaths this must outlive long enough to speak are exactly the
+# other kinds: abort is SystemExit, Ctrl-C is Interrupt. Plain English
+# rather than t() on purpose -- a report that only exists mid-crash
+# must not itself be able to abort on a missing locale key -- and the
+# times are the ISO form the JSON carries, since repairing that file by
+# hand is what the report is for.
+def apply_queue_moves(moves)
+  done = 0
+  moves.each do |entry, target|
+    yield entry, target
+    done += 1
+  end
+rescue Exception
+  if done.positive?
+    warn ''
+    warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
+    moves.each_with_index do |(entry, target), i|
+      warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+    end
+    warn ''
+  end
+  raise
+end
+
+# Moving a post earlier or later means exchanging times with its
+# neighbour: the set of occupied slots never changes, only which post
+# sits in which -- so a hand-picked 14:17 stays a 14:17, it just gets a
+# different post. A neighbour whose time already passed is off limits:
+# giving another post that time would schedule it into the past, and the
+# cron owns it now anyway.
+def queue_swap(entries, index, other_index)
+  unless (0...entries.size).cover?(other_index)
+    puts t(other_index.negative? ? 'cli.queue_already_first' : 'cli.queue_already_last')
+    puts
+    return false
+  end
+
+  entry, other = entries[index], entries[other_index]
+  if entry[:time] <= Time.now || other[:time] <= Time.now
+    puts t('cli.queue_swap_overdue')
+    puts
+    return false
+  end
+
+  # Both halves are checked BEFORE either is written. write_scheduled_date
+  # aborts the process on a stale file or a target path that is taken, and
+  # a swap is two independent writes -- so an abort on the second left the
+  # first applied: the moved post sat on a slot the un-moved post still
+  # held, and the cron published both. In the [u] direction the surviving
+  # half moved the picked post EARLIER, publishing it months before the
+  # date that had just been confirmed, with nothing on screen but the
+  # abort. A same-slug-in-two-years collision makes that deterministic,
+  # and the engine treats those as ordinary.
+  moves = [[entry, other[:time]], [other, entry[:time]]]
+  moves.each do |e, target|
+    abort_if_post_changed(e[:path], e[:raw], e[:post]['slug']) if e[:raw]
+    target_path = File.join(CONTENT_DIR, target.year.to_s, "#{e[:post]['slug']}.json")
+    next if File.expand_path(target_path) == File.expand_path(e[:path])
+
+    abort t('cli.post_already_exists', slug: e[:post]['slug'], path: target_path) if File.exist?(target_path)
+  end
+
+  apply_queue_moves(moves) do |e, target|
+    write_scheduled_date(e[:path], e[:post], target, raw: e[:raw])
+  end
+  puts Tui.paint(t('cli.queue_swapped', slug: entry[:slug],
+                                        date: other[:time].getlocal.strftime(t('date_time_format'))), :green)
+  puts
+  true
+end
+
+# After a post leaves the queue its time is free again, and the posts
+# behind it can each step forward into the gap -- every one takes over
+# its predecessor's time, so again no slot appears or disappears. Asked,
+# never automatic: a hand-picked date further down may be deliberate (an
+# anniversary post), and moving it unasked would break the scheduler's
+# one promise -- nothing moves a post's time except the author. A gap in
+# the past offers nothing: stepping into it would publish immediately.
+def queue_offer_compact(freed_time, rest)
+  rest = Array(rest)
+  return false if rest.empty? || freed_time <= Time.now
+
+  answer = Tui.key_choice(t('cli.queue_compact_prompt', count: rest.size))
+  return false unless answer.start_with?(t('cli.confirm_yes_char'))
+
+  times = [freed_time] + rest.map { |entry| entry[:time] }
+  # The whole loop is checked before the first write, for the reason
+  # queue_swap is: write_scheduled_date ABORTS the process, and an abort
+  # partway through N writes left the queue half-shifted -- some posts
+  # moved forward, some not -- while the message on the way out says
+  # nothing was saved.
+  rest.each_with_index do |entry, i|
+    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
+    target = File.join(CONTENT_DIR, times[i].year.to_s, "#{entry[:post]['slug']}.json")
+    next if File.expand_path(target) == File.expand_path(entry[:path])
+
+    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target) if File.exist?(target)
+  end
+  apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
+    entry[:path] = write_scheduled_date(entry[:path], entry[:post], target, raw: entry[:raw])
+  end
+  puts Tui.paint(t('cli.queue_compacted'), :green)
+  puts
+  true
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -981,14 +1533,7 @@ def cmd_unpublish(slug)
     return
   end
 
-  if post['mastodon_url']
-    puts t('cli.deleting_toot', url: post['mastodon_url'])
-    warn t('cli.delete_toot_failed') unless MastodonPoster.delete(post['mastodon_url'])
-  end
-  if post['bluesky_uri']
-    puts t('cli.deleting_bluesky', url: post['bluesky_url'])
-    warn t('cli.delete_bluesky_failed') unless BlueskyPoster.delete(post['bluesky_uri'])
-  end
+  toot_gone, skeet_gone = retract_announcements(post)
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
                        # The address this post just vacated. If it publishes again under a
@@ -997,9 +1542,19 @@ def cmd_unpublish(slug)
                        # would 404 with no trace, exactly what renames promise not to do.
                        # Publishing back under the same address just consumes the marker.
                        'unpublished_from' => "#{File.basename(File.dirname(path))}/#{slug}")
-  updated.delete('mastodon_url')
-  updated.delete('bluesky_url')
-  updated.delete('bluesky_uri')
+  # Kept when the delete failed, so the address survives to be retried --
+  # and so a re-publish can see there is already an announcement out there.
+  if toot_gone
+    updated.delete('mastodon_url')
+  else
+    warn t('cli.announcement_kept', url: post['mastodon_url'])
+  end
+  if skeet_gone
+    updated.delete('bluesky_url')
+    updated.delete('bluesky_uri')
+  else
+    warn t('cli.announcement_kept', url: post['bluesky_url'])
+  end
   AtomicWrite.write_json(path, updated)
   puts t('cli.reverted_to_draft', path: path)
 
@@ -1010,7 +1565,7 @@ def cmd_unpublish(slug)
     return
   end
 
-  draft_decision_loop(final_slug)
+  draft_decision_loop(final_slug, path: path)
 end
 
 # --- properties and actions ------------------------------------------
@@ -1081,6 +1636,11 @@ def cmd_props(slug)
                             elsif draft?(post) then t('cli.props_announces_on_publish')
                             else t('cli.props_not_announced')
                             end)
+    # Old addresses are counted, not listed: a post renamed a few times
+    # would push everything else off the screen, and the list is one
+    # keypress away in [a].
+    addresses = Array(post['former_slugs']).size
+    props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
     # The whole queue, after the property list rather than inside it: it is
     # a block, not a field, and until now the only way to see what goes out
     # when was opening every draft in turn -- which is also how an offered
@@ -1102,19 +1662,16 @@ def cmd_props(slug)
       case Tui.key_choice(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'))
       when 'p' then return publish_draft(slug)
       when 's'
-        abort_if_post_changed(path, original_raw, slug)
         puts
-        prompt_and_schedule(path, post)
+        prompt_and_schedule(path, post, raw: original_raw)
       when 'n'
         unless post['scheduled']
           puts t('cli.props_unknown_draft')
           next
         end
-        abort_if_post_changed(path, original_raw, slug)
-        unschedule_post(path, post, slug)
+        unschedule_post(path, post, slug, raw: original_raw)
       when 'r'
-        abort_if_post_changed(path, original_raw, slug)
-        slug = rename_post(path, post)
+        slug = rename_post(path, post, raw: original_raw)
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.
@@ -1142,11 +1699,11 @@ def cmd_props(slug)
         puts
         network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
       when 'c'
-        abort_if_post_changed(path, original_raw, slug)
-        toggle_pin(path, post, slug)
+        toggle_pin(path, post, slug, raw: original_raw)
       when 'r'
-        abort_if_post_changed(path, original_raw, slug)
-        slug = rename_post(path, post)
+        slug = rename_post(path, post, raw: original_raw)
+      when 'a'
+        props_addresses(path, slug)
       when 'x'
         cmd_delete(slug)
         # Cancelled (the post still exists) -> stay in the dialog.
@@ -1164,7 +1721,8 @@ end
 # header still carries `pinned:` and still works; this is the short way.
 # Unpinning deletes the key rather than writing false, so an unpinned
 # post looks like every other unpinned post.
-def toggle_pin(path, post, slug)
+def toggle_pin(path, post, slug, raw: nil)
+  abort_if_post_changed(path, raw, slug) if raw
   if truthy_frontmatter?(post['pinned'])
     updated = post.dup
     updated.delete('pinned')
@@ -1191,9 +1749,92 @@ end
 # has no public address yet, so its rename records nothing; only its
 # preview URL changes, which is why that path redeploys the preview.
 #
+# The addresses a post used to answer at, and the one way to drop one.
+#
+# A former_slugs entry normally needs no attention: it is a redirect, it
+# costs one stub page, and it keeps an old link alive. But an entry can go
+# stale -- a NEW post takes that address, the build refuses to overwrite a
+# live page with a stub (rightly) and says so on every single build. That
+# warning had no cure: nothing in the CLI could remove the entry, and the
+# only remaining option was hand-editing the post's JSON, which is exactly
+# what this dialog exists to avoid.
+#
+# Taken addresses are marked as such, because that is the whole reason
+# someone would come here: the marked one is the entry to drop.
+def props_addresses(path, slug)
+  loop do
+    # Re-read at the top of every pass rather than trusting the copy the
+    # dialog is holding: this screen writes the post back, and the window
+    # between reading it and writing it is however long someone spends at
+    # the picker -- with the scheduled-publish cron running every 15
+    # minutes. The write below refuses if anything moved in between.
+    raw = File.read(path, encoding: 'utf-8')
+    post = JSON.parse(raw)
+    entries = Array(post['former_slugs']).map(&:to_s)
+    if entries.empty?
+      puts t('cli.addresses_none')
+      return
+    end
+
+    current = "#{File.basename(File.dirname(path))}/#{slug}"
+    rows = entries.each_with_index.map { |former, i| address_row(former, current, i) }
+    puts
+    puts Tui.paint(t('cli.addresses_heading', count: entries.size), :dim)
+    index = address_pick(rows)
+    return if index.nil?
+
+    former = entries[index]
+    print t('cli.addresses_drop_confirm', address: former)
+    next unless Tui.key_choice('') == t('cli.confirm_yes_char')
+
+    abort_if_post_changed(path, raw, slug)
+    remaining = entries - [former]
+    updated = post.dup
+    remaining.empty? ? updated.delete('former_slugs') : updated['former_slugs'] = remaining
+    AtomicWrite.write_json(path, updated)
+    puts Tui.paint(t('cli.addresses_dropped', address: former), :green)
+    maybe_rebuild
+  end
+end
+
+# "2019/old-title  — taken by another post" for the stale ones. Taken
+# means: a post other than this one owns that year/slug today, so the
+# build will never emit the stub and the warning repeats forever.
+#
+# The comparison is against the post's whole current address, not its
+# slug: a post that moved between years keeps its slug, and the address it
+# vacated is precisely the one another post can take.
+def address_row(former, current, index)
+  parts = former.split('/').reject(&:empty?)
+  taken = parts.size == 2 && former != current &&
+          File.exist?(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"))
+  note = if parts.size != 2
+           "  #{t('cli.addresses_unusable')}"
+         elsif taken
+           "  #{t('cli.addresses_taken')}"
+         else
+           ''
+         end
+  format('%2d.  %s%s', index + 1, former, note)
+end
+
+# Same two faces as every other picker here: arrow keys in a terminal, a
+# numbered list and a read line when piped.
+def address_pick(rows)
+  return Tui.menu(rows, hint: t('cli.addresses_menu_hint')) if Tui.interactive?
+
+  rows.each { |row| puts "  #{row}" }
+  puts
+  print t('cli.addresses_pick_prompt')
+  line = $stdin.gets&.strip.to_s
+  puts
+  index = line.to_i - 1
+  line =~ /\A\d+\z/ && (0...rows.size).cover?(index) ? index : nil
+end
+
 # Returns the slug the caller should continue with: the new one after a
 # rename, the old one after any kind of cancel.
-def rename_post(path, post)
+def rename_post(path, post, raw: nil)
   old_slug = post['slug']
   year = File.basename(File.dirname(path))
 
@@ -1246,6 +1887,13 @@ def rename_post(path, post)
     return old_slug
   end
 
+  # After the confirmation, before the first move. A capture written back
+  # here is worse than elsewhere: `draft?(post)` reads the STALE state, so
+  # a post the cron published two prompts ago is renamed as if it were a
+  # draft -- no former_slugs, and the address it has been live at since
+  # then dies with no redirect.
+  abort_if_post_changed(path, raw, old_slug) if raw
+
   updated = post.merge('slug' => new_slug)
   unless draft?(post)
     former = Array(post['former_slugs']).map(&:to_s) + ["#{year}/#{old_slug}"]
@@ -1272,14 +1920,17 @@ end
 
 def cmd_edit(slug)
   edit_post(slug)
+  # Re-resolved AFTER the edit on purpose: a rename inside the editor moves
+  # the file, so the path captured before it would be stale. Everything
+  # downstream then works from this one.
   path = find_post_path(slug)
   return unless path
 
-  draft_decision_loop(slug) if draft?(JSON.parse(File.read(path, encoding: 'utf-8')))
+  draft_decision_loop(slug, path: path) if draft?(JSON.parse(File.read(path, encoding: 'utf-8')))
 end
 
-def edit_post(slug)
-  path = find_post_path(slug)
+def edit_post(slug, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   # Kept to compare against just before the save: an editor session is
@@ -1309,12 +1960,20 @@ def edit_post(slug)
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
-  raw = edit_in_editor(frontmatter + body, FRONTMATTER_HINT)
+  # Recovery is offered per post, not per command: text left over from
+  # `edit <this slug>` continues here, text from anything else is named
+  # rather than restored (see offer_editor_buffer).
+  restored = offer_editor_buffer('edit', slug)
+  opened_with = restored || frontmatter + body
+  raw = edit_in_editor(opened_with, FRONTMATTER_HINT, { 'kind' => 'edit', 'slug' => slug })
 
   # Same no-op guard as cmd_add: editor closed without saving (or saved
   # untouched) means nothing to do -- skip the save and the rebuild question.
-  if raw == frontmatter + body
-    discard_editor_buffer
+  if raw == opened_with
+    # Same as cmd_add: an untouched editor wrote no buffer, so there is
+    # nothing of this session's to clean up and possibly something of an
+    # earlier one's to protect.
+    puts t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
     puts t('cli.no_changes')
     puts
     return
@@ -1324,7 +1983,7 @@ def edit_post(slug)
   abort_on_double_frontmatter(new_body)
   abort_on_unknown_frontmatter(meta)
 
-  new_date = meta['date'].to_s.empty? ? date : Time.parse(meta['date'])
+  new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
   new_tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
   new_type = meta['type'].to_s.empty? ? nil : meta['type']
@@ -1333,7 +1992,14 @@ def edit_post(slug)
   wait_for_missing_images(missing)
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
+  check_video_playback(media_files)
   fill_image_dimensions(blocks, media_files, media_dir)
+  restore_posters(blocks, post['content'])
+  # Before the lookup, not after it: a player the post already has is not
+  # worth a network call, and asking anyway is what made an edit depend on
+  # a service answering.
+  restore_embed_lookups(blocks, post['content'])
+  resolve_embed_lookups(blocks)
 
   # Checks for a drop in every block type, not just images: markdown can't
   # express a link card or a foreign embed (Instagram), so saving would
@@ -1387,11 +2053,18 @@ def edit_post(slug)
   # the same slug, so "new_year/slug" would otherwise sit in its own
   # former_slugs and the build would try to redirect the live page to
   # itself -- a warning that fires on every build and no later edit clears.
-  if post['former_slugs']
-    former = Array(post['former_slugs']).map(&:to_s) - ["#{new_year}/#{slug}"]
-    updated['former_slugs'] = former unless former.empty?
-  end
+  #
+  # A date edit that moves a PUBLISHED post into another year also vacates
+  # its old public address -- /posts/2019/slug/ stops being generated the
+  # moment the post becomes /posts/2020/slug/. That is the same debt a
+  # rename creates, and the stub mechanism has always been able to pay it;
+  # nothing was writing the entry, so the old link just died. A draft
+  # vacates nothing, exactly as in rename_post.
+  vacated = new_year != year && !draft?(post) ? "#{year}/#{slug}" : nil
+  former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
+  updated['former_slugs'] = former unless former.empty?
   updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
+  updated['redirect_from'] = post['redirect_from'] if post['redirect_from']
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
   updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']
@@ -1429,20 +2102,26 @@ def edit_post(slug)
   # counted here, cleanup would delete them after editing and the page
   # would be left with a link to a nonexistent file.
   #
-  # The poster is also taken from the ORIGINAL post: it can't be written in
-  # markdown, so the round-trip can't carry it over, and it would always
-  # come out orphaned based on the new blocks alone. This affects 52
-  # imported videos, and the author can't remove that file, so cleanup must
-  # not remove it on their behalf.
+  # The ORIGINAL post's posters are read as well as the new blocks'. Since
+  # restore_posters the two normally agree, but not always: a video whose
+  # block has no markdown form at all (an import with no youtube_id and an
+  # empty embed_html) is dropped by the round-trip, and its poster with it.
+  # Keeping the file in that case is deliberate -- the author confirmed
+  # losing the block, not deleting a file they can't name in markdown, and
+  # a restore from trash would otherwise come back without its image.
   keep = (blocks.flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
           post['content'].map { |b| b.dig('poster', 0, 'url') }).compact.to_set
+
+  # The post first, its unreferenced media second. Pruning ahead of the
+  # write meant a failure in between left a post that still names files
+  # that are already gone; this order can at worst leave a file nothing
+  # references, which the next save collects.
+  AtomicWrite.write_json(new_path, updated)
   if Dir.exist?(new_media_dir)
     Dir.children(new_media_dir).each do |f|
       File.delete(File.join(new_media_dir, f)) unless keep.include?(f)
     end
   end
-
-  AtomicWrite.write_json(new_path, updated)
   discard_editor_buffer
   File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
   # Housekeeping only, and it runs last on purpose: an incoming/ the CLI
@@ -1459,13 +2138,43 @@ end
 # true on an actual delete, false when the user cancelled -- callers
 # decide separately whether/how to rebuild (the two call sites want
 # different rebuild behavior, see cmd_delete vs draft_decision_loop).
-def delete_post(slug)
-  path = find_post_path(slug)
+# Takes the announcement down on whichever network carries it, and says
+# for each whether it is really gone. Shared by unpublish and delete
+# because they owe the same thing: a page that stops existing must not
+# leave a public post pointing at it. The caller decides what to do with
+# a failure -- both keep the address so it can be retried, rather than
+# forgetting an announcement that is still out there.
+def retract_announcements(post)
+  toot_gone = true
+  if post['mastodon_url']
+    puts t('cli.deleting_toot', url: post['mastodon_url'])
+    toot_gone = MastodonPoster.delete(post['mastodon_url'])
+    warn t('cli.delete_toot_failed') unless toot_gone
+  end
+
+  skeet_gone = true
+  if post['bluesky_uri']
+    puts t('cli.deleting_bluesky', url: post['bluesky_url'])
+    skeet_gone = BlueskyPoster.delete(post['bluesky_uri'])
+    warn t('cli.delete_bluesky_failed') unless skeet_gone
+  end
+
+  [toot_gone, skeet_gone]
+end
+
+def delete_post(slug, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   text = post['content'].find { |b| b['type'] == 'text' }
   puts "#{post['date']}  #{post['title'] || text&.fetch('text', '')&.slice(0, 60)}"
+  # Said BEFORE the confirmation, not after it: deleting the post takes
+  # the announcement down with it, and that part cannot be undone by
+  # `restore` -- the thread and whatever was said under it are gone for
+  # good. One confirmation is enough, as long as it is an informed one.
+  announced = [post['mastodon_url'], post['bluesky_url']].compact
+  puts t('cli.delete_takes_announcement', url: announced.first) unless announced.empty?
   print t('cli.confirm_delete', slug: slug)
   confirmation = $stdin.gets&.strip
   unless confirmation == slug
@@ -1477,14 +2186,38 @@ def delete_post(slug)
   year = File.basename(File.dirname(path))
   media_dir = File.join(MEDIA_DIR, year, slug)
 
-  # No git, no backup elsewhere -- deleted posts go to trash/<slug>/ instead
-  # of straight away, so a mistake can be undone via `restore`. Deleting the
-  # same slug a second time overwrites the old version in trash -- trash
-  # only ever holds the most recent deletion.
-  trash_dir = File.join(TRASH_DIR, slug)
+  # No git, no backup elsewhere -- deleted posts go to trash/<year>/<slug>/
+  # instead of straight away, so a mistake can be undone via `restore`.
+  # Deleting the same year+slug a second time overwrites that version in
+  # trash; trash only ever holds the most recent deletion of each post.
+  #
+  # Keyed by year AND slug, because content is: the same slug in two years
+  # is two posts (backdating makes that ordinary), and a trash keyed by
+  # slug alone made deleting the older one destroy the newer one's trashed
+  # copy AND its whole media directory -- the undo for a deliberate delete,
+  # gone without a word.
+  # The page is about to stop existing, so the announcement pointing at it
+  # has to go too -- the same tidying up unpublish has always done. Left
+  # behind, it stayed public and linked to a 404 the moment the next build
+  # pruned the page, with nothing anywhere to say so.
+  toot_gone, skeet_gone = retract_announcements(post)
+
+  trash_dir = File.join(TRASH_DIR, year, slug)
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
-  FileUtils.mv(path, File.join(trash_dir, 'post.json'))
+  # Written rather than moved, because the copy that goes to trash must
+  # not keep an address that no longer resolves: a restored post would
+  # carry a dead announcement and `toot` would refuse to send a new one,
+  # seeing a post that already has one. An address whose deletion FAILED
+  # is kept, so it can still be retried by hand.
+  trashed = post.dup
+  trashed.delete('mastodon_url') if toot_gone
+  if skeet_gone
+    trashed.delete('bluesky_url')
+    trashed.delete('bluesky_uri')
+  end
+  File.write(File.join(trash_dir, 'post.json'), JSON.pretty_generate(trashed))
+  File.delete(path)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)
@@ -1501,10 +2234,49 @@ end
 # based on the year in the post's date. Won't overwrite an existing post
 # with the same slug -- that conflict (a new post was created under the same
 # slug after the old one was deleted) has to be resolved by hand.
+# Every trashed copy of a slug: the year-keyed ones, plus a flat
+# trash/<slug>/ left over from an installation that deleted a post before
+# the trash grew years. Both are restorable -- an upgrade must not strand
+# somebody's undo.
+def trashed_paths(slug)
+  (Dir.glob(File.join(TRASH_DIR, '*', slug, 'post.json')) +
+   [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) }.uniq.sort
+end
+
+# Mirrors pick_among_years, over what is in the trash rather than what is
+# published: a number picks, anything else cancels.
+def pick_among_trashed(slug, paths)
+  readable = paths.filter_map { |f| (summary = post_summary(f)) && [f, summary] }
+  abort t('cli.nothing_in_trash', slug: slug) if readable.empty?
+
+  paths = readable.map(&:first)
+  rows = readable.map { |(_, summary)| summary_row(summary) }
+  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+
+  if Tui.interactive?
+    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
+    abort t('cli.cancelled_empty') if choice.nil?
+    puts
+    return paths[choice]
+  end
+
+  rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
+  puts
+  print t('cli.enter_number')
+  input = $stdin.gets&.strip.to_s
+  puts
+  abort t('cli.cancelled_empty') unless input =~ /\A\d+\z/ && (1..paths.size).cover?(input.to_i)
+  paths[input.to_i - 1]
+end
+
 def cmd_restore(slug)
-  trash_dir = File.join(TRASH_DIR, slug)
-  trash_json = File.join(trash_dir, 'post.json')
-  abort t('cli.nothing_in_trash', slug: slug) unless File.exist?(trash_json)
+  found = trashed_paths(slug)
+  abort t('cli.nothing_in_trash', slug: slug) if found.empty?
+
+  # Two years of the same slug can sit in the trash at once now, so the
+  # same rule as everywhere else applies: never guess, show both and ask.
+  trash_json = found.size == 1 ? found.first : pick_among_trashed(slug, found)
+  trash_dir = File.dirname(trash_json)
 
   post = JSON.parse(File.read(trash_json, encoding: 'utf-8'))
   year = Time.parse(post['date']).year.to_s
@@ -1517,8 +2289,12 @@ def cmd_restore(slug)
 
   trash_media = File.join(trash_dir, 'media')
   if Dir.exist?(trash_media)
-    FileUtils.mkdir_p(File.join(MEDIA_DIR, year))
-    FileUtils.mv(trash_media, File.join(MEDIA_DIR, year, slug))
+    # move_media_dir, not a bare mv: with an orphan media directory already
+    # at the target (a post deleted and re-created under the same slug),
+    # mv puts the restored one INSIDE it -- media.nosync/2026/slug/slug/ --
+    # and every image in the restored post is a broken link. That is the
+    # exact nesting move_media_dir exists to prevent.
+    PostWriter.move_media_dir(trash_media, File.join(MEDIA_DIR, year, slug))
   end
   FileUtils.rm_rf(trash_dir)
 
@@ -1530,7 +2306,7 @@ def cmd_restore(slug)
       warn ''
       return
     end
-    draft_decision_loop(slug)
+    draft_decision_loop(slug, path: new_path)
   else
     maybe_rebuild
   end
@@ -1575,9 +2351,20 @@ def state_marker(post)
   marks.empty? ? '' : "  #{marks.join(' ')}"
 end
 
+# A plain draft shows no date, the same rule the properties dialog
+# follows: a draft's time is set by publishing or scheduling, so the
+# timestamp in its JSON is bookkeeping, not a fact about the post. Dashes
+# rather than blanks, so the column still lines up and reads as
+# deliberately empty. A scheduled draft does have a time -- schedule gave
+# it one -- and keeps showing it.
+def row_date(post)
+  return '----------' if post[:state] == DRAFT && !post[:scheduled]
+
+  Time.parse(post[:date]).strftime('%Y-%m-%d')
+end
+
 def summary_row(post)
-  date = Time.parse(post[:date]).strftime('%Y-%m-%d')
-  "#{date}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
 end
 
 def load_posts_summary
@@ -1596,7 +2383,371 @@ def cmd_list(filters)
   posts.reverse!
   posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
-  puts t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
+  count = t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
+  # The tally is for a person, so it goes where a person is looking. Down
+  # a pipe it would be three more lines that are not posts -- and this
+  # command exists to be piped, so `| wc -l` has to answer the question
+  # it looks like it is answering.
+  if $stdout.tty?
+    puts count
+    puts
+  else
+    warn count
+  end
+end
+
+# --- browsing the archive --------------------------------------------
+#
+# `list` prints the whole archive and scrolls it past you -- fine down a
+# pipe, useless as a way to look around 4000 posts. This is the same data
+# as a screen you can stay in: filters, a live search that speaks the same
+# query language as the site's search box, a look at the post under the
+# cursor, and Enter to open it.
+
+# The keys this screen claims. Deliberately none of the letters that mean
+# an ACTION elsewhere in the CLI -- p is "publish" in three dialogs and x
+# is "delete" in two, and a key whose meaning depends on which screen you
+# are looking at is a key that will eventually be pressed on the wrong
+# one. Preview is the space bar, the way every file manager does it.
+BROWSE_HOT_KEYS = ['/', 't', 's', 'g', 'z', ' '].freeze
+
+# The title is what a person recognises a post by, so it goes where the
+# eye lands. Over half of an imported archive has no title at all (a
+# tweet, a photo) -- those show the slug instead, dimmed, because it is
+# derived from the text and reads well enough to pick from. `list` keeps
+# the slug-first row: on the command line the slug is the thing you copy
+# into the next command.
+def browse_row(post)
+  title = post[:title].to_s.strip
+  label = title.empty? ? Tui.paint(post[:slug], :dim) : title
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{label}"
+end
+
+def browse_posts
+  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    summary = post_summary(file)
+    # Keyed by year/slug, not slug: backdating makes the same slug in two
+    # years easy (the archive really has such pairs), and a slug-keyed
+    # index let one post's text answer searches for the other.
+    summary&.merge(path: file, key: "#{File.basename(File.dirname(file))}/#{summary[:slug]}")
+  end.sort_by { |post| post[:date].to_s }.reverse
+end
+
+# Built on the first search and not before it: reading and folding every
+# post costs a couple of seconds on a large archive, and someone who only
+# came to scroll through last month should not pay for a search they never
+# ran. Keeping the plain text as well as the folded form is what lets the
+# screen show WHY a post matched.
+def browse_index(posts)
+  Tui.spinner(t('cli.browse_indexing', count: posts.size)) do
+    posts.each_with_object({}) do |summary, index|
+      begin
+        post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
+        text = PostText.plain(post).gsub(/\s+/, ' ').strip
+        index[summary[:key]] = { text: text, folded: PostText.searchable(post, text) }
+      rescue JSON::ParserError, SystemCallError
+        # post_summary already warned about this file; a post that cannot
+        # be read simply matches nothing.
+        index[summary[:key]] = { text: '', folded: '' }
+      end
+    end
+  end
+end
+
+def browse_state_match?(post, state)
+  case state
+  when 'draft' then post[:state] == DRAFT && !post[:scheduled]
+  when 'scheduled' then !post[:scheduled].nil? && post[:scheduled] != false
+  when 'pinned' then !!post[:pinned]
+  else post[:state] != DRAFT
+  end
+end
+
+def browse_filtered(posts, filters, index, tokens)
+  posts.select do |post|
+    next false if filters[:type] && post[:type] != filters[:type]
+    next false if filters[:state] && !browse_state_match?(post, filters[:state])
+    next false if filters[:tag] && post[:tags].none? { |tag| Slug.fold(tag) == Slug.fold(filters[:tag]) }
+    next true if tokens.empty?
+
+    SearchQuery.match?(index.to_h.dig(post[:key], :folded).to_s, tokens)
+  end
+end
+
+def browse_status(filters, query, searching, shown, total)
+  if searching
+    return [t('cli.browse_searching', query: query),
+            t('cli.browse_of_total', count: shown, total: total)]
+  end
+
+  parts = []
+  parts << t('cli.browse_filter_type', value: filters[:type]) if filters[:type]
+  parts << t('cli.browse_filter_state', value: t("cli.browse_state_#{filters[:state]}")) if filters[:state]
+  parts << t('cli.browse_filter_tag', value: filters[:tag]) if filters[:tag]
+  parts << t('cli.browse_filter_search', query: query) unless query.to_s.strip.empty?
+  return [t('cli.browse_heading'), t('cli.browse_total', count: total)] if parts.empty?
+
+  [t('cli.browse_filter_prefix', filters: parts.join(' · ')),
+   t('cli.browse_of_total', count: shown, total: total)]
+end
+
+# Folding character by character, keeping the position each folded
+# character came from -- so a hit found in the folded text can be shown
+# from the original, with its diacritics and capitals intact. Whitespace
+# is passed through as a single space rather than folded away, which is
+# what Slug.fold does to a lone space and would otherwise glue every word
+# to the next one.
+def fold_with_offsets(text)
+  folded = +''
+  offsets = []
+  text.each_char.with_index do |char, position|
+    piece = char.match?(/\s/) ? ' ' : Slug.fold(char)
+    piece.each_char { offsets << position }
+    folded << piece
+  end
+  [folded, offsets]
+end
+
+# One line of the post's own text around the first word that matched --
+# the answer to "why is this in my results?", which a full-text search
+# owes the reader. Only ever computed for the row under the cursor, and
+# cached, because folding a post character by character is not something
+# to repeat on every arrow key.
+def browse_context(entry, tokens, width, cache, slug)
+  return nil if entry.nil? || tokens.empty?
+
+  # Keyed by the query too: the one line whose whole job is explaining
+  # the CURRENT match must not answer with the fragment that matched the
+  # previous one after the user backspaces and types something else.
+  cache_key = [slug, tokens.map(&:text).join(' ')]
+  cache[cache_key] ||= begin
+    text = entry[:text].to_s
+    folded, offsets = fold_with_offsets(text)
+    token = tokens.reject(&:negated).find { |candidate| folded.include?(candidate.text) }
+    if token.nil? || text.empty?
+      ''
+    else
+      at = offsets[folded.index(token.text)] || 0
+      start = [at - 30, 0].max
+      fragment = text[start, width].to_s.strip
+      "#{start.positive? ? '…' : ''}#{fragment}#{start + width < text.length ? '…' : ''}"
+    end
+  end
+  cache[cache_key].empty? ? nil : cache[cache_key]
+end
+
+def browse_pick_type(posts)
+  counts = posts.group_by { |post| post[:type] }.transform_values(&:size).sort_by { |type, count| [-count, type] }
+  rows = [format('%-14s %d', t('cli.browse_filter_none'), posts.size)] +
+         counts.map { |type, count| format('%-14s %d', type, count) }
+  index = Tui.menu(rows, hint: t('cli.browse_menu_hint'))
+  return :cancel if index.nil?
+
+  index.zero? ? nil : counts[index - 1].first
+end
+
+BROWSE_STATES = %w[published draft scheduled pinned].freeze
+
+def browse_pick_state(posts)
+  counts = BROWSE_STATES.map { |state| [state, posts.count { |post| browse_state_match?(post, state) }] }
+  rows = [format('%-14s %d', t('cli.browse_filter_none'), posts.size)] +
+         counts.map { |state, count| format('%-14s %d', t("cli.browse_state_#{state}"), count) }
+  index = Tui.menu(rows, hint: t('cli.browse_menu_hint'))
+  return :cancel if index.nil?
+
+  index.zero? ? nil : counts[index - 1].first
+end
+
+# 1893 tags on a real archive, so this is a scrollable list of its own,
+# ordered by how much of the archive each one covers -- and a tag can be
+# typed instead, which is faster than arrowing to it.
+def browse_pick_tag(posts)
+  counts = Hash.new(0)
+  posts.each { |post| post[:tags].each { |tag| counts[tag] += 1 } }
+  return nil if counts.empty?
+
+  entries = counts.sort_by { |tag, count| [-count, Slug.fold(tag)] }
+  width = entries.map { |tag, _| tag.length }.max.clamp(8, 32)
+  rows = [format("%-#{width}s %d", t('cli.browse_filter_none'), posts.size)] +
+         entries.map { |tag, count| format("%-#{width}s %d", tag, count) }
+  # numeric_pick: false -- the rows carry no visible numbers, and real
+  # archives have tags NAMED "365" or "5800"; resolving a typed number as
+  # a row index silently filtered on whatever sat on that row and made
+  # the numeric tag unreachable by typing.
+  choice = Tui.menu(rows, hint: t('cli.browse_tag_menu_hint'), allow_text: true,
+                          numeric_pick: false,
+                          text_prompt: t('cli.browse_tag_prompt'))
+  return :cancel if choice.nil?
+  return choice.strip if choice.is_a?(String)
+
+  choice.zero? ? nil : entries[choice - 1].first
+end
+
+# The post as its own text, wrapped to the terminal: the same markdown
+# `edit` opens, so there is one answer in this engine to "what does this
+# post say" rather than a second renderer to keep in step. Media lines are
+# the exception -- an absolute path into media.nosync is noise in a
+# preview, where the file name and the alt text are the whole point.
+def browse_preview_lines(post, markdown, width)
+  markdown.split("\n").flat_map do |line|
+    case line
+    when /\A!!\[(.*?)\]\((.*?)\)\z/
+      [t('cli.browse_preview_media', file: File.basename(Regexp.last_match(2)),
+                                     caption: Regexp.last_match(1).empty? ? t('cli.browse_preview_no_caption') : Regexp.last_match(1))]
+    when /\A!\[(.*?)\]\((.*?)(?: "(.*)")?\)\z/
+      [t('cli.browse_preview_image', file: File.basename(Regexp.last_match(2)),
+                                     alt: Regexp.last_match(1).empty? ? t('cli.browse_preview_no_caption') : Regexp.last_match(1))]
+    else
+      wrap_to_width(line, width)
+    end
+  end
+end
+
+def wrap_to_width(line, width)
+  return [''] if line.strip.empty?
+
+  out = []
+  current = +''
+  line.split(/\s+/).each do |word|
+    # A URL longer than the terminal is one "word" -- broken here rather
+    # than left for the row truncation, which would hide the rest of it.
+    word.scan(/.{1,#{width}}/m).each do |piece|
+      if current.empty?
+        current = +piece
+      elsif current.length + 1 + piece.length <= width
+        current << ' ' << piece
+      else
+        out << current
+        current = +piece
+      end
+    end
+  end
+  out << current unless current.empty?
+  out
+end
+
+def browse_preview(summary)
+  post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
+  year = File.basename(File.dirname(summary[:path]))
+  markdown = MarkdownWriter.blocks_to_markdown(post['content'], File.join(MEDIA_DIR, year, summary[:slug]))
+  width = [Tui.term_width - 4, 40].max
+  header = [Tui.paint(post['title'].to_s.empty? ? summary[:slug] : post['title'], :bold),
+            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary)}  ·  #{summary[:slug]}"]
+  header << t('cli.browse_preview_tags', tags: post['tags'].join(', ')) unless (post['tags'] || []).empty?
+  lines = header + [''] + browse_preview_lines(post, markdown, width)
+  state = { selected: 0, offset: 0 }
+  Tui.browse(state, keys: t('cli.browse_preview_keys'), empty: t('cli.browse_preview_empty'), cursor: false) do
+    [lines, [t('cli.browse_preview_status'), '']]
+  end
+  puts
+rescue JSON::ParserError, SystemCallError => e
+  puts t('cli.unreadable_post', path: summary[:path], error: e.message.lines.first.to_s.strip[0, 100])
+  puts
+end
+
+# Time.parse with the file's own sentence instead of a backtrace -- a
+# hand-typed frontmatter date ("za tyden nekdy") used to end the run as
+# an uncaught ArgumentError while the editor buffer sat recoverable.
+def parse_frontmatter_date!(raw_value)
+  Time.parse(raw_value)
+rescue ArgumentError
+  abort t('cli.frontmatter_date_invalid', value: raw_value)
+end
+
+def cmd_browse(filters = {})
+  # Piped runs keep the line-based list they always got: there is no
+  # screen to scroll and no keys to press.
+  return cmd_list(filters) unless Tui.interactive?
+
+  posts = browse_posts
+  if posts.empty?
+    puts t('cli.no_posts_to_pick')
+    puts
+    return
+  end
+
+  active = { type: filters[:type], state: filters[:drafts] ? 'draft' : nil, tag: filters[:tag] }
+  index = nil
+  contexts = {}
+  view = []
+  state = { selected: 0, offset: 0, query: '' }
+
+  loop do
+    result = Tui.browse(state,
+                        keys: t('cli.browse_keys'),
+                        empty: t('cli.browse_empty'),
+                        hot_keys: BROWSE_HOT_KEYS,
+                        search_hint: t('cli.browse_search_keys'),
+                        context: lambda { |row|
+                          post = view[row]
+                          post && browse_context(index.to_h[post[:key]], SearchQuery.parse(state[:query]),
+                                                 [Tui.term_width - 12, 40].max, contexts, post[:key])
+                        }) do |query, searching|
+      tokens = SearchQuery.parse(query)
+      view = browse_filtered(posts, active, index, tokens)
+      [view.map { |post| browse_row(post) }, browse_status(active, query, searching, view.size, posts.size)]
+    end
+
+    break if result.nil?
+
+    kind, value, row = result
+    if kind == :enter
+      selected = view[value]
+      next if selected.nil?
+
+      # Everything below prints, so the frame this screen would repaint
+      # over is gone -- the next pass starts a fresh one.
+      state.delete(:lines)
+      puts
+      post_crossroads(selected[:slug])
+      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
+      posts = browse_posts
+      # The screen comes back with the query still active, so the index
+      # must come back with it -- nilling it made every post match
+      # nothing and the archive showed "(nothing matches)" for a query
+      # that had results a moment earlier. Rebuilt, not kept: the edit
+      # may have changed exactly the text being searched.
+      index = state[:query].to_s.strip.empty? ? nil : browse_index(posts)
+      contexts.clear
+      next
+    end
+
+    case value
+    when '/'
+      # The index is built here, before the typing starts, so the wait
+      # happens once and in the open rather than under the first keystroke.
+      index ||= browse_index(posts)
+      contexts.clear
+      state[:searching] = true
+    when 't', 's', 'g'
+      state.delete(:lines)
+      puts
+      picked = case value
+               when 't' then browse_pick_type(posts)
+               when 's' then browse_pick_state(posts)
+               else browse_pick_tag(posts)
+               end
+      key = { 't' => :type, 's' => :state, 'g' => :tag }.fetch(value)
+      active[key] = picked unless picked == :cancel
+      state[:selected] = 0
+      state[:offset] = 0
+      print "\e[2J\e[H"
+    when 'z'
+      active.each_key { |name| active[name] = nil }
+      state[:query] = ''
+      state[:selected] = 0
+      state[:offset] = 0
+      contexts.clear
+    when ' '
+      selected = row && view[row]
+      next if selected.nil?
+
+      state.delete(:lines)
+      puts
+      browse_preview(selected)
+      print "\e[2J\e[H"
+    end
+  end
   puts
 end
 
@@ -1675,7 +2826,15 @@ def pick_published_interactively
 end
 
 def trash_summary
-  Dir.glob(File.join(TRASH_DIR, '*', 'post.json')).filter_map { |f| post_summary(f) }
+  # Both layouts, the way restore_post's own lookup already does: posts have
+  # been keyed by year inside the trash since the content tree was, and this
+  # glob still described the flat one -- so `./blog.sh restore` with no slug,
+  # and the wizard's whole Trash entry, answered "Trash is empty" over a full
+  # trash. The engine's only undo, unreachable except by typing a slug the
+  # author would have to remember.
+  (Dir.glob(File.join(TRASH_DIR, '*', '*', 'post.json')) +
+   Dir.glob(File.join(TRASH_DIR, '*', 'post.json')))
+    .uniq.sort.filter_map { |f| post_summary(f) }
 end
 
 # Lets `restore` be called with no slug: offers the trash's contents, same
@@ -1700,6 +2859,65 @@ def warn_unreadable_image(file)
 
   warn t('cli.image_dimensions_unknown', file: File.basename(file.to_s))
   warn t('cli.image_heic_hint') if File.extname(file.to_s).downcase.match?(/\A\.hei[cf]\z/)
+end
+
+# Markdown has no way to write a video's poster image, so re-parsing an
+# edited post hands back a video block without one -- and the content-loss
+# safeguard doesn't notice, because it counts block TYPES and a video that
+# stays a video looks untouched. The file itself was never at risk (the
+# cleanup list reads the original blocks too, for exactly this reason), but
+# the JSON quietly lost the reference to it: 52 imported videos on sean.cz
+# carry a poster, and no editor of a post could have put it back.
+#
+# Nothing renders a poster today, which is why this was a slow leak rather
+# than a visible bug -- and why it had to be fixed before a renderer starts
+# using the field, not after.
+#
+# The key is whatever the markdown could still name: a local video's file,
+# or the video's own URL for an embedded one. Those are the only parts of
+# the block that survive the round-trip, so they're the only honest way to
+# recognise the same video coming back.
+def restore_posters(blocks, original_blocks)
+  posters = {}
+  Array(original_blocks).each do |b|
+    key = b.dig('media', 0, 'url') || b['url']
+    posters[key] ||= b['poster'] if key && b['poster']
+  end
+  return if posters.empty?
+
+  blocks.each do |b|
+    next if b['poster']
+
+    poster = posters[b.dig('media', 0, 'url') || b['url']]
+    b['poster'] = poster if poster
+  end
+end
+
+# The player address of a Funkwhale/Bandcamp embed, carried over from the
+# stored post the same way a poster is -- and for the same reason: markdown
+# cannot express it, so the round-trip hands back a block without it.
+#
+# Without this the re-lookup that follows decides whether a WORKING player
+# survives an ordinary edit, and that lookup can fail for reasons that have
+# nothing to do with the post: a laptop on a train, a service having a bad
+# minute. Adding a sentence to a post then deleted its player, and the
+# message said "editing and saving again retries" while doing the opposite.
+# A block that never had a player still has none here, so its lookup runs
+# as before.
+def restore_embed_lookups(blocks, original_blocks)
+  stored = {}
+  Array(original_blocks).each do |block|
+    url = block['url'].to_s
+    stored[url] ||= block['embed_src'] if !url.empty? && block['embed_src']
+  end
+  return if stored.empty?
+
+  blocks.each do |block|
+    next if block['embed_src']
+
+    src = stored[block['url'].to_s]
+    block['embed_src'] = src if src
+  end
 end
 
 def fill_image_dimensions(blocks, media_files, media_dir = nil)
@@ -1753,6 +2971,11 @@ def cmd_rebuild
 end
 
 def print_usage
+  # The identity block above the usage: "what am I even running, and
+  # where" is the first question of someone reading help on a server
+  # with more than one install on it.
+  puts SiteHeader.render
+  puts
   puts t('cli.usage', recent_count: RECENT_LIST_COUNT)
 end
 
@@ -1769,7 +2992,8 @@ end
 WIZARD_MENU = [
   ['add', t('cli.wizard_menu_add')],
   ['post', t('cli.wizard_menu_post')],
-  ['list', t('cli.wizard_menu_list')],
+  ['queue', t('cli.wizard_menu_queue')],
+  ['browse', t('cli.wizard_menu_browse')],
   ['restore', t('cli.wizard_menu_restore')],
   ['rebuild', t('cli.wizard_menu_rebuild')]
 ].freeze
@@ -1780,7 +3004,13 @@ WIZARD_MENU = [
 # `./blog.sh edit` skips this crossroads entirely and `props` is its own
 # command.
 def wizard_post_entry
-  slug = pick_slug_interactively
+  post_crossroads(pick_slug_interactively)
+end
+
+# The crossroads itself, reached from the wizard's post entry and from
+# Enter in the archive browser -- both have a post in hand at that point
+# and the same two things to do with it.
+def post_crossroads(slug)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
@@ -1800,8 +3030,9 @@ def run_wizard_choice(command)
   case command
   when 'add' then cmd_add
   when 'post' then wizard_post_entry
+  when 'queue' then cmd_queue
   when 'restore' then cmd_restore(pick_trash_interactively)
-  when 'list' then cmd_list({})
+  when 'browse' then cmd_browse({})
   when 'rebuild' then cmd_rebuild
   end
 # Plenty of cmd_*/pick_*_interactively paths end in `abort` (cancellation,
@@ -1833,7 +3064,8 @@ def run_wizard
       puts
       puts t('cli.wizard_prompt_action')
       puts
-      index = Tui.menu(WIZARD_MENU.map { |_, desc| desc }, hint: t('cli.menu_hint'))
+      index = Tui.menu(WIZARD_MENU.map { |_, desc| desc },
+                       hint: t('cli.wizard_menu_hint', count: WIZARD_MENU.size))
       # Esc leaves the cursor on the line right under the hint, so the shell
       # prompt lands flush against the menu. One blank line to sit on the
       # way out -- which is also what the piped branch below already does
@@ -1886,6 +3118,18 @@ command = ARGV.shift
 # keeps the abort message as the first thing said.
 SiteConfig.data unless ['help', '--help', '-h', 'version', '--version', '-v'].include?(command)
 
+# Every screen-bound command opens with the identity block -- which
+# engine, which site, which mode. The wizard prints (and after every
+# clear reprints) its own copy, `version`'s output IS the identity,
+# help puts it above the usage, and a piped stdout gets data only:
+# `./blog.sh list | wc -l` must keep counting posts, not banner lines.
+HEADER_MODES = %w[add edit props publish unpublish schedule queue delete
+                  restore toot bluesky rebuild preview list browse].freeze
+if HEADER_MODES.include?(command) && $stdout.tty?
+  puts SiteHeader.render(extra: t('cli.header_mode', mode: command))
+  puts
+end
+
 if command.nil?
   run_wizard
 else
@@ -1910,6 +3154,8 @@ else
   when 'schedule'
     slug = ARGV.shift || pick_draft_interactively
     cmd_schedule(slug)
+  when 'queue'
+    cmd_queue
   when 'unpublish'
     slug = ARGV.shift || pick_published_interactively
     cmd_unpublish(slug)
@@ -1933,14 +3179,17 @@ else
     # the URL line would sit in the buffer the whole time, so push it out.
     $stdout.flush
     PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
-  when 'list'
+  when 'list', 'browse'
     filters = {}
     ARGV.each do |arg|
       filters[:type] = Regexp.last_match(1) if arg =~ /\A--type=(.+)\z/
       filters[:tag] = Regexp.last_match(1) if arg =~ /\A--tag=(.+)\z/
       filters[:drafts] = true if arg == '--drafts'
     end
-    cmd_list(filters)
+    # Same filters, two ways to read the answer: `list` prints it,
+    # `browse` puts you inside it. Down a pipe they are the same command,
+    # because a screen you can't press keys in is just a list.
+    command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
   when 'help'
     print_usage
   when 'version', '--version', '-v'

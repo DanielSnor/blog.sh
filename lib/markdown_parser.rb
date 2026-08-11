@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'embed'
+
 # lib/markdown_parser.rb -- markdown text -> content blocks (the JSON schema
 # shared with the Tumblr/Twitter importers and build_blog.rb).
 #
@@ -41,7 +43,56 @@ module MarkdownParser
   # Alternation order matters: escape must come first, so `\*` never opens
   # italics. A link also accepts an optional quoted title -- without this
   # the title used to get shoved into the address and the link ended up dead.
-  INLINE_RE = /\\([*`~\[\]!\\])|\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|`([^`]+?)`|\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/m
+  # The escape class and the writer's ESCAPABLE change together: every
+  # character the writer may put a backslash before must lose it here, or
+  # the backslash becomes visible text on the next edit. ")" is in the
+  # class for exactly that reason and is NOT in ESCAPABLE: the writer only
+  # ever escapes it at the start of a line, where "1) first" would
+  # otherwise round-trip into an ordered list -- but the backslash it
+  # wrote had no way back out, so imported "1) ... 2) ..." enumerations
+  # published a visible "1\)" the moment anything else in the post was
+  # edited. The block sigils
+  # (# > - + . _ |) joined for the writer's line-start escaping -- a
+  # paragraph beginning ">50 %" must not round-trip into a quote.
+  #
+  # The link target allows one level of balanced parentheses
+  # ("/Page(ID-123).aspx"), matching what CommonMark does; the writer
+  # percent-encodes the pathological rest.
+  # Six extra alternatives carry the star collisions the writer
+  # legitimately produces when bold and italic meet. A run of stars is
+  # not one delimiter: three of them between two letters can close one
+  # span and open another, which is what CommonMark's delimiter runs say
+  # and what an author means. The shapes are "***both***",
+  # "***head*rest**" (italic on the head of a bold span),
+  # "***head**rest*" (bold on the head of an italic one),
+  # "**pre*tail***" (italic on its tail), "**bold***italic*" --
+  # adjacency, the middle run splitting two-plus-one -- and its mirror
+  # "*italic***bold**", splitting one-plus-two.
+  # The collision shapes use a tempered dot -- (?:(?!\*\*).) -- so their
+  # halves can never reach ACROSS an ordinary bold boundary to a "***"
+  # further down the paragraph; without it, "**A** ... ***x***" read as
+  # one giant span from A to x. The head shapes' REST halves and btail
+  # are tighter still: a rest may hold complete nested runs ("**x**"
+  # inside an italic's rest, "*x*" inside a bold's) but never a lone
+  # star, and btail no stars at all -- a lone star there is always a
+  # closer being stolen from a span further right, which surfaced as
+  # stray asterisks in the text. Plain italic refuses a closer that
+  # touches other stars for the same reason: the star before "**de**"
+  # inside "*ab~~c**de**f~~ghij*" is bold's opener, not italic's closer.
+  #
+  # Alternative order is load-bearing, in both directions. Plain bold --
+  # whose closer is exactly two stars, the (?!\*) guard -- comes BEFORE
+  # the tail-collision shapes, or "**F** dál ... ***v***" reads as one
+  # span from F to v. The adjacency shapes come AFTER them, immediately
+  # before plain italic: placed any earlier they take matches that
+  # belong to the tail collisions, and partially overlapping spans --
+  # what every NPF import produces -- come back with stray asterisks in
+  # the text. They may only have what nothing else can read.
+  # tests/test_markdown_roundtrip.rb walks all 1085 assignments of up to
+  # three spans -- permutations and repeated types included; that matrix
+  # is what these positions were settled against, and what will notice
+  # if they move.
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\*)\*(?!\*)|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -61,35 +112,64 @@ module MarkdownParser
     result = +''
     formatting = []
     pos = 0
-    text.scan(INLINE_RE) do |escaped, bold, italic, strike, code, link_text, link_url, link_title|
-      m = Regexp.last_match
+    while (m = INLINE_RE.match(text, pos))
       result << text[pos...m.begin(0)]
       start = result.length
-      if escaped
-        result << escaped
-      elsif bold
-        inner_text, inner_formatting = parse_inline(bold)
-        result << inner_text
+      if m[:esc]
+        result << m[:esc]
+      elsif m[:bi]
+        append_span(result, formatting, m[:bi], 'italic', start)
         formatting << { 'type' => 'bold', 'start' => start, 'end' => result.length }
-        formatting.concat(shift_formatting(inner_formatting, start))
-      elsif italic
-        inner_text, inner_formatting = parse_inline(italic)
-        result << inner_text
+      elsif m[:ihead]
+        # bold across both parts, italic on the head only.
+        append_span(result, formatting, m[:ihead], 'italic', start)
+        append_plain(result, formatting, m[:irest])
+        formatting << { 'type' => 'bold', 'start' => start, 'end' => result.length }
+      elsif m[:bhead]
+        # italic across both parts, bold on the head only.
+        append_span(result, formatting, m[:bhead], 'bold', start)
+        append_plain(result, formatting, m[:brest])
         formatting << { 'type' => 'italic', 'start' => start, 'end' => result.length }
-        formatting.concat(shift_formatting(inner_formatting, start))
-      elsif strike
-        inner_text, inner_formatting = parse_inline(strike)
-        result << inner_text
-        formatting << { 'type' => 'strikethrough', 'start' => start, 'end' => result.length }
-        formatting.concat(shift_formatting(inner_formatting, start))
-      elsif code
-        result << code
+      elsif m[:itail]
+        append_plain(result, formatting, m[:bpre])
+        append_span(result, formatting, m[:itail], 'italic', result.length)
+        formatting << { 'type' => 'bold', 'start' => start, 'end' => result.length }
+      elsif m[:btail]
+        append_plain(result, formatting, m[:ipre])
+        append_span(result, formatting, m[:btail], 'bold', result.length)
+        formatting << { 'type' => 'italic', 'start' => start, 'end' => result.length }
+      elsif m[:bold]
+        append_span(result, formatting, m[:bold], 'bold', start)
+      elsif m[:badj]
+        # A bold span ending exactly where an italic one begins: the writer
+        # renders that as "**abcd***efgh*", and the run of three stars in
+        # the middle splits 2 + 1 -- the closer for the bold, the opener
+        # for the italic. Plain bold cannot take it (its closer is exactly
+        # two stars, the (?!\*) guard), so without this shape the whole
+        # paragraph fell through to plain italic and came back with stray
+        # asterisks in the visible text. Matches what CommonMark's
+        # delimiter runs do with the same bytes.
+        append_span(result, formatting, m[:badj], 'bold', start)
+        append_span(result, formatting, m[:iadj], 'italic', result.length)
+      elsif m[:ileft]
+        # The mirror image: "*italic***bold**", the middle run splitting
+        # one-plus-one-plus-one... no -- one for the italic's closer, two
+        # for the bold's opener. Same delimiter-run arithmetic as badj,
+        # read from the other side.
+        append_span(result, formatting, m[:ileft], 'italic', start)
+        append_span(result, formatting, m[:bright], 'bold', result.length)
+      elsif m[:italic]
+        append_span(result, formatting, m[:italic], 'italic', start)
+      elsif m[:strike]
+        append_span(result, formatting, m[:strike], 'strikethrough', start)
+      elsif m[:code]
+        result << m[:code]
         formatting << { 'type' => 'code', 'start' => start, 'end' => result.length }
-      elsif link_text
-        inner_text, inner_formatting = parse_inline(link_text)
+      elsif m[:ltext]
+        inner_text, inner_formatting = parse_inline(m[:ltext])
         result << inner_text
-        entry = { 'type' => 'link', 'url' => link_url, 'start' => start, 'end' => result.length }
-        entry['title'] = link_title if link_title && !link_title.empty?
+        entry = { 'type' => 'link', 'url' => m[:lurl], 'start' => start, 'end' => result.length }
+        entry['title'] = unescape_title(m[:ltitle]) if m[:ltitle] && !m[:ltitle].empty?
         formatting << entry
         formatting.concat(shift_formatting(inner_formatting, start))
       end
@@ -99,13 +179,32 @@ module MarkdownParser
     [result, formatting]
   end
 
+  # Recursively parses `chunk`, appends its text to result and wraps it
+  # in one formatting entry of `type`.
+  def append_span(result, formatting, chunk, type, start)
+    inner_text, inner_formatting = parse_inline(chunk)
+    result << inner_text
+    formatting << { 'type' => type, 'start' => start, 'end' => result.length }
+    formatting.concat(shift_formatting(inner_formatting, start))
+  end
+
+  # The same, without a wrapping entry of its own.
+  def append_plain(result, formatting, chunk)
+    return if chunk.to_s.empty?
+
+    start = result.length
+    inner_text, inner_formatting = parse_inline(chunk)
+    result << inner_text
+    formatting.concat(shift_formatting(inner_formatting, start))
+  end
+
   def shift_formatting(formatting, offset)
     formatting.map { |f| f.merge('start' => f['start'] + offset, 'end' => f['end'] + offset) }
   end
 
   # --- block-level regexes -------------------------------------------------
 
-  IMAGE_RE = /\A!\[([^\]]*)\]\(([^)"]+?)(?:\s+"([^"]*)")?\)\z/
+  IMAGE_RE = /\A!\[([^\]]*)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
   # Two exclamation marks = video, whether a local file or YouTube.
   # Deliberately explicit: a bare address on its own line stays a plain
   # paragraph, so a video can also just be linked to instead of every link
@@ -144,7 +243,7 @@ module MarkdownParser
   # link's affordance, an attachment has nowhere to put it, and turning
   # one into an upload would both discard the title and demand a file
   # the author never meant to publish.
-  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"([^"]*)")?\)\z/
+  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
 
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
@@ -193,8 +292,12 @@ module MarkdownParser
   # A GFM-style table: first line is the header, second is a dash separator,
   # the rest is data. Alignment comes from colons in the separator (:---
   # left, ---: right, :---: center).
+  # Splits on unescaped pipes only: a cell whose text contains "|" is
+  # written back as "\|" (see table_to_markdown), and splitting on that
+  # used to silently truncate the cell and drop everything after it.
+  # The backslash itself is removed by parse_inline's escape handling.
   def split_table_row(line)
-    line.strip.sub(/\A\|/, '').sub(/\|\z/, '').split('|').map(&:strip)
+    line.strip.sub(/\A\|/, '').sub(/(?<!\\)\|\z/, '').split(/(?<!\\)\|/).map(&:strip)
   end
 
   def parse_table(para)
@@ -221,9 +324,12 @@ module MarkdownParser
 
     rows = lines.drop(2).map do |line|
       values = split_table_row(line)
-      # Missing cells are padded with empty ones, extra ones are discarded --
-      # so a short or stray row doesn't break the whole table.
-      Array.new(header.size) { |i| cell.call(values[i].to_s) }
+      # Missing cells are padded with empty ones so a short row doesn't
+      # break the table. Extra cells are KEPT: imported archives carry
+      # single-column headers over two-column rows, and discarding the
+      # overflow silently ate the second cell of every row on each edit.
+      # HTML renders a jagged table fine.
+      Array.new([header.size, values.size].max) { |i| cell.call(values[i].to_s) }
     end
 
     { 'type' => 'table', 'align' => align, 'header' => header.map { |h| cell.call(h) }, 'rows' => rows }
@@ -249,7 +355,14 @@ module MarkdownParser
     if quoted_lines.size > 1 && (m = /\A(?:—|--)\s+(.+)\z/.match(quoted_lines.last.strip))
       cite = m[1].strip
       quoted_lines.pop
-      quoted_lines.pop while quoted_lines.last.to_s.empty?
+      # The emptiness test has to come AFTER the emptiness of the array
+      # itself: `[].last` is nil and `nil.to_s.empty?` is true, so a quote
+      # whose only line above the attribution was blank spun here forever
+      # at full CPU -- `./blog.sh add` never returned, and the author lost
+      # the text they had just written to a Ctrl-C. The writer emits
+      # exactly that shape for a stored whitespace-only quote with a cite,
+      # so editing such a post hung on every save.
+      quoted_lines.pop while !quoted_lines.empty? && quoted_lines.last.to_s.strip.empty?
     end
 
     text, formatting = parse_inline(quoted_lines.join("\n"))
@@ -346,8 +459,15 @@ module MarkdownParser
   # gets copied.
   def resolve_image(path, media_dir, counter, media_files = {}, incoming_dir: nil)
     expanded = File.expand_path(path)
-    if media_dir && expanded.start_with?("#{File.expand_path(media_dir)}/")
-      return [File.basename(expanded), nil]
+    # realpath, not just expand_path: /tmp vs /private/tmp (macOS) or any
+    # symlinked path names the same file two ways, and classifying the
+    # post's OWN media file as a new external attachment made a
+    # year-moving edit copy from a source the move had just relocated --
+    # ENOENT mid-save, media moved, JSON left behind.
+    if media_dir
+      real = (File.realpath(expanded) rescue expanded)
+      real_dir = (File.realpath(File.expand_path(media_dir)) rescue File.expand_path(media_dir))
+      return [File.basename(expanded), nil] if real.start_with?("#{real_dir}/") || expanded.start_with?("#{File.expand_path(media_dir)}/")
     end
 
     # A bare filename (no directory component) is looked up in two places, in
@@ -408,7 +528,25 @@ module MarkdownParser
     format('%02d%s', number, ext)
   end
 
-  CODE_FENCE_LINE_RE = /\A```(\S*)\z/
+  # Three backticks or more, so a block whose own text contains a ``` line
+  # can be fenced by a longer run -- the standard markdown escape hatch, and
+  # what the writer now emits. Fixed at exactly three, a code block holding a
+  # fenced example closed at the inner fence: the block split into two empty
+  # code blocks with the text stranded between them as prose, and the edit
+  # guard stayed silent because no block TYPE had disappeared. The closing
+  # fence must be at least as long as the opening one (a shorter run inside
+  # is content, not a terminator).
+  # The writer escapes a backslash and a double quote inside a quoted title
+  # (an image caption, a link title) because the quote is the delimiter.
+  # Undone here so the stored value is what the author typed. nil stays nil:
+  # "no title" and "empty title" are different answers upstream.
+  def unescape_title(text)
+    return text if text.nil?
+
+    text.gsub(/\\(.)/) { Regexp.last_match(1) }
+  end
+
+  CODE_FENCE_LINE_RE = %r{\A(`{3,})[ \t]*([^\n`]*?)[ \t]*\z}
 
   # Splits raw body text into alternating :prose / :code segments on lines of
   # exactly ``` (optionally followed by a language hint, e.g. ```ruby). A code
@@ -457,10 +595,14 @@ module MarkdownParser
 
       segments << { type: :prose, text: buffer.join("\n") } unless buffer.empty?
       buffer = []
-      lang = m[1]
+      fence = m[1]
+      lang = m[2]
       i += 1
       code_lines = []
-      while i < lines.length && lines[i].strip != '```'
+      # Closed only by a fence at least as long as the opening one, and with
+      # nothing after it: a shorter or annotated run is part of the content.
+      until i >= lines.length ||
+            ((closing = /\A(`{3,})\z/.match(lines[i].strip)) && closing[1].length >= fence.length)
         code_lines << lines[i]
         i += 1
       end
@@ -496,6 +638,14 @@ module MarkdownParser
                   'youtube_id' => yt[1], 'caption' => caption }, counter]
       end
 
+      # The other platforms whose address alone says how to play it (see
+      # lib/embed.rb). Same shape as YouTube above -- provider plus the
+      # identifying part, never their embed code -- and the same gesture
+      # for the author: paste the address you would send a friend.
+      if (embed = Embed.detect(target))
+        return [{ 'type' => Embed.kind(embed), 'url' => target, 'caption' => caption }.merge(embed), counter]
+      end
+
       counter += 1
       filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
       media_files[src] = filename if src
@@ -503,7 +653,7 @@ module MarkdownParser
       return [{ 'type' => 'video', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
     elsif (m = IMAGE_RE.match(para))
       counter += 1
-      alt, path, caption = m[1], m[2], m[3]
+      alt, path, caption = m[1], m[2], unescape_title(m[3])
       # A single exclamation mark is for images only. A video with just one
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.
@@ -537,7 +687,10 @@ module MarkdownParser
       file['size'] = size if size&.positive?
       return [{ 'type' => 'file', 'media' => [file],
                 'label' => (label.empty? ? File.basename(target) : label) }, counter]
-    elsif para.match?(/(?<!\\)!\[[^\]]*\]\([^)]+\)/)
+    elsif para.gsub(/`[^`]*`/m, '`x`').match?(/(?<!\\)!\[[^\]]*\]\([^)]+\)/)
+      # Code spans are masked first: "`![popisek](foto.jpg)`" is a code
+      # EXAMPLE of image syntax, not an image, and aborting on it made the
+      # post uneditable.
       # An image in the middle of a paragraph can't be rendered -- the
       # schema only knows image blocks. This used to silently turn into a
       # link to the file plus a stray exclamation mark.
@@ -558,6 +711,12 @@ module MarkdownParser
     else
       text, formatting = parse_inline(collapse_soft_breaks(para))
       block = { 'type' => 'text', 'text' => text.gsub(BREAK_SENTINEL, "\n") }
+      # A quoted link title rides through parse_inline too, so a hard
+      # break inside one arrives here as the sentinel -- but in the
+      # formatting entry, which the swap on `text` above cannot reach.
+      # Left alone, the private-use character was stored in the title
+      # and published.
+      formatting.each { |f| f['title'] = f['title'].gsub(BREAK_SENTINEL, "\n") if f['title'] }
       block['formatting'] = formatting unless formatting.empty?
       return [block, counter]
     end

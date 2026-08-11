@@ -44,6 +44,21 @@ every page carries (and the URL never changed), while a nav slot is
 paid for by every visitor on every page. With quote and chat arriving,
 seven items was the budget.
 
+**The bar sizes itself instead of being sized for a label set.** That
+"budget" was a count, and a count is the wrong unit: the `document` type
+made it nine items, and a site that uses all of them ran its longest
+label under the search field -- measured at 906px (en), 927 (cs) and 899
+(de) against the 908 available, so one locale overflowed and the other
+two had single-digit slack. Anywhere between the mobile breakpoint and
+the full width, every locale did. Three rules replace the budget: the
+menu may wrap to a second row, the search box never shrinks or is
+overlapped, and the gap between items is 1.25rem rather than 1.875rem
+(eight gaps at nine items -- 80px, more than the whole overflow, without
+shortening a single label). A tenth type, a longer translation or a
+different font now costs a taller bar rather than a hidden item.
+*Cost:* a denser menu, and a two-row bar in the narrow band where the
+longest locale still doesn't fit on one.
+
 **The menu lists only types the site actually has.** Nav items, `/type/`
 listings and their sitemap entries exist only for content types with at
 least one published post -- a young site's menu grows with its content
@@ -268,8 +283,74 @@ no-gems promise for real. *Cost:* one more config key, and the
 conversion quality (JPEG, fixed 90) is not configurable -- a knob
 nobody asked for would outlive the question.
 
-**`rexml` is required lazily, inside the two fetchers that need it, not
-at load time.** `rexml` ships as a Ruby *default gem* -- present in a
+**Platform players are built from the address, not from the platform's
+embed code -- and only for platforms whose address says enough.** YouTube
+worked this way from the start; Vimeo, PeerTube, archive.org, Spotify,
+SoundCloud and Mixcloud now follow it (`lib/embed.rb`). The engine stores a
+provider and an id, never foreign HTML, so a post carries no third party's
+markup or tracking, and a platform changing its embed path is one edit here
+rather than a re-import of every post. It also costs no network call at any
+point: writing a post stays an offline operation.
+*Cost:* six patterns that a platform can invalidate, each of which fails
+visibly (an empty player) rather than silently. The rules came from the
+live services, not their docs, which is where the corrections came from --
+an unlisted Vimeo link needs its hash or the player answers 403, a Spotify
+URL copied from a browser carries an `intl-xx` segment the embed path
+rejects, SoundCloud has no id to extract so the whole watch URL is handed
+to the widget (which is also how a private track's secret_token gets
+through), and Mixcloud's widget redirects to a second hostname that the
+page's CSP has to allow as well.
+
+**Two platforms are asked once, when the post is saved -- the only network
+call in the authoring path.** Funkwhale and Bandcamp cannot be handled by
+the string transform the other platforms use, and both were established
+against the live services rather than their docs: Funkwhale's obvious embed
+path builds a player that looks right and stays a permanently black
+rectangle on a current instance, while its oEmbed endpoint answers
+correctly; Bandcamp's page address contains no id at all, only a slug, and
+it has no oEmbed endpoint to ask, so the id comes from the page's own
+twitter:player metadata. The answer is stored in the post as an address, so
+an edit never asks again and the build stays offline -- and it is an
+address, not the HTML those services returned, because "a post carries no
+third party's markup" does not stop applying because a lookup was involved.
+A failed lookup (offline, a timeout, a service with no player for that
+address) is a sentence and a saved post with a link in it, never a refused
+save: writing on a train has to end with a written post. *Cost:* saving a
+post can now block on a slow service for as long as the shared HTTP
+deadline allows, and the CLI says which address it is waiting on.
+
+**A page's frame-src is computed from the players it actually carries.**
+PeerTube is federated, so the host is a property of the post rather than of
+the engine: a fixed policy could not name it in advance, and widening
+frame-src for every site to cover every supported platform would hand every
+page permissions it does not use. Post pages and listings therefore compute
+their own frame origins from their blocks. The PeerTube host is taken with
+`URI.parse` and an explicit hostname shape, never pattern-matched out of the
+raw string -- `https://good.example@evil.test/w/x` reads as the good host to
+a careless regex and as the evil one to the browser. *Cost:* a page's CSP is
+no longer a constant, and a new provider has to say which origins it needs.
+
+**A phone video is mentioned, not refused -- the opposite of HEIC, and
+for a measurable reason.** A HEIC photo displays in Safari and nowhere
+else; HEVC video plays in the large majority of browsers, so refusing it
+would take away a video most readers could watch. The genuinely
+undeployable files are already stopped by the per-file size limit, and on
+real footage the two almost coincide: of twelve clips straight off a
+phone, exactly one was HEVC -- and it was also the only one over 100 MB.
+What was missing was a sentence at the moment the author can still act,
+so `lib/video_probe.rb` reads the video track's codec out of the file's
+own boxes (no ffprobe, the same box walk `MediaDimensions` already does)
+and the save says one line about it. The `.mov` container gets the same
+treatment for a different reason: the video inside is usually ordinary
+H.264, but not every browser accepts the container, and repacking it to
+`.mp4` copies the video across untouched. Neither message blocks the
+save, and the suggested command names the real file -- ffmpeg is not
+installed on a Mac by default, so the message says where to get it.
+*Cost:* the engine now knows about codecs, which it did not before; a
+new codec that browsers disagree about would need a line here.
+
+**`rexml` is required lazily, inside each file that needs it, not at
+load time.** `rexml` ships as a Ruby *default gem* -- present in a
 normal install, but some distros split their Ruby package and leave
 default gems out of the minimal one (Debian/Ubuntu's bare `ruby` vs.
 `ruby-full`). A build with no `widgets.pixelfed`/`widgets.rss`
@@ -357,6 +438,35 @@ reference encoder.
 600, never in git).** Split by sensitivity, not by topic: the site
 config is meant to sync across environments so local and production
 render identically; tokens are meant to exist only where they're used.
+
+**Config written by the engine is edited as text, never dumped from a
+parsed hash.** Loading `config/site.yml`, changing a key and writing it
+back is one line of Ruby and would have destroyed the thing that makes
+the file usable: of its 277 example lines, only about 60 are keys. The
+rest is the documentation for every setting the engine has, plus the
+commented-out blocks you uncomment when you want a widget or a custom
+font -- and real sites hand-edit around it (sean.cz keeps an `<img>`
+inside `about.html`'s folded scalar). So `lib/config_writer.rb`
+substitutes values line by line and leaves every other byte identical,
+and a config that doesn't exist yet is seeded from the example verbatim
+so every key it will ever set is already present to be substituted into.
+*Cost:* a text editor for a structured format, which is only safe
+because it is anchored (key name plus the exact indentation its parent
+implies, searched only inside that parent) and verified afterwards by
+reparsing the file and comparing the values back. Prose comments in the
+template parse as keys otherwise -- `# Optional: posts per listing page`
+would index as `Optional:`.
+
+**`./setup.sh` asks for credentials; `./import.sh` deliberately does
+not.** The import wizard reads `TUMBLR_API_KEY` from the environment
+because a bulk import is not the place to be handling a token, and there
+is a documented file for it. Setup is that file's other end -- it exists
+to create `env.sh` -- so refusing to ask would leave the one job it
+cannot delegate undone. The token is read without echo, masked in the
+diff it shows back, written into a file created mode 600, and verified
+against the instance before it is kept. *Cost:* one dialog in this
+engine handles a secret, so that is one place to be careful about
+rather than none.
 
 **Colors are 7 keys per mode; everything else is derived.** Across
 every palette this engine actually shipped, the other custom properties

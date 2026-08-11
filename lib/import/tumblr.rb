@@ -4,22 +4,38 @@ require 'json'
 require 'net/http'
 require 'time'
 require 'uri'
+require_relative '../i18n'
 require_relative '../slug'
+require_relative 'permalinks'
 
 module Import
-  # Imports a Tumblr blog through the API in NPF format. Every post on the
-  # blog is taken -- drafts included, kept as drafts -- since unlike the
-  # social-network adapters there's no reply/repost distinction to make.
+  # Imports a Tumblr blog through the API in NPF format. Every post the
+  # endpoint hands over is taken, reblogs included -- a Tumblr blog IS its
+  # reblogs, and unlike a Bluesky repost or a Mastodon boost a reblog is an
+  # entry of its own that often carries the owner's commentary. What the
+  # other blogs in the trail contributed is kept WITH THEIR NAMES on it
+  # (see #map) rather than merged into the owner's voice.
+  #
+  # The API-key endpoint is "retrieve published posts": drafts, the queue
+  # and private posts live behind other endpoints that want OAuth, so they
+  # are not in an import. The draft branch in #map is a safety net for a
+  # response that does carry one, not a promise that any will arrive.
   #
   # All media is downloaded, so nothing stays hotlinked to Tumblr's CDN and
   # an import of a few thousand posts runs for hours.
   class Tumblr
     PAGE_SIZE = 20
 
-    def initialize(blog, api_key:)
+    # Same writer-not-option shape as Feed, for the same reason: the
+    # wizard asks about permalinks after the adapter exists.
+    attr_accessor :keep_permalinks
+
+    def initialize(blog, api_key:, keep_permalinks: false)
       @blog = blog
       @api_key = api_key
       @account = blog.split('.').first
+      @keep_permalinks = keep_permalinks
+      @unmapped_permalinks = 0
     end
 
     def label
@@ -50,24 +66,34 @@ module Import
     def map(item, media)
       blocks = (item['content'] || []).filter_map { |b| map_block(b, media) }
 
-      # A reblog carries its own content in `trail`. Since every post being
-      # imported is the account's own, that content is simply appended -- no
-      # separate attribution is kept.
+      # A reblog carries the posts it was built on in `trail`, and those
+      # belong to OTHER blogs -- 12 of 20 posts in one real capture had a
+      # trail, 10 of them with nothing else, so the whole post was someone
+      # else's photo or text. This used to append it bare, on the
+      # assumption that everything on the blog was written by its owner:
+      # one post came out as ten consecutive paragraphs by four different
+      # people with nothing between them, reading as the owner's own
+      # monologue. The content stays (skipping it would drop most of a
+      # typical Tumblr blog, and the trail is what a reblog IS), but every
+      # stretch of it now says whose it is.
       (item['trail'] || []).each do |entry|
-        (entry['content'] || []).each do |b|
-          mapped = map_block(b, media)
-          blocks << mapped if mapped
-        end
+        mapped = (entry['content'] || []).filter_map { |b| map_block(b, media) }
+        next if mapped.empty?
+
+        credit = trail_credit(entry)
+        blocks << credit if credit
+        blocks.concat(mapped)
       end
 
       title, blocks = extract_title(blocks)
       return :empty if blocks.empty? && title.nil?
 
-      {
+      state = item['state'] == 'published' ? 'published' : 'draft'
+      post = {
         'slug' => build_slug(item),
         'title' => title,
         'date' => Time.parse(item['date']).iso8601,
-        'state' => item['state'] == 'published' ? 'published' : 'draft',
+        'state' => state,
         'tags' => item['tags'] || [],
         'content' => blocks,
         'source' => {
@@ -77,6 +103,19 @@ module Import
           'original_id' => item['id']
         }
       }
+      # post_url carries whatever domain the blog answers at -- the custom
+      # domain if it has one, which is the only case the wizard says yes in.
+      if @keep_permalinks && state == 'published'
+        path = Permalinks.local_path(item['post_url'])
+        path ? post['redirect_from'] = [path] : @unmapped_permalinks += 1
+      end
+      post
+    end
+
+    def postscript
+      return nil if @unmapped_permalinks.zero?
+
+      I18n.t('import.note.tumblr_unmapped', count: @unmapped_permalinks)
     end
 
     private
@@ -112,6 +151,29 @@ module Import
       [first['text'], blocks[1..]]
     end
 
+    # The "blogname:" line Tumblr itself renders above a trail item, as a
+    # link to that blog. Not a translated string: the only word in it is a
+    # name the API supplied.
+    #
+    # Nothing is credited to the account itself -- its own posts come back
+    # around in a trail all the time (1 of 12 trail items in the real
+    # capture, and 2 of 4 in one four-blog thread), and crediting yourself
+    # in your own archive is noise.
+    def trail_credit(entry)
+      blog = entry['blog'] || {}
+      # broken_blog_name is what the API sends instead of `blog` when the
+      # blog is gone -- the name is exactly what still matters then.
+      name = (blog['name'] || entry['broken_blog_name']).to_s.strip
+      return nil if name.empty? || name.casecmp?(@account)
+
+      # Offsets are codepoints, as everywhere in NPF, and cover the name
+      # rather than the colon after it.
+      formatting = [{ 'type' => 'bold', 'start' => 0, 'end' => name.length }]
+      url = blog['url'].to_s
+      formatting << { 'type' => 'link', 'start' => 0, 'end' => name.length, 'url' => url } unless url.empty?
+      { 'type' => 'text', 'text' => "#{name}:", 'formatting' => formatting }
+    end
+
     def map_block(block, media)
       case block['type']
       when 'text' then text_block(block)
@@ -119,6 +181,7 @@ module Import
       when 'video' then video_block(block, media)
       when 'audio' then audio_block(block, media)
       when 'link' then link_block(block, media)
+      when 'paywall' then paywall_block(block)
       end
     end
 
@@ -160,12 +223,21 @@ module Import
       }.compact
     end
 
-    # Self-hosted audio carries a downloadable file; SoundCloud/Spotify-style
-    # embeds only ever hand over an iframe, which stays external -- same
-    # split as video. Title and artist become the caption, since that's
-    # what a music post shows.
+    # Self-hosted audio carries a downloadable file. A third-party embed was
+    # assumed to hand over nothing but an iframe -- it doesn't: Bandcamp and
+    # SoundCloud both put a signed, expiring `audio/mpeg` address in `media`
+    # (3 of 4 audio blocks in a real capture had one). Going by whether
+    # `media` is there therefore downloaded someone else's track, and named
+    # it `NN.jpg`, because those stream URLs have no extension in their path
+    # and Media falls back to .jpg for anything unnamed -- which the build
+    # then served through <audio src="01.jpg">, a player that plays nothing.
+    # So the split is decided by the PROVIDER: a named third party keeps its
+    # embed and stays external, as the docs have always said it does.
+    #
+    # Title and artist become the caption, since that's what a music post
+    # shows.
     def audio_block(block, media)
-      item = block['media']
+      item = self_hosted?(block) ? block['media'] : nil
       media_filename = item && media.from_url(item['url'])
       caption = [block['title'], block['artist']].compact.reject(&:empty?).join(' — ')
 
@@ -177,6 +249,34 @@ module Import
         'media' => media_filename ? [{ 'url' => media_filename }] : nil,
         'caption' => (caption unless caption.empty?)
       }.compact
+    end
+
+    # An upload straight to Tumblr is provider "tumblr"; older posts come
+    # with no provider at all, so absence counts as ours and only a named
+    # third party is left alone.
+    def self_hosted?(block)
+      provider = block['provider'].to_s
+      provider.empty? || provider == 'tumblr'
+    end
+
+    # Post+ (Tumblr Creator) posts arrive over the API-key path as the free
+    # teaser plus this block; the paid part is not in the response at all,
+    # because an anonymous reader is a non-member. Dropping the block --
+    # which is what an unknown type used to get -- left an archive claiming
+    # the teaser WAS the post, with nothing in the summary to say otherwise.
+    # There is nothing to fetch, so the honest thing is to keep the dividing
+    # line visible. Tumblr's own wording carries it (%s is where its clients
+    # substitute the blog name), which is also why this needs no string of
+    # our own.
+    def paywall_block(block)
+      # The spec's own switch for a paywall block that is not to be shown.
+      return nil if block['is_visible'] == false
+
+      text = [block['title'], block['text']].compact.map(&:to_s).reject(&:empty?).join(' — ')
+      # A `divider` subtype can be a bare coloured rule with no words in it.
+      return { 'type' => 'hr' } if text.empty?
+
+      { 'type' => 'text', 'subtype' => 'quote', 'text' => text.gsub('%s') { @account } }
     end
 
     # Tumblr bakes its own sandbox origin (safe.txmblr.com) into the iframe

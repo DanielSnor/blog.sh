@@ -69,23 +69,51 @@ body {
   border-radius: 6px;
 }
 
+/* The bar holds two things that both want the width: the type filters and
+   the search box. With every content type present the menu is nine items,
+   and measured against the 908px this has inside a 940px page, the three
+   shipped locales came out at 906 (en), 927 (cs) and 899 (de) -- so the
+   longest one already ran under the search field and the other two had
+   single-digit slack. The three rules that keep it honest, in order:
+   the menu may wrap to a second row (a bar that grows is better than a
+   label hidden under an input), the search box never shrinks or gets
+   overlapped, and `min-width: 0` lets the menu actually give way instead
+   of forcing the overflow it used to. Between 700px and the full width
+   the same applied to every locale, English included. */
 nav {
   background: var(--nav-bg);
   padding: 0 1rem;
-  height: 60px;
+  min-height: 60px;
   box-sizing: content-box;
   display: flex;
   justify-content: space-between;
+  /* flex-start, NOT center: the active item's fill is exactly the bar's
+     60px content box (the transparent 5px borders and background-clip
+     keep it off the frame), so it only sits flush if the menu starts at
+     the top. Centering it left a strip of bar showing under the fill.
+     The search box centres itself with its own align-self. */
   align-items: flex-start;
+  gap: 1rem;
   border-top: 5px solid var(--nav-border);
   border-bottom: 5px solid var(--nav-border);
 }
 
-nav ul { list-style: none; display: flex; margin: 0; padding: 0; }
+nav ul { list-style: none; display: flex; flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; }
 
+/* 1.25rem rather than the original 1.875rem: eight gaps at nine items,
+   so the difference is 80px -- the whole overflow and then some, in
+   every locale, without a single label getting shorter. */
+/* The explicit height matters as much as the line-height: the link inside
+   is 60px tall plus two 5px borders and a -5px top margin, so its border
+   box contributes 65px to the row unless the row is told otherwise. The
+   bar used to be `height: 60px`, which simply clipped that; once it became
+   `min-height` (so the menu can wrap), the extra 5px grew the bar instead
+   and left a strip of bar background under the active item's fill. Fixing
+   the row's height keeps the overflow purely visual -- which is the whole
+   point of it: it is what lets a hovered link paint over the bar's frame. */
 nav li {
-  float: left;
-  margin-left: 1.875rem;
+  margin-left: 1.25rem;
+  height: 60px;
   text-transform: uppercase;
   font-weight: 400;
   font-size: 0.875rem;
@@ -117,18 +145,30 @@ nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bott
    paint over. The negative margins let the fill spill into the gap on
    each side without widening the item -- without them every item after
    the active one shifts sideways, so the whole bar jumps as you move
-   between listings. They match the nav's own 16px padding rather than
-   some smaller inset, so an active HOME (always the first item) sits
-   flush with the bar's edge instead of leaving a 4px sliver of
-   background beside it. Only ever one item is active, so a fill
-   reaching 16px into a 30px gap can't collide with a neighbour's. */
+   between listings.
+
+   The inset is HALF the gap between items, so the fill reaches exactly
+   as far towards its neighbours as they are from it. It used to be the
+   nav's own 16px against a 30px gap, which was nearly half; when the
+   gap dropped to 20px to fit nine types, that same 16px left 4px of air
+   before the next label and the fill read as a too-wide block.
+
+   The first item is the exception: it has no neighbour on its left, and
+   the bar's own 16px padding is what it has to reach across to sit
+   flush with the edge instead of leaving a sliver of background beside
+   it. */
 nav a[aria-current="page"] {
   background: var(--accent);
   background-clip: padding-box;
   color: #ffffff;
-  padding: 0 16px;
-  margin-left: -16px;
-  margin-right: -16px;
+  padding: 0 0.625rem;
+  margin-left: -0.625rem;
+  margin-right: -0.625rem;
+}
+
+nav li:first-child a[aria-current="page"] {
+  padding-left: 1rem;
+  margin-left: -1rem;
 }
 /* Without this the generic :hover above would paint the text --accent
    on an --accent ground and the label would vanish. Inverts the way
@@ -154,9 +194,13 @@ nav a[aria-current="page"]:hover {
 }
 .nav-toggle:hover { color: var(--accent); }
 
-.search-form { position: relative; align-self: center; display: flex; }
+/* flex: 0 0 auto -- the search box is the one thing in the bar that must
+   not be squeezed: a field narrower than its placeholder is useless, and
+   an overlapped one is worse. 160px rather than 225px buys the menu
+   another 65px, and still fits "Search…" with room to type in. */
+.search-form { position: relative; align-self: center; display: flex; flex: 0 0 auto; }
 .search-form input[type="search"] {
-  width: 225px;
+  width: 160px;
   height: 30px;
   background: var(--search-bg);
   color: #3a3a3a;
@@ -224,19 +268,23 @@ nav a[aria-current="page"]:hover {
   position: absolute;
   z-index: 2;
   margin: 0;
-  font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
 
-/* Colors come from colors.css (config/site.yml's colors.<mode>.banner_title/
-   banner_claim, independently optional) -- no light/dark override pair
-   needed here, colors.css already carries both modes. */
+/* Colors and fonts both come from colors.css (config/site.yml's
+   colors.<mode>.banner_title/banner_claim and fonts.banner_title/
+   banner_claim, all independently optional) -- no light/dark override pair
+   needed here, colors.css already carries both modes. The font stacks
+   repeat the engine's default as the var() fallback, so a page served with
+   a stylesheet older than this rule still gets a monospace header rather
+   than the browser's default serif. */
 .banner-title {
   top: 20px;
   left: 24px;
   max-width: 60%;
-  font-size: 45px;
+  font-family: var(--banner-title-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
+  font-size: var(--banner-title-size, 45px);
   font-weight: 700;
   line-height: 1.15;
   color: var(--banner-title-color);
@@ -246,16 +294,22 @@ nav a[aria-current="page"]:hover {
   right: 24px;
   bottom: 20px;
   max-width: 55%;
-  font-size: 20px;
+  font-family: var(--banner-claim-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
+  font-size: var(--banner-claim-size, 20px);
   font-weight: 400;
   line-height: 1.35;
   text-align: right;
   color: var(--banner-claim-color);
 }
 
+/* The narrow-screen sizes are scaled from the configured ones rather than
+   written out, so a site that sets its own size keeps the step down on a
+   phone instead of overflowing the banner with it. The factors are the
+   ratios the fixed values always had (30/45, 14/20), and calc() means the
+   configured value can be in any unit -- px, rem, even a clamp(). */
 @media (max-width: 700px) {
-  .banner-title { font-size: 30px; max-width: 65%; }
-  .banner-claim { font-size: 14px; max-width: 65%; }
+  .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); max-width: 65%; }
+  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 65%; }
 }
 
 #theme-toggle {
@@ -282,7 +336,11 @@ nav a[aria-current="page"]:hover {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  /* The sidebar track is its content width outright -- aside cards carry
+     no horizontal padding (see aside .card below), so every gutter here
+     is layout-level: this padding at the edges, the gap between columns.
+     The post column is the one that grows and shrinks with the viewport. */
+  grid-template-columns: minmax(0, 1fr) 260px;
   gap: 1.5rem;
   padding: 1.5rem 1rem;
 }
@@ -339,7 +397,10 @@ nav a[aria-current="page"]:hover {
 .card { background: var(--card-bg); padding: 1.5rem; border-radius: 4px; }
 
 aside > .card:first-child { margin-top: -1.5rem; }
-aside .card { margin-right: -1rem; }
+/* No horizontal padding: the 260px grid track IS the sidebar's content
+   width. The air on both sides is layout-level -- grid gap on the left,
+   the layout's own edge padding on the right. */
+aside .card { padding-left: 0; padding-right: 0; }
 
 h1 { color: var(--accent); font-size: 1.6rem; margin-top: 0; }
 h2 { color: var(--accent); font-size: 1.75rem; font-weight: 600; line-height: 1.25; margin-top: 0; }
@@ -570,8 +631,14 @@ blockquote {
 .embed-responsive { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1rem 0; }
 .embed-responsive iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
 
+/* An audio widget is a fixed-height strip, not a 16:9 picture -- each
+   platform's player is drawn for its own height (see AUDIO_HEIGHTS in
+   lib/embed.rb), so the height comes from the tag and only the frame is
+   styled here. */
+.embed-audio { display: block; width: 100%; border: 0; margin: 1rem 0; }
+
 .post-header { display: flex; gap: 1rem; align-items: flex-start; margin: -1.5rem -1.5rem 0 -1.5rem; }
-.post-body { flex: 1 1 auto; min-width: 0; padding-right: 1.5rem; }
+.post-body { flex: 1 1 auto; min-width: 0; }
 
 .date-badge {
   flex: 0 0 auto;

@@ -34,12 +34,26 @@ module FileSize
   # nil, not "0 B", when there is nothing to report: an attachment card
   # prints a size only when one is known, and nil is how it asks not to be
   # rendered at all.
+  #
+  # Rounds DOWN, never up. Rounding up let 99_999_999 B print as "100 MB",
+  # so a file the engine had just allowed and a file it would have refused
+  # read identically in the log -- and the soft warning contradicted itself
+  # out loud: "(100 MB) -- under the 100 MB limit". The classification was
+  # right either way (it counts bytes, not text), but a size that reads as
+  # the limit itself while being under it is the kind of detail someone
+  # debugging a refused deploy has no reason to distrust. Rounding down
+  # means the printed number is never larger than the file, so it can never
+  # claim a limit has been reached before it has.
   def human(bytes)
     value = bytes.to_i
     return nil unless value.positive?
     return "#{value} B" if value < 1000
-    return "#{(value / 1000.0).round} kB" if value < 1_000_000
+    return "#{value / 1000} kB" if value < 1_000_000
 
-    format('%.1f MB', value / 1_000_000.0).sub('.0 ', ' ')
+    # Integer division on purpose: (value / 100_000.0).floor would hand
+    # 2_900_000 back as 28 (28.999999999999996 floored), and a size that
+    # shrinks by a tenth for no visible reason is worse than the rounding
+    # this replaces.
+    format('%.1f MB', (value / 100_000) / 10.0).sub('.0 ', ' ')
   end
 end

@@ -29,6 +29,14 @@
 #   ./scripts/deploy-web.sh --prune             # also deletes orphaned files on Surfer
 #   ./scripts/deploy-web.sh --dry-run           # only prints what it would do (doesn't need Surfer)
 
+# Every other entry point inherits this from lib/site_config.rb; this one
+# does not load it. Without it a cron run -- where LANG is unset -- reads
+# the manifest and the paths inside it as US-ASCII, so a single accented
+# filename raises out of JSON.parse or out of a path comparison and BOTH
+# crons die on every tick, with the deploy never completing again.
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = nil
+
 require 'digest'
 require 'json'
 require 'time'
@@ -42,6 +50,16 @@ PRUNE = ARGV.include?('--prune')
 ONLY = ARGV.find { |a| a.start_with?('--only=') }&.delete_prefix('--only=')&.split(',')
 ROOT = File.expand_path('..', __dir__)
 PUBLIC_DIR = File.join(ROOT, 'public.nosync')
+
+# The same lock the build takes: a deploy walks public.nosync file by file
+# and reads the manifest, and a build rewriting it underneath produces
+# either an ENOENT on a file that was there a moment ago or a manifest
+# describing a tree that no longer exists.
+require_relative '../lib/run_lock'
+# --busy-ok is for cron wrappers: their tick skipping because another
+# run holds the lock is routine, and exit 1 here read as a failure mail.
+# A person's deploy keeps the loud non-zero.
+RunLock.acquire!(ROOT, label: 'deploy', busy_exit: ARGV.include?('--busy-ok') ? 0 : 3)
 BACKEND = DeployBackend.pick
 # One manifest per backend (the suffix): the manifest records what THIS
 # target already has, so switching DEPLOY_BACKEND must never inherit
@@ -176,9 +194,23 @@ abort('❌ public.nosync/ does not exist -- run the build first (ruby build/buil
 # would otherwise get a red ❌ on its very first post. Logged loudly so a
 # server whose env.sh lost its values doesn't look like a clean deploy.
 unless DRY || BACKEND.configured?
-  puts "ℹ️  Deploy backend '#{BACKEND.label}' is not configured -- skipping the upload. " \
-       'The build in public.nosync/ is complete; view it with ./blog.sh preview. ' \
-       'To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example).'
+  # "Nowhere yet" is an answer, not a half-finished setup. An unset
+  # DEPLOY_BACKEND resolves to Surfer for compatibility (see
+  # DeployBackend.pick), so naming that backend here told somebody who
+  # had just declined a deploy target in ./setup.sh that a product they
+  # have never heard of is misconfigured -- on their very first post.
+  # doctor already draws this line and says "No deploy target chosen";
+  # these two describe the same install and have to agree.
+  message =
+    if ENV['DEPLOY_BACKEND'].to_s.strip.empty?
+      'ℹ️  No deploy target chosen, so the site is built locally and goes nowhere. ' \
+      'View it with ./blog.sh preview; run ./setup.sh when you want it online.'
+    else
+      "ℹ️  Deploy backend '#{BACKEND.label}' is not configured -- skipping the upload. " \
+      'The build in public.nosync/ is complete; view it with ./blog.sh preview. ' \
+      'To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example).'
+    end
+  puts message
   exit 0
 end
 
@@ -395,7 +427,18 @@ SHRINK_MIN_FILES = 8
 GROWTH_MIN_FILES = 25
 SHRINK_MIN_BYTES = 25_000_000
 
-if !ONLY && !FORCE && swing?(build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
+# `--only` stands the guards down because a run that ships three named
+# files has nothing to say about the shape of the whole build -- true for
+# every per-file backend, and false for a snapshot one. git pages copies
+# and force-pushes the ENTIRE build whatever it was handed (see
+# deploy_backend/git.rb, and `sync`'s own "--only widens to the full
+# build"), so there `--only` disarms four guards over a push that replaces
+# the live site. The half-hourly refresh-sidebar cron is exactly such a
+# run: a broken build it never looked at would go out unexamined, and a
+# force-push leaves nothing to restore from. Same reasoning, and the same
+# SNAPSHOT test, as the per-file size limit above.
+
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{build_files} files, but #{shrink_files} were expected from #{ref_source}.
        That's a #{(100 - (build_files * 100.0 / shrink_files)).round}% drop -- looks like a broken build.
@@ -405,7 +448,7 @@ end
 
 # What the counts cannot see: the same number of files, each of them nearly
 # empty. A broken template or a lost media prefix does exactly that.
-if !ONLY && !FORCE && swing?(build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ holds #{FileSize.human(build_bytes)}, but #{FileSize.human(shrink_bytes)} were expected from #{ref_source}.
        The file count looks reasonable, so this is content going missing inside the pages rather than pages going missing.
@@ -417,7 +460,7 @@ end
 # matching year/slug, but not against duplication of some other kind), a
 # badly merged import, or an accidentally copied tree. Normal growth is a
 # handful of files per published post.
-if !ONLY && !FORCE && swing?(build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
   abort(<<~MSG)
     ❌ Stopped: public.nosync/ has #{build_files} files, only #{growth_files} were expected from #{ref_source}.
        That's a #{((build_files * 100.0 / growth_files) - 100).round}% increase -- looks like a duplicated or broken build.
@@ -430,7 +473,7 @@ end
 # precisely, by name, by the per-file limit. Aborting on the total would
 # just recreate the dead end this whole change removes, in the flows that
 # cannot pass --force.
-if !ONLY && !FORCE && swing?(build_bytes, growth_bytes, BYTES_GROWTH_NOTICE, 0, :up)
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, growth_bytes, BYTES_GROWTH_NOTICE, 0, :up)
   notices << "⚠️  The build grew from #{FileSize.human(growth_bytes)} to #{FileSize.human(build_bytes)} " \
              "since #{ref_source} -- expected if you added media, worth a look if you didn't."
 end

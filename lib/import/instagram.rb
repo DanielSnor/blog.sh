@@ -5,6 +5,7 @@ require 'time'
 require_relative '../slug'
 require_relative '../media_dimensions'
 require_relative 'html_blocks'
+require_relative 'meta_html'
 
 module Import
   # Imports an Instagram account export -- the zip from Settings → Accounts
@@ -264,7 +265,11 @@ module Import
     # reference, the date is the first timestamp-shaped text after the last
     # one, and everything between is Instagram's own metadata tables
     # (latitude, device id, "Has Camera Metadata"), which an archive of what
-    # you wrote has no use for.
+    # you wrote has no use for. The dates print in whatever language the
+    # export was requested in -- MetaHtml's tables (Czech and English,
+    # each verified against a real Meta export) read them back, and an
+    # export in a language they don't know says so by name instead of
+    # importing nothing in silence.
     class HtmlExport < Reader
       # Both attributes are used: photos are `<a href>` + `<img src>` of the
       # same file, a video is `<video src>` wrapping an `<a href>`. Taken
@@ -276,41 +281,37 @@ module Import
       # change; the hashed ones next to them have not.
       POST_BOX = /<div class="[^"]*\buiBoxWhite\b[^"]*">/.freeze
 
-      # "Jan 12, 2023 1:44 am". Anchored, so it matches the timestamp and
-      # not a caption that happens to mention a month.
-      TIMESTAMP = /\A[A-Z][a-z]{2} \d{1,2}, \d{4} \d{1,2}:\d{2} [ap]m\z/.freeze
-      TIMESTAMP_FORMAT = '%b %d, %Y %I:%M %p'
-
-      # The HTML export prints its timestamps without a zone, and the zone
-      # it prints them in is Meta's own: Pacific. Read as local time
-      # instead, an archive comes out shifted by most of a day -- the
-      # giveaway on the export this was built against was a six-hour hole
-      # across every afternoon and 106 of 286 posts between midnight and
-      # 6am, which converts to the two peaks a person posting after the
-      # morning and evening dog walk actually makes.
-      #
-      # A fixed -08:00 and *not* the America/Los_Angeles zone, which is the
-      # obvious choice and is wrong: the export prints standard time all
-      # year, so reading a July post as PDT puts it an hour early. Measured
-      # against the same account's JSON export, whose timestamps are epochs
-      # and therefore beyond argument: 173 of 288 posts -- exactly the ones
-      # in daylight-saving months -- were an hour out, and none are with a
-      # fixed offset.
-      EXPORT_OFFSET = '-0800'
-
+      # The timestamp is recognized among the box's text nodes by shape
+      # ("Jan 12, 2023 1:44 am" -- anchored, so a caption that merely
+      # mentions a month stays a caption) and converted back by
+      # MetaHtml.parse_pacific. The zone is the part the page never
+      # prints, and it is Meta's own: Pacific, as a fixed -08:00 --
+      # standard time all year, NOT the America/Los_Angeles zone that is
+      # the obvious reading. Both facts were measured against this same
+      # account's JSON export, whose epochs are beyond argument: read as
+      # local time, the archive showed a six-hour hole across every
+      # afternoon and 106 of 286 posts between midnight and 6am; read as
+      # the DST-observing zone, 173 of 288 posts -- exactly the ones in
+      # daylight-saving months -- sat an hour off. The result is handed
+      # back in the site's zone, so the date a reader sees and the year
+      # the post's URL is built from are the same day -- a post made
+      # late on New Year's Eve in Prague is an afternoon of December
+      # 31st to the export, and storing that as printed would file it
+      # under the wrong year for good.
       def format
         :html
       end
 
       # From the profile page of the export. The label is in whatever
-      # language the export was requested in, so a miss is expected rather
-      # than exceptional.
+      # language the export was requested in -- the languages MetaHtml
+      # knows are tried, and a miss still just means the directory's
+      # name, not a failure.
       def account
         @account ||= begin
           path = File.join(@export_dir, 'personal_information', 'personal_information',
                            'personal_information.html')
-          nodes = File.exist?(path) ? text_nodes(File.read(path, encoding: 'utf-8')) : []
-          index = nodes.index('Username')
+          nodes = File.exist?(path) ? MetaHtml.text_nodes(File.read(path, encoding: 'utf-8')) : []
+          index = nodes.find_index { |node| MetaHtml.username_label?(node) }
           index ? nodes[index + 1].to_s : fallback_account
         rescue StandardError
           fallback_account
@@ -321,19 +322,43 @@ module Import
 
       # Everything before the first post box is the page header; everything
       # after the last box's timestamp is the page footer, and neither
-      # holds text this looks at.
+      # holds text this looks at. A file whose boxes all failed to date is
+      # the signature of an export in a language the tables don't know,
+      # and deserves one loud line rather than a silent zero.
       def parse_file(path)
         html = File.read(path, encoding: 'utf-8')
-        html.split(POST_BOX).drop(1).filter_map { |chunk| parse_post(chunk) }
+        boxes = html.split(POST_BOX).drop(1)
+        posts = boxes.filter_map { |chunk| parse_post(chunk) }
+        if posts.empty? && !boxes.empty?
+          warn "  #{File.basename(path)}: none of its #{boxes.size} posts carried a readable date -- " \
+               'an export in a language the tables don\'t know? The JSON export needs no translation.'
+        end
+        posts
       end
 
       def parse_post(chunk)
         refs = chunk.scan(MEDIA_REF).flatten.uniq
         head, tail = split_at_media(chunk, refs.first)
-        printed = text_nodes(tail).find { |node| node.match?(TIMESTAMP) }
+        printed = MetaHtml.text_nodes(tail).find { |node| node.match?(MetaHtml::TIMESTAMP_NODE) }
         return nil unless printed
 
-        { caption: plain_text(head), media: refs, time: timestamp(printed) }
+        time = MetaHtml.parse_pacific(printed)
+        return unknown_stamp(printed) unless time
+
+        { caption: MetaHtml.plain_text(head), media: refs, time: time }
+      end
+
+      # One warn per unrecognized month-and-meridiem pair rather than per
+      # post, same policy as the Facebook and Threads readers.
+      def unknown_stamp(printed)
+        @unknown_stamps ||= {}
+        token = printed.gsub(/[\d:,]+/, ' ').split.join(' ')
+        unless @unknown_stamps[token]
+          @unknown_stamps[token] = true
+          warn "  cannot read the timestamp #{printed.inspect} -- posts dated like this are skipped; " \
+               'the JSON export needs no translation'
+        end
+        nil
       end
 
       # The caption is what comes before the post's first photo; the date
@@ -353,27 +378,6 @@ module Import
         [head.sub(/<[^<]*\z/, ''), rest.sub(/\A[^>]*>/, '')]
       end
 
-      def text_nodes(fragment)
-        fragment.gsub(/<[^>]*>/, "\n").split("\n").map { |node| HtmlBlocks.decode_entities(node).strip }
-                .reject(&:empty?)
-      end
-
-      # Tags dropped rather than turned into separators, so a caption's own
-      # newlines are all that remain -- they are what separates its
-      # sentences from its hashtag tail.
-      def plain_text(fragment)
-        HtmlBlocks.decode_entities(fragment.gsub(%r{<br\s*/?>}i, "\n").gsub(/<[^>]*>/, '')).strip
-      end
-
-      # Read with the export's offset appended, then handed back in the
-      # site's zone, so the date a reader sees and the year the post's URL
-      # is built from are the same day -- a post made late on New Year's
-      # Eve in Prague is an afternoon of December 31st to the export, and
-      # storing that as printed would file it under the wrong year for
-      # good.
-      def timestamp(printed)
-        Time.strptime("#{printed} #{EXPORT_OFFSET}", "#{TIMESTAMP_FORMAT} %z").getlocal
-      end
     end
 
     # The JSON export is the same archive without the page around it, and
@@ -459,12 +463,17 @@ module Import
 
       # The profile file nests the username differently between export
       # versions (string_map_data in the ones seen, plain keys in others),
-      # so it is searched for rather than reached for.
+      # so it is searched for rather than reached for. The key is a
+      # localized display label, and in a localized export it arrives
+      # mojibake-mangled like any other string -- so it goes through
+      # repair before the comparison, which on an English key changes
+      # nothing.
       def find_username(node)
         case node
         when Hash
-          if node.key?('Username')
-            value = node['Username']
+          key = node.keys.find { |k| MetaHtml.username_label?(repair(k.to_s)) }
+          if key
+            value = node[key]
             return repair(value.is_a?(Hash) ? value['value'].to_s : value.to_s)
           end
 

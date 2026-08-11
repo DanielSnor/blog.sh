@@ -1,19 +1,32 @@
+<%# The three divs stay in place even when empty: the footer is a fixed
+    1fr-2fr-1fr grid (site.css), and dropping a div would shift the
+    remaining columns into the wrong tracks. What comes and goes with the
+    content is the heading over it -- an emptied social list used to
+    leave an orphan "Find me on" hanging over nothing. %>
 <footer>
       <div>
+<% unless footer_links_html.empty? %>
         <h3><%= h(FOOTER['links_heading']) %></h3>
         <ul>
 <%= footer_links_html %>
         </ul>
+<% end %>
       </div>
       <div>
+<% unless FOOTER['note_html'].to_s.strip.empty? %>
         <h3><%= h(FOOTER['note_heading']) %></h3>
         <p><%= FOOTER['note_html'] %></p>
+<% end %>
+<% unless FOOTER['copyright'].to_s.strip.empty? %>
         <p class="copyright"><%= FOOTER['copyright'] %></p>
+<% end %>
       </div>
       <div>
+<% unless social_links_html.empty? %>
         <h3><%= h(FOOTER['social_heading']) %></h3>
         <div class="social-icons">
 <%= social_links_html %>
         </div>
+<% end %>
       </div>
     </footer>

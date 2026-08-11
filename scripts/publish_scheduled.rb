@@ -21,12 +21,22 @@ require_relative '../lib/site_config'
 
 SiteConfig.use_site_timezone!
 
+# Held for the whole run -- publishing, the rebuild and the deploy are one
+# operation as far as the site is concerned, and the sidebar cron or a
+# person at the CLI must not walk into the middle of it. A tick that finds
+# the lock held leaves quietly: nothing has been published, and cron is
+# back in fifteen minutes (see lib/run_lock.rb).
+require_relative '../lib/run_lock'
+RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0)
+
 # A post is announced before the site is rebuilt (so the toot's URL and the
 # comment thread exist in the same build), which means a failed deploy would
 # otherwise leave a live announcement pointing at a page that was never
 # uploaded -- and nothing would retry, because the post is no longer
 # scheduled and the next run has nothing due. This marker is that retry.
-DEPLOY_PENDING = File.join(Publishing::ROOT, '.deploy-pending')
+# One definition, in Publishing, because the manual publish leaves this
+# marker too now -- two copies of the same path is how they drift apart.
+DEPLOY_PENDING = Publishing::DEPLOY_PENDING
 
 due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
   begin
@@ -49,6 +59,15 @@ due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do 
   end
 end
 
+# Written on EVERY tick, before anything is decided -- including the ticks
+# where nothing is due, which are almost all of them. That is the point:
+# a queue that never fires looks exactly like a queue whose time has not
+# come, and the only difference is whether anything is running at all.
+# Without this the engine could not tell the two apart, and neither could
+# anyone else: a post can sit past its date indefinitely with nothing
+# anywhere saying why. `doctor` reads this file.
+Publishing.mark_scheduler_alive
+
 if due.empty? && !File.exist?(DEPLOY_PENDING)
   puts I18n.t('cron.no_scheduled_due')
   exit 0
@@ -64,6 +83,15 @@ due.each do |path, post, date|
   AtomicWrite.write_json(new_path, updated.merge(fields)) if fields
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
+  # The post is published either way -- that part worked, and undoing it
+  # would be worse. But an announcement that was attempted and failed is a
+  # failure of this run: counted, so the exit code is non-zero and cron
+  # mails somebody, and said out loud, because the post is now public with
+  # nothing announcing it and no second attempt coming.
+  if fields == false
+    failures += 1
+    warn I18n.t('cron.announce_failed', slug: updated['slug'])
+  end
 # SystemExit as well as StandardError: the likeliest per-post failure is
 # Publishing.publish's own `abort` when the target year already has a post
 # with this slug, and an abort in a loop over due posts must not take the
@@ -81,11 +109,9 @@ end
 reason = due.empty? ? I18n.t('cron.retrying_deploy') : I18n.t('cron.publishing_scheduled', count: due.size)
 deployed = Publishing.rebuild_and_deploy(reason)
 
-if deployed
-  File.delete(DEPLOY_PENDING) if File.exist?(DEPLOY_PENDING)
-else
-  File.write(DEPLOY_PENDING, Time.now.iso8601)
-  warn I18n.t('cron.deploy_will_retry')
-end
+# The .deploy-pending marker is written and cleared by rebuild_and_deploy
+# itself now, so every path that can leave the site owing a deploy -- this
+# cron and the manual publish alike -- leaves the same trace behind.
+warn I18n.t('cron.deploy_will_retry') unless deployed
 
 exit(deployed && failures.zero? ? 0 : 1)

@@ -1,15 +1,19 @@
-# Site configuration. Versioned and synced to the server -- unlike env.sh,
-# which only holds secrets (API tokens). If these values lived in env.sh
-# instead, a local build would render a different site than production, and
-# changes would have no history.
+# Site configuration -- everything about the site except its secrets,
+# which live in env.sh (API tokens). Your own config/site.yml is
+# gitignored, like env.sh: keep it with your backups, not in the engine's
+# repository. Splitting it this way is what lets a local build render the
+# same site as production.
 #
 # Copy this file to config/site.yml (gitignored -- see .gitignore) and fill
 # it in for your own site. After every edit, rebuild: ./blog.sh rebuild, or
 # directly ruby build/build_blog.rb && ./scripts/deploy-web.sh.
 #
-# Sections in reading order: identity (site, banner, about, footer,
-# social) -> the comments network (mastodon OR bluesky) -> optional
-# extras (widgets, analytics, colors). A minimal config with just site,
+# Sections in the order the page reads, top to bottom (the same order
+# ./style.sh's menu walks them): identity (site) -> the whole page's
+# palette (colors) -> the header (banner, fonts) -> the sidebar (about,
+# widgets) -> the footer (footer, social) -> analytics -> then the parts
+# with no place on the page: the comments network (mastodon OR bluesky),
+# publishing slots, media habits. A minimal config with just site,
 # banner, about and footer is a complete, working site.
 
 site:
@@ -48,6 +52,46 @@ site:
   # change, and changing this later renumbers every existing page.
   # page_size: 10
 
+# Optional. Omit this whole section (or any key inside it) to fall back to
+# blog.sh's own blue palette (DEFAULT_COLORS in lib/colors_css.rb). Each
+# mode only takes these 7 keys -- everything else the CSS needs (card
+# background, nav text/border, link/badge hover, search input background)
+# is derived from them at build time (see color_properties in
+# lib/colors_css.rb), not separately configurable, since it's never
+# varied independently across any palette this engine has shipped.
+# Ready-made palettes live in config/palettes.yml -- `./style.sh` lists
+# them, shows a preview, and writes the chosen one in here, which beats
+# picking fourteen hex values by hand. Adding your own to that file makes
+# it appear in the list.
+# Rebuild after changing any value here: ./blog.sh rebuild.
+#
+# banner_title / banner_claim are the one exception: two more OPTIONAL
+# keys per mode, independent of each other and of the 7 above, for the
+# banner overlay text's color (see banner.show_title/show_claim below).
+# Default when omitted: nav_bg in light mode, white in dark mode -- the
+# same look the banner had before these keys existed.
+colors:
+  light:
+    bg: "#f5f8fa"
+    text: "#444a5a"
+    meta_text: "#657784"
+    accent: "#1da1f2"
+    nav_bg: "#eaf5fd"
+    border: "#e1e8ed"
+    pill_bg: "#d6ecfc"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
+  dark:
+    bg: "#111111"
+    text: "#ffffff"
+    meta_text: "#6a7f8c"
+    accent: "#4ab3f4"
+    nav_bg: "#192734"
+    border: "#263340"
+    pill_bg: "#16324a"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
+
 banner:
   # Ships with the engine, so a fresh install renders before you've drawn
   # anything -- replace it with your own image and update the size below.
@@ -70,12 +114,83 @@ banner:
   # owner-edited config, not visitor input).
   # claim: "First line<br>Second line"
 
+# Optional, and the typographic half of the palette: the two lines painted
+# over the banner -- the site's name and its claim -- take their font AND
+# size from here. Omit the section (or any key in it) and they stay in the
+# engine's own monospace at 45px/20px, exactly as before these keys
+# existed. The rest of the site's typography is not configurable; this is
+# the header, not a theming system.
+# Rebuild after changing anything here: ./blog.sh rebuild.
+#
+# The *_size keys matter as much as the families: a serif set at the
+# monospace default's 45px fills the banner quite differently, so the pair
+# belongs together. Any CSS length works (px, rem, even clamp()), and the
+# narrow-screen sizes follow automatically -- site.css scales them from
+# these, so a phone still steps down instead of overflowing.
+#
+# Each family key is a CSS font stack, used as written, so system families
+# need nothing else: banner_title: '"Iowan Old Style", Palatino, Georgia,
+# serif' is a complete answer. Title and claim are independent -- a serif
+# name above a sans-serif claim is one line each.
+#
+# To use your OWN font, drop the file into assets/fonts/ and declare it
+# under `faces` first; then name it in the stack. Only the file name is
+# used (no paths), the format follows the extension (.woff2, .woff, .ttf,
+# .otf), `weight` and `style` are optional ("400 700" and normal). A file
+# declared here but missing from assets/fonts/ is named in the build
+# output and skipped -- the site would otherwise render in the fallback
+# and look like the config simply didn't work.
+# fonts:
+#   faces:
+#     - family: "Playfair Display"
+#       file: "playfair-display.woff2"
+#       weight: "400 700"
+#   banner_title: '"Playfair Display", Georgia, serif'
+#   banner_title_size: "52px"
+#   banner_claim: '"Open Sans", Arial, Helvetica, sans-serif'
+#   banner_claim_size: "20px"
+
 about:
   heading: "About"
   # May contain HTML (links). Inserted inside a <p>.
   html: >-
     A short bio about yourself, with a <a href="https://example.com">link</a>
     if you like.
+
+# Optional, and each entry independently so. Sidebar widget data is fetched
+# by the server (lib/sidebar.rb), not the visitor's browser, and refreshed
+# by cron via ./scripts/refresh-sidebar.sh. Commented out here because the
+# placeholder accounts don't exist -- uncomment an entry once you've put
+# your own values in; omitting any entry (or the whole `widgets:` key)
+# just means no such widget.
+# widgets:
+#   toots:
+#     heading: "Recent toots"
+#     # instance is optional -- it falls back to mastodon.instance below,
+#     # so set it only when the widget shows an account living elsewhere.
+#     # instance: "mastodon.social"
+#     account_id: "000000000000000000" # numeric Mastodon account id, not the @handle
+#     limit: 3
+#   pixelfed:
+#     heading: "Recent Pixelfed posts"
+#     feed_url: "https://pixelfed.social/users/yourname.atom"
+#     limit: 3
+#   commits:
+#     heading: "Recent commits"
+#     username: "yourname"
+#     limit: 3
+#   bluesky:
+#     heading: "Recent Bluesky posts"
+#     # handle is optional -- it falls back to bluesky.handle below, so set
+#     # it only when the widget shows an account other than the site's own.
+#     # handle: "you.bsky.social"
+#     limit: 3
+#   rss:
+#     heading: "Elsewhere"
+#     # Any RSS 2.0 or Atom feed: another blog, a YouTube channel, a
+#     # podcast -- or X through a self-hosted Nitter instance.
+#     feed_url: "https://example.com/feed.xml"
+#     limit: 3
 
 footer:
   links_heading: "Links"
@@ -91,8 +206,17 @@ footer:
   social_heading: "Find me on"
 
 # icon = a name from the built-in set: mastodon, pixelfed, linkedin,
-# github, bluesky, instagram, threads, youtube, rss, email.
+# github, bluesky, instagram, threads, facebook, x, youtube, rss, email.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
+#
+# rel = an optional rel attribute for the rendered link. rel: "me" is
+# what earns the green check mark next to your site on a Mastodon
+# profile: Mastodon fetches the address you put in a profile metadata
+# field and verifies it only if that page links back with rel="me" to
+# the profile. Since the icons sit in the footer, every page carries the
+# link -- put your home page in the profile field and it just works. The
+# url: here has to be your profile as Mastodon shows it
+# (https://instance/@handle). More than one entry may carry rel: "me".
 social:
   - name: "Mastodon"
     url: "https://mastodon.social/@yourname"
@@ -107,6 +231,33 @@ social:
   - name: "E-mail"
     url: "mailto:you@example.com"
     icon: "email"
+
+# Optional. Omit this whole section for a site with no analytics script.
+# Commented out so a fresh build doesn't reference a script that isn't
+# yours -- uncomment with your own values.
+# analytics:
+#   src: "https://analytics.example.com/script.js"
+#   website_id: "00000000-0000-0000-0000-000000000000"
+
+# Optional. The comments/announcement network: every published post is
+# announced there, and replies to that announcement are the post's
+# comments. Configure EITHER mastodon: OR bluesky: -- never both; the
+# build refuses a config with two networks, since comments live in
+# exactly one place. Omit both sections for a site with no network
+# integration at all (no announcements, no comments, no post stats).
+#
+# The secrets go in env.sh, not here: MASTODON_ACCESS_TOKEN for
+# Mastodon, BLUESKY_APP_PASSWORD for Bluesky.
+mastodon:
+  instance: "mastodon.social"
+  # Optional: your instance's status character limit (default 500).
+  # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
+  # toot_length: 500
+
+# The Bluesky alternative (uncomment this and remove mastodon: above):
+# bluesky:
+#   handle: "you.bsky.social"
+#   # pds: "https://bsky.social"   # only for a self-hosted PDS
 
 # Optional. The times posts usually go out. With this set, [s] in the
 # draft dialog offers the next FREE slot instead of an empty prompt, so
@@ -131,101 +282,3 @@ social:
 # backends; nothing else changes.
 # media:
 #   convert_heic: true
-
-# Optional. The comments/announcement network: every published post is
-# announced there, and replies to that announcement are the post's
-# comments. Configure EITHER mastodon: OR bluesky: -- never both; the
-# build refuses a config with two networks, since comments live in
-# exactly one place. Omit both sections for a site with no network
-# integration at all (no announcements, no comments, no post stats).
-#
-# The secrets go in env.sh, not here: MASTODON_ACCESS_TOKEN for
-# Mastodon, BLUESKY_APP_PASSWORD for Bluesky.
-mastodon:
-  instance: "mastodon.social"
-  # Optional: your instance's status character limit (default 500).
-  # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
-  # toot_length: 500
-
-# The Bluesky alternative (uncomment this and remove mastodon: above):
-# bluesky:
-#   handle: "you.bsky.social"
-#   # pds: "https://bsky.social"   # only for a self-hosted PDS
-
-# Optional, and each entry independently so. Sidebar widget data is fetched
-# by the server (lib/sidebar.rb), not the visitor's browser, and refreshed
-# by cron via ./scripts/refresh-sidebar.sh. Commented out here because the
-# placeholder accounts don't exist -- uncomment an entry once you've put
-# your own values in; omitting any entry (or the whole `widgets:` key)
-# just means no such widget.
-# widgets:
-#   toots:
-#     heading: "Recent toots"
-#     # instance is optional -- it falls back to mastodon.instance above,
-#     # so set it only when the widget shows an account living elsewhere.
-#     # instance: "mastodon.social"
-#     account_id: "000000000000000000" # numeric Mastodon account id, not the @handle
-#     limit: 3
-#   pixelfed:
-#     heading: "Recent Pixelfed posts"
-#     feed_url: "https://pixelfed.social/users/yourname.atom"
-#     limit: 3
-#   commits:
-#     heading: "Recent commits"
-#     username: "yourname"
-#     limit: 3
-#   bluesky:
-#     heading: "Recent Bluesky posts"
-#     # handle is optional -- it falls back to bluesky.handle above, so set
-#     # it only when the widget shows an account other than the site's own.
-#     # handle: "you.bsky.social"
-#     limit: 3
-#   rss:
-#     heading: "Elsewhere"
-#     # Any RSS 2.0 or Atom feed: another blog, a YouTube channel, a
-#     # podcast -- or X through a self-hosted Nitter instance.
-#     feed_url: "https://example.com/feed.xml"
-#     limit: 3
-
-# Optional. Omit this whole section for a site with no analytics script.
-# Commented out so a fresh build doesn't reference a script that isn't
-# yours -- uncomment with your own values.
-# analytics:
-#   src: "https://analytics.example.com/script.js"
-#   website_id: "00000000-0000-0000-0000-000000000000"
-
-# Optional. Omit this whole section (or any key inside it) to fall back to
-# blog.sh's own blue palette (build/build_blog.rb's DEFAULT_COLORS). Each
-# mode only takes these 7 keys -- everything else the CSS needs (card
-# background, nav text/border, link/badge hover, search input background)
-# is derived from them at build time (see color_properties in
-# build/build_blog.rb), not separately configurable, since it's never
-# varied independently across any palette this engine has shipped.
-# Rebuild after changing any value here: ./blog.sh rebuild.
-#
-# banner_title / banner_claim are the one exception: two more OPTIONAL
-# keys per mode, independent of each other and of the 7 above, for the
-# banner overlay text's color (see banner.show_title/show_claim above).
-# Default when omitted: nav_bg in light mode, white in dark mode -- the
-# same look the banner had before these keys existed.
-colors:
-  light:
-    bg: "#f5f8fa"
-    text: "#444a5a"
-    meta_text: "#657784"
-    accent: "#1da1f2"
-    nav_bg: "#eaf5fd"
-    border: "#e1e8ed"
-    pill_bg: "#d6ecfc"
-    # banner_title: "#ffffff"
-    # banner_claim: "#ffffff"
-  dark:
-    bg: "#111111"
-    text: "#ffffff"
-    meta_text: "#6a7f8c"
-    accent: "#4ab3f4"
-    nav_bg: "#192734"
-    border: "#263340"
-    pill_bg: "#16324a"
-    # banner_title: "#ffffff"
-    # banner_claim: "#ffffff"

@@ -18,6 +18,7 @@ Ein Link auf diese Seite steht auch in der Editor-Hilfe, sie ist beim Schreiben 
 - [Bilder](#bilder)
 - [Video](#video)
 - [Audio](#audio)
+- [Anhänge](#anhange)
 - [Escaping](#escaping)
 - [Bewusst nicht unterstützt](#bewusst-nicht-unterstutzt)
 
@@ -79,6 +80,19 @@ Hervorhebungen lassen sich kombinieren und verschachteln:
 ```
 
 **fetter Text mit *Kursivem* darin**
+
+Sie dürfen auch unmittelbar nebeneinander stehen, ohne Leerzeichen. Die
+drei Sterne in der Mitte werden als zwei gelesen: das schließende Paar
+des Fettdrucks und der einzelne, der das Kursive öffnet. Umgekehrt geht
+es auch — einer schließt das Kursive, das Paar öffnet den Fettdruck.
+
+```
+**fett***kursiv*
+*kursiv***fett**
+```
+
+**fett***kursiv*
+*kursiv***fett**
 
 ## Links
 
@@ -252,7 +266,7 @@ Der Pfad darf irgendwohin auf der Platte zeigen, die Datei wird automatisch kopi
 
 ## Video
 
-Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei und für YouTube. **Bei einem Video ist die Unterschrift Pflicht.**
+Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei (.mp4, .mov, .m4v) und für eine Videoadresse: YouTube, Vimeo, PeerTube, archive.org. **Bei einem Video ist die Unterschrift Pflicht.**
 
 ```
 !![Videounterschrift](/pfad/zum/video.mp4)
@@ -267,7 +281,12 @@ Eine bloße YouTube-Adresse auf eigener Zeile wird **nicht** zum Player — sie 
 
 Dieselben zwei Ausrufezeichen wie beim Video — unterschieden werden sie an
 der Dateiendung (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Die
-Unterschrift ist Pflicht**, gerendert wird ein nativer Player.
+Unterschrift ist Pflicht**, gerendert wird ein nativer Player. Dieselbe
+Zeile nimmt auch eine Adresse von Spotify, SoundCloud, Mixcloud, Funkwhale
+oder Bandcamp und macht daraus den Player der jeweiligen Plattform. (Bei
+den letzten beiden genügt die Adresse allein nicht, das Speichern fragt
+den Dienst einmal nach seinem Player -- der einzige Moment, in dem das
+Schreiben eines Beitrags das Netz braucht.)
 
 ```
 !![Unterschrift der Aufnahme](/pfad/zur/aufnahme.mp3)

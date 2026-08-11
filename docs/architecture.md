@@ -58,6 +58,7 @@ dedup by `source`).
 | `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
 | `former_slugs` | array of strings | every address the post used to have, as `"year/slug"` frozen at rename time; the build emits a redirect stub for each (see `props` → rename). Engine-side history like the announcement URLs: edits and re-imports carry it over untouched |
 | `unpublished_from` | string | drafts only -- the `"year/slug"` address the post vacated when it was unpublished. Publishing consumes it: back under a different slug it becomes a `former_slugs` redirect, back under the same one it just disappears |
+| `redirect_from` | array of strings | site-root paths the post answered at on its PREVIOUS platform (`"/old-post/"`, `"/2009/05/old-post.html"`), written by importers when the new site keeps the old domain. The build emits a redirect stub for each, after everything real -- a live page, listing or site file always wins over a stub, out loud. Deliberately separate from `former_slugs`: that is rename history inside this site, this is where the post lived before it arrived. Paths ending `.html`/`.htm` become literal files (Blogger-era URLs had no trailing slash); first segments the site itself owns (`posts`, `page`, `tag`, `type`, `assets`, `search`, `markdown`) are refused. Published posts only; edits and re-imports carry it over untouched |
 
 **Blocks** (`content` array entries), by `type`:
 
@@ -71,8 +72,8 @@ dedup by `source`).
 | `hr` | no fields |
 | `image` | `media` (see below); `alt_text`; `caption` |
 | `file` | `media` (`url`, `size` in bytes); `label` -- an attachment offered for download; the post's type becomes `document` when its text is caption-short |
-| `video` | one of three shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
-| `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
+| `video` | one of four shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; another platform the address alone identifies (Vimeo, PeerTube, archive.org) -- `provider`, `url`, `embed_id` (+ `embed_hash` for an unlisted Vimeo, `embed_origin` for the PeerTube instance), see `lib/embed.rb`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
+| `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; a platform the address identifies (Spotify, SoundCloud, Mixcloud) -- `provider`, `url` and, where there is one, `embed_id`/`embed_kind`, see `lib/embed.rb`; a platform that had to be asked (Funkwhale, Bandcamp) -- `provider`, `url`, `embed_src` resolved once at save time by `lib/embed_lookup.rb` (+ `embed_origin` for the Funkwhale instance); imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
 | `link` | `url`; `title`; `description` -- rendered as a link card |
 
 An unrecognized `type` renders as its raw JSON in a `<pre>` -- loud,
@@ -109,6 +110,12 @@ see it:
   formatting spans may come out normalized. Content markdown can't
   express (imported embeds, link cards) is protected by a count-based
   loss check in the CLI before saving.
+- The count-based check compares block types, so it sees a block that
+  disappeared but not an attribute that did. Where an attribute has no
+  markdown form and cannot be re-typed by the author -- a video's imported
+  `poster` -- the CLI carries it over from the stored post instead,
+  matching on the video's file or URL. Anything added to a block that
+  markdown cannot write down needs the same treatment.
 - The importers write the same schema through the shared
   `lib/post_writer.rb`, so an imported post and a hand-written one are
   indistinguishable downstream.
@@ -116,8 +123,8 @@ see it:
 ## Importing
 
 An import splits along the line between what every platform needs and what
-only one does, so that adding the fifth source doesn't mean a fifth copy of
-the first four's plumbing:
+only one does, so that adding a source means writing its mapping, not
+another copy of the plumbing every existing adapter shares:
 
 - **`Import::Media`** collects one post's media for `PostWriter`, from
   either a URL (download, following redirects, retrying transient failures)
@@ -133,10 +140,16 @@ the first four's plumbing:
   posts arrived than the source has. Two callbacks, `on_scan` and `on_post`,
   let a wizard show progress without this layer knowing what a terminal is.
 - **An adapter** implements only `label`, `each_item` (paging the source)
-  and `map(item, media)`, returning a post hash or a skip reason. Two
+  and `map(item, media)`, returning a post hash or a skip reason. Five
   optional hooks cover what sources differ on: `preamble` (a line to print
-  before a slow read) and `total` (the source's size, often knowable only
-  once the first page arrives).
+  before a slow read), `total` (the source's size, often knowable only
+  once the first page arrives), `postscript` (a one-line note after a run
+  or preview -- scheduled posts becoming drafts, posts with no usable
+  original address), `platform_tag` (the tag posts are filed under when
+  the platform's name makes a poor one -- "medium.com" says more than
+  "feed") and `keep_permalinks=` (a setter whose presence tells the
+  wizard this adapter can record old addresses as `redirect_from`, so the
+  question is asked per capability and defaults to no).
 - **`Import::HtmlBlocks`** converts a post body that arrives as markup into
   blocks, for the sources that hand over HTML rather than structured data.
   A tolerant tokenizer and a stack-based tree (an XML parser refuses real
@@ -159,9 +172,11 @@ site.timezone and shift by hours. Images referenced in the markup are
 downloaded and then *measured*: HTML rarely states dimensions, and a block
 without them is dropped at build time by `degenerate_image?`.
 
-An adapter judges items rather than pre-filtering them: `map` returns
-`:reply`/`:retweet`/`:quote`/`:empty` instead of the adapter quietly dropping
-them, so the run's summary can account for every item the source held. That
+An adapter judges items rather than pre-filtering them: `map` returns the
+reason as a Symbol -- `:reply`, `:retweet`, `:quote`, `:empty` and their kin;
+the wizard's `TRANSLATED_REASONS` in `scripts/import.rb` names two dozen
+across the adapters -- instead of quietly dropping the item, so the run's
+summary can account for every item the source held. That
 also means a written-post counter is not a progress fraction -- a source that
 skips half its items never writes as many posts as it has -- so both counters
 are reported and the caller picks: against a `LIMIT` the goal is posts
@@ -187,8 +202,10 @@ mirrored client-side by `fold()` in search.js), `lib/content_type.rb`
 "quote" means the post's first block is one, and media win only while the
 post's text stays caption-sized -- past 500 characters it's an article
 with illustrations, i.e. text), `lib/media_dimensions.rb`
-(width/height straight from PNG/JPEG/MP4 headers, so pages reserve
-space and never jump).
+(width/height straight from PNG/JPEG/MP4 headers -- EXIF orientation
+included, so a photo taken sideways reserves the space it is shown at),
+`lib/video_probe.rb` (the video track's codec from the same box walk, two
+levels further down at `stsd`, so a save can say that a clip is HEVC).
 
 ## Build pipeline (`build/build_blog.rb`)
 
@@ -222,8 +239,13 @@ A single linear pass, no framework:
    favicon are per-install files outside git (see decisions.md), so a
    fresh clone renders immediately while an owner's own artwork is never
    overwritten; `defaults/` itself is not published. `config/site.yml`'s 7-key palettes
-   compile into `assets/css/colors.css`; `site.css` itself contains zero
-   color values. `build_favicon_ico` wraps `assets/images/favicon.png` in
+   compile into `assets/css/colors.css`, together with the header's font
+   stacks and sizes and any `@font-face` a site declared for its own files
+   in `assets/fonts/`; `site.css` itself contains no palette values -- its
+   only color literals are palette-independent neutrals (white, two fixed
+   grays, black/white alpha overlays) -- and no site-specific typography. One generated stylesheet rather than two on
+   purpose: it is already linked from the layout, so adding fonts to it
+   changes two files on a deploy instead of every page in the archive. `build_favicon_ico` wraps `assets/images/favicon.png` in
    an ICO container (a 22-byte header, then the PNG verbatim) and emits
    `/favicon.ico` -- pages link the PNG, so this exists purely for clients
    that request the root path without reading the `<link>`. No image
@@ -276,7 +298,13 @@ one-liner -- that depends on `webrick`, a default gem some distros
 split out of their minimal Ruby package (see [decisions.md](decisions.md)).
 Percent-decodes the request path itself and rejects anything that
 resolves outside the served root, the one security property a static
-file server actually needs.
+file server actually needs. It answers byte ranges (206, and 416 for a
+range past the end) and streams the file rather than reading it whole:
+without ranges Safari refuses to play a media element at all, and
+seeking in a video or audio post is broken everywhere else -- a preview
+that cannot show what the deployed site does is not a preview. Every
+extension the engine can attach to a post has a MIME type here, for the
+same reason.
 
 ## Deploy (`scripts/deploy_web.rb` + `lib/deploy_backend/`)
 

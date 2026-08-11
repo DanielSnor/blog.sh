@@ -3,6 +3,9 @@
 require 'json'
 require 'fileutils'
 require 'time'
+# For $CHILD_STATUS -- the exit status of the build and the deploy is what
+# tells "the lock was busy" from "it broke", and $? does not read as either.
+require 'English'
 require_relative 'site_config'
 require_relative 'atomic_write'
 require_relative 'post_writer'
@@ -109,7 +112,13 @@ module Publishing
     return plain if plain.length <= limit
     return '' if limit <= 0
 
-    "#{plain[0, limit].sub(/\s+\S*\z/, '')}…"
+    # limit - 1, because the ellipsis is a character too: budgeted at the
+    # full limit, a perex that had to be cut came out exactly one unit
+    # over the network's maximum and the whole announcement was rejected.
+    # The word boundary is [[:space:]], not \s, so a non-breaking space --
+    # which Czech typography puts after single-letter prepositions, and
+    # which \s does not match -- still counts as one.
+    "#{plain[0, limit - 1].sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
   end
 
   def hashtags_for(tags)
@@ -132,6 +141,20 @@ module Publishing
     text.scan(/\X/).length
   end
 
+  # How much of the 300 the title is worth keeping room for before tags
+  # start being dropped. A headline cut to nothing announces nothing.
+  MIN_TITLE_GRAPHEMES = 40
+
+  # Cuts a title down to fit, on a word boundary where there is one. Only
+  # ever reached when the address and the tags alone leave no room -- see
+  # compose_bluesky_post.
+  def trim_to_graphemes(text, limit)
+    return text if grapheme_length(text) <= limit
+    return '' if limit <= 1
+
+    "#{text.scan(/\X/).first(limit - 1).join.sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
+  end
+
   # Same word-boundary trimming as perex_for, but budgeted in graphemes --
   # what Bluesky actually counts (an emoji or "ř" is one grapheme, not
   # one-plus bytes or codepoints).
@@ -141,7 +164,13 @@ module Publishing
     return plain if grapheme_length(plain) <= limit
     return '' if limit <= 0
 
-    "#{plain.scan(/\X/).first(limit).join.sub(/\s+\S*\z/, '')}…"
+    # limit - 1 and a [[:space:]] boundary, exactly as perex_for above:
+    # its structural twin got this and this one did not, so when the cut
+    # fell inside a run with no ASCII space (a long URL, an NBSP-joined
+    # Czech line) the sub removed nothing and the perex came back one
+    # grapheme over. Bluesky then rejected the whole record, the post went
+    # live with no announcement and no comment thread, and nothing said so.
+    "#{plain.scan(/\X/).first(limit - 1).join.sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
   end
 
   # The Bluesky counterpart of compose_toot: same never-truncate rule for
@@ -153,13 +182,46 @@ module Publishing
     fixed = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
     budget = BLUESKY_LENGTH - grapheme_length(fixed) - 2
 
+    # A long title plus many tags can fill the 300 graphemes on their own,
+    # and the preview then has nothing left to give up. Bluesky refuses
+    # the whole record at that point, so the post goes out with no
+    # announcement at all -- the one outcome worse than a shortened one.
+    # What yields, in order: the title (trimmed, on a word boundary), then
+    # tags from the end. The address never does -- a cut address is a dead
+    # one -- and no tag is ever half-written, because half a tag is a
+    # different tag.
+    if budget.negative?
+      tag_list = Array(tags).dup
+      loop do
+        hashtags = hashtags_for(tag_list)
+        room = BLUESKY_LENGTH - grapheme_length([url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")) - 2
+        break if room >= MIN_TITLE_GRAPHEMES || tag_list.empty?
+
+        tag_list.pop
+      end
+      hashtags = hashtags_for(tag_list)
+      room = BLUESKY_LENGTH - grapheme_length([url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")) - 2
+      title = trim_to_graphemes(title.to_s, room)
+      fixed = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
+      budget = BLUESKY_LENGTH - grapheme_length(fixed) - 2
+    end
+
     [title, perex_by_graphemes(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
   end
 
   # Sends the announcement to whichever network the site configured and
   # returns the post fields to store ('mastodon_url', or 'bluesky_url' +
-  # 'bluesky_uri'), or nil when nothing was sent. The caller decides
-  # WHETHER to announce (recency window, prompts); this decides only how.
+  # 'bluesky_uri'). The caller decides WHETHER to announce (recency
+  # window, prompts); this decides only how.
+  #
+  # Three outcomes, not two. nil means there was nothing to send -- no
+  # comment network is configured, which is a setting, not a fault.
+  # false means the send was ATTEMPTED and failed: an expired token, an
+  # instance that did not answer, a text the network refused. Both used to
+  # be nil, so the scheduled-publish cron could not tell them apart: it
+  # published the post, swallowed the failure, exited 0, and left no trace
+  # on disk that an announcement was ever owed. Nothing retried it, and
+  # nobody found out.
   def announce(post, year:)
     title = post['title']
     slug = post['slug']
@@ -169,29 +231,97 @@ module Publishing
     case SiteConfig.comment_network
     when :mastodon
       url = MastodonPoster.publish(compose_toot(title: title, slug: slug, year: year,
-                                                blocks: blocks, tags: tags))
-      url ? { 'mastodon_url' => url } : nil
+                                                blocks: blocks, tags: tags),
+                                   idempotency_key: "#{year}/#{slug}")
+      url ? { 'mastodon_url' => url } : false
     when :bluesky
       result = BlueskyPoster.publish(compose_bluesky_post(title: title, slug: slug, year: year,
                                                           blocks: blocks, tags: tags))
-      result ? { 'bluesky_url' => result[:url], 'bluesky_uri' => result[:uri] } : nil
+      result ? { 'bluesky_url' => result[:url], 'bluesky_uri' => result[:uri] } : false
     end
+  end
+
+  # The marker the publishing cron looks for: it means "the site owes the
+  # world a deploy". Written here rather than only by the cron, because
+  # the case that needs it most is the manual one -- ./blog.sh publish
+  # announces the post BEFORE it builds, so a build that does not happen
+  # leaves an announcement pointing at a page nobody will ever upload.
+  # The next cron tick reads this and finishes the job.
+  DEPLOY_PENDING = File.join(ROOT, '.deploy-pending')
+
+  # The exit code build_blog.rb and deploy_web.rb use for "another run
+  # holds the lock". Distinct from 1, because "come back in a minute" and
+  # "your site is broken" want different words and different advice --
+  # and because only one of them is a fault.
+  BUSY_EXIT = 3
+
+  # The scheduler's heartbeat. Its MTIME is the whole content -- the file
+  # says nothing except "something ran the queue at this moment".
+  SCHEDULER_HEARTBEAT = File.join(ROOT, '.last-scheduled-run')
+
+  def mark_scheduler_alive
+    File.write(SCHEDULER_HEARTBEAT, Time.now.iso8601)
+  rescue StandardError
+    # A heartbeat that cannot be written must never stop the publishing
+    # it exists to describe.
+    nil
+  end
+
+  def scheduler_last_run
+    return nil unless File.exist?(SCHEDULER_HEARTBEAT)
+
+    Time.parse(File.read(SCHEDULER_HEARTBEAT).strip)
+  rescue StandardError
+    begin
+      File.mtime(SCHEDULER_HEARTBEAT)
+    rescue StandardError
+      nil
+    end
+  end
+
+  def mark_deploy_pending
+    File.write(DEPLOY_PENDING, Time.now.iso8601)
+  rescue StandardError
+    nil
+  end
+
+  def clear_deploy_pending
+    File.delete(DEPLOY_PENDING) if File.exist?(DEPLOY_PENDING)
+  rescue StandardError
+    nil
   end
 
   # Build and deploy as one step (--prune included: after a delete or a
   # year-changing edit, live pages remain on the target that the build no
   # longer generates -- without prune, nothing would ever clean them up).
+  #
+  # Answers true or false and nothing else: ten callers read it as a
+  # yes/no and a third state would quietly read as success in half of
+  # them. Which KIND of no it was decides the wording and the marker, not
+  # the return value.
   def rebuild_and_deploy(reason)
     puts
     puts "#{reason}…"
     unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
-      warn I18n.t('cli.build_failed')
+      finish_later('build', $CHILD_STATUS)
       return false
     end
 
-    return true if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
+    if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
+      clear_deploy_pending
+      return true
+    end
 
-    warn I18n.t('cli.deploy_failed')
+    finish_later('deploy', $CHILD_STATUS)
     false
+  end
+
+  # Says which of the two things happened and leaves the marker behind so
+  # the next scheduled run picks the site back up.
+  def finish_later(step, status)
+    busy = status.respond_to?(:exitstatus) && status.exitstatus == BUSY_EXIT
+    warn I18n.t("cli.#{step}_#{busy ? 'busy' : 'failed'}")
+    mark_deploy_pending
+    warn I18n.t('cli.deploy_pending_marked')
   end
 end

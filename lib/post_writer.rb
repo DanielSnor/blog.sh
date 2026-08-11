@@ -51,7 +51,27 @@ module PostWriter
     FileUtils.mkdir_p(media_dir)
     media_files.each do |src_path, filename|
       dest = File.join(media_dir, filename)
-      FileUtils.cp(src_path, dest) unless File.exist?(dest)
+      next if File.exist?(dest)
+
+      # Copied beside the destination and renamed into place, rather than
+      # written straight to it. "Skip what already exists" is what makes a
+      # re-import safe, and a copy interrupted halfway -- Ctrl-C, a full
+      # disk, a container that went away -- leaves a truncated file that
+      # every later run then skips, so the half-image publishes and no
+      # amount of re-importing replaces it. A rename either happened or it
+      # did not, so the only file under the real name is a complete one.
+      tmp = File.join(media_dir, ".#{filename}.part")
+      begin
+        FileUtils.cp(src_path, tmp)
+        File.rename(tmp, dest)
+      rescue StandardError
+        begin
+          File.delete(tmp)
+        rescue StandardError
+          nil
+        end
+        raise
+      end
     end
   end
 
@@ -82,7 +102,11 @@ module PostWriter
     # importer that legitimately provides one still wins. `type` stays out:
     # absent, the build re-derives it from the (re-imported) blocks, so it
     # comes back on its own.
-    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at].each do |key|
+    # redirect_from rides along too: the importer that understands the
+    # source platform writes it once, and a later re-import from an export
+    # that carries no URL history (or a different importer entirely) must
+    # not silently drop the addresses the post still answers for.
+    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at redirect_from].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
     # A re-imported draft keeps its preview URL: the token is engine-side
@@ -90,6 +114,20 @@ module PostWriter
     # re-import would break every shared preview link.
     post['draft_token'] = old['draft_token'] if old && old['draft_token'] && post['state'] == 'draft' && !post['draft_token']
     post = ensure_draft_token(post)
+
+    # unpublished_from is a promise the engine owes the web: "this post
+    # used to live at that address, and when it is published again the
+    # address must redirect". Publishing.publish keeps that promise and
+    # spends the marker. A re-import publishes a post WITHOUT going
+    # through it -- the source simply says the post is public -- so the
+    # marker survived forever, and after unpublish -> rename -> re-import
+    # the old address 404'd while a marker for it sat in the JSON. Spent
+    # here for the same reason and in the same way.
+    if post['state'] != 'draft' && post['unpublished_from']
+      vacated = post.delete('unpublished_from')
+      former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{year}/#{slug}"]
+      former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
+    end
 
     new_dir = File.join(CONTENT_DIR, year)
     new_path = File.join(new_dir, "#{slug}.json")
@@ -106,6 +144,21 @@ module PostWriter
       if File.exist?(new_path)
         raise "cannot move '#{slug}' into #{year}: a different post already owns " \
               "#{new_path} -- resolve the slug clash by hand"
+      end
+
+      # A published post that moves years vacates its public address, and
+      # the redirect for it has to be recorded here exactly as edit_post
+      # records it -- a re-import from a source that started reporting its
+      # dates in another timezone is enough to move a post across a New
+      # Year, and every link to it died with no stub behind it.
+      #
+      # Read from the OLD file: `post` is what the import built, and the
+      # state that decides whether there is a public address to keep is the
+      # state the post is in now.
+      if old && old['state'] != 'draft'
+        vacated = "#{old_year}/#{slug}"
+        former = (Array(post['former_slugs']).map(&:to_s) + [vacated]).uniq - ["#{year}/#{slug}"]
+        post['former_slugs'] = former unless former.empty?
       end
 
       FileUtils.mkdir_p(new_dir)
@@ -143,9 +196,26 @@ module PostWriter
     return unless Dir.exist?(from)
 
     if Dir.exist?(to)
+      # A file already sitting under the name we are moving in is NOT a
+      # reason to leave ours behind. Skipping it -- which is what this did
+      # -- left the post pointing at somebody else's bytes under its own
+      # filename (01.jpg is 01.jpg in every post), while its real file
+      # stayed in the old year where nothing would ever look for it. The
+      # target directory here is an orphan a delete left behind, or the
+      # post's own; either way the arriving file is the one the post
+      # references. The one in the way is moved aside rather than
+      # overwritten, because nothing about a stray file says it is safe
+      # to destroy, and named loudly enough to notice.
       Dir.children(from).each do |f|
         dest = File.join(to, f)
-        FileUtils.mv(File.join(from, f), dest) unless File.exist?(dest)
+        if File.exist?(dest)
+          aside = "#{dest}.displaced"
+          n = 1
+          n += 1 while File.exist?("#{aside}#{n}")
+          FileUtils.mv(dest, "#{aside}#{n}")
+          warn "media: #{File.basename(to)}/#{f} was already taken -- the file that was there is now #{File.basename("#{aside}#{n}")}"
+        end
+        FileUtils.mv(File.join(from, f), dest)
       end
       FileUtils.rmdir(from) if Dir.empty?(from)
     else

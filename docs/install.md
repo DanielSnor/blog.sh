@@ -35,10 +35,17 @@ site on the internet.
 Each block below is the whole path for one platform: prerequisites,
 clone, config, first post, local preview. They end at the same place --
 a site you can see at `http://localhost:8000/` -- and from there,
-[section 6](#6-pick-a-deploy-target) takes it to the internet. The
-config example works as-is, so you can leave editing it for later;
-before deploying for real, fill in at least `site:` and `banner:`
-([section 2](#2-configure-the-site----configsiteyml)).
+[section 6](#6-pick-a-deploy-target) takes it to the internet.
+
+`./setup.sh` is the config step: it asks for the settings a site needs,
+checks the answers as it goes, and writes `config/site.yml` and `env.sh`
+for you. Every question can be skipped with Enter, and nothing is
+written until you have seen the diff and confirmed it -- so it is also
+the way to change any of this later. If you would rather edit the files
+yourself, the numbered sections below are the full reference and
+[section 2](#2-configure-the-site----configsiteyml) still starts with
+the two `cp` commands; the wizard leaves both files commented and
+hand-editable either way.
 
 ### macOS
 
@@ -66,8 +73,7 @@ Then:
 ```bash
 git clone https://github.com/DanielSnor/blog.sh.git myblog
 cd myblog
-cp config/site.yml.example config/site.yml
-cp env.sh.example env.sh && chmod 600 env.sh
+./setup.sh           # a few questions -> config/site.yml and env.sh
 ./blog.sh add        # write the first post; publish or keep as draft
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
@@ -89,8 +95,7 @@ both already complete.)
 ```bash
 git clone https://github.com/DanielSnor/blog.sh.git myblog
 cd myblog
-cp config/site.yml.example config/site.yml
-cp env.sh.example env.sh && chmod 600 env.sh
+./setup.sh           # a few questions -> config/site.yml and env.sh
 ./blog.sh add        # write the first post; publish or keep as draft
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
@@ -112,8 +117,7 @@ that Ubuntu terminal, it's the Linux path verbatim:
 sudo apt update && sudo apt install -y ruby-full git
 git clone https://github.com/DanielSnor/blog.sh.git myblog
 cd myblog
-cp config/site.yml.example config/site.yml
-cp env.sh.example env.sh && chmod 600 env.sh
+./setup.sh           # a few questions -> config/site.yml and env.sh
 ./blog.sh add        # write the first post; publish or keep as draft
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
@@ -137,9 +141,12 @@ ever, for the engine itself to run. The one nuance: the optional
 Pixelfed/RSS sidebar widgets parse XML with `rexml`, which Ruby ships
 as a *default gem* -- bundled with a normal `ruby` install, but some
 Linux distributions split their Ruby package and leave default gems
-out of the minimal one. If `widgets.pixelfed`/`widgets.rss` are unused,
-this never comes up; if you configure either and see a `LoadError`
-about `rexml`, either `gem install rexml` or install your distro's
+out of the minimal one. Importing is not optional about it: every XML
+source reads through `rexml`, which is WordPress, Blogger,
+Squarespace, podcasts, any RSS or Atom feed, the Wayback rescue and
+LiveJournal. If none of that is in your way -- no XML import, no
+`widgets.pixelfed`/`widgets.rss` -- it never comes up; if it is, and
+you see a `LoadError` about `rexml`, either `gem install rexml` or install your distro's
 fuller Ruby package -- e.g. `ruby-full` instead of the bare `ruby` on
 Debian/Ubuntu (Arch's own `ruby` package already includes the full
 standard library, no separate install needed there). `./blog.sh
@@ -165,6 +172,14 @@ your content -- see [Updating the engine](#9-updating-the-engine).
 cp config/site.yml.example config/site.yml
 ```
 
+Or let `./setup.sh` do it: it seeds the file from this same example --
+comments and all -- and fills in the answers you give it, which is the
+same file you would have written by hand, minus the chance of a tab
+where a space belongs. It covers the `site` block, the comments network
+and the deploy target; `./style.sh` covers `banner`, `about`, `footer`,
+`social`, `colors`, `fonts` and `widgets`. Both are re-runnable and
+neither takes anything away from editing the file directly.
+
 The example is fully commented. The short version:
 
 - **Required:** `site` (title, short_name, description, author, lang,
@@ -175,7 +190,25 @@ The example is fully commented. The short version:
   independently), `mastodon` **or** `bluesky` (comments + auto-announce
   -- exactly one, see [step 8](#8-comments-network-optional-mastodon-or-bluesky)),
   `colors` (7 keys per light/dark mode -- omitted keys fall back to the
-  built-in blue palette).
+  built-in blue palette; whole palettes ship in `config/palettes.yml`, and
+  `./style.sh` shows you a preview -- light and dark side by side -- and
+  writes the one you pick into this section, so you never have to choose
+  fourteen hex values by hand or blind), `fonts` (the banner title's and claim's font
+  stack and size, plus any `.woff2` you put in `assets/fonts/` -- omitted
+  keys fall back to the built-in JetBrains Mono at 45px/20px).
+
+`social` is the row of icons in the footer. Each entry takes `name`,
+`url` and either `icon` (a name from the built-in set) or `icon_svg`
+(your own markup), plus an optional `rel` that is passed through to the
+rendered link. `rel: "me"` on the Mastodon entry is what gets your site
+verified -- the green check mark next to it on your profile: Mastodon
+fetches the address from your profile's metadata field and accepts it
+only if that page links back to the profile with `rel="me"`. The footer
+is on every page, so pointing the profile field at your home page is
+enough; the entry's `url` has to be the profile as Mastodon shows it
+(`https://instance/@handle`). Several entries may carry it. Bluesky
+verifies domains a different way (DNS or `/.well-known`), so `rel: "me"`
+does nothing for a Bluesky entry.
 
 `site.lang` selects `locales/<lang>.yml` for every generated string --
 `en`, `cs` and `de` ship with the engine; a partial locale falls back to
@@ -213,6 +246,15 @@ a staging or local environment can point somewhere other than production
 while building from the same config. One site, one URL? Set
 `site.base_url` and leave this out.
 
+Watch the order they start in: the example above ships `SITE_BASE_URL`
+**active and pointing at `https://example.com`**, so filling in
+`site.base_url` carefully and leaving this file alone gives a site that
+still calls itself example.com in its feed, its sitemap and every share
+preview. Either comment this line out or give it the same address.
+`./setup.sh` writes both to the same value for exactly this reason, and
+`./blog.sh doctor` reports the address that would actually be used
+rather than the one in the config.
+
 ## 4. Banner and favicon
 
 Both ship with the engine as `assets/images/defaults/` -- the first build
@@ -226,6 +268,11 @@ brings the site back wearing the engine's default artwork. Set
 `banner.width`/`height` to the real
 dimensions of your image: those attributes are what reserves space before
 it loads, and a mismatch makes the page jump.
+
+`./style.sh` does that part for you -- give it the path to an image and
+it copies the file into place, reads its real dimensions and writes
+them, so the pair can never drift from the file. `./blog.sh doctor`
+reports it if they ever do.
 
 The favicon is used three ways from that one file: the `<link rel="icon">`,
 an `apple-touch-icon` (iOS scales it down for a home-screen bookmark), and
@@ -422,4 +469,10 @@ Per-deployment files (`content.nosync/`, `media.nosync/`,
 manifests) are gitignored and survive any pull untouched. The one thing
 to watch: if you've **edited engine files in place** (templates, CSS),
 a pull can conflict -- keep such customizations as commits on your own
-branch so git merges them for you.
+branch so git merges them for you. `config/palettes.yml` is one of
+those: it ships with the engine, so a palette of your own added to it
+is an edit in place. The wizards also leave a `.bak` of whatever they
+rewrote -- `config/site.yml.bak`, `env.sh.bak` -- which is how you take
+a wizard run back by hand. Nothing deletes them, and the `env.sh` one
+holds your previous tokens at the same 0600, so remove it once you have
+rotated a token.

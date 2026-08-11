@@ -10,7 +10,9 @@
 #   ./blog.sh restore [<slug>]
 #   ./blog.sh toot [<slug>]
 #   ./blog.sh rebuild
+#   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
+#   ./blog.sh doctor [--online]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -39,21 +41,47 @@ fi
 # or the usage would scroll away. Same arrangement as import.sh.
 case "${1:-}" in
   help | --help | -h)
-    exec ruby scripts/manage_post.rb help
+    exec ruby scripts/info.rb help
     ;;
   # Same reasoning as help, plus one of its own: "which version is this
   # install running?" is a question asked of a machine that is already
   # misbehaving -- it must not depend on env.sh or config being right.
+  # Both go to scripts/info.rb rather than manage_post.rb, for the reason
+  # its header gives: requiring manage_post.rb reads config/site.yml at
+  # load time through half a dozen libraries, so on a config that will not
+  # parse these two died before they could answer -- exactly the install
+  # whose owner is asking.
   version | --version | -v)
-    exec ruby scripts/manage_post.rb version
+    exec ruby scripts/info.rb version
+    ;;
+  # Doctor takes that furthest: it exists to explain an install with no
+  # env.sh, no config, or a config that won't parse, so the "Missing
+  # env.sh" guard below would turn away the one command that could say
+  # what to do about it. It still reads env.sh when there IS one --
+  # half of what it checks (the access token, the deploy target) lives
+  # there -- and goes to its own script for the reasons in its header.
+  doctor)
+    shift
+    if [ -f env.sh ]; then
+      set -a
+      # shellcheck source=/dev/null
+      . ./env.sh
+      set +a
+    fi
+    exec ruby scripts/doctor.rb "$@"
     ;;
 esac
 
-[ -t 1 ] && clear
-mode="${1:-}"
-echo "== blog.sh =="
-echo "Mode: ${mode:-wizard}"
-echo
+# No banner here: the identity block (which engine, which site, which
+# mode) is printed by the Ruby side via SiteHeader, which knows the
+# version and the site's name -- this wrapper knows neither.
+# `clear` fails on a TERM this machine has no terminfo entry for --
+# ghostty, kitty, wezterm and friends ship theirs into ~/.terminfo, which
+# a fresh account or an SSH target does not have. As the last command of
+# an AND-list it is what `set -e` sees, so the whole tool died before
+# printing a word. A screen that cannot be cleared is not a reason to
+# refuse to run.
+{ [ -t 1 ] && clear 2>/dev/null; } || true
 
 if [ ! -f env.sh ]; then
   echo "Missing env.sh -- copy the documented template first:"

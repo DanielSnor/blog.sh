@@ -118,6 +118,11 @@ module Import
         # Script and style contents are code, not prose -- dropped whole so
         # their bodies never leak into a post as text.
         html = html.gsub(%r{<(script|style)\b.*?</\1>}mi, '')
+        # A capture truncated INSIDE a script (routine in Wayback
+        # snapshots) leaves the pair regex above without a close -- and
+        # raw JavaScript then walked into the post as a paragraph. An
+        # unterminated script or style eats to the end.
+        html = html.gsub(%r{<(script|style)\b.*\z}mi, '')
         html = html.gsub(/<!--.*?-->/m, '')
         html = html.gsub(/<![^>]*>/, '')
 
@@ -171,13 +176,75 @@ module Import
                        tr td th hr figure figcaption section article aside header footer
                        nav main form dl dt dd].freeze
 
+      # Elements that carry no structure of their own. A run of these
+      # between two blocks is one sentence and has to be gathered into one
+      # -- see walk. Named rather than derived from BLOCK_LEVEL because an
+      # unknown element may hold blocks, and flattening one into a
+      # paragraph would swallow them.
+      INLINE_RUN = %w[a b strong i em u s del strike code span small sub sup mark abbr
+                      acronym cite q big font tt kbd samp var ins time bdi bdo img].freeze
+
       def initialize
         @blocks = []
         @warnings = Hash.new(0)
       end
 
+      # Not every body has blocks in it. Classic Blogger writes none at
+      # all: the post is a flat run of text, <a>, <b>, <span> and <br>,
+      # and one visit() per child turned a single sentence into a block
+      # per fragment -- with every link lost on the way, since
+      # emit_paragraph(<a>) renders the anchor's CHILDREN and never the
+      # anchor itself. So consecutive inline siblings are gathered into
+      # one synthetic paragraph, which is what the same markup wrapped in
+      # <p> has always produced.
+      #
+      # A <br> ends the run rather than sitting inside it. Inline.render
+      # renders one as a space, and a body written without paragraphs uses
+      # it as the line separator it looks like -- the footer of a
+      # Posterous-era post reads
+      #   Shot with: <strong>Camera+</strong> for iPhone<br />
+      #   Edited with: <strong>Snapseed</strong>
+      # and keeping the break inside the run welded those two facts into
+      # one line. Ending the run splits them the way the markup does,
+      # while the emphasis and the links between the breaks still travel
+      # together instead of being shredded a fragment at a time.
       def walk(node)
-        node.children.each { |child| visit(child) }
+        run = []
+        node.children.each do |child|
+          if child.text? || inline_run?(child)
+            run << child
+          elsif child.name == 'br'
+            flush_run(run)
+          else
+            flush_run(run)
+            visit(child)
+          end
+        end
+        flush_run(run)
+      end
+
+      # All the way down, because an <a> may legally wrap whole blocks
+      # (the card link of every modern theme) -- gathered into a run, its
+      # paragraphs would be flattened into one. <br> is allowed inside:
+      # <span>text<br />more</span> is what Blogger writes around every
+      # other sentence, and letting it break the run would put the split
+      # back that this is here to remove.
+      def inline_run?(node)
+        return false unless INLINE_RUN.include?(node.name)
+
+        node.children.all? { |c| c.text? || c.name == 'br' || inline_run?(c) }
+      end
+
+      def flush_run(run)
+        return if run.empty?
+
+        nodes = run.dup
+        run.clear
+        # A lone run of loose text is still just that -- kept on its own
+        # path so nothing changes for the bodies that already had blocks.
+        return visit(nodes.first) if nodes.size == 1 && nodes.first.text?
+
+        emit_paragraph(Node.new(name: 'p', attrs: {}, children: nodes))
       end
 
       def visit(node)
@@ -261,6 +328,13 @@ module Import
           block['subtype'] = 'quote'
           @blocks << block
         end
+        # Inline.render leaves <img> to the Builder, so a picture inside a
+        # quote had nowhere to land: it disappeared, and a quote holding
+        # nothing but a picture disappeared whole (the text was empty, so
+        # the block was dropped and no image ever took its place).
+        # emit_paragraph and emit_figure have always collected images;
+        # this branch was simply forgotten.
+        collect(node, 'img').each { |img| emit_image(img) }
       end
 
       def emit_list(node)
@@ -503,6 +577,19 @@ module Import
 
         close(stack, 'p') if open == 'p' && CLOSES_P.include?(name)
         close(stack, 'li') if stack.last.name == 'li' && name == 'li'
+        # Omitting </td> and </tr> is valid HTML5 and the house style of
+        # the hand-written archives page mode imports. Without these, each
+        # next cell NESTED inside the previous one, and the recursive cell
+        # collector then emitted every row twice: once concatenated into
+        # the first cell, once as itself.
+        if %w[td th].include?(name)
+          close(stack, 'td') if stack.any? { |n| n.name == 'td' }
+          close(stack, 'th') if stack.any? { |n| n.name == 'th' }
+        elsif name == 'tr'
+          close(stack, 'td') if stack.any? { |n| n.name == 'td' }
+          close(stack, 'th') if stack.any? { |n| n.name == 'th' }
+          close(stack, 'tr') if stack.any? { |n| n.name == 'tr' }
+        end
       end
 
       # An unmatched </div> must not pop the world: only unwind if the tag

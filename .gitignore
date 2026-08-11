@@ -1,11 +1,19 @@
 env.sh
+# The wizards keep a .bak of the file they rewrite. For env.sh that copy
+# holds the PREVIOUS live tokens, and `env.sh` above is a literal -- it
+# does not cover it. This repo is public and `git add -A` is one keystroke.
+*.bak
 .DS_Store
 .nova/
 .deploy_manifest*.json
 .deploy_manifest*.json.incomplete
 .deploy_baseline.json
 .deploy-pending
+# The scheduler's heartbeat -- one line, rewritten every fifteen minutes.
+.last-scheduled-run
+.blog-sh.lock
 .last-edit.md
+.last-edit.meta
 .stats_full_refresh_at
 config/site.yml
 assets/images/header.png
@@ -20,3 +28,10 @@ public.nosync/
 # Per-install graphics dropped into the working copy must never ride
 # an unrelated commit into the public engine repo again.
 assets/images/daniel.png
+# Local regression suite -- deliberately outside the public repo.
+tests/
+# ./style.sh builds a whole sample site here for every palette preview --
+# three dozen files, straight into the working copy. Same reason as the
+# graphics above: nothing generated should be able to ride along on an
+# unrelated commit.
+tmp/

@@ -1,15 +1,21 @@
 # frozen_string_literal: true
 
 require_relative 'run'
+require_relative '../i18n'
+
+# Operator tools speak English on purpose: a migrate script is reached by
+# typing a path, not the authoring UI, and its output lands in cron logs.
+# The pin is load-bearing twice over -- adapter postscripts render through
+# I18n so the wizard can translate them, and forcing the language here
+# keeps that lookup off SiteConfig, so a script still runs where no
+# site.yml answers.
+I18n.force_lang('en')
 
 module Import
   # The non-interactive front end: what `scripts/migrate_*.rb` need so each
   # one is a handful of lines rather than its own copy of progress reporting
   # and summary formatting. The wizard (scripts/import.rb) does its own
   # thing, since it also has a preview pass and prompts to run.
-  #
-  # Deliberately plain English and no I18n, matching the scripts it serves:
-  # these are operator tools reached by typing a path, not the authoring UI.
   module Cli
     module_function
 
@@ -22,6 +28,17 @@ module Import
       when nil, '' then nil
       when /\A[1-9]\d*\z/ then env['LIMIT'].to_i
       else abort("LIMIT must be a positive integer (got #{env['LIMIT'].inspect})")
+      end
+    end
+
+    # Reads KEEP_PERMALINKS from the environment, validated for the same
+    # reason as LIMIT: a typo like KEEP_PERMALINKS=yes silently meaning
+    # "no" would cost the one thing the flag exists to preserve.
+    def keep_permalinks_from_env(env = ENV)
+      case env['KEEP_PERMALINKS']
+      when nil, '', '0' then false
+      when '1' then true
+      else abort("KEEP_PERMALINKS must be 1 or 0 (got #{env['KEEP_PERMALINKS'].inspect})")
       end
     end
 
@@ -46,6 +63,10 @@ module Import
 
       result = Run.new(adapter, limit: limit, on_post: on_post).call
       report(result)
+      # One line, once -- e.g. "N post(s) had no usable original address":
+      # per-post warnings would repeat the same fact hundreds of times on
+      # exactly the archives (plain-permalink WordPress) it describes.
+      puts "  #{adapter.postscript}" if adapter.respond_to?(:postscript) && adapter.postscript
       # A cron or a script must see a partial run as a failure, or nobody
       # ever finds out the source died -- the summary above already said
       # everything a human needs.
@@ -83,7 +104,16 @@ module Import
       end
       return if result.media_failures.empty?
 
-      puts "  #{result.media_failures.size} media file(s) could not be downloaded; their posts were written without them."
+      # Split, because these are two different losses: a written post
+      # missing one of its files, and a post never written at all (a
+      # photo-only post whose file is gone skips as :empty). One line for
+      # both claimed every such post was "written without them" -- media
+      # lost from posts that never landed on disk.
+      from_written = result.media_failures.size - result.skipped_media_failures.size
+      puts "  #{from_written} media file(s) could not be downloaded; their posts were written without them." if from_written.positive?
+      unless result.skipped_media_failures.empty?
+        puts "  #{result.skipped_media_failures.size} media file(s) could not be downloaded from post(s) that were skipped."
+      end
     end
   end
 end

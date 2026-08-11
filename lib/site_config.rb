@@ -51,6 +51,15 @@ module SiteConfig
     YAML.load_file(path, aliases: true) || {}
   rescue ArgumentError
     YAML.load_file(path) || {}
+  rescue Psych::SyntaxError => e
+    # A hand-edited config with a stray tab or an unquoted colon used to
+    # surface as a Psych backtrace from whichever entry point happened to
+    # read the file first -- an unreadable answer to the single most
+    # common way this file breaks. The line number is what fixes it, and
+    # Psych knew it all along.
+    abort("❌ #{path} is not valid YAML: #{e.problem} at line #{e.line}, column #{e.column}. " \
+          "Usually indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. " \
+          "Run ./blog.sh doctor for the full picture.")
   end
 
   # Called once at startup by every entry point (each script under scripts/

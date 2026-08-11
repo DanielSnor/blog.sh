@@ -101,13 +101,25 @@ deploy step around exactly that. A few of the choices that came out of it:
   `publishing.slots` configured it offers the next free slot instead, so
   several drafts queue onto consecutive slots rather than publishing
   together
+- `queue` -- the scheduled posts as one screen: move a post a slot
+  earlier or later (times swap, slots never move), publish it right now,
+  give it another time, or return it to the drafts
 - `unpublish <slug>` -- returns a post to draft, deletes its announcement;
   gets a fresh date on the next publish
 - `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
 - `toot <slug>` / `bluesky <slug>` -- sends (or resends) the announcement
   after the fact, even for older posts that don't have one yet; never
   overwrites an existing one
-- `list [--type=] [--tag=] [--drafts]` -- filtered listing
+- `browse [--type=] [--tag=] [--drafts]` -- the archive as a screen you
+  can stay in: filters by type, state and tag (each offered with its
+  count), a **live full-text search that speaks the same query language
+  as the site's search box** -- words are ANDed, `"a quoted phrase"` is
+  one token, `-word` excludes, diacritics never decide a match -- a line
+  of the post's own text showing why it matched, the space bar for a
+  read-only preview of the whole post, and Enter to open the one you were
+  looking for. Piped or scripted, it prints the same list `list` does
+- `list [--type=] [--tag=] [--drafts]` -- the same filters, printed:
+  one line per post, for grep and for pipes
 - `rebuild` -- build and deploy in one step
 - Run with no arguments for an interactive menu: arrow keys and single
   keypresses in a terminal (numbers and slugs still work), plain
@@ -127,11 +139,20 @@ deploy step around exactly that. A few of the choices that came out of it:
   with a language hint, GFM-style aligned tables, images, video (local
   file or YouTube) with automatic sizing, audio with a native player,
   file attachments as download cards, backslash escaping
-- The full syntax reference at `/markdown/` is generated directly from
-  this parser, so it can't drift out of sync with what's actually supported;
-  its source (`templates/markdown-cheat-sheet.<lang>.md`) is localized the
-  same way as `locales/*.yml` -- picked by `site.lang` (en, cs and de ship
-  with the engine), English fallback.
+- A platform's own address turns into its player, from the address alone:
+  YouTube, Vimeo, PeerTube and archive.org as video, Spotify, SoundCloud
+  and Mixcloud as audio. The engine stores a provider and an id, never the
+  platform's embed code, and a page's Content-Security-Policy admits a
+  player's origin only when the page carries it -- except YouTube's two
+  origins, which every page allows. Funkwhale and Bandcamp keep no id in
+  their address, so those two are looked up once when the post is saved --
+  the only moment writing a post touches the network
+- The full syntax reference at `/markdown/` is rendered through this
+  same parser, so every example on it displays exactly as it would in a
+  post; the page itself is a hand-maintained document
+  (`templates/markdown-cheat-sheet.<lang>.md`), localized the same way
+  as `locales/*.yml` -- picked by `site.lang` (en, cs and de ship with
+  the engine), English fallback.
   Adding a language is data, not code -- see
   [docs/localization.md](docs/localization.md)
 
@@ -207,7 +228,9 @@ deploy step around exactly that. A few of the choices that came out of it:
   auto-assembled from adjacent image blocks
 - No framework -- vanilla JS in small, single-purpose files
 - Color scheme is config-driven, not a file to swap: `assets/css/site.css`
-  holds only layout/structure, no color values; `config/site.yml`'s
+  holds layout/structure and only the fixed colors that fit any palette
+  (white on accent surfaces, the dark scrims of the banner overlays and
+  the lightbox, the search field's grey text); `config/site.yml`'s
   `colors.light`/`colors.dark` (7 keys each -- bg/text/meta_text/accent/
   nav_bg/border/pill_bg) are compiled at build time into
   `assets/css/colors.css` (see `build_colors_css` in `build/build_blog.rb`).
@@ -215,12 +238,25 @@ deploy step around exactly that. A few of the choices that came out of it:
   badge hover, search input background) is derived from those 7, not
   separately configurable. Defaults to blog.sh's own blue palette
   (`DEFAULT_COLORS`) if `colors:` is omitted
-- Banner overlay: `site.short_name` (top-left, ~30px) and `site.description`
-  (bottom-right, ~20px, wraps to multiple lines) render on top of the banner
-  image in self-hosted JetBrains Mono. Each overlay darkens the corner it
-  sits in so it stays readable against any image -- and only that corner,
-  so a banner with both overlays off is shown exactly as authored. See
+- Seven whole palettes ship in `config/palettes.yml` -- default blue,
+  warm, monochrome, high contrast, sunflower, garden, ocean, each in
+  both modes -- so `./style.sh` can set a palette in one keystroke
+  instead of asking for fourteen hex values. Add your own by adding an
+  entry; the wizard lists what's in the file
+- Banner overlay: `site.short_name` (top-left) and `site.description`
+  (bottom-right, wraps to multiple lines) render on top of the banner
+  image. Each overlay darkens the corner it sits in so it stays readable
+  against any image -- and only that corner, so a banner with both
+  overlays off is shown exactly as authored. See
   `.banner-title`/`.banner-claim` in `site.css`.
+- Header typography is config-driven too: `fonts.banner_title` /
+  `fonts.banner_claim` (a CSS font stack each) and
+  `fonts.banner_title_size` / `fonts.banner_claim_size` (any CSS length)
+  compile into the same generated stylesheet as the palette. Drop a
+  `.woff2` into `assets/fonts/`, declare it under `fonts.faces`, and the
+  header is in your own type; say nothing and it stays self-hosted
+  JetBrains Mono at 45px/20px. Narrow screens scale from whatever size is
+  configured, so there is no second pair of keys to keep in sync
   Each independently optional: `banner.show_title`/`show_claim` (default
   true) toggle whether they render at all, `colors.<mode>.banner_title`/
   `banner_claim` override their color per light/dark mode (default: `nav_bg`
@@ -232,11 +268,24 @@ deploy step around exactly that. A few of the choices that came out of it:
 **Importing -- `import.sh`**
 - Its own wizard, separate from authoring: pick a source, see a dry-run
   preview (posts, media, skipped and why), confirm before anything is written
-- Eight sources: Bluesky and Tumblr via their APIs; Instagram, Mastodon,
-  Pixelfed and Twitter/X from their account exports; WordPress from a WXR
-  file and any RSS/Atom feed by URL -- Tumblr and Twitter carried over from
-  the original migration of four Tumblr blogs and a Twitter archive
-  (2008-2022)
+- Twenty-two sources: Bluesky, LiveJournal and Tumblr via their APIs;
+  Facebook, Threads,
+  beehiiv, Blogger, Ghost, Instagram, Mastodon, Medium, Movable
+  Type/TypePad, Pixelfed, Squarespace, Substack, Twitter/X and Wix from
+  their account exports and backups; a Jekyll or Hugo
+  tree (or any converter-made markdown folder) straight from disk; WordPress from a WXR
+  file, any RSS/Atom feed by URL, and any podcast feed with its
+  episodes' audio downloaded for keeps -- Tumblr and Twitter carried
+  over from the original migration of four Tumblr blogs and a Twitter
+  archive (2008-2022); and the Wayback Machine, for a blog whose
+  platform no longer exists at all
+- A blog that keeps its domain keeps its addresses: sources that know
+  their posts' original URLs (beehiiv, Blogger, Ghost, Jekyll/Hugo,
+  LiveJournal, Medium, Movable Type/TypePad, Squarespace, Substack,
+  WordPress, Tumblr, Wix, the Wayback Machine and any RSS/Atom feed) can
+  record each one as a `redirect_from` (Substack's `/p/<slug>` comes
+  straight from the export), and the built site answers at every old
+  path with a redirect
 - `lib/import/` holds what every source shares -- media download or copy,
   filename numbering, skip accounting, progress callbacks -- so an adapter
   only has to page a source and shape one item
@@ -250,16 +299,17 @@ deploy step around exactly that. A few of the choices that came out of it:
   document
 - Optional publishing slots (`mon 09:30`, …) turn `[s]` into a queue:
   drafts written in one sitting go out on consecutive slots instead of
-  together
+  together, and `./blog.sh queue` works the queue as one screen --
+  reorder, publish now, remove
 
 ## Stack
 
 - **Build:** Ruby (`build/build_blog.rb`)
 - **Authoring:** a Ruby CLI/wizard (`scripts/manage_post.rb`, run via `./blog.sh`)
 - **Templates:** ERB (`templates/`)
-- **i18n:** `locales/*.yml` + `lib/i18n.rb` -- ships with English (default)
-  and Czech; add another `locales/<code>.yml` for a different language,
-  missing keys fall back to English
+- **i18n:** `locales/*.yml` + `lib/i18n.rb` -- ships with English (default),
+  Czech and German; add another `locales/<code>.yml` for a different
+  language, missing keys fall back to English
 - **Deploy:** pluggable backends (`lib/deploy_backend/`) -- Cloudron
   Surfer (Files API), a local directory, rsync, git-pages, rclone, or
   SFTP; `scripts/deploy_web.rb`
@@ -269,6 +319,8 @@ deploy step around exactly that. A few of the choices that came out of it:
 
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
+setup.sh                 Setup wizard -- identity, address, comments network, deploy target
+style.sh                 Appearance wizard -- palette, banner, about, footer, sidebar
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
@@ -277,7 +329,7 @@ scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers
                            migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
 lib/import/              Import adapters plus the layer they share (media, run, CLI)
-locales/                 UI strings for the generated site and the CLI (en.yml, cs.yml)
+locales/                 UI strings for the generated site and the CLI (en.yml, cs.yml, de.yml)
 templates/               ERB templates (layout, post, index, search, partials)
                          + markdown-cheat-sheet.<lang>.md, the /markdown/ page's source
 assets/                  CSS/JS/fonts (drop your own images into assets/images/)
@@ -304,7 +356,9 @@ iCloud doesn't exist, it's just a name.
   `rexml`, a Ruby *default gem* (ships with a normal Ruby install, but
   some distro package splits leave it out -- see
   [install.md](docs/install.md#what-you-need) if `gem install rexml`
-  is ever needed)
+  is ever needed). Importing needs it for real: every XML source --
+  WordPress, Blogger, Squarespace, podcasts, any RSS or Atom feed, the
+  Wayback rescue and LiveJournal -- reads through `rexml`
 - **bash** (the thin `blog.sh` / `deploy-web.sh` / `refresh-sidebar.sh` wrappers)
 - Optional, per integration: somewhere to deploy to (a
   [Cloudron Surfer](https://cloudron.io) app, any rsync/SSH host, a
@@ -324,25 +378,39 @@ copy-paste path per platform -- Ruby included -- in
 [docs/install.md → Quick start](docs/install.md#quick-start). The steps
 below assume Ruby 2.7+ is already on the machine:
 
-1. Copy `config/site.yml.example` to `config/site.yml` and fill in your
-   site's title, description, social links, and (optionally) analytics,
-   sidebar widgets, and the comments network (Mastodon or Bluesky). Set
-   `site.timezone` if you'll publish from a server -- a server clock is
-   usually UTC, and without it `schedule` reads times as UTC and a post
-   written after midnight can be dated to the previous day.
-2. Copy `env.sh.example` to `env.sh` and `chmod 600 env.sh`. An unedited
-   copy is enough to try things out locally -- without the Surfer values,
-   uploads are simply skipped (logged, not an error).
-3. Replace `assets/images/header.png` (the banner) and
-   `assets/images/favicon.png` with your own -- defaults ship with the engine
-   (`assets/images/defaults/`, copied to any missing live name at build time),
-   so a fresh clone renders before you've drawn anything, and the live names
-   are gitignored so your artwork survives `git pull`. Update `banner.width`/
-   `height` to your image's real size; that's what reserves layout space
-   before it loads.
-4. `./blog.sh add` to write your first post.
-5. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
-6. `./blog.sh preview` to look at it locally before deploying anywhere
+1. `./setup.sh` -- it asks for the site's title, description, timezone,
+   address, comments network (Mastodon or Bluesky) and deploy target,
+   checks each answer as you give it, and writes `config/site.yml` and
+   `env.sh`. Every question can be skipped, nothing is written until you
+   have seen the diff and confirmed it, and re-running it is how you
+   change any of this later.
+
+   Prefer to do it by hand? Copy `config/site.yml.example` to
+   `config/site.yml` and `env.sh.example` to `env.sh` (`chmod 600
+   env.sh`) and edit them; both are fully commented, an unedited pair is
+   already a working local site, and the wizard writes the same files
+   without disturbing a line you wrote yourself.
+2. `./style.sh` for how it looks and what it says about itself: the
+   palette (seven ship with the engine, so it is one keystroke rather
+   than fourteen hex values), the banner image (copied into place and
+   measured, so its declared size can't drift from the file), your bio,
+   the footer, the social icons and the sidebar widgets. A menu, so you
+   can come back to one section without walking through the rest.
+3. `./blog.sh doctor` any time you want to know whether the
+   configuration is sound -- it reads what is on disk and reports every
+   problem at once, in whole sentences, including the ones that fail
+   silently (a timezone typo, a banner whose declared size no longer
+   matches the file, a sidebar widget that can never show anything).
+4. The favicon is the one piece of artwork no wizard handles: replace
+   `assets/images/favicon.png` with your own. Both it and the banner
+   ship as defaults (`assets/images/defaults/`, copied to any missing
+   live name at build time), so a fresh clone renders before you've
+   drawn anything, and the live names are gitignored so your artwork
+   survives `git pull` -- which also means nothing else keeps a copy, so
+   put both in your backup.
+5. `./blog.sh add` to write your first post.
+6. `ruby build/build_blog.rb` to build, or `./blog.sh rebuild` to build and deploy.
+7. `./blog.sh preview` to look at it locally before deploying anywhere
    (serves `public.nosync/` at `http://localhost:8000`, Ctrl-C stops it).
 
 Every integration beyond the core (analytics, each sidebar widget,
@@ -375,7 +443,11 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
 ./blog.sh rebuild              # rebuilds and deploys the whole site
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
+./blog.sh browse [--type=image] [--tag=foo] [--drafts]
+                               # the archive on screen: filters, search, preview, Enter opens the post
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+                               # the same, printed one line per post
+./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```
@@ -423,31 +495,64 @@ Available sources:
 
 | Source | Needs | Scope |
 | --- | --- | --- |
+| beehiiv | the posts CSV export | newsletters, drafts included, full text of paid posts -- premium issues arrive as drafts tagged `beehiiv-premium`, so nothing paid-for is published without you looking; the email chrome is undone, images download at full quality; the CSV has no publish date, only created_at |
+| Blogger | the Atom backup file | posts and drafts; the comments and settings the backup mixes in are skipped and counted, images download full-size (the markup only points at thumbnails), YouTube embeds become video blocks |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
+| Facebook | an unpacked export, HTML or JSON | your own posts with photos and videos from the archive; crossposts from Twitter/Posterous are skipped and counted by default (their own imports carry the originals), as are wordless check-ins and app stories |
+| Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages are skipped, images download from the live site |
 | Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
+| LiveJournal | `LJ_PASSWORD` (challenge digest, never plaintext) | every entry via the API — LJ has no export file; friends-only and private arrive as drafts, comments stay behind |
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
+| Jekyll/Hugo | the site tree (or any markdown folder) | posts and drafts with front matter, YAML or TOML; images come from the tree itself, no network; Liquid highlight becomes a code block |
+| Medium | an unpacked export | posts and drafts; images download from Medium's CDN, likely responses to other articles become drafts for review, newer exports carry no tags |
+| Movable Type/TypePad | the MT export file (gzip ok) | posts and drafts; comments and trackbacks in the file are counted and left behind; the format has no ids or URLs, so identity is minted from date+basename and redirects take a URL pattern |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
-| Tumblr | `TUMBLR_API_KEY` | every post on a blog, drafts included, reblog content appended |
+| Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode: the file and artwork download and are hosted locally, audio as a player and video as video -- the preview says how many gigabytes that means; items without an enclosure are skipped |
+| Squarespace | the "WordPress format" XML export | posts and drafts, feature images included; images, audio and video markup that a plain parse would lose is restored, pages and attachments are counted as skips |
+| Substack | an unpacked export | newsletters and podcasts, drafts included, full text of subscribers-only posts (the export is the author's), tagged `substack-paid` so you can find them; threads and pages are skipped, tags don't exist in the export |
+| Threads | an unpacked export, HTML or JSON | your own standalone posts with media from the archive; replies to other people's threads are skipped and counted, bare URLs become links |
+| Tumblr | `TUMBLR_API_KEY` | every published post on a blog; a reblog keeps the trail with each part credited to the blog it came from. Drafts, the queue and private posts sit behind endpoints an API key cannot reach |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
-| WordPress | a WXR export file | every post; pages, attachments and menu items are skipped |
+| Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN. A CSV that lost a quote to Excel is read anyway, and only the rows that slid out of line are skipped |
+| Wayback Machine | the dead blog's old URL | the Archive's feed captures reassembled oldest-first; blogs with no archived feed fall through to page mode (platform packs — blog.cz built in — or `POST_PATTERN`); what the Archive never saved is counted as lost |
+| WordPress | a WXR export file | every post, with its featured image and its captions; a password-protected post arrives as a draft rather than published; pages, attachments and menu items are skipped, and a custom post type is skipped under its own name so you can see what stayed behind |
 | RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 
 Every source is also reachable without the wizard, for a cron job or a
 scripted migration -- same mapping, no preview pass, writes immediately:
 
 ```bash
+ruby scripts/migrate_beehiiv.rb <posts.csv>
+ruby scripts/migrate_blogger.rb <blog-backup.xml>
 ruby scripts/migrate_bluesky.rb <handle>
+ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
+ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
 ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
+PERMALINK=... ruby scripts/migrate_jekyll.rb <path-to-site-tree>
+LJ_PASSWORD=... ruby scripts/migrate_livejournal.rb <username>
 ruby scripts/migrate_mastodon.rb <path-to-unpacked-archive>
+ruby scripts/migrate_medium.rb <path-to-unpacked-export>
+URL_PATTERN=... ruby scripts/migrate_movabletype.rb <mt-export.txt>
 ruby scripts/migrate_pixelfed.rb <path-to-statuses.json>
+ruby scripts/migrate_podcast.rb <feed-url | export.xml>
+ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
+ruby scripts/migrate_substack.rb <path-to-unpacked-export>
+ruby scripts/migrate_threads.rb <path-to-unpacked-export>
 TUMBLR_API_KEY=... ruby scripts/migrate_tumblr.rb <blog-name>.tumblr.com
 ruby scripts/migrate_twitter.rb <path-to-extracted-export>
+ruby scripts/migrate_wayback.rb <https://dead-blog.example>
+ruby scripts/migrate_wix.rb <posts.csv>
 ruby scripts/migrate_feed.rb <export.xml | feed-url>
 ```
 
 All of them take `LIMIT=n` to import only the first *n* posts, which is the
 way to sample a large archive before committing hours to it -- a later full
-run overwrites those posts in place rather than duplicating them. The full
+run overwrites those posts in place rather than duplicating them. The ones
+that know their posts' original URLs also take `KEEP_PERMALINKS=1`, which
+writes the `redirect_from` list that keeps the old site's links working;
+without it an archive imports with no redirects at all, and the only way
+back is another import. Movable Type/TypePad take `URL_PATTERN` instead and
+a markdown tree a `PERMALINK` pattern, for the same purpose. The full
 per-source guide, including undo and troubleshooting, is
 [docs/importing.md](docs/importing.md).
 They report progress as they go: the size of what they're about to read,
@@ -474,8 +579,9 @@ ruby build/build_blog.rb   # rebuild into public.nosync/
 
 The sidebar widgets and per-post stats are refreshed by
 `scripts/refresh-sidebar.sh` -- it fetches the data, rewrites only the
-four JSON files and uploads just those, no site rebuild. Run it from cron
-wherever the site is built:
+JSON files (six at most: toots, Pixelfed, commits, Bluesky, RSS, stats)
+and uploads just the ones the site's configured widgets produce, no site
+rebuild. Run it from cron wherever the site is built:
 
 ```
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh
@@ -497,15 +603,16 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 Things that currently assume this exact deployment and would need
 generalizing for anyone else to adopt this as-is:
 
-- **Imports** -- Bluesky, Tumblr, Mastodon, Pixelfed, Instagram, a
-  Twitter/X archive, WordPress and any RSS/Atom feed are covered. Two of
-  those are one adapter each covering two things: WordPress and feeds,
-  because they are one format (a WXR export *is* RSS 2.0, with `wp:`
-  elements layered on for what a feed has no room for), and Instagram's
-  HTML and JSON exports, because they are one archive serialised twice.
+- **Imports** -- twenty-two sources are covered (the table under
+  [Importing existing content](#importing-existing-content)). Some of
+  those share an adapter: WordPress and feeds, because they are one
+  format (a WXR export *is* RSS 2.0, with `wp:` elements layered on for
+  what a feed has no room for), and the HTML and JSON variants of the
+  Facebook, Instagram and Threads exports, because each pair is one
+  archive serialised twice.
   What a new source needs is an adapter with three methods -- everything
   else (media, dedup, dry-run, reporting, HTML → blocks) is already
-  shared. Threads is feasible but deferred (see below).
+  shared.
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:

@@ -98,7 +98,7 @@ everything about one post in one place -- state, type, tags, the pin,
 the announcement -- and offers the guarded actions:
 
 - **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
-  delete;
+  review the old addresses that redirect here, delete;
 - **draft**: publish, schedule (or reschedule, or cancel the schedule),
   rename the slug, delete.
 
@@ -124,11 +124,26 @@ their URL, so a renamed post may appear once more as a new item in
 subscribers' readers. The redirect keeps every clicked link working;
 what a reader app shows is its own business.
 
-The wizard menu lists five activities, not every command: publish,
-schedule, unpublish, delete and the announcement live in this dialog
-(and the draft dialog) instead of being menu items. Every CLI command
-still exists unchanged -- `./blog.sh unpublish <slug>` works exactly as
-before; only the menu stopped listing it.
+**Moving a post to another year** -- editing its date across a New Year
+-- moves its public address the same way a rename does, and records the
+old one the same way. The link from before the edit keeps working.
+
+**Old addresses can also be given up**, with `[a]` in the same dialog:
+it lists every address that redirects here and drops the one you pick.
+There is one situation where that is the only cure rather than a
+preference: if a NEW post has since taken an old address, the build
+refuses to overwrite a live page with a redirect stub -- correctly -- and
+says so on every build. The entry can never do anything again, and `[a]`
+marks exactly that entry as "taken by another post". Dropping any other
+one is a decision, not a repair: that link stops working for good.
+
+The wizard menu lists six activities -- a new post, a post in hand, the
+scheduled-post queue, the archive browser, the trash and a rebuild --
+not every command: publish, schedule, unpublish, delete and the
+announcement live in this dialog (and the draft dialog) instead of
+being menu items. Every CLI command still exists unchanged --
+`./blog.sh unpublish <slug>` works exactly as before; only the menu
+stopped listing it.
 
 ## Writing from a phone
 
@@ -156,6 +171,16 @@ JPEG itself during the save (detected by content, so a HEIC named `.jpg`
 is caught too; AVIF, which browsers do display, is left alone). The
 simplest fix is on the phone itself: Settings → Camera → Formats →
 Most Compatible.
+
+**Video from the same phone is mentioned, not refused.** The same
+setting decides the codec, and the save says one line when it matters:
+that a clip is HEVC (most browsers play it, the rest show an empty
+player), or that it is a QuickTime `.mov` (the video inside is usually
+ordinary H.264, but not every browser accepts the container). Both come
+with the `ffmpeg` command that fixes them -- re-encoding for the codec,
+repacking for the container, which copies the video across untouched.
+The post is saved either way; the only hard stop for a video is the
+per-file size limit, and a long 4K clip reaches that on its own.
 
 ## Pinning a post to the front page
 
@@ -220,6 +245,30 @@ always was. Times follow `site.timezone`, daylight saving included --
 cron still runs every 15 minutes, so a slot publishes within that window
 of its time.
 
+### Working the queue
+
+`./blog.sh queue` (also a wizard menu entry) shows every scheduled post
+in publish order and acts on the one you pick:
+
+- `[u]` / `[d]` move it a slot earlier or later. Moving exchanges times
+  with the neighbouring post -- the set of occupied times never changes,
+  only which post sits in which. A hand-scheduled 14:17 stays a 14:17.
+- `[p]` publishes it right now, the same flow as publishing a draft by
+  hand (announcement included).
+- `[s]` asks for a different time, same prompt as scheduling.
+- `[n]` returns it to the drafts; the post keeps its text, loses only
+  the plan.
+
+When a post leaves the queue -- published now, or removed -- its time is
+free again, and the screen offers to let the posts behind it each step
+forward into the gap, every one taking over its predecessor's time. It
+only offers: a hand-picked date further down may be deliberate, and
+nothing moves a post's time except you. A post whose time already passed
+is waiting for the cron and can't be reordered.
+
+The preview rebuilds once, when you leave the screen, not after every
+move.
+
 ## Attachments and the document type
 
 A line that is nothing but `[label](handbook.pdf)` -- a bare filename,
@@ -240,16 +289,18 @@ longer article that attaches its data stays an article with a file on it.
 `./import.sh` opens its own wizard: pick a source, and it reads the whole
 thing in dry-run first and tells you what *would* be written -- how many
 posts and media files, the first few slugs, and how many items it skipped
-and why. Nothing is written until you confirm, and confirming means typing the number of posts rather than pressing a key -- an answer you can't give without having read the preview. Sources are Bluesky and Tumblr over their
-APIs, and five exports you already have on disk: Twitter/X, Mastodon,
-Pixelfed, Instagram, and WordPress or any RSS/Atom feed -- those last two
-are one option, since a WXR export is RSS with extra elements and the file
-says which it is.
+and why. Nothing is written until you confirm, and confirming means typing the number of posts rather than pressing a key -- an answer you can't give without having read the preview. Sources are twenty-two: blog and newsletter
+platforms (WordPress, Blogger, Ghost, Medium, Substack, a Jekyll/Hugo
+tree, ...), the social networks (Twitter/X, Mastodon, Bluesky, Instagram,
+...), podcast feeds, and the Wayback Machine for a blog whose platform no
+longer exists at all. The wizard groups them by that question -- a blog
+you published, a network you posted to, a dead site -- and the full list
+lives in [importing.md](importing.md).
 
 Every source also runs without the wizard, for cron or a scripted
 migration -- one `scripts/migrate_<source>.rb` each, e.g.
 `scripts/migrate_bluesky.rb <handle>`, `scripts/migrate_instagram.rb <export-dir>`,
-`scripts/migrate_twitter.rb <export-dir>`,
+`scripts/migrate_wayback.rb <https://dead-blog.example>`,
 `scripts/migrate_feed.rb <export.xml | feed-url>`.
 Those skip the preview and write immediately; see
 [the README](../README.md#importing-existing-content).
@@ -260,9 +311,9 @@ Two things to expect on a real archive:
   thousand posts run for hours. Every phase reports progress -- what it's
   reading, how many items it found, then a `12/847` counter -- so a quiet
   terminal means something is wrong, not that it's working. Sample before
-  committing to that: the Tumblr and Twitter scripts take `LIMIT=20` to
-  import only the first twenty, which is enough to see whether the mapping
-  does what you expect. A second full run then overwrites them in place.
+  committing to that: every script takes `LIMIT=20` to import only the
+  first twenty, which is enough to see whether the mapping does what you
+  expect. A second full run then overwrites them in place.
 - **The deploy guard will stop you afterwards**, because a bulk import is
   exactly the "file count swung wildly" shape it watches for. That's
   working as intended: check the numbers, then re-run with `--force`.
@@ -371,7 +422,8 @@ wrong:
 | Add one 60 MB file | pass, with a notice |
 | Add one 120 MB file | stop, naming the file |
 | Empty `public.nosync/` | stop |
-| Delete `.deploy_baseline.json` | pass, saying the growth guard stands down once |
+| Delete `.deploy_baseline.json` | pass, with no stand-down notice -- the growth guard borrows the file count from the manifest |
+| Delete the manifest too | pass, saying the growth guard stands down once |
 | Any of the above | leave `.deploy_baseline.json` untouched -- a dry run is read-only |
 
 Two things make this easier to reason about: the failure state is anything
@@ -405,6 +457,12 @@ when nothing is due, so a tight interval costs nothing:
 */15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
 ```
 
+Every run of that job touches `.last-scheduled-run` in the project root,
+including the runs with nothing due. That file is the only evidence that
+anything is serving the queue at all, and it is what `./blog.sh doctor`
+reads to tell a queue that is simply waiting from one whose cron was
+never set up.
+
 A post is announced before the site is rebuilt, so the toot and the page
 it links to come from the same build. If the deploy then fails, the job
 leaves a `.deploy-pending` marker and the next run retries the deploy on
@@ -412,6 +470,29 @@ its own, even with nothing due -- so an announcement never keeps pointing
 at a page that was never uploaded. A post that cannot be published (a slug
 the target year already owns, a malformed date) is reported by name and
 skipped; the rest of the batch still publishes.
+
+### One writer at a time
+
+Building and deploying take an advisory lock (`.blog-sh.lock` in the
+project root), because two of the things that write `public.nosync` run
+from cron: the scheduled publish every 15 minutes and the sidebar refresh
+every 30. On a large archive a build plus a full deploy takes longer than
+a tick, so overlapping runs are ordinary -- and what they do to each other
+is not: a deploy walking a tree that is being rewritten, or pruning as an
+orphan a page the other run has just published.
+
+A run that finds the lock held does not wait for it. A cron tick says so
+and leaves with exit 0 -- cron is back in fifteen minutes, and a queue of
+blocked publishes would all wake up and do the same work at once. A run
+you started reports it and exits non-zero, so `./blog.sh` doesn't tell you
+a deploy happened when it didn't. The scheduled publish holds the lock for
+its whole run (publish, rebuild, deploy are one operation as far as the
+site is concerned), and the build and deploy it shells out to inherit it
+rather than deadlock against their own parent.
+
+If the filesystem can't do advisory locks -- some network mounts -- the
+lock degrades to no lock, which is where every installation was before
+this existed.
 
 ## Backup
 
@@ -426,14 +507,20 @@ everything generated is rebuildable:
 | `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
 | `env.sh` | tokens (or re-create them; mind the file's 600 mode in backups too) |
 | `trash/` | optional -- deleted-but-recoverable posts |
+| `config/palettes.yml` | only if you added a palette of your own -- the file itself ships with the engine |
 
 Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
 (self-heals with one full re-upload), `.deploy_baseline.json` (the guards'
 reference; losing it costs one deploy with the growth guard standing down,
 and it is rewritten by that same run), `incoming/` (transient staging), and
 the working files next to them -- `.last-edit.md` (the text from the last
-editor session) and `.deploy-pending` (a marker that says a scheduled
-publish still owes the target a deploy; see [Deploying](#deploying)).
+editor session, with `.last-edit.meta` recording which command it came
+from), `.deploy-pending` (a marker that says a scheduled publish still
+owes the target a deploy; see [Deploying](#deploying)) and
+`.last-scheduled-run` (the scheduled-publish heartbeat above). The
+wizards' `config/site.yml.bak` and `env.sh.bak` are not needed either --
+but the second holds your previous tokens, so delete rather than
+archive it.
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
 
@@ -442,9 +529,12 @@ The same list is exactly what to move when changing machines.
 | Symptom | Cause and fix |
 | --- | --- |
 | Anything at all, and you need to know what you're running | `./blog.sh version` -- it needs neither `env.sh` nor a config, on purpose. |
-| A save aborted and took your text with it | It didn't: the editor's text is in `.last-edit.md` in the project root until the next `add`/`edit` overwrites it. The abort message says so too. |
-| `Missing env.sh` | Copy the template: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
-| `Missing config/site.yml` | Same idea: `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
+| The site looks wrong, or you want to change how it looks | `./style.sh` -- a menu over the palette, banner, about, footer, social icons, sidebar widgets, fonts and analytics. Picking a palette offers a preview (your site in the candidate colors, light and dark side by side) before anything is written, and the run ends by offering a rebuild, since appearance is the one thing a diff can't show you. |
+| Anything config-shaped, and you want the whole picture | `./blog.sh doctor` -- it reads whatever is on disk and reports every problem at once, each with a fix line. It runs on a config too broken for anything else to load, including one whose YAML won't parse, and needs neither `env.sh` nor a valid config. Add `--online` to also ask whether the feeds, the analytics script and the access token still answer. |
+| `config/site.yml is not valid YAML` | The message names the line and column. Almost always a tab where spaces belong, a missing quote, or a colon inside an unquoted value (`title: Colon: here`). `./blog.sh doctor` says the same thing without stopping at the first problem. |
+| A save aborted and took your text with it | It didn't: the text is in `.last-edit.md`, and the next `add`/`edit` offers it back -- `[r]` opens the editor on it, `[d]` throws it away, `[c]` leaves it alone. Text from an interrupted `edit <slug>` is only offered to that same post: restoring it into an `add` would make a second post out of it, so the offer names the command that does continue it. |
+| `Missing env.sh` | `./setup.sh`, or copy the template by hand: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
+| `Missing config/site.yml` | Same two ways: `./setup.sh`, or `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
 | `Duplicate year/slug ... build stopped` | Two posts resolve to the same URL and media directory. Rename one slug; the build aborts rather than silently overwriting one with the other. |
 | Deploy stopped with a "% drop/increase" message | One of the four guards -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. The message names what it compared against, and when. |
 | Deploy or save stopped naming a file over 100 MB | One limit for every backend, so the site stays portable ([Deploying](#deploying)). Shrink the file, or take it out of the post and link to it instead. `--force` does not lift this -- the target would refuse it every run. |

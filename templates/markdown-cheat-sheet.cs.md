@@ -18,6 +18,7 @@ Odkaz na tuhle stránku je i v nápovědě v editoru, takže ji máte při psan�
 - [Obrázky](#obrazky)
 - [Video](#video)
 - [Audio](#audio)
+- [Přílohy](#prilohy)
 - [Escapování](#escapovani)
 - [Záměrně nepodporované](#zamerne-nepodporovane)
 
@@ -79,6 +80,18 @@ Zvýraznění jde kombinovat a vnořovat do sebe:
 ```
 
 **tučný text s *kurzívou* uvnitř**
+
+Můžou taky stát hned vedle sebe, bez mezery. Trojice hvězdiček uprostřed
+se čte jako dvě: zavírací pár tučného a jedna, která otevírá kurzívu.
+Funguje to i obráceně — jedna zavírá kurzívu, pár otevírá tučné.
+
+```
+**tučně***kurzívou*
+*kurzívou***tučně**
+```
+
+**tučně***kurzívou*
+*kurzívou***tučně**
 
 ## Odkazy
 
@@ -251,7 +264,7 @@ Cesta může vést kamkoliv na disku, soubor se zkopíruje sám. Holé jméno so
 
 ## Video
 
-Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor i pro YouTube. **Popisek je u videa povinný.**
+Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor (.mp4, .mov, .m4v) i pro adresu videa: YouTube, Vimeo, PeerTube, archive.org. **Popisek je u videa povinný.**
 
 ```
 !![Popisek videa](/cesta/k/videu.mp4)
@@ -266,10 +279,16 @@ Samotná adresa na YouTube napsaná na řádku se na přehrávač **nezmění** 
 
 Stejné dva vykřičníky jako u videa — rozlišuje je přípona souboru
 (.mp3, .m4a, .ogg, .opus, .aac, .flac, .wav). **Popisek je povinný**
-a soubor se vykreslí jako nativní přehrávač.
+a soubor se vykreslí jako nativní přehrávač. Na tentýž řádek jde napsat
+i adresu ze Spotify, SoundCloudu, Mixcloudu, Funkwhale nebo Bandcampu —
+udělá se z ní přehrávač té platformy. (U posledních dvou samotná adresa
+nestačí, takže se uložení postu jednou zeptá služby, kde má přehrávač —
+jediná chvíle, kdy psaní postu potřebuje síť.)
 
 ```
 !![Popisek nahrávky](/cesta/k/nahravce.mp3)
+!![Popisek nahrávky](https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT)
+!![Popisek nahrávky](https://soundcloud.com/nasa/apollo-11-onboard-recorder)
 ```
 
 ## Přílohy
@@ -314,7 +333,7 @@ by její cena dopadla na všechny, kdo ji *nepoužívají*:
 - podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu
   (názvy_souborů, snake_case); používejte hvězdičky
 - blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů;
-  používejte tři apostrofy
+  používejte tři zpětné apostrofy
 - nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici
   frontmatteru
 - vnořené citace `>>`

@@ -47,6 +47,7 @@ module MediaDimensions
       elsif head.byteslice(0, 3) == "\xFF\xD8\xFF".b
         f.rewind
         f.read(2)
+        orientation = nil
         loop do
           marker = f.read(2)
           break unless marker && marker.bytesize == 2
@@ -58,12 +59,68 @@ module MediaDimensions
           if (0xC0..0xCF).cover?(code) && ![0xC4, 0xC8, 0xCC].include?(code)
             f.read(1)
             h, w = f.read(4).to_s.unpack('n2')
+            # The frame header holds the stored size; a phone photo taken
+            # sideways is stored landscape with an EXIF tag telling the
+            # viewer to turn it. Browsers obey that tag, so the width and
+            # height written into the post have to describe the picture as
+            # SHOWN -- otherwise every portrait photo out of a phone
+            # reserved a landscape box and the page jumped exactly where
+            # the reservation was supposed to stop it.
+            w, h = h, w if EXIF_SWAPPED.include?(orientation)
             return sane([w, h])
+          elsif code == 0xE1
+            # Read first, decide second: `orientation ||= exif_orientation(f.read(...))`
+            # skips the read once an orientation is known, leaving the file
+            # positioned inside the segment -- and the next "marker" is then
+            # payload bytes. JPEGs routinely carry two APP1 segments (Exif
+            # and XMP), so that mistake produced nonsense dimensions for a
+            # very ordinary file.
+            payload = f.read(len - 2).to_s
+            orientation ||= exif_orientation(payload)
           else
             f.seek(len - 2, IO::SEEK_CUR)
           end
         end
       end
+    end
+    nil
+  rescue StandardError
+    nil
+  end
+
+  # The four EXIF orientations that turn the picture a quarter turn: 5-8
+  # are the transposed/rotated ones, where the stored width is the shown
+  # height. 1-4 keep the axes (identity, mirrors, 180°).
+  EXIF_SWAPPED = [5, 6, 7, 8].freeze
+
+  # Orientation out of an APP1 payload, or nil for anything that isn't a
+  # readable Exif block. Reads the one tag it needs from IFD0 and stops --
+  # no general TIFF parser, no gems, same principle as the rest of this file.
+  def exif_orientation(payload)
+    return nil unless payload.start_with?("Exif\0\0".b)
+
+    tiff = payload.byteslice(6..).to_s
+    return nil if tiff.bytesize < 8
+
+    case tiff.byteslice(0, 2)
+    when 'II'.b then short, long = 'v', 'V'
+    when 'MM'.b then short, long = 'n', 'N'
+    else return nil
+    end
+
+    ifd = tiff.byteslice(4, 4).unpack1(long).to_i
+    return nil if ifd < 8 || ifd + 2 > tiff.bytesize
+
+    count = tiff.byteslice(ifd, 2).unpack1(short).to_i
+    count.times do |i|
+      entry = tiff.byteslice(ifd + 2 + (i * 12), 12)
+      break unless entry && entry.bytesize == 12
+      next unless entry.byteslice(0, 2).unpack1(short) == 0x0112
+
+      # A SHORT sits in the first two bytes of the four-byte value field,
+      # whichever way the file is ordered.
+      value = entry.byteslice(8, 2).unpack1(short).to_i
+      return (1..8).cover?(value) ? value : nil
     end
     nil
   rescue StandardError

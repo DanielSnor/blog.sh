@@ -28,8 +28,9 @@ module HeicConverter
 
   # Content detection, not extension: a HEIC renamed to .jpg is still a
   # HEIC (and still displays nowhere but Safari), while an AVIF named
-  # .heic must not be converted needlessly. Reads the ftyp box, nothing
-  # else, and any unreadable or non-BMFF file is simply "not HEIC".
+  # .heic must not be converted needlessly. Reads the ftyp box and the
+  # top-level box types, nothing else, and any unreadable or non-BMFF file
+  # is simply "not HEIC".
   def heic?(path)
     File.open(path, 'rb') do |f|
       head = f.read(16)
@@ -37,20 +38,60 @@ module HeicConverter
       return false unless head.byteslice(4, 4) == 'ftyp'.b
 
       major = head.byteslice(8, 4)
-      return true if HEIC_BRANDS.include?(major)
-      return false if AVIF_BRANDS.include?(major)
-      return false unless CONTAINER_BRANDS.include?(major)
+      branded =
+        if HEIC_BRANDS.include?(major)
+          true
+        elsif AVIF_BRANDS.include?(major) || !CONTAINER_BRANDS.include?(major)
+          false
+        else
+          # A generic HEIF container (mif1/msf1): the codec hides in the
+          # compatible-brands list, which runs to the end of the ftyp box.
+          box_size = head.byteslice(0, 4).unpack1('N')
+          rest = f.read([box_size - 16, 240].min.to_i.clamp(0, 240)).to_s
+          brands = rest.scan(/.{4}/m)
+          (brands & AVIF_BRANDS).any? ? false : (brands & HEIC_BRANDS).any?
+        end
+      return false unless branded
 
-      # A generic HEIF container (mif1/msf1): the codec hides in the
-      # compatible-brands list, which runs to the end of the ftyp box.
-      box_size = head.byteslice(0, 4).unpack1('N')
-      rest = f.read([box_size - 16, 240].min.to_i.clamp(0, 240)).to_s
-      brands = rest.scan(/.{4}/m)
-      return false if (brands & AVIF_BRANDS).any?
-
-      (brands & HEIC_BRANDS).any?
+      !movie?(f)
     end
   rescue StandardError
+    false
+  end
+
+  # Four of the brands above -- hevc, hevx, hevm, hevs -- mean an HEVC
+  # image SEQUENCE, and `msf1` is its container. A video file can carry
+  # exactly those in its ftyp, so brands alone would hand a .mov to a
+  # still-image converter, which would answer with a single frame and call
+  # it the file: the video silently replaced by its first moment.
+  #
+  # The box after ftyp tells the two apart with certainty rather than
+  # guesswork: a still HEIF stores its picture in `meta`, a movie stores
+  # its tracks in `moov`. Nothing that has a movie box is a photo.
+  def movie?(file)
+    offset = 0
+    12.times do
+      file.seek(offset)
+      header = file.read(8)
+      break unless header && header.bytesize == 8
+
+      size = header.byteslice(0, 4).unpack1('N')
+      type = header.byteslice(4, 4)
+      return true if type == 'moov'.b
+      return false if type == 'meta'.b
+
+      # size 1 puts a 64-bit length in the next eight bytes; size 0 means
+      # "to the end of the file", so there is no box after it to look at.
+      if size == 1
+        large = file.read(8)
+        break unless large && large.bytesize == 8
+
+        size = large.unpack1('Q>')
+      end
+      break if size < 8
+
+      offset += size
+    end
     false
   end
 
