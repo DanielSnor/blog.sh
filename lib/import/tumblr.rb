@@ -64,7 +64,47 @@ module Import
     end
 
     def map(item, media)
-      blocks = (item['content'] || []).filter_map { |b| map_block(b, media) }
+      # An ask post keeps the question in `layout`, not in the blocks
+      # themselves: {"type": "ask", "blocks": [0, 1], "attribution": {...}}
+      # says which of `content`'s blocks somebody else wrote, and who. With
+      # the field ignored, a stranger's question came out as the opening
+      # paragraphs of the post, reading as the blog owner's own words, and
+      # the asker's name never reached the archive at all -- it lives
+      # nowhere else. The same defect the trail had, from the other end.
+      #
+      # A question is a quote with an attribution, and the schema already
+      # has both: subtype "quote" and `cite`. Costs the link to the asker's
+      # blog, since `cite` is plain text, and buys not inventing a word for
+      # "asked" in three languages. An anonymous ask -- Tumblr simply omits
+      # `attribution` -- stays an unattributed quote rather than gaining a
+      # localized "Anonymous" the source never said.
+      #
+      # `layout` of type "rows" is left alone: it is a display grid, not a
+      # statement about who wrote what.
+      ask = (item['layout'] || []).find { |entry| entry['type'] == 'ask' } || {}
+      ask_blocks = (ask['blocks'] || []).map(&:to_i)
+
+      # The indices point into the ORIGINAL `content` array, so they have to
+      # be read while walking it. Resolving them against the mapped blocks
+      # instead would go wrong the moment map_block drops one (a block type
+      # the engine has no shape for): everything after the hole shifts by
+      # one, and the ask would mark the owner's own answer as the question.
+      blocks = []
+      quoted = []
+      (item['content'] || []).each_with_index do |b, index|
+        mapped = map_block(b, media)
+        next unless mapped
+
+        if ask_blocks.include?(index)
+          mapped = as_question(mapped)
+          quoted << mapped
+        end
+        blocks << mapped
+      end
+      asker = ask.dig('attribution', 'blog', 'name').to_s.strip
+      # On the last one, so it reads the way a quotation ends: the words,
+      # then whose they were.
+      (quoted.reverse.find { |b| b['subtype'] == 'quote' } || {})['cite'] = asker unless asker.empty?
 
       # A reblog carries the posts it was built on in `trail`, and those
       # belong to OTHER blogs -- 12 of 20 posts in one real capture had a
@@ -172,6 +212,18 @@ module Import
       url = blog['url'].to_s
       formatting << { 'type' => 'link', 'start' => 0, 'end' => name.length, 'url' => url } unless url.empty?
       { 'type' => 'text', 'text' => "#{name}:", 'formatting' => formatting }
+    end
+
+    # A heading keeps its own subtype: it is already marked as not being
+    # running prose, and a question titled with one is nothing a real ask
+    # produces. Everything else a text block can be (NPF's list and indent
+    # subtypes) renders as a paragraph here anyway, so nothing is lost by
+    # making it a quote instead.
+    def as_question(block)
+      return block unless block['type'] == 'text'
+      return block if block['subtype'].to_s.start_with?('heading')
+
+      block.merge('subtype' => 'quote')
     end
 
     def map_block(block, media)

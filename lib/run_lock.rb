@@ -161,7 +161,15 @@ module RunLock
     # held either way; that part of the message was never in doubt.
     holder = '' unless holder_alive?(holder)
     detail = holder.empty? ? '' : " (#{holder})"
-    "ℹ️  Another #{label ? "#{label} " : ''}run is still going#{detail} -- skipping this one."
+    # Dropping the holder detail is right, but it takes the only actionable
+    # fact with it: that the run in the way is almost always the scheduled
+    # one, and will be gone shortly. Without that, the message describes a
+    # situation and offers nothing to do about it -- and the case where it
+    # matters most is the interactive one, where waiting is not automatic.
+    # Cron comes back on its own in fifteen minutes; a person who just
+    # confirmed a palette does not.
+    "ℹ️  Another #{label ? "#{label} " : ''}run is still going#{detail} -- " \
+      'skipping this one. Nothing is broken; try again in a minute.'
   end
 
   # The holder line starts with the pid that wrote it. Signal 0 asks the

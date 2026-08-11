@@ -532,7 +532,10 @@ blogs) and keep it in `env.sh`. Every post the key can reach is imported,
 which means the published ones: drafts, the queue and private posts live
 behind endpoints that want a full OAuth handshake, so an import cannot
 see them. Reblogged content from the trail comes with your own, each part
-credited to the blog it came from, and audio posts arrive as players (a self-hosted file is downloaded,
+credited to the blog it came from; the question in an ask post arrives as a
+quote with the asker's name under it (an anonymous one as a quote with no
+name, which is all Tumblr records), so neither ever reads as your own
+words. Audio posts arrive as players (a self-hosted file is downloaded,
 a SoundCloud/Spotify embed stays an embed). All media is downloaded; an import of a few thousand posts runs for
 hours, so sample with `LIMIT` first. A wrong key or blog name aborts with
 the API's reason instead of a stack trace.

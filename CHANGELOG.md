@@ -37,6 +37,27 @@ prints what an installation is running.
   when rendered, so the file stays as readable as it was. Existing configs
   are not touched.
 
+### Fixes
+
+- **A Tumblr ask post read as if the blog's owner had asked themselves.**
+  NPF keeps the question in `layout`, not in the blocks
+  (`{"type": "ask", "blocks": [0], "attribution": {...}}`), and the field was
+  ignored -- so a stranger's question came out as the opening paragraphs of
+  the post, in the owner's voice, and the asker's name never reached the
+  archive at all, since nothing else in the payload carries it. The question
+  is a quote with the asker under it now; an anonymous one stays a quote
+  with no name, which is all Tumblr records. Re-import to pick this up on an
+  archive already imported. A `rows` layout is still ignored on purpose --
+  it describes a display grid, not who wrote what.
+- **"Another run is still going" did not say to try again.** The lock
+  behaved correctly; the message was the problem. It names the run holding
+  the lock only when that process is still alive -- otherwise people go
+  hunting a pid that ended an hour ago -- but suppressing the detail took
+  the one actionable fact with it, that the run in the way is almost always
+  the scheduled one and will be gone in a minute. It says so now. The case
+  where it matters is the interactive one: cron comes back by itself in
+  fifteen minutes, somebody who just confirmed a palette does not.
+
 ### Upgrading
 
 - Nothing has to change, and nothing has to be rebuilt for the old behaviour
