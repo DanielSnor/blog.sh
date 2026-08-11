@@ -1,23 +1,25 @@
-<nav>
-      <button class="nav-toggle" type="button" aria-label="<%= h(t('nav.menu_label')) %>" aria-expanded="false">
+<% if NAV_ITEMS.any? || search %><nav>
+<%# The items come from NAV_ITEMS in build_blog.rb -- either the site's own
+    `nav:` list or, with no such key, All plus the content types the site
+    has. Rendering them through one loop means the default menu comes out
+    byte for byte as it did when it was hardcoded here.
+    An empty list renders no bar and no toggle at all, which is how a site
+    turns the menu off; a bar that only carries the search field is what
+    is left when the top nav has items switched off but search on.
+    The odd tag layout is not style: partials compile without an ERB trim
+    mode, so a tag's own line breaks would leak into every page as blank
+    lines. Same reason nav_current emits the whole aria-current attribute
+    inline instead of sitting in a conditional block. (Mind the delimiters
+    in this comment too -- an ERB opening tag written inside it ends the
+    comment early and dumps the rest into every page. Which is how this
+    note came to exist.)
+%><% if NAV_ITEMS.any? %>      <button class="nav-toggle" type="button" aria-label="<%= h(t('nav.menu_label')) %>" aria-expanded="false">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <ul>
-        <li><a href="/"<%= nav_current('/', active) %>><%= h(t('nav.all')) %></a></li>
-<%# Only types that exist on the site right now (NAV_TYPE_ITEMS in
-    build_blog.rb); an empty site's menu is just HOME. The odd tag layout
-    keeps the rendered bytes identical to the hardcoded list this replaced
-    -- partials compile without an ERB trim mode, so a tag's own line
-    breaks would otherwise leak into every page as extra blank lines.
-    Same reason nav_current emits the whole aria-current attribute inline
-    rather than the obvious conditional block around it: a block tag's own
-    newlines would land on every page, and pages whose nav has no active
-    item must stay byte-identical to before. (Mind the delimiters in this
-    comment too -- an ERB opening tag inside it ends the comment early and
-    dumps the rest into every page. Which is how this note came to exist.)
-%><% NAV_TYPE_ITEMS.each do |href, label| %>        <li><a href="<%= href %>"<%= nav_current(href, active) %>><%= h(label) %></a></li>
+<% NAV_ITEMS.each do |href, label| %>        <li><a href="<%= h(href) %>"<%= nav_current(href, active) %>><%= h(label) %></a></li>
 <% end %>      </ul>
-<% if search %>
+<% end %><% if search %>
       <form class="search-form" action="/search/" method="get" role="search">
         <input type="search" name="q" id="search-q" placeholder="<%= h(t('nav.search_placeholder')) %>" autocomplete="off">
         <button type="submit" aria-label="<%= h(t('nav.search_label')) %>">
@@ -25,4 +27,4 @@
         </button>
       </form>
 <% end %>
-    </nav>
+    </nav><% end %>

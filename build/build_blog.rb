@@ -1248,7 +1248,18 @@ def nav_active_for(path)
   # Pagination lives under the type ('/type/video/page/2/'), so the item is
   # the first two segments rather than the whole path.
   type = path[%r{\A/type/([^/]+)/}, 1]
-  type ? "/type/#{type}/" : nil
+  return "/type/#{type}/" if type
+
+  # A tag listing (and its pagination) belongs under the tag's own item,
+  # for the menus that are made of tags rather than types; anything else --
+  # a post, a generated page -- lights up only when an item points straight
+  # at it. Both are matched against the menu the site actually has rather
+  # than returned unconditionally, because the answer becomes a
+  # PARTIAL_RESULTS key: returning every path would give each of thousands
+  # of tag and post pages its own cache entry for an identical menu.
+  tag = path[%r{\A/tag/([^/]+)/}, 1]
+  candidate = tag ? "/tag/#{tag}/" : path
+  NAV_ITEM_HREFS.include?(candidate) ? candidate : nil
 end
 
 # The entire attribute, or an empty string -- see the comment in
@@ -1613,6 +1624,42 @@ NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
           'document' => 'documents' }.fetch(type)
   ["/type/#{type}/", t("nav.#{key}")]
 end.freeze
+
+# The menu a site actually shows. Without a `nav:` key it is what it has
+# always been -- All, then one item per content type the site has -- so no
+# existing installation renders a byte differently. With one, the site
+# names its own items instead:
+#
+#   nav:
+#     - { label: "Home", url: "/" }
+#     - { label: "Life in the UK", tag: "life-in-uk" }
+#
+# `tag:` is a tag's slug and becomes /tag/<slug>/; `url:` is taken as
+# written, so an item can point at a post, at a generated page or off the
+# site entirely. An entry missing either a label or a destination is
+# skipped rather than rendered as an empty link.
+#
+# An empty list is a decision, not a mistake: the menu then renders
+# nothing at all -- no bar, no toggle -- rather than an empty bar. That is
+# also how a site turns the menu off, so there is no second key for it.
+def configured_nav_items
+  entries = SiteConfig.get('nav', default: nil)
+  return nil unless entries.is_a?(Array)
+
+  entries.filter_map do |entry|
+    next unless entry.is_a?(Hash)
+
+    label = entry['label'].to_s.strip
+    slug = entry['tag'].to_s.strip
+    href = slug.empty? ? entry['url'].to_s.strip : "/tag/#{slug}/"
+    next if label.empty? || href.empty?
+
+    [href, label]
+  end
+end
+
+NAV_ITEMS = (configured_nav_items || ([['/', t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
+NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
