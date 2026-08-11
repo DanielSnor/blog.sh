@@ -19,12 +19,18 @@ no database, no admin server, no PHP.
 
 MIT licensed (see [LICENSE](LICENSE)).
 
-> **Status:** a personal tool, built for and around a single deployment
-> ([sean.cz](https://sean.cz)). It's shared as a working reference and is
-> usable as-is if your setup matches the assumptions below (single
-> author; deploys to Surfer, rsync, git-pages, rclone or a local
-> directory) -- see [Roadmap](#roadmap) for what would need to change to
-> fit other setups.
+> **Who it's for:** one person writing their own blog, at home in a
+> terminal, who wants to own the whole archive -- including everything
+> they already wrote somewhere else. Twenty-two
+> [import sources](#importing-existing-content) bring it in, from a
+> WordPress export to a blog whose platform no longer exists. It deploys
+> to Surfer, rsync, git-pages, rclone, SFTP or a local directory.
+>
+> **Who it isn't for:** several authors sharing one site, anyone who
+> needs a web admin interface, or a workflow where publishing isn't a
+> command. It's a personal tool, built for and around a single deployment
+> ([sean.cz](https://sean.cz)) and shared as a working reference -- see
+> [Roadmap](#roadmap) for what would need to change to fit other setups.
 
 | Light | Dark |
 | --- | --- |
@@ -66,6 +72,18 @@ deploy step around exactly that. A few of the choices that came out of it:
   cron, never by the visitor's browser -- so there's no client-side call
   to a third party on every page load, and no widget can slow down or
   break the page for a visitor.
+
+Concretely, against the tools this would otherwise be: **Hugo and
+Jekyll** are build steps -- they turn a folder of Markdown into HTML and
+stop there, leaving writing, publishing, announcing and deploying to be
+assembled from an editor, git and whatever CI you wire up. **Ghost** does
+cover all of that, but wants a Node server, a database and an admin
+interface to do it, and its comments and newsletter are its own.
+`blog.sh` is the third shape: a build *and* the authoring tool *and* the
+deploy step, with the database replaced by a directory of JSON files and
+the comment system replaced by a social network you already post to.
+What you give up is what those two are good at -- a theme ecosystem,
+plugins, and more than one author.
 
 ## Feature overview
 
@@ -293,14 +311,6 @@ deploy step around exactly that. A few of the choices that came out of it:
   same adapter, so an import can run from cron as well as from the wizard
 - Re-running an import overwrites in place (matched on source id), never
   duplicates
-- A post can be pinned to the top of the front page, and a post can carry
-  files: a lone `[label](handbook.pdf)` line becomes a download card with
-  the file's size, and a short post built around one is filed as a
-  document
-- Optional publishing slots (`mon 09:30`, …) turn `[s]` into a queue:
-  drafts written in one sitting go out on consecutive slots instead of
-  together, and `./blog.sh queue` works the queue as one screen --
-  reorder, publish now, remove
 
 ## Stack
 
