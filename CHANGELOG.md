@@ -12,198 +12,112 @@ prints what an installation is running.
 
 ## 1.2.1 -- unreleased
 
+A bug-fix release with two things added to it: the site's own words are
+Markdown now, and a photo no longer publishes where it was taken. The rest
+came out of two rounds of review over the release itself. Nothing to
+migrate -- `git pull`, rebuild, deploy.
+
 ### New
 
-- **The site's own chrome speaks Markdown.** `about.html`,
-  `footer.note_html`, `footer.copyright` and `banner.claim` were the only
-  texts on a Markdown blog that had to be written in HTML -- the field that
-  introduces the author wanted a hand-typed `<a href>` for a link. All four
-  go through the same parser the posts use now: links, bold, italics,
-  strikethrough and inline code, and in the two longer fields also lists,
-  quotes, code blocks, rules and as many paragraphs as you like. **Nothing
-  to migrate:** raw HTML still passes through untouched, so existing configs
-  render exactly as they did, `&copy;` is still a ©, and an `<img>` is still
-  how a photo gets into a bio. Images, video, audio and attachments are the
-  one thing Markdown does *not* get here -- they resolve filenames against a
-  post's media directory, which the sidebar and the footer do not have.
+- **The site's own words are Markdown.** `about.html`, `footer.note_html`,
+  `footer.copyright` and `banner.claim` were the only texts on a Markdown
+  blog that had to be written in HTML. They go through the same parser a
+  post does now -- links, emphasis, code, and in the two longer fields
+  lists, quotes and as many paragraphs as you like. Raw HTML still passes
+  through, so nothing has to be migrated and an `<img>` is still how a
+  photo gets into a bio.
 - **A photo no longer publishes the place it was taken.** A phone writes
-  coordinates into every picture it takes, the engine copied media byte for
-  byte, and nothing in it had ever looked at metadata -- so a snapshot from a
-  back garden put the back garden on the open web. Social networks strip this
-  on upload and their users have long since stopped thinking about it; a
-  static site has nobody to do it for them. New photos are cleaned on the way
-  into the archive, on the copy and never on your own file, which covers
-  authoring and all twenty-two importers alike, since they share one write.
-  Only the location goes: the camera, the lens and the moment the shutter
-  opened are your own record of your own photograph, and the Orientation tag
-  stays, which is what keeps a portrait photo standing up -- turning one back
-  the right way round needs an image decoder this engine deliberately does
-  not have. `media.strip_location: false` keeps the coordinates for a site
-  that wants them, such as a walking diary. Photos already published are left
-  alone: `./blog.sh doctor` counts them and `./blog.sh doctor
-  --strip-location` cleans them when asked -- the only thing doctor has ever
-  written, which is why it has to be named. **Known gaps**, written down
-  rather than guessed at: JPEG only, which is what phones produce and what a
-  converted HEIC arrives as, so Exif in a PNG or a WebP is left alone, as is
-  a second copy of the coordinates in an XMP packet. A GPS block holding
-  nothing but its own version number is not counted as a location and not
-  rewritten -- three photos in a real 2962-photo archive have exactly that
-  shape, and rewriting them would change three checksums to remove nothing.
+  coordinates into every picture it takes and the engine copied media byte
+  for byte, so a snapshot from a back garden put the back garden on the
+  web. New photos are cleaned on the way into the archive -- on the copy,
+  never on your own file -- which covers authoring and all twenty-two
+  importers. Only the location goes: the camera, the moment and the
+  orientation tag stay. `media.strip_location: false` keeps it.
+- `./blog.sh doctor --strip-location` takes the location out of photos
+  saved before that existed. It reads `media.nosync` and `assets/`, and the
+  site follows on the next rebuild. The only thing doctor has ever written
+  rather than reported, which is why it must be asked for by name.
+- **A table can have no header row.** Written as a table that opens with
+  the separator line, `| --- | --- |`, with every line after it data. A
+  keyboard-shortcut list or a table used for layout has no heading, and
+  until now the format could not say so.
 
 ### Changed
 
-- **A new default banner**, and it ships at twice its display size so it
-  stays sharp on a dense screen. `banner.width`/`height` in the example move
-  to 1880x600 to match: the stylesheet draws the banner at `width: 100%`, so
-  those two numbers hold the aspect ratio open while the image loads, and
-  the ratio is the one it always was. Only new installations see it --
-  `assets/images/header.png` is gitignored precisely so that a site's own
-  artwork survives a `git pull`, and `defaults/` seeds only what is missing.
+- **A new default banner**, shipped at twice its display size for dense
+  screens; `banner.width`/`height` in the example move to 1880x600 to
+  match. Only new installations see it -- `assets/images/header.png` is
+  gitignored so a site's own artwork survives a `git pull`.
 - `config/site.yml.example` writes `about.html` and `footer.note_html` as a
-  literal block scalar (`|-`) instead of a folded one (`>-`). In a folded
-  scalar YAML turns a blank line into a single newline, which now reads as
-  one wrapped paragraph rather than two -- and glues the items of a list
-  onto one line. Wrapped prose still collapses back into a single paragraph
-  when rendered, so the file stays as readable as it was. Existing configs
-  are not touched.
+  literal block scalar (`|-`). A folded one turns a blank line into a
+  single newline, which now reads as one wrapped paragraph rather than two
+  and glues a list onto one line. Existing configs are untouched.
 
 ### Fixes
 
-- **`doctor --strip-location` cleaned the archive and left the published
-  photo alone.** The strip keeps a photo's exact byte length on purpose, and
-  the build skipped copying a media file whenever the sizes matched -- on the
-  stated grounds that media is never edited in place, which is exactly what
-  this new tool does. So the archive went clean, `public.nosync` kept the old
-  bytes, the deploy saw nothing to upload, and the coordinates stayed on the
-  site. Doctor then reported "no published photo carries the place it was
-  taken" while the published one still did, and nothing in the tool could
-  notice, because it only ever looked at part of the picture. Media copies
-  compare modification time as well as size now (one more stat of a file
-  already being stat'd, no hashing), so a photo edited where it lies reaches
-  the site on the next build. And doctor reads the SOURCES -- `media.nosync`
-  and `assets/`, where the sidebar's own picture lives -- rather than the
-  build, which is made from them: cleaning the build achieved nothing that
-  lasted, since the next rebuild copied the coordinates straight back out of
-  the source, and counted every built photo twice besides.
 - **A continuation line under a nested list item crashed everything that
-  read it.** `- a` / `  - b` / `    text` -- the ordinary way to give a list
-  item a second line, and the shape the cheat sheet's own nesting example
-  invites -- reached a comparison against nil and raised. `./blog.sh add`
-  died with a Ruby backtrace and wrote no post (the text survived in the
-  editor buffer, and every retry failed the same way); the same three lines
-  in `about.html` killed the build outright and rendered no site at all. It
-  parses as an ordinary paragraph now, which is what the list grammar has
-  always said it does with a paragraph it cannot read as a clean list. This
-  one predates 1.2.1 -- it is in 1.2 as released, and in every version that
-  had nested lists.
-- **A Tumblr ask whose question is a picture the post already showed** put
-  the asker's name above the wrong copy -- at the top of the post, in front
-  of the owner's own words -- because the credit was placed by looking the
-  block up by value rather than by remembering where it went.
-- **An HTML table with labels down its side** lost its first row into a
-  header when that row's value cell happened to be empty. The rule that
-  recognises a matrix table's empty corner looked only at the first row; the
-  row below settles it, and if that one also starts with a `<th>` then the
-  `<th>` are labels and nothing there is a heading.
-- **Eleven smaller ones from the same review.** A bullet list whose first
-  item was nothing but pipes and dashes was read back as a headerless table,
-  swallowing the item; a pipe inside a code span in a table cell grew a
-  backslash on every single edit, without bound (this one predates 1.2.1);
-  ragged indentation under one bullet -- two nested runs at slightly
-  different depths -- silently dropped an item from the post; an image or
-  video line in `about.html` published a stray `!` and a link to a file that
-  was never copied anywhere; `config_line_html` could publish the private-use
-  character that stands in for a hard break into a `title=` attribute; a Wix
-  table whose `tableData` was not a mapping cost the whole post; an HTML
-  table with an empty corner cell and real `<th>` headings beside it had
-  those headings imported as data; a Tumblr ask made only of an image lost
-  the asker's name entirely; a GPS entry with an undefined type code or an
-  impossible count left the coordinates in the file while everything
-  downstream called it clean; `strip_file` read every file it was handed
-  whole -- videos included, eighteen times the memory the copy itself
-  needed -- before checking it was a JPEG at all; and it returned a photo
-  with the permissions of the temporary file rather than its own, quietly
-  making a 0640 archive world-readable.
-- **A GPS entry's data offset was trusted absolutely.** Nothing in the format
-  stops one from naming bytes that belong to the camera model, the MakerNote
-  or the thumbnail, and written into by a file like that the strip damaged
-  the photograph and left the coordinates in it. It now works out which
-  ranges the other directories own and refuses to write over any of them.
-  Nothing in a 29,805-photo corpus was shaped like this; the rule is there so
-  that the answer does not depend on that staying true.
-- **Every imported table handed its first row of data to a `<th>`.** A table
-  with no heading row -- a list of keyboard shortcuts, a set of figures, a
-  table used for layout -- came out with its first line published as a
-  column heading, which is a heading to a screen reader as much as to a
-  reader. Wix is where it showed, because Ricos states outright whether
-  there is a header (`tableData.rowHeader`) and all three answers -- true,
-  false, absent -- gave the same table; but the same thing happened on the
-  HTML path, which decides for fifteen other sources and did not tell `th`
-  from `td` at all. Both read what their source actually says now: Ricos its
-  flag, HTML its `<thead>` or a first row of `<th>`.
-  A table without a header had no way to exist before this, so the format
-  gained one: **a table may open with the separator row**, and then every
-  line after it is data. Markdown proper cannot say this and neither could
-  the alternative considered -- a header whose cells are all empty -- which
-  real archives rule out, since a genuinely empty header and an empty first
-  cell beside real headings both occur. Existing posts are untouched and
-  round-trip byte for byte; a table already imported keeps its promoted
-  header until it is re-imported or edited by hand.
-
-- **A Tumblr ask post read as if the blog's owner had asked themselves.**
-  NPF keeps the question in `layout`, not in the blocks
-  (`{"type": "ask", "blocks": [0], "attribution": {...}}`), and the field was
-  ignored -- so a stranger's question came out as the opening paragraphs of
-  the post, in the owner's voice, and the asker's name never reached the
-  archive at all, since nothing else in the payload carries it. The question
-  is a quote with the asker under it now; an anonymous one stays a quote
-  with no name, which is all Tumblr records. Re-import to pick this up on an
-  archive already imported. A `rows` layout is still ignored on purpose --
-  it describes a display grid, not who wrote what.
-- **`./style.sh` reported a held lock as a failed upload.** The palette
-  preview uploads one file on its own, and the wizard offers a rebuild at
-  the end; both read any non-zero exit as "it broke" and said so in yellow,
-  with "the lines above say why" pointing at a line that says only that
-  another run got there first. The publishing path has told the two apart
-  since 1.2 -- the exit code exists for exactly this -- so the wizard does
-  now too, in its own words and without the warning sign. The code itself
-  moved from `Publishing` to `RunLock`, where the lock that gives it its
-  meaning lives, with one helper to ask instead of two comparisons to keep
-  in step.
-- **The palette preview promised more than it could keep.** `./style.sh`
-  uploads the preview to the site and prints its address with a QR code to
-  scan, and said nothing about how long it would answer. It is a page the
-  build did not produce, so the next build removes it (`prune_public`) and
-  the deploy takes it off the site as an orphan -- which is the build doing
-  exactly its job, and can happen a minute later when a scheduled publish
-  starts one. Somebody photographed the QR one evening and found it dead the
-  next morning. The wizard says so now, with the address rather than under
-  the QR, so a run with no terminal to draw one in is told as well.
-- **"Another run is still going" did not say to try again.** The lock
-  behaved correctly; the message was the problem. It names the run holding
-  the lock only when that process is still alive -- otherwise people go
-  hunting a pid that ended an hour ago -- but suppressing the detail took
-  the one actionable fact with it, that the run in the way is almost always
-  the scheduled one and will be gone in a minute. It says so now. The case
-  where it matters is the interactive one: cron comes back by itself in
-  fifteen minutes, somebody who just confirmed a palette does not.
+  read it.** `- a` / `  - b` / `    text` -- the ordinary way to give a
+  list item a second line -- reached a comparison against nil. `blog.sh
+  add` died with a backtrace and wrote no post; the same three lines in
+  `about.html` killed the build and rendered no site at all. It parses as
+  an ordinary paragraph now. Live in 1.2 as released.
+- **Every imported table handed its first row of data to a `<th>`.** A
+  table with no heading row -- shortcuts, figures, a layout table -- came
+  out with its first line published as a column heading, which is a heading
+  to a screen reader as much as to a reader. Wix reads `tableData.rowHeader`
+  now and the HTML path its `<thead>` or a first row of `<th>`; the latter
+  decides for fifteen sources and did not tell `th` from `td` at all.
+- **A Tumblr ask read as if the blog's owner had asked themselves.** NPF
+  keeps the question in `layout`, and the field was ignored -- so a
+  stranger's question came out as the opening paragraphs of the post, in
+  the owner's voice, and the asker's name never reached the archive at all.
+  It is a quote with the asker under it now. Re-import to pick this up.
+- **`doctor --strip-location` cleaned the archive and left the site
+  alone.** The strip keeps a photo's byte length on purpose and the build
+  skipped copying a media file whenever the sizes matched, so the
+  coordinates stayed on the site while doctor called it clean. Media copies
+  compare modification time as well as size now.
+- **A GPS entry's data offset was trusted absolutely.** Nothing stops one
+  from naming bytes that belong to the camera model, the MakerNote or the
+  thumbnail, and written into by such a file the strip damaged the
+  photograph and left the coordinates in it. It works out which ranges the
+  other directories own and refuses to write over them.
+- **`./style.sh` reported a held lock as a failed upload**, in yellow, with
+  "the lines above say why" pointing at a line saying only that another run
+  got there first. The publishing path has told the two apart since the
+  exit code existed; the wizard does now too.
+- **The palette preview promised more than it could keep.** It is uploaded
+  to the site and printed with a QR code, and said nothing about how long
+  it would answer -- the next build removes it, which a scheduled publish
+  can start a minute later. The wizard says so now.
+- **"Another run is still going" did not say to try again.** The message
+  named the run holding the lock only while that process was alive, which
+  is right, but suppressing it took the one useful fact with it: the run in
+  the way is almost always the scheduled one.
+- Smaller ones, all from the same two rounds of review: a bullet list whose
+  first item was only pipes and dashes was read back as a headerless table;
+  a pipe inside a code span in a table cell grew a backslash on every edit;
+  ragged indentation under one bullet dropped an item; an image line in
+  `about.html` published a stray `!` and a dead link; a Wix table whose
+  `tableData` was not a mapping cost the whole post; a table with labels
+  down its side lost its first row when one value cell was empty; a Tumblr
+  ask made only of a picture lost the asker's name; a GPS entry with an
+  undefined type left the coordinates in the file; `strip_file` read every
+  file whole before checking it was a JPEG, and returned it with the
+  temporary file's permissions.
 
 ### Upgrading
 
-- **Photos saved from now on lose their coordinates.** Nothing on the site
-  changes and nothing already published is touched, but this is a behaviour
-  change that arrives without being asked for, so it is worth knowing before
-  the next photo post. Run `./blog.sh doctor` to see how many published
-  photos still carry a location, `./blog.sh doctor --strip-location` to clean
-  them (every rewritten photo gets a new checksum, so the next deploy uploads
-  it again), and set `media.strip_location: false` in `config/site.yml` if
-  your site is the kind that wants the place kept.
-- Nothing has to change, and nothing has to be rebuilt for the old behaviour
-  to keep working. If you want more than one paragraph (or a list) in
-  `about.html` or `footer.note_html` and your config still writes them as
-  `>-`, change that to `|-` first -- see Changed above for why. `./style.sh`
-  already writes the literal style for any value with a line break in it, so
-  editing the text through the wizard fixes it on the way past.
+- Nothing has to change and nothing has to be rebuilt for the old behaviour
+  to keep working. **Photos saved from now on lose their coordinates** --
+  that is the one behaviour change that arrives unasked. `./blog.sh doctor`
+  says how many already-saved photos still carry one, `--strip-location`
+  cleans them (each gets a new checksum, so the next deploy uploads it
+  again), and `media.strip_location: false` turns it off.
+- If you want more than one paragraph or a list in `about.html` or
+  `footer.note_html` and your config still writes them as `>-`, change that
+  to `|-` first. `./style.sh` already writes the literal style for any
+  value with a line break in it.
 
 ## 1.2 -- 2026-08-11
 
