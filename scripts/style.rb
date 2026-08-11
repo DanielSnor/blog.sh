@@ -252,6 +252,13 @@ def show_preview_online(url, local_fallback)
   end
 
   puts Tui.paint(t('pv_online', url: url), :cyan)
+  # Said with the address rather than under the QR code: a piped run gets no
+  # QR and still deserves to know. The page really is temporary -- the build
+  # removes anything it did not produce itself (prune_public), and the deploy
+  # then takes it off the site as an orphan. That is the build doing its job,
+  # not a defect; what was missing was anybody saying so. Somebody
+  # photographed the QR one evening and found it dead the next morning.
+  puts Tui.paint(t('pv_temporary'), :dim)
   if Tui.interactive? && (qr = QrCode.render(url))
     puts
     puts qr

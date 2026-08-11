@@ -842,6 +842,7 @@ style:
   pv_written: "✅ The preview is at %{path} -- open it in a browser."
   pv_uploading: "Uploading the preview to the site…"
   pv_online: "Preview: %{url}"
+  pv_temporary: "A temporary page -- the next build takes it down, and a scheduled run can start one at any minute. Look now rather than later."
   pv_upload_failed: "The upload did not go through -- the lines above say why. Local copy: %{path}"
   pv_upload_busy: "Another run holds the lock, so the preview was not uploaded. Nothing is broken -- try again in a minute. Local copy: %{path}"
   pv_failed: "The preview could not be built (%{message}). The palette can be written without it."

@@ -82,6 +82,15 @@ prints what an installation is running.
   moved from `Publishing` to `RunLock`, where the lock that gives it its
   meaning lives, with one helper to ask instead of two comparisons to keep
   in step.
+- **The palette preview promised more than it could keep.** `./style.sh`
+  uploads the preview to the site and prints its address with a QR code to
+  scan, and said nothing about how long it would answer. It is a page the
+  build did not produce, so the next build removes it (`prune_public`) and
+  the deploy takes it off the site as an orphan -- which is the build doing
+  exactly its job, and can happen a minute later when a scheduled publish
+  starts one. Somebody photographed the QR one evening and found it dead the
+  next morning. The wizard says so now, with the address rather than under
+  the QR, so a run with no terminal to draw one in is told as well.
 - **"Another run is still going" did not say to try again.** The lock
   behaved correctly; the message was the problem. It names the run holding
   the lock only when that process is still alive -- otherwise people go

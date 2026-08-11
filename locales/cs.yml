@@ -829,6 +829,7 @@ style:
   pv_written: "✅ Náhled je v %{path} — otevři si ho v prohlížeči."
   pv_uploading: "Nahrávám náhled na web…"
   pv_online: "Náhled: %{url}"
+  pv_temporary: "Dočasná stránka — odstraní ji nejbližší sestavení webu a to může plánovaný běh spustit každou chvíli. Podívej se radši hned."
   pv_upload_failed: "Nahrání na web nevyšlo — proč, říkají řádky výš. Lokální kopie: %{path}"
   pv_upload_busy: "Zámek drží jiný běh, náhled se teď nenahrál. Nic není rozbité — zkus to za minutu znovu. Lokální kopie: %{path}"
   pv_failed: "Náhled se nepodařilo postavit (%{message}). Paletu jde zapsat i bez něj."

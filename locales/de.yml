@@ -837,6 +837,7 @@ style:
   pv_written: "✅ Die Vorschau liegt in %{path} -- öffne sie im Browser."
   pv_uploading: "Lade die Vorschau auf die Website hoch…"
   pv_online: "Vorschau: %{url}"
+  pv_temporary: "Eine vorübergehende Seite -- der nächste Build entfernt sie, und ein geplanter Lauf kann jederzeit einen starten. Schau lieber gleich als später."
   pv_upload_failed: "Der Upload ging nicht durch -- warum, sagen die Zeilen oben. Lokale Kopie: %{path}"
   pv_upload_busy: "Ein anderer Lauf hält die Sperre, die Vorschau wurde nicht hochgeladen. Es ist nichts kaputt -- versuch es in einer Minute noch einmal. Lokale Kopie: %{path}"
   pv_failed: "Die Vorschau ließ sich nicht bauen (%{message}). Die Palette lässt sich auch ohne sie schreiben."
