@@ -650,8 +650,8 @@ doctor:
   age_hours: "%{count} h"
   age_days: "%{count} dn(í)"
 
-  media_location_clean: "Žádná publikovaná fotka nenese místo, kde vznikla."
-  media_location: "Publikovaných fotek s místem pořízení: %{count} — uložily se dřív, než to engine začal odstraňovat."
+  media_location_clean: "Žádná fotka v archivu nenese místo, kde vznikla."
+  media_location: "Fotek v archivu s místem pořízení: %{count} — uložily se dřív, než to engine začal odstraňovat, a web ukazuje to, co je v archivu."
   media_location_fix: "Odstraní to ./blog.sh doctor --strip-location. Nové fotky už jsou ošetřené; když chceš souřadnice zachovat, nastav media.strip_location na false v config/site.yml."
   media_location_no_dir: "Adresář media.nosync zatím není, takže není co čistit."
   media_location_stripping: "Odstraňuji místo pořízení z fotek: %{count}…"

@@ -656,8 +656,8 @@ doctor:
   age_hours: "%{count} Stunde(n)"
   age_days: "%{count} Tag(e)"
 
-  media_location_clean: "Kein veröffentlichtes Foto trägt den Ort, an dem es entstand."
-  media_location: "%{count} veröffentlichte(s) Foto(s) tragen noch den Aufnahmeort -- gespeichert, bevor die Engine ihn entfernt hat."
+  media_location_clean: "Kein Foto im Archiv trägt den Ort, an dem es entstand."
+  media_location: "%{count} Foto(s) im Archiv tragen noch den Aufnahmeort -- gespeichert, bevor die Engine ihn entfernt hat, und die Website zeigt, was das Archiv enthält."
   media_location_fix: "./blog.sh doctor --strip-location entfernt ihn. Neue Fotos sind bereits versorgt; setz media.strip_location in config/site.yml auf false, wenn du die Koordinaten behalten willst."
   media_location_no_dir: "Es gibt noch kein media.nosync-Verzeichnis, also nichts zu säubern."
   media_location_stripping: "Entferne den Aufnahmeort aus %{count} Foto(s)…"

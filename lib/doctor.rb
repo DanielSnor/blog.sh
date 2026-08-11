@@ -528,14 +528,19 @@ module Doctor
   # nil when there is nothing to look at -- a fresh install has nothing to
   # say about it, and a green line claiming otherwise is noise.
   #
-  # BOTH directories, and public.nosync is the one that matters: the finding
-  # says "published photo", and the published photo is the copy in the build,
-  # not the archive it came from. Looking only at media.nosync let this
-  # report a clean site while the coordinates were still on it -- the build
-  # had skipped the copy, so the two directories disagreed and nothing here
-  # could see it.
+  # THE SOURCES, not the build. public.nosync is made from these two trees on
+  # every build, so cleaning it achieves nothing: the next rebuild copies the
+  # coordinates straight back out of the source, and in between doctor
+  # reported the site clean. (Scanning it also counted every built photo
+  # twice, once in each tree.) Cleaning the sources is what lasts -- the
+  # build then carries it into public.nosync, which is what emit_copy's
+  # modification-time check exists for.
+  #
+  # assets/ belongs here as much as media.nosync does: it is the documented
+  # place a photo goes when it is part of the site rather than of a post --
+  # the bio picture in the sidebar of every page comes from there.
   def located_media(root)
-    dirs = [File.join(root, 'media.nosync'), File.join(root, 'public.nosync')]
+    dirs = [File.join(root, 'media.nosync'), File.join(root, 'assets')]
            .select { |d| File.directory?(d) }
     return nil if dirs.empty?
 

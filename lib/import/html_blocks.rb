@@ -397,9 +397,19 @@ module Import
         # a filled one is the other shape entirely -- a table with labels
         # down its side, where th and td alternate in every row and the first
         # row is not a heading at all.
+        # The second row settles it, and looking only at the first did not:
+        # a row-label table whose first value cell happens to be empty
+        # ("Rok | " over "Pocet | 12") matched the corner rule and lost its
+        # first row into a header. If the row below ALSO starts with a th,
+        # the th are labels down the side and no row here is a heading.
         first_tr, first_cells = pairs.first
+        second_cells = pairs[1] && pairs[1][1]
+        labels_down_the_side = second_cells && second_cells.first &&
+                               second_cells.first.name == 'th' &&
+                               first_cells.first && first_cells.first.name == 'th'
         headed = head_trs.any? { |t| t.equal?(first_tr) } ||
-                 (first_cells.any? { |c| c.name == 'th' } &&
+                 (!labels_down_the_side &&
+                  first_cells.any? { |c| c.name == 'th' } &&
                   first_cells.all? { |c| c.name == 'th' || Inline.render(c).first.to_s.strip.empty? })
 
         rows = pairs.map do |(_, cells)|

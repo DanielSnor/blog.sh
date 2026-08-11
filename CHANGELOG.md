@@ -70,10 +70,34 @@ prints what an installation is running.
   bytes, the deploy saw nothing to upload, and the coordinates stayed on the
   site. Doctor then reported "no published photo carries the place it was
   taken" while the published one still did, and nothing in the tool could
-  notice, because it only ever looked at the archive. Media copies compare
-  modification time as well as size now (one more stat of a file already
-  being stat'd, no hashing), and doctor reads both directories, so the
-  sentence about published photos is about the published photos.
+  notice, because it only ever looked at part of the picture. Media copies
+  compare modification time as well as size now (one more stat of a file
+  already being stat'd, no hashing), so a photo edited where it lies reaches
+  the site on the next build. And doctor reads the SOURCES -- `media.nosync`
+  and `assets/`, where the sidebar's own picture lives -- rather than the
+  build, which is made from them: cleaning the build achieved nothing that
+  lasted, since the next rebuild copied the coordinates straight back out of
+  the source, and counted every built photo twice besides.
+- **A continuation line under a nested list item crashed everything that
+  read it.** `- a` / `  - b` / `    text` -- the ordinary way to give a list
+  item a second line, and the shape the cheat sheet's own nesting example
+  invites -- reached a comparison against nil and raised. `./blog.sh add`
+  died with a Ruby backtrace and wrote no post (the text survived in the
+  editor buffer, and every retry failed the same way); the same three lines
+  in `about.html` killed the build outright and rendered no site at all. It
+  parses as an ordinary paragraph now, which is what the list grammar has
+  always said it does with a paragraph it cannot read as a clean list. This
+  one predates 1.2.1 -- it is in 1.2 as released, and in every version that
+  had nested lists.
+- **A Tumblr ask whose question is a picture the post already showed** put
+  the asker's name above the wrong copy -- at the top of the post, in front
+  of the owner's own words -- because the credit was placed by looking the
+  block up by value rather than by remembering where it went.
+- **An HTML table with labels down its side** lost its first row into a
+  header when that row's value cell happened to be empty. The rule that
+  recognises a matrix table's empty corner looked only at the first row; the
+  row below settles it, and if that one also starts with a `<th>` then the
+  `<th>` are labels and nothing there is a heading.
 - **Eleven smaller ones from the same review.** A bullet list whose first
   item was nothing but pipes and dashes was read back as a headerless table,
   swallowing the item; a pipe inside a code span in a table cell grew a

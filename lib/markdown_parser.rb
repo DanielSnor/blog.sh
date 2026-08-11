@@ -463,8 +463,20 @@ module MarkdownParser
       break if cur_indent < indent
 
       if cur_indent > indent
-        nested, idx = parse_list_level(lines, idx, cur_indent)
-        break unless nested && items.any?
+        # NOT straight into `idx`. A nested call that refuses answers a bare
+        # nil, which destructures into two nils -- and the assignment happens
+        # before the guard below can break, so this frame's own idx was gone.
+        # It then returned [its list, nil] to the frame above, where the list
+        # is truthy, the guard passes, and the next loop compares nil with a
+        # number. A continuation line under a nested item -- "- a" / "  - b" /
+        # "    text", the ordinary way to give an item a second line, and a
+        # shape the cheat sheet's own nesting example invites -- crashed
+        # `blog.sh add` with a Ruby backtrace and no post written. Put in
+        # about.html it killed the build outright and rendered no site at all.
+        nested, next_idx = parse_list_level(lines, idx, cur_indent)
+        break unless nested && next_idx && items.any?
+
+        idx = next_idx
 
         # Two differently-indented runs under the same item -- "  - a" then
         # "   - b", which is what hand-typed lists look like -- came back as

@@ -91,12 +91,19 @@ module Import
       # one, and the ask would mark the owner's own answer as the question.
       blocks = []
       quoted = []
+      # Where the question starts, remembered as a POSITION while the walk is
+      # here. Looking it up afterwards with Array#index finds the first block
+      # that is EQUAL, and a post whose question is a picture it already
+      # showed once put the credit above the wrong one -- at the top of the
+      # post, in front of the owner's own words.
+      quoted_at = nil
       (item['content'] || []).each_with_index do |b, index|
         mapped = map_block(b, media)
         next unless mapped
 
         if ask_blocks.include?(index)
           mapped = as_question(mapped)
+          quoted_at ||= blocks.size
           quoted << mapped
         end
         blocks << mapped
@@ -112,9 +119,9 @@ module Import
         last = quoted.reverse.find { |b| b['subtype'] == 'quote' }
         if last
           last['cite'] = asker
-        elsif (first = quoted.first) && (at = blocks.index(first))
-          blocks.insert(at, { 'type' => 'text', 'text' => "#{asker}:",
-                              'formatting' => [{ 'type' => 'bold', 'start' => 0, 'end' => asker.length }] })
+        elsif quoted_at
+          blocks.insert(quoted_at, { 'type' => 'text', 'text' => "#{asker}:",
+                                     'formatting' => [{ 'type' => 'bold', 'start' => 0, 'end' => asker.length }] })
         end
       end
 
