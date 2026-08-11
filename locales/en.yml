@@ -310,6 +310,7 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--strip-location]
                                      reads the configuration and says what is wrong with it
+      ./blog.sh check                walks the archive and says what is broken in it
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
@@ -705,6 +706,25 @@ doctor:
 # template's filler, so it cannot show the shape. Whether anybody
 # actually chose the value is what the "Now:" vs. "Suggested:" line says
 # (wizard.prompt_with_current / prompt_with_suggestion).
+check:
+  heading: "Checking this archive"
+  progress: "Reading posts: %{done}/%{total}"
+  no_posts: "There are no posts to check yet."
+  all_clear: "Nothing wrong with %{posts} post(s) -- media, links and redirects all check out."
+  media_missing: "%{slug}: the file %{file} is missing from its media directory."
+  media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
+  image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."
+  image_degenerate_fix: "Anything 1px or smaller is treated as a tracking pixel and dropped WITH its caption, so the page silently loses both. Replace the image or remove the block."
+  link_dead: "%{slug}: links to %{url}, which nothing on this site answers at."
+  link_dead_fix: "Usually a permalink left over from an import, or a slug renamed before renames kept a redirect. Fix the link, or give the target post a redirect_from entry."
+  media_orphan: "No post owns the media directory %{dir}."
+  media_orphan_fix: "Left over from a deleted or renamed post, or an import that ran twice. Nothing links to it; delete it yourself once you have looked."
+  redirect_collision: "%{origin} is claimed by more than one post: %{slugs}."
+  redirect_collision_fix: "Whichever renders last wins and the others' readers land on it. Leave the entry on one post only."
+  and_more: "...and %{count} more of the same kind, not listed."
+  summary: "%{errors} problem(s), %{warnings} thing(s) worth a look."
+  summary_clean: "The archive is sound."
+
 setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
   intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."

@@ -301,6 +301,7 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře post
       ./blog.sh doctor [--online] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
+      ./blog.sh check                projde archiv a řekne, co je v něm rozbité
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -692,6 +693,25 @@ doctor:
 # čerstvé instalaci je „současná hodnota" jen výplň ze šablony, takže tvar
 # ukázat neumí. Jestli hodnotu někdo doopravdy nastavil, říká řádek „Teď:"
 # vs. „Návrh:" (wizard.prompt_with_current / prompt_with_suggestion).
+check:
+  heading: "Kontrola archivu"
+  progress: "Čtu posty: %{done}/%{total}"
+  no_posts: "Zatím tu není co kontrolovat, archiv je prázdný."
+  all_clear: "Postů zkontrolováno: %{posts} — média, odkazy i přesměrování sedí."
+  media_missing: "%{slug}: soubor %{file} v adresáři médií chybí."
+  media_missing_fix: "Post si o něj říká a na stránce zůstane díra. Obvykle import, kterému selhalo stahování — buď soubor dodej, nebo ho z postu vyhoď."
+  image_degenerate: "%{slug}: obrázek %{file} má %{width}x%{height} a vůbec se nevykreslí."
+  image_degenerate_fix: "Cokoli 1px a menší se bere jako sledovací pixel a zahodí se I S POPISKEM, takže stránka tiše přijde o obojí. Vyměň obrázek, nebo blok smaž."
+  link_dead: "%{slug}: odkazuje na %{url}, kde na tomhle webu nic není."
+  link_dead_fix: "Obvykle permalink zbylý po importu, nebo slug přejmenovaný dřív, než si přejmenování začalo držet přesměrování. Oprav odkaz, nebo cílovému postu přidej redirect_from."
+  media_orphan: "K adresáři médií %{dir} nepatří žádný post."
+  media_orphan_fix: "Zbytek po smazaném nebo přejmenovaném postu, případně po importu, který běžel dvakrát. Nic na něj neodkazuje; smaž si ho sám, až se na něj podíváš."
+  redirect_collision: "Na adresu %{origin} si dělá nárok víc postů: %{slugs}."
+  redirect_collision_fix: "Vyhraje ten, který se vysází později, a čtenáři ostatních skončí u něj. Nech ten záznam jen u jednoho postu."
+  and_more: "...a dalších %{count} téhož druhu, nevypsaných."
+  summary: "Problémů: %{errors}, věcí ke kouknutí: %{warnings}."
+  summary_clean: "Archiv je v pořádku."
+
 setup:
   intro: "Zeptám se na nastavení, která web potřebuje k provozu, odpovědi cestou ověřím a zapíšu je do config/site.yml a env.sh."
   intro_skip: "Každou otázku jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."

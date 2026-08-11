@@ -13,6 +13,7 @@
 #   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
 #   ./blog.sh doctor [--online] [--strip-location]
+#   ./blog.sh check
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -69,6 +70,13 @@ case "${1:-}" in
       set +a
     fi
     exec ruby scripts/doctor.rb "$@"
+    ;;
+  # Reads the archive rather than the configuration, so it needs no env.sh
+  # at all -- everything it looks at is on disk in content.nosync and
+  # media.nosync. Its own script for the same reason doctor has one.
+  check)
+    shift
+    exec ruby scripts/check.rb "$@"
     ;;
 esac
 

@@ -309,6 +309,7 @@ cli:
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
       ./blog.sh doctor [--online] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
+      ./blog.sh check                geht das Archiv durch und nennt, was darin kaputt ist
       ./blog.sh help                 zeigt diese Hilfe
       ./blog.sh version              gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
@@ -702,6 +703,25 @@ doctor:
 # Platzhalter der Vorlage und zeigt keine Form. Ob jemand den Wert
 # wirklich gewählt hat, sagt die Zeile "Jetzt:" vs. "Vorschlag:"
 # (wizard.prompt_with_current / prompt_with_suggestion).
+check:
+  heading: "Archiv wird geprüft"
+  progress: "Beiträge gelesen: %{done}/%{total}"
+  no_posts: "Es gibt noch keine Beiträge zu prüfen."
+  all_clear: "%{posts} Beitrag/Beiträge geprüft -- Medien, Links und Weiterleitungen stimmen."
+  media_missing: "%{slug}: Die Datei %{file} fehlt im Medienverzeichnis."
+  media_missing_fix: "Der Beitrag fordert sie an, die Seite zeigt ein Loch. Meist ein Import mit fehlgeschlagenem Download -- lege die Datei dorthin oder nimm sie aus dem Beitrag heraus."
+  image_degenerate: "%{slug}: Das Bild %{file} ist %{width}x%{height} und wird gar nicht gerendert."
+  image_degenerate_fix: "Alles mit 1px oder weniger gilt als Zählpixel und wird MITSAMT Bildunterschrift verworfen, die Seite verliert also beides stillschweigend. Tausche das Bild aus oder entferne den Block."
+  link_dead: "%{slug}: verweist auf %{url}, wo diese Website nichts ausliefert."
+  link_dead_fix: "Meist ein Permalink aus einem Import oder ein Slug, der umbenannt wurde, bevor Umbenennungen eine Weiterleitung behielten. Korrigiere den Link oder gib dem Zielbeitrag einen redirect_from-Eintrag."
+  media_orphan: "Zum Medienverzeichnis %{dir} gehört kein Beitrag."
+  media_orphan_fix: "Rest eines gelöschten oder umbenannten Beitrags oder eines doppelt gelaufenen Imports. Nichts verweist darauf; lösche es selbst, nachdem du hineingesehen hast."
+  redirect_collision: "Auf %{origin} erheben mehrere Beiträge Anspruch: %{slugs}."
+  redirect_collision_fix: "Der zuletzt gerenderte gewinnt, die Leser der anderen landen bei ihm. Belasse den Eintrag bei nur einem Beitrag."
+  and_more: "...und %{count} weitere derselben Art, nicht aufgeführt."
+  summary: "%{errors} Problem(e), %{warnings} Sache(n) zum Nachsehen."
+  summary_clean: "Das Archiv ist in Ordnung."
+
 setup:
   intro: "Hier werden die Einstellungen abgefragt, die eine Website zum Laufen braucht. Die Antworten werden unterwegs geprüft und in config/site.yml und env.sh geschrieben."
   intro_skip: "Jede Frage lässt sich überspringen -- Enter übernimmt den darunter vorausgefüllten Wert. Nichts wird geschrieben, bevor du alle Änderungen zusammen gesehen und bestätigt hast."
