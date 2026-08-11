@@ -40,7 +40,11 @@ pagination:
   page: "Seite %{number}"
 
 tag:
-  heading: "Schlagwort: %{name}"
+  # In der Überschrift der Liste steht das Schlagwort selbst; dies ist das
+  # Wort, das sagt, um welche Art Liste es sich handelt -- es bleibt für
+  # Screenreader erhalten und ist standardmäßig unsichtbar (siehe
+  # .listing-heading__kind in site.css).
+  kind: "Schlagwort"
   title: "Schlagwort: %{name} – %{short_name}"
   description: "Beiträge mit dem Schlagwort %{name} auf der persönlichen Seite von %{author}."
 
@@ -60,7 +64,9 @@ index:
   empty: "Noch keine Beiträge dieses Typs."
 
 search:
-  heading: "Suche"
+  # Dient zugleich als Überschrift der Seite, solange keine Suchanfrage
+  # eingegeben wurde.
+  kind: "Suche"
   tagline: "Durchsucht alle Beitragstypen — unabhängig von Akzenten und Umlauten."
   tip: "Tipp: bei mehreren Wörtern müssen alle vorkommen;<br>eine exakte Wendung in Anführungszeichen setzen („…“);<br>ein Wort mit Minus ausschließen (-wort)."
   prompt: "Gib eine Suchanfrage ein."
@@ -88,7 +94,6 @@ js:
   no_results_final: "Keine Treffer."
   try_other_words: " Versuch es mit anderen oder allgemeineren Wörtern."
   searching_archive: " (das ältere Archiv wird noch durchsucht…)"
-  search_prefix: "Suche: "
   loading_index: "Index wird geladen…"
   index_unavailable: "Suchindex nicht verfügbar."
   lightbox_close: "Schließen"

@@ -155,8 +155,6 @@ def client_i18n_json
     no_results_final: t('js.no_results_final'),
     try_other_words: t('js.try_other_words'),
     searching_archive: t('js.searching_archive'),
-    search_prefix: t('js.search_prefix'),
-    search_heading: t('search.heading'),
     search_prompt: t('search.prompt'),
     loading_index: t('js.loading_index'),
     index_unavailable: t('js.index_unavailable'),
@@ -1275,7 +1273,46 @@ end
 # One compiled ERB per template, reused for every page it renders (recompiling
 # the same source for every one of what can be thousands of listing pages is
 # pure waste).
+# A listing's own heading: what kind of listing it is, then what it is a
+# listing OF. The kind stays in the markup and is hidden visually rather
+# than dropped, because the alternative loses it entirely -- a screen
+# reader on a tag page would announce "Bitwarden" and nothing else, and a
+# pill's background colour is not read aloud. Which listings show the kind
+# at all is a CSS decision (see .listing-heading__kind in site.css), so a
+# site can put the word back with one rule.
+#
+# Only listings whose value is an arbitrary string get a kind: a tag name
+# and a search query can be anything, so "Bitwarden" alone reads like a
+# post title, while the eight content-type labels are a closed set that
+# cannot be mistaken for one. That is why type listings pass no kind and
+# always did without one.
+def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil)
+  value = value.to_s
+  kind = kind.to_s
+  return '' if value.empty? && kind.empty?
+
+  classes = ['listing-heading']
+  classes << "listing-heading--#{variant}" if variant
+  parts = []
+  parts << %(<span class="listing-heading__kind">#{h(kind)}</span>) unless kind.empty?
+  parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
+  id_attr = value_id ? %( id="#{h(value_id)}") : ''
+  parts << %(<span class="listing-heading__value"#{id_attr}>#{h(value)}</span>)
+  %(<h2 class="#{classes.join(' ')}">#{parts.join}</h2>)
+end
+
+# Decorative by definition -- the accessible name is the kind span next to
+# it, so the glyph is hidden from assistive technology rather than given a
+# label that would then be read twice. Same magnifier the nav's search
+# button uses.
+LISTING_HEADING_ICONS = {
+  search: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+          'fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' \
+          '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+}.freeze
+
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
+                  heading_kind: nil, heading_variant: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
   pages, fixed = anchored_pages(posts)
   pages.each do |number, page_posts|
@@ -1295,7 +1332,9 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
-    main_html = template.result_with_hash(list_html: list_html, pagination: pagination, heading: heading)
+    heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant)
+    main_html = template.result_with_hash(list_html: list_html, pagination: pagination,
+                                          heading_html: heading_html)
     # A listing renders the same blocks the post page does, players
     # included, so it needs the same frame permissions. The pinned post
     # counts as one of them wherever it is lifted onto the landing page:
@@ -1680,7 +1719,8 @@ end
 
 tags_map.each do |slug, data|
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
-                base_path: "/tag/#{slug}", heading: t('tag.heading', name: data[:name]),
+                base_path: "/tag/#{slug}", heading: data[:name],
+                heading_kind: t('tag.kind'), heading_variant: 'tag',
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
 end
@@ -1689,7 +1729,7 @@ PRESENT_TYPES.each do |type|
   type_posts = posts.select { |post| dominant_content_type(post) == type }
   label = CONTENT_TYPE_LABELS[type]
   write_listing(type_posts, index_template, File.join(PUBLIC_DIR, 'type', type),
-                base_path: "/type/#{type}", heading: label,
+                base_path: "/type/#{type}", heading: label, heading_variant: 'type',
                 title: t('type.title', label: label, short_name: SITE_SHORT_NAME),
                 description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
 end

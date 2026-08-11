@@ -39,7 +39,10 @@ pagination:
   page: "strana %{number}"
 
 tag:
-  heading: "Štítek: %{name}"
+  # V nadpisu výpisu je vidět samotný štítek; tohle je slovo, které říká,
+  # o jaký výpis jde -- zůstává pro odečítače obrazovky a ve výchozím
+  # vzhledu se skrývá (viz .listing-heading__kind v site.css).
+  kind: "Štítek"
   title: "Štítek: %{name} – %{short_name}"
   description: "Příspěvky se štítkem %{name} na osobním webu %{author}."
 
@@ -59,7 +62,8 @@ index:
   empty: "Zatím žádné příspěvky tohoto typu."
 
 search:
-  heading: "Vyhledávání"
+  # Zároveň slouží jako nadpis stránky, dokud není zadaný žádný dotaz.
+  kind: "Vyhledávání"
   tagline: "Prohledá všechny typy příspěvků — bez ohledu na diakritiku."
   tip: "Tip: víc slov = musí být všechna;<br>přesnou frázi dej do uvozovek („…“);<br>slovo vyloučíš mínusem (-slovo)."
   prompt: "Zadej dotaz."
@@ -87,7 +91,6 @@ js:
   no_results_final: "Nic nenalezeno."
   try_other_words: " Zkus jiná / obecnější slova."
   searching_archive: " (hledám i ve starším archivu…)"
-  search_prefix: "Vyhledávání: "
   loading_index: "Načítám index…"
   index_unavailable: "Vyhledávací index není k dispozici."
   lightbox_close: "Zavřít"

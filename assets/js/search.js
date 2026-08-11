@@ -85,12 +85,25 @@
   document.addEventListener('DOMContentLoaded', function () {
     var input = document.getElementById('search-q');
     var results = document.getElementById('search-results');
-    var heading = document.getElementById('search-heading');
+    var heading = document.querySelector('.listing-heading--search');
+    var headingValue = document.getElementById('search-heading-value');
     if (!input) return;
+
+    // The word "Search" is already in the markup; this only fills the query
+    // next to it and tells the stylesheet there is one. Overwriting the whole
+    // heading -- what this did before -- deleted that word from the
+    // accessibility tree the moment somebody typed, leaving a page whose only
+    // heading was their own search terms.
+    function setSearchHeading(value) {
+      if (!headingValue) return;
+      var text = String(value == null ? '' : value).trim();
+      headingValue.textContent = text;
+      if (heading) heading.classList.toggle('has-query', text.length > 0);
+    }
 
     var q = new URLSearchParams(window.location.search).get('q') || '';
     if (results) input.value = q;
-    if (heading && q.trim()) heading.textContent = i18n.search_prefix + q;
+    setSearchHeading(q);
     if (!results) return; // outside /search/, let the form submit natively
 
     // The index is fetched in two batches: recent (search-index.json) right
@@ -125,7 +138,7 @@
       if (!index) return;
       var query = input.value;
       loadArchiveIfNeeded(query);
-      if (heading) heading.textContent = query.trim() ? i18n.search_prefix + query : i18n.search_heading;
+      setSearchHeading(query);
       renderResults(results, searchRank(combinedIndex(), parseQueryTokens(query)), query, archiveState === 'loading');
     }
 

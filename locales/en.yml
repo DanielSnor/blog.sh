@@ -40,7 +40,10 @@ pagination:
   page: "page %{number}"
 
 tag:
-  heading: "Tag: %{name}"
+  # The listing heading shows the tag itself; this is the word that says
+  # what kind of listing it is, kept for screen readers and hidden from
+  # sight by default (see .listing-heading__kind in site.css).
+  kind: "Tag"
   title: "Tag: %{name} – %{short_name}"
   description: "Posts tagged %{name} on %{author}'s personal site."
 
@@ -60,7 +63,8 @@ index:
   empty: "No posts of this type yet."
 
 search:
-  heading: "Search"
+  # Doubles as the page's own heading when no query has been typed yet.
+  kind: "Search"
   tagline: "Searches across all post types — accent-insensitive."
   tip: "Tip: more than one word means all must match;<br>put an exact phrase in quotes (“…”);<br>exclude a word with a minus (-word)."
   prompt: "Type a query."
@@ -91,7 +95,6 @@ js:
   no_results_final: "No results."
   try_other_words: " Try different or more general words."
   searching_archive: " (also searching the older archive…)"
-  search_prefix: "Search: "
   loading_index: "Loading index…"
   index_unavailable: "Search index unavailable."
   lightbox_close: "Close"
