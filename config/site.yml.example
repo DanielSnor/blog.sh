@@ -98,8 +98,13 @@ banner:
   src: "/assets/images/header.png"
   alt: "Your Site"
   # The file's actual dimensions -- reserves space before the image loads.
-  width: 940
-  height: 300
+  # The shipped banner is twice its display size so it stays sharp on a
+  # dense screen; .banner is width:100% in the stylesheet, so what these two
+  # numbers do is hold the ASPECT RATIO open while the image arrives. Put
+  # your own image's real dimensions here -- doctor compares them with the
+  # file and says so when they drift apart.
+  width: 1880
+  height: 600
   # Optional, independent of each other (default true for both): whether
   # site.short_name / site.description render as text overlaid on the
   # banner image. Turn either off if the image is busy enough on its own.

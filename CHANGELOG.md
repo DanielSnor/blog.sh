@@ -52,6 +52,13 @@ prints what an installation is running.
 
 ### Changed
 
+- **A new default banner**, and it ships at twice its display size so it
+  stays sharp on a dense screen. `banner.width`/`height` in the example move
+  to 1880x600 to match: the stylesheet draws the banner at `width: 100%`, so
+  those two numbers hold the aspect ratio open while the image loads, and
+  the ratio is the one it always was. Only new installations see it --
+  `assets/images/header.png` is gitignored precisely so that a site's own
+  artwork survives a `git pull`, and `defaults/` seeds only what is missing.
 - `config/site.yml.example` writes `about.html` and `footer.note_html` as a
   literal block scalar (`|-`) instead of a folded one (`>-`). In a folded
   scalar YAML turns a blank line into a single newline, which now reads as
