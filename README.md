@@ -97,7 +97,10 @@ typed blocks -- paragraph, heading, quote, list, table, code, image,
 video, audio, chat, link, divider -- rather than a Markdown blob
 re-parsed on every build. Inline formatting is stored as offsets into
 plain text, not nested HTML. Media lives locally next to its post, never
-hotlinked. A post is either published or a draft, a draft has an
+hotlinked, and a photo loses the place it was taken on the way in --
+`media.strip_location`, on unless you turn it off, and only the location:
+the camera, the moment and the tag that keeps a portrait photo standing up
+all stay. A post is either published or a draft, a draft has an
 unguessable preview URL, a published post can be pinned to the front
 page, and a post built around a file is filed as a document with a
 download card.
@@ -334,6 +337,8 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                # the same, printed one line per post
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
+./blog.sh doctor --strip-location
+                               # removes the place of capture from already-published photos
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```

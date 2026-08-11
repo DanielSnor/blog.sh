@@ -26,6 +26,29 @@ prints what an installation is running.
   how a photo gets into a bio. Images, video, audio and attachments are the
   one thing Markdown does *not* get here -- they resolve filenames against a
   post's media directory, which the sidebar and the footer do not have.
+- **A photo no longer publishes the place it was taken.** A phone writes
+  coordinates into every picture it takes, the engine copied media byte for
+  byte, and nothing in it had ever looked at metadata -- so a snapshot from a
+  back garden put the back garden on the open web. Social networks strip this
+  on upload and their users have long since stopped thinking about it; a
+  static site has nobody to do it for them. New photos are cleaned on the way
+  into the archive, on the copy and never on your own file, which covers
+  authoring and all twenty-two importers alike, since they share one write.
+  Only the location goes: the camera, the lens and the moment the shutter
+  opened are your own record of your own photograph, and the Orientation tag
+  stays, which is what keeps a portrait photo standing up -- turning one back
+  the right way round needs an image decoder this engine deliberately does
+  not have. `media.strip_location: false` keeps the coordinates for a site
+  that wants them, such as a walking diary. Photos already published are left
+  alone: `./blog.sh doctor` counts them and `./blog.sh doctor
+  --strip-location` cleans them when asked -- the only thing doctor has ever
+  written, which is why it has to be named. **Known gaps**, written down
+  rather than guessed at: JPEG only, which is what phones produce and what a
+  converted HEIC arrives as, so Exif in a PNG or a WebP is left alone, as is
+  a second copy of the coordinates in an XMP packet. A GPS block holding
+  nothing but its own version number is not counted as a location and not
+  rewritten -- three photos in a real 2962-photo archive have exactly that
+  shape, and rewriting them would change three checksums to remove nothing.
 
 ### Changed
 
@@ -70,6 +93,14 @@ prints what an installation is running.
 
 ### Upgrading
 
+- **Photos saved from now on lose their coordinates.** Nothing on the site
+  changes and nothing already published is touched, but this is a behaviour
+  change that arrives without being asked for, so it is worth knowing before
+  the next photo post. Run `./blog.sh doctor` to see how many published
+  photos still carry a location, `./blog.sh doctor --strip-location` to clean
+  them (every rewritten photo gets a new checksum, so the next deploy uploads
+  it again), and set `media.strip_location: false` in `config/site.yml` if
+  your site is the kind that wants the place kept.
 - Nothing has to change, and nothing has to be rebuilt for the old behaviour
   to keep working. If you want more than one paragraph (or a list) in
   `about.html` or `footer.note_html` and your config still writes them as

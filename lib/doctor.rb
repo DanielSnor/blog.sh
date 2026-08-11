@@ -11,6 +11,7 @@ require 'time'
 require_relative 'site_config'
 require_relative 'i18n'
 require_relative 'media_dimensions'
+require_relative 'exif_location'
 require_relative 'deploy_backend'
 # NOT require_relative 'publishing': it pulls in the posters, which read
 # SiteConfig at LOAD time -- and this is the one command that has to run
@@ -141,6 +142,7 @@ module Doctor
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
+    findings.concat(check_media_location(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
     findings
@@ -501,6 +503,39 @@ module Doctor
     return t('age_hours', count: hours) if hours < 48
 
     t('age_days', count: (hours / 24).floor)
+  end
+
+  # --- media ---------------------------------------------------------
+
+  # Where a photo was taken, in photos already published. New ones are
+  # cleaned on the way into the archive (lib/exif_location.rb), but an
+  # archive that existed before that has whatever its phone wrote, and
+  # nothing about upgrading an engine should silently rewrite pictures
+  # somebody already put on the web. So: counted here, cleaned only when
+  # asked -- `./blog.sh doctor --strip-location`.
+  #
+  # Cheap enough to run every time: only the first pages of each file are
+  # read, and 2962 photos took just over a second on the archive this was
+  # written against.
+  def check_media_location(root)
+    found = located_media(root)
+    return [] if found.nil?
+    return [ok(t('media_location_clean'))] if found.empty?
+
+    [warn(t('media_location', count: found.size), t('media_location_fix'))]
+  end
+
+  # nil when there is no media directory to look at -- a fresh install has
+  # nothing to say about it, and a green line claiming otherwise is noise.
+  def located_media(root)
+    dir = File.join(root, 'media.nosync')
+    return nil unless File.directory?(dir)
+
+    Dir.glob(File.join(dir, '**', '*.{jpg,jpeg,JPG,JPEG}')).select do |path|
+      ExifLocation.present?(path)
+    end
+  rescue StandardError
+    nil
   end
 
   # --- deploy --------------------------------------------------------

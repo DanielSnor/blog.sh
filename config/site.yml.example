@@ -295,5 +295,16 @@ mastodon:
 # ImageMagick or vips on Linux) -- and refuses the file if none is found.
 # This is the engine's only optional external tool besides the deploy
 # backends; nothing else changes.
+#
+# strip_location is ON without being set, and this is the line that turns it
+# off. A phone writes the spot it stood on into every photo it takes, and
+# this engine copies media byte for byte, so a picture from a back garden
+# published the back garden. Only the location goes: the camera, the lens and
+# the moment the shutter opened stay, and so does the Orientation tag, which
+# is what keeps a portrait photo standing up. Set it to false if you want the
+# coordinates kept -- a walking diary or a photo blog reasonably does.
+# Photos already published are not touched; `./blog.sh doctor` counts them
+# and `./blog.sh doctor --strip-location` cleans them up.
 # media:
 #   convert_heic: true
+#   strip_location: false

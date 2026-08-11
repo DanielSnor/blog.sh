@@ -39,6 +39,36 @@ require_relative '../lib/doctor'
 
 online = ARGV.include?('--online')
 
+# The one thing doctor does rather than reports, and it has to be asked for
+# by name. Everything else here reads; this rewrites photographs that are
+# already on somebody's website, so it never happens as a side effect of
+# running a check. It prints what it changed and what that costs -- every
+# rewritten file has a new checksum, so the next deploy uploads it again.
+if ARGV.include?('--strip-location')
+  require_relative '../lib/exif_location'
+
+  # Which installation is about to be written to, before it is written to.
+  puts SiteHeader.render
+  puts
+  found = Doctor.located_media(ROOT)
+  if found.nil?
+    puts I18n.t('doctor.media_location_no_dir')
+    exit 0
+  end
+  if found.empty?
+    puts Tui.paint(I18n.t('doctor.media_location_clean'), :green)
+    exit 0
+  end
+
+  puts I18n.t('doctor.media_location_stripping', count: found.size)
+  cleaned = found.count { |path| ExifLocation.strip_file(path) }
+  failed = found.size - cleaned
+  puts Tui.paint(I18n.t('doctor.media_location_stripped', count: cleaned), :green)
+  puts Tui.paint(I18n.t('doctor.media_location_unwritable', count: failed), :yellow) if failed.positive?
+  puts Tui.paint(I18n.t('doctor.media_location_redeploy'), :dim)
+  exit(failed.zero? ? 0 : 1)
+end
+
 def paint_level(level)
   case level
   when :error then Tui.paint('❌', :red)
