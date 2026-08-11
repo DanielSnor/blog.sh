@@ -8,7 +8,7 @@ guides that go deeper:
 | --- | --- |
 | [install.md](install.md) | How do I get from zero to a deployed site -- locally, on a VPS, on Cloudron, on Pages? |
 | [operations.md](operations.md) | How do I run it day to day -- writing, deploying, cron, backup, troubleshooting? |
-| [architecture.md](architecture.md) | How does it work inside -- content model, build pipeline, deploy, client side? |
+| [architecture.md](architecture.md) | How does it work inside -- content model, build pipeline, deploy, client side, security? |
 | [decisions.md](decisions.md) | Why is it built this way -- the trade-offs, each with its admitted cost? |
 | [importing.md](importing.md) | How do I bring an old blog in -- per-source guides, what gets kept, how to undo? |
 | [localization.md](localization.md) | How do I translate the engine into my language? |
@@ -17,7 +17,7 @@ guides that go deeper:
 
 | Situation | Read |
 | --- | --- |
-| Evaluating the engine | main README → the screenshots → *Why this exists* |
+| Evaluating the engine | main README → the screenshots → *Why this exists* → *What it does* |
 | Setting up a site | [install.md](install.md), top to bottom |
 | Writing and publishing posts | [operations.md → Writing and publishing](operations.md#writing-and-publishing) |
 | Moving content in from elsewhere | [importing.md](importing.md), then `./import.sh` |

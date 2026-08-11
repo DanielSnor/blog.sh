@@ -37,7 +37,8 @@ MIT licensed (see [LICENSE](LICENSE)).
 | ![Homepage, light mode](docs/screenshot-light.png) | ![Homepage, dark mode](docs/screenshot-dark.png) |
 
 *The default blue palette -- both modes come entirely from the 7-key
-`colors:` section in `config/site.yml` (see Appearance below).*
+`colors:` section in `config/site.yml` (see
+[install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)).*
 
 ## Why this exists
 
@@ -85,232 +86,107 @@ the comment system replaced by a social network you already post to.
 What you give up is what those two are good at -- a theme ecosystem,
 plugins, and more than one author.
 
-## Feature overview
+## What it does
 
-**Content model**
-- One post = one JSON file (`content.nosync/posts/<year>/<slug>.json`), no database
-- Content is a list of typed blocks (text, heading, quote, list, table,
-  code, image, video, audio, chat, link, divider) -- the same block format used
-  by the Tumblr/Twitter migration imports
-- Inline formatting (bold/italic/strikethrough/code/link) is stored as
-  offsets into plain text, not nested HTML
-- Media (`media.nosync/<year>/<slug>/`) always lives locally next to its
-  post -- no hotlinking to external hosts
-- Post states are `published` / `draft`, with a per-post `draft_token`
-  for private preview links
-- A published post can be pinned (`pinned: true`) to the top of the front
-  page -- once, marked in its date badge, and nowhere else in the archive
-- A post can carry files: a lone `[label](handbook.pdf)` line becomes a
-  download card with the file's size, and a short post built around one
-  is filed as a `document`
+A tour rather than a reference -- each part says where it is described in
+full.
 
-**Authoring -- `blog.sh` (CLI and interactive wizard)**
-- `add` -- always starts as a draft; after saving, offers a preview and
-  a publish / schedule / keep-as-draft / back-to-editing prompt
-- `edit <slug>` -- reopens an existing post as Markdown in `$EDITOR`
-- `props <slug>` -- one post's state and its guarded actions in one
-  place: publish, unpublish, (re-)announce, delete, and **renaming the
-  slug without breaking a link** -- the old address stays on the site as
-  a permanent redirect to the new one
-- `publish <slug>` -- shows a preview before confirming, never publishes blind
-- `schedule <slug>` -- automatic publishing (toot included) by a cron step
-  when the post's date arrives; asks for that date, whether reached as the
-  [s] dialog choice or as its own command; run again to cancel. With
-  `publishing.slots` configured it offers the next free slot instead, so
-  several drafts queue onto consecutive slots rather than publishing
-  together
-- `queue` -- the scheduled posts as one screen: move a post a slot
-  earlier or later (times swap, slots never move), publish it right now,
-  give it another time, or return it to the drafts
-- `unpublish <slug>` -- returns a post to draft, deletes its announcement;
-  gets a fresh date on the next publish
-- `delete <slug>` -- moves to `trash/` (recoverable); `restore <slug>` brings it back
-- `toot <slug>` / `bluesky <slug>` -- sends (or resends) the announcement
-  after the fact, even for older posts that don't have one yet; never
-  overwrites an existing one
-- `browse [--type=] [--tag=] [--drafts]` -- the archive as a screen you
-  can stay in: filters by type, state and tag (each offered with its
-  count), a **live full-text search that speaks the same query language
-  as the site's search box** -- words are ANDed, `"a quoted phrase"` is
-  one token, `-word` excludes, diacritics never decide a match -- a line
-  of the post's own text showing why it matched, the space bar for a
-  read-only preview of the whole post, and Enter to open the one you were
-  looking for. Piped or scripted, it prints the same list `list` does
-- `list [--type=] [--tag=] [--drafts]` -- the same filters, printed:
-  one line per post, for grep and for pipes
-- `rebuild` -- build and deploy in one step
-- Run with no arguments for an interactive menu: arrow keys and single
-  keypresses in a terminal (numbers and slugs still work), plain
-  line-based prompts when piped or scripted -- and a **QR code of the
-  draft's preview URL**, so a post written over SSH opens on your phone
-  by pointing the camera at the screen
-- `preview [<port>]` -- serves the build locally, no deploy needed
-- Writing from a phone: a bare filename in `![]()` resolves against
-  `incoming/` (an SFTP staging directory), with a wait loop for the file
-  to actually arrive before continuing
+**Content.** One post is one JSON file
+(`content.nosync/posts/<year>/<slug>.json`), and its text is a list of
+typed blocks -- paragraph, heading, quote, list, table, code, image,
+video, audio, chat, link, divider -- rather than a Markdown blob
+re-parsed on every build. Inline formatting is stored as offsets into
+plain text, not nested HTML. Media lives locally next to its post, never
+hotlinked. A post is either published or a draft, a draft has an
+unguessable preview URL, a published post can be pinned to the front
+page, and a post built around a file is filed as a document with a
+download card.
+→ [architecture.md → Content model](docs/architecture.md#content-model)
 
-**Markdown** (`lib/markdown_parser.rb`, shared by both the build and the authoring tool)
-- Paragraphs with hard line breaks, headings `#`–`######`,
-  bold/italic/strikethrough/code, titled links, bare URLs auto-linked,
-  ordered, nested and task lists, blockquotes with optional attribution,
-  chat transcripts (a ```chat fence), horizontal rules, fenced code blocks
-  with a language hint, GFM-style aligned tables, images, video (local
-  file or YouTube) with automatic sizing, audio with a native player,
-  file attachments as download cards, backslash escaping
-- A platform's own address turns into its player, from the address alone:
-  YouTube, Vimeo, PeerTube and archive.org as video, Spotify, SoundCloud
-  and Mixcloud as audio. The engine stores a provider and an id, never the
-  platform's embed code, and a page's Content-Security-Policy admits a
-  player's origin only when the page carries it -- except YouTube's two
-  origins, which every page allows. Funkwhale and Bandcamp keep no id in
-  their address, so those two are looked up once when the post is saved --
-  the only moment writing a post touches the network
-- The full syntax reference at `/markdown/` is rendered through this
-  same parser, so every example on it displays exactly as it would in a
-  post; the page itself is a hand-maintained document
-  (`templates/markdown-cheat-sheet.<lang>.md`), localized the same way
-  as `locales/*.yml` -- picked by `site.lang` (en, cs and de ship with
-  the engine), English fallback.
-  Adding a language is data, not code -- see
-  [docs/localization.md](docs/localization.md)
+**Writing.** `./blog.sh` is a CLI, and run bare an interactive menu: add,
+edit, publish, schedule, unpublish, delete and restore, (re-)send an
+announcement, rename a slug without breaking the old address -- it stays
+on the site as a permanent redirect -- and browse the archive on screen,
+with filters, previews and a live search that speaks the same query
+language as the site's own box. Nothing publishes blind: every public or
+destructive step shows a preview and asks first. With `publishing.slots`
+configured, drafts written in one sitting queue onto consecutive slots
+instead of going out together, and `./blog.sh queue` works that queue as
+one screen. A post written over SSH opens on your phone from the QR code
+the wizard prints. The complete command list is under
+[`blog.sh` -- authoring](#blogsh----authoring) below.
+→ [operations.md → Writing and publishing](docs/operations.md#writing-and-publishing)
 
-**Build** (`build_blog.rb`)
-- Static HTML from JSON via ERB templates, no framework
-- Pagination anchored to the oldest post (page boundaries stay stable as
-  new posts are added), plus tag and content-type archives -- the nav
-  menu and type archives exist only for types the site actually has, so
-  the menu grows with the content
-- RSS, sitemap, `robots.txt`
-- `/favicon.ico` generated from `assets/images/favicon.png` by wrapping it
-  in an ICO container, for the clients that request the root path blindly
-  and never read the `<link>` (bots, feed readers, older browsers)
-- Search index split into recent (newest 500, loaded eagerly) and
-  archive (the rest, loaded lazily on first search)
-- Separate generated pages for `/markdown/` (cheat sheet) and `/search/`,
-  outside `content/posts/`
-- Dates a reader sees are rendered in `site.timezone`, so an imported post
-  stored in UTC shows the day it was actually written; URLs, feeds and the
-  sitemap keep the stored offset, since a post's year must never move
-- Render memoization -- per-post content/time/type computed once, not
-  4-6x across every listing it appears in
-- Only changed files are written (`emit`); anything the build didn't
-  regenerate this run gets removed afterward (`prune_public`)
-- Guards against silent data loss: aborts on a year+slug collision between two posts
+**Markdown.** One parser (`lib/markdown_parser.rb`), shared by the build
+and the authoring tool: headings, the usual inline marks, titled and bare
+links, ordered, nested and task lists, blockquotes with attribution, chat
+transcripts, fenced code with a language hint, aligned tables, images,
+video, audio, file attachments, backslash escaping. A platform's own
+address becomes its player from the address alone -- YouTube, Vimeo,
+PeerTube and archive.org as video, Spotify, SoundCloud and Mixcloud as
+audio -- storing a provider and an id, never the platform's embed code.
+The syntax reference at `/markdown/` is rendered through this same
+parser, so every example on it behaves exactly as it would in a post.
+→ [architecture.md → The markdown round-trip](docs/architecture.md#the-markdown-round-trip)
 
-**Search**
-- Fully client-side, no server round-trip -- `search-index.json` (+ `-archive.json`)
-- Quoted phrases, `-word` exclusion, diacritic-insensitive
+**Build.** Static HTML from JSON through ERB templates, no framework:
+pagination anchored to the oldest post so page boundaries stay stable as
+new posts arrive, tag and content-type archives that exist only for the
+types the site actually has, RSS, a sitemap, `robots.txt`, a generated
+`/favicon.ico`, and a search index split into an eager recent half and a
+lazily loaded archive. Search itself is entirely client-side -- quoted
+phrases, `-word` exclusion, diacritics never deciding a match. Only
+changed files are written, and whatever the build didn't produce this run
+is removed afterwards.
+→ [architecture.md → Build pipeline](docs/architecture.md#build-pipeline-buildbuild_blogrb)
 
-**Sidebar widgets**
-- Latest toots, Bluesky posts, Pixelfed posts, commits, or any RSS/Atom
-  feed -- fetched server-side on a cron (`scripts/refresh-sidebar.sh`),
-  never by the visitor's browser
-- Per-post stats (likes/boosts/replies) for announced posts -- live for
-  the last 90 days, refreshed weekly beyond that
+**Deploy.** `scripts/deploy-web.sh` over a pluggable backend: Cloudron
+Surfer, a local directory, rsync over SSH, a git-pages snapshot push, any
+rclone remote, or plain SFTP. A SHA-256 + size + mtime manifest means
+only what changed is uploaded, and the guards refuse to proceed when the
+file count or the total bytes swing too far against the last build a
+deploy accepted -- so a bad `--prune` can't quietly empty the site.
+→ [install.md → Pick a deploy target](docs/install.md#6-pick-a-deploy-target),
+[the commands](#deploy)
 
-**Comments**
-- No comment system of its own -- every published post is auto-announced
-  on Mastodon or Bluesky (exactly one per site, `mastodon:` or `bluesky:`
-  in config), and replies to that announcement are the comments
-- The client fetches the thread via the network's public API (Mastodon
-  context, Bluesky AppView `getPostThread` -- both unauthenticated);
-  like/boost/reply counts surface next to the post in listings too
-- On Bluesky the announcement fits the 300-grapheme limit with clickable
-  link and hashtags (facets); on Mastodon it uses the instance's limit
-  (`mastodon.toot_length`, default 500)
+**Comments, without a comment system.** Every published post is
+auto-announced on Mastodon *or* Bluesky -- exactly one network per site
+-- and the replies to that announcement are the comments. The visitor's
+browser fetches the thread from the network's own public API, so there is
+no comment database to moderate, migrate or back up, and the reply, like
+and boost counts shown next to a post are that announcement's.
+→ [install.md → Comments network](docs/install.md#8-comments-network-optional-mastodon-or-bluesky)
 
-**Security**
-- Content-Security-Policy via meta tag, self-hosted fonts (no third-party origins)
-- Draft URLs use a `SecureRandom` token plus `noindex`
-- Consistent escaping of untrusted data (Fediverse display names, avatars) in both HTML and JS
-- `env.sh` (secrets) stays out of git, mode `600`
-- No third-party tracking scripts in post data
+**Sidebar widgets.** Latest toots, Bluesky posts, Pixelfed posts, GitHub
+commits, any RSS/Atom feed, and per-post stats -- each independently
+optional, all fetched server-side on a cron. The visitor's browser never
+calls a third party for them, so no widget can slow down or break a page.
+→ [operations.md → Cron](docs/operations.md#cron-sidebar-widgets-and-post-stats)
 
-**Deploy**
-- `scripts/deploy-web.sh` → a pluggable backend (`DEPLOY_BACKEND` in
-  env.sh): Cloudron Surfer (Files API, the default), a local directory,
-  rsync over SSH, a git-pages snapshot push (GitHub/GitLab/Codeberg
-  Pages), any rclone remote (S3, R2, WebDAV, ...), or plain SFTP; a
-  SHA-256 + size + mtime manifest means only new/changed files are
-  uploaded
-- `--prune` (optional, the one destructive operation), `--dry-run`, `--only=`
-- Safety nets against a sudden drop or spike in file count *and* in total
-  bytes, measured against the last build a deploy accepted, so a failed
-  upload can't disarm them
-- One file-size limit across every backend (refused at 100 MB, flagged at
-  50 MB), enforced when a post is saved as well as before it ships
+**Appearance.** Light and dark from CSS custom properties and
+`prefers-color-scheme`, with a manual toggle; a lightbox, collapsible
+mobile navigation, and photo galleries assembled from adjacent images.
+The whole palette is seven config keys per mode, compiled into a
+stylesheet at build time -- seven ready-made palettes ship with the
+engine, and the header's typeface and size are configuration too, not a
+file to edit. No framework anywhere; the JavaScript is small
+single-purpose files.
+→ [install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)
 
-**Appearance / UX**
-- Light/dark theme via CSS custom properties and `prefers-color-scheme`, with a manual toggle
-- Lightbox for images, collapsible mobile navigation, photo galleries
-  auto-assembled from adjacent image blocks
-- No framework -- vanilla JS in small, single-purpose files
-- Color scheme is config-driven, not a file to swap: `assets/css/site.css`
-  holds layout/structure and only the fixed colors that fit any palette
-  (white on accent surfaces, the dark scrims of the banner overlays and
-  the lightbox, the search field's grey text); `config/site.yml`'s
-  `colors.light`/`colors.dark` (7 keys each -- bg/text/meta_text/accent/
-  nav_bg/border/pill_bg) are compiled at build time into
-  `assets/css/colors.css` (see `build_colors_css` in `build/build_blog.rb`).
-  Everything else the CSS needs (card background, nav text/border, link/
-  badge hover, search input background) is derived from those 7, not
-  separately configurable. Defaults to blog.sh's own blue palette
-  (`DEFAULT_COLORS`) if `colors:` is omitted
-- Seven whole palettes ship in `config/palettes.yml` -- default blue,
-  warm, monochrome, high contrast, sunflower, garden, ocean, each in
-  both modes -- so `./style.sh` can set a palette in one keystroke
-  instead of asking for fourteen hex values. Add your own by adding an
-  entry; the wizard lists what's in the file
-- Banner overlay: `site.short_name` (top-left) and `site.description`
-  (bottom-right, wraps to multiple lines) render on top of the banner
-  image. Each overlay darkens the corner it sits in so it stays readable
-  against any image -- and only that corner, so a banner with both
-  overlays off is shown exactly as authored. See
-  `.banner-title`/`.banner-claim` in `site.css`.
-- Header typography is config-driven too: `fonts.banner_title` /
-  `fonts.banner_claim` (a CSS font stack each) and
-  `fonts.banner_title_size` / `fonts.banner_claim_size` (any CSS length)
-  compile into the same generated stylesheet as the palette. Drop a
-  `.woff2` into `assets/fonts/`, declare it under `fonts.faces`, and the
-  header is in your own type; say nothing and it stays self-hosted
-  JetBrains Mono at 45px/20px. Narrow screens scale from whatever size is
-  configured, so there is no second pair of keys to keep in sync
-  Each independently optional: `banner.show_title`/`show_claim` (default
-  true) toggle whether they render at all, `colors.<mode>.banner_title`/
-  `banner_claim` override their color per light/dark mode (default: `nav_bg`
-  in light, white in dark -- same as before these keys existed), and
-  `banner.claim` overrides *only* the overlay's claim, in Markdown or raw
-  HTML (e.g. a manual `<br>`) -- `site.description` itself stays plain text
-  everywhere else (meta description, RSS), same trust level as `about.html`
+**Security.** A Content-Security-Policy on every page, self-hosted fonts,
+no third-party tracking in post data, consistent escaping of everything
+that came off a network, and `env.sh` out of git at mode `600`.
+→ [architecture.md → Security](docs/architecture.md#security)
 
-**Importing -- `import.sh`**
-- Its own wizard, separate from authoring: pick a source, see a dry-run
-  preview (posts, media, skipped and why), confirm before anything is written
-- Twenty-two sources: Bluesky, LiveJournal and Tumblr via their APIs;
-  Facebook, Threads,
-  beehiiv, Blogger, Ghost, Instagram, Mastodon, Medium, Movable
-  Type/TypePad, Pixelfed, Squarespace, Substack, Twitter/X and Wix from
-  their account exports and backups; a Jekyll or Hugo
-  tree (or any converter-made markdown folder) straight from disk; WordPress from a WXR
-  file, any RSS/Atom feed by URL, and any podcast feed with its
-  episodes' audio downloaded for keeps -- Tumblr and Twitter carried
-  over from the original migration of four Tumblr blogs and a Twitter
-  archive (2008-2022); and the Wayback Machine, for a blog whose
-  platform no longer exists at all
-- A blog that keeps its domain keeps its addresses: sources that know
-  their posts' original URLs (beehiiv, Blogger, Ghost, Jekyll/Hugo,
-  LiveJournal, Medium, Movable Type/TypePad, Squarespace, Substack,
-  WordPress, Tumblr, Wix, the Wayback Machine and any RSS/Atom feed) can
-  record each one as a `redirect_from` (Substack's `/p/<slug>` comes
-  straight from the export), and the built site answers at every old
-  path with a redirect
-- `lib/import/` holds what every source shares -- media download or copy,
-  filename numbering, skip accounting, progress callbacks -- so an adapter
-  only has to page a source and shape one item
-- Each source is also a one-line script (`scripts/migrate_*.rb`) over the
-  same adapter, so an import can run from cron as well as from the wizard
-- Re-running an import overwrites in place (matched on source id), never
-  duplicates
+**Importing.** Twenty-two sources through `./import.sh`, which always
+previews in dry-run and makes you confirm before it writes anything.
+Imports land in the same block schema as hand-written posts with their
+media downloaded locally, so an imported post is indistinguishable from
+one you typed, and re-running an import overwrites in place rather than
+duplicating. Sources that know their posts' original URLs can record
+them, and the built site then answers at every old path.
+→ [the source table](#importing-existing-content),
+[importing.md](docs/importing.md)
 
 ## Stack
 
