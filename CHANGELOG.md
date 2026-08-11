@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.2 -- unreleased
+## 1.2 -- 2026-08-11
 
 The import release. Eight sources became twenty-two -- every blog platform
 worth naming, the whole social roster, podcasts, a plain markdown tree, and

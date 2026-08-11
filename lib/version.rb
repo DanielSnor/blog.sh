@@ -14,7 +14,7 @@
 # an install from a tarball (or any copy without .git, which is how the
 # engine gets vendored) would then report nothing at all.
 module BlogSh
-  VERSION = 'pre-1.2'
+  VERSION = '1.2'
 
   # For the User-Agent headers: "blog-sh-<role>/1.1", with the role in the
   # name so a server log can tell a feed fetch from an upload.
