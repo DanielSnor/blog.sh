@@ -668,6 +668,29 @@ blockquote {
 .date-badge svg { display: block; width: 40px; height: 40px; margin: 0 auto 0.35rem; }
 .date-badge a { color: inherit; text-decoration: none; display: block; }
 
+/* layout.hero: the post's lead image above its title, instead of a date
+   badge beside the text. The header stops being a row and becomes a
+   column, and the negative margins .post-header already carries are what
+   let the image reach the card's edges -- so everything under it puts its
+   own horizontal padding back.
+   Deliberately plain. The engine supplies the shape (image, then title,
+   then a byline); anything beyond that -- a card overlapping the photo, a
+   tint, a raster -- is a stylesheet's business, which is exactly the line
+   site.extra_css exists to draw. */
+.card.has-hero .post-header { display: block; }
+.post-hero__media img { display: block; width: 100%; height: auto; }
+.post-hero__content { padding: 1.5rem 1.5rem 0; }
+.post-hero__content h1 { margin: 0 0 0.5rem; }
+.post-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+  color: var(--meta-text);
+  font-size: 0.9rem;
+}
+.card.has-hero .post-body { padding: 1.5rem 1.5rem 0; }
+
 .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: 1rem 0; }
 /* The figure is a column and the image flexes into whatever space a
    figcaption leaves. The obvious `height: 100%` on the image instead

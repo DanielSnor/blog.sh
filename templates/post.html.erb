@@ -1,9 +1,17 @@
-        <%= draft_banner %><div class="card">
+        <%= draft_banner %><div class="card<%= hero_media ? ' has-hero' : '' %>">
           <article>
             <div class="post-header">
-              <%= date_badge(post) %>
+              <% if hero_media %><div class="post-hero">
+                <div class="post-hero__media"><%# Not lazy: this is the largest thing above the fold, and deferring it means the page draws itself around a hole. %>
+                  <img src="<%= h("#{post_path(post)}#{hero_media['url']}") %>"<%= size_attrs(hero_media) %> alt="<%= h(hero_block['alt_text'].to_s) %>" decoding="async" fetchpriority="high">
+                </div>
+                <div class="post-hero__content">
+                  <% if post['title'] %><h1><%= h(post['title']) %></h1><% end %>
+                  <p class="post-hero__meta"><span class="post-hero__author"><%= h(SITE_AUTHOR) %></span><time datetime="<%= h(post_time(post).iso8601) %>"><%= h(post_display_date(post)) %></time></p>
+                </div>
+              </div><% else %><%= date_badge(post) %><% end %>
               <div class="post-body">
-                <% if post['title'] %><h1><%= h(post['title']) %></h1><% end %>
+                <% if post['title'] && !hero_media %><h1><%= h(post['title']) %></h1><% end %>
                 <%= post_stats_html(post) %>
                 <div class="content">
                   <%= content_html %>

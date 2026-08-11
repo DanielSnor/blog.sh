@@ -150,6 +150,10 @@ BANNER = SiteConfig.fetch('banner')
 # per visual property would turn config/site.yml into a stylesheet written
 # in YAML.
 LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
+# The lead image lifted out of the text and shown above the title. Off
+# unless a site asks for it, because it reshapes every post page it
+# touches -- and a site is entitled to have had the shape it has.
+LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
 # The menu repeated under the content. It carries no search field, so with
 # an empty `nav:` there would be nothing left in it to show -- but a site
 # with a menu may still not want it twice.
@@ -868,6 +872,13 @@ PIN_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 # explains why this copy is first; on page 3 it would read as a sorting
 # bug. Its colour comes from the palette's text colour, so it keeps its
 # contrast on any accent without per-palette tuning.
+# The date a reader sees -- the site's timezone, the locale's format. The
+# same string date_badge puts in its tile, for the places that want the
+# date without the tile.
+def post_display_date(post)
+  post_display_time(post).strftime(t('date_format'))
+end
+
 def date_badge(post, link: nil, pinned: false)
   icon = CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
@@ -1090,8 +1101,39 @@ def post_structured_head(post)
   lines.map { |line| "\n  #{line}" }.join
 end
 
+# The post's lead image, when the site shows one: the first image whose
+# size is known and sane, together with the media entry the markup needs.
+# A post's own `hero:` overrides the site's answer in both directions --
+# the same two doors `pinned` has, and it reads the same spellings, so a
+# post that wants to keep its photo in the text says `hero: false` and one
+# on a site without heroes can still ask for one.
+#
+# Degenerate images are skipped rather than lifted: a 1x1 tracking pixel
+# from some imported archive would otherwise become the page's lead
+# picture. A post with nothing suitable simply keeps the ordinary layout,
+# so there is no second template to keep in step with this one.
+def hero_for(post)
+  return nil unless post.is_a?(Hash)
+
+  setting = post['hero']
+  wanted = setting.nil? ? LAYOUT_HERO : !%w[false no 0].include?(setting.to_s.strip.downcase)
+  return nil unless wanted
+
+  block = (post['content'] || []).find do |b|
+    b.is_a?(Hash) && b['type'] == 'image' && !degenerate_image?(b)
+  end
+  return nil unless block
+
+  media = (block['media'] || []).first
+  media && media['url'] ? [block, media] : nil
+end
+
 def render_post_html(post, template)
-  content_html = post_content_html(post)
+  hero_block, hero_media = hero_for(post)
+  # Rendered without the lifted block, or the same photo appears twice --
+  # once as the lead and once where it was written. Only the hero path
+  # pays for the extra render; every other post keeps the memoized one.
+  content_html = hero_block ? render_content(post['content'] - [hero_block], post_path(post)) : post_content_html(post)
   draft_banner = draft?(post) ? draft_banner(post) : ''
   layout(template.result(binding),
          title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post['title'] || post['slug']}" : (post['title'] || post['slug']),
