@@ -835,6 +835,7 @@ style:
   pv_uploading: "Uploading the preview to the site…"
   pv_online: "Preview: %{url}"
   pv_upload_failed: "The upload did not go through -- the lines above say why. Local copy: %{path}"
+  pv_upload_busy: "Another run holds the lock, so the preview was not uploaded. Nothing is broken -- try again in a minute. Local copy: %{path}"
   pv_failed: "The preview could not be built (%{message}). The palette can be written without it."
   pv_custom_name: "custom colours"
   pv_post_title: "The first post on a new site"
@@ -957,3 +958,4 @@ style:
   q_rebuild: "Rebuild the site now, so you can look at it? [y/N] "
   rebuilt: "✅ Built. ./blog.sh preview serves it at http://localhost:8000/, and ./blog.sh rebuild deploys it."
   rebuild_failed: "The build did not finish -- the lines above say why. Your config was written either way."
+  rebuild_busy: "Another run holds the lock, so the site was not rebuilt. Nothing is broken and your config was written -- try again in a minute."

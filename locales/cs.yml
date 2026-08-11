@@ -822,6 +822,7 @@ style:
   pv_uploading: "Nahrávám náhled na web…"
   pv_online: "Náhled: %{url}"
   pv_upload_failed: "Nahrání na web nevyšlo — proč, říkají řádky výš. Lokální kopie: %{path}"
+  pv_upload_busy: "Zámek drží jiný běh, náhled se teď nenahrál. Nic není rozbité — zkus to za minutu znovu. Lokální kopie: %{path}"
   pv_failed: "Náhled se nepodařilo postavit (%{message}). Paletu jde zapsat i bez něj."
   pv_custom_name: "vlastní barvy"
   pv_post_title: "První post na novém webu"
@@ -944,3 +945,4 @@ style:
   q_rebuild: "Znovu sestavit web hned, ať se na to můžeš podívat? [a/N] "
   rebuilt: "✅ Sestaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
   rebuild_failed: "Sestavení nedoběhlo — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."
+  rebuild_busy: "Zámek drží jiný běh, web se teď nepřestavěl. Nic není rozbité a konfigurace se zapsala — zkus to za minutu znovu."

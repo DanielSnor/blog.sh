@@ -49,6 +49,16 @@ prints what an installation is running.
   with no name, which is all Tumblr records. Re-import to pick this up on an
   archive already imported. A `rows` layout is still ignored on purpose --
   it describes a display grid, not who wrote what.
+- **`./style.sh` reported a held lock as a failed upload.** The palette
+  preview uploads one file on its own, and the wizard offers a rebuild at
+  the end; both read any non-zero exit as "it broke" and said so in yellow,
+  with "the lines above say why" pointing at a line that says only that
+  another run got there first. The publishing path has told the two apart
+  since 1.2 -- the exit code exists for exactly this -- so the wizard does
+  now too, in its own words and without the warning sign. The code itself
+  moved from `Publishing` to `RunLock`, where the lock that gives it its
+  meaning lives, with one helper to ask instead of two comparisons to keep
+  in step.
 - **"Another run is still going" did not say to try again.** The lock
   behaved correctly; the message was the problem. It names the run holding
   the lock only when that process is still alive -- otherwise people go

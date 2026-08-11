@@ -27,7 +27,25 @@ module RunLock
   ENV_MARKER = 'BLOG_SH_LOCK_HELD'
   BUSY = :busy
 
+  # The exit code build_blog.rb and deploy_web.rb use for "another run
+  # holds the lock". Distinct from 1, because "come back in a minute" and
+  # "your site is broken" want different words and different advice -- and
+  # because only one of them is a fault. It lives here, with the lock that
+  # gives it its meaning: it is this file's contract with the four scripts
+  # that take the lock and with everyone who shells out to them, and a
+  # caller that had to reach into the publishing library for it either
+  # dragged that library along or compared against a literal 3.
+  BUSY_EXIT = 3
+
   module_function
+
+  # Whether a finished child process left because the lock was held, told
+  # apart from every other way it could have failed. Callers that shell out
+  # to a build or a deploy ask this rather than reading the number, so the
+  # meaning of the code stays in one place.
+  def busy_exit?(status)
+    status.respond_to?(:exitstatus) && status.exitstatus == BUSY_EXIT
+  end
 
   def path(root)
     File.join(root, '.blog-sh.lock')
