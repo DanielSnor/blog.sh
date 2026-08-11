@@ -76,11 +76,30 @@ module ExifLocation
     false
   end
 
+  # Two bytes before megabytes. This is asked of every file copied into the
+  # archive -- video, audio and PDF alike -- and reading a 300 MB upload
+  # whole only to fail the marker check cost eighteen times the memory the
+  # copy itself used. The module's own principle, one function up: read
+  # exactly the bytes the question needs.
+  def jpeg?(path)
+    File.binread(path, 2) == "\xFF\xD8".b
+  rescue StandardError
+    false
+  end
+
   # Rewrites the file without its coordinates, and answers whether it had to.
   # Writes a sibling and renames, like everything else that touches media
   # here: a rewrite interrupted halfway must not leave a truncated photo
   # under the real name.
   def strip_file(path)
+    return false unless jpeg?(path)
+
+    stat = begin
+      File.stat(path)
+    rescue StandardError
+      return false
+    end
+
     data = begin
       File.binread(path)
     rescue StandardError
@@ -93,6 +112,10 @@ module ExifLocation
     tmp = File.join(File.dirname(path), ".#{File.basename(path)}.scrub")
     begin
       File.binwrite(tmp, stripped)
+      # The rename gives the photo the new file's mode, so an archive kept
+      # deliberately at 0640 came back 0644 -- doctor --strip-location
+      # quietly making every photo in it world-readable, and saying nothing.
+      File.chmod(stat.mode & 0o7777, tmp)
       File.rename(tmp, path)
       true
     rescue StandardError
@@ -240,7 +263,12 @@ module ExifLocation
     out = tiff.dup
     zero_gps_ifd(out, found)
     drop_entry(out, found)
-    out
+    # A file so malformed that neither step could safely touch anything comes
+    # back unchanged, and "unchanged" must not be reported as cleaned: the
+    # photo would be rewritten for nothing, counted as cured, and stop being
+    # mentioned. Answering nil leaves it exactly as it is and keeps doctor
+    # saying so.
+    out == tiff ? nil : out
   rescue StandardError
     nil
   end
@@ -271,13 +299,42 @@ module ExifLocation
       entry = out.byteslice(at, ENTRY_SIZE)
       break unless entry && entry.bytesize == ENTRY_SIZE
 
-      size = TYPE_SIZES.fetch(entry.byteslice(2, 2).unpack1(short).to_i, 0) *
-             entry.byteslice(4, 4).unpack1(long).to_i
-      next unless size > 4
+      type = entry.byteslice(2, 2).unpack1(short).to_i
+      size = TYPE_SIZES.fetch(type, 0) * entry.byteslice(4, 4).unpack1(long).to_i
+      target = entry.byteslice(8, 4).unpack1(long).to_i
 
-      blank(out, entry.byteslice(8, 4).unpack1(long).to_i, size, claimed)
+      if size > 4 && target + size <= out.bytesize
+        blank(out, target, size, claimed)
+      elsif !TYPE_SIZES.key?(type) || size > 4
+        # A type code the format does not define, or a count so large the
+        # data cannot fit in the file: the entry is malformed, and its
+        # declared extent is no use. Doing nothing left the coordinates
+        # lying in the file while everything downstream reported it clean --
+        # the exact outcome this module says it exists to prevent. So the
+        # run of bytes at the offset is cleared instead, up to whatever the
+        # other directories claim next and no further than a GPS payload
+        # could plausibly be.
+        blank_run(out, target, claimed, out.bytesize)
+      end
     end
     blank(out, base, COUNT_SIZE + (count * ENTRY_SIZE) + NEXT_IFD_SIZE, claimed)
+  end
+
+  # The largest possible GPS payload worth clearing blind: three RATIONALs
+  # are 24 bytes, a processing-method string is short, and a cap keeps a
+  # malformed file from blanking the whole tail of a TIFF block.
+  MAX_BLIND_RUN = 256
+
+  # Clears from `at` up to whatever is claimed next, the end of the block, or
+  # the cap -- whichever comes first. Safe by construction: it never writes a
+  # byte another directory owns.
+  def blank_run(out, at, claimed, limit)
+    return if at < 8 || at >= limit
+    return if claimed.any? { |(s, n)| n.positive? && at >= s && at < s + n }
+
+    stop = [at + MAX_BLIND_RUN, limit].min
+    claimed.each { |(s, n)| stop = s if n.positive? && s > at && s < stop }
+    blank(out, at, stop - at, claimed)
   end
 
   # Every byte range some other structure in this TIFF block owns: each
@@ -340,8 +397,15 @@ module ExifLocation
     short = found[:short]
     ifd = found[:ifd]
     tail_at = found[:at] + ENTRY_SIZE
+    # The count is a number in the file and can overstate what is actually
+    # there. Believing it and sliding anyway is the danger, so this refuses
+    # rather than clamping: a clamped count still names a slide, and the
+    # first attempt at one wrote twelve bytes over the Exif sub-IFD of a
+    # file whose count lied. Refusing leaves the pointer in place on such a
+    # file -- the GPS block above has been zeroed either way, so nothing
+    # reads a location out of it -- and touches nothing that is not ours.
     tail_end = ifd + COUNT_SIZE + (found[:count] * ENTRY_SIZE) + NEXT_IFD_SIZE
-    return if tail_end > out.bytesize
+    return if tail_end > out.bytesize || tail_at > tail_end
 
     tail = out.byteslice(tail_at, tail_end - tail_at).to_s
     out[found[:at], tail.bytesize] = tail

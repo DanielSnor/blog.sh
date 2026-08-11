@@ -74,6 +74,25 @@ prints what an installation is running.
   modification time as well as size now (one more stat of a file already
   being stat'd, no hashing), and doctor reads both directories, so the
   sentence about published photos is about the published photos.
+- **Eleven smaller ones from the same review.** A bullet list whose first
+  item was nothing but pipes and dashes was read back as a headerless table,
+  swallowing the item; a pipe inside a code span in a table cell grew a
+  backslash on every single edit, without bound (this one predates 1.2.1);
+  ragged indentation under one bullet -- two nested runs at slightly
+  different depths -- silently dropped an item from the post; an image or
+  video line in `about.html` published a stray `!` and a link to a file that
+  was never copied anywhere; `config_line_html` could publish the private-use
+  character that stands in for a hard break into a `title=` attribute; a Wix
+  table whose `tableData` was not a mapping cost the whole post; an HTML
+  table with an empty corner cell and real `<th>` headings beside it had
+  those headings imported as data; a Tumblr ask made only of an image lost
+  the asker's name entirely; a GPS entry with an undefined type code or an
+  impossible count left the coordinates in the file while everything
+  downstream called it clean; `strip_file` read every file it was handed
+  whole -- videos included, eighteen times the memory the copy itself
+  needed -- before checking it was a JPEG at all; and it returned a photo
+  with the permissions of the temporary file rather than its own, quietly
+  making a 0640 archive world-readable.
 - **A GPS entry's data offset was trusted absolutely.** Nothing in the format
   stops one from naming bytes that belong to the camera model, the MakerNote
   or the thumbnail, and written into by a file like that the strip damaged

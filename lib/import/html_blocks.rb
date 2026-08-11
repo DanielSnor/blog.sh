@@ -390,8 +390,17 @@ module Import
         end
         return if pairs.empty?
 
+        # "All of them th" missed the commonest headed table there is: a
+        # matrix, whose top-left corner is an empty td and whose real column
+        # headings beside it are th. Demanding every cell be a th read the
+        # source's own headings as data. An EMPTY td among th is that corner;
+        # a filled one is the other shape entirely -- a table with labels
+        # down its side, where th and td alternate in every row and the first
+        # row is not a heading at all.
         first_tr, first_cells = pairs.first
-        headed = head_trs.any? { |t| t.equal?(first_tr) } || first_cells.all? { |c| c.name == 'th' }
+        headed = head_trs.any? { |t| t.equal?(first_tr) } ||
+                 (first_cells.any? { |c| c.name == 'th' } &&
+                  first_cells.all? { |c| c.name == 'th' || Inline.render(c).first.to_s.strip.empty? })
 
         rows = pairs.map do |(_, cells)|
           cells.map do |cell|

@@ -296,8 +296,14 @@ module MarkdownParser
   # written back as "\|" (see table_to_markdown), and splitting on that
   # used to silently truncate the cell and drop everything after it.
   # The backslash itself is removed by parse_inline's escape handling.
+  # The backslash the writer puts before a pipe is a column-break escape and
+  # belongs to the table, not to the cell -- so it comes off here rather than
+  # being left for parse_inline. Left on, it survived inside a code span,
+  # whose content is verbatim on the way back: the cell text grew a backslash
+  # on every single edit, without bound, and the page showed them.
   def split_table_row(line)
-    line.strip.sub(/\A\|/, '').sub(/(?<!\\)\|\z/, '').split(/(?<!\\)\|/).map(&:strip)
+    line.strip.sub(/\A\|/, '').sub(/(?<!\\)\|\z/, '').split(/(?<!\\)\|/)
+        .map { |c| c.strip.gsub('\\|', '|') }
   end
 
   # A table that opens with the separator row has no header: the alignment
@@ -318,7 +324,14 @@ module MarkdownParser
     return nil if lines.size < 2
     return nil unless lines[0].include?('|')
 
-    headerless = separator_row?(lines[0])
+    # STRICT for the first line, and it has to be: a bullet list is written
+    # "- item", so a first bullet whose text is nothing but pipes and dashes
+    # ("- -|-") satisfied the loose separator pattern and the whole list was
+    # read back as a headerless table -- the first item swallowed into the
+    # separator, every other item keeping a literal "- " as cell text. The
+    # loose pattern stays where it always was, under a header, so no post
+    # that round-tripped before round-trips differently now.
+    headerless = strict_separator_row?(lines[0])
     sep = headerless ? 0 : 1
     return nil unless separator_row?(lines[sep])
 
@@ -365,6 +378,22 @@ module MarkdownParser
   # begins with one and so has no header at all.
   def separator_row?(line)
     line.include?('-') && TABLE_SEPARATOR_RE.match?(line)
+  end
+
+  # What a separator row written by this engine looks like, cell by cell:
+  # each one an unbroken run of dashes with an optional colon at either end.
+  # Nothing an author types as prose can be mistaken for it, which is what a
+  # line has to be before it may mean "this table has no header".
+  def strict_separator_row?(line)
+    # The leading pipe is the discriminator a bullet can never have: a list
+    # item is written "- text", so "- |-" reads cell-for-cell like a
+    # separator once the marker is off. The writer always emits the outer
+    # pipes, and the cheat sheets document that form, so requiring them
+    # costs nothing and closes the ambiguity outright.
+    return false unless line.start_with?('|') && line.include?('-')
+
+    cells = split_table_row(line)
+    !cells.empty? && cells.all? { |c| /\A:?-+:?\z/.match?(c.strip) }
   end
 
   # --- blockquote -------------------------------------------------------
@@ -437,7 +466,17 @@ module MarkdownParser
         nested, idx = parse_list_level(lines, idx, cur_indent)
         break unless nested && items.any?
 
-        items.last['children'] = nested
+        # Two differently-indented runs under the same item -- "  - a" then
+        # "   - b", which is what hand-typed lists look like -- came back as
+        # two calls, and the second assignment threw the first one's items
+        # away. The item simply vanished from the post, with nothing said.
+        # They belong to the same child list; ragged indentation under one
+        # parent is one level, not two.
+        if (existing = items.last['children'])
+          existing['items'] = (existing['items'] || []) + (nested['items'] || [])
+        else
+          items.last['children'] = nested
+        end
         next
       end
 

@@ -282,6 +282,11 @@ def config_line_html(text)
   return '' if text.to_s.strip.empty?
 
   body, formatting = MarkdownParser.parse_inline(MarkdownParser.collapse_soft_breaks(text.to_s.strip))
+  # The sentinel has to come back out of link TITLES as well as out of the
+  # text -- the post path was fixed for exactly this and the copy here was
+  # written without it, so a hard break inside a link title published a
+  # private-use character into a title= attribute.
+  formatting.each { |f| f['title'] = f['title'].gsub(MarkdownParser::BREAK_SENTINEL, "\n") if f['title'] }
   with_breaks(apply_formatting(body.gsub(MarkdownParser::BREAK_SENTINEL, "\n"), formatting, escape: false))
 end
 
@@ -307,6 +312,18 @@ end
 # post. Tables are left out on purpose along with the media blocks: the two
 # columns this renders into are 260px and a third of the footer.
 def config_prose_block(para)
+  # An image, a video or an attachment line has no block to become here, and
+  # leaving it to the inline parser was worse than not supporting it: the
+  # "[alt](path)" half still became a link, so `![Me](me.jpg)` published a
+  # stray "!" followed by an <a href> to a file with no media directory
+  # behind it -- a 404 in the sidebar of every page. Shown as the text it is
+  # instead, so the author can see it did not work and reach for the <img>
+  # the documentation points at.
+  if !para.include?("\n") &&
+     (MarkdownParser::VIDEO_RE.match?(para) || MarkdownParser::IMAGE_RE.match?(para))
+    return { 'type' => 'text', 'text' => para }
+  end
+
   if !para.include?("\n") && MarkdownParser::HR_RE.match?(para)
     { 'type' => 'hr' }
   elsif !para.include?("\n") && (m = MarkdownParser::HEADING_RE.match(para))

@@ -282,8 +282,17 @@ module Import
           # same table three times. Absent means false, the way it does
           # everywhere else in that format: a table only has a header row
           # when the editor was told to give it one.
+          # dig raises TypeError when tableData is not itself diggable, and a
+          # node whose tableData is a string or an array then cost the whole
+          # post -- Import::Run's rescue catches it and skips the item. This
+          # file's own design says the opposite: one odd cell must not cost
+          # an export, which is why blocks() rescues a parse error and why
+          # liberal_parsing exists.
+          table_data = node['tableData']
+          table_data = {} unless table_data.is_a?(Hash)
+
           block = { 'type' => 'table', 'align' => Array.new(rows.first.size, 'left') }
-          block['header'] = rows.shift if node.dig('tableData', 'rowHeader') == true
+          block['header'] = rows.shift if table_data['rowHeader'] == true
           block['rows'] = rows
           block
         when 'BUTTON'

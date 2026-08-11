@@ -102,9 +102,21 @@ module Import
         blocks << mapped
       end
       asker = ask.dig('attribution', 'blog', 'name').to_s.strip
-      # On the last one, so it reads the way a quotation ends: the words,
-      # then whose they were.
-      (quoted.reverse.find { |b| b['subtype'] == 'quote' } || {})['cite'] = asker unless asker.empty?
+      unless asker.empty?
+        # On the last quote, so it reads the way a quotation ends: the words,
+        # then whose they were. An ask can be a picture and nothing else,
+        # though, and then there is no quote to carry the name -- it used to
+        # be dropped on the floor, publishing a stranger's image as the
+        # blog's own with the one record of whose it was thrown away. A
+        # credit line above it says the same thing the trail's does.
+        last = quoted.reverse.find { |b| b['subtype'] == 'quote' }
+        if last
+          last['cite'] = asker
+        elsif (first = quoted.first) && (at = blocks.index(first))
+          blocks.insert(at, { 'type' => 'text', 'text' => "#{asker}:",
+                              'formatting' => [{ 'type' => 'bold', 'start' => 0, 'end' => asker.length }] })
+        end
+      end
 
       # A reblog carries the posts it was built on in `trail`, and those
       # belong to OTHER blogs -- 12 of 20 posts in one real capture had a
