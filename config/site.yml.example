@@ -109,9 +109,9 @@ banner:
   # else (meta description, RSS, listing pages) keeps using site.description
   # unchanged. Exists because site.description must stay plain text (see
   # above), so it can't carry a manual line break; this field can, since
-  # nothing but the banner overlay ever reads it. May contain HTML, same
-  # trust level as about.html/footer.note_html below (site.yml is
-  # owner-edited config, not visitor input).
+  # nothing but the banner overlay ever reads it. Markdown, and HTML just
+  # as before -- same trust level as about.html/footer.note_html below
+  # (site.yml is owner-edited config, not visitor input).
   # claim: "First line<br>Second line"
 
 # Optional, and the typographic half of the palette: the two lines painted
@@ -152,9 +152,17 @@ banner:
 
 about:
   heading: "About"
-  # May contain HTML (links). Inserted inside a <p>.
-  html: >-
-    A short bio about yourself, with a <a href="https://example.com">link</a>
+  # Markdown, the same as in a post: **bold**, [links](https://example.com),
+  # lists, a blank line for a new paragraph. Raw HTML still works too and is
+  # how a photo gets in (<img>) -- Markdown images are left out on purpose,
+  # since they resolve filenames against a post's media directory and the
+  # sidebar has none.
+  # The '|-' matters: in a folded scalar ('>-') YAML turns a blank line into
+  # a single newline, which reads as one wrapped paragraph rather than two --
+  # and glues the items of a list together. Here every line stays as typed,
+  # and wrapped prose still collapses back into one paragraph when rendered.
+  html: |-
+    A short bio about yourself, with a [link](https://example.com)
     if you like.
 
 # Optional, and each entry independently so. Sidebar widget data is fetched
@@ -198,10 +206,17 @@ footer:
     - title: "Example"
       url: "https://example.com"
   note_heading: "Found something here?"
-  note_html: >-
+  # Markdown as well (see about.html above for what '|-' is doing here);
+  # more than one paragraph is fine.
+  note_html: |-
     If an article or photo here caught your eye and you'd like to use it
     elsewhere, let me know -- happy to work something out. Please don't
     just copy-paste my content elsewhere without asking!
+  # Markdown too, on one line -- and HTML entities keep working, so the
+  # '&copy;' below still renders as a copyright sign and needs no migrating.
+  # (This file stays ASCII on purpose: ConfigWriter reads it under whatever
+  # default_external the caller has, which under cron or the system Ruby is
+  # US-ASCII -- one accented character here and both wizards stop working.)
   copyright: "All rights reserved &copy; 2026"
   social_heading: "Find me on"
 

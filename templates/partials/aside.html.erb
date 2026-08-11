@@ -1,7 +1,7 @@
 <aside>
         <div class="card">
           <h3><%= h(ABOUT['heading']) %></h3>
-          <p><%= ABOUT['html'] %></p>
+          <div class="chrome-text"><%= config_html(ABOUT['html']) %></div>
         </div>
 <% if WIDGETS['toots'] %>
         <div class="card">

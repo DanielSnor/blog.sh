@@ -249,14 +249,130 @@ def h(text)
   CGI.escapeHTML(text.to_s)
 end
 
-# banner.claim is an optional raw-HTML override for the banner overlay's
-# claim text -- same trust level as about.html/footer.note_html (site.yml
-# is edited only by the site owner), so a manual <br> can force a line
-# break the way CSS wrapping alone can't target. site.description itself
-# stays plain text, since it's also reused in <meta name="description">
-# and the RSS <description> -- those must never see raw markup.
+# --- Markdown in the site's own chrome ------------------------------------
+#
+# about.html, footer.note_html, footer.copyright and banner.claim are the
+# only texts on the site their author writes outside a post, and until now
+# they were also the only ones that had to be written in HTML. A Markdown
+# blog asking for a hand-typed <a href> in the one field that introduces its
+# author was the wrong way round. They go through lib/markdown_parser.rb now
+# -- the same parser the posts use, so there is one syntax to learn, not two.
+#
+# Raw HTML still passes through untouched, which is why nothing has to be
+# migrated: the shipped example writes "&copy;", live configs write <a href>,
+# and a hand-placed <br> stays available for what Markdown has no word for.
+# The trust note that always stood over banner.claim covers the rest of the
+# group unchanged -- site.yml is owner-edited config, never visitor input.
+#
+# The block vocabulary here is deliberately smaller than a post's:
+# paragraphs, headings, lists, quotes, code and rules, but no images, video,
+# audio or attachments. Those resolve filenames against a post's own media
+# directory, which the chrome has none of -- and a sidebar card 260px wide is
+# not where a photo grid belongs.
+def config_html(text)
+  return '' if text.to_s.strip.empty?
+
+  config_blocks(text).map { |block| render_config_block(block) }.join("\n")
+end
+
+# The single-line half of the same idea, for the two fields that live inside
+# a <p> the template gives its own class (footer.copyright, banner.claim):
+# inline Markdown only, no block wrapper to take that class away.
+def config_line_html(text)
+  return '' if text.to_s.strip.empty?
+
+  body, formatting = MarkdownParser.parse_inline(MarkdownParser.collapse_soft_breaks(text.to_s.strip))
+  with_breaks(apply_formatting(body.gsub(MarkdownParser::BREAK_SENTINEL, "\n"), formatting, escape: false))
+end
+
+def config_blocks(text)
+  blocks = []
+  MarkdownParser.split_code_fences(text.to_s).each do |segment|
+    if segment[:type] == :code
+      block = { 'type' => 'code', 'text' => segment[:text] }
+      block['lang'] = segment[:lang] unless segment[:lang].to_s.empty?
+      blocks << block
+      next
+    end
+
+    segment[:text].split(/\n\s*\n/).map(&:strip).reject(&:empty?).each do |para|
+      blocks << config_prose_block(para)
+    end
+  end
+  blocks
+end
+
+# The media-free sibling of MarkdownParser.parse_prose_block, in the same
+# order of tries, so a paragraph reads the same in a card as it does in a
+# post. Tables are left out on purpose along with the media blocks: the two
+# columns this renders into are 260px and a third of the footer.
+def config_prose_block(para)
+  if !para.include?("\n") && MarkdownParser::HR_RE.match?(para)
+    { 'type' => 'hr' }
+  elsif !para.include?("\n") && (m = MarkdownParser::HEADING_RE.match(para))
+    text, formatting = MarkdownParser.parse_inline(m[2])
+    block = { 'type' => 'text', 'subtype' => "heading#{m[1].length}", 'text' => text }
+    block['formatting'] = formatting unless formatting.empty?
+    block
+  elsif (quote = MarkdownParser.parse_blockquote(para))
+    quote
+  elsif (list = MarkdownParser.parse_list(para))
+    list
+  else
+    text, formatting = MarkdownParser.parse_inline(MarkdownParser.collapse_soft_breaks(para))
+    block = { 'type' => 'text', 'text' => text.gsub(MarkdownParser::BREAK_SENTINEL, "\n") }
+    formatting.each { |f| f['title'] = f['title'].gsub(MarkdownParser::BREAK_SENTINEL, "\n") if f['title'] }
+    block['formatting'] = formatting unless formatting.empty?
+    block
+  end
+end
+
+# Headings render without the id render_block gives a post's: the aside is
+# painted onto every page, so an "about" heading would hand out an id that
+# collides with the same heading inside the post next to it.
+def render_config_block(block)
+  case block['type']
+  when 'text'
+    heading = block['subtype'].to_s[/\Aheading([1-6])\z/, 1]
+    tag = if heading then "h#{heading}"
+          elsif block['subtype'] == 'quote' then 'blockquote'
+          else 'p'
+          end
+    inner = with_breaks(apply_formatting(block['text'], block['formatting'], escape: false))
+    inner += %(<cite>— #{h(block['cite'])}</cite>) if tag == 'blockquote' && block['cite']
+    "<#{tag}>#{inner}</#{tag}>"
+  when 'list'
+    tag = block['style'] == 'ol' ? 'ol' : 'ul'
+    items = (block['items'] || []).map do |it|
+      nested = it['children'] ? render_config_block(it['children']) : ''
+      body = apply_formatting(it['text'], it['formatting'], escape: false)
+      if it.key?('checked')
+        box = %(<input type="checkbox" disabled#{it['checked'] ? ' checked' : ''}>)
+        %(<li class="task-item">#{box} #{body}#{nested}</li>)
+      else
+        "<li>#{body}#{nested}</li>"
+      end
+    end.join
+    "<#{tag}>#{items}</#{tag}>"
+  when 'hr'
+    '<hr>'
+  when 'code'
+    # The one place in the chrome that keeps escaping: a code block exists to
+    # show markup as text, so passing it through raw would render the very
+    # thing the author was quoting.
+    lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{h(block['lang'])}")
+    %(<pre><code#{lang_class}>#{h(block['text'].to_s)}</code></pre>)
+  else
+    ''
+  end
+end
+
+# banner.claim overrides the banner overlay's claim text -- a place where a
+# manual line break can do what CSS wrapping alone can't target. site.description
+# itself stays plain text, since it is also reused in <meta name="description">
+# and the RSS <description>, and those must never see markup at all.
 def banner_claim_html
-  BANNER['claim'] || h(SITE_DESCRIPTION)
+  BANNER['claim'] ? config_line_html(BANNER['claim']) : h(SITE_DESCRIPTION)
 end
 
 def wrap_tag(chunk, format)
@@ -314,8 +430,15 @@ end
 
 # NPF formatting offsets are Unicode-codepoint based, same as Ruby's default
 # String indexing, so no conversion is needed before slicing `text`.
-def apply_formatting(text, formatting)
-  return autolink(text.to_s) if formatting.nil? || formatting.empty?
+#
+# `escape: false` is for the site's own chrome (see config_html below), where
+# the text comes from site.yml -- owner-edited config, never visitor input --
+# and raw HTML in it has always been passed through. Autolinking goes off with
+# it, and must: a bare address inside an href= attribute would otherwise be
+# turned into a second link in the middle of the first one.
+def apply_formatting(text, formatting, escape: true)
+  plain = ->(s) { escape ? autolink(s.to_s) : s.to_s }
+  return plain.call(text) if formatting.nil? || formatting.empty?
 
   # A stored span can point past the end of its text: importers used to
   # compute offsets against the raw HTML text and store the collapsed one
@@ -329,7 +452,7 @@ def apply_formatting(text, formatting)
 
     f.merge('start' => s, 'end' => e)
   end
-  return autolink(text.to_s) if formatting.empty?
+  return plain.call(text) if formatting.empty?
 
   boundaries = ([0, text.length] + formatting.flat_map { |f| [f['start'], f['end']] }).uniq.sort
 
@@ -340,7 +463,10 @@ def apply_formatting(text, formatting)
     # No autolinking inside an existing link, or it would produce a link
     # inside a link.
     linked = active.any? { |f| %w[link mention].include?(f['type']) }
-    chunk = linked ? CGI.escapeHTML(text[s...e]) : autolink(text[s...e])
+    chunk = if !escape then text[s...e]
+            elsif linked then CGI.escapeHTML(text[s...e])
+            else autolink(text[s...e])
+            end
     active.sort_by { |f| f['end'] - f['start'] }.each { |f| chunk = wrap_tag(chunk, f) }
     chunk
   end.join

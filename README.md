@@ -261,8 +261,8 @@ deploy step around exactly that. A few of the choices that came out of it:
   true) toggle whether they render at all, `colors.<mode>.banner_title`/
   `banner_claim` override their color per light/dark mode (default: `nav_bg`
   in light, white in dark -- same as before these keys existed), and
-  `banner.claim` overrides *only* the overlay's claim with raw HTML (e.g.
-  a manual `<br>`) -- `site.description` itself stays plain text
+  `banner.claim` overrides *only* the overlay's claim, in Markdown or raw
+  HTML (e.g. a manual `<br>`) -- `site.description` itself stays plain text
   everywhere else (meta description, RSS), same trust level as `about.html`
 
 **Importing -- `import.sh`**

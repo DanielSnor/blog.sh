@@ -10,6 +10,42 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.2.1 -- unreleased
+
+### New
+
+- **The site's own chrome speaks Markdown.** `about.html`,
+  `footer.note_html`, `footer.copyright` and `banner.claim` were the only
+  texts on a Markdown blog that had to be written in HTML -- the field that
+  introduces the author wanted a hand-typed `<a href>` for a link. All four
+  go through the same parser the posts use now: links, bold, italics,
+  strikethrough and inline code, and in the two longer fields also lists,
+  quotes, code blocks, rules and as many paragraphs as you like. **Nothing
+  to migrate:** raw HTML still passes through untouched, so existing configs
+  render exactly as they did, `&copy;` is still a ©, and an `<img>` is still
+  how a photo gets into a bio. Images, video, audio and attachments are the
+  one thing Markdown does *not* get here -- they resolve filenames against a
+  post's media directory, which the sidebar and the footer do not have.
+
+### Changed
+
+- `config/site.yml.example` writes `about.html` and `footer.note_html` as a
+  literal block scalar (`|-`) instead of a folded one (`>-`). In a folded
+  scalar YAML turns a blank line into a single newline, which now reads as
+  one wrapped paragraph rather than two -- and glues the items of a list
+  onto one line. Wrapped prose still collapses back into a single paragraph
+  when rendered, so the file stays as readable as it was. Existing configs
+  are not touched.
+
+### Upgrading
+
+- Nothing has to change, and nothing has to be rebuilt for the old behaviour
+  to keep working. If you want more than one paragraph (or a list) in
+  `about.html` or `footer.note_html` and your config still writes them as
+  `>-`, change that to `|-` first -- see Changed above for why. `./style.sh`
+  already writes the literal style for any value with a line break in it, so
+  editing the text through the wizard fixes it on the way past.
+
 ## 1.2 -- 2026-08-11
 
 The import release. Eight sources became twenty-two -- every blog platform

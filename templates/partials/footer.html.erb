@@ -15,10 +15,10 @@
       <div>
 <% unless FOOTER['note_html'].to_s.strip.empty? %>
         <h3><%= h(FOOTER['note_heading']) %></h3>
-        <p><%= FOOTER['note_html'] %></p>
+        <div class="chrome-text"><%= config_html(FOOTER['note_html']) %></div>
 <% end %>
 <% unless FOOTER['copyright'].to_s.strip.empty? %>
-        <p class="copyright"><%= FOOTER['copyright'] %></p>
+        <p class="copyright"><%= config_line_html(FOOTER['copyright']) %></p>
 <% end %>
       </div>
       <div>

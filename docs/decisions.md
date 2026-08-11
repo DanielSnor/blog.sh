@@ -487,8 +487,25 @@ and the RSS `<description>` too, so it has to stay plain text -- a
 literal `<br>` there would leak broken markup into a feed reader or a
 search result snippet. `banner.claim` exists purely so the banner
 overlay can have a manual line break (or any other markup) without
-touching those other, stricter consumers; it's optional and raw HTML,
-same trust level as `about.html`/`footer.note_html` (site.yml is
-owner-edited config, not visitor input). *Cost:* one more field to
-know about, and the two can drift out of sync if a site changes its
-description without updating the claim override to match.
+touching those other, stricter consumers; it's optional, and Markdown
+or raw HTML, same trust level as `about.html`/`footer.note_html`
+(site.yml is owner-edited config, not visitor input). *Cost:* one more
+field to know about, and the two can drift out of sync if a site
+changes its description without updating the claim override to match.
+
+**The site's own chrome speaks Markdown, and keeps accepting HTML.**
+`about.html`, `footer.note_html`, `footer.copyright` and `banner.claim`
+are the only texts on the site written outside a post, and until 1.2.1
+they were also the only ones that had to be written in HTML -- a
+Markdown blog asking for a hand-typed `<a href>` in the one field that
+introduces its author. They go through `lib/markdown_parser.rb` now,
+the same parser the posts use. Raw HTML still passes through untouched
+(`apply_formatting(..., escape: false)`), which is why nothing has to
+be migrated: existing configs keep rendering byte for byte, and an
+`<img>` stays the way to put a photo in a bio. *Cost:* two renderers
+for one syntax -- the chrome's block vocabulary is deliberately smaller
+than a post's (no images, video, audio, attachments or tables, all of
+which resolve against a post's media directory or need more width than
+a 260px sidebar has), so a table pasted into a bio renders as a
+paragraph of pipes rather than a table. And the passthrough means a
+typo in hand-written HTML still reaches the page, exactly as before.
