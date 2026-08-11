@@ -10,6 +10,63 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.3 -- unreleased
+
+Dressing a site differently no longer means editing the engine. Five
+things that used to require a modified template are settings now: your own
+stylesheet, your own menu, the sidebar, the repeated bottom menu, and a
+lead image above the post's title. Nothing changes for a site that says
+nothing -- every default is the layout the engine already had, verified
+byte-for-byte against the previous build.
+
+### New
+
+- **`site.extra_css`.** Stylesheets loaded after the engine's own, which is
+  where a skin belongs -- previously the only way in was a `<link>` added
+  to `layout.html.erb`, and `git pull` took it away again. Paths on this
+  site only: every page carries `style-src 'self'`, so a stylesheet on
+  another host is discarded by the browser with no error in any place you
+  would look, and the site just renders undressed. The build says which
+  line it skipped and why; `doctor` reports that plus a local path that
+  isn't there, which fails equally quietly.
+- **Your own menu (`nav:`).** Entries the site names -- `tag:` for a tag's
+  listing, `url:` for anywhere at all -- instead of the content types the
+  engine derives, for sites whose subjects map them better than their
+  media types do. Without the key nothing changes. An empty list is an
+  answer too: no bar and no toggle, which is how a site turns the menu off
+  without a second key for it.
+- **`layout.sidebar` and `layout.nav_bottom`.** The right-hand column and
+  the menu repeated under the content can each be switched off. With the
+  sidebar gone the content takes the full width rather than leaving a gap
+  where it used to be.
+- **`layout.hero`.** A post's first usable image, lifted out of the text
+  and shown above the title with the byline under it. Off unless asked
+  for, since it reshapes every post page; a single post overrides the site
+  in either direction with its own `hero:` line, the same two doors
+  `pinned` has. A 1x1 tracking pixel out of an old import is skipped
+  rather than promoted to lead picture, and a post with nothing suitable
+  keeps the ordinary layout.
+
+### Changed
+
+- **A listing's heading marks what it is instead of saying it twice.**
+  "Tag: archive" is now the tag itself, wearing the pill shape tags wear
+  everywhere else on the site; a search shows the query behind a
+  magnifier. The word is still in the markup and still read aloud -- it is
+  clipped, not removed, because `display: none` would take it out of the
+  accessibility tree and leave a screen reader announcing a bare name with
+  no hint of where it is. Content-type listings are untouched: they never
+  had a prefix, which is what suggested this. The window title still says
+  "Tag: ...", where there is no stylesheet and no pill to say it instead.
+
+### Upgrading
+
+- Nothing to migrate. The one visible change is the heading above tag
+  listings and search results, so those pages are rewritten on the next
+  build -- a full deploy, not an incremental one, on a site with many tags.
+  To keep the old wording, put the word back with one CSS rule on
+  `.listing-heading__kind` in a stylesheet of your own.
+
 ## 1.2.1 -- 2026-08-12
 
 A bug-fix release with two things added to it: the site's own words are

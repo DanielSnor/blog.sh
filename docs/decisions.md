@@ -364,9 +364,14 @@ every other file's load-time-requires convention.
 **No third-party requests from the visitor's browser.** Widgets are
 fetched server-side on cron into same-origin JSON: visitors' IPs leak
 nowhere, GitHub's rate limit can't kill the sidebar, and a slow third
-party can't slow the page. The one exception is deliberate: the
-Mastodon comments thread, fetched client-side because it's the actual
-live discussion. Fonts are self-hosted for the same reason.
+party can't slow the page. Two exceptions are deliberate, and naming
+both matters -- an unlisted one reads later like an oversight somebody
+should "fix". The first is the comments thread, fetched client-side
+because it is the actual live discussion. The second is an analytics
+script, for a site that asks for one: `analytics:` is absent by
+default, nothing is added to any page without it, and the policy names
+that origin only while the section exists. Fonts are self-hosted for
+the same reason as the rest.
 
 **CSP without `unsafe-inline`, delivered as a meta tag.** The single
 inline script (client i18n strings) is allowlisted by its SHA-256
@@ -467,6 +472,53 @@ diff it shows back, written into a file created mode 600, and verified
 against the instance before it is kept. *Cost:* one dialog in this
 engine handles a secret, so that is one place to be careful about
 rather than none.
+
+**A site is customized by its configuration, not by editing the
+engine.** There is one release, and it either runs as shipped or runs
+the way a site asked for in `config/site.yml` -- so switching off the
+sidebar, naming your own menu, loading your own stylesheet or turning on
+the hero are all settings, and none of them is a reason to hold a
+modified copy of a template. That matters because a modified template
+is not a private matter: `git pull` either refuses it or silently
+reverts it, and the site's own look is what gets lost.
+
+Two layers carry it. Configuration switches whole structural regions on
+and off (`layout.sidebar`, `layout.nav_bottom`, `layout.hero`, `nav:`),
+and a stylesheet of the site's own (`site.extra_css`) does everything
+about how those regions look. Neither can rot: the engine knows about
+the first, and a CSS rule that stops matching simply stops applying.
+
+*Cost, and it is a real one:* the engine has to anticipate. Every future
+"I want it different" is either a new key or an answer of no, and the
+line between them has to hold -- keys name **regions and modes**, never
+individual visual properties, or this file becomes a stylesheet written
+in YAML. The palette made the same trade first (7 keys, everything else
+derived, promote one only when reality demands it).
+
+*The rejected alternative:* letting a site override whole templates from
+a directory of its own. It would answer every wish at once, which is
+exactly why it is the wrong shape here -- it is not "a setting", it is a
+fork with better manners, and a forked template is frozen in time. The
+site quietly stops receiving whatever the engine adds to that template
+later, and nothing says so. If it is ever built, `doctor` has to
+remember which version each override was written against and say when
+the original has moved on.
+
+**A listing's heading marks what it is; it doesn't say it twice.** Tag
+and search headings used to be sentences with a colon ("Tag: archive").
+The word is now its own element beside the value, hidden from sight by
+the stylesheet -- clipped rather than `display: none`, since that would
+take it out of the accessibility tree as well, and a screen reader on a
+tag page would then announce a bare name with no hint of where it is.
+The value carries the marker instead: a tag wears the pill shape tags
+wear everywhere else, a query sits behind the magnifier from the nav.
+Content-type listings get no marker at all, and never had one --
+**a marker belongs where the value is arbitrary text**, which a tag name
+and a search query are and a closed set of eight labels is not. The
+window title keeps the word: a browser tab and a search result have
+neither stylesheet nor pill, so there it is the only thing telling two
+pages apart. *Cost:* one more element in the markup, and a site that
+wants the word back has to undo one rule rather than translate a string.
 
 **Colors are 7 keys per mode; everything else is derived.** Across
 every palette this engine actually shipped, the other custom properties
