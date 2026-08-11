@@ -345,6 +345,11 @@ nav a[aria-current="page"]:hover {
   padding: 1.5rem 1rem;
 }
 
+/* With layout.sidebar off there is no second column to reserve room for,
+   so the content takes the whole width instead of leaving a 260px gap
+   where the aside used to be. */
+.layout--no-aside { grid-template-columns: minmax(0, 1fr); }
+
 @media (max-width: 700px) {
   .wrap { margin-top: 0; margin-bottom: 0; }
 

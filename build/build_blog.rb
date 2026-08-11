@@ -143,6 +143,18 @@ BANNER = SiteConfig.fetch('banner')
 # site that just doesn't want the overlay) can drop either line without
 # losing the other. Both default to true, so an existing site's banner
 # renders exactly as it did before these keys existed.
+# Which structural regions of the page exist at all. Both default to true,
+# so a site that says nothing renders exactly what it rendered before.
+# These are switches for whole regions, not for how they look: what a
+# region looks like belongs in a stylesheet (site.extra_css), and a key
+# per visual property would turn config/site.yml into a stylesheet written
+# in YAML.
+LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
+# The menu repeated under the content. It carries no search field, so with
+# an empty `nav:` there would be nothing left in it to show -- but a site
+# with a menu may still not want it twice.
+LAYOUT_NAV_BOTTOM = SiteConfig.get('layout', 'nav_bottom', default: true)
+
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
 ANALYTICS = SiteConfig.get('analytics')
