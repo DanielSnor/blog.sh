@@ -1254,6 +1254,24 @@ end
 # from some imported archive would otherwise become the page's lead
 # picture. A post with nothing suitable simply keeps the ordinary layout,
 # so there is no second template to keep in step with this one.
+# The date in the hero's byline, or nothing at all on a page.
+#
+# The rule is the same one the date badge follows -- "Contact, 1 July 2022"
+# says nothing except that somebody had to type a date into a field -- but
+# it was written into only one of the two places a date reaches the top of
+# the page. A page with no usable image looked right, so the hole stayed
+# shut until Ivan's About page turned out to have a portrait.
+#
+# A helper returning '' rather than a conditional in the template, for the
+# reason reading_time_html gives: post.html.erb renders for every post on
+# the site, and a block tag on its own line leaves its newlines on all of
+# them.
+def hero_time_html(post)
+  return '' if page?(post)
+
+  %(<time datetime="#{h(post_time(post).iso8601)}">#{h(post_display_date(post))}</time>)
+end
+
 def hero_for(post)
   return nil unless post.is_a?(Hash)
 
