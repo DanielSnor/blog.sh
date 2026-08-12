@@ -194,6 +194,7 @@ cli:
   template_unchanged: "Template left unchanged (not saved?), no post was created."
   empty_content: "Empty content, nothing was written."
   wrote_draft: "Written as draft: %{path}"
+  incoming_not_cleaned: "Left in incoming/: %{files} — the copy is in the post, but the staged original could not be deleted (no write permission on incoming/). Remove it by hand, so an empty incoming/ still means nothing is pending."
   generating_preview: "Generating preview"
   draft_saved_preview_pending: "Draft is saved. The preview will show up after a successful deploy -- then run ./blog.sh edit %{slug}"
 

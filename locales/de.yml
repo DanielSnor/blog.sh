@@ -193,6 +193,7 @@ cli:
   template_unchanged: "Vorlage unverändert (nicht gespeichert?), es wurde kein Beitrag angelegt."
   empty_content: "Leerer Inhalt, nichts geschrieben."
   wrote_draft: "Als Entwurf gespeichert: %{path}"
+  incoming_not_cleaned: "In incoming/ geblieben: %{files} — die Kopie steckt im Beitrag, das Original ließ sich nicht löschen (keine Schreibrechte auf incoming/). Räume es von Hand weg, damit ein leeres incoming/ weiterhin heißt: nichts steht aus."
   generating_preview: "Erzeuge Vorschau"
   draft_saved_preview_pending: "Der Entwurf ist gespeichert. Die Vorschau erscheint nach einem erfolgreichen Deploy -- dann ./blog.sh edit %{slug} ausführen"
 

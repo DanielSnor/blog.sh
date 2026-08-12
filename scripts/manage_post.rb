@@ -176,14 +176,31 @@ end
 # photo -- in converted form -- so the same "empty incoming/ means nothing
 # pending" rule applies to it.
 def cleanup_incoming(media_files, extra_sources = [])
+  left = []
   (media_files.keys + extra_sources).each do |src|
     next unless src
 
     expanded = File.expand_path(src)
     next unless expanded.start_with?("#{File.expand_path(INCOMING_DIR)}/")
+    next unless File.exist?(expanded)
 
-    File.delete(expanded) if File.exist?(expanded)
+    begin
+      File.delete(expanded)
+    rescue SystemCallError
+      # Deleting needs write permission on the DIRECTORY, not on the file,
+      # so an incoming/ owned by whoever uploads into it (a separate SFTP
+      # account is the usual arrangement) refuses this to the account that
+      # runs the CLI. The comment at the call site has always said this
+      # must not abort a save that already succeeded -- it now does not.
+      left << File.basename(expanded)
+    end
   end
+  return if left.empty?
+
+  # Said out loud rather than swallowed: "an empty incoming/ means nothing
+  # is pending" is the whole point of the tidying, and a file left behind
+  # quietly makes that untrue.
+  warn t('cli.incoming_not_cleaned', files: left.join(', '))
 end
 
 # Converts -- or refuses -- HEIC photos among the freshly attached media,

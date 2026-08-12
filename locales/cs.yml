@@ -191,6 +191,7 @@ cli:
   template_unchanged: "Šablona zůstala beze změny (neuloženo?), post nevznikl."
   empty_content: "Prázdný obsah, nic se nezapsalo."
   wrote_draft: "Zapsáno jako draft: %{path}"
+  incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je v postu, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně, ať dál platí, že prázdné incoming = nic nečeká."
   generating_preview: "Generuji náhled"
   draft_saved_preview_pending: "Draft je uložený. Náhled se ukáže po úspěšném nasazení — pak spusť ./blog.sh edit %{slug}"
 
