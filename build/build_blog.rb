@@ -1898,6 +1898,23 @@ emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
             description: t('search.page_description'),
             path: '/search/'))
 
+# The page a mistyped or long-dead address lands on. Every supported host
+# serves /404.html for a path it has nothing at -- until now that was the
+# host's own default, which says nothing about this site and offers no way
+# on. This one carries the site's chrome, so the menu and the search field
+# turn a dead end into somewhere to go next.
+#
+# Nothing that already exists is rewritten by adding it: it is a new file
+# at an address nothing else claims. noindex because a 404 that gets
+# indexed is worse than no 404 at all.
+emit(File.join(PUBLIC_DIR, '404.html'),
+     layout(%(        <h2 class="listing-heading"><span class="listing-heading__value">#{h(t('not_found.heading'))}</span></h2>\n) +
+            %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
+            title: t('not_found.page_title', site_title: SITE_TITLE),
+            description: t('not_found.page_description'),
+            path: '/404.html',
+            extra_head: %(\n  <meta name="robots" content="noindex">)))
+
 if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))
   cheat_blocks, = MarkdownParser.parse_body(cheat_body, nil)

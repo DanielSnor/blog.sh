@@ -73,6 +73,12 @@ search:
   page_title: "Suche – %{site_title}"
   page_description: "Volltextsuche über alle Beiträge, unabhängig von Akzenten."
 
+not_found:
+  heading: "Hier ist nichts"
+  body: "Diese Adresse zeigt auf dieser Website auf nichts -- vielleicht ein Tippfehler, vielleicht etwas, das inzwischen umgezogen ist. Das Menü oben und das Suchfeld sind der Weg weiter."
+  page_title: "Hier ist nichts – %{site_title}"
+  page_description: "Die Seite, auf die diese Adresse zeigt, existiert nicht."
+
 markdown_page:
   default_title: "Markdown"
   description: "Leitfaden zur Syntax, mit der dieses Blog geschrieben wird."

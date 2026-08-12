@@ -70,6 +70,12 @@ search:
   page_title: "Vyhledávání – %{site_title}"
   page_description: "Fulltextové vyhledávání v příspěvcích, bez ohledu na diakritiku."
 
+not_found:
+  heading: "Tady nic není"
+  body: "Tahle adresa na tomhle webu na nic nemíří — buď je v ní překlep, nebo mířila na něco, co se mezitím přestěhovalo. Cesta dál je menu nahoře a vyhledávací pole."
+  page_title: "Tady nic není – %{site_title}"
+  page_description: "Stránka, na kterou tahle adresa míří, neexistuje."
+
 markdown_page:
   default_title: "Markdown"
   description: "Návod na syntaxi, kterou tenhle blog používá pro psaní příspěvků."

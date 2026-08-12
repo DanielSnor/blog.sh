@@ -71,6 +71,12 @@ search:
   page_title: "Search – %{site_title}"
   page_description: "Full-text search across posts, accent-insensitive."
 
+not_found:
+  heading: "Nothing here"
+  body: "This address does not point at anything on this site -- it may have been mistyped, or it may have been something that has since moved. The menu above and the search box are the way on."
+  page_title: "Nothing here – %{site_title}"
+  page_description: "The page this address points at does not exist."
+
 markdown_page:
   default_title: "Markdown"
   description: "Guide to the syntax this blog uses for writing posts."
