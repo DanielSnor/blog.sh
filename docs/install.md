@@ -177,7 +177,7 @@ comments and all -- and fills in the answers you give it, which is the
 same file you would have written by hand, minus the chance of a tab
 where a space belongs. It covers the `site` block, the comments network
 and the deploy target; `./style.sh` covers `banner`, `about`, `footer`,
-`social`, `colors`, `fonts` and `widgets`. Both are re-runnable and
+`social`, `colors`, `fonts`, `widgets` and `nav`. Both are re-runnable and
 neither takes anything away from editing the file directly.
 
 The example is fully commented. The short version:

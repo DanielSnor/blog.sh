@@ -227,7 +227,7 @@ them, and the built site then answers at every old path.
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
 setup.sh                 Setup wizard -- identity, address, comments network, deploy target
-style.sh                 Appearance wizard -- palette, banner, about, footer, sidebar
+style.sh                 Appearance wizard -- palette, banner, menu, about, footer, sidebar
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:

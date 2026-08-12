@@ -51,6 +51,12 @@ require_relative '../lib/media_dimensions'
 require_relative '../lib/version'
 require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
+require_relative '../lib/slug'
+# For the menu section: what tags and pages exist, and which addresses
+# the build answers at. Shared with check and doctor rather than read
+# again here, so that all three agree about what a menu item can point
+# at.
+require_relative '../lib/checker'
 
 def t(key, **vars)
   I18n.t("style.#{key}", **vars)
@@ -424,6 +430,156 @@ def section_social
   puts
 end
 
+# --- the menu bar ----------------------------------------------------
+
+# `nav:` has three states and they are not "list, empty list, and a
+# default": the ABSENCE of the key means the derived menu (All + one item
+# per content type the site actually has), a list means those items and
+# nothing else, and an empty list means no menu bar at all. That makes
+# this the one section where doing nothing has to write nothing --
+# section_social ends with an unconditional set_list, which here would
+# turn a derived menu off for anyone who walked in to look.
+#
+# Its second job is to stop the mistake doctor now reports: a menu item
+# is written once and then outlives what it points at. So a tag or an
+# address that the archive does not produce is questioned HERE, while the
+# person is still the one who can say whether it is a typo or a post they
+# have not written yet.
+def section_nav
+  entries = current['nav']
+  derived = !entries.is_a?(Array)
+  entries = [] unless entries.is_a?(Array)
+  touched = false
+
+  loop do
+    if derived
+      puts Tui.paint(t('nav_derived'), :dim)
+    elsif entries.empty?
+      puts Tui.paint(t('nav_is_off'), :dim)
+    else
+      puts Tui.paint(t('nav_current'), :bold)
+      entries.each_with_index { |e, i| puts "   #{i + 1}) #{nav_summary(e)}" }
+    end
+    puts
+
+    options = [['add', t('list_add')]]
+    options << ['remove', t('list_remove')] unless entries.empty?
+    options << ['off', t('nav_turn_off')] if derived || entries.any?
+    options << ['keep', t('list_keep')]
+    action = Wizard.choose(t('q_nav_action'), options, current_index: options.size - 1)
+
+    case action
+    when 'add'
+      # Said before the first item and not after it: adding one entry to a
+      # derived menu does not add one entry, it replaces the whole menu.
+      puts Tui.paint(t('nav_replaces_derived'), :yellow) if derived && entries.empty?
+      entry = ask_nav_entry
+      next unless entry
+
+      entries << entry
+      derived = false
+      touched = true
+    when 'remove'
+      entries = remove_from(entries) { |e| nav_summary(e) }
+      derived = false
+      touched = true
+    when 'off'
+      entries = []
+      derived = false
+      touched = true
+      puts Tui.paint(t('nav_off_note'), :green)
+      puts
+    else
+      break
+    end
+  end
+
+  site.set_list(%w[nav], entries) if touched
+  puts
+end
+
+def nav_summary(entry)
+  target = entry['tag'].to_s.empty? ? entry['url'].to_s : "/tag/#{entry['tag']}/"
+  "#{entry['label']} -> #{target}"
+end
+
+def ask_nav_entry
+  label = Wizard.ask(t('q_nav_label'), '')
+  return nil if label.to_s.strip.empty?
+
+  kinds = [['home', t('nav_kind_home')], ['tag', t('nav_kind_tag')]]
+  kinds << ['page', t('nav_kind_page')] if nav_pages.any?
+  kinds << ['url', t('nav_kind_url')]
+
+  case Wizard.choose(t('q_nav_kind'), kinds, current_index: 0)
+  when 'home' then { 'label' => label.strip, 'url' => '/' }
+  when 'tag' then ask_nav_tag(label.strip)
+  when 'page'
+    path = Wizard.choose(t('q_nav_page'), nav_pages.map { |p| [p, p] }, current_index: 0)
+    { 'label' => label.strip, 'url' => path }
+  else ask_nav_url(label.strip)
+  end
+end
+
+def ask_nav_tag(label)
+  answer = Wizard.ask(t('q_nav_tag'), '', hint: t('h_nav_tag', list: nav_tag_sample))
+  slug = Slug.slugify(answer.to_s)
+  return nil if slug.empty?
+  return nil if !nav_tags.include?(slug) && !nav_confirm_unknown(t('nav_tag_unknown', tag: slug))
+
+  { 'label' => label, 'tag' => slug }
+end
+
+def ask_nav_url(label)
+  url = Wizard.ask(t('q_nav_url'), '', hint: t('h_nav_url')).to_s.strip
+  return nil if url.empty?
+  # Only addresses on this site are judged. Somebody else's page is a
+  # perfectly good menu item, and whether it answers is not a question
+  # this archive can be asked.
+  if url.start_with?('/') && !nav_known.include?(url) && !nav_known.include?("#{url}/") &&
+     !nav_confirm_unknown(t('nav_url_unknown', url: url))
+    return nil
+  end
+
+  { 'label' => label, 'url' => url }
+end
+
+def nav_confirm_unknown(message)
+  puts Tui.paint("   #{message}", :yellow)
+  Wizard.confirm(t('q_nav_anyway'))
+end
+
+# The archive, read once and only if somebody actually adds an item -- a
+# site with hundreds of posts should not pay for opening this section to
+# look at it. Checker's, rather than a second reading of the same files:
+# it already knows every address the build answers at, and doctor judges
+# the finished menu by exactly that set.
+def nav_posts
+  @nav_posts ||= Checker.load_posts(ROOT)
+end
+
+def nav_tag_slugs
+  @nav_tag_slugs ||= nav_posts.flat_map { |p| Array(p['tags']).map { |tag| Slug.slugify(tag.to_s) } }.reject(&:empty?)
+end
+
+def nav_tags
+  @nav_tags ||= nav_tag_slugs.to_set
+end
+
+def nav_known
+  @nav_known ||= Checker.known_paths(nav_posts)
+end
+
+def nav_pages
+  @nav_pages ||= nav_posts.select { |p| p['page'] }.map { |p| "/#{p['slug']}/" }.sort
+end
+
+# The tags worth putting in a menu are the ones with posts behind them, so
+# the hint is the busiest few rather than an alphabetical wall.
+def nav_tag_sample
+  @nav_tag_sample ||= nav_tag_slugs.tally.sort_by { |slug, count| [-count, slug] }.first(8).map(&:first).join(', ')
+end
+
 def ask_social_entry
   name = Wizard.ask(t('q_social_name'), '')
   url = Wizard.ask(t('q_social_url'), '', hint: t('h_social_url'))
@@ -564,13 +720,14 @@ end
 # --- the menu --------------------------------------------------------
 
 # In the order the page reads, top to bottom: the whole page first
-# (palette), then the header (image, fonts), the sidebar (bio, widgets),
+# (palette), then the header (image, fonts, menu bar), the sidebar (bio, widgets),
 # the footer (texts and links, then the icon row that lives in it), and
 # last the one thing with no place on the page at all.
 SECTIONS = [
   ['palette', 'section_palette'],
   ['banner', 'section_banner'],
   ['fonts', 'section_fonts'],
+  ['nav', 'section_nav'],
   ['about', 'section_about'],
   ['widgets', 'section_widgets'],
   ['footer', 'section_footer'],

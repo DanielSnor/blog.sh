@@ -348,10 +348,17 @@ module ConfigWriter
           "#{' ' * item_indent}#{marker}#{k}: #{ConfigWriter.scalar(v)}\n"
         end
       end
-      body = ["#{' ' * item_indent}[]\n"] if items.empty?
-
       extent = value_extent(line_no)
-      @lines[line_no..extent] = ["#{' ' * indent}#{key}:\n", *body]
+      # An empty list is written inline. `key:` followed by an indented
+      # `[]` parses the same, but it reads as a key someone forgot to
+      # finish -- and for `nav:` the difference between 'no items' and
+      # 'nothing written yet' is the difference between no menu bar and
+      # the derived one.
+      @lines[line_no..extent] = if items.empty?
+                                  ["#{' ' * indent}#{key}: []\n"]
+                                else
+                                  ["#{' ' * indent}#{key}:\n", *body]
+                                end
       @intended[key_path] = items.map { |i| i.reject { |_, v| v.nil? } }
       self
     end

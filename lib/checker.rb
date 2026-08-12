@@ -8,7 +8,6 @@ require 'uri'
 require 'timeout'
 require_relative 'slug'
 require_relative 'i18n'
-require_relative 'feed_http'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -103,6 +102,11 @@ module Checker
 
   def post_path(post)
     return "/draft/#{post['draft_token']}/#{post['slug']}/" if draft?(post)
+    # A page is served at the root, not under a year. Reading its
+    # address off the year was quiet in both directions: a link to
+    # /about/ was reported dead, and the dated address it invented
+    # instead was accepted from anywhere.
+    return "/#{post['slug']}/" if post['page']
 
     "/posts/#{post['__year']}/#{post['slug']}/"
   end
@@ -325,6 +329,14 @@ module Checker
   end
 
   def request(uri, klass)
+    # Required here rather than at the top of the file, and it is not
+    # tidiness: feed_http reads SiteConfig at LOAD time, and doctor --
+    # which shares this file's knowledge of what addresses exist --
+    # has to run on a config nothing else can read. Requiring it up
+    # there killed doctor on an unreadable site.yml, which is the one
+    # case doctor exists for. Same lazy-require reasoning as rexml in
+    # the sidebar fetchers (docs/decisions.md).
+    require_relative 'feed_http'
     req = klass.new(uri)
     req['User-Agent'] = FeedHttp::USER_AGENT
     Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',

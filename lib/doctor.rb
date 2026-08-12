@@ -13,6 +13,13 @@ require_relative 'i18n'
 require_relative 'media_dimensions'
 require_relative 'exif_location'
 require_relative 'deploy_backend'
+require_relative 'slug'
+# For the one thing doctor cannot answer from config alone: whether a
+# menu entry points at an address this archive produces. Sharing the
+# set with check rather than building a second one is the point --
+# two diagnostics disagreeing about what the build makes is worse than
+# one of them staying quiet.
+require_relative 'checker'
 # NOT require_relative 'publishing': it pulls in the posters, which read
 # SiteConfig at LOAD time -- and this is the one command that has to run
 # on a config nothing else can load. Requiring it put the raw Psych
@@ -140,6 +147,7 @@ module Doctor
     findings.concat(check_colors(data))
     findings.concat(check_fonts(data, root))
     findings.concat(check_extra_css(data, root))
+    findings.concat(check_nav(data, root))
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
@@ -405,6 +413,52 @@ module Doctor
       findings << error(t('extra_css_missing', value: href), t('extra_css_missing_fix')) unless File.exist?(path)
     end
     findings << ok(t('extra_css_ok', count: entries.size)) if findings.empty?
+    findings
+  end
+
+  # A menu item pointing at nothing is as quiet as any other config
+  # mistake: the build renders the link, the deploy ships it, and the
+  # reader finds the 404. It happens most easily to the entries that were
+  # RIGHT once -- a post that got renamed, a tag whose last post was
+  # unpublished, a page deleted after the menu was written.
+  #
+  # Only for a site that has a `nav:` list at all, and the archive is read
+  # only then: a site using the derived menu pays nothing for this.
+  #
+  # The set of addresses is Checker's, not a second copy of it. A doctor
+  # that disagreed with check about what the build produces would be worse
+  # than one that said nothing -- and this is exactly the kind of list
+  # (tags, posts, pages, redirect stubs) that drifts if it is written
+  # twice. An `url:` off the site is left alone: pointing at somebody
+  # else's page is a legitimate menu item, and whether it answers is
+  # `check --online`'s question, not this one.
+  def check_nav(data, root)
+    entries = data['nav']
+    return [] unless entries.is_a?(Array) && entries.any?
+
+    posts = Checker.load_posts(root)
+    known = Checker.known_paths(posts)
+    tags = posts.flat_map { |p| Array(p['tags']).map { |t| Slug.slugify(t.to_s) } }.to_set
+
+    findings = []
+    entries.each do |entry|
+      next unless entry.is_a?(Hash)
+
+      label = entry['label'].to_s.strip
+      slug = entry['tag'].to_s.strip
+      if !slug.empty?
+        findings << error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix')) unless tags.include?(slug)
+        next
+      end
+
+      url = entry['url'].to_s.strip
+      next unless url.start_with?('/')
+      next if url.start_with?('/type/', '/assets/')
+      next if known.include?(url) || known.include?("#{url}/")
+
+      findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
+    end
+    findings << ok(t('nav_ok', count: entries.size)) if findings.empty?
     findings
   end
 

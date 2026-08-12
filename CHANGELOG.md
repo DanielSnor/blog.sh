@@ -96,7 +96,19 @@ byte-for-byte against the previous build.
   engine derives, for sites whose subjects map them better than their
   media types do. Without the key nothing changes. An empty list is an
   answer too: no bar and no toggle, which is how a site turns the menu off
-  without a second key for it.
+  without a second key for it. `./style.sh` has a section for it, and it
+  is the one section where doing nothing writes nothing -- walking in to
+  look at a derived menu must not turn it into an empty one. Adding an
+  entry offers your busiest tags and your pages by name, and questions a
+  tag or an address the archive does not produce before it is written
+  rather than after.
+- **`doctor` reads the menu.** A menu item is written once and then
+  outlives what it points at -- a post renamed, a tag whose last post was
+  unpublished -- and until now nothing said so: the build rendered the
+  link, the deploy shipped it, and the reader found the 404. It names the
+  item and what is missing, for entries on this site only; an address
+  somewhere else is `check --online`'s business. Sites without a `nav:`
+  key are not read at all, so nothing pays for a menu they do not have.
 - **`layout.sidebar` and `layout.nav_bottom`.** The right-hand column and
   the menu repeated under the content can each be switched off. With the
   sidebar gone the content takes the full width rather than leaving a gap

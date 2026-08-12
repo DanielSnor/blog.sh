@@ -223,6 +223,10 @@ banner:
 #
 # An empty list (nav: []) is an answer too: no menu bar and no toggle at
 # all. That is how a site turns the menu off -- there is no second key.
+#
+# `./style.sh` writes this for you and offers the tags and pages you
+# actually have; `./blog.sh doctor` says so when an entry stops pointing
+# at anything, which is what happens to a menu written a year ago.
 # nav:
 #   - { label: "Home", url: "/" }
 #   - { label: "Photography", tag: "photography" }
