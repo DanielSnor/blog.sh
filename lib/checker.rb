@@ -289,14 +289,23 @@ module Checker
 
   # HEAD first: a link checker has no use for the body, and a HEAD over a
   # few thousand links is the difference between minutes and an afternoon.
-  # Some servers answer HEAD with 405 or 501 while serving GET perfectly --
-  # those are retried rather than reported.
+  #
+  # But HEAD is never believed when it says the page is GONE. Some servers
+  # answer it with 405 or 501 while serving GET perfectly; worse, some
+  # answer 404 to HEAD and 200 to GET for the very same address --
+  # bsky.app does exactly this on profile pages, and the first run of this
+  # check over a real archive reported thirty-four live links as dead
+  # because of it. So anything that looks fatal is confirmed with a GET,
+  # which costs one extra request per apparently-dead link and buys the
+  # only thing this tool has: being right.
+  RETRY_WITH_GET = ([405, 501] + ONLINE_GONE).freeze
+
   def probe(url, redirects_left = 4)
     uri = URI.parse(url)
     return { gone: false } unless uri.is_a?(URI::HTTP) && uri.host
 
     res = request(uri, Net::HTTP::Head)
-    res = request(uri, Net::HTTP::Get) if res.is_a?(Net::HTTPResponse) && [405, 501].include?(res.code.to_i)
+    res = request(uri, Net::HTTP::Get) if res.is_a?(Net::HTTPResponse) && RETRY_WITH_GET.include?(res.code.to_i)
 
     case res
     when :dns

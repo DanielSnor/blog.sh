@@ -35,7 +35,9 @@ byte-for-byte against the previous build.
   answering 404/410 are reported, because a timeout or a 5xx means "not
   right now" and forty findings that are fine tomorrow would cost the
   tool its credibility. Answers are cached for a fortnight, or nobody
-  would ever run it twice.
+  would ever run it twice. A HEAD that says the page is gone is never
+  believed on its own -- some servers answer 404 to HEAD and 200 to GET
+  for the same address -- so anything fatal is confirmed with a GET.
 - **Editing a post is undoable.** The previous text is kept before an
   overwrite, by an edit or by a re-import, and `[v]` in the `props` dialog
   puts one back. Ten per post, oldest dropped; they travel to the trash
