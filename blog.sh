@@ -14,6 +14,7 @@
 #   ./blog.sh list [--type=image] [--tag=foo]
 #   ./blog.sh doctor [--online] [--strip-location]
 #   ./blog.sh check
+#   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -77,6 +78,14 @@ case "${1:-}" in
   check)
     shift
     exec ruby scripts/check.rb "$@"
+    ;;
+  # Same door as check, for the same reason and one more: leaving with
+  # your posts has to work on the installation you are leaving. A config
+  # that no longer parses, a token that expired, a deploy target that is
+  # gone -- none of that is a reason to be unable to take the archive out.
+  export)
+    shift
+    exec ruby scripts/export.rb "$@"
     ;;
 esac
 

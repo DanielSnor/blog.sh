@@ -305,6 +305,7 @@ def section_banner
       # Everything else in these wizards writes only after the confirmation;
       # this is the one thing that touches a file, so it waits with them.
       @pending_banner = path
+      src = ask_banner_src(src, path)
       puts Tui.paint(t('banner_pending', path: src), :green)
       puts
     else
@@ -331,6 +332,31 @@ def section_banner
   show_claim = Wizard.confirm(t('q_show_claim'), default: current.dig('banner', 'show_claim') != false)
   site.set(%w[banner show_claim], show_claim)
   puts
+end
+
+# Where the banner is copied TO. The name is configuration (banner.src),
+# not a convention -- but the wizard could only ever copy onto whatever
+# the config already said, so a site that wanted its own filename had to
+# edit site.yml by hand and then run this again.
+#
+# Only asked when the chosen file is named differently from the configured
+# one; answering with the current path keeps it, which is what somebody
+# replacing an image in place wants and is therefore the default. The
+# answer is normalised to a path under assets/images/, because that is
+# where install_pending_banner writes and where .gitignore keeps
+# per-install artwork out of the engine's repository.
+def ask_banner_src(current_src, source)
+  suggested = "/assets/images/#{File.basename(source)}"
+  return current_src if suggested == current_src
+
+  answer = Wizard.ask(t('q_banner_src'), current_src,
+                      hint: t('h_banner_src', suggested: suggested)).to_s.strip
+  return current_src if answer.empty? || answer == current_src
+
+  name = File.basename(answer)
+  chosen = "/assets/images/#{name}"
+  site.set(%w[banner src], chosen)
+  chosen
 end
 
 # Runs after review_and_write reports :written -- never before it.

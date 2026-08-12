@@ -940,6 +940,8 @@ style:
 
   banner_current: "Obrázek hlavičky je teď %{path}."
   q_banner_file: "Cesta k novému obrázku hlavičky (Enter nechá stávající)"
+  q_banner_src: "Pod jakým jménem ho uložit?"
+  h_banner_src: "Enter nechá současné. Podle vybraného souboru by to bylo %{suggested} — jméno je volba (banner.src), ne dané pravidlo."
   h_banner_file: "Jakékoli PNG, JPEG, GIF nebo WebP. Zkopíruje se na místo a změří, takže rozměry v configu budou sedět se souborem."
   banner_not_found: "%{path} není soubor, hlavička zůstala beze změny."
   banner_copied: "✅ Zkopírováno do %{path}."

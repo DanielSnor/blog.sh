@@ -944,6 +944,8 @@ style:
 
   banner_current: "Das Bannerbild ist jetzt %{path}."
   q_banner_file: "Pfad zu einem neuen Bannerbild (Enter behält das aktuelle)"
+  q_banner_src: "Unter welchem Namen speichern?"
+  h_banner_src: "Enter behält den aktuellen. Nach der gewählten Datei wäre es %{suggested} -- der Name ist eine Einstellung (banner.src), keine feste Regel."
   h_banner_file: "Jedes PNG, JPEG, GIF oder WebP. Es wird an seinen Platz kopiert und vermessen, damit Breite und Höhe in der Konfiguration zur Datei passen."
   banner_not_found: "%{path} ist keine Datei, das Banner blieb unverändert."
   banner_copied: "✅ Nach %{path} kopiert."

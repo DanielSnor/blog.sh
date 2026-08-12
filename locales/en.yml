@@ -331,6 +331,8 @@ cli:
       ./blog.sh doctor [--online] [--strip-location]
                                      reads the configuration and says what is wrong with it
       ./blog.sh check                walks the archive and says what is broken in it
+      ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+                                     writes the whole archive out as a tree of markdown files (default tmp/export)
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
@@ -768,6 +770,21 @@ check:
   summary: "%{errors} problem(s), %{warnings} thing(s) worth a look."
   summary_clean: "The archive is sound."
 
+export:
+  heading: "Writing this archive out to %{path}"
+  progress: "Writing posts: %{done}/%{total}"
+  unknown_option: "Unknown option: %{option}. export takes a directory, --no-drafts, --dry-run and --force."
+  target_not_empty: "%{path} is not empty."
+  target_not_empty_fix: "Give an empty directory, or repeat with --force to write alongside what is already there. Nothing is deleted either way."
+  dry_run_notice: "Dry run: everything is counted, nothing is written."
+  no_drafts_notice: "Drafts are staying home -- only published posts and pages are going out."
+  no_posts: "There is nothing to export yet."
+  summary: "Written to %{path}: %{posts} post(s), %{drafts} draft(s), %{pages} page(s), and %{media} media file(s) (%{size})."
+  summary_dry: "Would write to %{path}: %{posts} post(s), %{drafts} draft(s), %{pages} page(s), and %{media} media file(s) (%{size})."
+  fallback_note: "%{count} block(s) markdown has no syntax for were written as HTML: %{kinds}. Any engine that passes HTML through will render them -- but read back in, they arrive as text rather than as blocks."
+  collisions: "%{count} file(s) were renamed so they would not overwrite each other -- two posts asked for the same filename."
+  next_steps: "The layout is Jekyll's: _posts/, _drafts/, pages at the root, media under assets/. Hugo, Eleventy and Astro read it with a line of config; ./import.sh reads it as it stands."
+
 setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
   intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."
@@ -947,6 +964,8 @@ style:
 
   banner_current: "The banner image is now %{path}."
   q_banner_file: "Path to a new banner image (Enter to keep the current one)"
+  q_banner_src: "What should it be saved as?"
+  h_banner_src: "Enter keeps the current one. After the file you picked it would be %{suggested} -- the name is a setting (banner.src), not a fixed rule."
   h_banner_file: "Any PNG, JPEG, GIF or WebP. It is copied into place and measured, so the config's width and height match the file."
   banner_not_found: "%{path} is not a file, so the banner was left alone."
   banner_copied: "✅ Copied into %{path}."
