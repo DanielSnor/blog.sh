@@ -685,14 +685,19 @@ blockquote {
   gap: 1.1rem;
   margin: 0.5rem 0 1rem;
 }
-.reading-time {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+/* Laid out inline rather than as a flex chip, and that is about alignment,
+   not tidiness: the baseline of a flex box is the baseline of its FIRST
+   item, which here is the icon -- so anywhere the neighbours are aligned
+   on their baselines (the hero's byline is), the whole thing rode 5px
+   above the author and the date. Inline, its baseline is the text's own,
+   which is what everything around it is aligned to. */
+.post-stat.reading-time {
+  display: inline;
+  white-space: nowrap;
   color: var(--meta-text);
   font-size: 0.85rem;
 }
-.reading-time svg { flex: none; }
+.reading-time svg { vertical-align: -0.18em; margin-right: 0.3rem; }
 
 .series-note { font-size: 0.85rem; margin: 0 0 1rem; }
 .series-note a { color: var(--meta-text); }
@@ -799,7 +804,7 @@ blockquote {
    takes the byline's size and colour instead of the body row's -- and a
    skin that restyles .post-hero__meta gets the clock restyled with it,
    without having to know the clock exists. */
-.post-hero__meta .reading-time { color: inherit; font-size: inherit; }
+.post-hero__meta .reading-time { color: inherit; font-size: inherit; letter-spacing: inherit; }
 .card.has-hero .post-body { padding: 1.5rem 1.5rem 0; }
 
 .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: 1rem 0; }
