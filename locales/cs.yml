@@ -720,10 +720,17 @@ doctor:
 # ukázat neumí. Jestli hodnotu někdo doopravdy nastavil, říká řádek „Teď:"
 # vs. „Návrh:" (wizard.prompt_with_current / prompt_with_suggestion).
 check:
+  progress_online: "Ptám se webu: %{done}/%{total}"
+  running_online: "Kontroluju i odkazy mimo tenhle web — chvíli to potrvá."
+  online_ok: "Všech %{count} odkazů ven pořád odpovídá."
+  link_gone: "%{slug}: %{url} je pryč (%{reason})."
+  link_gone_fix: "Hlásí se jen hostitelé, kteří už neexistují, a stránky s 404/410 — timeout nebo 5xx znamená „teď ne“ a nechává se být. Oprav odkaz, vyhoď ho, nebo ho namiř do archivu Wayback Machine."
+  reason_no_host: "takový hostitel neexistuje"
+  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, nic jiného."
   heading: "Kontrola archivu"
   progress: "Čtu posty: %{done}/%{total}"
   no_posts: "Zatím tu není co kontrolovat, archiv je prázdný."
-  all_clear: "Postů zkontrolováno: %{posts} — média, odkazy i přesměrování sedí."
+  all_clear: "Uvnitř archivu je vše v pořádku: %{posts} postů, média, odkazy i přesměrování sedí."
   media_missing: "%{slug}: soubor %{file} v adresáři médií chybí."
   media_missing_fix: "Post si o něj říká a na stránce zůstane díra. Obvykle import, kterému selhalo stahování — buď soubor dodej, nebo ho z postu vyhoď."
   image_degenerate: "%{slug}: obrázek %{file} má %{width}x%{height} a vůbec se nevykreslí."

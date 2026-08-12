@@ -733,10 +733,17 @@ doctor:
 # actually chose the value is what the "Now:" vs. "Suggested:" line says
 # (wizard.prompt_with_current / prompt_with_suggestion).
 check:
+  progress_online: "Asking the web: %{done}/%{total}"
+  running_online: "Also checking links that leave this site -- this takes a while."
+  online_ok: "All %{count} outside link(s) still answer."
+  link_gone: "%{slug}: %{url} is gone (%{reason})."
+  link_gone_fix: "Only hosts that no longer resolve and pages answering 404/410 are reported -- a timeout or a 5xx is \"not right now\" and is left alone. Fix the link, drop it, or point it at the Wayback Machine."
+  reason_no_host: "the host does not exist"
+  unknown_option: "Unknown option: %{option}. check takes --online, nothing else."
   heading: "Checking this archive"
   progress: "Reading posts: %{done}/%{total}"
   no_posts: "There are no posts to check yet."
-  all_clear: "Nothing wrong with %{posts} post(s) -- media, links and redirects all check out."
+  all_clear: "Nothing wrong inside the archive: %{posts} post(s), with media, links and redirects all checking out."
   media_missing: "%{slug}: the file %{file} is missing from its media directory."
   media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
   image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."

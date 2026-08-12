@@ -32,6 +32,20 @@ require_relative '../lib/tui'
 require_relative '../lib/site_header'
 require_relative '../lib/checker'
 
+# An unknown switch is refused rather than ignored. `--online` sat here
+# unimplemented for a while and a run that quietly accepted it told its
+# user that external links had been checked when nothing had left the
+# machine -- worse than not offering the switch at all.
+online = false
+ARGV.each do |arg|
+  case arg
+  when '--online' then online = true
+  else
+    warn(I18n.t('check.unknown_option', option: arg))
+    exit 2
+  end
+end
+
 def paint_level(level)
   case level
   when :error then Tui.paint('❌', :red)
@@ -56,9 +70,22 @@ progress = lambda do |done, total|
   tty ? print("\r#{line}\e[K") : puts(line)
 end
 
-findings = Checker.run(root: ROOT, progress: progress)
+online_progress = lambda do |done, total|
+  next unless tty || (done % 50).zero? || done == total
+
+  line = I18n.t('check.progress_online', done: done, total: total)
+  tty ? print("\r#{line}\e[K") : puts(line)
+end
+
+puts Tui.paint(I18n.t('check.running_online'), :dim) if online
+
+findings = Checker.run(root: ROOT, progress: progress, online: online,
+                       online_progress: online_progress)
+# On a terminal the counter has just been erased, and the cursor is sitting
+# on the blank line it left -- printing another one here would leave two.
+# Piped, the counters are real lines of output and want a separator.
 print("\r\e[K") if tty
-puts
+puts unless tty
 
 order = { error: 0, warn: 1, ok: 2 }
 findings.sort_by.with_index { |f, i| [order.fetch(f.level, 3), i] }.each do |finding|

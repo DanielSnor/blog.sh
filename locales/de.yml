@@ -730,10 +730,17 @@ doctor:
 # wirklich gewählt hat, sagt die Zeile "Jetzt:" vs. "Vorschlag:"
 # (wizard.prompt_with_current / prompt_with_suggestion).
 check:
+  progress_online: "Frage das Web: %{done}/%{total}"
+  running_online: "Auch Links nach außen werden geprüft -- das dauert eine Weile."
+  online_ok: "Alle %{count} externen Link(s) antworten weiterhin."
+  link_gone: "%{slug}: %{url} ist weg (%{reason})."
+  link_gone_fix: "Gemeldet werden nur Hosts, die nicht mehr auflösen, und Seiten mit 404/410 -- ein Timeout oder ein 5xx heißt \"gerade nicht\" und bleibt unangetastet. Korrigiere den Link, entferne ihn oder zeige auf die Wayback Machine."
+  reason_no_host: "diesen Host gibt es nicht"
+  unknown_option: "Unbekannte Option: %{option}. check kennt nur --online."
   heading: "Archiv wird geprüft"
   progress: "Beiträge gelesen: %{done}/%{total}"
   no_posts: "Es gibt noch keine Beiträge zu prüfen."
-  all_clear: "%{posts} Beitrag/Beiträge geprüft -- Medien, Links und Weiterleitungen stimmen."
+  all_clear: "Im Archiv selbst ist alles in Ordnung: %{posts} Beitrag/Beiträge, Medien, Links und Weiterleitungen stimmen."
   media_missing: "%{slug}: Die Datei %{file} fehlt im Medienverzeichnis."
   media_missing_fix: "Der Beitrag fordert sie an, die Seite zeigt ein Loch. Meist ein Import mit fehlgeschlagenem Download -- lege die Datei dorthin oder nimm sie aus dem Beitrag heraus."
   image_degenerate: "%{slug}: Das Bild %{file} ist %{width}x%{height} und wird gar nicht gerendert."

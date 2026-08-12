@@ -30,7 +30,12 @@ byte-for-byte against the previous build.
   has ever run and every finding names a post to go and fix. It only
   reports -- nothing is deleted -- and exits non-zero when it found
   something, so it can hang off cron. On a 4400-post archive it takes
-  under a second.
+  under a second. `--online` additionally asks the web about the links
+  that leave the site: only a host that no longer resolves and a page
+  answering 404/410 are reported, because a timeout or a 5xx means "not
+  right now" and forty findings that are fine tomorrow would cost the
+  tool its credibility. Answers are cached for a fortnight, or nobody
+  would ever run it twice.
 - **Editing a post is undoable.** The previous text is kept before an
   overwrite, by an edit or by a re-import, and `[v]` in the `props` dialog
   puts one back. Ten per post, oldest dropped; they travel to the trash
