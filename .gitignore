@@ -16,8 +16,6 @@ env.sh
 .last-edit.meta
 .stats_full_refresh_at
 config/site.yml
-assets/images/header.png
-assets/images/favicon.png
 incoming/
 trash/
 drafts/
@@ -25,9 +23,20 @@ content.nosync/
 media.nosync/
 public.nosync/
 
-# Per-install graphics dropped into the working copy must never ride
-# an unrelated commit into the public engine repo again.
-assets/images/daniel.png
+# Per-install graphics dropped into the working copy must never ride an
+# unrelated commit into the public engine repo again.
+#
+# By directory rather than by filename, and that is the whole point: the
+# banner's path is a config key (banner.src), so naming files here only
+# ever covered the ones somebody had already been bitten by. A site that
+# points banner.src at its own filename -- or drops in a bio photo, or a
+# skin's artwork -- got no protection at all, and the gap was being patched
+# by hand in .git/info/exclude on every install separately.
+#
+# Only the engine's own shipped defaults are tracked; the install copies
+# them into place on first run.
+assets/images/*
+!assets/images/defaults/
 # Local regression suite -- deliberately outside the public repo.
 tests/
 # ./style.sh builds a whole sample site here for every palette preview --
