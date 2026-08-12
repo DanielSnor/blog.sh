@@ -5,6 +5,7 @@ require 'fileutils'
 require 'time'
 require 'yaml'
 require_relative 'markdown_writer'
+require_relative 'embed'
 
 # lib/exporter.rb -- the archive as a tree of markdown files: what
 # `./blog.sh export` writes, and the mirror of lib/import/. The engine
@@ -193,14 +194,27 @@ module Exporter
   # Rendering one block at a time is equivalent to rendering them
   # together: the writer carries no state between blocks, it maps and
   # joins with a blank line, which is what happens here too.
+  # Video and audio skip the markdown path even though the writer HAS
+  # syntax for them, because that syntax is this engine's own: `!![cap](url)`
+  # is, to CommonMark -- which is what Jekyll, Hugo and Eleventy read -- a
+  # literal "!" followed by an IMAGE. Exported that way, a YouTube video
+  # renders on the destination site as an exclamation mark and a broken
+  # image, and re-importing the tree fetched YouTube's HTML page and filed
+  # it in the archive as `02.jpg`. Caught against a real 118-post archive;
+  # no fixture would have shown it, because both ends were ours.
+  HTML_ONLY = %w[video audio link].freeze
+
   def render_blocks(blocks, media_rel)
     fallbacks = Hash.new(0)
     parts = Array(blocks).map do |block|
-      rendered = MarkdownWriter.blocks_to_markdown([block], media_rel)
-      next rendered unless rendered.strip.empty?
+      type = block['type'].to_s
+      unless HTML_ONLY.include?(type)
+        rendered = MarkdownWriter.blocks_to_markdown([block], media_rel)
+        next rendered unless rendered.strip.empty?
+      end
 
-      fallbacks[block['type'].to_s] += 1
-      html_fallback(block)
+      fallbacks[type] += 1
+      html_fallback(block, media_rel)
     end
     [parts.reject { |p| p.to_s.empty? }.join("\n\n"), fallbacks]
   end
@@ -215,30 +229,55 @@ module Exporter
   # blog.sh's own importer reads these back as text, not as blocks --
   # which is why every one of them is counted and said out loud instead
   # of being quietly declared a success.
-  def html_fallback(block)
+  def html_fallback(block, media_rel)
     case block['type'].to_s
     when 'link'
       title = escape_html((block['title'] || block['url']).to_s)
       description = escape_html(block['description'].to_s)
       link = escape_html(block['url'].to_s)
       %(<p class="link-block"><a href="#{link}"><strong>#{title}</strong></a><br>#{description}</p>)
-    when 'video', 'audio'
-      embed = block['embed_html'].to_s
-      address = block['url'].to_s
-      # Falls through to the <pre> below when there is neither an embed
-      # nor an address: a block counted as "written as HTML" that wrote
-      # nothing would be a lie told by the summary itself.
-      if !embed.strip.empty? then embed
-      elsif !address.empty?
-        %(<p><a href="#{escape_html(address)}">#{escape_html(address)}</a></p>)
-      else
-        "<pre>#{escape_html(block.to_json)}</pre>"
-      end
+    when 'video', 'audio' then player_html(block, media_rel)
     else
       # What the build does with a block type it does not know: show it
       # rather than swallow it.
       "<pre>#{escape_html(block.to_json)}</pre>"
     end
+  end
+
+  # The markup the build renders, minus what only means something inside
+  # this site's stylesheet: a local file becomes the HTML5 element
+  # pointing into assets/, YouTube and the platforms Embed knows become
+  # the player's iframe, and an address nothing recognises stays a link
+  # -- the same courtesy the build shows. Wrapped in a <figure> when the
+  # block has a caption, so the words under it survive too.
+  #
+  # Falls through to the <pre> when there is nothing at all to point at:
+  # a block counted as "written as HTML" that wrote nothing would be a
+  # lie told by the summary itself.
+  def player_html(block, media_rel)
+    file = (block['media'] || []).first
+    id = block['youtube_id'].to_s
+    inner =
+      if file
+        src = escape_html(File.join(media_rel, file['url'].to_s))
+        element = block['type'].to_s == 'audio' ? 'audio' : 'video'
+        %(<#{element} controls preload="metadata" src="#{src}"></#{element}>)
+      elsif !block['embed_html'].to_s.strip.empty?
+        block['embed_html']
+      elsif !id.empty?
+        # youtube-nocookie, as the build uses: the same player without
+        # tracking cookies until the visitor presses play.
+        %(<iframe src="https://www.youtube-nocookie.com/embed/#{escape_html(id)}" ) +
+          %(title="YouTube" frameborder="0" loading="lazy" allowfullscreen></iframe>)
+      elsif (src = Embed.src(block))
+        %(<iframe src="#{escape_html(src)}" frameborder="0" loading="lazy" allowfullscreen></iframe>)
+      elsif !block['url'].to_s.empty?
+        %(<a href="#{escape_html(block['url'])}">#{escape_html(block['url'])}</a>)
+      end
+    return "<pre>#{escape_html(block.to_json)}</pre>" if inner.nil?
+
+    caption = block['caption'].to_s.strip
+    caption.empty? ? inner : "<figure>#{inner}<figcaption>#{escape_html(caption)}</figcaption></figure>"
   end
 
   def escape_html(text)

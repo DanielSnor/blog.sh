@@ -331,7 +331,23 @@ def section_banner
   site.set(%w[banner show_title], show_title)
   show_claim = Wizard.confirm(t('q_show_claim'), default: current.dig('banner', 'show_claim') != false)
   site.set(%w[banner show_claim], show_claim)
+
+  # Only where it can be seen. The claim's text is site.description unless
+  # this overrides it -- and it exists because site.description has to stay
+  # plain text (it is reused in meta, RSS and listing descriptions), so it
+  # cannot carry a line break. This field can, since the banner overlay is
+  # the only thing that reads it.
+  ask_banner_claim if show_claim
+
   puts
+end
+
+def ask_banner_claim
+  now = current.dig('banner', 'claim')
+  answer = Wizard.ask(t('q_banner_claim'), now, hint: t('h_banner_claim')).to_s
+  return if answer.strip.empty? || answer == now.to_s
+
+  site.set(%w[banner claim], answer)
 end
 
 # Where the banner is copied TO. The name is configuration (banner.src),
@@ -803,6 +819,81 @@ def section_fonts
     site.set(['fonts', key], value) if value
   end
   puts
+  section_font_faces
+end
+
+# Self-hosted faces. Declaring one here is what makes its name usable in
+# the stacks above -- naming a family the browser has never been given
+# silently falls back, and the banner then looks like the setting simply
+# did not work.
+def section_font_faces
+  entries = current.dig('fonts', 'faces')
+  entries = [] unless entries.is_a?(Array)
+  entries = entries.select { |e| e.is_a?(Hash) }
+  touched = false
+
+  loop do
+    puts Tui.paint(t('faces_current'), :bold)
+    if entries.empty?
+      puts Tui.paint("   #{t('list_empty')}", :dim)
+    else
+      entries.each_with_index do |e, i|
+        mark = font_file_exists?(e['file']) ? '' : "  #{t('faces_missing_mark')}"
+        puts "   #{i + 1}) #{e['family']} -- #{e['file']}#{mark}"
+      end
+    end
+    puts
+
+    options = [['add', t('list_add')]]
+    options << ['remove', t('list_remove')] unless entries.empty?
+    options << ['keep', t('list_keep')]
+    case Wizard.choose(t('q_faces_action'), options, current_index: options.size - 1)
+    when 'add'
+      entry = ask_font_face
+      next unless entry
+
+      entries << entry
+      touched = true
+    when 'remove'
+      entries = remove_from(entries) { |e| "#{e['family']} -- #{e['file']}" }
+      touched = true
+    else
+      break
+    end
+  end
+
+  site.set_list(%w[fonts faces], entries) if touched
+  puts
+end
+
+def font_file_exists?(file)
+  return false if file.to_s.strip.empty?
+
+  File.file?(File.join(ROOT, 'assets', 'fonts', File.basename(file.to_s)))
+end
+
+# Only the file NAME is stored -- the engine looks in assets/fonts/ and a
+# path there would resolve to nothing. weight and style are optional and
+# left out when empty rather than written as blanks, which is what the
+# reader of the config would have to interpret otherwise.
+def ask_font_face
+  family = Wizard.ask(t('q_face_family'), '', hint: t('h_face_family')).to_s.strip
+  return nil if family.empty?
+
+  file = File.basename(Wizard.ask(t('q_face_file'), '', hint: t('h_face_file')).to_s.strip)
+  return nil if file.empty?
+
+  unless font_file_exists?(file)
+    puts Tui.paint("   #{t('faces_not_found', file: file)}", :yellow)
+    return nil unless Wizard.confirm(t('q_faces_anyway'))
+  end
+
+  entry = { 'family' => family, 'file' => file }
+  weight = Wizard.ask(t('q_face_weight'), '', hint: t('h_face_weight')).to_s.strip
+  entry['weight'] = weight unless weight.empty?
+  style = Wizard.ask(t('q_face_style'), '', hint: t('h_face_style')).to_s.strip
+  entry['style'] = style unless style.empty?
+  entry
 end
 
 def section_analytics
