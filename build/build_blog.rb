@@ -1323,6 +1323,11 @@ end
 # '' when there is nothing to put in it: a site with no comments network
 # and a post too short to time has to come out exactly as it did before
 # this row existed.
+#
+# The template passes nil for the minutes when a hero is drawn, because
+# the hero carries the byline -- author and date -- and the reading time
+# belongs with them rather than orphaned above the text. Two facts about
+# the post in two places is one place too many.
 def post_meta_html(post, minutes)
   stats = post_stats_html(post)
   reading = reading_time_html(minutes)
