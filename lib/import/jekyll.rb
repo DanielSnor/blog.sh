@@ -54,8 +54,11 @@ module Import
       @total
     end
 
+    # Nil for a post this engine wrote itself (see apply_own_keys): it
+    # already knows where it came from, and a round-trip through export
+    # and back must not leave a "jekyll" pill behind on every post.
     def platform_tag
-      'jekyll'
+      @own_post ? nil : 'jekyll'
     end
 
     def each_item(&block)
@@ -65,8 +68,9 @@ module Import
       # converter's output -- or a site built entirely on collections
       # (_docs, _tutorials), which Jekyll allows and jekyll/jekyll's own
       # docs/ is. Same shape, wider net, minus the machinery.
-      posts = wider_net if posts.empty? && drafts.empty?
-      files = (posts + drafts).sort
+      swept = posts.empty? && drafts.empty?
+      posts = wider_net if swept
+      files = (posts + drafts + (swept ? [] : root_pages)).sort
       @total = files.size
       files.each(&block)
     end
@@ -106,10 +110,56 @@ module Import
         origin = origin_path(meta, slug, date)
         post['redirect_from'] = [origin] if origin
       end
+      apply_own_keys(post, meta)
       post
     end
 
     private
+
+    # Front matter this engine wrote itself. `./blog.sh export` writes
+    # everything markdown has no word for under a single `blogsh:` key,
+    # so a tree that came out of blog.sh can go back in whole -- the
+    # series, the redirects, the announcement URLs, a draft's token,
+    # and above all `source`, which is what makes a re-import land on
+    # the same posts instead of doubling the archive. A tree from
+    # anywhere else has no such key and nothing here fires.
+    #
+    # A whitelist rather than a merge: front matter is a file somebody
+    # handed us, and a post is not a place to let arbitrary keys in.
+    OWN_NESTED_KEYS = %w[source former_slugs redirect_from unpublished_from
+                         mastodon_url bluesky_url bluesky_uri draft_token
+                         created_at scheduled state page].freeze
+    # The ones that sit flat, because a destination engine plausibly
+    # understands them too -- Hugo has series, most engines have a pinned.
+    OWN_FLAT_KEYS = %w[series series_part pinned hero toc].freeze
+
+    def apply_own_keys(post, meta)
+      own = meta['blogsh']
+      # Read per post rather than per tree: a folder can hold both an
+      # export and something somebody wrote by hand, and only the posts
+      # that carry their own history should be treated as returning
+      # home. platform_tag asks this too.
+      @own_post = own.is_a?(Hash)
+
+      OWN_FLAT_KEYS.each do |key|
+        value = meta[key]
+        post[key] = value unless value.nil?
+      end
+      # `type: page` is how a page is written -- the same reading
+      # scripts/manage_post.rb gives it. Any other type is a content-type
+      # override and passes through as one.
+      type = meta['type'].to_s.strip
+      if type == 'page' then post['page'] = true
+      elsif !type.empty? then post['type'] = type
+      end
+
+      return unless own.is_a?(Hash)
+
+      OWN_NESTED_KEYS.each do |key|
+        value = own[key]
+        post[key] = value unless value.nil?
+      end
+    end
 
     # Not writing: _site/ is what Jekyll BUILT (every page a second
     # time), public/ and resources/ are Hugo's, the rest is machinery or
@@ -123,6 +173,25 @@ module Import
     # The files a repository keeps for people, not readers. Only in the
     # root: _docs/readme.md is a page about something.
     NOT_A_POST = %w[readme license licence contributing changelog code_of_conduct authors].freeze
+
+    # A Jekyll site keeps its pages as markdown in the ROOT -- about.md,
+    # colophon.md -- and `./blog.sh export` writes them there for the
+    # same reason. Without this they were the one thing a tree could
+    # hold that the importer walked straight past, so a site exported
+    # and imported back came home one page short.
+    #
+    # Only when _posts/ or _drafts/ turned something up: with neither,
+    # wider_net has already swept the whole tree and would hand the same
+    # files over twice. And only files, never directories -- a Hugo page
+    # bundle in the root is a post, and comes in through wider_net.
+    NOT_A_PAGE = %w[index home 404 feed rss atom sitemap search tags categories archive robots].freeze
+
+    def root_pages
+      Dir.glob(File.join(@dir, '*.{md,markdown}')).reject do |path|
+        base = File.basename(path, '.*').downcase
+        NOT_A_PAGE.include?(base) || NOT_A_POST.include?(base)
+      end
+    end
 
     # Markdown only, deliberately, even though a tree WITH _posts/ reads
     # .html as well. This net is cast over a directory nobody has

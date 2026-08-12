@@ -331,6 +331,45 @@ Back up `content.nosync/` before the first real import
 (`tar czf ../content-backup-$(date +%F).tar.gz content.nosync`) -- it isn't
 in git, and on a server there's nothing else to fall back on.
 
+## Taking your content elsewhere
+
+```bash
+./blog.sh export ~/my-blog-export        # everything, drafts included
+./blog.sh export ~/public-copy --no-drafts
+./blog.sh export ~/somewhere --dry-run   # counts, writes nothing
+```
+
+Writes the archive as a tree of markdown files with YAML front matter,
+in Jekyll's layout: `_posts/2026-05-01-slug.md`, `_drafts/slug.md`,
+pages at the root, media copied under `assets/<year>/<slug>/`. Without a
+directory it writes to `tmp/export`. A directory that already has
+something in it is refused until you repeat the command with `--force`,
+which writes alongside what is there -- an export never deletes
+anything, at either end.
+
+It reads only the archive on disk, so it works on an installation whose
+`env.sh` is gone or whose config no longer parses. That is deliberate:
+the day you need to leave is not the day the configuration is at its
+best.
+
+Three things are worth knowing before you rely on the result:
+
+- **The summary counts what could not stay markdown.** A link card and
+  an embed the engine cannot recognise the address of are written as
+  HTML. Every engine that passes HTML through renders them; imported
+  back, they arrive as text rather than as blocks.
+- **`redirect_from` is written in the shape `jekyll-redirect-from`
+  reads,** and it merges both kinds of old address -- where the post
+  lived on the platform it came from, and where it lived here before a
+  rename. On a Jekyll site with that plugin, every address the post has
+  ever had goes on answering.
+- **An export can be imported back.** `./import.sh` → *Markdown tree*
+  reads the `blogsh:` block the export writes, so posts keep their
+  identity (`source`), their series, their redirects and their
+  announcement URLs. That is the supported way to move an installation
+  to another machine or another host -- and, run against a scratch
+  copy, the way to check that an export really did come out whole.
+
 ## Deploying
 
 `./blog.sh rebuild` = build + deploy with `--prune` in one step; the
@@ -523,6 +562,12 @@ but the second holds your previous tokens, so delete rather than
 archive it.
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
+
+A backup is those paths as they are -- not an export. `./blog.sh export`
+([Taking your content elsewhere](#taking-your-content-elsewhere)) is for
+leaving, and it converts: what markdown cannot write down comes out as
+HTML. Restoring from an export is possible (`./import.sh` reads it back
+whole), but restoring from the archive itself is exact.
 
 ## Troubleshooting
 

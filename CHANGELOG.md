@@ -38,6 +38,28 @@ byte-for-byte against the previous build.
   would ever run it twice. A HEAD that says the page is gone is never
   believed on its own -- some servers answer 404 to HEAD and 200 to GET
   for the same address -- so anything fatal is confirmed with a GET.
+- **`./blog.sh export`.** The other direction of the twenty-two
+  importers, and the answer to the question anyone should ask before
+  moving in: the whole archive as a tree of markdown files with YAML
+  front matter, in Jekyll's layout -- `_posts/`, `_drafts/`, pages at the
+  root, media copied under `assets/<year>/<slug>/`. `--dry-run` counts
+  and writes nothing, `--no-drafts` leaves unpublished work at home, and
+  a directory with something already in it is refused until the command
+  is repeated with `--force`; nothing is deleted at either end. Like
+  `check` it reads only the archive on disk, so it still works on an
+  installation whose `env.sh` is gone or whose config no longer parses --
+  the day you need to leave is not the day the configuration is at its
+  best. The front matter carries `redirect_from` in exactly the shape the
+  `jekyll-redirect-from` plugin reads, merging both kinds of old address,
+  so on a Jekyll site every URL a post ever had goes on answering. What
+  markdown has no syntax for -- a link card, an embed whose address the
+  engine cannot recognise -- is written as HTML and *counted in the
+  summary*, because imported back it arrives as text rather than as
+  blocks. Everything else the engine keeps and no other engine has a word
+  for travels under one `blogsh:` key, which `./import.sh` reads back:
+  posts keep their identity, series, redirects and announcement URLs, so
+  export plus re-import moves an installation instead of merely leaving
+  one.
 - **Editing a post is undoable.** The previous text is kept before an
   overwrite, by an edit or by a re-import, and `[v]` in the `props` dialog
   puts one back. Ten per post, oldest dropped; they travel to the trash
@@ -143,6 +165,19 @@ byte-for-byte against the previous build.
 
 ### Fixed
 
+- **A markdown tree's pages are no longer walked past.** The importer
+  read `_posts/` and `_drafts/` and nothing else, so a Jekyll site's
+  pages -- `about.md`, `colophon.md`, which live in the root by
+  convention -- were the one thing a tree could hold that never arrived.
+  Root-level markdown is now read too, minus the names that are never a
+  page (`index`, `404`, `feed`, `sitemap`, and friends). It also means an
+  archive exported from this engine comes back a page short of nothing.
+- **A re-imported post no longer collects a platform tag it has already
+  got.** The tag is skipped for a post whose front matter carries its own
+  `blogsh:` history, so exporting and importing back does not pin a
+  "jekyll" pill on the whole archive -- or worse, one naming the platform
+  the post left years ago, which is what `source.platform` would have
+  provided.
 - **`hero:` survived a save.** It shipped in this cycle as a post-level
   override and an edit threw it away: `edit_post` rebuilds a post from its
   frontmatter and then carries over a named list of fields that cannot be

@@ -312,6 +312,22 @@ pattern (`PERMALINK='/:year/:month/:day/:title/'`, the wizard asks) to
 keep permalinks; a post's explicit front matter `permalink` always
 wins, and without either, no redirect is guessed at.
 
+Pages count too: markdown in the root of the tree (`about.md`,
+`colophon.md` -- where Jekyll keeps its pages) is read alongside
+`_posts/` and `_drafts/`, minus the names that are never a page
+(`index`, `404`, `feed`, `sitemap` and friends).
+
+**A tree written by `./blog.sh export` comes back whole.** Its front
+matter carries a `blogsh:` block, which this importer reads: the post's
+`source` (so a re-import lands on the same post instead of doubling it),
+its series, redirects, former addresses, announcement URLs, a draft's
+token. Such a post also gets no platform tag -- it is coming home, not
+arriving from Jekyll. That makes export + import the supported way to
+move an installation between machines or hosts. The only thing not
+restored is what the export could not write as markdown in the first
+place: a link card and an unrecognised embed come back as the HTML text
+they were written as (the export says how many, per type).
+
 The pattern understands `:year`, `:month`, `:day`, `:title` and
 `:slug`, and nothing else -- anything further is left in the address
 exactly as you typed it. That matters because copying Jekyll's own

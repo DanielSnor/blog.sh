@@ -328,6 +328,8 @@ cli:
       ./blog.sh doctor [--online] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
       ./blog.sh check                projde archiv a řekne, co je v něm rozbité
+      ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
+                                     zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -761,6 +763,21 @@ check:
   summary: "Problémů: %{errors}, věcí ke kouknutí: %{warnings}."
   summary_clean: "Archiv je v pořádku."
 
+export:
+  heading: "Zapisuju archiv do %{path}"
+  progress: "Zapisuju posty: %{done}/%{total}"
+  unknown_option: "Neznámý přepínač: %{option}. export bere adresář, --no-drafts, --dry-run a --force."
+  target_not_empty: "%{path} není prázdný."
+  target_not_empty_fix: "Zadej prázdný adresář, nebo zopakuj s --force a zapíše se vedle toho, co tam už je. Nic se v žádném případě nemaže."
+  dry_run_notice: "Nanečisto: všechno se spočítá, nic se nezapíše."
+  no_drafts_notice: "Rozepsané zůstávají doma — ven jdou jen publikované posty a stránky."
+  no_posts: "Zatím není co exportovat."
+  summary: "Zapsáno do %{path}: %{posts} postů, %{drafts} rozepsaných, %{pages} stránek a %{media} souborů médií (%{size})."
+  summary_dry: "Zapsalo by se do %{path}: %{posts} postů, %{drafts} rozepsaných, %{pages} stránek a %{media} souborů médií (%{size})."
+  fallback_note: "%{count} bloků, pro které markdown nemá zápis, se zapsalo jako HTML: %{kinds}. Každý engine, který HTML propouští, je vykreslí — ale při zpětném načtení přijdou jako text, ne jako bloky."
+  collisions: "%{count} souborů se přejmenovalo, aby se nepřepsaly navzájem — dva posty chtěly stejné jméno souboru."
+  next_steps: "Rozvržení je jekyllovské: _posts/, _drafts/, stránky v kořeni, média pod assets/. Hugo, Eleventy i Astro ho přečtou po jednom řádku konfigurace; ./import.sh ho přečte tak, jak je."
+
 setup:
   intro: "Zeptám se na nastavení, která web potřebuje k provozu, odpovědi cestou ověřím a zapíšu je do config/site.yml a env.sh."
   intro_skip: "Každou otázku jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."
@@ -892,6 +909,7 @@ style:
   menu_social: "Sociální sítě — řádek ikon v patičce a ověření na Mastodonu"
   menu_widgets: "Postranní panel — tooty, Pixelfed, commity, Bluesky, jakýkoli RSS feed"
   menu_fonts: "Písma — písmo a velikost názvu a popisu na hlavičce"
+  menu_layout: "Rozvrzeni - ktere casti stranky vubec jsou, a vlastni stylopis"
   menu_nav: "Menu — co stojí v pruhu pod bannerem"
   menu_analytics: "Měření návštěvnosti — skript, jestli nějaký máš"
 
@@ -1050,6 +1068,17 @@ style:
   nav_tag_unknown: "Štítek %{tag} nemá žádný post, jeho výpis se nestaví a položka by byla 404."
   nav_url_unknown: "Na %{url} tenhle web nic nevydává, položka by byla 404."
   q_nav_anyway: "Přidat ji přesto?"
+  q_layout_sidebar: "Postranní panel vpravo (bio, widgety, statistiky u postu)?"
+  q_layout_nav_bottom: "Zopakovat menu i pod obsahem?"
+  q_layout_hero: "Vytáhnout první obrázek postu nad titulek?"
+  css_current: "Vlastní stylopisy, v pořadí načítání:"
+  q_css_action: "Přidat stylopis, odebrat, nebo nechat být?"
+  q_css_file: "Cesta ke stylopisu na tomhle webu"
+  h_css_file: "Například /assets/css/skin.css. Soubor patří do assets/css/ a načte se až za stylopisem enginu, takže ho přebíjí."
+  css_missing_mark: "⚠️  soubor tam není"
+  css_not_found: "Soubor %{path} na disku není — prohlížeč ho prostě nedostane a web se vykreslí bez něj."
+  q_css_anyway: "Přidat ho přesto?"
+  css_remote: "Jen cesty na tomhle webu. Stránky nesou style-src 'self', takže stylopis z cizího serveru prohlížeč zahodí bez jediné hlášky."
   nav_url_relative: "%{url} není adresa — bez lomítek to prohlížeč čte proti stránce, na které menu zrovna stojí."
   q_nav_use_absolute: "Zapsat jako %{url}?"
   h_nav_tag_empty: "Jméno štítku, ne adresa. Zatím není nic oštítkované, takže není co nabídnout."

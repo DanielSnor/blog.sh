@@ -146,8 +146,17 @@ module Import
       # one: "feed" says nothing about where a post came from, where
       # "medium.com" says all of it. source.platform stays what it is --
       # the kind of source, and half the re-import dedup key.
-      platform = if @adapter.respond_to?(:platform_tag) && @adapter.platform_tag
-                   @adapter.platform_tag.to_s
+      platform = if @adapter.respond_to?(:platform_tag)
+                   tag = @adapter.platform_tag
+                   # An adapter that HAS the method and still answers nil
+                   # is saying this post wants no platform tag at all --
+                   # not "fall back to source.platform". A tree written by
+                   # `./blog.sh export` carries its own source, so
+                   # importing it back would otherwise pin every post with
+                   # a pill for the platform it left years ago.
+                   return if tag.nil?
+
+                   tag.to_s
                  else
                    post.dig('source', 'platform').to_s
                  end

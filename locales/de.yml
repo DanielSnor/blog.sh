@@ -330,6 +330,8 @@ cli:
       ./blog.sh doctor [--online] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
       ./blog.sh check                geht das Archiv durch und nennt, was darin kaputt ist
+      ./blog.sh export [<Verzeichnis>] [--no-drafts] [--dry-run] [--force]
+                                     schreibt das ganze Archiv als Baum von Markdown-Dateien (Standard tmp/export)
       ./blog.sh help                 zeigt diese Hilfe
       ./blog.sh version              gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
@@ -765,6 +767,21 @@ check:
   summary: "%{errors} Problem(e), %{warnings} Sache(n) zum Nachsehen."
   summary_clean: "Das Archiv ist in Ordnung."
 
+export:
+  heading: "Das Archiv wird nach %{path} geschrieben"
+  progress: "Beiträge geschrieben: %{done}/%{total}"
+  unknown_option: "Unbekannte Option: %{option}. export kennt ein Verzeichnis, --no-drafts, --dry-run und --force."
+  target_not_empty: "%{path} ist nicht leer."
+  target_not_empty_fix: "Gib ein leeres Verzeichnis an oder wiederhole mit --force, dann wird neben dem Vorhandenen geschrieben. Gelöscht wird in keinem Fall etwas."
+  dry_run_notice: "Trockenlauf: Es wird alles gezählt und nichts geschrieben."
+  no_drafts_notice: "Entwürfe bleiben zu Hause -- nach draußen gehen nur veröffentlichte Beiträge und Seiten."
+  no_posts: "Es gibt noch nichts zu exportieren."
+  summary: "Nach %{path} geschrieben: %{posts} Beitrag/Beiträge, %{drafts} Entwurf/Entwürfe, %{pages} Seite(n) und %{media} Mediendatei(en) (%{size})."
+  summary_dry: "Nach %{path} geschrieben würde: %{posts} Beitrag/Beiträge, %{drafts} Entwurf/Entwürfe, %{pages} Seite(n) und %{media} Mediendatei(en) (%{size})."
+  fallback_note: "%{count} Block/Blöcke, für die Markdown keine Schreibweise hat, wurden als HTML geschrieben: %{kinds}. Jede Engine, die HTML durchreicht, stellt sie dar -- beim Zurücklesen kommen sie jedoch als Text an, nicht als Blöcke."
+  collisions: "%{count} Datei(en) wurden umbenannt, damit sie sich nicht gegenseitig überschreiben -- zwei Beiträge wollten denselben Dateinamen."
+  next_steps: "Der Aufbau ist der von Jekyll: _posts/, _drafts/, Seiten im Wurzelverzeichnis, Medien unter assets/. Hugo, Eleventy und Astro lesen ihn mit einer Zeile Konfiguration; ./import.sh liest ihn, wie er ist."
+
 setup:
   intro: "Hier werden die Einstellungen abgefragt, die eine Website zum Laufen braucht. Die Antworten werden unterwegs geprüft und in config/site.yml und env.sh geschrieben."
   intro_skip: "Jede Frage lässt sich überspringen -- Enter übernimmt den darunter vorausgefüllten Wert. Nichts wird geschrieben, bevor du alle Änderungen zusammen gesehen und bestätigt hast."
@@ -896,6 +913,7 @@ style:
   menu_social: "Soziale Netzwerke -- die Icon-Reihe in der Fußzeile und die Mastodon-Verifizierung"
   menu_widgets: "Seitenleiste -- Toots, Pixelfed, Commits, Bluesky, jeder RSS-Feed"
   menu_fonts: "Schriften -- Schrift und Größe von Name und Beschreibung auf dem Banner"
+  menu_layout: "Layout -- welche Bereiche der Seite es gibt, und dein eigenes Stylesheet"
   menu_nav: "Menüleiste -- was im Streifen unter dem Banner steht"
   menu_analytics: "Statistik -- das Skript, falls du eines betreibst"
 
@@ -1054,6 +1072,17 @@ style:
   nav_tag_unknown: "Kein Beitrag trägt das Schlagwort %{tag}, dessen Liste wird nicht gebaut und der Eintrag wäre ein 404."
   nav_url_unknown: "Diese Website liefert unter %{url} nichts aus, der Eintrag wäre ein 404."
   q_nav_anyway: "Trotzdem hinzufügen?"
+  q_layout_sidebar: "Die rechte Spalte (Bio, Widgets, Beitragszahlen)?"
+  q_layout_nav_bottom: "Das Menü auch unter dem Inhalt wiederholen?"
+  q_layout_hero: "Das erste Bild eines Beitrags über den Titel heben?"
+  css_current: "Eigene Stylesheets, in Ladereihenfolge:"
+  q_css_action: "Stylesheet hinzufügen, entfernen oder so lassen?"
+  q_css_file: "Pfad zu einem Stylesheet auf dieser Website"
+  h_css_file: "Zum Beispiel /assets/css/skin.css. Die Datei gehört nach assets/css/ und lädt nach dem eigenen des Motors, überschreibt es also."
+  css_missing_mark: "⚠️  Datei fehlt"
+  css_not_found: "%{path} liegt nicht auf der Platte -- der Browser bekommt es schlicht nie und die Seite wird ohne gerendert."
+  q_css_anyway: "Trotzdem hinzufügen?"
+  css_remote: "Nur Pfade auf dieser Website. Jede Seite trägt style-src 'self', ein Stylesheet auf fremdem Host verwirft der Browser wortlos."
   nav_url_relative: "%{url} ist keine Adresse -- ohne Schrägstriche liest der Browser das gegen die Seite, auf der das Menü steht."
   q_nav_use_absolute: "Als %{url} schreiben?"
   h_nav_tag_empty: "Der Name des Schlagworts, nicht die Adresse. Noch ist nichts verschlagwortet, es gibt nichts anzubieten."

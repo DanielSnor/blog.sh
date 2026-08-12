@@ -51,13 +51,20 @@ dedup by `source`).
 | `state` | `"published"` \| `"draft"` | absent = published |
 | `draft_token` | string | drafts only -- the hidden preview URL segment |
 | `created_at` | string | drafts only -- publish-time "was the date edited?" check |
-| `type` | string | explicit dominant content type; absent = derived from blocks |
+| `type` | string | explicit dominant content type; absent = derived from blocks. `type: page` is not a content type but the way a page is written -- see `page` below |
 | `source` | object | `platform` plus optionally `account`, `original_id` -- the re-import dedup key |
 | `mastodon_url` | string | the post's comment toot (Mastodon sites), set on publish/`toot` |
 | `bluesky_url` | string | the announcement's human link (Bluesky sites), set on publish/`bluesky` |
 | `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
 | `former_slugs` | array of strings | every address the post used to have, as `"year/slug"` frozen at rename time; the build emits a redirect stub for each (see `props` → rename). Engine-side history like the announcement URLs: edits and re-imports carry it over untouched |
 | `unpublished_from` | string | drafts only -- the `"year/slug"` address the post vacated when it was unpublished. Publishing consumes it: back under a different slug it becomes a `former_slugs` redirect, back under the same one it just disappears |
+| `series` | string | the series this post belongs to; the build gives every series its own listing at `/series/<slug>/` and puts "part 2 of 5" navigation on the post |
+| `series_part` | integer | position within the series -- without it, parts are ordered by date, which is the usual case; the number is for the rare insert |
+| `pinned` | string/boolean | one post held at the top of the front page. Truth test is strict (`true`/`yes`/`1`), so a hand-edited `false` cannot pin by accident; more than one pinned post warns and the newest wins. Listings past page one, the archives and the feeds ignore it |
+| `toc` | string/boolean | table of contents on the post page. Absent = automatic (from 4 headings up); an explicit false suppresses it, an explicit true forces it below that threshold |
+| `hero` | string/boolean | whether the first non-degenerate image runs full width above the post. Absent = whatever `layout.hero` says for the whole site |
+| `scheduled` | boolean | set on a draft whose `date` is its future publish time; the `publish-scheduled` cron publishes it then and drops the key |
+| `page` | boolean | a page rather than a post: a permanent address (`/<slug>/`), out of the listings, the archives and the feed, but in the sitemap and the search index. Written as `type: page` in front matter; `page: true` is the older spelling and is still read |
 | `redirect_from` | array of strings | site-root paths the post answered at on its PREVIOUS platform (`"/old-post/"`, `"/2009/05/old-post.html"`), written by importers when the new site keeps the old domain. The build emits a redirect stub for each, after everything real -- a live page, listing or site file always wins over a stub, out loud. Deliberately separate from `former_slugs`: that is rename history inside this site, this is where the post lived before it arrived. Paths ending `.html`/`.htm` become literal files (Blogger-era URLs had no trailing slash); first segments the site itself owns (`posts`, `page`, `tag`, `type`, `assets`, `search`, `markdown`) are refused. Published posts only; edits and re-imports carry it over untouched |
 
 **Blocks** (`content` array entries), by `type`:
@@ -206,6 +213,48 @@ with illustrations, i.e. text), `lib/media_dimensions.rb`
 included, so a photo taken sideways reserves the space it is shown at),
 `lib/video_probe.rb` (the video track's codec from the same box walk, two
 levels further down at `stsd`, so a save can say that a clip is HEVC).
+
+## Exporting (`lib/exporter.rb`)
+
+The mirror of the importers, and a much smaller thing: one source (this
+archive), one destination format, no adapters. `./blog.sh export` walks
+`content.nosync` and writes a Jekyll-shaped tree -- `_posts/<date>-<slug>.md`,
+`_drafts/<slug>.md`, pages at the root, media copied under
+`assets/<year>/<slug>/`. It only reads: nothing in the archive is
+touched, which is what lets it be the one command that still works on an
+installation somebody is leaving (hence its own entry point in
+`scripts/export.rb`, needing neither `env.sh` nor a config that parses).
+
+Three details carry the design:
+
+- **Its own front matter writer, deliberately not the CLI's.**
+  `build_frontmatter` in `scripts/manage_post.rb` is not YAML and does
+  not try to be: its reader (`MarkdownParser.parse_frontmatter`) splits
+  on the first colon and quotes nothing, which is right for a human
+  editing one post. Every reader downstream of an *export* -- Jekyll,
+  Hugo, `Import::Jekyll` -- uses a real YAML parser, where an unquoted
+  title containing a colon is a syntax error that takes the whole post
+  with it. The exporter therefore dumps through Psych with
+  `line_width: -1` (a folded long title is valid YAML and unreadable).
+- **Blocks markdown cannot write down become HTML, and get counted.**
+  `MarkdownWriter` drops what it has no syntax for -- the link card, an
+  imported embed with no recognisable address -- which is correct for
+  `edit`, where the CLI's loss guard stands behind it, and wrong for an
+  export. So the exporter renders block by block (the writer keeps no
+  state between blocks, so this is equivalent) and gives anything that
+  came back empty the same HTML the build renders. Counted per type and
+  said out loud, because read back in they are text, not blocks.
+- **`blogsh:` is the round-trip.** Everything no other engine has a word
+  for goes under that one key -- `source` above all, which is half the
+  re-import dedup key. `Import::Jekyll` reads it back (whitelisted, never
+  merged), which turns export + import into a way to move an
+  installation. A post carrying it also gets no platform tag: a tree that
+  came from here and goes back must not collect a "jekyll" pill per
+  round.
+
+What is deliberately lost: `small`/`mention`/`color` spans keep their
+text and lose their styling, and a draft's preview URL is not exported
+(it is a private address, not a permalink).
 
 ## Build pipeline (`build/build_blog.rb`)
 

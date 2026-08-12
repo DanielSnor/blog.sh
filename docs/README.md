@@ -21,6 +21,7 @@ guides that go deeper:
 | Setting up a site | [install.md](install.md), top to bottom |
 | Writing and publishing posts | [operations.md → Writing and publishing](operations.md#writing-and-publishing) |
 | Moving content in from elsewhere | [importing.md](importing.md), then `./import.sh` |
+| Taking content out, or moving the whole site | [operations.md → Taking your content elsewhere](operations.md#taking-your-content-elsewhere), then `./blog.sh export` |
 | Something failed | [operations.md → Troubleshooting](operations.md#troubleshooting) |
 | Understanding the internals | [architecture.md](architecture.md), then the source -- every `lib/` file opens with a design comment |
 | Translating the engine | [localization.md](localization.md) -- a partial locale is useful from day one |

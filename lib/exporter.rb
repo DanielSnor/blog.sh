@@ -99,8 +99,9 @@ module Exporter
   def export_post(post, root:, target:, taken:, dry_run:, result:)
     year = post['__year'].to_s
     slug = post['slug'].to_s
-    name = file_name(post, slug, taken, result)
-    path = File.join(target, *dir_for(post), name)
+    dir = dir_for(post)
+    name = file_name(post, slug, dir, taken, result)
+    path = File.join(target, *dir, name)
     media_rel = "/#{ASSETS}/#{year}/#{slug}"
 
     body, fallbacks = render_blocks(post['content'], media_rel)
@@ -128,7 +129,7 @@ module Exporter
     draft?(post) ? ['_drafts'] : ['_posts']
   end
 
-  def file_name(post, slug, taken, result)
+  def file_name(post, slug, dir, taken, result)
     base = if page?(post) || draft?(post)
              slug
            else
@@ -136,15 +137,18 @@ module Exporter
            end
     # Slugs are unique across the archive, so this is a belt-and-braces
     # count rather than an expected case -- but two files silently
-    # becoming one is the sort of loss an export must never take.
+    # becoming one is the sort of loss an export must never take. Keyed
+    # by directory as well as name: a draft and a page may share a slug
+    # without sharing a file, and renaming one of those would be a
+    # collision reported where there is none.
     name = base
     suffix = 1
-    while taken[name]
+    while taken[File.join(*dir, name)]
       suffix += 1
       name = "#{base}-#{suffix}"
       result.collisions += 1
     end
-    taken[name] = true
+    taken[File.join(*dir, name)] = true
     "#{name}.md"
   end
 
@@ -220,12 +224,15 @@ module Exporter
       %(<p class="link-block"><a href="#{link}"><strong>#{title}</strong></a><br>#{description}</p>)
     when 'video', 'audio'
       embed = block['embed_html'].to_s
-      next_best = block['url'].to_s
+      address = block['url'].to_s
+      # Falls through to the <pre> below when there is neither an embed
+      # nor an address: a block counted as "written as HTML" that wrote
+      # nothing would be a lie told by the summary itself.
       if !embed.strip.empty? then embed
-      elsif !next_best.empty?
-        %(<p><a href="#{escape_html(next_best)}">#{escape_html(next_best)}</a></p>)
+      elsif !address.empty?
+        %(<p><a href="#{escape_html(address)}">#{escape_html(address)}</a></p>)
       else
-        ''
+        "<pre>#{escape_html(block.to_json)}</pre>"
       end
     else
       # What the build does with a block type it does not know: show it

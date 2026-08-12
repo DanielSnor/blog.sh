@@ -399,6 +399,97 @@ end
 
 # --- words -----------------------------------------------------------
 
+# Which regions of the page exist at all, and the stylesheet that dresses
+# what is left. Both belong to the same moment -- the one where the
+# engine's own look is not the look you want -- so they are one section
+# rather than two entries in the menu.
+#
+# Every switch is asked with the site's current answer as the default, and
+# an unset key means the engine's own: sidebar and the repeated bottom menu
+# on, the lead image off. Pressing Enter through the section therefore
+# changes nothing, which is the rule the menu section had to learn the
+# hard way.
+def section_layout
+  sidebar = Wizard.confirm(t('q_layout_sidebar'), default: current.dig('layout', 'sidebar') != false)
+  site.set(%w[layout sidebar], sidebar)
+
+  nav_bottom = Wizard.confirm(t('q_layout_nav_bottom'), default: current.dig('layout', 'nav_bottom') != false)
+  site.set(%w[layout nav_bottom], nav_bottom)
+
+  hero = Wizard.confirm(t('q_layout_hero'), default: current.dig('layout', 'hero') == true)
+  site.set(%w[layout hero], hero)
+
+  puts
+  section_extra_css
+end
+
+# The skin. A list, in load order, of stylesheets the browser gets after
+# the engine's own -- which is what lets a site look like something else
+# without editing a template and losing the edit to the next git pull.
+def section_extra_css
+  entries = current.dig('site', 'extra_css')
+  entries = [] unless entries.is_a?(Array)
+  entries = entries.map(&:to_s)
+  touched = false
+
+  loop do
+    puts Tui.paint(t('css_current'), :bold)
+    if entries.empty?
+      puts Tui.paint("   #{t('list_empty')}", :dim)
+    else
+      entries.each_with_index { |e, i| puts "   #{i + 1}) #{e}#{css_exists?(e) ? '' : "  #{t('css_missing_mark')}"}" }
+    end
+    puts
+
+    options = [['add', t('list_add')]]
+    options << ['remove', t('list_remove')] unless entries.empty?
+    options << ['keep', t('list_keep')]
+    case Wizard.choose(t('q_css_action'), options, current_index: options.size - 1)
+    when 'add'
+      entry = ask_css_entry
+      next unless entry
+
+      entries << entry
+      touched = true
+    when 'remove'
+      entries = remove_from(entries) { |e| e }
+      touched = true
+    else
+      break
+    end
+  end
+
+  site.set_list(%w[site extra_css], entries) if touched
+  puts
+end
+
+def css_exists?(href)
+  File.file?(File.join(ROOT, href.to_s.sub(%r{\A/}, '')))
+end
+
+# Two things are worth saying before the answer is taken, because both
+# fail silently on the finished page: a stylesheet on another host is
+# discarded by the browser (every page carries style-src 'self'), and a
+# path that is not there simply never arrives.
+def ask_css_entry
+  answer = Wizard.ask(t('q_css_file'), '', hint: t('h_css_file')).to_s.strip
+  return nil if answer.empty?
+
+  href = answer.start_with?('/') ? answer : "/#{answer}"
+  if href.include?('://')
+    puts Tui.paint("   #{t('css_remote')}", :yellow)
+    puts
+    return nil
+  end
+
+  unless css_exists?(href)
+    puts Tui.paint("   #{t('css_not_found', path: href)}", :yellow)
+    return nil unless Wizard.confirm(t('q_css_anyway'))
+  end
+
+  href
+end
+
 def section_about
   heading = Wizard.ask(t('q_about_heading'), current.dig('about', 'heading'), hint: t('h_about_heading'),
                        suggested: template?('about', 'heading'))
@@ -776,6 +867,7 @@ SECTIONS = [
   ['palette', 'section_palette'],
   ['banner', 'section_banner'],
   ['fonts', 'section_fonts'],
+  ['layout', 'section_layout'],
   ['nav', 'section_nav'],
   ['about', 'section_about'],
   ['widgets', 'section_widgets'],

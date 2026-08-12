@@ -52,6 +52,7 @@ MIT licensed (see [LICENSE](LICENSE)).
 [Authoring](#blogsh----authoring) ·
 [Configuration](#configuration-envsh-per-deployment-never-in-git) ·
 [Importing existing content](#importing-existing-content) ·
+[Exporting](#exporting) ·
 [Deploy](#deploy) · [Roadmap](#roadmap) ·
 [Example deployments](#example-deployments)
 
@@ -357,6 +358,9 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
+./blog.sh check                # walks the archive and says what is broken in it
+./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+                               # writes the whole archive out as a tree of markdown files
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```
@@ -473,6 +477,41 @@ Two limits worth knowing before you start: only a Bluesky self-thread's
 opening post is imported (the continuations are replies), and Bluesky
 serves video as an HLS playlist rather than a file, so a video post is
 imported as its poster frame with the original linked from `source`.
+
+## Exporting
+
+```bash
+./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+```
+
+The other direction, and the point of the twenty-two importers: an
+archive you cannot take with you is not yours. This writes the whole
+thing out as a tree of markdown files with YAML front matter, in
+Jekyll's layout because that is the one the most other engines read --
+`_posts/2026-05-01-slug.md`, `_drafts/slug.md`, pages at the root, media
+copied under `assets/<year>/<slug>/`. Without a directory it writes to
+`tmp/export`. `--dry-run` counts everything and writes nothing. Nothing
+is ever deleted, and a target with something already in it is refused
+until the command is repeated with `--force`.
+
+The front matter comes in three layers: what every engine understands
+(`title`, `date`, `tags`, `published`), what some do (`permalink`, plus
+`redirect_from` in exactly the shape the `jekyll-redirect-from` plugin
+reads -- so every address a post has ever had, on the old platform and
+on this site, goes on answering), and under a single `blogsh:` key what
+only this engine has a word for: `source`, `former_slugs`, the
+announcement URLs, a draft's token. A destination engine ignores that
+last layer. `./import.sh` reads it back, which is what makes export plus
+re-import a way to *move* an installation rather than only a way to
+leave one.
+
+Two things markdown cannot write down are written as HTML instead: the
+link card, and an embed imported from a platform whose address the
+engine does not recognise. Any engine that passes HTML through renders
+them -- but they are counted in the summary, because read back in they
+arrive as text rather than as blocks. Inline `small`, `mention` and
+`color` spans keep their text and lose their styling, for the same
+reason.
 
 ## Deploy
 
