@@ -6,6 +6,7 @@ require 'uri'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
+require_relative 'pages_note'
 require_relative 'permalinks'
 
 module Import
@@ -31,6 +32,7 @@ module Import
       @site_url = site_url.to_s.sub(%r{/+\z}, '')
       @keep_permalinks = keep_permalinks
       @scheduled = 0
+      @page_paths = []
     end
 
     def label
@@ -84,7 +86,10 @@ module Import
           'original_id' => item['id']
         }
       }
-      post['page'] = true if is_page
+      if is_page
+        post['page'] = true
+        @page_paths << "/#{post['slug']}/"
+      end
       if @keep_permalinks && state == 'published'
         path = Permalinks.local_path(post_url(item))
         # A page already lands at the root, so on Ghost -- where a page
@@ -97,9 +102,11 @@ module Import
     end
 
     def postscript
-      return nil if @scheduled.zero?
-
-      I18n.t('import.note.ghost_scheduled', count: @scheduled)
+      notes = []
+      notes << I18n.t('import.note.ghost_scheduled', count: @scheduled) if @scheduled.positive?
+      notes << Import.pages_note(@page_paths)
+      notes.compact!
+      notes.empty? ? nil : notes.join("\n  ")
     end
 
     private

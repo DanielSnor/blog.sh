@@ -6,6 +6,7 @@ require_relative '../feed_http'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
+require_relative 'pages_note'
 require_relative 'xml_repair'
 require_relative 'permalinks'
 
@@ -54,6 +55,7 @@ module Import
       @source = source
       @keep_permalinks = keep_permalinks
       @unmapped_permalinks = 0
+      @page_paths = []
     end
 
     def label
@@ -152,7 +154,10 @@ module Import
       # importer reads. Drafts never had a public address, and a plain
       # "?p=123" permalink has its identity in the query string, which a
       # static stub can never answer -- those are counted, not guessed at.
-      post['page'] = true if is_page
+      if is_page
+        post['page'] = true
+        @page_paths << "/#{post['slug']}/"
+      end
       if @keep_permalinks && state == 'published'
         path = Permalinks.local_path(item_link(item))
         # A page that already lived at the root keeps that very address
@@ -176,6 +181,8 @@ module Import
         notes << I18n.t('import.note.feed_controls_dropped', count: @repaired.controls)
       end
       notes << I18n.t('import.note.feed_unmapped', count: @unmapped_permalinks) if @unmapped_permalinks.positive?
+      notes << Import.pages_note(@page_paths)
+      notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
     end
 

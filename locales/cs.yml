@@ -549,6 +549,8 @@ import:
   # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
   # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.
   note:
+    pages_imported: "Stránek se přeneslo %{count} a leží na %{paths}. Zatím na ně nic na webu neodkazuje — menu se odvozuje z typů obsahu, dokud neřekneš jinak, takže je přidej pod `nav:` v config/site.yml, jestli tam patří."
+    pages_and_more: " a dalších %{count}"
     ssg_images_freed: "Obrázků uvnitř řádku textu, kde je post neumí ukázat: %{count} — každý dostal vlastní řádek, a obrázek, který byl jen ozdobou odkazu, se stal jeho textem."
     ssg_liquid_links_dropped: "Odkazů adresovaných přes Liquid ({{ site.repository }}, {% link %}, {% post_url %}): %{count} — taková adresa mimo Jekyll nic neznamená. Slova zůstala, adresa šla pryč; lepší než odkaz mířící na stránku tohohle blogu, která tu nikdy nebyla."
     substack_paid: "Postů jen pro předplatitele Substacku: %{count} — naimportovány celé (export je tvůj) a označené štítkem „substack-paid“, ať je před publikací najdeš."

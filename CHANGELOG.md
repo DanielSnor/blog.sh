@@ -54,7 +54,12 @@ byte-for-byte against the previous build.
   looked complete. Where the source served a page at the same address
   this engine now does (Ghost, WordPress), no redirect is written: it
   would point the page at itself. A page in a WordPress trash stays in
-  the trash, like any trashed post.
+  the trash, like any trashed post. The import then SAYS how many pages
+  came across and where they are, and that nothing links to them yet --
+  a fresh site derives its menu from content types, and the engine will
+  not write a `nav:` key on your behalf, because its absence is what
+  means "derive the menu": adding two entries would replace the whole
+  thing with a hand-written list.
 - **A 404 page.** Built by the site rather than left to the host's
   default, so a mistyped address lands somewhere with the menu and the
   search field on it. noindex.

@@ -8,6 +8,7 @@ require 'uri'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
+require_relative 'pages_note'
 require_relative 'permalinks'
 
 module Import
@@ -41,6 +42,7 @@ module Import
       @site_url = site_url.to_s.sub(%r{/+\z}, '')
       @keep_permalinks = keep_permalinks
       @paid = 0
+      @page_paths = []
     end
 
     def label
@@ -73,6 +75,7 @@ module Import
       # same instance it then imports with, and a counter that only grows
       # reported every paid post twice.
       @paid = 0
+      @page_paths = []
       # Oldest first, numeric id as the tiebreaker -- the export's own
       # order is not guaranteed, and imported slugs collide less
       # confusingly when the earlier post got there first.
@@ -127,7 +130,10 @@ module Import
           'original_id' => numeric_id(item)
         }.compact
       }
-      post['page'] = true if is_page
+      if is_page
+        post['page'] = true
+        @page_paths << "/#{slug}/"
+      end
       # Substack serves a page at /p/<slug> like everything else, so the
       # old address is a real one to keep even for a page -- unlike Ghost
       # or WordPress, where it would be the address the page now has.
@@ -136,12 +142,14 @@ module Import
     end
 
     def postscript
-      return nil if @paid.zero?
+      notes = [Import.pages_note(@page_paths)]
+      return notes.compact.first if @paid.zero?
 
       # lookup rather than t: a missing key aborts, and no summary line is
       # worth failing an import that has already written everything. The
       # posts carry PAID_TAG either way, so the fact is never lost.
-      I18n.t('import.note.substack_paid', count: @paid)
+      notes << I18n.t('import.note.substack_paid', count: @paid)
+      notes.compact.join("\n  ")
     end
 
     private

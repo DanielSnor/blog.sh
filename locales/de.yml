@@ -556,6 +556,8 @@ import:
   # Adapter-Postscripts -- die Hinweise unter Vorschau und Zusammenfassung. Der
   # Skript-Weg (migrate_*.rb) gibt sie auf Englisch aus, siehe lib/import/cli.rb.
   note:
+    pages_imported: "%{count} Seite(n) kamen mit und liegen unter %{paths}. Noch verweist nichts auf der Website auf sie -- das Menü wird aus deinen Inhaltstypen abgeleitet, solange du nichts anderes sagst; trage sie also unter `nav:` in config/site.yml ein, wenn sie dorthin gehören."
+    pages_and_more: " und %{count} weitere"
     ssg_images_freed: "%{count} Bild(er) standen mitten in einer Textzeile, wo ein Beitrag sie nicht zeigen kann -- jedes bekam eine eigene Zeile, und ein Bild, das nur Zierde eines Links war, wurde zum Linktext."
     ssg_liquid_links_dropped: "%{count} Link(s) waren über Liquid adressiert ({{ site.repository }}, {% link %}, {% post_url %}) -- eine Adresse, die außerhalb von Jekyll nichts bedeutet. Die Worte blieben, die Adresse fiel weg, statt auf eine Seite dieses Blogs zu zeigen, die es nie gab."
     substack_paid: "%{count} Beitrag/Beiträge waren auf Substack nur für Abonnenten -- vollständig importiert (der Export gehört dir) und mit \"substack-paid\" getaggt, damit du sie vor dem Veröffentlichen findest."

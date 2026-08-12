@@ -561,6 +561,8 @@ import:
   # Adapter postscripts -- the notes under the preview and the summary. The
   # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.
   note:
+    pages_imported: "%{count} page(s) came across and are at %{paths}. Nothing on the site links to them yet -- the menu is derived from your content types until you say otherwise, so add them under `nav:` in config/site.yml if they belong there."
+    pages_and_more: " and %{count} more"
     ssg_images_freed: "%{count} image(s) sat inside a line of text, where a post cannot show them -- each was moved onto a line of its own, and a picture that was only a link's decoration became the link's text."
     ssg_liquid_links_dropped: "%{count} link(s) were addressed through Liquid ({{ site.repository }}, {% link %}, {% post_url %}) -- an address that means nothing outside Jekyll. The words were kept and the address dropped, rather than left pointing at a page of this blog that was never there."
     substack_paid: "%{count} post(s) were subscribers-only on Substack -- imported in full (the export is yours) and tagged \"substack-paid\", so you can find them before you publish."
