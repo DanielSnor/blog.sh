@@ -82,7 +82,7 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned hero page].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero page series series_part toc].freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -609,7 +609,8 @@ def hero_frontmatter_value(post)
   SITE_HERO ? true : nil
 end
 
-def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil)
+def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
+                      series: nil, series_part: nil, toc: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
@@ -624,6 +625,9 @@ def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil)
   # has already said something of its own.
   lines << "hero: #{hero}" unless hero.nil?
   lines << "page: #{page}" unless page.nil?
+  lines << "series: #{series}" unless series.nil?
+  lines << "series_part: #{series_part}" unless series_part.nil?
+  lines << "toc: #{toc}" unless toc.nil?
   lines << '---'
   "#{lines.join("\n")}\n\n"
 end
@@ -2071,7 +2075,12 @@ def edit_post(slug, path: nil)
     # its address, so it is not something to hand somebody as a checkbox
     # on every edit. Shown when set, so that saving cannot silently
     # un-page a page.
-    page: truthy_frontmatter?(post['page']) ? true : nil
+    page: truthy_frontmatter?(post['page']) ? true : nil,
+    # Both shown only when set, for the reason the pin is: a key on every
+    # new post suggests every post needs an answer, and almost none do.
+    series: post['series'].to_s.strip.empty? ? nil : post['series'].to_s.strip,
+    series_part: post['series_part'],
+    toc: post['toc'].nil? ? nil : truthy_frontmatter?(post['toc'])
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
@@ -2165,6 +2174,16 @@ def edit_post(slug, path: nil)
     updated['hero'] = hero_wanted unless hero_wanted == SITE_HERO
   end
   updated['page'] = true if truthy_frontmatter?(meta['page'])
+  # Written as typed: the series name is a display name (the slug for its
+  # address is derived at build time), and the part number is an override
+  # for the rare post published out of order.
+  updated['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
+  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  updated['series_part'] = part if part
+  # Only stored when it disagrees with the engine's own judgement, so the
+  # ordinary post carries no line about a table of contents it was never
+  # going to have.
+  updated['toc'] = truthy_frontmatter?(meta['toc']) if meta.key?('toc') && !meta['toc'].to_s.strip.empty?
   # Same survival rule as the announcement URLs below: former_slugs is not
   # representable in the frontmatter, so a save that forgot to carry it
   # over would silently break every redirect the post has accumulated --

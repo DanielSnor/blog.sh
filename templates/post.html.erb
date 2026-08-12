@@ -13,10 +13,11 @@
               <div class="post-body">
                 <% if post['title'] && !hero_media %><h1><%= h(post['title']) %></h1><% end %>
                 <%= post_stats_html(post) %>
+                <%= reading_time_html(minutes) %><%= series_nav_html(series_slug, series_posts, series_index, :top) %><%= toc_html(toc) %>
                 <div class="content">
                   <%= content_html %>
                 </div>
-                <%= tags_html(post) %>
+                <%= series_nav_html(series_slug, series_posts, series_index, :bottom) %><%= tags_html(post) %>
                 <% if post['mastodon_url'] || post['bluesky_uri'] %>
                   <div class="comments">
                     <h3><%= h(t('post.comments_heading')) %></h3>

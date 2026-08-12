@@ -41,7 +41,7 @@
   <meta property="og:description" content="<%= h(page_description) %>">
   <meta property="og:url" content="<%= h(page_url) %>">
   <meta property="og:image" content="<%= h(og_image) %>">
-  <meta name="twitter:card" content="summary_large_image"><%= extra_head %>
+  <meta name="twitter:card" content="summary_large_image"><%= fediverse_creator_meta %><%= extra_head %>
 <% if ANALYTICS %>
   <script defer src="<%= h(ANALYTICS['src']) %>" data-website-id="<%= h(ANALYTICS['website_id']) %>"></script>
 <% end %>

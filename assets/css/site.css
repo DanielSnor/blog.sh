@@ -668,6 +668,60 @@ blockquote {
 .date-badge svg { display: block; width: 40px; height: 40px; margin: 0 auto 0.35rem; }
 .date-badge a { color: inherit; text-decoration: none; display: block; }
 
+/* How long a post is, what is in it, and where it sits in a series --
+   three ways of answering "is this worth starting" before the reader
+   commits, all in the quiet colour the other metadata uses. */
+.reading-time { color: var(--meta-text); font-size: 0.85rem; margin: 0 0 0.75rem; }
+
+.series-note { font-size: 0.85rem; margin: 0 0 1rem; }
+.series-note a { color: var(--meta-text); }
+.series-note a:hover { color: var(--accent); }
+
+/* Two links that flow to opposite ends, and sit under each other on a
+   narrow screen rather than being squeezed into one line. */
+.series-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+}
+.series-nav .series-next { margin-left: auto; text-align: right; }
+
+/* Both of these are <nav> for the landmark, so both have to undo what the
+   bar at the top of every page sets on the element itself -- the same
+   reset .pagination has carried since it was written. Without it a table
+   of contents comes out as an uppercase, right-aligned, 60px-per-row menu
+   with the site's nav background behind it. */
+.toc, .series-nav {
+  min-height: 0;
+  box-sizing: border-box;
+  border: none;
+  background: none;
+  padding: 0;
+  gap: 0;
+  align-items: initial;
+  justify-content: initial;
+}
+.toc li, .series-nav a { height: auto; line-height: inherit; text-transform: none; letter-spacing: normal; }
+.toc a, .series-nav a {
+  height: auto;
+  display: inline;
+  margin-top: 0;
+  border: none;
+  color: var(--accent);
+}
+
+.toc { display: block; margin: 0 0 1.5rem; padding: 0.75rem 1rem; background: var(--pill-bg); border-radius: 6px; }
+.toc-heading { margin: 0 0 0.4rem; font-size: 0.8rem; text-transform: uppercase; color: var(--meta-text); }
+.toc ol { margin: 0; padding-left: 1.2rem; font-size: 0.9rem; }
+.toc li { margin: 0.15rem 0; }
+/* Depth shown by indentation only: a numbered outline that restates the
+   heading levels would compete with the headings themselves. */
+.toc .toc-l3 { margin-left: 0.75rem; }
+.toc .toc-l4, .toc .toc-l5, .toc .toc-l6 { margin-left: 1.5rem; }
+
 /* layout.hero: the post's lead image above its title, instead of a date
    badge beside the text. The header stops being a row and becomes a
    column, and the negative margins .post-header already carries are what

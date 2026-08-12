@@ -23,6 +23,12 @@ nav:
   search_placeholder: "Hledat…"
 
 post:
+  reading_time: "Na čtení %{minutes} min"
+  toc_heading: "Na téhle stránce"
+  toc_label: "Obsah"
+  series_part: "Díl %{number} ze %{total} — %{name}"
+  series_previous: "← %{title}"
+  series_next: "%{title} →"
   comments_heading: "Komentáře"
   back_to_list: "← zpět na výpis"
   read_more: "Číst dál"
@@ -45,6 +51,11 @@ tag:
   kind: "Štítek"
   title: "Štítek: %{name} – %{short_name}"
   description: "Příspěvky se štítkem %{name} na osobním webu %{author}."
+
+series:
+  kind: "Série"
+  title: "%{name} – %{short_name}"
+  description: "Série %{name} na osobním webu, kde %{author} píše — v pořadí ke čtení."
 
 type:
   text: "Text"

@@ -24,6 +24,12 @@ nav:
   search_placeholder: "Search…"
 
 post:
+  reading_time: "%{minutes} min read"
+  toc_heading: "On this page"
+  toc_label: "Table of contents"
+  series_part: "Part %{number} of %{total} of %{name}"
+  series_previous: "← %{title}"
+  series_next: "%{title} →"
   comments_heading: "Comments"
   back_to_list: "← back to list"
   read_more: "Read more"
@@ -46,6 +52,11 @@ tag:
   kind: "Tag"
   title: "Tag: %{name} – %{short_name}"
   description: "Posts tagged %{name} on %{author}'s personal site."
+
+series:
+  kind: "Series"
+  title: "%{name} – %{short_name}"
+  description: "The series %{name} on the personal site of %{author}, in reading order."
 
 type:
   text: "Text"

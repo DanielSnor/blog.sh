@@ -24,6 +24,12 @@ nav:
   search_placeholder: "Suchen…"
 
 post:
+  reading_time: "%{minutes} Min. Lesezeit"
+  toc_heading: "Auf dieser Seite"
+  toc_label: "Inhaltsverzeichnis"
+  series_part: "Teil %{number} von %{total} von %{name}"
+  series_previous: "← %{title}"
+  series_next: "%{title} →"
   comments_heading: "Kommentare"
   back_to_list: "← zurück zur Übersicht"
   read_more: "Weiterlesen"
@@ -47,6 +53,11 @@ tag:
   kind: "Schlagwort"
   title: "Schlagwort: %{name} – %{short_name}"
   description: "Beiträge mit dem Schlagwort %{name} auf der persönlichen Seite von %{author}."
+
+series:
+  kind: "Serie"
+  title: "%{name} – %{short_name}"
+  description: "Die Serie %{name} auf der persönlichen Seite von %{author}, in Lesereihenfolge."
 
 type:
   text: "Text"
