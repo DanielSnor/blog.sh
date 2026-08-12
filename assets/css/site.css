@@ -671,7 +671,28 @@ blockquote {
 /* How long a post is, what is in it, and where it sits in a series --
    three ways of answering "is this worth starting" before the reader
    commits, all in the quiet colour the other metadata uses. */
-.reading-time { color: var(--meta-text); font-size: 0.85rem; margin: 0 0 0.75rem; }
+/* Everything worth knowing before reading: how many people marked it, how
+   long it takes. One row, one gap, and the reading time is simply the
+   fourth item -- it wraps onto a second line on a narrow screen like any
+   other. The row is an element rather than two loose inline boxes because
+   the contents list floats beside it, and a float takes the top of the
+   line it lands in: unwrapped, the contents began level with the star
+   instead of level with the article. */
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.1rem;
+  margin: 0.5rem 0 1rem;
+}
+.reading-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--meta-text);
+  font-size: 0.85rem;
+}
+.reading-time svg { flex: none; }
 
 .series-note { font-size: 0.85rem; margin: 0 0 1rem; }
 .series-note a { color: var(--meta-text); }
@@ -705,24 +726,49 @@ blockquote {
   justify-content: initial;
 }
 .toc li, .toc a, .series-nav a { height: auto; text-transform: none; letter-spacing: normal; }
+/* An explicit line-height, on the ITEM as well as the anchor. `inherit`
+   was here and was exactly wrong: on the anchor it inherits from the item,
+   and the item is what carries the menu bar's 60px. The engine's own
+   site.css sets that on `nav li`, so this was not a skin's doing -- every
+   default site had eight chapters spread over 547px. Found on sean.cz
+   after 1.3 went live, not in a test. */
+.toc li, .toc a, .series-nav a { line-height: 1.55; }
 .toc a, .series-nav a {
   height: auto;
-  /* line-height too, and on the ANCHOR rather than only the item: a skin
-     that sizes `nav a` to the height of the menu bar (which is what a skin
-     that touches the nav at all tends to do) otherwise gives every line of
-     a contents list the height of a nav item -- 56px for 12px text. Found
-     on a live install, not in a test. */
-  line-height: inherit;
   display: inline;
   margin-top: 0;
   border: none;
   color: var(--accent);
 }
 
-.toc { display: block; margin: 0 0 1.5rem; padding: 0.75rem 1rem; background: var(--pill-bg); border-radius: 6px; }
-.toc-heading { margin: 0 0 0.4rem; font-size: 0.8rem; text-transform: uppercase; color: var(--meta-text); }
-.toc ol { margin: 0; padding-left: 1.2rem; font-size: 0.9rem; }
-.toc li { margin: 0.15rem 0; }
+/* Half the column, floated, with the article beginning to its left -- so
+   the contents are a sidebar to the text rather than a gate in front of
+   it. No fill: a tinted panel is at the mercy of whatever pill_bg the
+   site's palette carries (on sean.cz that is #ccc, which lands as a slab),
+   while a rule in the accent colour reads the same in every palette and
+   in both schemes. */
+.toc {
+  display: block;
+  float: right;
+  width: 50%;
+  box-sizing: border-box;
+  margin: 0 0 1rem 1.5rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  background: none;
+  border-left: 3px solid var(--accent);
+}
+.toc-heading { margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--meta-text); }
+.toc ol { margin: 0; padding-left: 1.15rem; font-size: 0.9rem; }
+.toc li { margin: 0.12rem 0; }
+/* Whatever follows the article -- the tag pills, the next/previous nav --
+   must not ride up beside a contents list taller than the text. */
+.post-body::after { content: ""; display: block; clear: both; }
+
+/* On a phone the two cannot sit side by side, so the contents go back to
+   being a block: first the chapters, then the article under them. */
+@media (max-width: 700px) {
+  .toc { float: none; width: auto; margin: 0 0 1.5rem; }
+}
 /* Depth shown by indentation only: a numbered outline that restates the
    heading levels would compete with the headings themselves. */
 .toc .toc-l3 { margin-left: 0.75rem; }
@@ -900,10 +946,13 @@ aside .card { margin-bottom: 1.5rem; }
 .comment-date { color: var(--meta-text); font-size: 0.78rem; }
 .comment-favs { color: var(--meta-text); font-size: 0.78rem; }
 
+/* Inside the row it is a flex item and carries no margins of its own; the
+   row owns the spacing. Still a flex container, so the three counts keep
+   their own gap. */
 .post-stats {
   display: flex;
   gap: 1.1rem;
-  margin: 0.5rem 0 1rem;
+  margin: 0;
   color: var(--meta-text);
   font-size: 0.85rem;
 }

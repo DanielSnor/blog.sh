@@ -1292,10 +1292,43 @@ end
 # renders for every post on the site, and a block tag on its own line
 # leaves its newlines on all of them whether or not the block runs -- so a
 # post with none of these has to come out exactly as it did before.
+# The clock sits in the same row as the favourites, boosts and replies,
+# because it is the same kind of fact: something to know about the post
+# before deciding to read it. On its own line above the text it read as an
+# announcement.
+#
+# The row is a block of its own, and that is not tidiness: the contents
+# list floats, and a float takes the top of the line box it lands in. With
+# the counts and the clock as loose inline boxes, that line WAS the
+# metadata -- so the contents began level with the star rather than level
+# with the article. Wrapped, the float starts after the row, which is
+# where the text starts too.
+#
+# The number is bare ("6 min") since the icon already says what it counts;
+# the full sentence stays as the accessible name, which is where a screen
+# reader needs it and where an icon says nothing at all.
+READING_TIME_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" ' \
+                    'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+                    'stroke-linejoin="round" aria-hidden="true">' \
+                    '<circle cx="12" cy="12" r="9.5"/><path d="M12 6.5V12l3.5 2"/></svg>'
+
 def reading_time_html(minutes)
   return '' unless minutes
 
-  %(<p class="reading-time">#{h(t('post.reading_time', minutes: minutes))}</p>\n                )
+  %(<span class="post-stat reading-time" title="#{h(t('post.reading_time', minutes: minutes))}" ) +
+    %(aria-label="#{h(t('post.reading_time', minutes: minutes))}">#{READING_TIME_ICON}) +
+    %(<span>#{h(t('post.reading_minutes', minutes: minutes))}</span></span>)
+end
+
+# '' when there is nothing to put in it: a site with no comments network
+# and a post too short to time has to come out exactly as it did before
+# this row existed.
+def post_meta_html(post, minutes)
+  stats = post_stats_html(post)
+  reading = reading_time_html(minutes)
+  return '' if stats.empty? && reading.empty?
+
+  %(<div class="post-meta">#{stats}#{reading}</div>)
 end
 
 def toc_html(entries)

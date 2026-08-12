@@ -25,6 +25,7 @@ nav:
 
 post:
   reading_time: "%{minutes} Min. Lesezeit"
+  reading_minutes: "%{minutes} Min."
   toc_heading: "Auf dieser Seite"
   toc_label: "Inhaltsverzeichnis"
   series_part: "Teil %{number} von %{total} von %{name}"

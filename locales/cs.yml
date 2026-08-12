@@ -24,6 +24,7 @@ nav:
 
 post:
   reading_time: "Na čtení %{minutes} min"
+  reading_minutes: "%{minutes} min"
   toc_heading: "Na téhle stránce"
   toc_label: "Obsah"
   series_part: "Díl %{number} ze %{total} — %{name}"
