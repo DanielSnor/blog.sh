@@ -511,10 +511,17 @@ authoring markdown has a form for them -- `!![caption](url)` is this
 engine's own syntax, and to CommonMark it reads as an exclamation mark
 followed by an image, so a YouTube clip exported as markdown would land
 on the destination site as a broken image. As HTML they arrive as the
-player the build renders. Every one of them is counted in the summary,
-because read back in they come home as text rather than as blocks.
-Inline `small`, `mention` and `color` spans keep their text and lose
-their styling, for the same reason.
+player the build renders.
+
+None of that is lost on the way home: above each one the export writes
+the block's own definition in an HTML comment, which every other engine
+drops on the floor and `./import.sh` reads back -- so a video returns as
+a video, with its file, its dimensions and its caption, not as a
+paragraph of markup. They are still counted in the summary, because the
+destination gets HTML where the rest of the post is markdown, and that
+is worth knowing. Inline `small`, `mention` and `color` spans keep their
+text and lose their styling; those have no comment and do not come
+back.
 
 ## Deploy
 

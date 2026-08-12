@@ -214,9 +214,40 @@ module Exporter
       end
 
       fallbacks[type] += 1
-      html_fallback(block, media_rel)
+      "#{block_comment(block, media_rel)}\n#{html_fallback(block, media_rel)}"
     end
     [parts.reject { |p| p.to_s.empty? }.join("\n\n"), fallbacks]
+  end
+
+  # The block itself, in a comment above its HTML. Every engine drops an
+  # HTML comment on the floor, so the destination site is unaffected --
+  # and Import::Jekyll reads it back, which is what lets a video survive
+  # the trip out and home again instead of arriving as a paragraph of
+  # markup. No blank line between the two: that keeps comment and markup
+  # a single HTML block to any markdown parser.
+  #
+  # Media paths are rewritten to where they are IN THE EXPORT, so the
+  # importer can find the file the block names.
+  #
+  # "--" is escaped as a JSON string escape (still the same string to any
+  # JSON reader): a caption containing "-->" would otherwise close the
+  # comment early and spill markup into the page.
+  def block_comment(block, media_rel)
+    json = JSON.generate(with_export_paths(block, media_rel)).gsub('--', '-\\u002d')
+    "<!-- blogsh:block #{json} -->"
+  end
+
+  def with_export_paths(block, media_rel)
+    copy = block.dup
+    %w[media poster].each do |key|
+      entries = copy[key]
+      next unless entries.is_a?(Array)
+
+      copy[key] = entries.map do |entry|
+        entry.is_a?(Hash) && entry['url'] ? entry.merge('url' => File.join(media_rel, entry['url'].to_s)) : entry
+      end
+    end
+    copy
   end
 
   # Raw HTML inside markdown, which Jekyll, Hugo and Eleventy all pass

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'cgi'
+require 'json'
 require 'time'
 require 'yaml'
 # For the run's postscript below -- the other adapters that speak in the
@@ -246,6 +247,10 @@ module Import
     # as authoring uploads), so they ride through the parse as sentinels
     # and become blocks in localize().
     def markdown_blocks(body)
+      # First, before any other rewriting: the comment carries a block's
+      # JSON verbatim, and a pass meant for prose (Liquid, lazy lists,
+      # inline images) has no business reaching inside it.
+      body = own_blocks_to_sentinels(body)
       body = resolve_references(body)
       body = liquid_free(body)
       body = outside_fences(body) { |prose| join_lazy_list_lines(prose) }
@@ -525,9 +530,56 @@ module Import
 
     SENTINEL = /@@ssg-image:([^:@]*):([^@]*)@@/
 
+    # What `./blog.sh export` writes above the HTML it had to fall back
+    # to for a block markdown cannot express -- video, audio, a link
+    # card. Reading it back is what turns an export into a round-trip
+    # instead of a one-way door: the block comes home as a block rather
+    # than as a paragraph of markup. The comment ends at the first
+    # " -->", which the exporter guarantees by escaping "--" inside the
+    # JSON; the HTML under it runs to the blank line and is dropped with
+    # it, since the block itself says everything that markup did.
+    #
+    # Anybody else's HTML comments are untouched: the marker is specific,
+    # and a tree that never came from here simply has none.
+    OWN_BLOCK_RE = /^<!-- blogsh:block (\{.*?\}) -->\n.*?(?=\n\n|\z)/m
+    OWN_BLOCK_SENTINEL = %r{\A@@blogsh-block:([A-Za-z0-9+/=]+)@@\z}
+
+    def own_blocks_to_sentinels(body)
+      body.gsub(OWN_BLOCK_RE) { "@@blogsh-block:#{[Regexp.last_match(1)].pack('m0')}@@" }
+    end
+
+    # The block as it was written, with its media re-registered: the JSON
+    # names each file where it sits in the export
+    # (/assets/<year>/<slug>/01.mp4), and from_file copies it into this
+    # archive under the number it gets here -- the same path an image
+    # takes through image_block.
+    def own_block(packed, media)
+      block = JSON.parse(packed.unpack1('m'))
+      return nil unless block.is_a?(Hash)
+
+      %w[media poster].each do |key|
+        entries = block[key]
+        next unless entries.is_a?(Array)
+
+        block[key] = entries.filter_map do |entry|
+          next entry unless entry.is_a?(Hash) && entry['url']
+
+          src = entry['url'].to_s
+          local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, @dir)
+          name = media.from_file(local)
+          name ? entry.merge('url' => name) : nil
+        end
+      end
+      block
+    rescue JSON::ParserError
+      nil
+    end
+
     def localize(blocks, media, post_path)
       blocks.filter_map do |block|
-        if block['type'] == 'text' && (m = block['text'].to_s.strip.match(/\A#{SENTINEL}\z/))
+        if block['type'] == 'text' && (m = block['text'].to_s.strip.match(OWN_BLOCK_SENTINEL))
+          own_block(m[1], media)
+        elsif block['type'] == 'text' && (m = block['text'].to_s.strip.match(/\A#{SENTINEL}\z/))
           image_block(CGI.unescape(m[1]), CGI.unescape(m[2]), media, post_path)
         elsif block['type'] == 'image'
           # From the HtmlBlocks path: the URL is still the tree's own.

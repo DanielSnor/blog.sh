@@ -778,7 +778,7 @@ export:
   no_posts: "Es gibt noch nichts zu exportieren."
   summary: "Nach %{path} geschrieben: %{posts} Beitrag/Beiträge, %{drafts} Entwurf/Entwürfe, %{pages} Seite(n) und %{media} Mediendatei(en) (%{size})."
   summary_dry: "Nach %{path} geschrieben würde: %{posts} Beitrag/Beiträge, %{drafts} Entwurf/Entwürfe, %{pages} Seite(n) und %{media} Mediendatei(en) (%{size})."
-  fallback_note: "%{count} Block/Blöcke, für die Markdown keine Schreibweise hat, wurden als HTML geschrieben: %{kinds}. Jede Engine, die HTML durchreicht, stellt sie dar -- beim Zurücklesen kommen sie jedoch als Text an, nicht als Blöcke."
+  fallback_note: "%{count} Block/Blöcke, für die Markdown keine Schreibweise hat, wurden als HTML geschrieben: %{kinds}. Jede Engine, die HTML durchreicht, stellt sie dar, und diese Engine liest sie vollständig zurück -- jeder trägt seine eigene Definition in einem Kommentar darüber, den alle anderen ignorieren."
   collisions: "%{count} Datei(en) wurden umbenannt, damit sie sich nicht gegenseitig überschreiben -- zwei Beiträge wollten denselben Dateinamen."
   next_steps: "Der Aufbau ist der von Jekyll: _posts/, _drafts/, Seiten im Wurzelverzeichnis, Medien unter assets/. Hugo, Eleventy und Astro lesen ihn mit einer Zeile Konfiguration; ./import.sh liest ihn, wie er ist."
 

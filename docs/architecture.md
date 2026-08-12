@@ -243,7 +243,14 @@ Three details carry the design:
   export. So the exporter renders block by block (the writer keeps no
   state between blocks, so this is equivalent) and gives anything that
   came back empty the same HTML the build renders. Counted per type and
-  said out loud, because read back in they are text, not blocks.
+  said out loud, because the destination gets HTML where the rest of the
+  post is markdown. Above each one goes `<!-- blogsh:block {...} -->`,
+  the block's own JSON with its media paths rewritten to where they sit
+  in the export: every other engine ignores an HTML comment, and
+  `Import::Jekyll` turns it back into the block (`own_blocks_to_sentinels`
+  → `own_block`), so the round-trip loses nothing. `--` inside the JSON
+  is escaped as `\u002d`, or a caption containing `-->` would close the
+  comment early and spill markup into the page.
   **Video and audio skip the markdown path even where the writer has a
   form for them**: `!![caption](url)` is this engine's own syntax, and
   CommonMark -- what every destination engine reads -- parses it as a

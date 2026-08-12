@@ -774,7 +774,7 @@ export:
   no_posts: "Zatím není co exportovat."
   summary: "Zapsáno do %{path}: %{posts} postů, %{drafts} rozepsaných, %{pages} stránek a %{media} souborů médií (%{size})."
   summary_dry: "Zapsalo by se do %{path}: %{posts} postů, %{drafts} rozepsaných, %{pages} stránek a %{media} souborů médií (%{size})."
-  fallback_note: "%{count} bloků, pro které markdown nemá zápis, se zapsalo jako HTML: %{kinds}. Každý engine, který HTML propouští, je vykreslí — ale při zpětném načtení přijdou jako text, ne jako bloky."
+  fallback_note: "%{count} bloků, pro které markdown nemá zápis, se zapsalo jako HTML: %{kinds}. Každý engine, který HTML propouští, je vykreslí, a tenhle engine je přečte zpátky celé — každý si nad sebou nese vlastní zápis v komentáři, kterého si nikdo jiný nevšimne."
   collisions: "%{count} souborů se přejmenovalo, aby se nepřepsaly navzájem — dva posty chtěly stejné jméno souboru."
   next_steps: "Rozvržení je jekyllovské: _posts/, _drafts/, stránky v kořeni, média pod assets/. Hugo, Eleventy i Astro ho přečtou po jednom řádku konfigurace; ./import.sh ho přečte tak, jak je."
 

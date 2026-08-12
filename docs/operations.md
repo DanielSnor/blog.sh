@@ -358,8 +358,9 @@ Three things are worth knowing before you rely on the result:
   link cards are written as HTML -- video and audio deliberately, because
   the engine's own `!![caption](url)` reads as an exclamation mark and an
   image to everybody else's markdown parser. Every engine that passes
-  HTML through renders them properly; imported back, they arrive as text
-  rather than as blocks.
+  HTML through renders them properly, and importing the tree back gives
+  them again as blocks -- each carries its own definition in a comment
+  above it, which other engines ignore.
 - **`redirect_from` is written in the shape `jekyll-redirect-from`
   reads,** and it merges both kinds of old address -- where the post
   lived on the platform it came from, and where it lived here before a

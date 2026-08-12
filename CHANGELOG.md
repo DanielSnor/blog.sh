@@ -53,8 +53,10 @@ byte-for-byte against the previous build.
   `jekyll-redirect-from` plugin reads, merging both kinds of old address,
   so on a Jekyll site every URL a post ever had goes on answering. What
   markdown has no syntax for -- video, audio, a link card -- is written
-  as HTML and *counted in the summary*, because imported back it arrives
-  as text rather than as blocks. Video and audio go out as HTML even
+  as HTML and *counted in the summary*, because the destination gets
+  HTML where the rest of the post is markdown. Each one carries its own
+  definition in an HTML comment above it, which other engines ignore and
+  `./import.sh` reads back, so nothing is lost in either direction. Video and audio go out as HTML even
   though the authoring markdown has a form for them: `!![caption](url)`
   is this engine's own, and every other markdown parser reads it as an
   exclamation mark followed by an image. Verified over a real 118-post

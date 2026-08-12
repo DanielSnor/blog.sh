@@ -323,10 +323,12 @@ matter carries a `blogsh:` block, which this importer reads: the post's
 its series, redirects, former addresses, announcement URLs, a draft's
 token. Such a post also gets no platform tag -- it is coming home, not
 arriving from Jekyll. That makes export + import the supported way to
-move an installation between machines or hosts. The only thing not
-restored is what the export could not write as markdown in the first
-place: video, audio and link cards come back as the HTML text they were
-written as (the export says how many, per type).
+move an installation between machines or hosts. Video, audio and link
+cards -- the blocks written as HTML because markdown has no syntax for
+them -- come back as blocks too, from the `<!-- blogsh:block ... -->`
+comment the export leaves above each one, media files included. What
+does not survive is inline `small`, `mention` and `color`: the text
+remains, the styling does not.
 
 The pattern understands `:year`, `:month`, `:day`, `:title` and
 `:slug`, and nothing else -- anything further is left in the address
