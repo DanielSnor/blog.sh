@@ -922,8 +922,31 @@ def draft?(post)
   post['state'] == 'draft'
 end
 
+# A page is a post that does not belong in the stream: About, Contact, the
+# colophon. It keeps a permanent address and stays findable -- it is in the
+# sitemap and in the search index -- but it is out of the listings, the tag
+# and type archives and the feed, because a reader working through the
+# archive is not looking for it and a subscriber did not ask to be told it
+# changed.
+def page?(post)
+  truthy?(post['page'])
+end
+
+# "true"/"yes"/"1" as written by hand, and the real booleans YAML and JSON
+# produce. Same spellings `pinned` has always taken.
+def truthy?(value)
+  return false if value.nil? || value == false
+
+  !%w[false no 0].include?(value.to_s.strip.downcase)
+end
+
 def post_path(post)
   return "/draft/#{post['draft_token']}/#{post['slug']}/" if draft?(post)
+  # At the root, because that is what a page is -- and because every
+  # redirect_from a migration carries for one (Ghost, WordPress,
+  # Squarespace) is a root path. A dated address for something with no
+  # date would be the odd one out on every site that has ever had pages.
+  return "/#{post['slug']}/" if page?(post)
 
   "/posts/#{post_time(post).year}/#{post['slug']}/"
 end
@@ -1641,6 +1664,25 @@ posts.reverse!
 # RSS, the sitemap and the search index all draw from it unchanged. Drafts
 # only get their own page at a hidden address.
 drafts, posts = posts.partition { |p| draft?(p) }
+# Pages come out of `posts` here, once, so that everything downstream --
+# listings, tags, types, RSS, pagination -- keeps drawing from a list that
+# means "the stream" and needs no exception of its own. The two consumers
+# that DO want them (the sitemap and the search index) ask for them by
+# name, which is the right way round: being findable is the point of a
+# page, and being in the stream is not.
+#
+# A page at the root cannot be allowed to shadow an address the engine
+# already owns. The rest of the site lives under /posts/, /tag/, /type/,
+# /draft/ and the two generated pages, so those are the names to refuse.
+RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
+                            robots.txt 404 favicon.ico].freeze
+pages, posts = posts.partition { |p| page?(p) }
+pages.reject! do |page|
+  next false unless RESERVED_ROOT_SEGMENTS.include?(page['slug'].to_s.downcase)
+
+  warn "⚠️  Page '#{page['slug']}' would sit on an address the engine already uses (/#{page['slug']}/) -- not built. Rename it."
+  true
+end
 # A draft without its token would build at the GUESSABLE /draft//slug/ --
 # every writer in the engine guarantees the token, so a missing one means
 # a hand-copied or hand-edited JSON, and the unguessable-URL design must
@@ -1745,7 +1787,7 @@ def referenced_media_filenames(post)
   end.compact
 end
 
-(posts + drafts).each do |post|
+(posts + pages + drafts).each do |post|
   year = post_time(post).year
   dir = output_dir(post)
 
@@ -1886,8 +1928,14 @@ end
 
 # posts is sorted newest-first, so splitting into "first N" / "the rest" is
 # also the split into recent / archive -- no further sorting needed.
-recent_search_index = posts.first(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
-archive_search_index = posts.drop(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
+# Pages are searchable for the same reason they are in the sitemap:
+# somebody typing "contact" expects to be handed the contact page, and
+# it is in no listing they could have browsed to instead. They go in the
+# eagerly-loaded half regardless of age -- there are a handful of them,
+# and burying them in the lazy archive would defeat the point.
+searchable = pages + posts
+recent_search_index = searchable.first(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
+archive_search_index = searchable.drop(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
 emit(File.join(PUBLIC_DIR, 'search-index.json'), recent_search_index.to_json)
 emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), archive_search_index.to_json)
 
@@ -1945,7 +1993,10 @@ File.write(STATS_PATH, '{}') unless File.exist?(STATS_PATH)
 WRITTEN[STATS_PATH] = true
 
 emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
-emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts, tags_map, PRESENT_TYPES))
+# Pages ride along in the sitemap: being findable is the whole point of
+# one, and the sitemap is how a search engine is told they exist at all
+# -- nothing links to them from the archive.
+emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES))
 emit(File.join(PUBLIC_DIR, 'robots.txt'), "User-agent: *\nAllow: /\nSitemap: #{SITE_BASE_URL}/sitemap.xml\n")
 
 # An imported post keeps answering at the addresses its previous platform

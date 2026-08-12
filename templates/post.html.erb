@@ -9,7 +9,7 @@
                   <% if post['title'] %><h1><%= h(post['title']) %></h1><% end %>
                   <p class="post-hero__meta"><span class="post-hero__author"><%= h(SITE_AUTHOR) %></span><time datetime="<%= h(post_time(post).iso8601) %>"><%= h(post_display_date(post)) %></time></p>
                 </div>
-              </div><% else %><%= date_badge(post) %><% end %>
+              </div><% elsif !page?(post) %><%= date_badge(post) %><% end %><%# A page has no date worth showing: "Contact, 1 July 2022" says nothing except that somebody had to type a date into a field. %>
               <div class="post-body">
                 <% if post['title'] && !hero_media %><h1><%= h(post['title']) %></h1><% end %>
                 <%= post_stats_html(post) %>

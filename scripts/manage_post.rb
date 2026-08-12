@@ -82,7 +82,7 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned hero].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero page].freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -609,7 +609,7 @@ def hero_frontmatter_value(post)
   SITE_HERO ? true : nil
 end
 
-def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil)
+def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
@@ -623,6 +623,7 @@ def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil)
   # it can actually be acted on -- a site that uses heroes, or a post that
   # has already said something of its own.
   lines << "hero: #{hero}" unless hero.nil?
+  lines << "page: #{page}" unless page.nil?
   lines << '---'
   "#{lines.join("\n")}\n\n"
 end
@@ -2065,7 +2066,12 @@ def edit_post(slug, path: nil)
     # even when the site doesn't, because a header without the line saves
     # the post without it, which is exactly how this field went missing
     # before it was here at all.
-    hero: hero_frontmatter_value(post)
+    hero: hero_frontmatter_value(post),
+    # Offered only where it already is: turning a post into a page moves
+    # its address, so it is not something to hand somebody as a checkbox
+    # on every edit. Shown when set, so that saving cannot silently
+    # un-page a page.
+    page: truthy_frontmatter?(post['page']) ? true : nil
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
@@ -2158,6 +2164,7 @@ def edit_post(slug, path: nil)
     hero_wanted = truthy_frontmatter?(meta['hero'])
     updated['hero'] = hero_wanted unless hero_wanted == SITE_HERO
   end
+  updated['page'] = true if truthy_frontmatter?(meta['page'])
   # Same survival rule as the announcement URLs below: former_slugs is not
   # representable in the frontmatter, so a save that forgot to carry it
   # over would silently break every redirect the post has accumulated --
