@@ -704,9 +704,15 @@ blockquote {
   align-items: initial;
   justify-content: initial;
 }
-.toc li, .series-nav a { height: auto; line-height: inherit; text-transform: none; letter-spacing: normal; }
+.toc li, .toc a, .series-nav a { height: auto; text-transform: none; letter-spacing: normal; }
 .toc a, .series-nav a {
   height: auto;
+  /* line-height too, and on the ANCHOR rather than only the item: a skin
+     that sizes `nav a` to the height of the menu bar (which is what a skin
+     that touches the nav at all tends to do) otherwise gives every line of
+     a contents list the height of a nav item -- 56px for 12px text. Found
+     on a live install, not in a test. */
+  line-height: inherit;
   display: inline;
   margin-top: 0;
   border: none;
