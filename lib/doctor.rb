@@ -447,19 +447,43 @@ module Doctor
       label = entry['label'].to_s.strip
       slug = entry['tag'].to_s.strip
       if !slug.empty?
-        findings << error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix')) unless tags.include?(slug)
+        findings << error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix')) unless tags.include?(slug) || posts.empty?
         next
       end
 
       url = entry['url'].to_s.strip
+      next if url.empty?
+
+      # `about` rather than `/about/`. The browser reads it against the
+      # page the menu is standing on, so the item points somewhere
+      # different from every page -- and from the front page it may even
+      # work, which is exactly why it survives being looked at.
+      if relative_nav_url?(url)
+        fixed = "/#{url.delete_prefix('/')}/"
+        findings << error(t('nav_url_relative', label: label, url: url), t('nav_url_relative_fix', url: fixed))
+        next
+      end
+
       next unless url.start_with?('/')
-      next if url.start_with?('/type/', '/assets/')
+      next if url.start_with?('//', '/type/', '/assets/')
+      # Nothing to judge against on an archive with no posts in it yet.
+      next if posts.empty?
       next if known.include?(url) || known.include?("#{url}/")
 
       findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
     end
-    findings << ok(t('nav_ok', count: entries.size)) if findings.empty?
+    findings << ok(t('nav_ok', count: entries.size)) if findings.empty? && !posts.empty?
     findings
+  end
+
+  # An address that is neither on this site nor anywhere else -- it only
+  # means something relative to wherever it is written, which for a menu
+  # is every page at a different depth.
+  def relative_nav_url?(url)
+    return false if url.start_with?('/', '#')
+    return false if url.include?('://')
+
+    !url.start_with?('mailto:', 'tel:')
   end
 
   # Each widget needs the one value that identifies what it should show.

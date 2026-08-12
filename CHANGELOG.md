@@ -109,6 +109,12 @@ byte-for-byte against the previous build.
   item and what is missing, for entries on this site only; an address
   somewhere else is `check --online`'s business. Sites without a `nav:`
   key are not read at all, so nothing pays for a menu they do not have.
+  It also names an entry written as `url: "about"` instead of
+  `url: "/about/"` -- without the slashes that is not an address but a
+  name read against whatever page the menu is standing on, so the item
+  leads somewhere different from every page and may well work from the
+  front page, which is how it survives being looked at. `./style.sh`
+  offers the corrected form rather than just warning.
 - **`layout.sidebar` and `layout.nav_bottom`.** The right-hand column and
   the menu repeated under the content can each be switched off. With the
   sidebar gone the content takes the full width rather than leaving a gap

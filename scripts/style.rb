@@ -522,10 +522,14 @@ def ask_nav_entry
 end
 
 def ask_nav_tag(label)
-  answer = Wizard.ask(t('q_nav_tag'), '', hint: t('h_nav_tag', list: nav_tag_sample))
+  hint = nav_tag_sample.empty? ? t('h_nav_tag_empty') : t('h_nav_tag', list: nav_tag_sample)
+  answer = Wizard.ask(t('q_nav_tag'), '', hint: hint)
   slug = Slug.slugify(answer.to_s)
   return nil if slug.empty?
-  return nil if !nav_tags.include?(slug) && !nav_confirm_unknown(t('nav_tag_unknown', tag: slug))
+  # An archive with nothing in it has nothing to disagree with, and a
+  # brand-new site writing its menu first should not be told that every
+  # tag it names is missing.
+  return nil if nav_posts.any? && !nav_tags.include?(slug) && !nav_confirm_unknown(t('nav_tag_unknown', tag: slug))
 
   { 'label' => label, 'tag' => slug }
 end
@@ -533,15 +537,34 @@ end
 def ask_nav_url(label)
   url = Wizard.ask(t('q_nav_url'), '', hint: t('h_nav_url')).to_s.strip
   return nil if url.empty?
+
+  # `about` is not an address, it is an address relative to whatever page
+  # it is written on -- and a menu is written on all of them. Offered as a
+  # correction rather than a warning, because there is exactly one thing
+  # the person meant.
+  if relative_nav_url?(url)
+    fixed = "/#{url}/"
+    puts Tui.paint("   #{t('nav_url_relative', url: url)}", :yellow)
+    url = fixed if Wizard.confirm(t('q_nav_use_absolute', url: fixed))
+  end
+
   # Only addresses on this site are judged. Somebody else's page is a
   # perfectly good menu item, and whether it answers is not a question
   # this archive can be asked.
-  if url.start_with?('/') && !nav_known.include?(url) && !nav_known.include?("#{url}/") &&
+  if url.start_with?('/') && !url.start_with?('//') && nav_posts.any? &&
+     !nav_known.include?(url) && !nav_known.include?("#{url}/") &&
      !nav_confirm_unknown(t('nav_url_unknown', url: url))
     return nil
   end
 
   { 'label' => label, 'url' => url }
+end
+
+def relative_nav_url?(url)
+  return false if url.start_with?('/', '#')
+  return false if url.include?('://')
+
+  !url.start_with?('mailto:', 'tel:')
 end
 
 def nav_confirm_unknown(message)
