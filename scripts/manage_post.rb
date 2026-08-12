@@ -13,6 +13,7 @@ require 'set'
 require 'securerandom'
 require 'shellwords'
 require_relative '../lib/post_writer'
+require_relative '../lib/post_versions'
 require_relative '../lib/atomic_write'
 require_relative '../lib/mastodon_poster'
 require_relative '../lib/bluesky_poster'
@@ -1681,7 +1682,7 @@ def cmd_props(slug)
     puts
 
     if draft?(post)
-      case Tui.key_choice(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'))
+      case Tui.key_choice(with_versions_key(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'), path, slug))
       when 'p' then return publish_draft(slug)
       when 's'
         puts
@@ -1694,6 +1695,8 @@ def cmd_props(slug)
         unschedule_post(path, post, slug, raw: original_raw)
       when 'r'
         slug = rename_post(path, post, raw: original_raw)
+      when 'v'
+        props_versions(path, slug)
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.
@@ -1705,7 +1708,7 @@ def cmd_props(slug)
       else puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft')
       end
     else
-      case Tui.key_choice(network_label ? t('cli.props_actions_published', network: network_label) : t('cli.props_actions_published_plain'))
+      case Tui.key_choice(with_versions_key(network_label ? t('cli.props_actions_published', network: network_label) : t('cli.props_actions_published_plain'), path, slug))
       when 'u'
         cmd_unpublish(slug)
         # A cancelled confirmation leaves the post published -- come back
@@ -1726,6 +1729,8 @@ def cmd_props(slug)
         slug = rename_post(path, post, raw: original_raw)
       when 'a'
         props_addresses(path, slug)
+      when 'v'
+        props_versions(path, slug)
       when 'x'
         cmd_delete(slug)
         # Cancelled (the post still exists) -> stay in the dialog.
@@ -1783,6 +1788,82 @@ end
 #
 # Taken addresses are marked as such, because that is the whole reason
 # someone would come here: the marked one is the entry to drop.
+# The [v] key joins the prompt only for a post that has something to show.
+# A row of actions is read every time the dialog opens, and one that is
+# there on every post from the day it is installed -- doing nothing on all
+# of them until somebody has edited one -- costs more attention than it
+# saves. Inserted before [Enter], which is literal in every locale.
+def with_versions_key(prompt, path, slug)
+  year = File.basename(File.dirname(path))
+  return prompt if PostVersions.list(slug, year, content_dir: CONTENT_DIR).empty?
+
+  prompt.sub('[Enter]') { "#{t('cli.props_action_versions')}[Enter]" }
+end
+
+# The undo for editing. Lists what this post said before its recent saves
+# and puts one of them back -- keeping the current text as a version of its
+# own first, so choosing wrong is itself undoable.
+#
+# Only the text comes back. Media is not versioned (see lib/post_versions.rb),
+# so a version old enough to name an image the post no longer has would
+# restore a broken reference -- which is what the cap on how many are kept
+# is for, and what the sentence under the list says out loud.
+def props_versions(path, slug)
+  year = File.basename(File.dirname(path))
+  versions = PostVersions.list(slug, year, content_dir: CONTENT_DIR)
+  if versions.empty?
+    puts t('cli.versions_none')
+    puts
+    return
+  end
+
+  puts
+  puts t('cli.versions_heading', slug: slug)
+  versions.each_with_index do |file, i|
+    stamp = File.basename(file, '.json')
+    puts "  #{i + 1}) #{PostVersions.human_stamp(stamp)}"
+  end
+  puts t('cli.versions_media_note')
+  print t('cli.versions_prompt', count: versions.size)
+  answer = $stdin.gets.to_s.strip
+  if answer.empty?
+    puts
+    return
+  end
+
+  index = answer.to_i
+  unless index.between?(1, versions.size)
+    puts t('cli.versions_unknown')
+    puts
+    return
+  end
+
+  chosen = versions[index - 1]
+  restored = JSON.parse(File.read(chosen, encoding: 'utf-8'))
+  print t('cli.versions_confirm', word: t('cli.confirm_word'))
+  unless $stdin.gets&.strip&.downcase == t('cli.confirm_word')
+    puts t('cli.cancelled_nothing_saved')
+    puts
+    return
+  end
+
+  # The current text becomes a version too, so this is not the one move in
+  # the engine that cannot be walked back.
+  PostVersions.keep(path, content_dir: CONTENT_DIR)
+  current = JSON.parse(File.read(path, encoding: 'utf-8'))
+  # Only what the author writes comes back. Everything the engine owns --
+  # the announcement URLs, the draft token, the state, the redirects --
+  # belongs to the post as it is NOW, and restoring an old copy of it would
+  # sever a live thread or resurrect an address that has since been spent.
+  %w[title tags content type hero].each do |key|
+    restored.key?(key) ? current[key] = restored[key] : current.delete(key)
+  end
+  AtomicWrite.write_json(path, current)
+  puts t('cli.versions_restored', path: path)
+  puts
+  rebuild_and_deploy(t('cli.updating_preview'))
+end
+
 def props_addresses(path, slug)
   loop do
     # Re-read at the top of every pass rather than trusting the copy the
@@ -2147,6 +2228,12 @@ def edit_post(slug, path: nil)
   keep = (blocks.flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
           post['content'].map { |b| b.dig('poster', 0, 'url') }).compact.to_set
 
+  # The one place a post's TEXT is replaced by a person, so the one place
+  # the previous text is worth keeping. Field-only writes elsewhere
+  # (pinning, announcing, scheduling) deliberately make no version: a
+  # history of pin toggles would bury the one entry anybody ever wants.
+  PostVersions.keep(path, content_dir: CONTENT_DIR)
+
   # The post first, its unreferenced media second. Pruning ahead of the
   # write meant a failure in between left a post that still names files
   # that are already gone; this order can at worst leave a file nothing
@@ -2240,6 +2327,11 @@ def delete_post(slug, path: nil)
   trash_dir = File.join(TRASH_DIR, year, slug)
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
+  # The post's earlier drafts go with it. Left behind they would be an
+  # orphan directory nothing points at, and a restore would bring the post
+  # back with amnesia -- the one thing `restore` exists to prevent.
+  PostVersions.move(slug, year, from_content_dir: CONTENT_DIR,
+                    to_dir: File.join(trash_dir, 'versions'))
   # Written rather than moved, because the copy that goes to trash must
   # not keep an address that no longer resolves: a restored post would
   # carry a dead announcement and `toot` would refuse to send a new one,
@@ -2330,6 +2422,14 @@ def cmd_restore(slug)
     # and every image in the restored post is a broken link. That is the
     # exact nesting move_media_dir exists to prevent.
     PostWriter.move_media_dir(trash_media, File.join(MEDIA_DIR, year, slug))
+  end
+  # ...and the history comes back with it, so a restored post can still be
+  # walked back to what it said before its last edit.
+  trash_versions = File.join(trash_dir, 'versions')
+  if Dir.exist?(trash_versions)
+    FileUtils.mkdir_p(File.join(PostVersions.versions_root(CONTENT_DIR), year))
+    FileUtils.rm_rf(File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
+    FileUtils.mv(trash_versions, File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
   end
   FileUtils.rm_rf(trash_dir)
 

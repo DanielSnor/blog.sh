@@ -3,6 +3,7 @@ require 'fileutils'
 require 'securerandom'
 require 'time'
 require_relative 'atomic_write'
+require_relative 'post_versions'
 require_relative 'exif_location'
 require_relative 'site_config'
 
@@ -182,6 +183,12 @@ module PostWriter
     end
 
     copy_media(media_files, year, slug)
+    # The other way a post's text gets replaced, and the more dangerous
+    # one: a re-import overwrites in place across the whole archive at
+    # once, and nobody reads a few thousand posts afterwards to see what
+    # the source decided to change. Keyed on the OLD location, since that
+    # is the copy about to stop existing.
+    PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
     # Write first, delete second -- same ordering as Publishing.publish, so
     # a failure in between leaves the post twice (recoverable) rather than
     # not at all.
