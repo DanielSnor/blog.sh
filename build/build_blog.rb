@@ -1363,7 +1363,8 @@ def rss_item(post)
   ITEM
 end
 
-def render_rss(posts)
+def render_rss(posts, path: '/rss.xml', title: SITE_TITLE, description: SITE_DESCRIPTION,
+               link: "#{SITE_BASE_URL}/")
   items = posts.first(RSS_ITEM_LIMIT).map { |post| rss_item(post) }.join
   # The newest post's date, not Time.now -- otherwise rss.xml differs on
   # every build and gets re-uploaded even when nothing changed.
@@ -1372,10 +1373,10 @@ def render_rss(posts)
     <?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
       <channel>
-        <title>#{h(SITE_TITLE)}</title>
-        <link>#{SITE_BASE_URL}/</link>
-        <atom:link href="#{SITE_BASE_URL}/rss.xml" rel="self" type="application/rss+xml" />
-        <description>#{h(SITE_DESCRIPTION)}</description>
+        <title>#{h(title)}</title>
+        <link>#{link}</link>
+        <atom:link href="#{SITE_BASE_URL}#{path}" rel="self" type="application/rss+xml" />
+        <description>#{h(description)}</description>
         <language>#{SITE_LANG}</language>
         <lastBuildDate>#{last_build}</lastBuildDate>
         #{items}
@@ -1606,7 +1607,7 @@ LISTING_HEADING_ICONS = {
 }.freeze
 
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
-                  heading_kind: nil, heading_variant: nil,
+                  heading_kind: nil, heading_variant: nil, feed_path: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
   pages, fixed = anchored_pages(posts)
   pages.each do |number, page_posts|
@@ -1645,6 +1646,9 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
+                           # So a reader who wants only this subject can be handed it by
+                           # their feed reader, which looks for exactly this link.
+                           extra_head: feed_path ? %(\n  <link rel="alternate" type="application/rss+xml" title="#{h(page_title)}" href="#{h(feed_path)}">) : '',
                            frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] })))
   end
   pages.size
@@ -2080,10 +2084,30 @@ posts.each do |post|
   end
 end
 
+# A feed per tag, but only for the tags the site's own menu points at.
+#
+# The alternative is a feed for every tag, and on a real archive that is
+# 1761 files nobody will ever fetch, rebuilt and re-diffed on every build
+# -- the exact inverse of "nothing renders that wasn't asked for". A tag
+# in the menu is the site saying this is a subject it publishes on, which
+# is the same thing as saying somebody might want to follow just that.
+#
+# A site with the default type menu gets none, and that is the intended
+# answer rather than an oversight: it has not named any subject yet.
+FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _| href[%r{\A/tag/([^/]+)/\z}, 1] }.freeze
+
 tags_map.each do |slug, data|
+  if FEED_TAG_SLUGS.include?(slug)
+    emit(File.join(PUBLIC_DIR, 'tag', slug, 'rss.xml'),
+         render_rss(data[:posts], path: "/tag/#{slug}/rss.xml",
+                    title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
+                    description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
+                    link: "#{SITE_BASE_URL}/tag/#{slug}/"))
+  end
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
                 heading_kind: t('tag.kind'), heading_variant: 'tag',
+                feed_path: FEED_TAG_SLUGS.include?(slug) ? "/tag/#{slug}/rss.xml" : nil,
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
 end
@@ -2192,7 +2216,39 @@ emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
 emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES))
-emit(File.join(PUBLIC_DIR, 'robots.txt'), "User-agent: *\nAllow: /\nSitemap: #{SITE_BASE_URL}/sitemap.xml\n")
+# The crawlers that collect text to train on, as of this release. A list in
+# the engine goes stale, which is why the free-text key below exists beside
+# it -- but a list nobody has to research is the difference between a site
+# that makes this choice and one that meant to.
+#
+# Off by default. Wanting to be findable in an answer somebody gets from a
+# machine is a legitimate position, and it is not the engine's to take on
+# a site's behalf.
+#
+# And it is a request, not a fence: some of these honour robots.txt and
+# some do not. Anything here that said "blocks" would be a lie -- see
+# docs/decisions.md.
+AI_CRAWLERS = %w[GPTBot ChatGPT-User OAI-SearchBot ClaudeBot Claude-Web anthropic-ai
+                 CCBot Google-Extended PerplexityBot Bytespider Amazonbot
+                 Applebot-Extended meta-externalagent Diffbot Omgilibot].freeze
+
+def robots_txt
+  lines = ['User-agent: *', 'Allow: /']
+  if SiteConfig.get('seo', 'block_ai_crawlers', default: false)
+    AI_CRAWLERS.each { |agent| lines << '' << "User-agent: #{agent}" << 'Disallow: /' }
+  end
+  extra = SiteConfig.get('seo', 'robots_extra').to_s.strip
+  lines << '' << extra unless extra.empty?
+  # The blank line only when something was actually put between: a site
+  # that configures neither has to get back the exact three lines it got
+  # before this existed, or every install re-uploads a robots.txt to say
+  # what it already said.
+  lines << '' if lines.size > 2
+  lines << "Sitemap: #{SITE_BASE_URL}/sitemap.xml"
+  "#{lines.join("\n")}\n"
+end
+
+emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
 
 # An imported post keeps answering at the addresses its previous platform
 # gave it: redirect_from is a list of site-root paths ("/bitwarden/",

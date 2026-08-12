@@ -45,6 +45,7 @@ pagination:
   page: "strana %{number}"
 
 tag:
+  feed_title: "%{name} – %{site_title}"
   # V nadpisu výpisu je vidět samotný štítek; tohle je slovo, které říká,
   # o jaký výpis jde -- zůstává pro odečítače obrazovky a ve výchozím
   # vzhledu se skrývá (viz .listing-heading__kind v site.css).

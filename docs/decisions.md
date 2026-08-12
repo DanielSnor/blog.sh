@@ -504,6 +504,52 @@ later, and nothing says so. If it is ever built, `doctor` has to
 remember which version each override was written against and say when
 the original has moved on.
 
+**Editing a post is undoable, and not because a setting says so.**
+Deleting a post has always gone to `trash/`; editing one was final, and
+editing is what happens every day. The previous text is now kept before
+an overwrite -- by an edit, and by a re-import, which is the more
+dangerous of the two because it replaces the whole archive at once and
+nobody reads a few thousand posts afterwards. There is no key to turn it
+off: a safety net with a switch is off exactly when it is needed, since
+nobody turns it on before the mistake, and none of the engine's other
+guards (the trash, the slug-collision abort, the deploy guards) are
+optional either -- only the destructive direction ever is. Field-only
+writes make no version, or a history of pin toggles would bury the one
+entry anybody wants. *Cost:* ten copies of the text per edited post, and
+media is not versioned -- so a version old enough can name an image the
+post no longer has, which is what the cap is for.
+
+**A series is not a tag.** Tags are many per post and unordered; a series
+is one and has an order, which is the whole of the difference and enough
+of it. Ordering is by date with `series_part:` as the override, the same
+shape `type:` uses -- publishing out of order is rare enough that the
+date is the right default and common enough that there has to be a way to
+say otherwise. Previous and next are offered only *within* a series and
+never across the archive: on a site assembled from twenty-two sources the
+chronological neighbour of an essay is a tweet from fifteen years
+earlier, and calling that "next" is noise wearing the clothes of
+navigation. *Cost:* one more field, and a series of one is silently not a
+series (it is a post).
+
+**A feed per tag, only for the tags the menu names.** Generating one for
+every tag means 1761 files on a real archive, rebuilt and re-diffed on
+every build, that nobody will ever fetch -- the exact inverse of "nothing
+renders that wasn't asked for". A tag in `nav:` is the site saying this
+is a subject it publishes on, which is the same statement as "somebody
+might want to follow just this". *Cost:* a site with the derived type
+menu gets no tag feeds at all, which is the intended answer rather than
+an oversight -- it has not named a subject yet.
+
+**robots.txt can say no to AI crawlers, and the engine does not decide
+which way.** `seo.block_ai_crawlers` writes out a maintained list;
+`seo.robots_extra` is appended verbatim for the ones no list will be
+current about. Off by default, because wanting to be findable in a
+machine-generated answer is a legitimate position and not the engine's to
+take for a site. And it is documented as a *request*: some of these
+crawlers honour robots.txt and some do not, so anything here that said
+"blocks" would be a lie. *Cost:* a list in the engine goes stale, and
+updating it is a release note.
+
 **A listing's heading marks what it is; it doesn't say it twice.** Tag
 and search headings used to be sentences with a colon ("Tag: archive").
 The word is now its own element beside the value, hidden from sight by

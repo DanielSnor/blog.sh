@@ -21,6 +21,51 @@ byte-for-byte against the previous build.
 
 ### New
 
+- **`./blog.sh check`.** Walks the archive and reports what is broken in
+  it: media a post asks for and does not have, images of 1px or less
+  (which the build drops *with* their captions, so the page loses both
+  without a trace), internal links to addresses nothing answers at, media
+  directories no post owns, and one old address claimed by two posts. It
+  reads the content rather than the built site, so it works before a build
+  has ever run and every finding names a post to go and fix. It only
+  reports -- nothing is deleted -- and exits non-zero when it found
+  something, so it can hang off cron. On a 4400-post archive it takes
+  under a second.
+- **Editing a post is undoable.** The previous text is kept before an
+  overwrite, by an edit or by a re-import, and `[v]` in the `props` dialog
+  puts one back. Ten per post, oldest dropped; they travel to the trash
+  with their post and come back with it. Not configurable -- a safety net
+  with a switch is off exactly when it is needed. Only the text is
+  versioned, not media.
+- **Pages.** `page: true` takes a post out of the listings, the tag and
+  type archives and the feed, and gives it a permanent address at the root
+  (`/about/`) with no date on it -- while leaving it in the sitemap and
+  the search index, because being findable is the whole point of one.
+  (The importers that currently skip pages still skip them; that is its
+  own piece of work.)
+- **A 404 page.** Built by the site rather than left to the host's
+  default, so a mistyped address lands somewhere with the menu and the
+  search field on it. noindex.
+- **Series.** `series:` groups posts and `series_part:` overrides the date
+  for one published out of order; each series gets a listing in reading
+  order, and every post in one links to the previous and next part.
+  Deliberately only within the series: on an archive assembled from
+  twenty-two sources the chronological neighbour is usually unrelated.
+- **Reading time and a table of contents.** The first above the length at
+  which the engine already stops calling a post a photo with a caption;
+  the second from four headings up, or whenever a post asks with `toc:`.
+- **`fediverse:creator`.** Mastodon reads it off a shared link and puts
+  the author's account on the preview card. No new key -- it is the
+  `social:` entry pointing at a profile on the instance the site already
+  announces to, and a profile on any other instance is not passed off as
+  the account.
+- **A feed per tag, for the tags the menu names.** With autodiscovery on
+  the tag's own page. A site using the derived type menu gets none: it has
+  not named a subject yet.
+- **`seo.block_ai_crawlers` and `seo.robots_extra`.** A maintained list of
+  training crawlers written into robots.txt, plus free text for the ones
+  no list will be current about. Off by default. Worth saying plainly:
+  robots.txt is a request, not a fence.
 - **`site.extra_css`.** Stylesheets loaded after the engine's own, which is
   where a skin belongs -- previously the only way in was a `<link>` added
   to `layout.html.erb`, and `git pull` took it away again. Paths on this
@@ -59,13 +104,30 @@ byte-for-byte against the previous build.
   had a prefix, which is what suggested this. The window title still says
   "Tag: ...", where there is no stylesheet and no pill to say it instead.
 
+### Fixed
+
+- **`hero:` survived a save.** It shipped in this cycle as a post-level
+  override and an edit threw it away: `edit_post` rebuilds a post from its
+  frontmatter and then carries over a named list of fields that cannot be
+  expressed there, and `hero` was in neither place. Opening an opted-out
+  post in the editor silently gave it back the site's answer. It is a
+  frontmatter attribute now, next to `pinned`.
+
 ### Upgrading
 
-- Nothing to migrate. The one visible change is the heading above tag
-  listings and search results, so those pages are rewritten on the next
-  build -- a full deploy, not an incremental one, on a site with many tags.
-  To keep the old wording, put the word back with one CSS rule on
+- Nothing to migrate, and nothing new is on by default -- a site that adds
+  no keys gets the same bytes it got before, which is checked in the test
+  suite rather than assumed.
+- Two things rewrite existing pages, so the next deploy is a full one
+  rather than incremental: the heading above tag listings and search
+  results, and the post pages (reading time and the contents list appear
+  on the long ones). On an archive with many tags and posts that is most
+  of the site.
+- To keep the old heading wording, put the word back with one CSS rule on
   `.listing-heading__kind` in a stylesheet of your own.
+- Post versions live in `content.nosync/versions/`. They are part of your
+  content, not of the engine -- if you back up `content.nosync/`, they are
+  already covered.
 
 ## 1.2.1 -- 2026-08-12
 

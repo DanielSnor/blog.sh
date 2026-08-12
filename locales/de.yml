@@ -46,6 +46,7 @@ pagination:
   page: "Seite %{number}"
 
 tag:
+  feed_title: "%{name} – %{site_title}"
   # In der Überschrift der Liste steht das Schlagwort selbst; dies ist das
   # Wort, das sagt, um welche Art Liste es sich handelt -- es bleibt für
   # Screenreader erhalten und ist standardmäßig unsichtbar (siehe

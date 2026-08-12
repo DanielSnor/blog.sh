@@ -46,6 +46,7 @@ pagination:
   page: "page %{number}"
 
 tag:
+  feed_title: "%{name} – %{site_title}"
   # The listing heading shows the tag itself; this is the word that says
   # what kind of listing it is, kept for screen readers and hidden from
   # sight by default (see .listing-heading__kind in site.css).
