@@ -1,6 +1,6 @@
 # blog.sh — .sh → .rb → .html
 
-![sh → .rb → .html](assets/images/defaults/header.png)
+![sh → .rb → .html](https://blogsh.app/assets/images/header.png)
 
 *minimalistic static web/log cms*
 
@@ -17,6 +17,10 @@ A minimalist, file-based web/log engine. Posts are plain JSON files, the
 site is a static build, and authoring happens through a CLI/wizard --
 no database, no admin server, no PHP.
 
+**See it running:** [blogsh.app](https://blogsh.app) is this engine
+publishing its own documentation -- every page there was built and
+deployed by `./blog.sh` itself.
+
 MIT licensed (see [LICENSE](LICENSE)).
 
 > **Who it's for:** one person writing their own blog, at home in a
@@ -28,9 +32,11 @@ MIT licensed (see [LICENSE](LICENSE)).
 >
 > **Who it isn't for:** several authors sharing one site, anyone who
 > needs a web admin interface, or a workflow where publishing isn't a
-> command. It's a personal tool, built for and around a single deployment
-> ([sean.cz](https://sean.cz)) and shared as a working reference -- see
-> [Roadmap](#roadmap) for what would need to change to fit other setups.
+> command. It grew around a single deployment
+> ([sean.cz](https://sean.cz)) and still fits that shape best, but it
+> installs and runs as-is -- `setup.sh` asks the questions, and
+> [blogsh.app](https://blogsh.app) is a second site running the same
+> unmodified engine.
 
 | Light | Dark |
 | --- | --- |
@@ -39,6 +45,15 @@ MIT licensed (see [LICENSE](LICENSE)).
 *The default blue palette -- both modes come entirely from the 7-key
 `colors:` section in `config/site.yml` (see
 [install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)).*
+
+**Contents:** [Why this exists](#why-this-exists) ·
+[What it does](#what-it-does) · [Stack](#stack) · [Structure](#structure) ·
+[Requirements](#requirements) · [Getting started](#getting-started) ·
+[Authoring](#blogsh----authoring) ·
+[Configuration](#configuration-envsh-per-deployment-never-in-git) ·
+[Importing existing content](#importing-existing-content) ·
+[Deploy](#deploy) · [Roadmap](#roadmap) ·
+[Example deployments](#example-deployments)
 
 ## Why this exists
 
@@ -494,8 +509,7 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 
 ## Roadmap
 
-Things that currently assume this exact deployment and would need
-generalizing for anyone else to adopt this as-is:
+What isn't built yet, and what building it would take:
 
 - **Imports** -- twenty-two sources are covered (the table under
   [Importing existing content](#importing-existing-content)). Some of
@@ -542,9 +556,13 @@ generalizing for anyone else to adopt this as-is:
   about widgets only -- importing an Instagram archive needs no API and is
   covered above.)
 
-## Example deployment
+## Example deployments
 
 This engine was extracted from the codebase powering
 [sean.cz](https://sean.cz), Daniel Šnor's personal blog -- a reference for
 what a fully-configured deployment (all optional integrations enabled)
 looks like in practice.
+
+[blogsh.app](https://blogsh.app) is the second one: the project's own site,
+running the same unmodified engine and publishing its documentation as
+ordinary posts.
