@@ -2039,7 +2039,11 @@ end
 # unpublished post is off the site, old addresses included, and the stubs
 # come back when it does. Stubs stay out of listings, feeds, the sitemap
 # and the search index by construction -- they are not posts.
-posts.each do |post|
+#
+# Pages are in here as well as posts: a renamed page owes its old
+# address exactly what a renamed post does. They are out of the
+# LISTINGS, not out of the engine's promises.
+(posts + pages).each do |post|
   Array(post['former_slugs']).each do |former|
     parts = former.to_s.split('/').reject(&:empty?)
     # "." and ".." can only arrive via a hand-edited JSON (slugify never
@@ -2260,7 +2264,10 @@ emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
 # EVERYTHING real -- posts, listings, search, feeds, root files -- and a
 # stub yields to whatever the build already produced, out loud.
 REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
-posts.each do |post|
+# Pages too, for the reason above -- and because a source like Substack
+# serves its pages under /p/<slug>, so the old address is a real one the
+# importer records and this loop is the only thing that answers it.
+(posts + pages).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
     if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
