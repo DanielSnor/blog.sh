@@ -167,11 +167,17 @@ cli:
     (Poznámku si tedy piš přes //, ne přes # — mřížky jsou vyhrazené pro nadpisy.)
 
     FRONTMATTER (mezi --- a ---):
-      title  nadpis (volitelný)
-      tags   tagy oddělené čárkou, např: příroda, procházka, praha
-      type   typ postu — text / quote / chat / image / video / audio / link
-             (volitelné — necháš-li prázdné, typ se odvodí sám podle
-             obsahu postu)
+      title   nadpis (volitelný)
+      tags    tagy oddělené čárkou, např: příroda, procházka, praha
+      type    typ postu — text / quote / chat / image / video / audio / link
+              (volitelné — necháš-li prázdné, typ se odvodí sám podle
+              obsahu postu)
+              page → stránka mimo výpisy, archiv i RSS, na vlastní adrese
+              (About, Kontakt)
+      pinned  true → post se drží na začátku první stránky výpisu
+      series  jméno série; posty se stejným jménem tvoří sérii
+      hero    true/false → úvodní obrázek nad titulkem u tohohle postu
+      toc     true/false → seznam kapitol (sám naskočí od čtyř nadpisů)
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.

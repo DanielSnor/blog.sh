@@ -609,12 +609,31 @@ def hero_frontmatter_value(post)
   SITE_HERO ? true : nil
 end
 
+PAGE_TYPE = 'page'
+
+# `type: page` is how a page is written, because that is how it is thought
+# about: a page is a kind of post, not a flag on one. Inside it stays the
+# `page` field, and the content TYPE stays derived -- a page never appears
+# in a /type/ listing, so it has no use for one.
+#
+# `page: true` is still read, so pages written before this keep working
+# and an import that sets the field needs no translation.
+def frontmatter_type_and_page(meta)
+  type = meta['type'].to_s.strip
+  return [nil, true] if type.casecmp(PAGE_TYPE).zero?
+
+  [type.empty? ? nil : type, truthy_frontmatter?(meta['page'])]
+end
+
 def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
                       series: nil, series_part: nil, toc: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
-  lines << "type: #{type}" if type
+  # A page says so on the type line, which is where somebody looks to find
+  # out what kind of thing they are editing -- and it is the only line it
+  # needs, since a page's content type is never used.
+  lines << "type: #{page ? PAGE_TYPE : type}" if page || type
   # Only shown when the post already carries it: a key that appears on
   # every new post would suggest pinning is part of writing one, when it
   # is a decision about an existing post.
@@ -624,7 +643,6 @@ def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
   # it can actually be acted on -- a site that uses heroes, or a post that
   # has already said something of its own.
   lines << "hero: #{hero}" unless hero.nil?
-  lines << "page: #{page}" unless page.nil?
   lines << "series: #{series}" unless series.nil?
   lines << "series_part: #{series_part}" unless series_part.nil?
   lines << "toc: #{toc}" unless toc.nil?
@@ -711,7 +729,7 @@ def cmd_add
   date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'])
   title = meta['title'].to_s.empty? ? nil : meta['title']
   tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
-  type = meta['type'].to_s.empty? ? nil : meta['type']
+  type, page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
@@ -773,6 +791,9 @@ def cmd_add
     'source' => { 'platform' => 'manual' }
   }
   post['type'] = type if type
+  # Was not read here at all before: a page could only be made by editing
+  # one into existence, never by writing one.
+  post['page'] = true if page
   post['pinned'] = true if truthy_frontmatter?(meta['pinned'])
 
   path = PostWriter.write(post, media_files: media_files)
@@ -2110,7 +2131,7 @@ def edit_post(slug, path: nil)
   new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
   new_tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
-  new_type = meta['type'].to_s.empty? ? nil : meta['type']
+  new_type, new_page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
@@ -2173,7 +2194,7 @@ def edit_post(slug, path: nil)
     hero_wanted = truthy_frontmatter?(meta['hero'])
     updated['hero'] = hero_wanted unless hero_wanted == SITE_HERO
   end
-  updated['page'] = true if truthy_frontmatter?(meta['page'])
+  updated['page'] = true if new_page
   # Written as typed: the series name is a display name (the slug for its
   # address is derived at build time), and the part number is an override
   # for the rare post published out of order.
