@@ -123,8 +123,22 @@ module PostWriter
     # source platform writes it once, and a later re-import from an export
     # that carries no URL history (or a different importer entirely) must
     # not silently drop the addresses the post still answers for.
-    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at redirect_from].each do |key|
+    # page, series and series_part joined the list in 1.3. Same rule as the
+    # rest: carried over only when the importer said nothing itself, so an
+    # adapter that DOES recognise a page still wins, and a series -- which
+    # no source has a notion of -- survives every re-import.
+    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at
+       redirect_from page series series_part].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
+    end
+    # hero and toc need presence rather than truth, and that distinction is
+    # the whole point of them: `hero: false` is a post saying "not me", and
+    # a guard that tests `old[key]` reads that as "nothing to carry" and
+    # throws it away -- which is exactly how the field went missing from
+    # the editor before it was a frontmatter key. Only what the importer
+    # itself did not set, as above.
+    %w[hero toc].each do |key|
+      post[key] = old[key] if old&.key?(key) && !post.key?(key)
     end
     # A re-imported draft keeps its preview URL: the token is engine-side
     # state like the announcement URLs above, and minting a fresh one per

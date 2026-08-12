@@ -454,7 +454,7 @@ ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
 
 In Squarespace: **Settings → Import/Export → Export**, pick "WordPress
 format". It is almost a WordPress export, and everything a WXR import
-does applies -- pages and attachments counted as skips, drafts as
+does applies -- pages arrive as pages, attachments counted as skips, drafts as
 drafts. The differences are all in what a plain parse would silently
 lose, and the importer restores each: image URLs hidden in `data-src`,
 audio players that are just a `<div>` with data attributes (they become
@@ -484,7 +484,9 @@ Newsletters and podcasts come over, drafts included; a podcast episode's
 mp3 downloads and leads the post as an audio block. **Paid posts import
 in full** -- the export is the author's, so it carries the complete
 text, and the paywall marker is simply removed. The subtitle becomes the
-post's first paragraph. Threads and pages are skipped and counted.
+post's first paragraph. A page arrives as a page (it keeps its /p/
+address as a redirect, which is where Substack served it); threads are
+skipped and counted.
 
 Two honest gaps, both the export's: **tags don't exist in it** (Substack
 keeps them only on the live site -- posts arrive with just the platform
@@ -654,7 +656,7 @@ matters: **a public feed carries only its last few dozen items; a WXR file
 is the complete archive.** For WordPress, always export: **Tools → Export →
 All content**.
 
-From a WXR: only posts are imported (pages, attachments and menu items are
+From a WXR: posts and pages are imported (attachments and menu items are
 counted separately -- in a stock export they outnumber the posts), the slug
 the site already published under is kept, `publish` stays published and
 `draft`/`pending`/`private`/`future` become drafts, trashed items are

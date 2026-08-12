@@ -533,7 +533,6 @@ import:
     quote: "Zitat-Post"
     empty: "kein verwertbarer Inhalt"
     attachment: "Anhang, kein Beitrag"
-    page: "Seite, kein Beitrag"
     not_a_post: "kein Beitrag"
     trashed: "im Papierkorb"
     boost: "Boost"

@@ -56,10 +56,14 @@ module Import
     end
 
     def map(item, media)
-      # Pages are deliberately not posts: an about page or a contact page
-      # in the middle of the archive would be timeline noise. The summary
-      # counts them so nobody wonders where they went.
-      return :page if item['type'] != 'post'
+      # A page is imported AS a page rather than skipped. It was skipped
+      # while the engine had nowhere to put one: an about or a contact page
+      # dropped into the middle of the archive would have been timeline
+      # noise. Now it keeps its address and stays out of the stream, which
+      # is what it was on the old site too -- and a migration that silently
+      # left the About page behind was the worst kind of loss, because the
+      # site looked complete.
+      is_page = item['type'] != 'post'
 
       html = item['html'].to_s.gsub('__GHOST_URL__', @site_url)
       blocks = leading_blocks(item, media) + body_blocks(html, media, item)
@@ -80,9 +84,14 @@ module Import
           'original_id' => item['id']
         }
       }
+      post['page'] = true if is_page
       if @keep_permalinks && state == 'published'
         path = Permalinks.local_path(post_url(item))
-        post['redirect_from'] = [path] if path
+        # A page already lands at the root, so on Ghost -- where a page
+        # lived at /about/ too -- the redirect would point the new address
+        # at itself. The build warns about exactly that, once per build,
+        # forever.
+        post['redirect_from'] = [path] if path && !(is_page && path == "/#{post['slug']}/")
       end
       post
     end

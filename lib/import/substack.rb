@@ -82,10 +82,12 @@ module Import
     end
 
     def map(item, media)
-      case item['type']
-      when 'thread' then return :thread
-      when 'page' then return :page
-      end
+      return :thread if item['type'] == 'thread'
+
+      # Imported as a page rather than skipped: Substack's "page" is the
+      # about/archive-style standing text, which is exactly what the
+      # engine's page type is for.
+      is_page = item['type'] == 'page'
 
       html_path = File.join(@dir, 'posts', "#{item['post_id']}.html")
       # Substack sometimes exports the newest posts as CSV rows with no
@@ -125,6 +127,10 @@ module Import
           'original_id' => numeric_id(item)
         }.compact
       }
+      post['page'] = true if is_page
+      # Substack serves a page at /p/<slug> like everything else, so the
+      # old address is a real one to keep even for a page -- unlike Ghost
+      # or WordPress, where it would be the address the page now has.
       post['redirect_from'] = ["/p/#{slug}"] if @keep_permalinks && state == 'published'
       post
     end

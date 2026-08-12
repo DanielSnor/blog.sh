@@ -48,8 +48,13 @@ byte-for-byte against the previous build.
   type archives and the feed, and gives it a permanent address at the root
   (`/about/`) with no date on it -- while leaving it in the sitemap and
   the search index, because being findable is the whole point of one.
-  (The importers that currently skip pages still skip them; that is its
-  own piece of work.)
+  **Ghost, WordPress, Squarespace and Substack import them as pages**
+  instead of counting them as skips -- a migration that quietly left the
+  About page behind was the worst kind of loss, because the new site
+  looked complete. Where the source served a page at the same address
+  this engine now does (Ghost, WordPress), no redirect is written: it
+  would point the page at itself. A page in a WordPress trash stays in
+  the trash, like any trashed post.
 - **A 404 page.** Built by the site rather than left to the host's
   default, so a mistyped address lands somewhere with the menu and the
   search field on it. noindex.

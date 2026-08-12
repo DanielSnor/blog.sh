@@ -526,7 +526,6 @@ import:
     quote: "citace"
     empty: "žádný použitelný obsah"
     attachment: "příloha, ne post"
-    page: "stránka, ne post"
     not_a_post: "není post"
     trashed: "v koši"
     boost: "boost"

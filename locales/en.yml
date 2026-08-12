@@ -538,7 +538,6 @@ import:
     quote: "quote post"
     empty: "no usable content"
     attachment: "attachment, not a post"
-    page: "page, not a post"
     not_a_post: "not a post"
     trashed: "in the trash"
     boost: "boost"

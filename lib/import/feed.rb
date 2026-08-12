@@ -113,6 +113,10 @@ module Import
       reason = skip_reason(item)
       return reason if reason
 
+      # Asked before the blocks are built, because the answer decides where
+      # the post lives rather than what is in it.
+      is_page = wordpress? && text_of(item, 'wp:post_type') == 'page'
+
       html = body_html(item)
       html = expand_shortcodes(html) if wordpress?
       parsed = HtmlBlocks.parse(html)
@@ -148,8 +152,13 @@ module Import
       # importer reads. Drafts never had a public address, and a plain
       # "?p=123" permalink has its identity in the query string, which a
       # static stub can never answer -- those are counted, not guessed at.
+      post['page'] = true if is_page
       if @keep_permalinks && state == 'published'
         path = Permalinks.local_path(item_link(item))
+        # A page that already lived at the root keeps that very address
+        # here, so a redirect from it would point the page at itself --
+        # which the build reports on every run and no edit ever clears.
+        path = nil if path && is_page && path == "/#{post['slug']}/"
         path ? post['redirect_from'] = [path] : @unmapped_permalinks += 1
       end
       post
@@ -421,7 +430,9 @@ module Import
       case type
       when 'post' then trashed?(item) ? :trashed : false
       when 'attachment' then :attachment
-      when 'page' then :page
+      # A page is imported as a page now rather than skipped -- trashed
+      # ones stay out for the same reason a trashed post does.
+      when 'page' then trashed?(item) ? :trashed : false
       else custom_type_reason(type)
       end
     end
