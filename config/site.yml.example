@@ -8,13 +8,40 @@
 # it in for your own site. After every edit, rebuild: ./blog.sh rebuild, or
 # directly ruby build/build_blog.rb && ./scripts/deploy-web.sh.
 #
-# Sections in the order the page reads, top to bottom (the same order
-# ./style.sh's menu walks them): identity (site) -> the whole page's
-# palette (colors) -> the header (banner, fonts) -> the sidebar (about,
-# widgets) -> the footer (footer, social) -> analytics -> then the parts
-# with no place on the page: the comments network (mastodon OR bluesky),
-# publishing slots, media habits. A minimal config with just site,
-# banner, about and footer is a complete, working site.
+# A minimal config with just site, banner, about and footer is a complete,
+# working site. Everything else is optional, and a section left out means
+# the engine's own default -- never a broken page.
+#
+# EVERY SETTING THERE IS, in the order they appear below. A key shown in
+# (brackets) is optional and commented out where it lives; the rest of
+# this file explains each one where it stands.
+#
+#   site        title, short_name, description, author, lang, locale,
+#               timezone, base_url, (page_size), (extra_css)
+#   banner      src, alt, width, height, (show_title), (show_claim), (claim)
+#   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
+#               pill_bg, (banner_title), (banner_claim)
+#   fonts       (faces), (banner_title), (banner_title_size),
+#               (banner_claim), (banner_claim_size)
+#   layout      (sidebar), (nav_bottom), (hero)
+#   nav         (the menu bar: label with tag or url -- or [] for none)
+#   about       heading, html
+#   widgets     (toots, pixelfed, commits, bluesky, rss)
+#   footer      links_heading, links, note_heading, note_html, copyright,
+#               social_heading
+#   social      name, url, icon or icon_svg, (rel)
+#   mastodon    instance, (toot_length)          -- OR bluesky, never both
+#   bluesky     (handle), (pds)
+#   publishing  (slots)
+#   media       (convert_heic), (strip_location)
+#   seo         (block_ai_crawlers), (robots_extra)
+#   analytics   (src), (website_id)
+#
+# The order is the order the page reads, top to bottom -- identity, then
+# the header, the palette and the type, then the regions, the menu, the
+# sidebar, the footer -- and after that the parts with no place on the
+# page at all: the comments network, publishing, media, robots, analytics.
+# ./style.sh walks its own menu the same way.
 
 site:
   # The full title -- <title> on the homepage, and the basis for every other page's.
@@ -64,46 +91,6 @@ site:
   # extra_css:
   #   - "/assets/css/skin.css"
 
-# Optional. Omit this whole section (or any key inside it) to fall back to
-# blog.sh's own blue palette (DEFAULT_COLORS in lib/colors_css.rb). Each
-# mode only takes these 7 keys -- everything else the CSS needs (card
-# background, nav text/border, link/badge hover, search input background)
-# is derived from them at build time (see color_properties in
-# lib/colors_css.rb), not separately configurable, since it's never
-# varied independently across any palette this engine has shipped.
-# Ready-made palettes live in config/palettes.yml -- `./style.sh` lists
-# them, shows a preview, and writes the chosen one in here, which beats
-# picking fourteen hex values by hand. Adding your own to that file makes
-# it appear in the list.
-# Rebuild after changing any value here: ./blog.sh rebuild.
-#
-# banner_title / banner_claim are the one exception: two more OPTIONAL
-# keys per mode, independent of each other and of the 7 above, for the
-# banner overlay text's color (see banner.show_title/show_claim below).
-# Default when omitted: nav_bg in light mode, white in dark mode -- the
-# same look the banner had before these keys existed.
-colors:
-  light:
-    bg: "#f5f8fa"
-    text: "#444a5a"
-    meta_text: "#657784"
-    accent: "#1da1f2"
-    nav_bg: "#eaf5fd"
-    border: "#e1e8ed"
-    pill_bg: "#d6ecfc"
-    # banner_title: "#ffffff"
-    # banner_claim: "#ffffff"
-  dark:
-    bg: "#111111"
-    text: "#ffffff"
-    meta_text: "#6a7f8c"
-    accent: "#4ab3f4"
-    nav_bg: "#192734"
-    border: "#263340"
-    pill_bg: "#16324a"
-    # banner_title: "#ffffff"
-    # banner_claim: "#ffffff"
-
 banner:
   # Ships with the engine, so a fresh install renders before you've drawn
   # anything -- replace it with your own image and update the size below.
@@ -130,6 +117,46 @@ banner:
   # as before -- same trust level as about.html/footer.note_html below
   # (site.yml is owner-edited config, not visitor input).
   # claim: "First line<br>Second line"
+
+# Optional. Omit this whole section (or any key inside it) to fall back to
+# blog.sh's own blue palette (DEFAULT_COLORS in lib/colors_css.rb). Each
+# mode only takes these 7 keys -- everything else the CSS needs (card
+# background, nav text/border, link/badge hover, search input background)
+# is derived from them at build time (see color_properties in
+# lib/colors_css.rb), not separately configurable, since it's never
+# varied independently across any palette this engine has shipped.
+# Ready-made palettes live in config/palettes.yml -- `./style.sh` lists
+# them, shows a preview, and writes the chosen one in here, which beats
+# picking fourteen hex values by hand. Adding your own to that file makes
+# it appear in the list.
+# Rebuild after changing any value here: ./blog.sh rebuild.
+#
+# banner_title / banner_claim are the one exception: two more OPTIONAL
+# keys per mode, independent of each other and of the 7 above, for the
+# banner overlay text's color (see banner.show_title/show_claim above).
+# Default when omitted: nav_bg in light mode, white in dark mode -- the
+# same look the banner had before these keys existed.
+colors:
+  light:
+    bg: "#f5f8fa"
+    text: "#444a5a"
+    meta_text: "#657784"
+    accent: "#1da1f2"
+    nav_bg: "#eaf5fd"
+    border: "#e1e8ed"
+    pill_bg: "#d6ecfc"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
+  dark:
+    bg: "#111111"
+    text: "#ffffff"
+    meta_text: "#6a7f8c"
+    accent: "#4ab3f4"
+    nav_bg: "#192734"
+    border: "#263340"
+    pill_bg: "#16324a"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
 
 # Optional, and the typographic half of the palette: the two lines painted
 # over the banner -- the site's name and its claim -- take their font AND
@@ -191,26 +218,6 @@ banner:
 #   # that doesn't use them. A post with no usable image (or only a 1x1
 #   # tracking pixel out of an old import) keeps the ordinary layout.
 #   hero: false
-
-# Optional. What robots.txt says beyond "everything is allowed".
-#
-# block_ai_crawlers writes out a maintained list of the crawlers that
-# collect text to train on (GPTBot, ClaudeBot, CCBot, Google-Extended,
-# PerplexityBot and friends). Off by default: wanting to be findable in an
-# answer somebody gets from a machine is a legitimate position, and the
-# engine does not take it on your behalf either way.
-#
-# It is a REQUEST, not a fence. Some of these honour robots.txt and some
-# do not, and nothing here can make them -- if that matters to you, the
-# answer is at the web server, not in this file.
-#
-# robots_extra is appended verbatim, for the agents no list will ever be
-# current about.
-# seo:
-#   block_ai_crawlers: false
-#   robots_extra: |
-#     User-agent: SomeOtherBot
-#     Disallow: /
 
 # Optional. The menu across the top. Without this key the menu is what the
 # engine derives: All, then one entry per content type the site actually
@@ -329,13 +336,6 @@ social:
     url: "mailto:you@example.com"
     icon: "email"
 
-# Optional. Omit this whole section for a site with no analytics script.
-# Commented out so a fresh build doesn't reference a script that isn't
-# yours -- uncomment with your own values.
-# analytics:
-#   src: "https://analytics.example.com/script.js"
-#   website_id: "00000000-0000-0000-0000-000000000000"
-
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's
 # comments. Configure EITHER mastodon: OR bluesky: -- never both; the
@@ -393,3 +393,30 @@ mastodon:
 # media:
 #   convert_heic: true
 #   strip_location: false
+
+# Optional. What robots.txt says beyond "everything is allowed".
+#
+# block_ai_crawlers writes out a maintained list of the crawlers that
+# collect text to train on (GPTBot, ClaudeBot, CCBot, Google-Extended,
+# PerplexityBot and friends). Off by default: wanting to be findable in an
+# answer somebody gets from a machine is a legitimate position, and the
+# engine does not take it on your behalf either way.
+#
+# It is a REQUEST, not a fence. Some of these honour robots.txt and some
+# do not, and nothing here can make them -- if that matters to you, the
+# answer is at the web server, not in this file.
+#
+# robots_extra is appended verbatim, for the agents no list will ever be
+# current about.
+# seo:
+#   block_ai_crawlers: false
+#   robots_extra: |
+#     User-agent: SomeOtherBot
+#     Disallow: /
+
+# Optional. Omit this whole section for a site with no analytics script.
+# Commented out so a fresh build doesn't reference a script that isn't
+# yours -- uncomment with your own values.
+# analytics:
+#   src: "https://analytics.example.com/script.js"
+#   website_id: "00000000-0000-0000-0000-000000000000"
