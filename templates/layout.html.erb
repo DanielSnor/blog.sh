@@ -25,11 +25,16 @@
   <title><%= h(page_title) %></title>
   <meta name="description" content="<%= h(page_description) %>">
   <link rel="canonical" href="<%= h(page_url) %>">
-  <link rel="icon" type="image/png" href="/assets/images/favicon.png">
-  <%# Same file: iOS scales it down, so adding a home-screen icon doesn't mean
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png"><%# Same file: iOS scales it down, so adding a home-screen icon doesn't mean
       maintaining a second image. Without this link iOS uses a screenshot of
       the page instead. /favicon.ico needs no link -- the clients that want it
-      probe the root path blindly (see build_favicon_ico). %>
+      probe the root path blindly (see build_favicon_ico).
+
+      It opens at the END of the line above rather than on one of its own,
+      and that is not formatting: these templates compile without ERB trim
+      mode, so a comment sitting on its own line leaves its indentation and
+      its newline in the output -- two spaces on every page of every site
+      built with this engine. %>
   <link rel="apple-touch-icon" href="/assets/images/favicon.png">
   <link rel="stylesheet" href="/assets/css/colors.css">
   <link rel="stylesheet" href="/assets/css/site.css"><%= extra_css_links %>
