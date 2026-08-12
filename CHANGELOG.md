@@ -52,10 +52,14 @@ byte-for-byte against the previous build.
   best. The front matter carries `redirect_from` in exactly the shape the
   `jekyll-redirect-from` plugin reads, merging both kinds of old address,
   so on a Jekyll site every URL a post ever had goes on answering. What
-  markdown has no syntax for -- a link card, an embed whose address the
-  engine cannot recognise -- is written as HTML and *counted in the
-  summary*, because imported back it arrives as text rather than as
-  blocks. Everything else the engine keeps and no other engine has a word
+  markdown has no syntax for -- video, audio, a link card -- is written
+  as HTML and *counted in the summary*, because imported back it arrives
+  as text rather than as blocks. Video and audio go out as HTML even
+  though the authoring markdown has a form for them: `!![caption](url)`
+  is this engine's own, and every other markdown parser reads it as an
+  exclamation mark followed by an image. Verified over a real 118-post
+  archive -- 118 posts and 420 media files out and back with every field
+  identical, which is also how that video defect was found. Everything else the engine keeps and no other engine has a word
   for travels under one `blogsh:` key, which `./import.sh` reads back:
   posts keep their identity, series, redirects and announcement URLs, so
   export plus re-import moves an installation instead of merely leaving
@@ -150,6 +154,20 @@ byte-for-byte against the previous build.
   `pinned` has. A 1x1 tracking pixel out of an old import is skipped
   rather than promoted to lead picture, and a post with nothing suitable
   keeps the ordinary layout.
+- **`./style.sh` can set everything about how the site looks.** It grew a
+  Layout section -- the three region switches above and the list of your
+  own stylesheets -- and learned four settings that until now had to be
+  written into the YAML by hand: the banner's *filename* (it could replace
+  the image, but only onto whatever path the config already named), the
+  claim text painted over it, and self-hosted font faces. A site can now
+  be dressed entirely from the wizard, which was the point of making all
+  of this configuration in the first place.
+
+  Both lists say which of their entries has no file on disk, and refuse a
+  stylesheet on another host: every page carries `style-src 'self'`, so
+  the browser would discard it without a word and the site would simply
+  render undressed. Pressing Enter through any of these sections changes
+  nothing -- the current answer is always the default.
 
 ### Changed
 
@@ -162,6 +180,14 @@ byte-for-byte against the previous build.
   no hint of where it is. Content-type listings are untouched: they never
   had a prefix, which is what suggested this. The window title still says
   "Tag: ...", where there is no stylesheet and no pill to say it instead.
+- **`config/site.yml.example` opens with an index.** Every section and
+  every key it accepts, optional ones in brackets, so the answer to "what
+  can I set?" is the first thirty lines rather than the whole file.
+  Nothing was missing from it -- the keys were all there, some of them
+  commented inside a section, which is easy to read past in four hundred
+  lines of explanation. The sections are also in the order the page reads
+  now, the order its own header had been describing since before `layout`,
+  `seo` and `nav` were added in the middle of the appearance ones.
 
 ### Fixed
 

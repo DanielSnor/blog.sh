@@ -244,6 +244,16 @@ Three details carry the design:
   state between blocks, so this is equivalent) and gives anything that
   came back empty the same HTML the build renders. Counted per type and
   said out loud, because read back in they are text, not blocks.
+  **Video and audio skip the markdown path even where the writer has a
+  form for them**: `!![caption](url)` is this engine's own syntax, and
+  CommonMark -- what every destination engine reads -- parses it as a
+  literal `!` followed by an *image*. Exported as markdown, a YouTube
+  video rendered on the destination as a broken image, and re-importing
+  the tree downloaded YouTube's HTML page and filed it in the archive as
+  `02.jpg` with no error reported, because the fetch had technically
+  succeeded. Found only by running the whole thing over a real 118-post
+  archive; a fixture could not have shown it, because both ends of a
+  fixture round-trip are ours.
 - **`blogsh:` is the round-trip.** Everything no other engine has a word
   for goes under that one key -- `source` above all, which is half the
   re-import dedup key. `Import::Jekyll` reads it back (whitelisted, never

@@ -505,13 +505,16 @@ last layer. `./import.sh` reads it back, which is what makes export plus
 re-import a way to *move* an installation rather than only a way to
 leave one.
 
-Two things markdown cannot write down are written as HTML instead: the
-link card, and an embed imported from a platform whose address the
-engine does not recognise. Any engine that passes HTML through renders
-them -- but they are counted in the summary, because read back in they
-arrive as text rather than as blocks. Inline `small`, `mention` and
-`color` spans keep their text and lose their styling, for the same
-reason.
+What markdown cannot write down is written as HTML instead: video,
+audio and the link card. Video and audio go that way even though the
+authoring markdown has a form for them -- `!![caption](url)` is this
+engine's own syntax, and to CommonMark it reads as an exclamation mark
+followed by an image, so a YouTube clip exported as markdown would land
+on the destination site as a broken image. As HTML they arrive as the
+player the build renders. Every one of them is counted in the summary,
+because read back in they come home as text rather than as blocks.
+Inline `small`, `mention` and `color` spans keep their text and lose
+their styling, for the same reason.
 
 ## Deploy
 

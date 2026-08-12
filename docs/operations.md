@@ -354,10 +354,12 @@ best.
 
 Three things are worth knowing before you rely on the result:
 
-- **The summary counts what could not stay markdown.** A link card and
-  an embed the engine cannot recognise the address of are written as
-  HTML. Every engine that passes HTML through renders them; imported
-  back, they arrive as text rather than as blocks.
+- **The summary counts what could not stay markdown.** Video, audio and
+  link cards are written as HTML -- video and audio deliberately, because
+  the engine's own `!![caption](url)` reads as an exclamation mark and an
+  image to everybody else's markdown parser. Every engine that passes
+  HTML through renders them properly; imported back, they arrive as text
+  rather than as blocks.
 - **`redirect_from` is written in the shape `jekyll-redirect-from`
   reads,** and it merges both kinds of old address -- where the post
   lived on the platform it came from, and where it lived here before a

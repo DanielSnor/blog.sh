@@ -325,8 +325,8 @@ token. Such a post also gets no platform tag -- it is coming home, not
 arriving from Jekyll. That makes export + import the supported way to
 move an installation between machines or hosts. The only thing not
 restored is what the export could not write as markdown in the first
-place: a link card and an unrecognised embed come back as the HTML text
-they were written as (the export says how many, per type).
+place: video, audio and link cards come back as the HTML text they were
+written as (the export says how many, per type).
 
 The pattern understands `:year`, `:month`, `:day`, `:title` and
 `:slug`, and nothing else -- anything further is left in the address
