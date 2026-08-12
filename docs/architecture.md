@@ -66,7 +66,7 @@ dedup by `source`).
 | --- | --- |
 | `text` | `text`; `subtype` (`heading1`-`heading6`, `quote`; absent = paragraph); `formatting`; a quote may carry `cite` (attribution, rendered as a right-aligned line) |
 | `list` | `style` (`"ul"`/`"ol"`); `items` -- each `{text, formatting?, children?}` where `children` is a nested list block |
-| `table` | `align` (array of `left`/`center`/`right`); `header` (array of cells); `rows` (array of cell arrays); a cell is `{text, formatting?}` |
+| `table` | `align` (array of `left`/`center`/`right`); `header` (array of cells, **absent when the table has none** -- written as a table opening with the separator row, rendered without a `<thead>`); `rows` (array of cell arrays); a cell is `{text, formatting?}` |
 | `code` | `text` (verbatim, blank lines preserved); `lang` (cosmetic) |
 | `chat` | `lines` -- array of `{name, text}`; `name` may be nil for a continuation line |
 | `hr` | no fields |
@@ -230,7 +230,8 @@ A single linear pass, no framework:
    therefore never shift, so adding a post rewrites a handful of files
    instead of the whole archive.
 5. **Indexes & feeds.** Client-side search index split into recent
-   (newest 500, loaded eagerly) and archive (loaded on first query);
+   (`search-index.json`, newest 500, loaded eagerly) and archive
+   (`search-index-archive.json`, loaded on first query);
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
 6. **Assets, colors and the root favicon.** Before `assets/` is copied
@@ -255,9 +256,9 @@ A single linear pass, no framework:
    are one byte each and 0 means 256, so a larger source can't state its
    size -- browsers load it and report 256, immaterial at favicon sizes.
 7. **Write & prune.** `emit` writes a file only when its bytes actually
-   changed and records every generated path; whatever the build didn't
-   produce this run is deleted afterward, deepest directories collapsing
-   first.
+   changed and records every generated path; `prune_public` then deletes
+   whatever the build didn't produce this run, deepest directories
+   collapsing first.
 
 Renders are memoized per post (content HTML, parsed time, dominant
 type, list item) keyed by object identity -- a post appears on its own
@@ -368,3 +369,34 @@ origins:
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.
+
+## Security
+
+The threat model is a static site with no server of its own: nothing
+here authenticates anybody, so what remains to get wrong is what the
+pages carry and what the working directory holds.
+
+- **Content-Security-Policy**, delivered as a meta tag, because a static
+  host may not let you set headers. Fonts are self-hosted, so no
+  third-party origin is needed for them. A media player's origin is
+  admitted only on the pages that actually embed one -- the build knows
+  which posts carry a provider, so an archive page that embeds nothing
+  allows nothing; YouTube's two origins are the exception and are
+  allowed everywhere. The one inline script is allowlisted by content
+  hash, see [The client side](#the-client-side).
+- **Draft URLs** carry a `SecureRandom` token and `noindex`. That makes
+  a preview link unguessable and keeps it out of search results. It is
+  not access control: anyone the link reaches can read the draft, which
+  is the point of being able to send one.
+- **Escaping** is consistent for everything that came off a network --
+  Fediverse display names, avatar URLs, reply text -- in both the HTML
+  the build writes and the DOM the client builds. The one exception is
+  Mastodon's own sanitized status HTML, see
+  [The client side](#the-client-side).
+- **`env.sh`** holds the live credentials, stays out of git, and is mode
+  `600`. The wizards leave a `.bak` of whatever they rewrote at the same
+  mode, so it still holds the previous tokens -- remove it once one has
+  been rotated.
+- **No third-party tracking** goes into post data, and the sidebar
+  widgets are fetched server-side by cron rather than by the visitor's
+  browser, so reading a page contacts one origin.

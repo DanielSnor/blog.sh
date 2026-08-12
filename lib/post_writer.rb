@@ -3,6 +3,8 @@ require 'fileutils'
 require 'securerandom'
 require 'time'
 require_relative 'atomic_write'
+require_relative 'exif_location'
+require_relative 'site_config'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
@@ -44,6 +46,15 @@ module PostWriter
     path
   end
 
+  # media.strip_location, on unless a site says otherwise. On by default
+  # because the cost of the wrong default is asymmetric: a photographer who
+  # wants coordinates in their archive notices they are missing and turns
+  # this off, while somebody who never knew phones write them finds out from
+  # a stranger who read them off the web.
+  def self.strip_location?
+    SiteConfig.get('media', 'strip_location', default: true) != false
+  end
+
   def self.copy_media(media_files, year, slug)
     return if media_files.empty?
 
@@ -63,6 +74,11 @@ module PostWriter
       tmp = File.join(media_dir, ".#{filename}.part")
       begin
         FileUtils.cp(src_path, tmp)
+        # On the copy, never on the author's own file: what sits in
+        # incoming/ or in a photo library is theirs, and the archive's
+        # copy is the one about to be published. Between the cp and the
+        # rename is the one moment the file is the engine's alone.
+        ExifLocation.strip_file(tmp) if strip_location?
         File.rename(tmp, dest)
       rescue StandardError
         begin

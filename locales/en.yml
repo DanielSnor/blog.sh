@@ -305,7 +305,8 @@ cli:
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      walks the archive on screen: filters, search, preview, Enter opens the post
-      ./blog.sh doctor [--online]    reads the configuration and says what is wrong with it
+      ./blog.sh doctor [--online] [--strip-location]
+                                     reads the configuration and says what is wrong with it
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
@@ -662,6 +663,14 @@ doctor:
   age_hours: "%{count} hour(s)"
   age_days: "%{count} day(s)"
 
+  media_location_clean: "No photo in the archive carries the place it was taken."
+  media_location: "%{count} photo(s) in the archive still carry the place they were taken -- saved before the engine started removing it, and the site shows what the archive holds."
+  media_location_fix: "./blog.sh doctor --strip-location removes it. New photos are already handled; set media.strip_location to false in config/site.yml if you want the coordinates kept."
+  media_location_no_dir: "There is no media.nosync directory yet, so there is nothing to clean."
+  media_location_stripping: "Removing the location from %{count} photo(s)…"
+  media_location_stripped: "Cleaned %{count} photo(s)."
+  media_location_unwritable: "%{count} could not be rewritten -- check the file permissions and run this again."
+  media_location_redeploy: "Each rewritten photo has a new checksum, so the next deploy uploads it again. Run ./blog.sh rebuild when you're ready."
   backend_unset: "No deploy target chosen, so the site is built locally and goes nowhere."
   backend_unset_fix: "That is a fine place to start -- ./blog.sh preview shows the build. Run ./setup.sh when you want it online."
   backend_ok: "Deploying with the %{name} backend."
@@ -834,7 +843,9 @@ style:
   pv_written: "✅ The preview is at %{path} -- open it in a browser."
   pv_uploading: "Uploading the preview to the site…"
   pv_online: "Preview: %{url}"
+  pv_temporary: "A temporary page -- the next build takes it down, and a scheduled run can start one at any minute. Look now rather than later."
   pv_upload_failed: "The upload did not go through -- the lines above say why. Local copy: %{path}"
+  pv_upload_busy: "Another run holds the lock, so the preview was not uploaded. Nothing is broken -- try again in a minute. Local copy: %{path}"
   pv_failed: "The preview could not be built (%{message}). The palette can be written without it."
   pv_custom_name: "custom colours"
   pv_post_title: "The first post on a new site"
@@ -878,8 +889,8 @@ style:
   q_about_heading: "\"About\" heading"
   h_about_heading: "For example \"About\" or \"Who writes this\"."
   q_about_html: "Your bio"
-  h_about_html: "A few sentences about yourself. May contain HTML, so a link or a photo is fine."
-  c_about_html: "Write your bio below. HTML is allowed -- a link, or an <img> for a photo.\nLines starting with // are dropped."
+  h_about_html: "A few sentences about yourself, in Markdown -- the same as in a post."
+  c_about_html: "Write your bio below. Markdown works here just as it does in a post:\n**bold**, [a link](https://example.com), a list, a blank line for a new paragraph.\nHTML is still allowed too -- an <img> is still how a photo gets in.\nLines starting with // are dropped."
 
   q_footer_links_heading: "Heading above the footer links"
   h_footer_links_heading: "For example \"Links\" or \"Elsewhere\"."
@@ -888,10 +899,10 @@ style:
   q_footer_social_heading: "Heading above the social icons"
   h_footer_social_heading: "For example \"Find me on\"."
   q_footer_copyright: "Copyright line"
-  h_footer_copyright: "E.g.: &copy; 2026 Petra Small -- HTML entities work, &copy; becomes ©."
+  h_footer_copyright: "E.g.: &copy; 2026 Petra Small -- Markdown works, and so do HTML entities: &copy; becomes ©."
   q_footer_note: "The footer note"
-  h_footer_note: "The paragraph under that heading. May contain HTML."
-  c_footer_note: "Write the footer note below. HTML is allowed.\nLines starting with // are dropped."
+  h_footer_note: "The paragraph under that heading, in Markdown -- and more than one if you like."
+  c_footer_note: "Write the footer note below. Markdown works here:\n**bold**, [a link](https://example.com), a list, a blank line for a new paragraph.\nHTML is still allowed too.\nLines starting with // are dropped."
 
   social_current: "Icons in the footer now"
   q_social_action: "Add one, remove one, or leave them?"
@@ -957,3 +968,4 @@ style:
   q_rebuild: "Rebuild the site now, so you can look at it? [y/N] "
   rebuilt: "✅ Built. ./blog.sh preview serves it at http://localhost:8000/, and ./blog.sh rebuild deploys it."
   rebuild_failed: "The build did not finish -- the lines above say why. Your config was written either way."
+  rebuild_busy: "Another run holds the lock, so the site was not rebuilt. Nothing is broken and your config was written -- try again in a minute."

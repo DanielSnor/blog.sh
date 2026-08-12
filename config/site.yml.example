@@ -98,8 +98,13 @@ banner:
   src: "/assets/images/header.png"
   alt: "Your Site"
   # The file's actual dimensions -- reserves space before the image loads.
-  width: 940
-  height: 300
+  # The shipped banner is twice its display size so it stays sharp on a
+  # dense screen; .banner is width:100% in the stylesheet, so what these two
+  # numbers do is hold the ASPECT RATIO open while the image arrives. Put
+  # your own image's real dimensions here -- doctor compares them with the
+  # file and says so when they drift apart.
+  width: 1880
+  height: 600
   # Optional, independent of each other (default true for both): whether
   # site.short_name / site.description render as text overlaid on the
   # banner image. Turn either off if the image is busy enough on its own.
@@ -109,9 +114,9 @@ banner:
   # else (meta description, RSS, listing pages) keeps using site.description
   # unchanged. Exists because site.description must stay plain text (see
   # above), so it can't carry a manual line break; this field can, since
-  # nothing but the banner overlay ever reads it. May contain HTML, same
-  # trust level as about.html/footer.note_html below (site.yml is
-  # owner-edited config, not visitor input).
+  # nothing but the banner overlay ever reads it. Markdown, and HTML just
+  # as before -- same trust level as about.html/footer.note_html below
+  # (site.yml is owner-edited config, not visitor input).
   # claim: "First line<br>Second line"
 
 # Optional, and the typographic half of the palette: the two lines painted
@@ -152,9 +157,17 @@ banner:
 
 about:
   heading: "About"
-  # May contain HTML (links). Inserted inside a <p>.
-  html: >-
-    A short bio about yourself, with a <a href="https://example.com">link</a>
+  # Markdown, the same as in a post: **bold**, [links](https://example.com),
+  # lists, a blank line for a new paragraph. Raw HTML still works too and is
+  # how a photo gets in (<img>) -- Markdown images are left out on purpose,
+  # since they resolve filenames against a post's media directory and the
+  # sidebar has none.
+  # The '|-' matters: in a folded scalar ('>-') YAML turns a blank line into
+  # a single newline, which reads as one wrapped paragraph rather than two --
+  # and glues the items of a list together. Here every line stays as typed,
+  # and wrapped prose still collapses back into one paragraph when rendered.
+  html: |-
+    A short bio about yourself, with a [link](https://example.com)
     if you like.
 
 # Optional, and each entry independently so. Sidebar widget data is fetched
@@ -198,10 +211,17 @@ footer:
     - title: "Example"
       url: "https://example.com"
   note_heading: "Found something here?"
-  note_html: >-
+  # Markdown as well (see about.html above for what '|-' is doing here);
+  # more than one paragraph is fine.
+  note_html: |-
     If an article or photo here caught your eye and you'd like to use it
     elsewhere, let me know -- happy to work something out. Please don't
     just copy-paste my content elsewhere without asking!
+  # Markdown too, on one line -- and HTML entities keep working, so the
+  # '&copy;' below still renders as a copyright sign and needs no migrating.
+  # (This file stays ASCII on purpose: ConfigWriter reads it under whatever
+  # default_external the caller has, which under cron or the system Ruby is
+  # US-ASCII -- one accented character here and both wizards stop working.)
   copyright: "All rights reserved &copy; 2026"
   social_heading: "Find me on"
 
@@ -280,5 +300,19 @@ mastodon:
 # ImageMagick or vips on Linux) -- and refuses the file if none is found.
 # This is the engine's only optional external tool besides the deploy
 # backends; nothing else changes.
+#
+# strip_location is ON without being set, and this is the line that turns it
+# off. A phone writes the spot it stood on into every photo it takes, and
+# this engine copies media byte for byte, so a picture from a back garden
+# published the back garden. Only the location goes: the camera, the lens and
+# the moment the shutter opened stay, and so does the Orientation tag, which
+# is what keeps a portrait photo standing up. Set it to false if you want the
+# coordinates kept -- a walking diary or a photo blog reasonably does.
+# Photos already in the archive are not touched by the upgrade. `./blog.sh
+# doctor` counts the ones that still carry a location -- in media.nosync and
+# in assets/, where the sidebar's own picture lives -- and `./blog.sh doctor
+# --strip-location` cleans them. Rebuild afterwards: the site is made from
+# those two directories, so that is what carries the change onto it.
 # media:
 #   convert_heic: true
+#   strip_location: false

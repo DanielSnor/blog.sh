@@ -12,6 +12,7 @@ require_relative 'post_writer'
 require_relative 'mastodon_poster'
 require_relative 'bluesky_poster'
 require_relative 'i18n'
+require_relative 'run_lock'
 
 # lib/publishing.rb -- the mechanics of making a draft public, shared by
 # the interactive CLI (scripts/manage_post.rb) and the scheduled-publish
@@ -249,12 +250,6 @@ module Publishing
   # The next cron tick reads this and finishes the job.
   DEPLOY_PENDING = File.join(ROOT, '.deploy-pending')
 
-  # The exit code build_blog.rb and deploy_web.rb use for "another run
-  # holds the lock". Distinct from 1, because "come back in a minute" and
-  # "your site is broken" want different words and different advice --
-  # and because only one of them is a fault.
-  BUSY_EXIT = 3
-
   # The scheduler's heartbeat. Its MTIME is the whole content -- the file
   # says nothing except "something ran the queue at this moment".
   SCHEDULER_HEARTBEAT = File.join(ROOT, '.last-scheduled-run')
@@ -319,7 +314,7 @@ module Publishing
   # Says which of the two things happened and leaves the marker behind so
   # the next scheduled run picks the site back up.
   def finish_later(step, status)
-    busy = status.respond_to?(:exitstatus) && status.exitstatus == BUSY_EXIT
+    busy = RunLock.busy_exit?(status)
     warn I18n.t("cli.#{step}_#{busy ? 'busy' : 'failed'}")
     mark_deploy_pending
     warn I18n.t('cli.deploy_pending_marked')

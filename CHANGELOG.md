@@ -10,6 +10,115 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.2.1 -- 2026-08-12
+
+A bug-fix release with two things added to it: the site's own words are
+Markdown now, and a photo no longer publishes where it was taken. The rest
+came out of two rounds of review over the release itself. Nothing to
+migrate -- `git pull`, rebuild, deploy.
+
+### New
+
+- **The site's own words are Markdown.** `about.html`, `footer.note_html`,
+  `footer.copyright` and `banner.claim` were the only texts on a Markdown
+  blog that had to be written in HTML. They go through the same parser a
+  post does now -- links, emphasis, code, and in the two longer fields
+  lists, quotes and as many paragraphs as you like. Raw HTML still passes
+  through, so nothing has to be migrated and an `<img>` is still how a
+  photo gets into a bio.
+- **A photo no longer publishes the place it was taken.** A phone writes
+  coordinates into every picture it takes and the engine copied media byte
+  for byte, so a snapshot from a back garden put the back garden on the
+  web. New photos are cleaned on the way into the archive -- on the copy,
+  never on your own file -- which covers authoring and all twenty-two
+  importers. Only the location goes: the camera, the moment and the
+  orientation tag stay. `media.strip_location: false` keeps it.
+- `./blog.sh doctor --strip-location` takes the location out of photos
+  saved before that existed. It reads `media.nosync` and `assets/`, and the
+  site follows on the next rebuild. The only thing doctor has ever written
+  rather than reported, which is why it must be asked for by name.
+- **A table can have no header row.** Written as a table that opens with
+  the separator line, `| --- | --- |`, with every line after it data. A
+  keyboard-shortcut list or a table used for layout has no heading, and
+  until now the format could not say so.
+
+### Changed
+
+- **A new default banner**, shipped at twice its display size for dense
+  screens; `banner.width`/`height` in the example move to 1880x600 to
+  match. Only new installations see it -- `assets/images/header.png` is
+  gitignored so a site's own artwork survives a `git pull`.
+- `config/site.yml.example` writes `about.html` and `footer.note_html` as a
+  literal block scalar (`|-`). A folded one turns a blank line into a
+  single newline, which now reads as one wrapped paragraph rather than two
+  and glues a list onto one line. Existing configs are untouched.
+
+### Fixes
+
+- **A continuation line under a nested list item crashed everything that
+  read it.** `- a` / `  - b` / `    text` -- the ordinary way to give a
+  list item a second line -- reached a comparison against nil. `blog.sh
+  add` died with a backtrace and wrote no post; the same three lines in
+  `about.html` killed the build and rendered no site at all. It parses as
+  an ordinary paragraph now. Live in 1.2 as released.
+- **Every imported table handed its first row of data to a `<th>`.** A
+  table with no heading row -- shortcuts, figures, a layout table -- came
+  out with its first line published as a column heading, which is a heading
+  to a screen reader as much as to a reader. Wix reads `tableData.rowHeader`
+  now and the HTML path its `<thead>` or a first row of `<th>`; the latter
+  decides for fifteen sources and did not tell `th` from `td` at all.
+- **A Tumblr ask read as if the blog's owner had asked themselves.** NPF
+  keeps the question in `layout`, and the field was ignored -- so a
+  stranger's question came out as the opening paragraphs of the post, in
+  the owner's voice, and the asker's name never reached the archive at all.
+  It is a quote with the asker under it now. Re-import to pick this up.
+- **`doctor --strip-location` cleaned the archive and left the site
+  alone.** The strip keeps a photo's byte length on purpose and the build
+  skipped copying a media file whenever the sizes matched, so the
+  coordinates stayed on the site while doctor called it clean. Media copies
+  compare modification time as well as size now.
+- **A GPS entry's data offset was trusted absolutely.** Nothing stops one
+  from naming bytes that belong to the camera model, the MakerNote or the
+  thumbnail, and written into by such a file the strip damaged the
+  photograph and left the coordinates in it. It works out which ranges the
+  other directories own and refuses to write over them.
+- **`./style.sh` reported a held lock as a failed upload**, in yellow, with
+  "the lines above say why" pointing at a line saying only that another run
+  got there first. The publishing path has told the two apart since the
+  exit code existed; the wizard does now too.
+- **The palette preview promised more than it could keep.** It is uploaded
+  to the site and printed with a QR code, and said nothing about how long
+  it would answer -- the next build removes it, which a scheduled publish
+  can start a minute later. The wizard says so now.
+- **"Another run is still going" did not say to try again.** The message
+  named the run holding the lock only while that process was alive, which
+  is right, but suppressing it took the one useful fact with it: the run in
+  the way is almost always the scheduled one.
+- Smaller ones, all from the same two rounds of review: a bullet list whose
+  first item was only pipes and dashes was read back as a headerless table;
+  a pipe inside a code span in a table cell grew a backslash on every edit;
+  ragged indentation under one bullet dropped an item; an image line in
+  `about.html` published a stray `!` and a dead link; a Wix table whose
+  `tableData` was not a mapping cost the whole post; a table with labels
+  down its side lost its first row when one value cell was empty; a Tumblr
+  ask made only of a picture lost the asker's name; a GPS entry with an
+  undefined type left the coordinates in the file; `strip_file` read every
+  file whole before checking it was a JPEG, and returned it with the
+  temporary file's permissions.
+
+### Upgrading
+
+- Nothing has to change and nothing has to be rebuilt for the old behaviour
+  to keep working. **Photos saved from now on lose their coordinates** --
+  that is the one behaviour change that arrives unasked. `./blog.sh doctor`
+  says how many already-saved photos still carry one, `--strip-location`
+  cleans them (each gets a new checksum, so the next deploy uploads it
+  again), and `media.strip_location: false` turns it off.
+- If you want more than one paragraph or a list in `about.html` or
+  `footer.note_html` and your config still writes them as `>-`, change that
+  to `|-` first. `./style.sh` already writes the literal style for any
+  value with a line break in it.
+
 ## 1.2 -- 2026-08-11
 
 The import release. Eight sources became twenty-two -- every blog platform

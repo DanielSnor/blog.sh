@@ -594,13 +594,20 @@ blockquote {
   color: var(--text);
 }
 
-.content hr {
+/* .chrome-text is the about card and the footer note -- config text that
+   speaks the same Markdown a post does (build_blog.rb's config_html), so it
+   can arrive as a rule, a quote or a code block. It gets the same look as
+   the post body rather than a second set of values to keep in step.
+   Lists are the exception: the browser's 40px marker indent is a sixth of
+   a 260px sidebar, so both zones use the same narrower one. */
+.chrome-text ul, .chrome-text ol { padding-left: 1.2rem; margin: 0.5rem 0; }
+.content hr, .chrome-text hr {
   border: none;
   border-top: 1px solid var(--border);
   margin: 1.5rem 0;
 }
 
-.content pre {
+.content pre, .chrome-text pre {
   background: var(--nav-bg);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -610,14 +617,14 @@ blockquote {
 }
 /* Inline `code` spans get a small pill look; .content pre code below
    resets that for the fenced-block case so the two don't double up. */
-.content code {
+.content code, .chrome-text code {
   background: var(--nav-bg);
   padding: 0.1em 0.35em;
   border-radius: 3px;
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.9em;
 }
-.content pre code {
+.content pre code, .chrome-text pre code {
   background: none;
   padding: 0;
   border-radius: 0;
@@ -798,6 +805,13 @@ footer li { margin-bottom: 0.5rem; }
 footer li::before { content: '\203a\00a0'; color: var(--accent); }
 footer p { color: var(--meta-text); font-size: 0.85rem; }
 footer .copyright { color: var(--text); }
+/* A bullet list in the footer note keeps the chevron the links column uses --
+   it is the footer's own way of marking an item. A numbered one cannot: the
+   chevron would replace the numbers, which are the whole point of writing
+   "1." instead of "-". Nested levels indent, which padding: 0 above undoes. */
+footer .chrome-text ol { list-style: decimal; }
+footer .chrome-text ol > li::before { content: none; }
+footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 
 .social-icons { display: flex; gap: 0.6rem; }
 .social-icons a {

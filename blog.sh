@@ -12,7 +12,7 @@
 #   ./blog.sh rebuild
 #   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
-#   ./blog.sh doctor [--online]
+#   ./blog.sh doctor [--online] [--strip-location]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail

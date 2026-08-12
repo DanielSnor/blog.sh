@@ -20,6 +20,10 @@
 require 'yaml'
 require_relative '../lib/yaml_compat'
 require 'rbconfig'
+# For $CHILD_STATUS -- whether the build or the deploy left because the lock
+# was held decides the words, and $? does not read as either.
+require 'English'
+require_relative '../lib/run_lock'
 require_relative '../lib/site_config'
 
 ROOT = File.expand_path('..', __dir__)
@@ -233,12 +237,28 @@ def show_preview_online(url, local_fallback)
   # -- a preview upload must not sweep along whatever else happens to sit
   # undeployed in public.nosync, let alone prune.
   unless system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--only=palette-preview.html')
-    puts Tui.paint("⚠️  #{t('pv_upload_failed', path: relative(local_fallback))}", :yellow)
+    # A held lock is not a failed upload, and saying so sends somebody
+    # looking for a fault that isn't there -- the hourly sidebar refresh and
+    # a confirmed palette arriving in the same minute is an ordinary
+    # Tuesday. Same distinction Publishing.finish_later makes for the
+    # publishing path; this one shells out to the deploy on its own.
+    if RunLock.busy_exit?($CHILD_STATUS)
+      puts Tui.paint("⏳  #{t('pv_upload_busy', path: relative(local_fallback))}", :cyan)
+    else
+      puts Tui.paint("⚠️  #{t('pv_upload_failed', path: relative(local_fallback))}", :yellow)
+    end
     open_in_browser(local_fallback)
     return
   end
 
   puts Tui.paint(t('pv_online', url: url), :cyan)
+  # Said with the address rather than under the QR code: a piped run gets no
+  # QR and still deserves to know. The page really is temporary -- the build
+  # removes anything it did not produce itself (prune_public), and the deploy
+  # then takes it off the site as an orphan. That is the build doing its job,
+  # not a defect; what was missing was anybody saying so. Somebody
+  # photographed the QR one evening and found it dead the next morning.
+  puts Tui.paint(t('pv_temporary'), :dim)
   if Tui.interactive? && (qr = QrCode.render(url))
     puts
     puts qr
@@ -615,6 +635,8 @@ def offer_rebuild
   if ok
     puts
     puts Tui.paint(t('rebuilt'), :green)
+  elsif RunLock.busy_exit?($CHILD_STATUS)
+    puts Tui.paint("⏳  #{t('rebuild_busy')}", :cyan)
   else
     puts Tui.paint("⚠️  #{t('rebuild_failed')}", :yellow)
   end

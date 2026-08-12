@@ -302,7 +302,8 @@ cli:
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
-      ./blog.sh doctor [--online]    liest die Konfiguration und sagt, was daran nicht stimmt
+      ./blog.sh doctor [--online] [--strip-location]
+                                     liest die Konfiguration und sagt, was daran nicht stimmt
       ./blog.sh help                 zeigt diese Hilfe
       ./blog.sh version              gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
@@ -656,6 +657,14 @@ doctor:
   age_hours: "%{count} Stunde(n)"
   age_days: "%{count} Tag(e)"
 
+  media_location_clean: "Kein Foto im Archiv trägt den Ort, an dem es entstand."
+  media_location: "%{count} Foto(s) im Archiv tragen noch den Aufnahmeort -- gespeichert, bevor die Engine ihn entfernt hat, und die Website zeigt, was das Archiv enthält."
+  media_location_fix: "./blog.sh doctor --strip-location entfernt ihn. Neue Fotos sind bereits versorgt; setz media.strip_location in config/site.yml auf false, wenn du die Koordinaten behalten willst."
+  media_location_no_dir: "Es gibt noch kein media.nosync-Verzeichnis, also nichts zu säubern."
+  media_location_stripping: "Entferne den Aufnahmeort aus %{count} Foto(s)…"
+  media_location_stripped: "%{count} Foto(s) gesäubert."
+  media_location_unwritable: "%{count} konnten nicht neu geschrieben werden -- prüf die Dateirechte und starte das noch einmal."
+  media_location_redeploy: "Jedes neu geschriebene Foto hat eine neue Prüfsumme, der nächste Deploy lädt es also erneut hoch. Führ ./blog.sh rebuild aus, wenn du so weit bist."
   backend_unset: "Kein Deploy-Ziel gewählt, die Website wird also lokal gebaut und geht nirgendwohin."
   backend_unset_fix: "Als Anfang völlig in Ordnung -- ./blog.sh preview zeigt den Build. Führe ./setup.sh aus, wenn sie online soll."
   backend_ok: "Deploy über das Backend %{name}."
@@ -829,7 +838,9 @@ style:
   pv_written: "✅ Die Vorschau liegt in %{path} -- öffne sie im Browser."
   pv_uploading: "Lade die Vorschau auf die Website hoch…"
   pv_online: "Vorschau: %{url}"
+  pv_temporary: "Eine vorübergehende Seite -- der nächste Build entfernt sie, und ein geplanter Lauf kann jederzeit einen starten. Schau lieber gleich als später."
   pv_upload_failed: "Der Upload ging nicht durch -- warum, sagen die Zeilen oben. Lokale Kopie: %{path}"
+  pv_upload_busy: "Ein anderer Lauf hält die Sperre, die Vorschau wurde nicht hochgeladen. Es ist nichts kaputt -- versuch es in einer Minute noch einmal. Lokale Kopie: %{path}"
   pv_failed: "Die Vorschau ließ sich nicht bauen (%{message}). Die Palette lässt sich auch ohne sie schreiben."
   pv_custom_name: "eigene Farben"
   pv_post_title: "Der erste Beitrag auf einer neuen Website"
@@ -873,8 +884,8 @@ style:
   q_about_heading: "Überschrift für „Über mich\""
   h_about_heading: "Zum Beispiel „Über mich\" oder „Wer hier schreibt\"."
   q_about_html: "Deine Kurzbiografie"
-  h_about_html: "Ein paar Sätze über dich. HTML ist erlaubt, ein Link oder ein Foto also kein Problem."
-  c_about_html: "Schreib deine Kurzbiografie unten. HTML ist erlaubt -- ein Link oder ein <img> für ein Foto.\nZeilen, die mit // beginnen, werden verworfen."
+  h_about_html: "Ein paar Sätze über dich, in Markdown -- genau wie in einem Beitrag."
+  c_about_html: "Schreib deine Kurzbiografie unten. Markdown funktioniert hier wie in einem Beitrag:\n**fett**, [ein Link](https://example.com), eine Liste, eine Leerzeile beginnt einen neuen Absatz.\nHTML ist weiterhin erlaubt -- ein Foto kommt nach wie vor als <img> hinein.\nZeilen, die mit // beginnen, werden verworfen."
 
   q_footer_links_heading: "Überschrift über den Links in der Fußzeile"
   h_footer_links_heading: "Zum Beispiel „Links\" oder „Anderswo\"."
@@ -883,10 +894,10 @@ style:
   q_footer_social_heading: "Überschrift über den Netzwerk-Icons"
   h_footer_social_heading: "Zum Beispiel „Du findest mich auf\"."
   q_footer_copyright: "Copyright-Zeile"
-  h_footer_copyright: "Z. B.: &copy; 2026 Petra Klein -- HTML-Entities funktionieren, &copy; wird zu ©."
+  h_footer_copyright: "Z. B.: &copy; 2026 Petra Klein -- Markdown funktioniert, HTML-Entities auch: &copy; wird zu ©."
   q_footer_note: "Der Hinweis in der Fußzeile"
-  h_footer_note: "Der Absatz unter dieser Überschrift. HTML ist erlaubt."
-  c_footer_note: "Schreib den Hinweis für die Fußzeile. HTML ist erlaubt.\nZeilen, die mit // beginnen, werden verworfen."
+  h_footer_note: "Der Absatz unter dieser Überschrift, in Markdown -- gern auch mehrere."
+  c_footer_note: "Schreib den Hinweis für die Fußzeile. Markdown funktioniert hier:\n**fett**, [ein Link](https://example.com), eine Liste, eine Leerzeile beginnt einen neuen Absatz.\nHTML ist weiterhin erlaubt.\nZeilen, die mit // beginnen, werden verworfen."
 
   social_current: "Icons in der Fußzeile jetzt"
   q_social_action: "Eines hinzufügen, eines entfernen, oder so lassen?"
@@ -952,3 +963,4 @@ style:
   q_rebuild: "Die Website jetzt neu bauen, damit du sie ansehen kannst? [j/N] "
   rebuilt: "✅ Gebaut. ./blog.sh preview liefert sie unter http://localhost:8000/ aus, ./blog.sh rebuild veröffentlicht sie."
   rebuild_failed: "Der Build lief nicht durch -- warum, sagen die Zeilen oben. Deine Konfiguration wurde trotzdem geschrieben."
+  rebuild_busy: "Ein anderer Lauf hält die Sperre, die Website wurde nicht neu gebaut. Es ist nichts kaputt und deine Konfiguration wurde geschrieben -- versuch es in einer Minute noch einmal."

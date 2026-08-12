@@ -249,6 +249,18 @@ První řádek je hlavička, druhý oddělovač s pomlčkami, zbytek data. Dvojt
 
 V buňkách funguje běžné formátování včetně odkazů. Široká tabulka se posouvá sama v sobě, stejně jako blok kódu.
 
+Když začneš rovnou oddělovačem, tabulka žádnou hlavičku nemá a každý řádek je data. Hodí se na seznam dvojic nebo na tabulku použitou k rozvržení, kde by nadpis lhal. Ten první řádek piš i s vnějšími svislítky, přesně jako níž — podle nich se pozná tabulka bez hlavičky od odrážkového seznamu, jehož první položka je shodou okolností interpunkce:
+
+```
+| --- | --- |
+| Ctrl + c | Kopírovat |
+| Ctrl + v | Vložit |
+```
+
+| --- | --- |
+| Ctrl + c | Kopírovat |
+| Ctrl + v | Vložit |
+
 ## Obrázky
 
 Vykřičník, popisek v hranatých závorkách, cesta v kulatých. Za cestu se dá přidat titulek v uvozovkách, který se zobrazí jako popisek pod fotkou.

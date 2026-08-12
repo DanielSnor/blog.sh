@@ -296,7 +296,8 @@ cli:
                                      vypíše posty po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře post
-      ./blog.sh doctor [--online]    přečte konfiguraci a řekne, co je s ní špatně
+      ./blog.sh doctor [--online] [--strip-location]
+                                     přečte konfiguraci a řekne, co je s ní špatně
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -650,6 +651,14 @@ doctor:
   age_hours: "%{count} h"
   age_days: "%{count} dn(í)"
 
+  media_location_clean: "Žádná fotka v archivu nenese místo, kde vznikla."
+  media_location: "Fotek v archivu s místem pořízení: %{count} — uložily se dřív, než to engine začal odstraňovat, a web ukazuje to, co je v archivu."
+  media_location_fix: "Odstraní to ./blog.sh doctor --strip-location. Nové fotky už jsou ošetřené; když chceš souřadnice zachovat, nastav media.strip_location na false v config/site.yml."
+  media_location_no_dir: "Adresář media.nosync zatím není, takže není co čistit."
+  media_location_stripping: "Odstraňuji místo pořízení z fotek: %{count}…"
+  media_location_stripped: "Vyčištěných fotek: %{count}."
+  media_location_unwritable: "Přepsat se nepodařilo: %{count} — zkontroluj práva k souborům a spusť to znovu."
+  media_location_redeploy: "Každá přepsaná fotka má nový kontrolní součet, takže ji nejbližší nasazení nahraje znovu. Až budeš chtít, spusť ./blog.sh rebuild."
   backend_unset: "Není vybraný cíl nasazení, web se tedy staví lokálně a nikam neputuje."
   backend_unset_fix: "Jako začátek to úplně stačí — sestavený web ukáže ./blog.sh preview. Až ho budeš chtít online, spusť ./setup.sh."
   backend_ok: "Nasazuje se backendem %{name}."
@@ -821,7 +830,9 @@ style:
   pv_written: "✅ Náhled je v %{path} — otevři si ho v prohlížeči."
   pv_uploading: "Nahrávám náhled na web…"
   pv_online: "Náhled: %{url}"
+  pv_temporary: "Dočasná stránka — odstraní ji nejbližší sestavení webu a to může plánovaný běh spustit každou chvíli. Podívej se radši hned."
   pv_upload_failed: "Nahrání na web nevyšlo — proč, říkají řádky výš. Lokální kopie: %{path}"
+  pv_upload_busy: "Zámek drží jiný běh, náhled se teď nenahrál. Nic není rozbité — zkus to za minutu znovu. Lokální kopie: %{path}"
   pv_failed: "Náhled se nepodařilo postavit (%{message}). Paletu jde zapsat i bez něj."
   pv_custom_name: "vlastní barvy"
   pv_post_title: "První post na novém webu"
@@ -865,8 +876,8 @@ style:
   q_about_heading: "Nadpis sekce „O mně“"
   h_about_heading: "Třeba „O mně“ nebo „Kdo to píše“."
   q_about_html: "Tvoje bio"
-  h_about_html: "Pár vět o sobě. Smí obsahovat HTML, takže odkaz nebo fotka nevadí."
-  c_about_html: "Napiš svoje bio níž. HTML je povolené — odkaz, nebo <img> s fotkou.\nŘádky začínající // se zahodí."
+  h_about_html: "Pár vět o sobě, v Markdownu — stejně jako v postu."
+  c_about_html: "Napiš svoje bio níž. Markdown tu funguje stejně jako v postu:\n**tučně**, [odkaz](https://example.com), odrážky, prázdný řádek začne nový odstavec.\nHTML je pořád povolené — fotka se sem dostane dál jako <img>.\nŘádky začínající // se zahodí."
 
   q_footer_links_heading: "Nadpis nad odkazy v patičce"
   h_footer_links_heading: "Třeba „Odkazy“ nebo „Jinde“."
@@ -875,10 +886,10 @@ style:
   q_footer_social_heading: "Nadpis nad ikonami sítí"
   h_footer_social_heading: "Třeba „Najdete mě na“."
   q_footer_copyright: "Řádek s copyrightem"
-  h_footer_copyright: "Třeba: &copy; 2026 Petra Malá — HTML entity fungují, &copy; se vykreslí jako ©."
+  h_footer_copyright: "Třeba: &copy; 2026 Petra Malá — funguje Markdown i HTML entity, &copy; se vykreslí jako ©."
   q_footer_note: "Poznámka v patičce"
-  h_footer_note: "Odstavec pod tím nadpisem. Smí obsahovat HTML."
-  c_footer_note: "Napiš poznámku do patičky. HTML je povolené.\nŘádky začínající // se zahodí."
+  h_footer_note: "Odstavec pod tím nadpisem, v Markdownu — a klidně jich může být víc."
+  c_footer_note: "Napiš poznámku do patičky. Markdown tu funguje:\n**tučně**, [odkaz](https://example.com), odrážky, prázdný řádek začne nový odstavec.\nHTML je pořád povolené.\nŘádky začínající // se zahodí."
 
   social_current: "Ikony v patičce teď"
   q_social_action: "Přidat, odebrat, nebo nechat být?"
@@ -944,3 +955,4 @@ style:
   q_rebuild: "Znovu sestavit web hned, ať se na to můžeš podívat? [a/N] "
   rebuilt: "✅ Sestaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
   rebuild_failed: "Sestavení nedoběhlo — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."
+  rebuild_busy: "Zámek drží jiný běh, web se teď nepřestavěl. Nic není rozbité a konfigurace se zapsala — zkus to za minutu znovu."

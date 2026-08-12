@@ -296,18 +296,47 @@ module MarkdownParser
   # written back as "\|" (see table_to_markdown), and splitting on that
   # used to silently truncate the cell and drop everything after it.
   # The backslash itself is removed by parse_inline's escape handling.
+  # The backslash the writer puts before a pipe is a column-break escape and
+  # belongs to the table, not to the cell -- so it comes off here rather than
+  # being left for parse_inline. Left on, it survived inside a code span,
+  # whose content is verbatim on the way back: the cell text grew a backslash
+  # on every single edit, without bound, and the page showed them.
   def split_table_row(line)
-    line.strip.sub(/\A\|/, '').sub(/(?<!\\)\|\z/, '').split(/(?<!\\)\|/).map(&:strip)
+    line.strip.sub(/\A\|/, '').sub(/(?<!\\)\|\z/, '').split(/(?<!\\)\|/)
+        .map { |c| c.strip.gsub('\\|', '|') }
   end
 
+  # A table that opens with the separator row has no header: the alignment
+  # comes from that first line and everything after it is data. Markdown
+  # proper has no way to say this -- GFM's grammar starts at the header --
+  # but the shape has to be sayable, because plenty of real tables are
+  # headerless and the importers meet them: a Wix table with
+  # `tableData.rowHeader` false, an HTML table with no <thead>. Without it
+  # they lost their first row of data to a <th>, and once that had happened
+  # nothing in the file remembered it.
+  #
+  # The separator can't be mistaken for a header. A header row of dashes
+  # would have to be written `\-\-\-` to mean it, and the writer escapes it
+  # that way. The cost is one shape this engine reads and other renderers
+  # don't -- deliberate, and the same trade the video and chat blocks make.
   def parse_table(para)
     lines = para.split("\n").map(&:strip).reject(&:empty?)
     return nil if lines.size < 2
     return nil unless lines[0].include?('|')
-    return nil unless lines[1].include?('-') && TABLE_SEPARATOR_RE.match?(lines[1])
 
-    header = split_table_row(lines[0])
-    align = split_table_row(lines[1]).map do |spec|
+    # STRICT for the first line, and it has to be: a bullet list is written
+    # "- item", so a first bullet whose text is nothing but pipes and dashes
+    # ("- -|-") satisfied the loose separator pattern and the whole list was
+    # read back as a headerless table -- the first item swallowed into the
+    # separator, every other item keeping a literal "- " as cell text. The
+    # loose pattern stays where it always was, under a header, so no post
+    # that round-tripped before round-trips differently now.
+    headerless = strict_separator_row?(lines[0])
+    sep = headerless ? 0 : 1
+    return nil unless separator_row?(lines[sep])
+
+    header = headerless ? nil : split_table_row(lines[0])
+    align = split_table_row(lines[sep]).map do |spec|
       left = spec.start_with?(':')
       right = spec.end_with?(':')
       if left && right then 'center'
@@ -315,24 +344,56 @@ module MarkdownParser
       else 'left'
       end
     end
-    return nil if header.empty? || align.size != header.size
+    return nil if align.empty?
+    return nil if header && (header.empty? || align.size != header.size)
 
     cell = lambda do |raw|
       text, formatting = parse_inline(raw)
       formatting.empty? ? { 'text' => text } : { 'text' => text, 'formatting' => formatting }
     end
 
-    rows = lines.drop(2).map do |line|
+    # The separator decides the width when there is no header to do it.
+    width = header ? header.size : align.size
+    rows = lines.drop(sep + 1).map do |line|
       values = split_table_row(line)
       # Missing cells are padded with empty ones so a short row doesn't
       # break the table. Extra cells are KEPT: imported archives carry
       # single-column headers over two-column rows, and discarding the
       # overflow silently ate the second cell of every row on each edit.
       # HTML renders a jagged table fine.
-      Array.new([header.size, values.size].max) { |i| cell.call(values[i].to_s) }
+      Array.new([width, values.size].max) { |i| cell.call(values[i].to_s) }
     end
 
-    { 'type' => 'table', 'align' => align, 'header' => header.map { |h| cell.call(h) }, 'rows' => rows }
+    # Built in this order on purpose: a headed table has to come out with
+    # its keys in exactly the order it has had since the format existed, or
+    # every table in every archive rewrites itself on the next save.
+    block = { 'type' => 'table', 'align' => align }
+    block['header'] = header.map { |h| cell.call(h) } if header
+    block['rows'] = rows
+    block
+  end
+
+  # A row that is nothing but the dashes-and-colons of a separator. Used
+  # twice: to find the separator under a header, and to notice a table that
+  # begins with one and so has no header at all.
+  def separator_row?(line)
+    line.include?('-') && TABLE_SEPARATOR_RE.match?(line)
+  end
+
+  # What a separator row written by this engine looks like, cell by cell:
+  # each one an unbroken run of dashes with an optional colon at either end.
+  # Nothing an author types as prose can be mistaken for it, which is what a
+  # line has to be before it may mean "this table has no header".
+  def strict_separator_row?(line)
+    # The leading pipe is the discriminator a bullet can never have: a list
+    # item is written "- text", so "- |-" reads cell-for-cell like a
+    # separator once the marker is off. The writer always emits the outer
+    # pipes, and the cheat sheets document that form, so requiring them
+    # costs nothing and closes the ambiguity outright.
+    return false unless line.start_with?('|') && line.include?('-')
+
+    cells = split_table_row(line)
+    !cells.empty? && cells.all? { |c| /\A:?-+:?\z/.match?(c.strip) }
   end
 
   # --- blockquote -------------------------------------------------------
@@ -402,10 +463,32 @@ module MarkdownParser
       break if cur_indent < indent
 
       if cur_indent > indent
-        nested, idx = parse_list_level(lines, idx, cur_indent)
-        break unless nested && items.any?
+        # NOT straight into `idx`. A nested call that refuses answers a bare
+        # nil, which destructures into two nils -- and the assignment happens
+        # before the guard below can break, so this frame's own idx was gone.
+        # It then returned [its list, nil] to the frame above, where the list
+        # is truthy, the guard passes, and the next loop compares nil with a
+        # number. A continuation line under a nested item -- "- a" / "  - b" /
+        # "    text", the ordinary way to give an item a second line, and a
+        # shape the cheat sheet's own nesting example invites -- crashed
+        # `blog.sh add` with a Ruby backtrace and no post written. Put in
+        # about.html it killed the build outright and rendered no site at all.
+        nested, next_idx = parse_list_level(lines, idx, cur_indent)
+        break unless nested && next_idx && items.any?
 
-        items.last['children'] = nested
+        idx = next_idx
+
+        # Two differently-indented runs under the same item -- "  - a" then
+        # "   - b", which is what hand-typed lists look like -- came back as
+        # two calls, and the second assignment threw the first one's items
+        # away. The item simply vanished from the post, with nothing said.
+        # They belong to the same child list; ragged indentation under one
+        # parent is one level, not two.
+        if (existing = items.last['children'])
+          existing['items'] = (existing['items'] || []) + (nested['items'] || [])
+        else
+          items.last['children'] = nested
+        end
         next
       end
 

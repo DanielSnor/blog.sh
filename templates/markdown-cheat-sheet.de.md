@@ -251,6 +251,18 @@ Die erste Zeile ist der Kopf, die zweite ein Bindestrich-Trenner, der Rest sind 
 
 In Zellen funktioniert normale Formatierung, Links eingeschlossen. Eine breite Tabelle scrollt in sich selbst, wie ein Codeblock.
 
+Fängst du gleich mit der Trennzeile an, hat die Tabelle gar keine Kopfzeile -- jede Zeile ist dann Inhalt. Praktisch für eine Liste von Paaren oder eine Tabelle, die dem Layout dient, wo eine Überschrift schlicht falsch wäre. Schreib diese erste Zeile mit den äußeren Pipes, genau wie unten: daran erkennt man eine Tabelle ohne Kopfzeile von einer Aufzählung, deren erster Punkt zufällig aus Satzzeichen besteht:
+
+```
+| --- | --- |
+| Ctrl + c | Kopieren |
+| Ctrl + v | Einfügen |
+```
+
+| --- | --- |
+| Ctrl + c | Kopieren |
+| Ctrl + v | Einfügen |
+
 ## Bilder
 
 Ein Ausrufezeichen, Alt-Text in eckigen Klammern, Pfad in runden. Nach dem Pfad kann ein Titel in Anführungszeichen stehen — er erscheint als Bildunterschrift unter dem Foto.

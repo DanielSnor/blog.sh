@@ -397,7 +397,14 @@ module MarkdownWriter
       else '---'
       end
     end
-    [cells.call(block['header']), "| #{separator.join(' | ')} |", *block['rows'].map { |r| cells.call(r) }].join("\n")
+    head = block['header'] ? cells.call(block['header']) : nil
+    # The one shape that can collide with the headerless grammar: a header
+    # whose every cell is dashes would be read back as the separator row of
+    # a table with no header, and the real header would become its first row
+    # of data. Escaping says "these are characters" -- the parser's escape
+    # class has always taken "-", so it reads back as the same three dashes.
+    head = head.gsub('-') { '\\-' } if head && MarkdownParser.separator_row?(head)
+    [*head, "| #{separator.join(' | ')} |", *block['rows'].map { |r| cells.call(r) }].join("\n")
   end
 
   # Only a video we know can actually play survives the round-trip: either a

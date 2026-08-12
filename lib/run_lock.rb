@@ -27,7 +27,25 @@ module RunLock
   ENV_MARKER = 'BLOG_SH_LOCK_HELD'
   BUSY = :busy
 
+  # The exit code build_blog.rb and deploy_web.rb use for "another run
+  # holds the lock". Distinct from 1, because "come back in a minute" and
+  # "your site is broken" want different words and different advice -- and
+  # because only one of them is a fault. It lives here, with the lock that
+  # gives it its meaning: it is this file's contract with the four scripts
+  # that take the lock and with everyone who shells out to them, and a
+  # caller that had to reach into the publishing library for it either
+  # dragged that library along or compared against a literal 3.
+  BUSY_EXIT = 3
+
   module_function
+
+  # Whether a finished child process left because the lock was held, told
+  # apart from every other way it could have failed. Callers that shell out
+  # to a build or a deploy ask this rather than reading the number, so the
+  # meaning of the code stays in one place.
+  def busy_exit?(status)
+    status.respond_to?(:exitstatus) && status.exitstatus == BUSY_EXIT
+  end
 
   def path(root)
     File.join(root, '.blog-sh.lock')
@@ -161,7 +179,15 @@ module RunLock
     # held either way; that part of the message was never in doubt.
     holder = '' unless holder_alive?(holder)
     detail = holder.empty? ? '' : " (#{holder})"
-    "ℹ️  Another #{label ? "#{label} " : ''}run is still going#{detail} -- skipping this one."
+    # Dropping the holder detail is right, but it takes the only actionable
+    # fact with it: that the run in the way is almost always the scheduled
+    # one, and will be gone shortly. Without that, the message describes a
+    # situation and offers nothing to do about it -- and the case where it
+    # matters most is the interactive one, where waiting is not automatic.
+    # Cron comes back on its own in fifteen minutes; a person who just
+    # confirmed a palette does not.
+    "ℹ️  Another #{label ? "#{label} " : ''}run is still going#{detail} -- " \
+      'skipping this one. Nothing is broken; try again in a minute.'
   end
 
   # The holder line starts with the pid that wrote it. Signal 0 asks the

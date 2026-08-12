@@ -11,6 +11,7 @@ require 'time'
 require_relative 'site_config'
 require_relative 'i18n'
 require_relative 'media_dimensions'
+require_relative 'exif_location'
 require_relative 'deploy_backend'
 # NOT require_relative 'publishing': it pulls in the posters, which read
 # SiteConfig at LOAD time -- and this is the one command that has to run
@@ -141,6 +142,7 @@ module Doctor
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
+    findings.concat(check_media_location(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
     findings
@@ -501,6 +503,54 @@ module Doctor
     return t('age_hours', count: hours) if hours < 48
 
     t('age_days', count: (hours / 24).floor)
+  end
+
+  # --- media ---------------------------------------------------------
+
+  # Where a photo was taken, in photos already published. New ones are
+  # cleaned on the way into the archive (lib/exif_location.rb), but an
+  # archive that existed before that has whatever its phone wrote, and
+  # nothing about upgrading an engine should silently rewrite pictures
+  # somebody already put on the web. So: counted here, cleaned only when
+  # asked -- `./blog.sh doctor --strip-location`.
+  #
+  # Cheap enough to run every time: only the first pages of each file are
+  # read, and 2962 photos took just over a second on the archive this was
+  # written against.
+  def check_media_location(root)
+    found = located_media(root)
+    return [] if found.nil?
+    return [ok(t('media_location_clean'))] if found.empty?
+
+    [warn(t('media_location', count: found.size), t('media_location_fix'))]
+  end
+
+  # nil when there is nothing to look at -- a fresh install has nothing to
+  # say about it, and a green line claiming otherwise is noise.
+  #
+  # THE SOURCES, not the build. public.nosync is made from these two trees on
+  # every build, so cleaning it achieves nothing: the next rebuild copies the
+  # coordinates straight back out of the source, and in between doctor
+  # reported the site clean. (Scanning it also counted every built photo
+  # twice, once in each tree.) Cleaning the sources is what lasts -- the
+  # build then carries it into public.nosync, which is what emit_copy's
+  # modification-time check exists for.
+  #
+  # assets/ belongs here as much as media.nosync does: it is the documented
+  # place a photo goes when it is part of the site rather than of a post --
+  # the bio picture in the sidebar of every page comes from there.
+  def located_media(root)
+    dirs = [File.join(root, 'media.nosync'), File.join(root, 'assets')]
+           .select { |d| File.directory?(d) }
+    return nil if dirs.empty?
+
+    dirs.flat_map do |dir|
+      Dir.glob(File.join(dir, '**', '*.{jpg,jpeg,JPG,JPEG}')).select do |path|
+        ExifLocation.present?(path)
+      end
+    end
+  rescue StandardError
+    nil
   end
 
   # --- deploy --------------------------------------------------------

@@ -227,6 +227,34 @@ the stored offset -- setting this later rewrites no history, it only changes
 the day shown for posts whose local day genuinely differs (and never a
 post's URL).
 
+### The palette and the header's type
+
+`colors.light` and `colors.dark` take the same seven keys -- `bg`,
+`text`, `meta_text`, `accent`, `nav_bg`, `border`, `pill_bg` -- and the
+build compiles them into `assets/css/colors.css`. Everything else the
+stylesheet needs is derived from those seven rather than configured
+separately: the card background, the nav's text and border, the hover
+states of links and badges, the search field's background. That is why
+there are seven keys and not twenty, and why a palette cannot end up
+internally inconsistent. Omit the section entirely and the site uses
+blog.sh's own blue (`DEFAULT_COLORS`).
+
+`assets/css/site.css` is the other half, and it is not generated: layout
+and structure, plus the few colors that are fixed because they work
+against any palette -- white on accent surfaces, the dark scrims behind
+the banner overlays and the lightbox, the search field's grey
+placeholder. Changing `colors:` is configuration; editing that file is
+editing an engine file, with the pull conflicts that implies (see
+[step 9](#9-updating-the-engine)).
+
+`fonts.banner_title` and `fonts.banner_claim` take a CSS font stack each,
+`fonts.banner_title_size` and `fonts.banner_claim_size` any CSS length,
+and they compile into that same generated stylesheet. Drop a `.woff2`
+into `assets/fonts/`, declare it under `fonts.faces`, and the header is
+in your own type; say nothing and it stays self-hosted JetBrains Mono at
+45px/20px. Narrow screens scale from whatever size is configured, so
+there is no second pair of keys to keep in sync.
+
 ## 3. Configure the environment -- `env.sh`
 
 ```bash
@@ -279,11 +307,19 @@ an `apple-touch-icon` (iOS scales it down for a home-screen bookmark), and
 a generated `/favicon.ico` for clients that request the root path without
 reading the link. A square PNG of 180 px or more covers all three.
 
-The banner gets `site.short_name` and `site.description` rendered on top of
-it (see "Appearance" in the main README), each darkening the corner it sits
-in so it stays readable -- so a calm image works best, though turning both
-overlays off with `banner.show_title`/`show_claim` leaves the image
-completely untouched.
+The banner gets `site.short_name` rendered top-left and `site.description`
+bottom-right (wrapping to several lines if it is long), each darkening the
+corner it sits in so it stays readable against any image -- and only that
+corner, so a banner with both overlays off is shown exactly as authored. A
+calm image still works best. Each is independently optional:
+`banner.show_title` and `banner.show_claim` (both default true) decide
+whether they render at all, and `colors.<mode>.banner_title` /
+`colors.<mode>.banner_claim` override their color per light and dark mode
+-- by default `nav_bg` in light, white in dark. `banner.claim` overrides
+*only* the overlay's text, in Markdown or raw HTML (a manual `<br>`, say);
+`site.description` itself stays plain text everywhere else it is used, in
+the meta description and the feed. Their typeface and size are
+[`fonts`](#the-palette-and-the-headers-type).
 
 ## 5. First build and local preview
 
@@ -445,6 +481,10 @@ announcement (logged, not an error).
    wants the *numeric* account id, not the @handle -- find it at
    `https://<instance>/api/v1/accounts/lookup?acct=<username>`.
    (The widget's instance falls back to `mastodon.instance`.)
+4. `mastodon.toot_length` is your instance's character limit, 500 by
+   default. Set it if yours differs -- the announcement's perex is
+   budgeted against this number, so a limit set too high gets the post
+   rejected at publish time and one set too low just wastes room.
 
 **Bluesky:**
 
