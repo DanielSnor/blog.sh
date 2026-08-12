@@ -518,9 +518,15 @@ What isn't built yet, and what building it would take:
   what a feed has no room for), and the HTML and JSON variants of the
   Facebook, Instagram and Threads exports, because each pair is one
   archive serialised twice.
-  What a new source needs is an adapter with three methods -- everything
-  else (media, dedup, dry-run, reporting, HTML → blocks) is already
-  shared.
+  What a new source needs is an adapter with three methods (`label`,
+  `each_item`, `map`) -- everything else (media, dedup, dry-run,
+  reporting, HTML → blocks) is already shared.
+  That table says what is covered, not how hard each one has been leaned
+  on. Some of these have carried somebody's whole archive onto a live
+  site; others have met a sample export and no more. LiveJournal is the
+  one that has never run against the live service at all -- it has no
+  export file, so the adapter talks to the API, and exercising that
+  needs a real account.
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:
