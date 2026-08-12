@@ -12,8 +12,7 @@
               </div><% elsif !page?(post) %><%= date_badge(post) %><% end %><%# A page has no date worth showing: "Contact, 1 July 2022" says nothing except that somebody had to type a date into a field. %>
               <div class="post-body">
                 <% if post['title'] && !hero_media %><h1><%= h(post['title']) %></h1><% end %>
-                <%= post_stats_html(post) %>
-                <%= reading_time_html(minutes) %><%= series_nav_html(series_slug, series_posts, series_index, :top) %><%= toc_html(toc) %>
+                <%= post_stats_html(post) %><%= reading_time_html(minutes) %><%= series_nav_html(series_slug, series_posts, series_index, :top) %><%= toc_html(toc) %><%# All four on one line, and the crowding is the point: each helper returns '' when it has nothing to say, but a line of its own emits its indentation and its newline regardless -- so a post with no reading time, no series and no contents would carry a blank line that the same post did not carry before 1.3. %>
                 <div class="content">
                   <%= content_html %>
                 </div>
