@@ -95,8 +95,10 @@ byte-for-byte against the previous build.
   listing, `url:` for anywhere at all -- instead of the content types the
   engine derives, for sites whose subjects map them better than their
   media types do. Without the key nothing changes. An empty list is an
-  answer too: no bar and no toggle, which is how a site turns the menu off
-  without a second key for it. `./style.sh` has a section for it, and it
+  answer too: no items and no toggle button, which is how a site turns the
+  menu off without a second key for it. The bar itself stays if the site
+  still has search, because that is where the search field lives; with
+  search off as well, nothing is left to draw and the bar goes too. `./style.sh` has a section for it, and it
   is the one section where doing nothing writes nothing -- walking in to
   look at a derived menu must not turn it into an empty one. Adding an
   entry offers your busiest tags and your pages by name, and questions a
