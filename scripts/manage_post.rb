@@ -1969,8 +1969,12 @@ end
 # operations that each used to be its own wizard menu item -- gathering
 # them under the post is what let the menu shrink to activities.
 
+# Returns the row rather than printing it, so the same builder serves both
+# faces: the frame collects the rows, the piped path prints them.
 def props_line(key, value)
-  puts format('  %-12s %s', t("cli.props_label_#{key}"), value) unless value.to_s.empty?
+  return nil if value.to_s.empty?
+
+  format('  %-12s %s', t("cli.props_label_#{key}"), value)
 end
 
 def props_title(post)
@@ -1988,7 +1992,88 @@ def abort_if_post_changed(path, original_raw, slug)
   abort t('cli.post_changed_while_editing', slug: slug)
 end
 
+# Everything above the keys, as rows. Built once and used by both faces:
+# the frame paints them, the piped path prints them.
+# No leading blank row: in the scrolling dialog one separated the title
+# from whatever was printed before it, and the piped path below still adds
+# it. At the top of a frame it is just a gap.
+def props_frame_lines(post, path, slug, year)
+  lines = ["  #{Tui.paint(props_title(post), :bold)}",
+           "  #{draft?(post) ? t('cli.props_draft_banner') : "posts/#{year}/#{post['slug']}/"}", '']
+  if draft?(post)
+    # No created/date line for a plain draft, on purpose: a draft has no
+    # time -- its date is set by publishing or scheduling, and showing
+    # anything earlier would suggest it means something.
+    lines << props_line('scheduled', post['scheduled'] ? Time.parse(post['date']).getlocal.strftime(t('date_time_format')) : nil)
+  else
+    lines << props_line('state', t('cli.props_state_published', date: Time.parse(post['date']).getlocal.strftime(t('date_time_format'))))
+  end
+  lines << props_line('type', ContentType.dominant(post))
+  lines << props_line('tags', (post['tags'] || []).join(', '))
+  lines << props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
+  lines << props_line('unlisted', truthy_frontmatter?(post['unlisted']) ? t('cli.props_unlisted_yes') : nil)
+  announced = post['mastodon_url'] || post['bluesky_url']
+  lines << props_line('announced', if announced then announced
+                                   elsif draft?(post) then t('cli.props_announces_on_publish')
+                                   else t('cli.props_not_announced')
+                                   end)
+  # Old addresses are counted, not listed: a post renamed a few times
+  # would push everything else off the screen, and the list is one
+  # keypress away in [a].
+  addresses = Array(post['former_slugs']).size
+  lines << props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
+  lines.compact!
+  # The whole queue, after the property list rather than inside it: it is
+  # a block, not a field, and until now the only way to see what goes out
+  # when was opening every draft in turn -- which is also how an offered
+  # slot could look like the wrong one.
+  if post['scheduled'] && (queue = scheduled_entries.sort_by(&:first)).size > 1
+    lines << ''
+    lines << Tui.paint(t('cli.props_queue_heading', count: queue.size), :dim)
+    queue.each do |time, queued_slug|
+      mark = queued_slug == post['slug'] ? '→' : ' '
+      lines << "  #{mark} #{time.getlocal.strftime(t('date_time_format'))}  #{queued_slug}"
+    end
+  end
+  lines << ''
+  lines << Tui.paint(t('cli.props_attributes_hint'), :dim)
+  lines << ''
+  lines
+end
+
+# The keys row for the post as it stands: which three of the six shapes it
+# is (draft, scheduled, published, announced or not) decides the wording,
+# and [v] joins only when there is a version to restore.
+def props_prompt(post, path, slug, network_label)
+  key = if draft?(post)
+          post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'
+        elsif network_label
+          'cli.props_actions_published'
+        else
+          'cli.props_actions_published_plain'
+        end
+  with_versions_key(t(key, network: network_label), path, slug)
+end
+
 def cmd_props(slug)
+  return Tui.screen { |screen| props_loop(slug, screen) } if Tui.interactive?
+
+  props_loop(slug, nil)
+end
+
+# Runs an action that speaks for itself. On a frame it takes the terminal
+# and gives it back; piped it simply runs, which is what it always did.
+def props_run(screen, &block)
+  return block.call unless screen
+
+  screen.leave(t('cli.wizard_continue_prompt'), &block)
+end
+
+# One loop for both faces. The actions are the point of this dialog and
+# there is no version of "keep them in step" that survives two copies of
+# this case statement, so the difference between a frame and a scroll is
+# confined to how the rows get on screen and how the key comes back.
+def props_loop(slug, screen)
   network = SiteConfig.comment_network
   network_label = { mastodon: 'Mastodon', bluesky: 'Bluesky' }[network]
 
@@ -2007,79 +2092,59 @@ def cmd_props(slug)
     post = JSON.parse(original_raw)
     year = File.basename(File.dirname(path))
 
-    puts
-    puts "  #{Tui.paint(props_title(post), :bold)}"
-    puts "  #{draft?(post) ? t('cli.props_draft_banner') : "posts/#{year}/#{post['slug']}/"}"
-    puts
-    if draft?(post)
-      # No created/date line for a plain draft, on purpose: a draft has no
-      # time -- its date is set by publishing or scheduling, and showing
-      # anything earlier would suggest it means something.
-      props_line('scheduled', post['scheduled'] ? Time.parse(post['date']).getlocal.strftime(t('date_time_format')) : nil)
+    lines = props_frame_lines(post, path, slug, year)
+    prompt = props_prompt(post, path, slug, network_label)
+
+    if screen
+      keys = Tui.fold_prompt(Tui.paint(prompt, :dim), Tui.term_width).lines.map(&:chomp)
+      screen.paint(lines + keys, keep_last: keys.size)
+      key = screen.key
+      next if key == :resize
+
+      # The frame's key comes back as a symbol for Enter and Esc, where the
+      # line-based dialog has always produced an empty string; the case
+      # statements below were written against that and stay untouched.
+      key = '' unless key.is_a?(String)
     else
-      props_line('state', t('cli.props_state_published', date: Time.parse(post['date']).getlocal.strftime(t('date_time_format'))))
-    end
-    props_line('type', ContentType.dominant(post))
-    props_line('tags', (post['tags'] || []).join(', '))
-    props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
-    props_line('unlisted', truthy_frontmatter?(post['unlisted']) ? t('cli.props_unlisted_yes') : nil)
-    announced = post['mastodon_url'] || post['bluesky_url']
-    props_line('announced', if announced then announced
-                            elsif draft?(post) then t('cli.props_announces_on_publish')
-                            else t('cli.props_not_announced')
-                            end)
-    # Old addresses are counted, not listed: a post renamed a few times
-    # would push everything else off the screen, and the list is one
-    # keypress away in [a].
-    addresses = Array(post['former_slugs']).size
-    props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
-    # The whole queue, after the property list rather than inside it: it is
-    # a block, not a field, and until now the only way to see what goes out
-    # when was opening every draft in turn -- which is also how an offered
-    # slot could look like the wrong one.
-    if post['scheduled'] && (queue = scheduled_entries.sort_by(&:first)).size > 1
       puts
-      puts Tui.paint(t('cli.props_queue_heading', count: queue.size), :dim)
-      queue.each do |time, queued_slug|
-        mark = queued_slug == post['slug'] ? '→' : ' '
-        puts "  #{mark} #{time.getlocal.strftime(t('date_time_format'))}  #{queued_slug}"
-      end
+      lines.each { |line| puts line }
+      key = Tui.key_choice(prompt)
     end
-
-    puts
-    puts Tui.paint(t('cli.props_attributes_hint'), :dim)
-    puts
 
     if draft?(post)
-      case Tui.key_choice(with_versions_key(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'), path, slug))
-      when 'p' then return publish_draft(slug)
+      case key
+      when 'p' then return props_run(screen) { publish_draft(slug) }
       when 's'
-        puts
-        prompt_and_schedule(path, post, raw: original_raw)
+        props_run(screen) do
+          puts
+          prompt_and_schedule(path, post, raw: original_raw)
+        end
       when 'n'
         unless post['scheduled']
-          puts t('cli.props_unknown_draft')
+          props_run(screen) { puts t('cli.props_unknown_draft') }
           next
         end
-        unschedule_post(path, post, slug, raw: original_raw)
+        props_run(screen) { unschedule_post(path, post, slug, raw: original_raw) }
       when 'r'
-        slug = rename_post(path, post, raw: original_raw)
+        slug = props_run(screen) { rename_post(path, post, raw: original_raw) }
       when 'v'
-        props_versions(path, slug)
+        props_run(screen) { props_versions(path, slug) }
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.
-        next unless delete_post(slug)
+        gone = props_run(screen) do
+          delete_post(slug) && rebuild_and_deploy(t('cli.updating_preview'))
+        end
+        next unless gone
 
-        rebuild_and_deploy(t('cli.updating_preview'))
         return
       when '' then return
-      else puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft')
+      else props_run(screen) { puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft') }
       end
     else
-      case Tui.key_choice(with_versions_key(network_label ? t('cli.props_actions_published', network: network_label) : t('cli.props_actions_published_plain'), path, slug))
+      case key
       when 'u'
-        cmd_unpublish(slug)
+        props_run(screen) { cmd_unpublish(slug) }
         # A cancelled confirmation leaves the post published -- come back
         # to the dialog rather than ending it. After a real unpublish the
         # draft decision loop has already offered everything there is.
@@ -2087,25 +2152,27 @@ def cmd_props(slug)
         return if p2.nil? || draft?(JSON.parse(File.read(p2, encoding: 'utf-8')))
       when 't'
         unless network_label
-          puts t('cli.props_unknown_published_plain')
+          props_run(screen) { puts t('cli.props_unknown_published_plain') }
           next
         end
-        puts
-        network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
+        props_run(screen) do
+          puts
+          network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
+        end
       when 'c'
-        toggle_pin(path, post, slug, raw: original_raw)
+        props_run(screen) { toggle_pin(path, post, slug, raw: original_raw) }
       when 'r'
-        slug = rename_post(path, post, raw: original_raw)
+        slug = props_run(screen) { rename_post(path, post, raw: original_raw) }
       when 'a'
-        props_addresses(path, slug)
+        props_run(screen) { props_addresses(path, slug) }
       when 'v'
-        props_versions(path, slug)
+        props_run(screen) { props_versions(path, slug) }
       when 'x'
-        cmd_delete(slug)
+        props_run(screen) { cmd_delete(slug) }
         # Cancelled (the post still exists) -> stay in the dialog.
         return unless find_post_path(slug)
       when '' then return
-      else puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain')
+      else props_run(screen) { puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain') }
       end
     end
   end
