@@ -98,6 +98,13 @@ markdown_page:
 
 ui:
   scroll_top: "Up"
+  # Label for the appearance toggle. Read twice: the layout puts it on the
+  # page, and assets/js/theme-toggle.js rewrites it on every click -- which is
+  # why it also travels through window.BLOG_I18N (client_i18n_json in
+  # build/build_blog.rb).
+  theme_auto: "Appearance: follow system"
+  theme_light: "Appearance: light"
+  theme_dark: "Appearance: dark"
 
 # Consumed client-side via window.BLOG_I18N (see client_i18n_json in
 # build/build_blog.rb and templates/layout.html.erb) -- assets/js/*.js can't

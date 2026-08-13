@@ -57,7 +57,11 @@
       <a href="/" class="banner-link"><img class="banner" src="<%= h(BANNER['src']) %>" alt="<%= h(BANNER['alt']) %>" width="<%= BANNER['width'] %>" height="<%= BANNER['height'] %>"></a>
       <% if BANNER_SHOW_TITLE %><p class="banner-title"><%= h(SITE_SHORT_NAME) %></p><% end %>
       <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= banner_claim_html %></p><% end %>
-      <button id="theme-toggle" type="button">☀︎/☾︎</button>
+      <button id="theme-toggle" type="button" title="<%= h(t('ui.theme_auto')) %>" aria-label="<%= h(t('ui.theme_auto')) %>">☀︎/☾︎</button><%# Both the symbol and the label are what "follow the system" looks like --
+      the page is built once and served to everyone, so the server can't know
+      which of the three states a given reader is in. theme-toggle.js corrects
+      both on load. Without the label a screen reader announces the raw sun and
+      moon glyphs. %>
     </div>
     <%= partial('nav', search: true, active: nav_active) %>
 

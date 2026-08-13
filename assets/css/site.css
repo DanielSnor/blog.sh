@@ -325,6 +325,13 @@ nav a[aria-current="page"]:hover {
   font-size: 0.85rem;
   cursor: pointer;
   transition: 0.3s ease-in-out;
+  /* The label is one glyph when a reader has picked light or dark and three
+     when it follows the system, so without a floor the button would resize
+     under the cursor on every click -- and the transition above would animate
+     it doing so. Just past the three-glyph state, which is what the button
+     measured before it had states at all, so the banner keeps its old look. */
+  min-width: 3.6em;
+  text-align: center;
 }
 #theme-toggle:hover { background: var(--hover-invert); border-color: var(--hover-invert); color: var(--badge-hover-text); }
 

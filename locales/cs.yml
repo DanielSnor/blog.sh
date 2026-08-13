@@ -97,6 +97,12 @@ markdown_page:
 
 ui:
   scroll_top: "Nahoru"
+  # Popisek přepínače vzhledu. Čte se dvakrát: šablona ho vloží do stránky a
+  # assets/js/theme-toggle.js ho přepisuje při každém kliknutí, takže se sem
+  # dostává i přes window.BLOG_I18N (client_i18n_json v build/build_blog.rb).
+  theme_auto: "Vzhled: podle systému"
+  theme_light: "Vzhled: světlý"
+  theme_dark: "Vzhled: tmavý"
 
 js:
   date_locale: "cs-CZ"

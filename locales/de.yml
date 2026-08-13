@@ -100,6 +100,13 @@ markdown_page:
 
 ui:
   scroll_top: "Nach oben"
+  # Beschriftung des Erscheinungsbild-Umschalters. Wird zweimal gelesen: das
+  # Layout setzt sie auf die Seite, assets/js/theme-toggle.js schreibt sie bei
+  # jedem Klick neu -- deshalb läuft sie auch über window.BLOG_I18N
+  # (client_i18n_json in build/build_blog.rb).
+  theme_auto: "Erscheinungsbild: wie im System"
+  theme_light: "Erscheinungsbild: hell"
+  theme_dark: "Erscheinungsbild: dunkel"
 
 js:
   date_locale: "de-DE"

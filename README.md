@@ -183,7 +183,9 @@ calls a third party for them, so no widget can slow down or break a page.
 → [operations.md → Cron](docs/operations.md#cron-sidebar-widgets-and-post-stats)
 
 **Appearance.** Light and dark from CSS custom properties and
-`prefers-color-scheme`, with a manual toggle; a lightbox, collapsible
+`prefers-color-scheme`, with a toggle that cycles through three states --
+follow the system, light, dark -- so a reader who tries the other mode can
+hand the decision back; a lightbox, collapsible
 mobile navigation, and photo galleries assembled from adjacent images.
 The whole palette is seven config keys per mode, compiled into a
 stylesheet at build time -- seven ready-made palettes ship with the

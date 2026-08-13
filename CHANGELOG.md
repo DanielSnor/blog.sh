@@ -214,6 +214,19 @@ byte-for-byte against the previous build.
 
 ### Fixed
 
+- **The appearance toggle can find its way back to the system.** One click
+  on the sun/moon button wrote a theme into `localStorage` and nothing ever
+  removed it, so a reader who tried the other mode once was pinned to that
+  choice on every later visit -- and the only way out was to clear the
+  site's stored data, which nobody thinks to do. A phone or a Mac set to
+  change appearance during the day stopped reaching the site at all. The
+  button now cycles through three states -- follow the system, light, dark
+  -- and says which one it is on, both in the symbol it shows and in its
+  label, so "the system decides" is finally distinguishable from a choice
+  that was made once and forgotten. The first click still flips to the
+  opposite of what is on screen: a fixed light-then-dark cycle would have
+  done nothing visible for a reader whose system is already light, and a
+  button that does nothing on its first press reads as broken.
 - **A markdown tree's pages are no longer walked past.** The importer
   read `_posts/` and `_drafts/` and nothing else, so a Jekyll site's
   pages -- `about.md`, `colophon.md`, which live in the root by
