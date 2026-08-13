@@ -12,6 +12,7 @@ require 'tmpdir'
 require 'set'
 require 'securerandom'
 require 'shellwords'
+require 'stringio'
 require_relative '../lib/post_writer'
 require_relative '../lib/post_versions'
 require_relative '../lib/atomic_write'
@@ -1414,7 +1415,162 @@ end
 # rebuild happens once, on the way out, not after every move -- with a
 # multi-post reshuffle the intermediate states aren't worth a deploy
 # each.
+# PROTOTYPE (13 Aug 2026): the queue as a screen that stays put instead of
+# a dialog that reprints itself. Every keypress used to leave another full
+# copy of the queue in the scrollback -- twenty rows, a hint line and an
+# action row, again and again, so five moves buried the terminal in five
+# identical screens. Here the frame is repainted over itself and the
+# terminal never scrolls.
+#
+# Deliberately NOT the alternate screen: see Tui.frame. The last frame
+# stays on screen when the queue is left, and everything above it survives.
+#
+# What is prototype-grade and would need deciding before this spreads to
+# the other screens:
+#   * the size is re-read on every repaint, so a window resized WHILE the
+#     screen waits for a key straightens out on the next keypress rather
+#     than immediately -- no SIGWINCH handler yet
+#   * messages the actions print are captured and shown on the frame's own
+#     status line; anything printing more than one line ([p], [s], [n])
+#     leaves the screen instead, runs as it always did, and waits for a key
+#     before the frame comes back
+#   * piped input keeps the old line-based path untouched, below
 def cmd_queue
+  return cmd_queue_screen if Tui.interactive?
+
+  cmd_queue_lines
+end
+
+# The rows of one frame: heading, the window of the queue with the cursor,
+# a status line for whatever the last action said, and the keys. Built as
+# one array so Tui.frame can paint it in a single write -- a frame assembled
+# with several prints flickers on a slow connection, which SSH from a phone
+# certainly is.
+def queue_frame_lines(entries, selected, offset, window, mode, status)
+  lines = [Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold), '']
+  entries[offset, window].to_a.each_with_index do |entry, i|
+    row = queue_row(entry, offset + i)
+    lines << if (offset + i) == selected
+               Tui.paint("› #{Tui.truncate_to_width(Tui.strip_ansi(row), Tui.term_width - 2)}", :invert)
+             else
+               "  #{Tui.truncate_ansi(row, Tui.term_width - 2)}"
+             end
+  end
+  lines << ''
+  lines << (status.to_s.empty? ? '' : Tui.truncate_to_width(status.to_s, Tui.term_width))
+  lines << ''
+  keys = mode == :list ? t('cli.queue_menu_hint') : with_carry_key(t('cli.queue_actions', slug: entries[selected][:slug]))
+  lines.concat(Tui.fold_prompt(Tui.paint(keys, :dim), Tui.term_width).lines.map(&:chomp))
+  lines
+end
+
+# Runs one of the actions that speak in a single line ([u], [d], [m]) and
+# hands back what it said, so the frame can show it on its status line
+# rather than letting it scroll the screen. $stdout is restored in an
+# ensure because these actions can abort the process outright.
+def queue_quiet_action(&block)
+  buffer = StringIO.new
+  original = $stdout
+  $stdout = buffer
+  result = block.call
+  [result, buffer.string.lines.map(&:chomp).reject(&:empty?).last.to_s]
+ensure
+  $stdout = original
+end
+
+def cmd_queue_screen
+  dirty = false
+  selected = 0
+  offset = 0
+  mode = :list
+  status = ''
+
+  loop do
+    entries = queue_entries
+    if entries.empty?
+      puts t('cli.queue_empty')
+      puts
+      break
+    end
+
+    selected = selected.clamp(0, entries.size - 1)
+    # Six rows go to the heading, its blank line, the blank line under the
+    # list, the status line and the two-line keys block; the rest is queue.
+    window = [entries.size, [Tui.term_height - 7, 3].max].min
+    offset = Tui.clamp_offset(selected, offset, window, entries.size)
+    lines = queue_frame_lines(entries, selected, offset, window, mode, status)
+
+    key = Tui.raw_screen do
+      print "\e[?25l"
+      Tui.frame(lines)
+      Tui.read_key
+    ensure
+      print "\e[?25h"
+    end
+    status = ''
+
+    if mode == :list
+      case key
+      when :up then selected = (selected - 1) % entries.size
+      when :down then selected = (selected + 1) % entries.size
+      when :page_up then selected = [selected - window, 0].max
+      when :page_down then selected = [selected + window, entries.size - 1].min
+      when :home then selected = 0
+      when :end then selected = entries.size - 1
+      when :enter then mode = :actions
+      when :escape then break
+      end
+      next
+    end
+
+    case key
+    when 'u', 'd'
+      moved, status = queue_quiet_action { queue_swap(entries, selected, selected + (key == 'u' ? -1 : 1)) }
+      if moved
+        dirty = true
+        # The cursor travels with the post it just moved, the same rule the
+        # line-based screen follows through queue_focus_index.
+        selected += key == 'u' ? -1 : 1
+      end
+    when 'm'
+      # queue_carry paints its own frame into this same screen and comes
+      # back with the cursor on the post it put down.
+      carried, status = queue_quiet_action { queue_carry(entries, selected) }
+      dirty ||= carried
+    when 'p', 's', 'n'
+      # These print more than a line -- a publish announces, a reschedule
+      # asks. They get the terminal to themselves.
+      Tui.frame_end(lines)
+      dirty = true if queue_act_slow(entries, selected, key)
+      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
+      mode = :list
+    when :enter, :escape then mode = :list
+    end
+  end
+
+  rebuild_and_deploy(t('cli.updating_preview')) if dirty
+end
+
+# The three actions that leave the screen. Split out of queue_act so the
+# frame-based screen and the line-based one below run the same code for
+# them rather than two copies that can drift.
+def queue_act_slow(entries, index, key)
+  entry = entries[index]
+  case key
+  when 'p'
+    freed = entry[:time]
+    publish_draft(entry[:slug], path: entry[:path])
+    queue_offer_compact(freed, entries[(index + 1)..])
+  when 's'
+    puts
+    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw])
+  when 'n'
+    unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
+    queue_offer_compact(entry[:time], entries[(index + 1)..])
+  end
+end
+
+def cmd_queue_lines
   dirty = false
   focus = nil
   loop do
@@ -1478,20 +1634,11 @@ end
 
 def queue_act(entries, index)
   entry = entries[index]
-  case Tui.key_choice(with_carry_key(t('cli.queue_actions', slug: entry[:slug])))
+  case (key = Tui.key_choice(with_carry_key(t('cli.queue_actions', slug: entry[:slug]))))
   when 'u' then queue_swap(entries, index, index - 1)
   when 'd' then queue_swap(entries, index, index + 1)
   when 'm' then queue_carry(entries, index)
-  when 'p'
-    freed = entry[:time]
-    publish_draft(entry[:slug], path: entry[:path])
-    queue_offer_compact(freed, entries[(index + 1)..])
-  when 's'
-    puts
-    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw])
-  when 'n'
-    unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
-    queue_offer_compact(entry[:time], entries[(index + 1)..])
+  when 'p', 's', 'n' then queue_act_slow(entries, index, key)
   when '' then false
   else
     puts t('cli.queue_unknown')
@@ -1597,8 +1744,7 @@ end
 def queue_carry_screen(entries, index, first_future)
   target = index
   offset = 0
-  painted = 0
-  window = [entries.size, [Tui.term_height - 4, 5].max].min
+  window = [entries.size, [Tui.term_height - 7, 3].max].min
 
   print "\e[?25l"
   loop do
@@ -1606,19 +1752,22 @@ def queue_carry_screen(entries, index, first_future)
     order.insert(target, order.delete_at(index))
     offset = Tui.clamp_offset(target, offset, window, entries.size)
 
-    print "\e[#{painted}A" if painted.positive?
-    order[offset, window].each_with_index do |entry, i|
+    # The same frame the queue screen paints, so picking a post up does not
+    # move anything on screen except the post itself -- the heading stays on
+    # its row, the list stays in its rows, only the hint at the bottom
+    # changes to say what the arrows now do.
+    lines = [Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold), '']
+    order[offset, window].to_a.each_with_index do |entry, i|
       row = queue_row(entry, offset + i)
-      line = if (offset + i) == target
-               Tui.paint("⇅ #{Tui.truncate_to_width(Tui.strip_ansi(row), Tui.term_width - 2)}", :invert)
-             else
-               "  #{Tui.truncate_ansi(row, Tui.term_width - 2)}"
-             end
-      print "\e[2K#{line}\n"
+      lines << if (offset + i) == target
+                 Tui.paint("⇅ #{Tui.truncate_to_width(Tui.strip_ansi(row), Tui.term_width - 2)}", :invert)
+               else
+                 "  #{Tui.truncate_ansi(row, Tui.term_width - 2)}"
+               end
     end
-    print "\e[2K\n"
-    print "\e[2K#{Tui.paint(Tui.truncate_to_width(t('cli.queue_carry_hint'), Tui.term_width), :dim)}\n"
-    painted = [entries.size, window].min + 2
+    lines.push('', '', '')
+    lines << Tui.paint(Tui.truncate_to_width(t('cli.queue_carry_hint'), Tui.term_width), :dim)
+    Tui.frame(lines)
 
     case Tui.read_key
     # No wraparound: carrying a post off the top and having it appear at the

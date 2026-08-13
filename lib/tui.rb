@@ -654,6 +654,40 @@ module Tui
     print "\e[?25h"
   end
 
+  # A screen that stays put. The frame is painted from the top of the
+  # viewport, over whatever the last frame left there, and the terminal
+  # never scrolls -- so a dialog that used to reprint its whole list after
+  # every keypress now lives on the same rows from beginning to end.
+  #
+  # NOT the alternate screen (\e[?1049h). That plane is discarded on exit,
+  # and this CLI prints things worth keeping: a draft's address, what was
+  # uploaded, what refused. Here the last frame stays exactly where it was
+  # drawn and the scrollback above it is never touched -- which is the same
+  # promise `pause_and_clear` has always made.
+  #
+  # The rows are joined rather than printed one by one, and the last one
+  # carries no line ending: printing term_height lines each with a newline
+  # scrolls the view by one, and a screen that scrolls by one per repaint
+  # is the very thing this exists to stop. \e[J clears whatever the
+  # previous, taller frame left below this one.
+  #
+  # \r\n, not \n -- callers paint inside raw_screen, where OPOST is off and
+  # the kernel no longer turns a newline into carriage-return plus newline.
+  def frame(lines)
+    width = term_width
+    body = lines.first(term_height).map { |line| "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}" }
+    print "\e[H#{body.join("\r\n")}\e[J"
+  end
+
+  # Everything below the frame, cleared. For leaving a screen behind before
+  # an operation that prints its own long output (a build, a deploy): the
+  # frame stays as the last thing on screen and the output starts under it,
+  # instead of the two overwriting each other row by row.
+  def frame_end(lines)
+    frame(lines)
+    print "\r\n"
+  end
+
   # $stdin.raw with a floor: a stdin that cannot do raw (not a real
   # terminal) just runs the block -- getch then does its own per-key raw
   # exactly as before.
