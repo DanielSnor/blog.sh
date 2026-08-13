@@ -1467,11 +1467,21 @@ end
 # Returns true when something changed that the closing rebuild must pick
 # up. "Publish now" rebuilds inside publish_draft as always; only the
 # compaction it may be followed by still needs the closing one.
+# [m] joins the row only in a terminal: carrying a post is a screen, and a
+# piped caller has [u] and [d], which need no screen at all. Inserted before
+# [Enter] the way the versions key is, which is literal in every locale.
+def with_carry_key(prompt)
+  return prompt unless Tui.interactive?
+
+  prompt.sub('[Enter]') { "#{t('cli.queue_action_carry')}[Enter]" }
+end
+
 def queue_act(entries, index)
   entry = entries[index]
-  case Tui.key_choice(t('cli.queue_actions', slug: entry[:slug]))
+  case Tui.key_choice(with_carry_key(t('cli.queue_actions', slug: entry[:slug])))
   when 'u' then queue_swap(entries, index, index - 1)
   when 'd' then queue_swap(entries, index, index + 1)
+  when 'm' then queue_carry(entries, index)
   when 'p'
     freed = entry[:time]
     publish_draft(entry[:slug], path: entry[:path])
@@ -1521,6 +1531,109 @@ rescue Exception
     warn ''
   end
   raise
+end
+
+# Picking the post up and carrying it, instead of trading places with one
+# neighbour at a time. The arrows move the post itself through the queue --
+# on screen and in memory -- and nothing is written until Enter puts it
+# down. Esc walks away and the queue is exactly as it was.
+#
+# The times do not travel with it. A queue of twenty slots stays those
+# twenty slots; carrying a post from the eighth to the second means the six
+# in between each step back one slot, which is the rule [u] already
+# follows, applied to a whole run at once. That is what lets this be a
+# single confirmed write instead of a write per slot: the set of occupied
+# times is identical before and after, only the posts sitting in them
+# differ.
+#
+# A post whose time has passed is off limits at both ends, for the reason
+# queue_swap gives -- the cron owns it now, and handing another post that
+# time would schedule it into the past.
+def queue_carry(entries, index)
+  first_future = entries.index { |entry| entry[:time] > Time.now }
+  if first_future.nil? || index < first_future
+    puts t('cli.queue_swap_overdue')
+    puts
+    return false
+  end
+
+  target = queue_carry_screen(entries, index, first_future)
+  return false if target.nil? || target == index
+
+  order = entries.dup
+  order.insert(target, order.delete_at(index))
+  times = entries.map { |entry| entry[:time] }
+  moves = order.each_with_index.filter_map do |entry, i|
+    [entry, times[i]] unless entry[:time] == times[i]
+  end
+
+  # Every half checked before any of it is written -- the whole reason
+  # queue_swap does the same, only here the run is longer and a failure
+  # partway through would leave more of the queue half-moved.
+  moves.each do |entry, target_time|
+    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
+    target_path = File.join(CONTENT_DIR, target_time.year.to_s, "#{entry[:post]['slug']}.json")
+    next if File.expand_path(target_path) == File.expand_path(entry[:path])
+
+    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
+  end
+
+  apply_queue_moves(moves) do |entry, target_time|
+    write_scheduled_date(entry[:path], entry[:post], target_time, raw: entry[:raw])
+  end
+  puts Tui.paint(t('cli.queue_carried', slug: entries[index][:slug], position: target + 1,
+                                        date: times[target].getlocal.strftime(t('date_time_format'))), :green)
+  puts
+  true
+end
+
+# Draws the queue with one post held under the cursor and returns the
+# position it was put down at, or nil on Esc. Its own repaint loop rather
+# than Tui.menu, because the rows themselves reorder as the post travels --
+# a menu moves a cursor over a fixed list, and this moves the list.
+#
+# Piped callers never reach here: [m] is offered only in a terminal, and
+# scripted reordering has [u]/[d], which need no screen at all.
+def queue_carry_screen(entries, index, first_future)
+  target = index
+  offset = 0
+  painted = 0
+  window = [entries.size, [Tui.term_height - 4, 5].max].min
+
+  print "\e[?25l"
+  loop do
+    order = entries.dup
+    order.insert(target, order.delete_at(index))
+    offset = Tui.clamp_offset(target, offset, window, entries.size)
+
+    print "\e[#{painted}A" if painted.positive?
+    order[offset, window].each_with_index do |entry, i|
+      row = queue_row(entry, offset + i)
+      line = if (offset + i) == target
+               Tui.paint("⇅ #{Tui.truncate_to_width(Tui.strip_ansi(row), Tui.term_width - 2)}", :invert)
+             else
+               "  #{Tui.truncate_ansi(row, Tui.term_width - 2)}"
+             end
+      print "\e[2K#{line}\n"
+    end
+    print "\e[2K\n"
+    print "\e[2K#{Tui.paint(Tui.truncate_to_width(t('cli.queue_carry_hint'), Tui.term_width), :dim)}\n"
+    painted = [entries.size, window].min + 2
+
+    case Tui.read_key
+    # No wraparound: carrying a post off the top and having it appear at the
+    # bottom is a move nobody meant to make, and unlike a cursor this one
+    # writes to disk when it lands.
+    when :up then target = [target - 1, first_future].max
+    when :down then target = [target + 1, entries.size - 1].min
+    when :home then target = first_future
+    when :end then target = entries.size - 1
+    when :enter then return target
+    when :escape then return nil
+    end
+  end
+ensure
+  print "\e[?25h"
 end
 
 # Moving a post earlier or later means exchanging times with its

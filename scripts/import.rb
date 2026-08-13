@@ -89,9 +89,23 @@ def source_name(key)
   t("import.source.#{key}")
 end
 
+# Which answers are paths is decided from the prompt's own NAME rather than
+# from a flag repeated at twenty-two call sites: every path question here is
+# `*_path_prompt` or `*_dir_prompt`, and `*_source_prompt` takes either a
+# path or a URL (where completion simply finds nothing and costs nothing).
+# An importer added later gets Tab completion by following the naming, and
+# the five questions that ask for a handle, a blog name or a URL never get
+# it by accident.
+PATH_PROMPTS = /_(path|dir|source)_prompt\z/.freeze
+
 def ask(prompt_key)
-  print t(prompt_key)
-  value = $stdin.gets.to_s.strip
+  value = if prompt_key.match?(PATH_PROMPTS)
+            Tui.path_line(t(prompt_key))
+          else
+            print t(prompt_key)
+            $stdin.gets
+          end
+  value = value.to_s.strip
   value.empty? ? nil : value
 end
 

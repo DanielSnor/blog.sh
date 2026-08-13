@@ -66,6 +66,17 @@ byte-for-byte against the previous build.
   posts keep their identity, series, redirects and announcement URLs, so
   export plus re-import moves an installation instead of merely leaving
   one.
+- **Carrying a post through the publishing queue.** `[m]` in the queue's
+  action row picks the post up: the arrows then move the post itself
+  through the queue on screen, Enter puts it down and Esc leaves everything
+  as it was. The times belong to the queue rather than to the post, so
+  carrying one from the eighth slot to the second steps the six in between
+  back one slot each -- the same instants are occupied before and after,
+  and the whole move is one confirmed write instead of one per slot. `[u]`
+  and `[d]` are unchanged for a move of a single slot, and remain the only
+  way when the input is piped, where there is no screen to carry anything
+  across. A post whose time has already passed is off limits at both ends,
+  as it is for `[u]` and `[d]`: the cron owns it now.
 - **Unlisted posts.** `unlisted: true` keeps a published post on its
   ordinary address, with its date and its redirects, and takes it out of
   the homepage, the tag and type archives, the feeds, the sitemap and the
@@ -229,6 +240,26 @@ byte-for-byte against the previous build.
   like the rest, and keeps the numbered prompt for piped input the way they
   all do. The note about images not being versioned moved above the list,
   where it is read before the choosing rather than after it.
+- **Action rows fold instead of wrapping mid-word.** The row of keys under
+  a post runs to 137 characters in German and 134 in Czech, so on an
+  80-column terminal -- or a phone over SSH -- it wrapped wherever the width
+  ran out, which is *inside* an item: the bracket naming a key ended up on
+  the line above its own words. It now breaks between items and keeps each
+  one whole. Nothing is dropped, unlike the keys line on the browse screen:
+  there they are ways to move around, here they are the actions themselves,
+  and hiding `[x] delete` from the narrowest terminal would hide it from the
+  reader least able to guess it is there.
+- **Page Up, Page Down, Home and End work in the pickers.** They already
+  worked on the browse screen; the arrow menu read the very same keys and
+  threw them away, so a picker over a long list -- the publishing queue, a
+  tag with hundreds of posts -- could only be walked one row at a time.
+- **Tab completes paths in the import wizard.** Every question that asks
+  where an export is completes file and directory names, including inside
+  directories whose name contains a space, which is where readline's own
+  defaults would otherwise give up. Questions asking for a handle, a blog
+  name or a URL do not complete. Readline ships with Ruby and installs
+  nothing; where it is genuinely absent the prompt behaves exactly as
+  before.
 
 ### Fixed
 

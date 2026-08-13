@@ -211,11 +211,50 @@ module Tui
   # by a line of input when piped -- the returned string matches what the
   # line-based dialogs always produced ('' for Enter/Esc, the downcased
   # answer otherwise), so callers' case statements stay unchanged.
+  # The keys line of a single-key prompt, folded to the terminal rather than
+  # left to wrap wherever the width happens to run out -- which lands inside
+  # an item, so "[r] rename slug" breaks after "rename" and the bracket
+  # naming the key sits on the line above its own words. Items stay whole
+  # and the trailing ": " stays with the last one, because that is where the
+  # cursor waits for the keypress.
+  #
+  # FOLDED, not trimmed the way `browse`'s keys line is. There the dropped
+  # items are ways to move around and a reader can guess them; here they are
+  # the actions themselves, and dropping "[x] delete" would mean the action
+  # does not exist on the one screen where the terminal is narrowest -- a
+  # phone over SSH. Nothing is hidden, it is only stacked.
+  #
+  # Two spaces is the separator every one of these strings uses, in all
+  # three locales. A prompt with no separator (or one that fits) comes back
+  # byte for byte, so piped output and the tests over it are untouched.
+  def fold_prompt(text, width)
+    return text if width < 20 || display_width(strip_ansi(text)) <= width
+
+    parts = text.split(/ {2,}/).reject(&:empty?)
+    return text if parts.size < 2
+
+    lines = []
+    current = +''
+    parts.each do |part|
+      candidate = current.empty? ? part : "#{current}  #{part}"
+      if !current.empty? && display_width(strip_ansi(candidate)) > width
+        lines << current
+        current = +'' << part
+      else
+        current = candidate
+      end
+    end
+    lines << current
+    lines.join("\n")
+  end
+
   def key_choice(prompt)
-    print prompt
     unless interactive?
+      print prompt
       return $stdin.gets&.strip.to_s.downcase
     end
+
+    print fold_prompt(prompt, term_width)
 
     key = read_key
     case key
@@ -228,6 +267,66 @@ module Tui
     else
       puts
       ''
+    end
+  end
+
+  # A line of input where Tab completes file names. The import wizard asks
+  # for the path to an export somebody has just downloaded, and without this
+  # the only way in is typing it from memory, correctly, the first time --
+  # for a name like `twitter-2026-08-13-a1b2c3.zip` sitting three
+  # directories down.
+  #
+  # readline is a DEFAULT gem: it ships with Ruby and installs nothing, so
+  # "no gems, no lockfile" still holds. It can nevertheless be absent (a Ruby
+  # built --without-readline), so a failed require degrades to the ordinary
+  # prompt rather than taking the wizard down on its first question. Piped
+  # input skips it too -- there is no terminal to complete against.
+  def path_line(prompt)
+    return plain_line(prompt) unless interactive? && readline?
+
+    # Word breaks off on purpose. Readline splits on spaces by default, and
+    # plenty of exports sit in a directory whose name has one -- completing
+    # only the fragment after the space finds nothing and reads as broken.
+    # With no break characters the whole line is the word, which is what a
+    # path is.
+    Readline.completion_append_character = nil
+    Readline.completer_word_break_characters = ''
+    Readline.completion_proc = ->(str) { complete_path(str) }
+    Readline.readline(prompt, false)
+  end
+
+  def plain_line(prompt)
+    print prompt
+    $stdin.gets
+  end
+
+  # Candidates are returned in the shape the line was typed in -- a "~" that
+  # was typed stays a "~". Handing back the expanded form instead would
+  # rewrite the visible line into an absolute path on the first Tab, which
+  # is disorienting when the answer is about to be echoed back in an error
+  # message. Directories get their trailing slash so a second Tab descends.
+  def complete_path(str)
+    typed = str.to_s
+    home = Dir.home
+    pattern = typed.empty? ? '*' : "#{typed.sub(/\A~/, home)}*"
+    Dir.glob(pattern).map do |hit|
+      shown = typed.start_with?('~') ? hit.sub(/\A#{Regexp.escape(home)}/, '~') : hit
+      File.directory?(hit) ? "#{shown}/" : shown
+    end
+  rescue StandardError
+    # A malformed glob (an unbalanced brace in a half-typed path) must not
+    # kill the prompt mid-question.
+    []
+  end
+
+  def readline?
+    return @readline unless @readline.nil?
+
+    @readline = begin
+      require 'readline'
+      true
+    rescue LoadError
+      false
     end
   end
 
@@ -334,6 +433,24 @@ module Tui
       when :down
         selected = (selected + 1) % items.size
         offset = clamp_offset(selected, offset, window, items.size)
+      when :page_up, :page_down
+        # Paging moves the window, not just the cursor -- the rule `browse`
+        # already follows: leaving the offset to clamp_offset scrolls a
+        # single line and parks the cursor on the edge, which reads as a
+        # broken Page Down. And no wraparound, unlike the arrows: a page is
+        # a distance, and one that would land past the end stops at the end.
+        # read_key has named these keys since it learned to drain escape
+        # sequences; this menu was simply throwing them away, so a picker
+        # over a long archive could only be walked one row at a time.
+        delta = key == :page_up ? -window : window
+        selected = (selected + delta).clamp(0, [items.size - 1, 0].max)
+        offset = (offset + delta).clamp(0, [items.size - window, 0].max)
+      when :home
+        selected = 0
+        offset = 0
+      when :end
+        selected = [items.size - 1, 0].max
+        offset = [items.size - window, 0].max
       when :enter then return selected
       when :escape then return nil
       when String
