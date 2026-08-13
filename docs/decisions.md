@@ -637,6 +637,17 @@ a palette whose accent sits close to its card background gets a quiet
 ring on the page body, and a skin that repaints a control's ground has
 to look at the ring itself rather than getting a new one for free.
 
+**The phone's search field is ordered ahead of the menu it is written
+after.** In the markup the bar reads button, menu, search -- which is the
+order a desktop wants. On a phone the menu is 100% wide and wraps to its
+own line, so left alone the field would land on a third line and move
+down the screen every time the menu opened; `order` puts it back beside
+the button. *Cost:* the usual price of ordering, that Tab follows the
+markup and not the eye -- with the menu open, Tab goes from the button
+down to the menu items and only then back up to the field. Closed, the
+items are `display: none` and there is nothing to disagree about, which
+is the state the bar is in almost always.
+
 **The images a lightbox can open are made into buttons by the script, not
 by the build.** `tabindex` and `role="button"` are added at runtime rather
 than written into the HTML, so a page served without its JavaScript --

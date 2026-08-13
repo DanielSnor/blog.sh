@@ -190,8 +190,10 @@ nav {
    scrolls something into view: a heading reached from the contents list, a
    link reached with Tab, any anchor followed from anywhere. Without this
    they are all scrolled to the top of the window, which is exactly where
-   the bar is, and arrive underneath it. The number is the bar's own
-   height -- 60px of row and its two 5px borders. */
+   the bar is, and arrive underneath it. The number is the bar's own height,
+   and it is the same on both sides of the breakpoint: a 60px row and two
+   5px borders on a desktop, a 44px row with 8px of padding and the same two
+   borders on a phone. */
 html { scroll-padding-top: 70px; }
 
 nav ul { list-style: none; display: flex; flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; }
@@ -533,21 +535,51 @@ nav a[aria-current="page"]:hover {
 
   .nav-toggle { display: flex; }
 
+  /* The bar hugs what it holds instead of standing 60px tall regardless.
+     That floor was worth having when the bar held one 40px hamburger and
+     nothing else; with the search field beside it there is nothing left to
+     prop up, and the floor had become the reason the top row moved: closed,
+     the spare 16px was shared out above and below the row, and the moment
+     the menu opened there was no spare (the 1rem gap between flex lines had
+     taken it), so the button and the field slid 8px up as the menu came
+     down. Hugging, the row sits at the same offset in both states -- and
+     the bar comes out 70px, exactly what it is on a desktop. */
   nav {
     flex-wrap: wrap;
     height: auto;
-    min-height: 60px;
+    min-height: 0;
     padding: 0.5rem 1rem;
   }
 
-  /* The same sum as above with this padding in it: 60 + 2x8 + 2x5. The
-     opened menu is far taller again, but nothing scrolls to an anchor
-     while the reader is holding the menu open. */
-  html { scroll-padding-top: 86px; }
+  /* The search field stays in the bar on a phone. It used to be folded away
+     with the menu, which put the archive's only way in behind a button that
+     says nothing about search -- on a site with four thousand posts that is
+     the wrong thing to hide, and it was hidden in the emptiest bar on the
+     site: one 44px button and the rest of the width doing nothing.
 
-  nav ul, .search-form { display: none; width: 100%; }
+     `order` puts it beside that button rather than after the menu. Without
+     it the field is the third item in the row, so opening the menu -- which
+     is 100% wide and wraps to its own line -- would push the field down to a
+     third line, moving the thing the reader was about to tap. The cost of
+     ordering is the usual one, that Tab follows the markup and not the eye:
+     with the menu open, Tab goes from the button to the menu items below
+     before reaching the field above them. Closed, the items are display:none
+     and there is nothing to disagree about -- and open is a state the reader
+     has just asked for, with the items being what they asked for. */
+  nav ul { display: none; width: 100%; order: 1; }
   nav.nav-open ul { display: flex; flex-direction: column; margin-top: 0.5rem; }
-  nav.nav-open .search-form { display: flex; margin-top: 0.75rem; padding-bottom: 0.75rem; }
+
+  /* Takes what the button leaves. min-width: 0 because a flex item will not
+     shrink below its content by default, and the field carries a
+     placeholder. */
+  .search-form { flex: 1 1 auto; min-width: 0; }
+
+  /* 40px rather than the 30 it has on a desktop: the bar is 60px with 8px
+     of padding, so 44 is what fits, and a 30px-tall target in the middle of
+     a phone screen is the same complaint the hamburger and the appearance
+     toggle just answered. 40 keeps a hair of air above and below. */
+  .search-form input[type="search"] { height: 40px; }
+  .search-form button { width: 40px; height: 40px; }
 
   nav li { float: none; margin-left: 0; line-height: normal; }
 

@@ -372,6 +372,18 @@ byte-for-byte against the previous build.
   the list is ranked: the fifty shown are the fifty best answers rather
   than the fifty that happen to be newest. Ranking the whole 4400 costs
   16ms the first time and 6ms after that, measured on that archive.
+- **On a phone the search field is in the bar, not folded into the menu.**
+  It was hidden with the menu items behind a button that says nothing about
+  search -- on an archive of four thousand posts, the wrong thing to put
+  out of sight, and it was hidden in the emptiest bar on the site: one
+  button and the rest of the width doing nothing. The field now sits beside
+  that button and takes the room, at 40px tall rather than the desktop's 30
+  so a finger has something to land on. Opening the menu drops the items
+  underneath it and moves nothing that was already on screen. The bar also
+  stops standing 60px tall regardless of what it holds: that floor made
+  sense when it held one hamburger, and it was what made the row shift as
+  the menu opened. It hugs its contents now and comes out 70px -- the same
+  height it has always had on a desktop.
 - **The lightbox can be opened, walked and closed without a mouse.** Escape
   and the arrow keys worked inside it, which was of no use to anybody: the
   only way in was a click, because an image is not a focusable thing. The
