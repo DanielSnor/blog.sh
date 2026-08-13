@@ -187,6 +187,9 @@ calls a third party for them, so no widget can slow down or break a page.
 follow the system, light, dark -- so a reader who tries the other mode can
 hand the decision back; a lightbox, collapsible
 mobile navigation, and photo galleries assembled from adjacent images.
+The menu bar follows the reader down the page, so the way out of an
+article is wherever they finished it rather than back at the top, and it
+carries the search field on a phone as well as on a desktop.
 The whole palette is seven config keys per mode, compiled into a
 stylesheet at build time -- seven ready-made palettes ship with the
 engine, and the header's typeface and size are configuration too, not a
@@ -196,6 +199,18 @@ in the same Markdown a post is, and raw HTML still works in them, which is
 how a photo gets into a bio. No framework anywhere; the JavaScript is
 small single-purpose files.
 → [install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)
+
+**Reachable without a mouse, and quiet if you ask.** One focus ring for
+the whole site, in the site's own accent, so a reader moving by keyboard
+can always see where they are -- and it goes inside the control wherever
+the ground behind it is a photograph or a fill it would disappear into.
+The lightbox opens with Enter, walks with the arrows, keeps Tab inside
+itself while it is up and hands focus back to the picture it was opened
+from; the menu on a phone closes with Escape or a tap on the page. Every
+page has exactly one `h1`. A reader whose system asks for less movement
+gets the site with its transitions off and the back-to-top button putting
+them at the top rather than travelling there.
+→ [decisions.md](docs/decisions.md)
 
 **Security.** A Content-Security-Policy on every page, self-hosted fonts,
 no third-party tracking in post data, consistent escaping of everything
