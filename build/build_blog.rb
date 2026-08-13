@@ -189,7 +189,15 @@ LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
 # The menu repeated under the content. It carries no search field, so with
 # an empty `nav:` there would be nothing left in it to show -- but a site
 # with a menu may still not want it twice.
-LAYOUT_NAV_BOTTOM = SiteConfig.get('layout', 'nav_bottom', default: true)
+# Off unless asked for. It was on -- hardcoded into the layout -- for as
+# long as the menu bar sat at the top of the page and stayed there: a reader
+# who had come to the end of an article needed a way out where they were,
+# not one at the beginning. The bar follows them now (see .wrap > nav in
+# site.css), so the repetition has nothing left to answer, and on a phone it
+# came out as a second hamburger on the same screen as the one stuck to the
+# top of it. A site that wants the bar anyway -- as a rule under the content
+# before the footer, which is the other thing it does -- says so.
+LAYOUT_NAV_BOTTOM = SiteConfig.get('layout', 'nav_bottom', default: false)
 
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)

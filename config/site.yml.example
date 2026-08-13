@@ -207,9 +207,11 @@ colors:
 #   # sidebar was. Default: true.
 #   sidebar: true
 #   # The menu repeated under the content. It carries no search field, so
-#   # it is pure repetition -- some sites want it, some don't.
-#   # Default: true.
-#   nav_bottom: true
+#   # it is pure repetition -- and since the top bar follows you down the
+#   # page, there is nothing left for it to answer: it was there because
+#   # the bar used to stay at the top. Switch it on if you want a rule
+#   # under the content before the footer anyway. Default: false.
+#   nav_bottom: false
 #   # Lift a post's first usable image out of the text and show it above
 #   # the title, with the byline under it. Off by default because it
 #   # reshapes every post page. A single post overrides the site either
