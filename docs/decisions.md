@@ -637,6 +637,23 @@ a palette whose accent sits close to its card background gets a quiet
 ring on the page body, and a skin that repaints a control's ground has
 to look at the ring itself rather than getting a new one for free.
 
+**The images a lightbox can open are made into buttons by the script, not
+by the build.** `tabindex` and `role="button"` are added at runtime rather
+than written into the HTML, so a page served without its JavaScript --
+blocked, failed, still loading -- shows pictures rather than things that
+announce themselves as pressable and then do nothing when pressed. *Cost:*
+the tab order of a photo-heavy post is only correct once the script has
+run, and a reader tabbing in the first few hundred milliseconds walks past
+images that are about to become buttons.
+
+**Only the top menu bar is sticky.** With `layout.nav_bottom` on there are
+two `<nav>`s on a page; the rule is scoped to the first one under `.wrap`
+rather than to `nav`, because two sticky bars at `top: 0` means the lower
+one rides up over the upper one at the end of every page. *Cost:* a
+structural selector rather than a class -- if the layout ever renders the
+bottom menu before the top one, or moves either out of `.wrap`, the
+stickiness follows the markup instead of the intent.
+
 **Search ranks with four numbers, and draws fifty.** Chronological
 results were defended for a while on the grounds that an archive is a
 diary and a diary is read by date -- but that only holds when the answers

@@ -164,6 +164,36 @@ nav {
   border-bottom: 5px solid var(--nav-border);
 }
 
+/* The bar follows the reader down the page. On an archive listing -- and
+   more so on a post, where the way out is the menu and the menu was at the
+   top of an article they have just read to the bottom of -- that is the
+   difference between changing your mind about what to read and scrolling
+   all the way back to be allowed to.
+
+   The TOP bar, and only it: with layout.nav_bottom on there are two <nav>s
+   on the page, and sticking both means the second one slides up over the
+   first at the end of every page and covers it. The top one is always the
+   first of its type here -- it is rendered with the search field whether or
+   not the site has menu items, while the repeated one at the bottom needs
+   items to exist at all.
+
+   Above the page, below the two things meant to cover it: the back-to-top
+   button at 10 and the lightbox at 100. The bar paints its own opaque
+   background, or the text would show through as it passed underneath. */
+.wrap > nav:first-of-type {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+/* What a bar that covers the top of the window owes to everything that
+   scrolls something into view: a heading reached from the contents list, a
+   link reached with Tab, any anchor followed from anywhere. Without this
+   they are all scrolled to the top of the window, which is exactly where
+   the bar is, and arrive underneath it. The number is the bar's own
+   height -- 60px of row and its two 5px borders. */
+html { scroll-padding-top: 70px; }
+
 nav ul { list-style: none; display: flex; flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; }
 
 /* 1.25rem rather than the original 1.875rem: eight gaps at nine items,
@@ -245,12 +275,16 @@ nav a[aria-current="page"]:hover {
   border-color: transparent;
 }
 
+/* 44px, which is the smallest a finger reliably hits, and 4px more than
+   this was. It costs nothing to look at: the button has no background and
+   no border, so all that grows is the area that answers to a tap around a
+   24px glyph that has not moved. */
 .nav-toggle {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   align-self: center;
   background: none;
   border: none;
@@ -451,6 +485,19 @@ nav a[aria-current="page"]:hover {
 }
 #theme-toggle:hover { background: var(--hover-invert); border-color: var(--hover-invert); color: var(--badge-hover-text); }
 
+/* The button is 32px tall and a finger wants 44. Growing it would be the
+   obvious answer and the wrong one: this thing sits on the banner of every
+   site built with the engine, and 12px of extra height is a visible change
+   to a corner nobody asked to have redecorated. So the target grows and
+   the button does not -- 6px of reach above and below, which is part of
+   the button for a tap and invisible to the eye. Width needs nothing: the
+   three-glyph floor already keeps it past 44. */
+#theme-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
 .banner { display: block; width: 100%; height: auto; }
 
 .layout, .layout main, .layout aside {
@@ -492,6 +539,11 @@ nav a[aria-current="page"]:hover {
     min-height: 60px;
     padding: 0.5rem 1rem;
   }
+
+  /* The same sum as above with this padding in it: 60 + 2x8 + 2x5. The
+     opened menu is far taller again, but nothing scrolls to an anchor
+     while the reader is holding the menu open. */
+  html { scroll-padding-top: 86px; }
 
   nav ul, .search-form { display: none; width: 100%; }
   nav.nav-open ul { display: flex; flex-direction: column; margin-top: 0.5rem; }

@@ -71,7 +71,10 @@
       : '';
     return (
       '<div class="comment">' +
-        '<img class="comment-avatar" src="' + esc(acct.avatar) + '" alt="" loading="lazy">' +
+        // 40x40 is what .comment-avatar is in the stylesheet, said here too
+        // so the row is its right height before the picture arrives -- a
+        // thread of twenty replies used to shuffle downwards as they landed.
+        '<img class="comment-avatar" src="' + esc(acct.avatar) + '" alt="" width="40" height="40" loading="lazy">' +
         '<div class="comment-body">' +
           '<div class="comment-meta">' +
             '<a href="' + esc(acct.url) + '" target="_blank" rel="noopener">' + esc(name) + '</a>' +
@@ -134,7 +137,7 @@
       : '';
     return (
       '<div class="comment">' +
-        '<img class="comment-avatar" src="' + esc(author.avatar) + '" alt="" loading="lazy">' +
+        '<img class="comment-avatar" src="' + esc(author.avatar) + '" alt="" width="40" height="40" loading="lazy">' +
         '<div class="comment-body">' +
           '<div class="comment-meta">' +
             '<a href="' + esc('https://bsky.app/profile/' + author.handle) + '" target="_blank" rel="noopener">' + esc(name) + '</a>' +

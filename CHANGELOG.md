@@ -372,6 +372,38 @@ byte-for-byte against the previous build.
   the list is ranked: the fifty shown are the fifty best answers rather
   than the fifty that happen to be newest. Ranking the whole 4400 costs
   16ms the first time and 6ms after that, measured on that archive.
+- **The lightbox can be opened, walked and closed without a mouse.** Escape
+  and the arrow keys worked inside it, which was of no use to anybody: the
+  only way in was a click, because an image is not a focusable thing. The
+  images it can open are buttons now -- a tab stop, Enter or Space to open,
+  named by their own alt text (and where a picture has none, by a label of
+  its own, since a button with no name is announced as nothing at all).
+  They are made buttons by the script rather than in the built markup, so a
+  page whose JavaScript never arrives has pictures again instead of things
+  that claim to be pressable and are not. Once open, the overlay says what
+  it is (`role="dialog"`, `aria-modal`), takes focus to its close button,
+  and keeps Tab inside itself -- it used to walk off into the article
+  underneath, which is still there, still focusable, and entirely hidden
+  behind a black screen. Closing puts the reader back on the image they
+  opened. No gestures and no counter: this is a lightbox, not a gallery.
+- **Small things, one sweep.** The scroll listener behind the back-to-top
+  button is declared `passive`, so a phone no longer waits to see whether
+  it cancels the scroll before scrolling. Comment avatars carry the 40x40
+  the stylesheet gives them, so a thread stops shuffling downwards as the
+  pictures land. And two tap targets reach the 44px a finger needs: the
+  hamburger grows from 40 (it has no background, so nothing looks any
+  different), and the appearance toggle keeps the size it paints and gains
+  6px of reach above and below instead -- it sits on every banner this
+  engine builds, and a corner nobody asked to have redecorated is not the
+  place to spend 12px of height.
+- **The menu bar follows the reader down the page.** It was at the top of
+  the page and stayed there, so on a post read to its end the way out was
+  a scroll back to the beginning. Only the top bar: a site with the
+  repeated bottom menu has two of them, and sticking both would slide the
+  second up over the first at the end of every page. Anything that scrolls
+  something into view now stops short of the bar rather than under it -- a
+  heading reached from the contents list, a link reached with Tab, an
+  anchor followed from anywhere.
 - **A search has an address again.** `?q=` was read on the way into the
   page and never written back, so a search existed only on the screen of
   whoever ran it: there was nothing to send anybody, nothing to bookmark,

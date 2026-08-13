@@ -9,7 +9,12 @@
       btn.classList.toggle('visible', window.scrollY > THRESHOLD);
     }
 
-    window.addEventListener('scroll', update);
+    // passive: this listener only reads scrollY and toggles a class -- it
+    // will never call preventDefault. Saying so lets the browser scroll
+    // without first waiting to see whether this handler cancels it, which on
+    // a phone is the difference between a scroll that follows the finger and
+    // one that catches up afterwards.
+    window.addEventListener('scroll', update, { passive: true });
     update();
 
     btn.addEventListener('click', function () {

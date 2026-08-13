@@ -128,6 +128,8 @@ js:
   lightbox_close: "Schließen"
   lightbox_prev: "Zurück"
   lightbox_next: "Weiter"
+  lightbox_label: "Bildansicht"
+  lightbox_open: "Bild öffnen"
 
 cli:
   cancel_word: "abbrechen"
@@ -423,7 +425,7 @@ cli:
   versions_menu_hint: "↑↓ bewegen · Enter Fassung wiederherstellen · Esc zurück"
   versions_prompt: "Welche Version wiederherstellen? [1-%{count}, Enter bricht ab]: "
   versions_unknown: "Keine Fassung mit dieser Nummer."
-  versions_confirm: "Der aktuelle Text wird ebenfalls als Fassung abgelegt, das ist also umkehrbar. Tippe \"%{word}\" zum Wiederherstellen: "
+  versions_confirm: "Der aktuelle Text wird ebenfalls als Fassung abgelegt, das ist also umkehrbar. Wiederherstellen? [j/N] "
   versions_restored: "Wiederhergestellt: %{path}"
   props_unknown_draft: "Nicht verstanden, versuch p / s / r / x."
   props_unknown_scheduled: "Nicht verstanden, versuch p / s / n / r / x."

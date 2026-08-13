@@ -124,6 +124,8 @@ js:
   lightbox_close: "Zavřít"
   lightbox_prev: "Předchozí"
   lightbox_next: "Další"
+  lightbox_label: "Prohlížeč obrázků"
+  lightbox_open: "Zvětšit obrázek"
 
 cli:
   cancel_word: "zrušit"
@@ -413,7 +415,7 @@ cli:
   versions_menu_hint: "↑↓ pohyb · Enter obnovit verzi · Esc zpět"
   versions_prompt: "Kterou verzi vrátit? [1-%{count}, Enter zruší]: "
   versions_unknown: "Verze s tímhle číslem není."
-  versions_confirm: "Současný text se taky odloží jako verze, takže je to vratné. Napiš „%{word}“ pro obnovení: "
+  versions_confirm: "Současný text se taky odloží jako verze, takže je to vratné. Obnovit? [a/N] "
   versions_restored: "Obnoveno: %{path}"
   props_unknown_draft: "Nerozumím, zkus p / s / r / x."
   props_unknown_scheduled: "Nerozumím, zkus p / s / n / r / x."

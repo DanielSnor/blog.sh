@@ -251,6 +251,8 @@ def client_i18n_json
     lightbox_close: t('js.lightbox_close'),
     lightbox_prev: t('js.lightbox_prev'),
     lightbox_next: t('js.lightbox_next'),
+    lightbox_label: t('js.lightbox_label'),
+    lightbox_open: t('js.lightbox_open'),
     theme_auto: t('ui.theme_auto'),
     theme_light: t('ui.theme_light'),
     theme_dark: t('ui.theme_dark')

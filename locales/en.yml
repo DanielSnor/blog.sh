@@ -132,6 +132,11 @@ js:
   lightbox_close: "Close"
   lightbox_prev: "Previous"
   lightbox_next: "Next"
+  # The name of the overlay itself, for a screen reader announcing what just
+  # opened; and the name of the image-as-button where the image has no alt
+  # text to be named by.
+  lightbox_label: "Image viewer"
+  lightbox_open: "Open image"
 
 # scripts/manage_post.rb (the ./blog.sh authoring CLI/wizard) and its
 # frontmatter-editor hint text. cancel_word is compared against user input
@@ -427,7 +432,7 @@ cli:
   versions_menu_hint: "↑↓ move · Enter restore the version · Esc back"
   versions_prompt: "Restore which version? [1-%{count}, Enter cancels]: "
   versions_unknown: "No version with that number."
-  versions_confirm: "The current text is kept as a version too, so this is undoable. Type \"%{word}\" to restore: "
+  versions_confirm: "The current text is kept as a version too, so this is undoable. Restore it? [y/N] "
   versions_restored: "Restored: %{path}"
   props_unknown_draft: "Not understood, try p / s / r / x."
   props_unknown_scheduled: "Not understood, try p / s / n / r / x."
