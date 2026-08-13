@@ -199,11 +199,32 @@
         .catch(function () { archiveState = 'failed'; });
     }
 
+    // The address follows the query. ?q= was read on the way in and never
+    // written again, so a search existed only on the screen of whoever ran
+    // it: it could not be sent to anybody, bookmarked, or -- the one that
+    // stings -- come back to. Following a result and pressing Back landed
+    // on an empty search box, with the query to type in all over again.
+    //
+    // replaceState, not pushState: at one entry per keystroke Back would
+    // walk the query backwards a letter at a time and never leave the page.
+    // /search/ stays one entry in the history whose address happens to be
+    // current, which is what makes coming back to it restore the search.
+    function syncAddress(query) {
+      var url = new URL(window.location.href);
+      if (query.trim()) url.searchParams.set('q', query);
+      else url.searchParams.delete('q');
+      // Only when it actually moved: run() is called again when the archive
+      // arrives, and browsers put a ceiling on how often a page may rewrite
+      // its own address.
+      if (url.href !== window.location.href) window.history.replaceState(null, '', url.href);
+    }
+
     function run() {
       if (!index) return;
       var query = input.value;
       loadArchiveIfNeeded(query);
       setSearchHeading(query);
+      syncAddress(query);
       var tokens = parseQueryTokens(query);
       var hits = rankHits(searchMatches(combinedIndex(), tokens), tokens);
       renderResults(results, hits, query, archiveState === 'loading');

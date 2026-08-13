@@ -372,6 +372,15 @@ byte-for-byte against the previous build.
   the list is ranked: the fifty shown are the fifty best answers rather
   than the fifty that happen to be newest. Ranking the whole 4400 costs
   16ms the first time and 6ms after that, measured on that archive.
+- **A search has an address again.** `?q=` was read on the way into the
+  page and never written back, so a search existed only on the screen of
+  whoever ran it: there was nothing to send anybody, nothing to bookmark,
+  and -- the one that stings -- nothing to come back to. Following a
+  result and pressing Back landed on an empty search box with the query to
+  type all over again. The address now follows the query as it is typed,
+  and drops `?q=` entirely when the box is empty. It replaces the current
+  history entry rather than adding one, so Back still leaves the search
+  page instead of walking the query backwards a letter at a time.
 - **Every page has an h1.** A post had one and the cheat sheet had one;
   every listing in the archive started its outline at level two. Tag,
   series, content-type and search listings had a heading already -- it was

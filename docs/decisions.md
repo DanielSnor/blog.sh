@@ -653,6 +653,17 @@ the query ranks no higher than one that says it in passing. Both are
 fixable by putting more fields in the index, and both would cost every
 visitor the bytes.
 
+**The search address is replaced, not pushed.** Typing rewrites `?q=` on
+the current history entry rather than adding one. Pushing would give
+every keystroke its own entry, and Back would then walk the query
+backwards a letter at a time without ever leaving the page -- the
+behaviour people mean when they complain a site "traps" the back button.
+*Cost:* Back does not undo a search; it leaves /search/ altogether, and
+there is no way to return to the query you had two words ago. Which is
+the trade: the address is worth having so a search can be sent to
+somebody and come back to, and it is not worth having at the price of the
+back button.
+
 **A result list has a ceiling, and the count above it does not.** Fifty
 cards, with "4371 results" still printed above them. Showing everything
 was 619ms and 21 855 elements on a real archive; showing fifty and lying
