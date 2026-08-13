@@ -688,6 +688,89 @@ module Tui
     print "\r\n"
   end
 
+  # One screen's worth of terminal, held for as long as the caller needs it.
+  # The queue was the first of these; the rest of the CLI follows, so the
+  # loop that was written inside it lives here instead of being copied.
+  #
+  # The caller drives it: `paint` puts a frame up, `key` waits for a
+  # keypress, `leave` hands the terminal over to something that prints more
+  # than a frame can hold (a build, a publish) and takes it back afterwards.
+  # Nothing here knows what a queue or a post is -- it knows rows, keys and
+  # who owns the terminal right now.
+  #
+  # A window RESIZED WHILE THE SCREEN WAITS is the reason `key` is not just
+  # read_key. A trap alone would not do: $stdin.getch blocks in the kernel
+  # and the handler runs but the read stays parked, so the frame would only
+  # straighten on the next keypress. The handler therefore writes a byte to
+  # a pipe this waits on alongside the terminal -- the self-pipe every
+  # event loop ends up with -- and `key` answers :resize, which every caller
+  # treats as "paint again".
+  class Screen
+    def initialize
+      @lines = []
+      @resize_r, @resize_w = IO.pipe
+      @previous = Signal.trap('WINCH') do
+        begin
+          @resize_w.write_nonblock('.')
+        rescue StandardError
+          nil
+        end
+      end
+    end
+
+    def paint(lines)
+      @lines = lines
+      Tui.frame(lines)
+    end
+
+    def key
+      Tui.raw_screen do
+        print "\e[?25l"
+        ready, = IO.select([$stdin, @resize_r])
+        if ready.include?(@resize_r)
+          begin
+            @resize_r.read_nonblock(256)
+          rescue StandardError
+            nil
+          end
+          :resize
+        else
+          Tui.read_key
+        end
+      ensure
+        print "\e[?25h"
+      end
+    end
+
+    # The frame stays as the last thing on screen and the output starts
+    # under it, rather than the two overwriting each other row by row. The
+    # pause is what keeps the output readable: without it the next frame
+    # would wipe whatever was just said.
+    def leave(pause_message)
+      Tui.frame_end(@lines)
+      result = yield
+      Tui.pause_and_clear(pause_message)
+      result
+    end
+
+    def close
+      Signal.trap('WINCH', @previous || 'DEFAULT')
+      @resize_r.close
+      @resize_w.close
+    rescue StandardError
+      nil
+    end
+  end
+
+  # Runs a screen and always gives the signal handler and the pipe back,
+  # including when the block aborts the process or the user interrupts it.
+  def screen
+    scr = Screen.new
+    yield scr
+  ensure
+    scr&.close
+  end
+
   # $stdin.raw with a floor: a stdin that cannot do raw (not a real
   # terminal) just runs the block -- getch then does its own per-key raw
   # exactly as before.

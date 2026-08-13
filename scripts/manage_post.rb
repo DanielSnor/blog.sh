@@ -1490,6 +1490,7 @@ def cmd_queue_screen
   mode = :list
   status = ''
 
+  Tui.screen do |screen|
   loop do
     entries = queue_entries
     if entries.empty?
@@ -1500,18 +1501,19 @@ def cmd_queue_screen
 
     selected = selected.clamp(0, entries.size - 1)
     # Six rows go to the heading, its blank line, the blank line under the
-    # list, the status line and the two-line keys block; the rest is queue.
+    # list and the keys block, which folds to two on a narrow terminal; the
+    # rest is queue. Recomputed every frame, so a resized window is simply
+    # the next frame with a different number of rows.
     window = [entries.size, [Tui.term_height - 7, 3].max].min
     offset = Tui.clamp_offset(selected, offset, window, entries.size)
-    lines = queue_frame_lines(entries, selected, offset, window, mode, status)
+    screen.paint(queue_frame_lines(entries, selected, offset, window, mode, status))
 
-    key = Tui.raw_screen do
-      print "\e[?25l"
-      Tui.frame(lines)
-      Tui.read_key
-    ensure
-      print "\e[?25h"
-    end
+    key = screen.key
+    # A window resized while the screen waits repaints and changes nothing
+    # else -- including the status line, which the user has not read yet
+    # and did not ask to lose by dragging a corner.
+    next if key == :resize
+
     status = ''
 
     if mode == :list
@@ -1547,12 +1549,7 @@ def cmd_queue_screen
       if first_future.nil? || selected < first_future
         status = t('cli.queue_swap_overdue')
       else
-        target = Tui.raw_screen do
-          print "\e[?25l"
-          queue_carry_screen(entries, selected, first_future)
-        ensure
-          print "\e[?25h"
-        end
+        target = queue_carry_screen(entries, selected, first_future, screen)
         if target && target != selected
           carried, status = queue_quiet_action { queue_carry_apply(entries, selected, target) }
           if carried
@@ -1562,14 +1559,15 @@ def cmd_queue_screen
         end
       end
     when 'p', 's', 'n'
-      # These print more than a line -- a publish announces, a reschedule
-      # asks. They get the terminal to themselves.
-      Tui.frame_end(lines)
-      dirty = true if queue_act_slow(entries, selected, key)
-      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
+      # These print more than a frame can hold -- a publish announces, a
+      # reschedule asks a question of its own. They get the terminal.
+      screen.leave(t('cli.wizard_continue_prompt')) do
+        dirty = true if queue_act_slow(entries, selected, key)
+      end
       mode = :list
     when :enter, :escape then mode = :list
     end
+  end
   end
 
   rebuild_and_deploy(t('cli.updating_preview')) if dirty
@@ -1728,7 +1726,7 @@ def queue_carry(entries, index)
     return false
   end
 
-  target = queue_carry_screen(entries, index, first_future)
+  target = Tui.screen { |screen| queue_carry_screen(entries, index, first_future, screen) }
   return false if target.nil? || target == index
 
   queue_carry_apply(entries, index, target)
@@ -1772,13 +1770,12 @@ end
 #
 # Piped callers never reach here: [m] is offered only in a terminal, and
 # scripted reordering has [u]/[d], which need no screen at all.
-def queue_carry_screen(entries, index, first_future)
+def queue_carry_screen(entries, index, first_future, screen)
   target = index
   offset = 0
-  window = [entries.size, [Tui.term_height - 7, 3].max].min
 
-  print "\e[?25l"
   loop do
+    window = [entries.size, [Tui.term_height - 7, 3].max].min
     order = entries.dup
     order.insert(target, order.delete_at(index))
     offset = Tui.clamp_offset(target, offset, window, entries.size)
@@ -1796,11 +1793,12 @@ def queue_carry_screen(entries, index, first_future)
                  "  #{Tui.truncate_ansi(row, Tui.term_width - 2)}"
                end
     end
-    lines.push('', '', '')
+    lines << ''
     lines << Tui.paint(Tui.truncate_to_width(t('cli.queue_carry_hint'), Tui.term_width), :dim)
-    Tui.frame(lines)
+    screen.paint(lines)
 
-    case Tui.read_key
+    case screen.key
+    when :resize then next
     # No wraparound: carrying a post off the top and having it appear at the
     # bottom is a move nobody meant to make, and unlike a cursor this one
     # writes to disk when it lands.
@@ -1812,8 +1810,6 @@ def queue_carry_screen(entries, index, first_future)
     when :escape then return nil
     end
   end
-ensure
-  print "\e[?25h"
 end
 
 # Moving a post earlier or later means exchanging times with its
