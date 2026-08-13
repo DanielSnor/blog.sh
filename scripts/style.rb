@@ -296,7 +296,7 @@ def section_banner
 
   answer = Wizard.ask(t('q_banner_file'), '', hint: t('h_banner_file'))
   unless answer.to_s.empty?
-    path = File.expand_path(answer.strip.gsub(/\A['"]|['"]\z/, ''))
+    path = resolve_source(answer)
     if File.file?(path)
       # Remembered, NOT copied. The copy used to happen the moment the path
       # was typed, so answering "no" to the review at the end printed
@@ -375,16 +375,69 @@ def ask_banner_src(current_src, source)
   chosen
 end
 
-# Runs after review_and_write reports :written -- never before it.
-def install_pending_banner
-  return unless @pending_banner
+# incoming/ is where anything meant for the site is dropped -- it is the
+# one directory a separate upload account can write to, and the post
+# editor has taken photos from it all along. Answering a prompt with a
+# bare filename looks there; an answer with a directory in it is a path on
+# this machine and is used as given, which is what working from a Mac
+# wants.
+INCOMING_DIR = File.join(ROOT, 'incoming')
 
+def resolve_source(answer)
+  path = answer.to_s.strip.gsub(/\A['"]|['"]\z/, '')
+  return nil if path.empty?
+
+  return File.expand_path(path) unless File.dirname(path) == '.'
+
+  in_incoming = File.join(INCOMING_DIR, path)
+  File.file?(in_incoming) ? in_incoming : File.expand_path(path)
+end
+
+# Queued, not copied: everything in these wizards happens after the diff is
+# confirmed, and a file moved before that would be gone if the answer was
+# "no".
+def queue_file(source, href)
+  @pending_files ||= []
+  @pending_files << [source, href]
+  href
+end
+
+# Runs after review_and_write reports :written -- never before it.
+def install_pending_files
   require 'fileutils'
-  src = site.intended[%w[banner src]] || current.dig('banner', 'src') || '/assets/images/header.png'
-  target = File.join(ROOT, src.sub(%r{\A/}, ''))
-  FileUtils.mkdir_p(File.dirname(target))
-  FileUtils.cp(@pending_banner, target)
-  puts Tui.paint(t('banner_copied', path: src), :green)
+  if @pending_banner
+    src = site.intended[%w[banner src]] || current.dig('banner', 'src') || '/assets/images/header.png'
+    queue_file(@pending_banner, src)
+  end
+  return if @pending_files.nil? || @pending_files.empty?
+
+  left = []
+  @pending_files.each do |source, href|
+    target = File.join(ROOT, href.sub(%r{\A/}, ''))
+    FileUtils.mkdir_p(File.dirname(target))
+    FileUtils.cp(source, target)
+    # Where it went, every time. A file that disappears out of incoming/
+    # without saying where is worse than one that was never moved.
+    puts Tui.paint(t('file_copied', path: href), :green)
+    left << File.basename(source) unless drop_from_incoming(source)
+  end
+  return if left.empty?
+
+  puts Tui.paint(t('incoming_not_cleaned', files: left.join(', ')), :yellow)
+end
+
+# Only files that came from incoming/ are cleared, and only after the copy
+# succeeded -- a path somewhere else on the machine is the author's own
+# file and is never touched. Deleting needs write permission on the
+# DIRECTORY, which an upload account's incoming/ may not give us; that is
+# said out loud rather than swallowed.
+def drop_from_incoming(source)
+  return true unless File.expand_path(source).start_with?("#{File.expand_path(INCOMING_DIR)}/")
+
+  File.delete(source)
+  true
+rescue SystemCallError
+  false
 end
 
 def measure_banner(src, source_file = nil)
@@ -480,7 +533,14 @@ def section_extra_css
 end
 
 def css_exists?(href)
-  File.file?(File.join(ROOT, href.to_s.sub(%r{\A/}, '')))
+  File.file?(File.join(ROOT, href.to_s.sub(%r{\A/}, ''))) || queued?(href)
+end
+
+# A file waiting for the confirmation is not a missing file. Without this
+# the list warned about the very thing it had just accepted, one line
+# after saying where it would go.
+def queued?(href)
+  Array(@pending_files).any? { |_, target| target == href }
 end
 
 # Two things are worth saying before the answer is taken, because both
@@ -491,19 +551,28 @@ def ask_css_entry
   answer = Wizard.ask(t('q_css_file'), '', hint: t('h_css_file')).to_s.strip
   return nil if answer.empty?
 
-  href = answer.start_with?('/') ? answer : "/#{answer}"
-  if href.include?('://')
+  if answer.include?('://')
     puts Tui.paint("   #{t('css_remote')}", :yellow)
     puts
     return nil
   end
 
-  unless css_exists?(href)
+  # Already in assets/css/ -- the answer names a file the site has, and
+  # nothing needs installing.
+  href = answer.start_with?('/') ? answer : "/assets/css/#{File.basename(answer)}"
+  return href if css_exists?(href)
+
+  source = resolve_source(answer)
+  unless source && File.file?(source)
     puts Tui.paint("   #{t('css_not_found', path: href)}", :yellow)
     return nil unless Wizard.confirm(t('q_css_anyway'))
+
+    return href
   end
 
-  href
+  href = "/assets/css/#{File.basename(source)}"
+  puts Tui.paint("   #{t('file_will_go', path: href)}", :green)
+  queue_file(source, href)
 end
 
 def section_about
@@ -869,7 +938,8 @@ end
 def font_file_exists?(file)
   return false if file.to_s.strip.empty?
 
-  File.file?(File.join(ROOT, 'assets', 'fonts', File.basename(file.to_s)))
+  name = File.basename(file.to_s)
+  File.file?(File.join(ROOT, 'assets', 'fonts', name)) || queued?("/assets/fonts/#{name}")
 end
 
 # Only the file NAME is stored -- the engine looks in assets/fonts/ and a
@@ -880,12 +950,20 @@ def ask_font_face
   family = Wizard.ask(t('q_face_family'), '', hint: t('h_face_family')).to_s.strip
   return nil if family.empty?
 
-  file = File.basename(Wizard.ask(t('q_face_file'), '', hint: t('h_face_file')).to_s.strip)
+  answer = Wizard.ask(t('q_face_file'), '', hint: t('h_face_file')).to_s.strip
+  file = File.basename(answer)
   return nil if file.empty?
 
   unless font_file_exists?(file)
-    puts Tui.paint("   #{t('faces_not_found', file: file)}", :yellow)
-    return nil unless Wizard.confirm(t('q_faces_anyway'))
+    source = resolve_source(answer)
+    if source && File.file?(source)
+      href = "/assets/fonts/#{file}"
+      puts Tui.paint("   #{t('file_will_go', path: href)}", :green)
+      queue_file(source, href)
+    else
+      puts Tui.paint("   #{t('faces_not_found', file: file)}", :yellow)
+      return nil unless Wizard.confirm(t('q_faces_anyway'))
+    end
   end
 
   entry = { 'family' => family, 'file' => file }
@@ -990,7 +1068,7 @@ def run
   outcome = Wizard.review_and_write([[relative(SITE_YML), site]])
   return unless outcome == :written
 
-  install_pending_banner
+  install_pending_files
   offer_rebuild
 end
 
