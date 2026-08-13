@@ -294,6 +294,20 @@ which only existed because the bar didn't.
   confirmations for what disappears -- deleting a post and unpublishing one
   still ask for the slug.
 
+- **"yes" is a keypress, not any word that starts with one.** Three
+  confirmations in the authoring CLI tested their answer with
+  `start_with?`, which on a terminal is the same as testing the whole thing
+  -- one key is all there is. Down a pipe it is not: the answer is the
+  whole line, so on a Czech site "ahoj" meant yes, and so did "abort",
+  which is the exact opposite of what the person typing it meant. The three
+  it reached were restoring an old version over the text being worked on,
+  compacting the publishing queue, and announcing a backdated post -- and
+  that last one cannot be taken back. All four places that ask now share
+  one rule, the one the setup and style wizards were already using: the
+  locale's own yes key, plus the three shipped ones so habits carried
+  between languages keep working. A scripted run that piped a whole word
+  where a key was asked for has to pipe the key.
+
 ### Fixed
 
 - **The appearance toggle can find its way back to the system.** One click
@@ -470,6 +484,74 @@ which only existed because the bar didn't.
   flow, and the first post still begins at the top of the page to the pixel
   -- but a reader who moves through a page by its headings now has a way
   into the front page, which until now was the one page that offered none.
+
+- **A post with no title of its own now has a heading.** Two thirds of a
+  real archive can be untitled -- 2,754 of sean.cz's 4,418 posts are
+  imported tweets and photographs, and a photograph with a caption has
+  nothing to call itself. Their pages carried no `h1` at all, so the
+  promise above held everywhere except on most of the site. The date is
+  what those posts are called: it is the first thing on the page and what
+  every listing identifies them by, so the tile already saying it is the
+  heading now. Nothing was added to achieve that and nothing moved -- a
+  clipped heading repeating the date, which is how the front page carries
+  the site title, would have had a screen reader announce it twice in a
+  row. With a lead image the date does move, from the byline up to where
+  the title would be, because that is where the heading belongs and a
+  heading cannot live inside the byline's paragraph. A titled post is
+  untouched.
+- **The 404 page is built from the same heading as every other listing.**
+  It was written out by hand and kept the `h2` that listings had before
+  this cycle, which made the one page 1.3 adds the one page "every page has
+  an `h1`" was not true of.
+- **`check` no longer calls a working address dead.** It knew the posts,
+  the tags, the redirect stubs and three fixed pages -- and nothing else,
+  so a post linking to its own site's feed, to a later page of any listing,
+  or to a series it belongs to was reported as a dead link, with the advice
+  that it was probably a permalink left over from an import. On a site
+  using series that made `check` exit non-zero over a healthy archive,
+  which on cron is the difference between a report worth reading and one
+  worth filtering. The files every build writes are known now, series
+  listings are derived from the posts the way tag listings already were,
+  and a page N is judged by the listing it belongs to -- so `/tag/x/page/2/`
+  passes where the tag exists and is still reported where it does not.
+- **An unlisted post is not announced.** It is out of the listings, the
+  feeds, the sitemap and the search index by the author's own instruction,
+  and publishing it put its address into a public timeline anyway: by hand
+  without a word, and from cron without anyone to ask. There is no
+  half-measure worth having, since an announcement cannot be recalled once
+  a server has it, so the rule holds on both paths and `--force` does not
+  open this door the way it opens the backdating one. To announce such a
+  post, take the flag off first -- one edit, and the decision is then an
+  explicit one rather than a side effect of publishing. The properties
+  dialog says which it will be instead of promising a toot that is never
+  coming, and the cron run says it skipped one, as a skip rather than a
+  failure so the exit code still means what it meant.
+- **An unlisted post stays unlisted through a re-import.** No source has a
+  notion of the flag, so no importer ever sets it, and it was in neither of
+  the two lists of fields carried across when a post is matched again by
+  its source id -- which put a post the author had taken out of the
+  listings back into every one of them, silently, and against the promise
+  the import summary makes out loud that re-running is safe. It is carried
+  by presence rather than by truth, next to `hero` and `toc`, so an
+  `unlisted: false` written on purpose is not read as nothing to carry.
+- **`export` sees a directory that holds only dotfiles.** The guard against
+  writing a whole Jekyll tree into somebody's existing work listed the
+  target with a glob, and a glob does not show entries whose name begins
+  with a dot -- so a freshly cloned repository, holding `.git` and
+  `.gitignore` and nothing else, read as empty and was written into without
+  the `--force` that is supposed to be required. That is the most likely
+  destination anyone types here.
+- **Two questions in the menu section asked without saying why.** The
+  reason -- that the address the item points at answers nothing, or that
+  what was typed is not an address at all -- was printed just before the
+  question, and the frame the question is drawn in paints from the top of
+  the screen and erases below it, so the sentence was gone before it could
+  be read. A confirmation with its reason removed is the one thing a
+  confirmation must not be. The same repaint was swallowing which of its
+  three states the menu section is in, so a menu derived from content
+  looked exactly like one switched off at the moment of choosing between
+  them, and the line naming a malformed palette, which the code comments
+  promise is "named once". All three now travel inside the frame.
 
 ### Upgrading
 

@@ -131,13 +131,23 @@ module PostWriter
        redirect_from page series series_part].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
-    # hero and toc need presence rather than truth, and that distinction is
-    # the whole point of them: `hero: false` is a post saying "not me", and
-    # a guard that tests `old[key]` reads that as "nothing to carry" and
-    # throws it away -- which is exactly how the field went missing from
-    # the editor before it was a frontmatter key. Only what the importer
-    # itself did not set, as above.
-    %w[hero toc].each do |key|
+    # hero, toc and unlisted need presence rather than truth, and that
+    # distinction is the whole point of them: `hero: false` is a post saying
+    # "not me", and a guard that tests `old[key]` reads that as "nothing to
+    # carry" and throws it away -- which is exactly how the field went
+    # missing from the editor before it was a frontmatter key. Only what the
+    # importer itself did not set, as above.
+    #
+    # unlisted was left out of both lists when it arrived in this cycle, and
+    # of the three it is the one that costs something to lose: no source has
+    # a notion of it, so no adapter ever sets it, and a re-import therefore
+    # put a post the author had taken out of the listings back into every
+    # one of them -- the homepage, the feeds, the sitemap and the search
+    # index. Silently, and against a promise the import summary makes out
+    # loud, that re-running is safe because posts are matched on their
+    # source id. A post is unlisted for people, not for search engines, so
+    # the failure is quiet on the one side that matters.
+    %w[hero toc unlisted].each do |key|
       post[key] = old[key] if old&.key?(key) && !post.key?(key)
     end
     # A re-imported draft keeps its preview URL: the token is engine-side

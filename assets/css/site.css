@@ -863,6 +863,14 @@ blockquote {
 .post-header { display: flex; gap: 1rem; align-items: flex-start; margin: -1.5rem -1.5rem 0 -1.5rem; }
 .post-body { flex: 1 1 auto; min-width: 0; }
 
+/* margin and font-weight are declared here only because this tile is an h1
+   on a post with no title of its own -- the date is what such a post is
+   called, so the thing already saying it is the heading rather than a
+   second one being added above it. Everything else in this rule already
+   beat the h1 element styles on specificity; these two were not declared at
+   all, so the heading would have arrived bold and with a browser default
+   margin under it, moving the content down on every untitled post. Which,
+   on an archive of imported tweets and photographs, is most of them. */
 .date-badge {
   flex: 0 0 auto;
   width: 72px;
@@ -872,7 +880,9 @@ blockquote {
   border-radius: 4px;
   padding: 0.6rem 0.25rem;
   font-size: 0.75rem;
+  font-weight: inherit;
   line-height: 1.3;
+  margin: 0;
   transition: 0.3s ease-in-out;
 }
 .date-badge:hover { background: var(--hover-invert); color: var(--badge-hover-text); }

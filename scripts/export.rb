@@ -67,7 +67,15 @@ puts
 # neither. Nothing is ever deleted here -- --force writes alongside what
 # is already there, which the message says out loud so nobody expects a
 # clean slate.
-if !dry_run && Dir.exist?(target) && !Dir.glob(File.join(target, '*')).empty? && !force
+#
+# Dir.children rather than Dir.glob('*'): a glob without FNM_DOTMATCH does
+# not see entries that begin with a dot, so a directory holding nothing but
+# `.git` and `.gitignore` read as empty and the guard did not fire. That is
+# not an exotic case -- it is a freshly cloned repository for the site being
+# exported to, which is the single most likely destination anyone types
+# here, and the one place where writing a whole Jekyll tree in unasked is
+# hardest to notice and most annoying to undo.
+if !dry_run && Dir.exist?(target) && !Dir.children(target).empty? && !force
   warn Tui.paint(I18n.t('export.target_not_empty', path: target), :red)
   warn Tui.paint("   #{I18n.t('export.target_not_empty_fix')}", :dim)
   exit 2

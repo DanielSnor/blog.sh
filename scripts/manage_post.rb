@@ -684,6 +684,22 @@ end
 TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old thread) don't get an auto announcement
 
 def announce_post(post, year:, date:, force: false)
+  # An unlisted post is not announced, and force does not open this door the
+  # way it opens the backdating one. The whole point of `unlisted` is a post
+  # that exists at its address for the handful of people you send the link
+  # to: it is out of the listings, the feeds, the sitemap and the search
+  # index, and putting its URL into a public timeline undoes all four in one
+  # go. There is no half-measure worth having here -- an announcement cannot
+  # be taken back once a server has it, so the rule is the same whether the
+  # post is published by hand or by cron, which has nobody to ask.
+  #
+  # To announce such a post, take the flag off first. That is one edit, and
+  # it makes the decision explicit rather than a side effect of publishing.
+  if truthy_frontmatter?(post['unlisted'])
+    warn t('cli.unlisted_no_toot')
+    return nil
+  end
+
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_toot')
     return nil
@@ -1053,7 +1069,7 @@ def announce_on_publish(post, year, date)
   force = false
   if (date - Time.now).abs > TOOT_RECENCY_WINDOW
     answer = Tui.key_choice(t('cli.date_outside_window_prompt', date: date.strftime(t('date_format'))))
-    return nil unless answer.start_with?(t('cli.confirm_yes_char'))
+    return nil unless Tui.yes?(answer)
 
     force = true
   end
@@ -1879,7 +1895,7 @@ def queue_offer_compact(freed_time, rest)
   return false if rest.empty? || freed_time <= Time.now
 
   answer = Tui.key_choice(t('cli.queue_compact_prompt', count: rest.size))
-  return false unless answer.start_with?(t('cli.confirm_yes_char'))
+  return false unless Tui.yes?(answer)
 
   times = [freed_time] + rest.map { |entry| entry[:time] }
   # The whole loop is checked before the first write, for the reason
@@ -2018,7 +2034,14 @@ def props_frame_lines(post, path, slug, year)
   lines << props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
   lines << props_line('unlisted', truthy_frontmatter?(post['unlisted']) ? t('cli.props_unlisted_yes') : nil)
   announced = post['mastodon_url'] || post['bluesky_url']
+  # An unlisted draft used to be told "goes out when the post publishes",
+  # which was both a false promise and the wrong way round: an unlisted post
+  # is never announced, so the line has to say that rather than leave the
+  # author expecting a toot that will not come -- or worse, believing one is
+  # owed and going to look for why it failed.
   lines << props_line('announced', if announced then announced
+                                   elsif truthy_frontmatter?(post['unlisted'])
+                                     t('cli.props_announces_never_unlisted')
                                    elsif draft?(post) then t('cli.props_announces_on_publish')
                                    else t('cli.props_not_announced')
                                    end)
@@ -2338,7 +2361,7 @@ def props_versions(path, slug)
   # write something out argues with itself. It stays a confirmation rather
   # than becoming none, because Enter in the list is a single keystroke and
   # this overwrites the text being worked on.
-  unless Tui.key_choice(t('cli.versions_confirm')).start_with?(t('cli.confirm_yes_char'))
+  unless Tui.yes?(Tui.key_choice(t('cli.versions_confirm')))
     puts t('cli.cancelled_nothing_saved')
     puts
     return

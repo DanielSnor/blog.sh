@@ -189,8 +189,21 @@ module Wizard
   # Returns the chosen option's first element. Esc (or an unusable
   # answer when piped) keeps whatever is current, which is the same
   # promise every other prompt here makes.
-  def choose(label, options, current_index: 0)
+  # `note:` is what the reader needs to see WHILE choosing -- the state the
+  # options act on. Same rule as the label, and for the same reason the
+  # comment below already gives: this menu paints from the top of the
+  # viewport, so anything printed just before it is painted over. The menu
+  # section was printing which of its three states the site is in ("derived
+  # from your content", "switched off", or the list of items) and then
+  # calling this, which wiped it -- leaving a derived menu and a menu turned
+  # off looking exactly alike at the moment of the choice, which is the one
+  # distinction the section exists to make. Rows, not a string: the third
+  # state is a list.
+  def choose(label, options, current_index: 0, note: nil)
+    rows = Array(note)
     unless Tui.interactive?
+      rows.each { |row| puts row }
+      puts unless rows.empty?
       puts Tui.paint(label, :bold)
       puts
       options.each_with_index { |(_, desc), i| puts "  #{i + 1}) #{desc}" }
@@ -213,8 +226,9 @@ module Wizard
 
     # The section's label belongs in the frame: the menu paints from the top
     # of the viewport, so a label printed before it would be painted over.
+    header = rows.empty? ? [] : rows + ['']
     index = Tui.menu(options.map { |(_, desc)| desc },
-                     header: [Tui.paint(label, :bold), ''],
+                     header: header + [Tui.paint(label, :bold), ''],
                      hint: t('menu_hint', count: [options.size, 9].min),
                      initial: current_index)
     chosen = index || current_index
@@ -263,11 +277,30 @@ module Wizard
   # already on: pressing Enter through the wizard is documented as keeping
   # things as they are, and for the banner's two overlays it silently
   # turned them off instead.
-  def confirm(prompt, default: nil)
+  # `note:` is the reason the question is being asked -- the sentence that
+  # makes a yes or a no mean anything. It has to travel INTO the frame,
+  # because a caller that printed it first was printing it onto a screen
+  # this method then wiped: Tui.frame starts at \e[H and ends with \e[J, so
+  # a `puts` immediately before a confirm is overwritten from the top and
+  # erased below. That left two questions in the menu section asking to
+  # write an address without the sentence saying what was wrong with it,
+  # which is a confirmation with its reason removed -- the one thing a
+  # confirmation is for. Down a pipe there is no frame and nothing to wipe,
+  # so it is printed there as before.
+  def confirm(prompt, default: nil, note: nil)
+    lines = context.dup
+    if note
+      if Tui.interactive?
+        lines << '' unless lines.empty?
+        lines << Tui.paint("   #{note}", :yellow)
+      else
+        puts Tui.paint("   #{note}", :yellow)
+      end
+    end
     # The frame ends in a blank row and key_choice writes the prompt onto
     # it, so the question stands on whatever the section has decided so far
     # instead of appearing alone under a repaint.
-    Tui.frame(context.dup + ['', '']) if Tui.interactive? && !context.empty?
+    Tui.frame(lines + ['', '']) if Tui.interactive? && !lines.empty?
     answer = Tui.key_choice(prompt)
     return default if default != nil && answer.to_s.empty?
 
@@ -277,8 +310,13 @@ module Wizard
     # exactly that -- would have had the wizard refuse the answer it had
     # just offered on screen, and throw the whole run away. The three are
     # still accepted alongside it, so nobody's habits break.
-    yes = I18n.lookup('cli.confirm_yes_char').to_s.downcase
-    answer == yes || %w[y j a].include?(answer)
+    #
+    # This rule used to live here and, in a laxer form, at three call sites
+    # in manage_post.rb; the laxer form accepted any word starting with the
+    # letter, which down a pipe made "abort" mean yes. Two definitions of
+    # what counts as consent is one too many, so there is now one, and it
+    # is this one -- moved to Tui.yes? where the answer is read.
+    Tui.yes?(answer)
   end
 
   # Everything a run collected, shown once and written once.

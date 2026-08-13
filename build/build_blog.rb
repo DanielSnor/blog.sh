@@ -981,13 +981,34 @@ def post_display_date(post)
   post_display_time(post).strftime(t('date_format'))
 end
 
-def date_badge(post, link: nil, pinned: false)
+# `heading:` turns the tile into the page's h1 instead of a div.
+#
+# Most of this archive has no title -- 2,754 of sean.cz's 4,418 posts are
+# imported tweets and photographs, and a photograph with a caption has
+# nothing to call itself. Their pages had no h1 at all: post_heading_html
+# returns an empty string when there is neither a title nor a borrowed one
+# from a link, so a reader moving through the page by its headings found
+# nothing to land on, on the majority of the site.
+#
+# The date is what those pages are called -- it is already the first thing
+# on them and the thing every listing identifies them by. So the tile that
+# was already saying it becomes the heading, rather than a second heading
+# being added above it: a clipped h1 carrying the same date (the trick the
+# front page uses for the site title) would have every screen reader
+# announce the date twice in a row. Nothing moves, nothing new is drawn,
+# and the outline starts where the page does.
+#
+# Only on the post's own page, and only when there is no title: in a
+# listing the heading is the post title at h2 and the badge beside it is a
+# link to the post, which is a different job.
+def date_badge(post, link: nil, pinned: false, heading: false)
   icon = CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
   pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
   inner = "#{icon}<span>#{date}</span>"
   inner = %(<a href="#{link}">#{inner}</a>) if link
-  %(<div class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</div>)
+  tag = heading ? 'h1' : 'div'
+  %(<#{tag} class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</#{tag}>)
 end
 
 # Folding/slugification lives in lib/slug.rb, shared with the CLI and both
@@ -1300,10 +1321,25 @@ end
 # reason reading_time_html gives: post.html.erb renders for every post on
 # the site, and a block tag on its own line leaves its newlines on all of
 # them.
-def hero_time_html(post)
+# The same question the badge answers, in the layout that has no badge: with
+# a hero the date lives in the byline under the picture, so on a titled post
+# it is a <time> and on an untitled one it is the heading -- a <time> inside
+# an h1, which keeps the machine-readable date and gives the page the
+# outline entry it had none of. See date_badge for why the date rather than
+# a clipped copy of it.
+def hero_time_html(post, heading: false)
   return '' if page?(post)
 
-  %(<time datetime="#{h(post_time(post).iso8601)}">#{h(post_display_date(post))}</time>)
+  stamp = %(<time datetime="#{h(post_time(post).iso8601)}">#{h(post_display_date(post))}</time>)
+  heading ? %(<h1 class="post-hero__date">#{stamp}</h1>) : stamp
+end
+
+# Whether the post says what it is called. Untitled posts -- an imported
+# tweet, a photograph with a caption -- borrow a title from a link block if
+# they carry one, and otherwise have none at all; on those the date does the
+# job, and this is what asks.
+def post_names_itself?(post)
+  !post['title'].nil? || !link_title_block(post).nil?
 end
 
 def hero_for(post)
@@ -2337,8 +2373,15 @@ emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
 # Nothing that already exists is rewritten by adding it: it is a new file
 # at an address nothing else claims. noindex because a 404 that gets
 # indexed is worse than no 404 at all.
+#
+# Through listing_heading_html rather than a hand-written copy of what it
+# emits. The two had drifted by exactly one level: every listing became an h1
+# in this cycle and this page, written out by hand, stayed an h2 -- so the
+# one page 1.3 added was the one page the promise "every page has an h1" did
+# not hold for. Nothing is drawn differently; the markup is what the helper
+# was already producing everywhere else.
 emit(File.join(PUBLIC_DIR, '404.html'),
-     layout(%(        <h2 class="listing-heading"><span class="listing-heading__value">#{h(t('not_found.heading'))}</span></h2>\n) +
+     layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
             %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
             title: t('not_found.page_title', site_title: SITE_TITLE),
             description: t('not_found.page_description'),

@@ -38,7 +38,23 @@ module Checker
   # Everything a page of this site can be, other than a post: the generated
   # pages and the roots. A link to one of these is fine even though no post
   # produces it.
-  FIXED_PATHS = ['/', '/search/', '/markdown/'].freeze
+  #
+  # The four files at the end are written by every build, unconditionally,
+  # and they were missing -- so a post linking to its own site's feed was
+  # reported as a dead link, with the advice that it was probably a permalink
+  # left over from an import. A checker that is confidently wrong about a
+  # working address costs more than one that says nothing, which is the rule
+  # the comment on known_paths sets out and this list was breaking.
+  FIXED_PATHS = ['/', '/search/', '/markdown/',
+                 '/rss.xml', '/sitemap.xml', '/robots.txt', '/404.html'].freeze
+
+  # A listing's later pages live under <listing>/page/N/, whatever the
+  # listing is -- the front page, a tag, a series, a content type. How many
+  # there are depends on site.page_size, so counting them here is exactly
+  # the second opinion known_paths refuses to give; the base address is the
+  # thing worth checking, and it is checked. Trailing digits only, so a post
+  # whose slug happens to be "page" is unaffected.
+  PAGE_SUFFIX = %r{/page/\d+/?\z}.freeze
 
   module_function
 
@@ -126,8 +142,22 @@ module Checker
       paths << post_path(post)
       (post['tags'] || []).each do |tag|
         slug = Slug.slugify(tag.to_s)
-        paths << "/tag/#{slug}/" unless slug.empty?
+        next if slug.empty?
+
+        paths << "/tag/#{slug}/"
+        # A tag the site names in its menu gets a feed of its own. Which
+        # tags those are is a config question, so the feed is accepted
+        # wherever the tag itself is known rather than worked out again.
+        paths << "/tag/#{slug}/rss.xml"
       end
+      # Series listings are derived the same way tag listings are -- from a
+      # key the post carries -- so unlike the content types there is nothing
+      # to guess and no second opinion to drift. They were simply forgotten
+      # when series arrived in this cycle, which made every link to one a
+      # reported dead link and gave `check` a non-zero exit over a healthy
+      # archive.
+      series = Slug.slugify(post['series'].to_s)
+      paths << "/series/#{series}/" unless series.empty?
       Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
       Array(post['redirect_from']).each { |origin| paths << origin.to_s }
     end
@@ -190,6 +220,10 @@ module Checker
         path = url.split('#').first.split('?').first.to_s
         next if path.empty? || path.start_with?('/type/') || path.start_with?('/assets/')
         next if known.include?(path) || known.include?("#{path}/")
+
+        # A later page of a listing is judged by the listing it belongs to.
+        base = path.sub(PAGE_SUFFIX, '/')
+        next if base != path && (known.include?(base) || known.include?("#{base}/"))
 
         dead << [post['slug'], url]
       end

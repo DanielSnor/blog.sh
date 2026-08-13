@@ -248,6 +248,28 @@ module Tui
     lines.join("\n")
   end
 
+  # Whether an answer from key_choice means yes.
+  #
+  # On a terminal key_choice returns one keypress, so testing the first
+  # letter and testing the whole answer are the same thing. Down a pipe it
+  # returns the entire LINE -- and there the callers that asked
+  # `.start_with?(yes_char)` were accepting any word that happened to begin
+  # with it. On a Czech site that made "ahoj" and "abort" both mean yes:
+  # "abort" in particular reads as the exact opposite of what it did, and
+  # the three places it reached were restoring an old version over the text
+  # being worked on, compacting the publishing queue, and announcing a
+  # backdated post -- the last of which cannot be taken back at all.
+  #
+  # Exact matches only, and the same set Wizard.confirm accepts: the
+  # locale's own character, plus the three shipped ones so that habits
+  # carried between languages keep working. A word is not a keypress.
+  def yes?(answer)
+    answer = answer.to_s.strip.downcase
+    return false if answer.empty?
+
+    answer == I18n.lookup('cli.confirm_yes_char').to_s.downcase || %w[y j a].include?(answer)
+  end
+
   def key_choice(prompt)
     unless interactive?
       print prompt

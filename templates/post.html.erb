@@ -6,10 +6,11 @@
                   <img src="<%= h("#{post_path(post)}#{hero_media['url']}") %>"<%= size_attrs(hero_media) %> alt="<%= h(hero_block['alt_text'].to_s) %>" decoding="async" fetchpriority="high">
                 </div>
                 <div class="post-hero__content">
-                  <%= post_heading_html(post, 'h1', nil) %>
-                  <p class="post-hero__meta"><span class="post-hero__author"><%= h(SITE_AUTHOR) %></span><%= hero_time_html(post) %><%= reading_time_html(minutes) %></p>
+                  <%# An untitled post's date is its heading, so with a hero it moves up here from the byline rather than being printed in both places -- see date_badge. It cannot stay in the byline and be a heading: that paragraph is a <p>, and an h1 inside one is closed by the browser before it starts. %>
+                  <%= post_names_itself?(post) ? post_heading_html(post, 'h1', nil) : hero_time_html(post, heading: true) %>
+                  <p class="post-hero__meta"><span class="post-hero__author"><%= h(SITE_AUTHOR) %></span><%= post_names_itself?(post) ? hero_time_html(post) : '' %><%= reading_time_html(minutes) %></p>
                 </div>
-              </div><% elsif !page?(post) %><%= date_badge(post) %><% end %><%# A page has no date worth showing: "Contact, 1 July 2022" says nothing except that somebody had to type a date into a field. %>
+              </div><% elsif !page?(post) %><%= date_badge(post, heading: !post_names_itself?(post)) %><% end %><%# A page has no date worth showing: "Contact, 1 July 2022" says nothing except that somebody had to type a date into a field. %>
               <div class="post-body">
                 <% unless hero_media %><%= post_heading_html(post, 'h1', nil) %><% end %>
                 <%= post_meta_html(post, hero_media ? nil : minutes) %><%= series_nav_html(series_slug, series_posts, series_index, :top) %><%= toc_html(toc) %><%# All four on one line, and the crowding is the point: each helper returns '' when it has nothing to say, but a line of its own emits its indentation and its newline regardless -- so a post with no reading time, no series and no contents would carry a blank line that the same post did not carry before 1.3. %>

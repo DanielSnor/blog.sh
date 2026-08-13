@@ -114,13 +114,24 @@ def palettes
     # A malformed palette is named once and left out; the rest still work.
     loaded.select do |slug, data|
       ok = data.is_a?(Hash) && %w[light dark].all? { |m| data[m].is_a?(Hash) }
-      puts Tui.paint(t('palette_malformed', name: slug), :yellow) unless ok
+      palette_warnings << Tui.paint(t('palette_malformed', name: slug), :yellow) unless ok
       ok
     end
   rescue StandardError => e
-    puts Tui.paint(t('palettes_unreadable', message: e.message), :red)
+    palette_warnings << Tui.paint(t('palettes_unreadable', message: e.message), :red)
     {}
   end
+end
+
+# Collected rather than printed, and handed to the menu that follows.
+# Printing them here kept the promise the comment above makes -- "named
+# once" -- for about a millisecond: the very next thing the section does is
+# draw a menu, which paints from the top of the viewport and erases below,
+# so the one line telling you why your palette is not on the list was gone
+# before you could read it. Same defect as the menu section's state rows,
+# same fix: the words go INTO the frame.
+def palette_warnings
+  @palette_warnings ||= []
 end
 
 # A shipped palette's name is translated; one somebody added to
@@ -146,9 +157,10 @@ def section_palette
   options << ['custom', t('palette_custom')]
   index = options.index { |o| o.first == now } || 0
 
-  puts Tui.paint(t('palette_intro'), :dim)
-  puts
-  chosen = Wizard.choose(t('q_palette'), options, current_index: index)
+  # palettes is read by the line above, so any complaint about a malformed
+  # entry exists by now and travels into the frame with the intro.
+  chosen = Wizard.choose(t('q_palette'), options, current_index: index,
+                         note: palette_warnings + [Tui.paint(t('palette_intro'), :dim)])
   return section_colors_by_hand if chosen == 'custom'
 
   data = palettes[chosen]
@@ -651,21 +663,25 @@ def section_nav
   touched = false
 
   loop do
-    if derived
-      puts Tui.paint(t('nav_derived'), :dim)
-    elsif entries.empty?
-      puts Tui.paint(t('nav_is_off'), :dim)
-    else
-      puts Tui.paint(t('nav_current'), :bold)
-      entries.each_with_index { |e, i| puts "   #{i + 1}) #{nav_summary(e)}" }
-    end
-    puts
+    # Which of the three states the site is in travels INTO the menu rather
+    # than being printed above it -- see Wizard.choose. Printed first, it
+    # was painted over, and a derived menu then looked no different from
+    # one switched off at the moment of choosing between them.
+    state = if derived
+              [Tui.paint(t('nav_derived'), :dim)]
+            elsif entries.empty?
+              [Tui.paint(t('nav_is_off'), :dim)]
+            else
+              [Tui.paint(t('nav_current'), :bold)] +
+                entries.each_with_index.map { |e, i| "   #{i + 1}) #{nav_summary(e)}" }
+            end
 
     options = [['add', t('list_add')]]
     options << ['remove', t('list_remove')] unless entries.empty?
     options << ['off', t('nav_turn_off')] if derived || entries.any?
     options << ['keep', t('list_keep')]
-    action = Wizard.choose(t('q_nav_action'), options, current_index: options.size - 1)
+    action = Wizard.choose(t('q_nav_action'), options,
+                           current_index: options.size - 1, note: state)
 
     case action
     when 'add'
@@ -743,8 +759,8 @@ def ask_nav_url(label)
   # the person meant.
   if relative_nav_url?(url)
     fixed = "/#{url}/"
-    puts Tui.paint("   #{t('nav_url_relative', url: url)}", :yellow)
-    url = fixed if Wizard.confirm(t('q_nav_use_absolute', url: fixed))
+    url = fixed if Wizard.confirm(t('q_nav_use_absolute', url: fixed),
+                                  note: t('nav_url_relative', url: url))
   end
 
   # Only addresses on this site are judged. Somebody else's page is a
@@ -767,8 +783,7 @@ def relative_nav_url?(url)
 end
 
 def nav_confirm_unknown(message)
-  puts Tui.paint("   #{message}", :yellow)
-  Wizard.confirm(t('q_nav_anyway'))
+  Wizard.confirm(t('q_nav_anyway'), note: message)
 end
 
 # The archive, read once and only if somebody actually adds an item -- a
