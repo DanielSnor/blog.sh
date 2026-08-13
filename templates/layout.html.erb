@@ -73,8 +73,7 @@
       </main>
 
       <% if LAYOUT_SIDEBAR %><%= partial('aside') %><% end %>
-    </div><% if LAYOUT_NAV_BOTTOM %><%# The opening tag rides the end of the line above and the closing one the end of the line below, so that the line break between them belongs to the branch. On its own line the conditional emitted its own indentation whether or not it emitted a menu -- which nobody noticed while the menu was always on, and which put a whitespace-only line into every page in the archive the moment it was not. There is no ERB trim mode here; see the note in partials/nav.html.erb. %>
-    <%= partial('nav', search: false, active: nav_active) %><% end %>
+    </div>
 
     <%= partial('footer') %>
   </div>

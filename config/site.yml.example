@@ -23,7 +23,7 @@
 #               pill_bg, (banner_title), (banner_claim)
 #   fonts       (faces), (banner_title), (banner_title_size),
 #               (banner_claim), (banner_claim_size)
-#   layout      (sidebar), (nav_bottom), (hero)
+#   layout      (sidebar), (hero)
 #   nav         (the menu bar: label with tag or url -- or [] for none)
 #   about       heading, html
 #   widgets     (toots, pixelfed, commits, bluesky, rss)
@@ -206,13 +206,6 @@ colors:
 #   # the content takes the full width instead of leaving a gap where the
 #   # sidebar was. Default: true.
 #   sidebar: true
-#   # The menu repeated under the content. It carries no search field, so
-#   # it is pure repetition -- and since the top bar follows you down the
-#   # page, there is nothing left for it to answer: it was there because
-#   # the bar used to stay at the top. The line it drew above the footer
-#   # is drawn without it now, so switching this on adds the menu itself
-#   # and nothing else. Default: false.
-#   nav_bottom: false
 #   # Lift a post's first usable image out of the text and show it above
 #   # the title, with the byline under it. Off by default because it
 #   # reshapes every post page. A single post overrides the site either

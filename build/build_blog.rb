@@ -189,17 +189,6 @@ LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
 # The menu repeated under the content. It carries no search field, so with
 # an empty `nav:` there would be nothing left in it to show -- but a site
 # with a menu may still not want it twice.
-# Off unless asked for. It was on -- hardcoded into the layout -- for as
-# long as the menu bar sat at the top of the page and stayed there: a reader
-# who had come to the end of an article needed a way out where they were,
-# not one at the beginning. The bar follows them now (see .wrap > nav in
-# site.css), so the repetition has nothing left to answer, and on a phone it
-# came out as a second hamburger on the same screen as the one stuck to the
-# top of it. The line it drew between the content and the footer was doing
-# real work and is drawn by the stylesheet now (.layout + footer); what the
-# key still buys is the menu itself, repeated at the end of the page, for a
-# site that wants it there.
-LAYOUT_NAV_BOTTOM = SiteConfig.get('layout', 'nav_bottom', default: false)
 
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
@@ -687,7 +676,7 @@ def heading_id(text, seen)
   seen[base] > 1 ? "#{base}-#{seen[base]}" : base
 end
 
-def render_block(block, media_prefix, seen = {})
+def render_block(block, media_prefix, seen = {}, title_lifted: false)
   case block['type']
   when 'text'
     heading = block['subtype'].to_s[/\Aheading([1-6])\z/, 1]
@@ -771,7 +760,14 @@ def render_block(block, media_prefix, seen = {})
   when 'link'
     title = CGI.escapeHTML((block['title'] || block['url']).to_s)
     description = CGI.escapeHTML(block['description'].to_s)
-    %(<p class="link-block"><a href="#{CGI.escapeHTML(block['url'].to_s)}"><strong>#{title}</strong></a><br>#{description}</p>)
+    if title_lifted
+      # The title is the post's heading now, and the heading is the link.
+      # What is left here is the description -- and a link block that had
+      # none has nothing left to draw at all.
+      description.empty? ? '' : %(<p class="link-block">#{description}</p>)
+    else
+      %(<p class="link-block"><a href="#{CGI.escapeHTML(block['url'].to_s)}"><strong>#{title}</strong></a><br>#{description}</p>)
+    end
   else
     "<pre>#{block.to_json}</pre>"
   end
@@ -848,7 +844,10 @@ def degenerate_image?(block)
   w <= 1 || h <= 1
 end
 
-def render_content(blocks, media_prefix)
+# `lifted` is the one block whose title has been promoted to the post's
+# heading (see link_title_block); it is compared by identity, so a second
+# link block with the same title still renders in full.
+def render_content(blocks, media_prefix, lifted: nil)
   blocks = blocks.reject { |b| degenerate_image?(b) }
   seen = {}
   html = []
@@ -862,11 +861,11 @@ def render_content(blocks, media_prefix)
       end
       html << (group.length > 1 ? render_photo_grid(group, media_prefix, seen) : render_block(group.first, media_prefix, seen))
     else
-      html << render_block(blocks[i], media_prefix, seen)
+      html << render_block(blocks[i], media_prefix, seen, title_lifted: blocks[i].equal?(lifted))
       i += 1
     end
   end
-  html.join("\n")
+  html.reject(&:empty?).join("\n")
 end
 
 CONTENT_ICONS = {
@@ -1126,7 +1125,7 @@ end
 # The media prefix is post_path either way, so the rendered content is
 # identical on the post's own page and in every listing it appears in.
 def post_content_html(post)
-  CONTENT_CACHE[post] ||= render_content(post['content'], post_path(post))
+  CONTENT_CACHE[post] ||= render_content(post['content'], post_path(post), lifted: link_title_block(post))
 end
 
 def plain_text_length(post)
@@ -1200,7 +1199,7 @@ def build_list_item(post, pinned: false)
   excerpt = excerpt?(post)
   content_class = excerpt ? 'content excerpt' : 'content'
   read_more = excerpt ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
-  title = post['title'] ? %(<h2><a href="#{prefix}">#{h(post['title'])}</a></h2>) : ''
+  title = post_heading_html(post, 'h2', prefix)
   stats = post_stats_html(post)
   <<~HTML
     <div class="card post-list-item">
@@ -1259,7 +1258,7 @@ def post_structured_head(post)
   data = {
     '@context' => 'https://schema.org',
     '@type' => 'BlogPosting',
-    'headline' => post['title'].to_s.empty? ? post['slug'] : post['title'],
+    'headline' => post_title_for(post),
     'datePublished' => published,
     'url' => "#{SITE_BASE_URL}#{post_path(post)}",
     'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_path(post)}",
@@ -1403,8 +1402,42 @@ def series_nav_html(slug, in_series, index, position)
   %(<nav class="series-nav">#{links.join}</nav>\n                )
 end
 
+# A link post carries no title of its own -- what the reader takes for its
+# title lives inside its link block. The engine therefore had nothing to put
+# in a heading, in <title>, or in a feed item: listings and post pages
+# printed no heading at all and the title came out as bold body text inside
+# the article, while the tab and the feed printed the slug.
+#
+# The first link block that has a title lends it to the post. The block then
+# renders without it (see render_block), or the page would say it twice.
+def link_title_block(post)
+  return nil if post['title']
+
+  (post['content'] || []).find { |b| b['type'] == 'link' && !b['title'].to_s.empty? }
+end
+
 def post_title_for(post)
-  (post['title'] || post['slug']).to_s
+  return post['title'].to_s if post['title']
+
+  block = link_title_block(post)
+  (block ? block['title'] : post['slug']).to_s
+end
+
+# The heading itself. A post's own title links to the post in a listing and
+# is plain text on the post's own page -- `self_href` nil says which. A link
+# post's borrowed title goes where the link goes in both places: on a blog
+# of links that is the thing the reader is reaching for, and the date badge
+# beside it is still the way to the post's own page.
+def post_heading_html(post, level, self_href)
+  if post['title']
+    inner = self_href ? %(<a href="#{self_href}">#{h(post['title'])}</a>) : h(post['title'])
+    return %(<#{level}>#{inner}</#{level}>)
+  end
+
+  block = link_title_block(post)
+  return '' unless block
+
+  %(<#{level}><a href="#{h(block['url'])}">#{h(block['title'])}</a></#{level}>)
 end
 
 def render_post_html(post, template)
@@ -1418,7 +1451,7 @@ def render_post_html(post, template)
   content_html = hero_block ? render_content(post['content'] - [hero_block], post_path(post)) : post_content_html(post)
   draft_banner = draft?(post) ? draft_banner(post) : ''
   layout(template.result(binding),
-         title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post['title'] || post['slug']}" : (post['title'] || post['slug']),
+         title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),
          description: post_description(post),
          path: post_path(post),
          image: post_og_image(post),
@@ -1438,7 +1471,7 @@ end
 
 def rss_item(post)
   url = "#{SITE_BASE_URL}#{post_path(post)}"
-  title = CGI.escapeHTML((post['title'] || post['slug']).to_s)
+  title = CGI.escapeHTML(post_title_for(post))
   pub_date = post_time(post).rfc2822
   description = render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}")
   # A post's rendered HTML goes into the feed inside CDATA, and CDATA has
@@ -2147,7 +2180,7 @@ def redirect_stub_html(post)
     <meta http-equiv="refresh" content="0; url=#{url}">
     <link rel="canonical" href="#{url}">
     <meta name="robots" content="noindex">
-    <title>#{h(post['title'] || post['slug'])}</title>
+    <title>#{h(post_title_for(post))}</title>
     </head>
     <body>
     <p>#{h(t('redirect.moved'))} <a href="#{url}">#{h(url)}</a></p>

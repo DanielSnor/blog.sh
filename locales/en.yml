@@ -1137,7 +1137,6 @@ style:
   nav_url_unknown: "This site does not answer at %{url}, so the item would be a 404."
   q_nav_anyway: "Add it anyway?"
   q_layout_sidebar: "The right-hand column (bio, widgets, per-post stats)?"
-  q_layout_nav_bottom: "Repeat the menu under the content as well?"
   q_layout_hero: "Lift a post's first image above its title?"
   css_current: "Your own stylesheets, in load order:"
   q_css_action: "Add a stylesheet, remove one, or leave them?"

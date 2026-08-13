@@ -170,17 +170,14 @@ nav {
    difference between changing your mind about what to read and scrolling
    all the way back to be allowed to.
 
-   The TOP bar, and only it: with layout.nav_bottom on there are two <nav>s
-   on the page, and sticking both means the second one slides up over the
-   first at the end of every page and covers it. The top one is always the
-   first of its type here -- it is rendered with the search field whether or
-   not the site has menu items, while the repeated one at the bottom needs
-   items to exist at all.
+   Scoped to the page's own bar rather than to `nav`: a post also carries a
+   pagination nav inside <main>, and there is nothing sticky about "older
+   posts".
 
    Above the page, below the two things meant to cover it: the back-to-top
    button at 10 and the lightbox at 100. The bar paints its own opaque
    background, or the text would show through as it passed underneath. */
-.wrap > nav:first-of-type {
+.wrap > nav {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -847,6 +844,13 @@ blockquote {
 
 .video-unavailable { color: var(--meta-text); font-style: italic; }
 
+/* The link block is body text and stays body text. A link post's title is
+   no longer in here -- it is the post's heading now, in an h1 or an h2 like
+   every other title (see post_heading_html in build_blog.rb) -- so what is
+   left in the block is the description, or an ordinary inline link where a
+   titled post quotes something mid-article. */
+.link-block { margin: 1rem 0; }
+
 .embed-responsive { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1rem 0; }
 .embed-responsive iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
 
@@ -962,7 +966,7 @@ blockquote {
 .toc {
   display: block;
   float: right;
-  width: 50%;
+  width: 40%;
   box-sizing: border-box;
   margin: 0 0 1rem 1.5rem;
   padding: 0.1rem 0 0.1rem 0.9rem;
@@ -1192,7 +1196,7 @@ aside .card { margin-bottom: 1.5rem; }
 .comment-content a { word-break: break-word; }
 
 footer {
-  background: var(--card-bg);
+  background: var(--nav-bg);
   border-radius: 4px;
   padding: 1.5rem;
   display: grid;
@@ -1202,16 +1206,13 @@ footer {
 
 /* Where the content ends and the footer begins. The two carry the same
    background and sit flush against each other, which nobody had cause to
-   notice while the repeated menu bar stood between them: what did the
-   dividing was that bar's own frame. With the bar off by default the
-   article ran straight into the colophon with nothing to mark the seam.
+   notice while a repeated menu bar stood between them: what did the
+   dividing was that bar's own frame. When the bar went, the article ran
+   straight into the colophon with nothing to mark the seam.
    So the line stays and the bar goes -- the same line, not a new one:
-   5px of --nav-border, which is what the menu carried above and below
-   itself and what the page's own frame is drawn in. Written as an
-   adjacent sibling so it appears only where the footer really does follow
-   the content: a site that asks for the bottom menu back has that bar
-   between them again, and would otherwise get the same line twice. */
-.layout + footer { border-top: 5px solid var(--nav-border); }
+   5px of --nav-border, which is what that bar carried above and below
+   itself and what the page's own frame is drawn in. */
+footer { border-top: 5px solid var(--nav-border); }
 
 @media (max-width: 700px) {
   footer { grid-template-columns: 1fr; }
@@ -1231,13 +1232,18 @@ footer .chrome-text ol > li::before { content: none; }
 footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 
 .social-icons { display: flex; gap: 0.6rem; }
+/* The tiles take the tag pills' ground, not the bar's. They used to be
+   --nav-bg, which was a shade off the white card they sat on -- and became
+   invisible the moment the footer took that same colour for itself. The
+   pills are the site's other small raised thing, and they are raised
+   against exactly this background. */
 .social-icons a {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: var(--nav-bg);
+  background: var(--pill-bg);
   color: var(--text);
   border-radius: 4px;
   font-size: 0.8rem;
@@ -1257,16 +1263,21 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   height: 30px;
   align-items: center;
   justify-content: center;
+  /* The same tile the social icons are: pill ground, body text, no frame.
+     The colours were already identical -- --nav-text is literally --text in
+     the generated palette -- so all that set this apart was a 1px border in
+     the metadata grey, which made one small square on the page look like a
+     different kind of thing from the others. */
   background: var(--pill-bg);
-  border: 1px solid var(--nav-border);
-  border-radius: 5px;
-  color: var(--nav-text);
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
   cursor: pointer;
   transition: 0.3s ease-in-out;
   z-index: 10;
 }
 #scroll-top.visible { display: flex; }
-#scroll-top:hover { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+#scroll-top:hover { background: var(--accent); color: #ffffff; }
 #scroll-top svg { width: 16px; height: 16px; }
 
 /* Placed last so it wins the cascade over the base .date-badge/h1 rules

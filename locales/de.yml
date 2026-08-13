@@ -1128,7 +1128,6 @@ style:
   nav_url_unknown: "Diese Website liefert unter %{url} nichts aus, der Eintrag wäre ein 404."
   q_nav_anyway: "Trotzdem hinzufügen?"
   q_layout_sidebar: "Die rechte Spalte (Bio, Widgets, Beitragszahlen)?"
-  q_layout_nav_bottom: "Das Menü auch unter dem Inhalt wiederholen?"
   q_layout_hero: "Das erste Bild eines Beitrags über den Titel heben?"
   css_current: "Eigene Stylesheets, in Ladereihenfolge:"
   q_css_action: "Stylesheet hinzufügen, entfernen oder so lassen?"

@@ -12,13 +12,13 @@ prints what an installation is running.
 
 ## 1.3 -- unreleased
 
-Dressing a site differently no longer means editing the engine. Five
+Dressing a site differently no longer means editing the engine. Four
 things that used to require a modified template are settings now: your own
-stylesheet, your own menu, the sidebar, the repeated bottom menu, and a
-lead image above the post's title. Every default is the layout the engine
-already had, with one deliberate exception: the menu bar follows you down
-the page now, which leaves the menu repeated under the content with
-nothing to answer, so that one is off unless a site asks for it.
+stylesheet, your own menu, the sidebar, and a lead image above the post's
+title. Every default is the layout the engine already had, with one
+deliberate exception: the menu bar follows you down the page now, and the
+menu that used to be repeated under the content -- which existed because
+it didn't -- is gone.
 
 ### New
 
@@ -178,17 +178,9 @@ nothing to answer, so that one is off unless a site asks for it.
   leads somewhere different from every page and may well work from the
   front page, which is how it survives being looked at. `./style.sh`
   offers the corrected form rather than just warning.
-- **`layout.sidebar` and `layout.nav_bottom`.** The right-hand column and
-  the menu repeated under the content can each be switched off. With the
-  sidebar gone the content takes the full width rather than leaving a gap
-  where it used to be. The sidebar stays on unless you say otherwise; the
-  bottom menu is the other way round, and off unless you do -- it existed
-  to give a reader who had reached the end of an article a way out where
-  they were standing, and the bar at the top now goes with them. One thing
-  it was quietly doing has been kept without it: the line between the
-  content and the footer, which was that bar's own frame and is now drawn
-  by the stylesheet, in the same 5px it always was. So `nav_bottom: true`
-  adds the menu and only the menu.
+- **`layout.sidebar`.** The right-hand column -- about, widgets, per-post
+  stats -- can be switched off, and with it gone the content takes the full
+  width rather than leaving a gap where it used to be.
 - **`layout.hero`.** A post's first usable image, lifted out of the text
   and shown above the title with the byline under it. Off unless asked
   for, since it reshapes every post page; a single post overrides the site
@@ -449,12 +441,14 @@ nothing to answer, so that one is off unless a site asks for it.
 ### Upgrading
 
 - Nothing to migrate. One thing does look different without being asked
-  for, and it is the only one: the menu repeated under the content is gone
-  unless the site sets `layout.nav_bottom: true`. It was hardcoded on until
-  this release, and it was there because the bar at the top used to stay at
-  the top -- which it no longer does. A site that wants it back is one line
-  of config away, and everything else a site gets without adding a key is
-  the page it got before.
+  for, and it is the only one: the menu that used to be repeated under the
+  content is gone. It was hardcoded into the layout, never a setting, and
+  it was there because the bar at the top used to stay at the top -- which
+  it no longer does. The line it drew between the content and the footer
+  was doing real work and is drawn without it now, in the same 5px. There
+  is no key to bring the bar back: a repeat of a bar that is on screen the
+  whole time is not a preference, it is two of the same thing. Everything
+  else a site gets without adding a key is the page it got before.
 - It is no longer the same *bytes*, though, and the next deploy is a full
   one rather than incremental. The banner's two overlay lines moved inside
   a wrapper element, which is in the layout every page shares, so the whole

@@ -1116,7 +1116,6 @@ style:
   nav_url_unknown: "Na %{url} tenhle web nic nevydává, položka by byla 404."
   q_nav_anyway: "Přidat ji přesto?"
   q_layout_sidebar: "Postranní panel vpravo (bio, widgety, statistiky u postu)?"
-  q_layout_nav_bottom: "Zopakovat menu i pod obsahem?"
   q_layout_hero: "Vytáhnout první obrázek postu nad titulek?"
   css_current: "Vlastní stylopisy, v pořadí načítání:"
   q_css_action: "Přidat stylopis, odebrat, nebo nechat být?"

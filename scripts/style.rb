@@ -482,9 +482,6 @@ def section_layout
   sidebar = Wizard.confirm(t('q_layout_sidebar'), default: current.dig('layout', 'sidebar') != false)
   site.set(%w[layout sidebar], sidebar)
 
-  nav_bottom = Wizard.confirm(t('q_layout_nav_bottom'), default: current.dig('layout', 'nav_bottom') != false)
-  site.set(%w[layout nav_bottom], nav_bottom)
-
   hero = Wizard.confirm(t('q_layout_hero'), default: current.dig('layout', 'hero') == true)
   site.set(%w[layout hero], hero)
 

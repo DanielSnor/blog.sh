@@ -498,7 +498,7 @@ is not a private matter: `git pull` either refuses it or silently
 reverts it, and the site's own look is what gets lost.
 
 Two layers carry it. Configuration switches whole structural regions on
-and off (`layout.sidebar`, `layout.nav_bottom`, `layout.hero`, `nav:`),
+and off (`layout.sidebar`, `layout.hero`, `nav:`),
 and a stylesheet of the site's own (`site.extra_css`) does everything
 about how those regions look. Neither can rot: the engine knows about
 the first, and a CSS rule that stops matching simply stops applying.
@@ -657,30 +657,32 @@ the tab order of a photo-heavy post is only correct once the script has
 run, and a reader tabbing in the first few hundred milliseconds walks past
 images that are about to become buttons.
 
-**The bottom menu is off by default, and the setting stays.** A sticky
-bar answers the question the repeated menu was invented for -- how does a
-reader who has just finished an article get anywhere -- and answers it
-for the whole page rather than only at the end of it. Leaving both on
-would have put two identical menus on one phone screen, one of them
-glued to the top. The key survives for the sites that want the menu
-there anyway; what does not depend on it any more is the line between
-the content and the footer. That line was the bar's own frame, and
-switching the bar off took it away with it -- the article ran into the
-colophon, same background, no seam -- so the stylesheet draws it now,
-the same 5px the bar carried and the page's frame is drawn in. *Cost:*
-the one thing in this release that changes a site's appearance without
-being asked -- every install that upgrades loses its bottom bar until it
-writes `nav_bottom: true`. Deliberately not solved by keeping the old
-default and hoping people notice the redundancy: a default is a
-recommendation, and recommending both is recommending clutter.
+**The menu repeated under the content is gone, and there is no key to
+bring it back.** A sticky bar answers the question that menu was invented
+for -- how does a reader who has just finished an article get anywhere --
+and answers it for the whole page rather than only at the end of it.
+Keeping both put two identical menus on one phone screen, one of them
+glued to the top. It was offered as a setting for about an hour, and the
+setting was the wrong answer: a repeat of a bar that is on screen the
+whole time is not a preference somebody might hold, it is two of the same
+thing, and a key nobody would ever have a reason to set is a key that
+rots. It had never shipped -- it was invented in this cycle and removed in
+it -- so nothing had to be deprecated. What did depend on the bar is the
+line between the content and the footer: that was its own frame, and
+without it the article ran into the colophon with the same background and
+no seam, so the stylesheet draws that line now, the same 5px the bar
+carried. *Cost:* the one thing in this release that changes a site's
+appearance without being asked, and this time with no way back -- a site
+that genuinely wanted a second menu under its posts has to put it in a
+template of its own, which is exactly the thing the rest of this release
+is trying to make unnecessary.
 
-**Only the top menu bar is sticky.** With `layout.nav_bottom` on there are
-two `<nav>`s on a page; the rule is scoped to the first one under `.wrap`
-rather than to `nav`, because two sticky bars at `top: 0` means the lower
-one rides up over the upper one at the end of every page. *Cost:* a
-structural selector rather than a class -- if the layout ever renders the
-bottom menu before the top one, or moves either out of `.wrap`, the
-stickiness follows the markup instead of the intent.
+**The sticky rule is scoped to the page's own bar, not to `nav`.** A post
+carries a second `<nav>` inside `<main>` for its pagination, and there is
+nothing sticky about "older posts". `.wrap > nav` says which one is the
+menu bar. *Cost:* a structural selector rather than a class -- move the
+bar out of `.wrap` and the stickiness follows the markup instead of the
+intent.
 
 **Search ranks with four numbers, and draws fifty.** Chronological
 results were defended for a while on the grounds that an archive is a
