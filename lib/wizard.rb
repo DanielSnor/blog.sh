@@ -120,9 +120,9 @@ module Wizard
   # answer when piped) keeps whatever is current, which is the same
   # promise every other prompt here makes.
   def choose(label, options, current_index: 0)
-    puts Tui.paint(label, :bold)
-    puts
     unless Tui.interactive?
+      puts Tui.paint(label, :bold)
+      puts
       options.each_with_index { |(_, desc), i| puts "  #{i + 1}) #{desc}" }
       print t('choice_prompt')
       line = $stdin.gets
@@ -141,7 +141,10 @@ module Wizard
       return options[index].first
     end
 
+    # The section's label belongs in the frame: the menu paints from the top
+    # of the viewport, so a label printed before it would be painted over.
     index = Tui.menu(options.map { |(_, desc)| desc },
+                     header: [Tui.paint(label, :bold), ''],
                      hint: t('menu_hint', count: [options.size, 9].min),
                      initial: current_index)
     puts
@@ -151,10 +154,10 @@ module Wizard
   # A menu that can be left, for wizards built as a set of sections
   # rather than one pass. Returns nil when the user is done.
   def choose_or_exit(label, options)
-    puts Tui.paint(label, :bold)
-    puts
     rows = options.map { |(_, desc)| desc } + [t('done')]
     unless Tui.interactive?
+      puts Tui.paint(label, :bold)
+      puts
       rows.each_with_index { |desc, i| puts "  #{i + 1}) #{desc}" }
       print t('choice_prompt')
       line = $stdin.gets
@@ -168,7 +171,8 @@ module Wizard
       return options[index].first
     end
 
-    index = Tui.menu(rows, hint: t('menu_hint_exit', count: [rows.size, 9].min))
+    index = Tui.menu(rows, header: [Tui.paint(label, :bold), ''],
+                           hint: t('menu_hint_exit', count: [rows.size, 9].min))
     puts
     return nil if index.nil? || index >= options.size
 

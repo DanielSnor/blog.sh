@@ -425,11 +425,13 @@ def ask_source
         return choices.first
       end
 
-      puts
-      puts t("import.group.#{key}")
+      # The group's name goes into the frame rather than being printed
+      # above it -- the menu paints from the top of the viewport now, so
+      # anything printed first is painted over.
       # Single-key pick reaches row 9 at most -- with more rows (blogs has
       # 13) the hint stops at 9 rather than promising keys that don't exist.
       index = Tui.menu(choices.map { |k, _| source_name(k) },
+                       header: [t("import.group.#{key}"), ''],
                        hint: t('import.menu_hint', count: [choices.size, 9].min))
       # Backing out of a group is not backing out of the import --
       # return to the group question instead of quitting the wizard.

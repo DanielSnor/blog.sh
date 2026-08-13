@@ -1147,14 +1147,19 @@ def pick_among_years(slug, paths)
 
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }
-  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+  question = t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
+    # The question goes INTO the frame. Printed above it, as it used to be,
+    # the frame would paint straight over it.
+    choice = Tui.menu(rows, header: [question, ''],
+                            hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
   end
+
+  puts question
 
   rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
   puts
@@ -2249,9 +2254,10 @@ end
 # instead of quietly going back: a piped caller that typed 9 for three
 # versions has made a mistake worth hearing about, and the sentence for it
 # already exists in every locale.
-def version_pick(rows)
-  return Tui.menu(rows, hint: t('cli.versions_menu_hint')) if Tui.interactive?
+def version_pick(rows, header)
+  return Tui.menu(rows, header: header, hint: t('cli.versions_menu_hint')) if Tui.interactive?
 
+  header.each { |line| puts line }
   rows.each { |row| puts "  #{row}" }
   puts
   print t('cli.versions_prompt', count: rows.size)
@@ -2282,15 +2288,15 @@ def props_versions(path, slug)
     return
   end
 
-  puts
-  puts t('cli.versions_heading', slug: slug)
-  # Before the list rather than under it, which is where it used to sit: the
-  # arrow menu paints the rows itself and keeps its hint on the last line, so
-  # a note printed after the list would be scrolled away by the first
-  # keypress. It is a warning about the whole operation anyway, and a warning
-  # is worth more read before the choosing than after it.
-  puts t('cli.versions_media_note')
-  index = version_pick(versions.map.with_index { |file, i| version_row(file, i) })
+  # Both lines travel INTO the picker's frame. Printed here, as they were
+  # while the menu repainted in place, the frame would paint over them --
+  # and what it painted over was the heading naming the post and the
+  # warning that images are not versioned, which is the one thing a reader
+  # has to weigh before choosing. The warning sits above the list on
+  # purpose: it is about the whole operation, and a warning is worth more
+  # read before the choosing than after it.
+  header = [t('cli.versions_heading', slug: slug), t('cli.versions_media_note'), '']
+  index = version_pick(versions.map.with_index { |file, i| version_row(file, i) }, header)
   if index.nil?
     puts
     return
@@ -2339,9 +2345,8 @@ def props_addresses(path, slug)
 
     current = "#{File.basename(File.dirname(path))}/#{slug}"
     rows = entries.each_with_index.map { |former, i| address_row(former, current, i) }
-    puts
-    puts Tui.paint(t('cli.addresses_heading', count: entries.size), :dim)
-    index = address_pick(rows)
+    # Into the frame, not above it -- see version_pick.
+    index = address_pick(rows, [Tui.paint(t('cli.addresses_heading', count: entries.size), :dim), ''])
     return if index.nil?
 
     former = entries[index]
@@ -2381,9 +2386,11 @@ end
 
 # Same two faces as every other picker here: arrow keys in a terminal, a
 # numbered list and a read line when piped.
-def address_pick(rows)
-  return Tui.menu(rows, hint: t('cli.addresses_menu_hint')) if Tui.interactive?
+def address_pick(rows, header)
+  return Tui.menu(rows, header: header, hint: t('cli.addresses_menu_hint')) if Tui.interactive?
 
+  puts
+  header.each { |line| puts line }
   rows.each { |row| puts "  #{row}" }
   puts
   print t('cli.addresses_pick_prompt')
@@ -2859,14 +2866,19 @@ def pick_among_trashed(slug, paths)
 
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }
-  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+  question = t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
+    # The question goes INTO the frame. Printed above it, as it used to be,
+    # the frame would paint straight over it.
+    choice = Tui.menu(rows, header: [question, ''],
+                            hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
   end
+
+  puts question
 
   rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
   puts

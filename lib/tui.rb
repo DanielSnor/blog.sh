@@ -382,49 +382,50 @@ module Tui
   # promise that Enter keeps the current value was false: Enter on the
   # language menu switched an English site to Czech, because cs sorts
   # first.
-  def menu(items, hint: nil, allow_text: false, text_prompt: nil, initial: 0, numeric_pick: true)
+  # `header:` are rows that belong ABOVE the list, inside the frame -- the
+  # question a picker is answering, most often. They used to be printed by
+  # the caller just before calling this, which worked while the menu
+  # repainted in place and stopped working the moment it started painting
+  # from the top of the viewport: the frame would land on top of them.
+  def menu(items, hint: nil, header: [], allow_text: false, text_prompt: nil, initial: 0, numeric_pick: true)
     selected = initial.to_i.clamp(0, [items.size - 1, 0].max)
-    offset = clamp_offset(selected, 0, [items.size, [term_height - 2 - (hint ? 2 : 0), 5].max].min, items.size)
-    # Leave a couple of rows above the menu for whatever's already on
-    # screen (the prompt that preceded it) plus the hint block, so the
-    # menu doesn't try to claim the entire terminal height for itself.
-    budget = term_height - 2 - (hint ? 2 : 0)
-    window = [items.size, [budget, 5].max].min
+    header = Array(header)
+    # The rows the list cannot have: the header, the blank line under the
+    # list and the hint, plus one so the frame never quite fills the window
+    # (a full-height frame leaves the cursor with nowhere to stand, which
+    # matters for allow_text, where a line gets typed under it).
+    budget = term_height - header.size - (hint ? 2 : 0) - 1
+    window = [items.size, [budget, 3].max].min
+    offset = clamp_offset(selected, 0, window, items.size)
     scrollable = items.size > window
-    # +2 for the hint, not +1: a blank separator line precedes it, and
-    # the cursor-up repaint math must count every physical line printed.
-    lines = window + (hint ? 2 : 0)
-    painted_once = false
 
-    print "\e[?25l"
     loop do
       avail = term_width - 2 # "› " / "  " prefix
-      print "\e[#{lines}A" if painted_once
-      items[offset, window].each_with_index do |item, i|
-        line =
-          if (offset + i) == selected
-            # Stripped here, and only here: the whole row is painted
-            # :invert, and a colour's own reset inside it would end the
-            # inversion mid-line. Being the inverted row is the stronger
-            # signal anyway.
-            paint("› #{truncate_to_width(strip_ansi(item), avail)}", :invert)
-          else
-            # Colour kept, so the state markers read the same in a picker as
-            # they do in `list` -- the picker used to be the one place that
-            # showed them in plain grey.
-            "  #{truncate_ansi(item, avail)}"
-          end
-        print "\e[2K#{line}\n"
+      rows = header.dup
+      items[offset, window].to_a.each_with_index do |item, i|
+        rows << if (offset + i) == selected
+                  # Stripped here, and only here: the whole row is painted
+                  # :invert, and a colour's own reset inside it would end the
+                  # inversion mid-line. Being the inverted row is the stronger
+                  # signal anyway.
+                  paint("› #{truncate_to_width(strip_ansi(item), avail)}", :invert)
+                else
+                  # Colour kept, so the state markers read the same in a picker as
+                  # they do in `list` -- the picker used to be the one place that
+                  # showed them in plain grey.
+                  "  #{truncate_ansi(item, avail)}"
+                end
       end
       if hint
-        print "\e[2K\n"
+        rows << ''
         # Numeric rather than worded ("16-31 of 50") on purpose: this file
         # deliberately depends on nothing but io/console -- no config, no
         # locales -- and a bare range reads the same in every language.
         text = scrollable ? "#{hint} · #{offset + 1}-#{offset + window}/#{items.size}" : hint
-        print "\e[2K#{paint(truncate_to_width(text, term_width), :dim)}\n"
+        rows << paint(truncate_to_width(text, term_width), :dim)
       end
-      painted_once = true
+      print "\e[?25l"
+      frame(rows, keep_last: hint ? 2 : 0)
 
       case (key = read_key)
       when :up
@@ -470,7 +471,10 @@ module Tui
           index = offset + relative
           return index if relative < window && index < items.size
         elsif allow_text && key =~ /\A[[:alnum:]]\z/
-          print "\e[?25h#{text_prompt}#{key}"
+          # On its own line under the frame, which the frame leaves room
+          # for: typing onto the last painted row would put the answer
+          # inside the hint, and the frame would repaint over it.
+          print "\r\n\e[?25h#{text_prompt}#{key}"
           rest = $stdin.gets.to_s.strip
           line = "#{key}#{rest}"
           # numeric_pick: false for menus whose rows carry no numbers and
