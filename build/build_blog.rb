@@ -195,8 +195,10 @@ LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
 # not one at the beginning. The bar follows them now (see .wrap > nav in
 # site.css), so the repetition has nothing left to answer, and on a phone it
 # came out as a second hamburger on the same screen as the one stuck to the
-# top of it. A site that wants the bar anyway -- as a rule under the content
-# before the footer, which is the other thing it does -- says so.
+# top of it. The line it drew between the content and the footer was doing
+# real work and is drawn by the stylesheet now (.layout + footer); what the
+# key still buys is the menu itself, repeated at the end of the page, for a
+# site that wants it there.
 LAYOUT_NAV_BOTTOM = SiteConfig.get('layout', 'nav_bottom', default: false)
 
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)

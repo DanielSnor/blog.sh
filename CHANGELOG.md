@@ -184,9 +184,11 @@ nothing to answer, so that one is off unless a site asks for it.
   where it used to be. The sidebar stays on unless you say otherwise; the
   bottom menu is the other way round, and off unless you do -- it existed
   to give a reader who had reached the end of an article a way out where
-  they were standing, and the bar at the top now goes with them. A site
-  that wants it for what it also does -- a rule under the content, before
-  the footer -- writes `nav_bottom: true` and has it back.
+  they were standing, and the bar at the top now goes with them. One thing
+  it was quietly doing has been kept without it: the line between the
+  content and the footer, which was that bar's own frame and is now drawn
+  by the stylesheet, in the same 5px it always was. So `nav_bottom: true`
+  adds the menu and only the menu.
 - **`layout.hero`.** A post's first usable image, lifted out of the text
   and shown above the title with the byline under it. Off unless asked
   for, since it reshapes every post page; a single post overrides the site

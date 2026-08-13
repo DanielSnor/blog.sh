@@ -1200,6 +1200,19 @@ footer {
   gap: 1.5rem;
 }
 
+/* Where the content ends and the footer begins. The two carry the same
+   background and sit flush against each other, which nobody had cause to
+   notice while the repeated menu bar stood between them: what did the
+   dividing was that bar's own frame. With the bar off by default the
+   article ran straight into the colophon with nothing to mark the seam.
+   So the line stays and the bar goes -- the same line, not a new one:
+   5px of --nav-border, which is what the menu carried above and below
+   itself and what the page's own frame is drawn in. Written as an
+   adjacent sibling so it appears only where the footer really does follow
+   the content: a site that asks for the bottom menu back has that bar
+   between them again, and would otherwise get the same line twice. */
+.layout + footer { border-top: 5px solid var(--nav-border); }
+
 @media (max-width: 700px) {
   footer { grid-template-columns: 1fr; }
 }

@@ -662,14 +662,17 @@ bar answers the question the repeated menu was invented for -- how does a
 reader who has just finished an article get anywhere -- and answers it
 for the whole page rather than only at the end of it. Leaving both on
 would have put two identical menus on one phone screen, one of them
-glued to the top. The key survives because the bar does a second thing
-nobody legislated for: it is a rule under the content, before the
-footer, and a site is entitled to want that. *Cost:* the one thing in
-this release that changes a site's appearance without being asked --
-every install that upgrades loses its bottom bar until it writes
-`nav_bottom: true`. Deliberately not solved by keeping the old default
-and hoping people notice the redundancy: a default is a recommendation,
-and recommending both is recommending clutter.
+glued to the top. The key survives for the sites that want the menu
+there anyway; what does not depend on it any more is the line between
+the content and the footer. That line was the bar's own frame, and
+switching the bar off took it away with it -- the article ran into the
+colophon, same background, no seam -- so the stylesheet draws it now,
+the same 5px the bar carried and the page's frame is drawn in. *Cost:*
+the one thing in this release that changes a site's appearance without
+being asked -- every install that upgrades loses its bottom bar until it
+writes `nav_bottom: true`. Deliberately not solved by keeping the old
+default and hoping people notice the redundancy: a default is a
+recommendation, and recommending both is recommending clutter.
 
 **Only the top menu bar is sticky.** With `layout.nav_bottom` on there are
 two `<nav>`s on a page; the rule is scoped to the first one under `.wrap`
