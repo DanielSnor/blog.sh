@@ -177,6 +177,8 @@ cli:
               page → stránka mimo výpisy, archiv i RSS, na vlastní adrese
               (About, Kontakt)
       pinned  true → post se drží na začátku první stránky výpisu
+      unlisted true → post zůstane na své adrese, ale zmizí z výpisů,
+              feedů, sitemapy i hledání (odkaz pro pár lidí, ne heslo)
       series  jméno série; posty se stejným jménem tvoří sérii
       hero    true/false → úvodní obrázek nad titulkem u tohohle postu
       toc     true/false → seznam kapitol (sám naskočí od čtyř nadpisů)
@@ -386,6 +388,7 @@ cli:
   props_draft_banner: "draft — není na webu, jen náhled"
   props_state_published: "publikováno, %{date}"
   props_pinned_yes: "ano — drží se nahoře na úvodní stránce"
+  props_unlisted_yes: "ano — dostupný na své adrese, ale v žádném výpisu, feedu, sitemapě ani hledání"
   props_announces_on_publish: "zatím ne — odejde s publikací"
   props_not_announced: "bez oznámení"
   props_attributes_hint: "Typ a štítky se upravují v hlavičce při editaci textu."
@@ -778,7 +781,7 @@ stats:
   heading_sources: "Odkud to je"
   archive_line: "%{total} postů: %{published} publikovaných, %{drafts} rozepsaných, %{scheduled} naplánovaných, %{pages} stránek"
   span_line: "%{first} – %{last}, to je %{days} dní"
-  busiest_line: "nejvíc toho přibylo v roce %{year} (%{count} postů)"
+  busiest_line: "nejvíc toho přibylo v roce %{year} (postů: %{count})"
   words_line: "%{total} slov celkem, %{mean} na post v průměru, %{median} uprostřed"
   longest_line: "nejdelší: %{slug} (%{words} slov)"
   reading_line: "přečíst celý archiv trvá %{hours} hodiny"
