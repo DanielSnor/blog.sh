@@ -573,8 +573,8 @@ def ask_css_entry
 
   source = resolve_source(answer)
   unless source && File.file?(source)
-    puts Tui.paint("   #{t('css_not_found', path: href)}", :yellow)
-    return nil unless Wizard.confirm(t('q_css_anyway'))
+    return nil unless Wizard.confirm(t('q_css_anyway'),
+                                     note: t('css_not_found', path: href))
 
     return href
   end
@@ -828,8 +828,7 @@ def ask_social_entry
   # The hint carries the other half nobody guesses: the profile has to
   # link back, or nothing turns green.
   if icon == 'mastodon'
-    puts Tui.paint("   #{t('h_social_rel')}", :dim)
-    entry['rel'] = 'me' if Wizard.confirm(t('q_social_rel'))
+    entry['rel'] = 'me' if Wizard.confirm(t('q_social_rel'), note: t('h_social_rel'))
   end
   entry
 end
@@ -973,8 +972,8 @@ def ask_font_face
       puts Tui.paint("   #{t('file_will_go', path: href)}", :green)
       queue_file(source, href)
     else
-      puts Tui.paint("   #{t('faces_not_found', file: file)}", :yellow)
-      return nil unless Wizard.confirm(t('q_faces_anyway'))
+      return nil unless Wizard.confirm(t('q_faces_anyway'),
+                                       note: t('faces_not_found', file: file))
     end
   end
 

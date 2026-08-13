@@ -599,17 +599,30 @@ which only existed because the bar didn't.
   `.gitignore` and nothing else, read as empty and was written into without
   the `--force` that is supposed to be required. That is the most likely
   destination anyone types here.
-- **Two questions in the menu section asked without saying why.** The
-  reason -- that the address the item points at answers nothing, or that
-  what was typed is not an address at all -- was printed just before the
-  question, and the frame the question is drawn in paints from the top of
-  the screen and erases below it, so the sentence was gone before it could
-  be read. A confirmation with its reason removed is the one thing a
-  confirmation must not be. The same repaint was swallowing which of its
-  three states the menu section is in, so a menu derived from content
-  looked exactly like one switched off at the moment of choosing between
-  them, and the line naming a malformed palette, which the code comments
-  promise is "named once". All three now travel inside the frame.
+- **Questions in `./style.sh` asked without saying why.** The reason --
+  that the address a menu item points at answers nothing, that a
+  stylesheet or a font file is not where you said it was, that what was
+  typed is not an address at all -- was printed just before the question,
+  and the frame the question is drawn in paints from the top of the screen
+  and erases below it, so the sentence was gone before it could be read.
+  What was left was "add it anyway?" with nothing to answer it against,
+  and a confirmation with its reason removed is the one thing a
+  confirmation must not be. Five of them, plus the hint explaining what
+  `rel="me"` is for.
+
+  The same repaint was swallowing two things that are not questions: which
+  of its three states the menu section is in, so a menu derived from
+  content looked exactly like one switched off at the moment of choosing
+  between them, and the line naming a malformed palette, which the code
+  comments promise is "named once". All of it travels inside the frame
+  now.
+
+  This is a defect this cycle introduced: the screens are new, and
+  anything printed just before one is painted over. One place still has
+  it -- the banner section names the file currently set, and the question
+  that follows erases it -- and it is left because the fix is entangled
+  with a second unfixed defect, hints running to 344 columns and being
+  cut off by the same frame. Both belong to the same decision.
 
 ### Upgrading
 
