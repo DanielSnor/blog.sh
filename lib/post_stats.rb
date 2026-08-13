@@ -129,6 +129,8 @@ module PostStats
       }
     end
 
+    blind!(:mastodon) unless status.key?('favourited')
+
     shown = approved_mastodon(status, descendants)
     {
       'stats' => {
@@ -138,6 +140,29 @@ module PostStats
       },
       'comments' => shown.map { |s| mastodon_comment(s) }
     }
+  end
+
+  # The failure this whole feature has to survive, and the one it was not
+  # surviving. An answer that does not carry the field saying what the
+  # authenticated account liked is not an answer meaning "nothing" -- it is
+  # the network declining to say, because the request was not authenticated
+  # or the token lacks read:statuses. Read as "nothing", it publishes an
+  # empty thread for every post, and since an empty array is not nil the
+  # merge in refresh_sidebar.rb writes it straight over what was published:
+  # one tick, and every approved comment on the site is gone.
+  #
+  # The comment above mastodon_token! has always said so, and doctor
+  # --online has always tested for it -- but only there, on the path a
+  # person runs by hand, and never on the path cron takes. So it is checked
+  # here, where the answer arrives, and raising is the point: fetch_one
+  # turns it into a warning and the previous comments.json entry survives
+  # untouched. A thread nobody answered is still fine; the field is on the
+  # announcement itself, so this asks the one status that always exists.
+  def blind!(kind)
+    raise "comments.approval is on but the #{kind} answer did not say which posts are " \
+          "favourited -- the request was not authenticated, or the token is missing " \
+          '(Mastodon) read:statuses. Refusing rather than publishing an empty thread ' \
+          'over the comments already approved.'
   end
 
   # `favourited` is absent, not false, on an unauthenticated response --
@@ -231,6 +256,13 @@ module PostStats
         'comments' => nil
       }
     end
+
+    # Same refusal as the Mastodon side, and it catches a second thing for
+    # free: #notFoundPost and #blockedPost come back in place of a post, so
+    # thread['post'] is nil and there is no viewer to read -- which would
+    # otherwise have published nulls and an empty discussion for a post that
+    # was merely unreachable for a moment.
+    blind!(:bluesky) if post['viewer'].nil?
 
     shown = approved_bluesky(thread['replies'], post.dig('author', 'did'), [])
     {

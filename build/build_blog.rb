@@ -2436,6 +2436,26 @@ STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
 File.write(STATS_PATH, '{}') unless File.exist?(STATS_PATH)
 WRITTEN[STATS_PATH] = true
 
+# The approved comments, written by the same cron and needing the same
+# protection -- which it did not have. Every build swept the file away as
+# something no longer generated, and since a publish is a build followed by
+# a deploy with --prune, publishing a post took every approved comment off
+# the whole site until the next cron tick put them back. On a moderated
+# site that is the feature deleting its own output as a side effect of
+# ordinary use.
+#
+# Registered only while moderation is on, and that condition is doing work
+# rather than tidiness: with it off the file must NOT be protected. It is
+# deleted when moderation is switched off precisely so a rejected comment
+# stops being readable at a public address, and a build that kept it alive
+# would hold the door open for exactly what the deletion is there to close.
+# Nothing is created here, unlike stats.json -- a comments.json that does
+# not exist yet means the cron has not run, and inventing an empty one
+# would tell the page there is nothing to show rather than nothing to
+# read.
+COMMENTS_PATH = File.join(PUBLIC_DIR, 'comments.json')
+WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
+
 emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
