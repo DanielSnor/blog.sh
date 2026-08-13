@@ -240,6 +240,7 @@ def client_i18n_json
     results_one: t('js.results_one'),
     results_few: t('js.results_few'),
     results_many: t('js.results_many'),
+    results_capped: t('js.results_capped'),
     no_results_pending: t('js.no_results_pending'),
     no_results_final: t('js.no_results_final'),
     try_other_words: t('js.try_other_words'),
@@ -1678,7 +1679,24 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   parts << %(<span class="listing-heading__value"#{id_attr}>#{h(value)}</span>)
-  %(<h2 class="#{classes.join(' ')}">#{parts.join}</h2>)
+  # h1, not h2. This is what the page is about -- the tag being listed, the
+  # search being run -- and the posts under it are h2 already, so at h2 it
+  # was a sibling of the things it introduces rather than their heading. A
+  # listing had no h1 at all, which left every page in the archive except a
+  # post and the cheat sheet with an outline that started at level two.
+  %(<h1 class="#{classes.join(' ')}">#{parts.join}</h1>)
+end
+
+# The landing page is the one listing with nothing to announce: it is the
+# site itself, and the banner has said so already. Giving it a visible
+# heading would put a word on every front page built with this engine that
+# nobody asked for -- so it gets the site's own title, clipped out of sight
+# by the stylesheet the way the "Tag"/"Search" labels are. Clipped rather
+# than display:none for the same reason as those: hidden is not the same as
+# gone, and the point of this heading is to be there for a reader who
+# navigates by headings and cannot see the banner at all.
+def home_heading_html
+  %(<h1 class="listing-heading listing-heading--home">#{h(SITE_TITLE)}</h1>)
 end
 
 # Decorative by definition -- the accessible name is the kind span next to
@@ -1713,6 +1731,10 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant)
+    # Tags, series and content types all name themselves; the landing page is
+    # the only listing that arrives here with nothing, and it is the only one
+    # that would otherwise have no h1 (see home_heading_html).
+    heading_html = home_heading_html if heading_html.empty?
     main_html = template.result_with_hash(list_html: list_html, pagination: pagination,
                                           heading_html: heading_html)
     # A listing renders the same blocks the post page does, players

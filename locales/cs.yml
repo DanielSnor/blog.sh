@@ -114,6 +114,7 @@ js:
   results_one: "výsledek"
   results_few: "výsledky"
   results_many: "výsledků"
+  results_capped: " — zobrazeno nejlepších %{count}"
   no_results_pending: "Nic nenalezeno,"
   no_results_final: "Nic nenalezeno."
   try_other_words: " Zkus jiná / obecnější slova."

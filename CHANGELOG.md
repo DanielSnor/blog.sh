@@ -348,6 +348,42 @@ byte-for-byte against the previous build.
   way out at all. Escape hands focus back to the button on the way out,
   since that is where the reader was before they opened it. A tap inside
   the menu is left alone, the search field in there included.
+- **Search answers with its best results, not its most recent ones.** The
+  index carries one folded blob per post -- title, text and tags run
+  together -- so all the search could tell was that the words were in there
+  somewhere, and what came back came back in index order, which is by date.
+  A search of sean.cz for "mastodon" opened with four posts from this
+  summer that mention it in passing; the three articles actually called
+  "Tipy pro Mastodon", "Velký test Mastodon aplikací" and one more sat
+  below them, where their dates had put them. Results are now scored: a
+  word in the title counts for more than a word in the text, and a whole
+  word counts for more than the same letters inside a longer one, so "art"
+  no longer answers with everything about a "start". Everything else is
+  unchanged -- the same AND matching, the same quoted phrases and the same
+  `-excluded` words -- and ties keep the order they had, so among equally
+  good answers the recent one still comes first. On a personal archive that
+  is usually the right tiebreak, and it is only ever a tiebreak now.
+- **A search no longer draws a card for every post it found.** Two letters
+  match most of an archive: on sean.cz, "a" is in 4371 of 4400 posts, and
+  the page built a card for each one -- 21 855 elements in a single
+  innerHTML, a results page 868 metres tall, and 619ms of work on every
+  keystroke. Fifty cards are drawn now (41ms, 250 elements), and the count
+  above them still says how many there were. The cap is only honest because
+  the list is ranked: the fifty shown are the fifty best answers rather
+  than the fifty that happen to be newest. Ranking the whole 4400 costs
+  16ms the first time and 6ms after that, measured on that archive.
+- **Every page has an h1.** A post had one and the cheat sheet had one;
+  every listing in the archive started its outline at level two. Tag,
+  series, content-type and search listings had a heading already -- it was
+  simply an h2, the same level as the post titles it introduces, so it read
+  as their sibling rather than their heading; it is an h1 now, and looks
+  exactly as it did. The front page had no heading at all, being the one
+  listing with nothing to announce, so it gets the site's own title, taken
+  out of sight by the stylesheet the way the "Tag" and "Search" labels are.
+  Nothing is drawn on it that was not drawn before -- the heading is out of
+  flow, and the first post still begins at the top of the page to the pixel
+  -- but a reader who moves through a page by its headings now has a way
+  into the front page, which until now was the one page that offered none.
 
 ### Upgrading
 
@@ -357,9 +393,15 @@ byte-for-byte against the previous build.
 - It is no longer the same *bytes*, though, and the next deploy is a full
   one rather than incremental. The banner's two overlay lines moved inside
   a wrapper element, which is in the layout every page shares, so the whole
-  archive is rewritten -- and on top of that the heading above tag listings
-  and search results changed, and the post pages carry reading time and a
-  contents list.
+  archive is rewritten -- and on top of that every listing heading became
+  an h1, the front page gained one of its own, the heading above tag
+  listings and search results changed, and the post pages carry reading
+  time and a contents list.
+- One thing a site's own text gains: the front page (and its `/page/N/`
+  continuations) now carries the site's title as a heading. It is clipped
+  by the stylesheet, so nothing is drawn -- but a tool that reads the page
+  as text rather than as a rendered document will see the title where it
+  saw nothing before.
 - A stylesheet of your own that positioned `.banner-title` or
   `.banner-claim` wants a look before you upgrade. Neither is absolutely
   positioned any more: the box around them is (`.banner-overlay`, which

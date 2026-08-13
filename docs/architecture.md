@@ -315,7 +315,12 @@ A single linear pass, no framework:
    instead of the whole archive.
 5. **Indexes & feeds.** Client-side search index split into recent
    (`search-index.json`, newest 500, loaded eagerly) and archive
-   (`search-index-archive.json`, loaded on first query);
+   (`search-index-archive.json`, loaded on first query). Each entry
+   carries one folded blob (title, text and tags together), which is what
+   `assets/js/search.js` matches on; it scores the hits afterwards -- a
+   word in the title above a word in the text, a whole word above the
+   same letters inside a longer one, date as the tiebreak -- and draws at
+   most `RESULT_LIMIT` of them while reporting the true count;
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
 6. **Assets, colors and the root favicon.** Before `assets/` is copied

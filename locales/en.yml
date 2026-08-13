@@ -119,6 +119,10 @@ js:
   results_one: "result"
   results_few: "results"
   results_many: "results"
+  # Appended to the count when more was found than is drawn. The number is
+  # the cap itself (RESULT_LIMIT in assets/js/search.js), not the count, so
+  # it needs no plural forms.
+  results_capped: " — showing the best %{count}"
   no_results_pending: "No results yet,"
   no_results_final: "No results."
   try_other_words: " Try different or more general words."

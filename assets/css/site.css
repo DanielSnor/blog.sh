@@ -955,7 +955,12 @@ blockquote {
 }
 .tag-pill:hover { background: var(--accent); color: #ffffff; }
 
-.listing-heading { font-size: 1.6rem; font-weight: 600; margin-bottom: 1.5rem; }
+/* line-height is written out because this heading used to be an h2 and took
+   the 1.25 from that rule with it. As an h1 it would fall back to the
+   browser's `normal`, which in Open Sans is nearer 1.36 -- a listing
+   heading that grew a couple of pixels taller for no reason anyone could
+   see in the markup. */
+.listing-heading { font-size: 1.6rem; font-weight: 600; line-height: 1.25; margin-bottom: 1.5rem; }
 
 /* The kind of listing ("Tag", "Search") stays in the markup and is taken
    out of sight rather than out of the document -- clipped, never
@@ -965,9 +970,17 @@ blockquote {
    It is hidden exactly where the value can speak for itself: a tag name
    arrives dressed as a pill, a query arrives behind a magnifier. The
    search page opened WITHOUT a query has no value to show, so the word
-   stays and the page keeps a heading. */
+   stays and the page keeps a heading.
+
+   The landing page's own heading is clipped here for the same reason and
+   the whole way down: it says the site's name, which the banner is already
+   saying in much larger type, so there is nothing for it to show -- but a
+   page with no h1 is a page a reader who moves by headings cannot get into,
+   and until now the front page was one. Out of flow, so it costs that page
+   no space it did not already have. */
 .listing-heading--tag .listing-heading__kind,
-.listing-heading--search.has-query .listing-heading__kind {
+.listing-heading--search.has-query .listing-heading__kind,
+.listing-heading--home {
   position: absolute;
   width: 1px;
   height: 1px;

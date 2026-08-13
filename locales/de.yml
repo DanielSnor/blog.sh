@@ -118,6 +118,7 @@ js:
   results_one: "Treffer"
   results_few: "Treffer"
   results_many: "Treffer"
+  results_capped: " — die besten %{count} werden angezeigt"
   no_results_pending: "Noch keine Treffer,"
   no_results_final: "Keine Treffer."
   try_other_words: " Versuch es mit anderen oder allgemeineren Wörtern."

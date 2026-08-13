@@ -637,6 +637,44 @@ a palette whose accent sits close to its card background gets a quiet
 ring on the page body, and a skin that repaints a control's ground has
 to look at the ring itself rather than getting a new one for free.
 
+**Search ranks with four numbers, and draws fifty.** Chronological
+results were defended for a while on the grounds that an archive is a
+diary and a diary is read by date -- but that only holds when the answers
+are equally good, and they are not: a post whose title is the query is a
+better answer than one that mentioned the word once, whatever their
+dates. So the hits are scored (title above text, whole word above part of
+a word) and date decides the ties, which is the part of the old argument
+that was right. The scale is four constants rather than a term-frequency
+model, because the whole of it has to be explainable in one sentence to
+be maintainable in a 150-line script. *Cost:* no BM25, no term
+frequency -- forty mentions do not beat one, and the index's single
+folded blob cannot tell a tag from a paragraph, so a post *tagged* with
+the query ranks no higher than one that says it in passing. Both are
+fixable by putting more fields in the index, and both would cost every
+visitor the bytes.
+
+**A result list has a ceiling, and the count above it does not.** Fifty
+cards, with "4371 results" still printed above them. Showing everything
+was 619ms and 21 855 elements on a real archive; showing fifty and lying
+about the total would be worse than either. There is no "show more" and
+no pagination: a reader who has not found it in fifty ranked answers is
+better served by narrowing the query, and every extra control here is one
+more thing to translate and maintain. *Cost:* the 51st answer is
+unreachable except by asking a better question -- which is only fair
+because the list is ranked, and would have been indefensible while it was
+in date order.
+
+**The front page's h1 is there and not visible.** Every listing heading
+became an h1 (it was an h2, a sibling of the post titles it introduces),
+which left the front page as the only listing with no heading to promote
+-- it announces nothing, being the site itself. A visible one would put a
+word on every front page built with this engine that nobody asked for, so
+it carries the site's title clipped out of sight, the same way the
+"Tag"/"Search" labels are. *Cost:* text in the page that nobody sees --
+which means it can go stale without anyone noticing, and a tool reading
+the page as text rather than rendering it will find a title where there
+used to be none.
+
 **The banner's overlay lines are a column, not two pinned corners.** The
 site name and the claim used to be positioned absolutely against opposite
 corners of the picture, which reads well and holds only as long as there
