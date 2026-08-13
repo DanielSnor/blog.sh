@@ -46,7 +46,7 @@ dedup by `source`).
 | `slug` | string, required | URL segment; `Slug.slugify` output |
 | `date` | string, required | ISO 8601 with offset |
 | `content` | array, required | blocks, see below |
-| `title` | string | posts without one are titled by their slug |
+| `title` | string | optional. A post without one borrows the title of its first `link` block -- that is where a link post keeps what the reader takes for its title, and it becomes the heading (an `h1` on the post's page, an `h2` in a listing, both pointing where the link points), the `<title>`, the feed item and the structured data. With neither, the slug stands in |
 | `tags` | array of strings | rendered as pills, slugified for tag URLs |
 | `state` | `"published"` \| `"draft"` | absent = published |
 | `draft_token` | string | drafts only -- the hidden preview URL segment |
@@ -82,7 +82,7 @@ dedup by `source`).
 | `file` | `media` (`url`, `size` in bytes); `label` -- an attachment offered for download; the post's type becomes `document` when its text is caption-short |
 | `video` | one of four shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; another platform the address alone identifies (Vimeo, PeerTube, archive.org) -- `provider`, `url`, `embed_id` (+ `embed_hash` for an unlisted Vimeo, `embed_origin` for the PeerTube instance), see `lib/embed.rb`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
 | `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; a platform the address identifies (Spotify, SoundCloud, Mixcloud) -- `provider`, `url` and, where there is one, `embed_id`/`embed_kind`, see `lib/embed.rb`; a platform that had to be asked (Funkwhale, Bandcamp) -- `provider`, `url`, `embed_src` resolved once at save time by `lib/embed_lookup.rb` (+ `embed_origin` for the Funkwhale instance); imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
-| `link` | `url`; `title`; `description` -- rendered as a link card |
+| `link` | `url`; `title`; `description`. On a post with no title of its own the FIRST such block lends its title to the post (see `title` above) and then renders without it, leaving the description; anywhere else -- a titled post quoting a link mid-article, or a second link block -- it renders in full as a link card |
 
 An unrecognized `type` renders as its raw JSON in a `<pre>` -- loud,
 not silent.
@@ -357,24 +357,52 @@ don't depend on page content.
 
 ## The terminal UI
 
-`lib/tui.rb` is the whole UI layer: colors, single-keypress choices, an
-inline arrow-key menu and a spinner -- pure stdlib (`io/console`), plain
-VT100 sequences, no terminfo and no gems. Three deliberate constraints:
+`lib/tui.rb` is the whole UI layer: colors, single-keypress choices,
+arrow-key menus, the screens they live on and a spinner -- pure stdlib
+(`io/console`), plain VT100 sequences, no terminfo and no gems. Four
+deliberate constraints:
 
 - **Everything degrades.** `Tui.interactive?` gates every enhancement,
   so piped, scripted and cron runs keep the exact line-based behavior
   (and escape-code-free output) they always had. Colors additionally
   honor `NO_COLOR` and `TERM=dumb`.
-- **Raw mode per keystroke, never persistent.** `STDIN.getch` enters and
-  leaves raw mode around a single read, so no crash can leave the user's
-  shell broken -- the classic TUI failure mode.
-- **Inline, not fullscreen.** The menu repaints its lines in place with
-  cursor-up; no alternate screen, so the dialog stays in the scrollback.
-  A list longer than the terminal is tall scrolls inside a window sized
-  once per call (a wrapped or overflowing line would break the
-  fixed cursor-up arithmetic, which is also why items are truncated
-  rather than wrapped). A lone Esc is told apart from an arrow key by a
-  50 ms wait for the rest of the sequence.
+- **A screen that stays put.** `Tui.frame(rows, keep_last:)` paints from
+  the top of the viewport over whatever the previous frame left there,
+  writing the rows in one go and ending the last without a newline -- a
+  full-height frame that ends in one scrolls the view by exactly what this
+  exists to prevent. `keep_last` names the rows that survive a window too
+  short to hold the frame (the keys, normally); what gets dropped instead
+  is the end of the list, which the cursor can still scroll to. Everything
+  interactive is built on it: the wizard menu, the publishing queue,
+  `Tui.menu`, `Tui.browse`, the props dialog and the questions in
+  `./setup.sh`, `./style.sh` and `./import.sh`.
+- **Not the alternate screen.** `\e[?1049h` would discard its plane on
+  exit, and this CLI prints things worth keeping -- a draft's address,
+  what a deploy uploaded, what refused. The last frame stays where it was
+  drawn and the scrollback above it is never touched.
+- **Raw mode around a frame, never a session.** `Tui::Screen#key` holds
+  raw for one paint-and-read and gives it back, so no crash can leave the
+  user's shell broken -- the classic TUI failure mode. A lone Esc is told
+  apart from an arrow key by a 50 ms wait for the rest of the sequence.
+
+`Tui.screen` yields a `Screen`: `paint` puts a frame up, `key` waits for
+one keypress, and `leave` hands the terminal to something that prints more
+than a frame can hold (a build, a publish) and takes it back afterwards.
+Nothing in it knows what a post or a queue is. A window resized *while*
+`key` waits answers `:resize`, which every caller treats as "paint again":
+a trap alone would not do, because `getch` blocks in the kernel and the
+handler would run with the read still parked, so the handler writes a byte
+to a pipe that `key` waits on alongside the terminal.
+
+Two rules follow from painting at the top, and both are easy to get wrong.
+Anything a caller prints *just before* a picker is painted over, so the
+rows that belong above a list travel into it as `header:` rather than
+being printed first. And a list longer than the window scrolls inside it,
+with the window recomputed every frame rather than once per call, so a
+resized terminal is simply the next frame with a different number of rows.
+`context:` adds one line under the cursor saying what the selected row
+*is* -- what a version said, where the row itself can only say when it was
+kept -- and it is called for the selected row only.
 
 `lib/qr_code.rb` renders a draft's preview URL as a scannable QR code in
 half-block glyphs -- the smallest correct subset of the spec that the job

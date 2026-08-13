@@ -83,7 +83,25 @@ arrow-key menus (digits still quick-select, typing a slug still works),
 single-keypress answers without Enter, colored state markers and a
 **QR code of the draft preview URL** -- point your phone's camera at
 the screen instead of retyping a token. A menu longer than the terminal
-is tall scrolls, showing your position in the list next to the hint.
+is tall scrolls, showing your position in the list next to the hint;
+`Page Up`, `Page Down`, `Home` and `End` work in every list.
+
+**The screens hold still.** A menu, the queue, the archive, a post's
+properties and every picker repaint over themselves instead of printing
+another copy each time you press a key, so the terminal shows the screen
+you are on rather than a pile of the ones you were on. Anything that
+prints more than a screen can hold -- a build, a publish, a reschedule --
+takes the terminal for as long as it needs and hands it back. Nothing is
+hidden on the way out: this is not the alternate screen, so the last
+screen stays where it was drawn and everything above it is still in your
+scrollback. Resize the window and the screen repaints itself, even while
+it waits for an answer; on a window too short for everything, the rows
+telling you how to get out are the ones that survive.
+
+The three question-and-answer wizards -- `./setup.sh`, `./style.sh` and
+`./import.sh` -- keep the section you are in and the answers already given
+above the question, so a half-finished run says where you are.
+
 Piped, scripted or cron runs get the plain line-based prompts unchanged,
 with no escape codes in the output. Colors honor `NO_COLOR` and
 `TERM=dumb`.
@@ -100,7 +118,28 @@ the announcement -- and offers the guarded actions:
 - **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
   review the old addresses that redirect here, delete;
 - **draft**: publish, schedule (or reschedule, or cancel the schedule),
-  rename the slug, delete.
+  rename the slug, delete;
+- **either, once there is one**: `[v]` restores what the post said before
+  one of its recent saves.
+
+**Undoing an edit** is what `[v]` is for. Every `edit` keeps the previous
+text first, up to ten of them per post, and `[v]` lists them newest first
+with the line under the cursor showing what that version said -- its
+title, or its opening words when it has none -- so the choice is made by
+recognising the text rather than by reading timestamps. The key appears
+only on a post that has been edited at least once.
+
+Choosing one is itself undoable: the current text is kept as a version
+before it is replaced, so a wrong choice is one `[v]` away from being
+walked back. That is why it confirms with a single key rather than asking
+for a word to be typed out, which this engine keeps for the things that
+disappear. Only the text comes back -- images are not versioned, so a
+version old enough to mention a picture the post no longer has would
+restore a broken reference, which is what the cap on how many are kept is
+for and what the line above the list says out loud. A version that will
+not parse stays in the list without a preview, since that is exactly the
+one somebody may be trying to restore *from*. Versions travel with the
+post into the trash and back out again.
 
 Type and tags are shown here but *edited* in the frontmatter of `edit`,
 prefilled with their current values -- one keystroke away from the text
@@ -265,6 +304,16 @@ in publish order and acts on the one you pick:
 - `[u]` / `[d]` move it a slot earlier or later. Moving exchanges times
   with the neighbouring post -- the set of occupied times never changes,
   only which post sits in which. A hand-scheduled 14:17 stays a 14:17.
+  The cursor follows the post you moved, so pressing `[u]` again carries
+  the same post further.
+- `[m]` picks the post up and carries it: the arrows then move the post
+  itself through the queue, Enter puts it down and Escape leaves the queue
+  as it was. Carrying from the eighth slot to the second steps the six in
+  between back one slot each, so the same times stay occupied and the
+  whole move is one write instead of one per slot. For a single slot
+  `[u]`/`[d]` are quicker; `[m]` is for the longer trip, and it is offered
+  in a terminal only -- a piped run has `[u]`/`[d]` and no screen to carry
+  anything across.
 - `[p]` publishes it right now, the same flow as publishing a draft by
   hand (announcement included).
 - `[s]` asks for a different time, same prompt as scheduling.

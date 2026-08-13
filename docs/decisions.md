@@ -409,16 +409,46 @@ escape code may ever reach a log. *Cost:* two code paths in the
 dialogs -- worth it, since cron and scripts drive the same commands
 humans do.
 
-**No curses, no fullscreen, no dependencies.** `io/console` plus VT100
-sequences cover what a conversational CLI needs, and staying inline
-keeps the whole session in the scrollback where a user can scroll back
-through it. *Cost:* no complex layouts -- deliberately not the goal.
+**No curses, no dependencies.** `io/console` plus VT100 sequences cover
+what this needs. *Cost:* no complex layouts -- deliberately not the goal.
+
+**A screen that repaints, but not the alternate screen.** Every keypress
+in a dialog used to leave another full copy of it behind: walking three
+rows down the queue, opening the actions and moving a post three slots
+scrolled the view by 37 lines and buried the terminal in identical
+screens. Frames are painted from the top of the viewport instead, so the
+same sequence scrolls it by none. The alternate screen (`\e[?1049h`) would
+have been the obvious way and is deliberately not used: it discards its
+plane on exit, and this CLI prints things worth keeping -- a draft's
+address, what a deploy uploaded, what refused. Painting in place keeps
+both properties, the screen holding still *and* the scrollback intact.
+*Cost:* a full frame per keypress is about a third more bytes over the
+wire than the old partial repaint (9129 vs 6942 for that sequence);
+repainting only changed rows is the obvious answer if that ever matters.
+
+**Action rows fold; navigation keys are trimmed.** The keys under a post
+run to 137 characters in German, so on 80 columns -- or a phone over SSH
+-- something has to give. `browse`'s navigation line drops items from the
+middle, which is right for ways to move around: a reader can guess them.
+The rows under a post are the actions themselves, so they break between
+items instead and keep every one. Hiding `[x] delete` would hide it from
+exactly the reader least able to guess it is there. *Cost:* on a narrow
+terminal the keys take four lines instead of one.
+
+**Confirmations are graded by what disappears.** Deleting a post and
+unpublishing one ask for the slug to be typed out. Restoring an earlier
+version asks for one key, because it loses nothing -- the current text is
+kept as a version of its own first, which is what the sentence above the
+prompt says. A prompt explaining that a move is reversible and then
+demanding a word be written out argues with itself. It stays a
+confirmation rather than becoming none: Enter in the list is a single
+keystroke and a restore overwrites the text being worked on.
 
 **The menu scrolls; the lists aren't capped to fit a screen.** Pickers
-used to offer only the 10 most recent posts because the menu printed
-every item it was handed, so anything longer than the terminal broke its
-cursor-up repaint. Scrolling a window moves that limit into the UI where
-it belongs -- on a blog with thousands of posts, a cap that small is a
+used to offer only the 10 most recent posts, because back when the menu
+printed every item it was handed, anything longer than the terminal broke
+the repaint. Scrolling a window moves that limit into the UI where it
+belongs -- on a blog with thousands of posts, a cap that small is a
 functional restriction, not tidiness. *Cost:* window arithmetic (and
 digits selecting within the visible window, not the whole list).
 

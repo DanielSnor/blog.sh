@@ -260,6 +260,39 @@ which only existed because the bar didn't.
   name or a URL do not complete. Readline ships with Ruby and installs
   nothing; where it is genuinely absent the prompt behaves exactly as
   before.
+- **The wizard holds still.** Every keypress in a dialog used to leave
+  another full copy of it in the terminal: walking three rows down the
+  publishing queue, opening the actions and moving a post three slots
+  scrolled the view by 37 lines, and the screen you were working on was
+  buried under identical copies of itself. Screens are now painted over
+  themselves from the top, so the same sequence scrolls it by none. This is
+  every interactive screen in all four entry points -- the `./blog.sh`
+  wizard menu, the queue, the archive, a post's properties and all sixteen
+  pickers, plus the questions in `./import.sh`, `./style.sh` and
+  `./setup.sh`. Actions that print more than a screen can hold (a build, a
+  publish, a reschedule) get the terminal to themselves and hand it back
+  when they are done. It is deliberately **not** the alternate screen that
+  `less` and `vim` use: that discards everything on exit, and this CLI
+  prints things worth keeping. The last screen stays where it was drawn and
+  the scrollback above it is untouched. Resizing the window repaints it,
+  even mid-question, and a window too short for a screen drops list rows
+  rather than the line telling you how to get out. Piped and cron runs are
+  untouched, as ever.
+- **The three question-and-answer wizards keep a record.** `./setup.sh`,
+  `./style.sh` and `./import.sh` ask one thing at a time, and on a screen
+  that repaints each question would have replaced the last with no sign of
+  what had already been answered. Each question now stands under the
+  section's name and the answers already given in it, so a run you are
+  halfway through says where you are and what you have said.
+- **A version list says what each version said.** Restoring an earlier
+  version offered timestamps and nothing else, so the choice was made by
+  time and hope on the one screen whose point is recognising a text you
+  wrote. The row under the cursor now shows that version's title, or its
+  opening words when it has none. Confirming a restore is also one
+  keypress now instead of a word typed out: it loses nothing (the current
+  text is kept as a version of its own), and this engine keeps typed
+  confirmations for what disappears -- deleting a post and unpublishing one
+  still ask for the slug.
 
 ### Fixed
 
