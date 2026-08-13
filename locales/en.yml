@@ -878,6 +878,12 @@ setup:
   password_skipped: "No app password. The site works; it just never announces anything until you add one to env.sh."
 
   section_deploy_intro: "The built site is an ordinary folder of files; this picks where ./blog.sh rebuild uploads it after every change. Go by where the site will run -- and if you don't know yet, keep the first option. It can be changed any time by running ./setup.sh again."
+  q_page_size: "How many posts on one listing page?"
+  h_page_size: "Asked now and only now, on the first setup. Pagination is anchored to the oldest post, so old pages never change and a saved link to one stays true -- but that rests on this number staying put. After the first deploy, changing it moves every boundary and rewrites every listing page in the archive."
+  e_page_size: "A whole number greater than zero."
+  section_scheduler: "Scheduled publishing"
+  section_scheduler_intro: "A scheduled post does not publish itself -- something has to run at the time. If you mean to use ./blog.sh schedule, add this line to cron (it deploys nothing on its own; the job looks whether anything is due and exits):"
+  scheduler_note: "Without that line a post waits in the queue and nobody ever sends it. Doctor notices, but only once something is scheduled. The sidebar has a job of its own, refresh-sidebar.sh -- see docs/operations.md."
   q_backend: "Where should the built site go?"
   backend_none: "Nowhere yet -- write and preview locally, decide later"
   backend_surfer: "Cloudron Surfer -- you run your own Cloudron with the Surfer app on it"

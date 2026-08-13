@@ -875,6 +875,12 @@ setup:
   password_skipped: "Kein App-Passwort. Die Website funktioniert, sie kündigt nur nie etwas an, bis du eines in env.sh einträgst."
 
   section_deploy_intro: "Die fertige Website ist ein gewöhnlicher Ordner voller Dateien; hier wird gewählt, wohin ./blog.sh rebuild ihn nach jeder Änderung hochlädt. Richte dich danach, wo die Website laufen wird -- und wenn du es noch nicht weißt, lass die erste Option stehen. Ändern geht jederzeit, ./setup.sh einfach noch einmal starten."
+  q_page_size: "Wie viele Beitraege auf einer Listenseite?"
+  h_page_size: "Wird jetzt gefragt und nur jetzt, bei der ersten Einrichtung. Die Seitenzahlen sind am aeltesten Beitrag verankert, alte Seiten aendern sich also nie und ein gespeicherter Link bleibt gueltig -- das haengt aber daran, dass diese Zahl bleibt. Nach dem ersten Deploy verschiebt eine Aenderung jede Grenze und schreibt jede Listenseite neu."
+  e_page_size: "Eine ganze Zahl groesser als null."
+  section_scheduler: "Geplantes Veroeffentlichen"
+  section_scheduler_intro: "Ein geplanter Beitrag veroeffentlicht sich nicht selbst -- zur Zeit muss etwas laufen. Wer ./blog.sh schedule nutzen will, traegt diese Zeile in cron ein (sie deployt nichts von sich aus; der Job schaut nur, ob etwas faellig ist, und endet):"
+  scheduler_note: "Ohne diese Zeile wartet ein Beitrag in der Warteschlange und niemand schickt ihn je. Doctor merkt es, aber erst wenn etwas geplant ist. Die Seitenleiste hat einen eigenen Job, refresh-sidebar.sh -- siehe docs/operations.md."
   q_backend: "Wohin soll die gebaute Website?"
   backend_none: "Noch nirgendwo -- lokal schreiben und ansehen, später entscheiden"
   backend_surfer: "Cloudron Surfer -- du betreibst ein eigenes Cloudron mit der Surfer-App darauf"

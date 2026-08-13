@@ -190,8 +190,10 @@ def run
   # an optional integration -- it goes last, like in the config file.
   ask_language(site, current)
   ask_identity(site, current)
+  ask_page_size(site, current)
   ask_address(site, env, current)
   ask_deploy(env, current)
+  tell_about_scheduler
   ask_network(site, env, current)
 
   review_and_write(site, env)
@@ -295,6 +297,46 @@ end
 # site that still calls itself example.com everywhere. Setting both to
 # the same value is the only answer that cannot surprise anyone; the
 # override stays available for whoever actually wants it.
+# Asked on a FIRST RUN only, and that is the whole point of it being
+# here: pagination is anchored to the oldest post, so old listing pages
+# never change -- and that immutability rests on the page size staying
+# what it was. Change it after the first deploy and every boundary moves,
+# every listing page in the archive is rewritten, and an address somebody
+# saved points at different posts.
+#
+# On a re-run the question is therefore not asked at all. Somebody who
+# really means it can still edit the key by hand, where the comment in
+# config/site.yml.example says the same thing at more length.
+def ask_page_size(site, current)
+  return unless @fresh
+
+  value = ask_valid(t('q_page_size'), current.dig('site', 'page_size') || 10,
+                    hint: t('h_page_size')) do |answer|
+    t('e_page_size') unless answer.to_s.match?(/\A[1-9]\d*\z/)
+  end
+  site.set(%w[site page_size], value.to_i) if value
+end
+
+# Nothing to write here -- a cron entry lives in the machine's crontab,
+# not in this repository, and installing one on somebody's behalf is a
+# change to their system rather than to their site.
+#
+# It is said all the same, because the failure it prevents is silent:
+# ./blog.sh schedule accepts a date, the post waits, and without this job
+# nothing ever publishes it. Doctor cannot warn about it on a fresh
+# install either -- it stays quiet while the queue is empty, so the first
+# hint would otherwise be a post that did not go out.
+def tell_about_scheduler
+  puts Tui.paint(t('section_scheduler'), :bold)
+  puts
+  puts t('section_scheduler_intro')
+  puts
+  puts Tui.paint("  */15 * * * * #{File.join(ROOT, 'scripts', 'publish-scheduled.sh')}", :green)
+  puts
+  puts Tui.paint(t('scheduler_note'), :dim)
+  puts
+end
+
 def ask_address(site, env, current)
   puts Tui.paint(t('section_address'), :bold)
   puts

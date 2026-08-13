@@ -864,6 +864,12 @@ setup:
   password_skipped: "Bez hesla aplikace. Web funguje, jen nikdy nic neoznámí, dokud ho nedoplníš do env.sh."
 
   section_deploy_intro: "Hotový web je obyčejná složka souborů; tady se vybírá, kam ji ./blog.sh rebuild po každé změně nahraje. Řiď se tím, kde ti web poběží — a jestli to ještě nevíš, nech první možnost. Změnit to jde kdykoli, stačí ./setup.sh spustit znovu."
+  q_page_size: "Kolik postů na jednu stránku výpisu?"
+  h_page_size: "Ptám se jen teď, při prvním nastavení. Stránkování je ukotvené od nejstaršího postu, takže staré stránky se už nemění a uložený odkaz na ně platí napořád — jenže to stojí na tom, že se tohle číslo nemění. Po prvním nasazení by se přečíslovaly všechny hranice a přepsala každá stránka archivu."
+  e_page_size: "Celé číslo větší než nula."
+  section_scheduler: "Plánované publikování"
+  section_scheduler_intro: "Naplánovaný post nevydá ./blog.sh sám od sebe — musí ho někdo v ten čas spustit. Když chceš ./blog.sh schedule používat, přidej si do cronu tenhle řádek (nic se tím nenasazuje, úloha jen kouká, jestli něco dozrálo, a hned končí):"
+  scheduler_note: "Bez toho řádku post počká ve frontě a nikdo ho nevydá. Doctor to pozná, ale až budeš mít něco naplánovaného. Postranní panel má vlastní úlohu, refresh-sidebar.sh — podrobnosti v docs/operations.md."
   q_backend: "Kam má hotový web putovat?"
   backend_none: "Zatím nikam — psát a prohlížet lokálně, rozhodnout se později"
   backend_surfer: "Cloudron Surfer — máš vlastní Cloudron a v něm appku Surfer"
