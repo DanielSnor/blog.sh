@@ -311,6 +311,33 @@ module Doctor
     else
       findings << ok(t('no_network'))
     end
+    findings.concat(check_comments(data, mastodon || bluesky))
+    findings
+  end
+
+  # Moderation has three ways to be configured into silence, and all three
+  # end the same way -- a site whose comments simply stop appearing, with
+  # nothing on the page to say why. Each gets named here instead.
+  def check_comments(data, network)
+    approval = dig(data, 'comments', 'approval').to_s.strip.downcase
+    return [] if approval.empty? || approval == 'off' || approval == 'false'
+
+    # `approval: on` reaches here as "true" -- YAML, not the author. The
+    # value in a plain "unknown value X" message would be one they never
+    # typed, so that case gets named for what it is.
+    return [error(t('approval_boolean'), t('approval_boolean_fix'))] if approval == 'true'
+
+    unless %w[fav favourite favorite].include?(approval)
+      return [error(t('approval_unknown', value: approval), t('approval_unknown_fix'))]
+    end
+
+    # Nothing announces the posts, so no thread exists to approve out of.
+    return [error(t('approval_no_network'), t('approval_no_network_fix'))] unless network
+
+    findings = [ok(t('approval_ok'))]
+    # The comments now arrive by cron. Without it the site keeps whatever
+    # comments.json it last uploaded, forever.
+    findings << warn(t('approval_needs_cron'), t('approval_needs_cron_fix'))
     findings
   end
 
@@ -723,7 +750,27 @@ module Doctor
     end
 
     findings.concat(check_online_network(data))
+    findings.concat(check_online_approval(data))
     findings
+  end
+
+  # Whether the credentials can actually see which replies the author
+  # favourited -- the one moderation failure that looks like success from
+  # every other angle (see PostStats.approval_probe).
+  def check_online_approval(data)
+    approval = dig(data, 'comments', 'approval').to_s.strip.downcase
+    return [] unless %w[fav favourite favorite].include?(approval)
+
+    require_relative 'post_stats'
+    entry = PostStats.entries.max_by { |e| e[:date].to_s }
+    return [warn(t('approval_probe_nothing'))] unless entry
+
+    case PostStats.approval_probe(entry)
+    when :ok then [ok(t('approval_probe_ok'))]
+    else [error(t('approval_probe_blind'), t('approval_probe_blind_fix'))]
+    end
+  rescue StandardError => e
+    [warn(t('approval_probe_failed', message: e.message.to_s.lines.first.to_s.strip))]
   end
 
   def check_online_network(data)

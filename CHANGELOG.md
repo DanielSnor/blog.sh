@@ -203,6 +203,52 @@ which only existed because the bar didn't.
   render undressed. Pressing Enter through any of these sections changes
   nothing -- the current answer is always the default.
 
+- **Only the comments you star, if you want it that way.** Until now a
+  reply written to wound was published like any other, and the only
+  recourse was on the network. `comments.approval: fav` in
+  `config/site.yml` inverts it: a reply appears under the post once you
+  favourite it, from whatever Mastodon or Bluesky client you already
+  have open. There is no queue and no dashboard -- the moderation
+  interface is the app on your phone, and approving is one tap where you
+  were reading anyway. Your own replies need no star, and a reply is
+  shown only when everything between it and the announcement is shown
+  too, so an approved answer never hangs under a rejected question.
+
+  What it costs, in the open:
+  - **It needs `scripts/refresh-sidebar.sh` in cron.** "Did *I*
+    favourite this?" is a question only an authenticated request can
+    ask, and a token cannot be shipped to a browser -- so cron reads the
+    thread and writes `comments.json`, and the page renders from that.
+    Without that job nothing new ever appears.
+  - **On Mastodon the token needs `read:statuses`** as well as
+    `write:statuses`. One without it is not refused; it gets a perfectly
+    good answer with the `favourited` field left out, which would read
+    as "approved nothing". `./blog.sh doctor --online` now says outright
+    whether the token can see your favourites, because that failure
+    looks like success from every other angle. On Bluesky the existing
+    app password is enough.
+  - **A favourite is public** on both networks: approving is also
+    endorsing, and stars handed out over the years count retroactively.
+  - **Approval is not instant** -- one cron interval, or up to a week for
+    a post older than ~90 days, which `./scripts/refresh-sidebar.sh
+    --full` (new) settles on the spot.
+  - **Turning it on hides every existing comment** until you go and star
+    the keepers.
+  - It keeps a reply off the blog. It cannot remove it from the network,
+    where the thread stays public and the post still links to it.
+- **A moderated post makes no third-party request at all.** Reading the
+  thread server-side removes the last one a visitor's browser made: the
+  page's CSP drops its `connect-src` grant to the instance and the
+  comments arrive from the site's own domain. This was the one
+  deliberate exception to "no third-party requests from the visitor's
+  browser", justified by the thread being the live discussion -- which
+  moderation ends, so the exception ends with it. Avatars are still
+  loaded from the instance hosting them; that one is not fixed.
+- `./scripts/refresh-sidebar.sh --full` forces the weekly full pass
+  rather than waiting for it. Useful on its own, and necessary with
+  moderation on: a comment starred under an old post would otherwise
+  wait for that pass.
+
 ### Changed
 
 - **A listing's heading marks what it is instead of saying it twice.**
@@ -307,6 +353,18 @@ which only existed because the bar didn't.
   locale's own yes key, plus the three shipped ones so habits carried
   between languages keep working. A scripted run that piped a whole word
   where a key was asked for has to pipe the key.
+
+- `refresh_sidebar.rb` writes `comments.json` beside `stats.json` while
+  moderation is on, and **deletes it** when moderation is switched off --
+  a file left behind would keep a since-rejected comment readable at a
+  public URL after the page stopped showing it. Both files are merged
+  rather than replaced on every run, so a failed fetch keeps a thread as
+  last published instead of blanking a discussion.
+- `doctor` names the three ways moderation can be configured into
+  silence: an unknown `approval` value, moderation without a network to
+  announce on, and moderation without the cron job that feeds it.
+- The comment count next to a post counts approved replies while
+  moderation is on, so the number and the list under it agree.
 
 ### Fixed
 

@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Regenerates the sidebar widget JSON files (pixelfed.json, toots.json,
-# commits.json, bluesky.json) and announced-post stats (stats.json), and
-# uploads only those to the deploy target -- without rebuilding the
-# whole site. Meant for cron.
+# commits.json, bluesky.json), announced-post stats (stats.json) and --
+# where comments.approval is on -- the approved comments themselves
+# (comments.json), then uploads only those to the deploy target, without
+# rebuilding the whole site. Meant for cron.
 #
 # Usage:
-#   ./scripts/refresh-sidebar.sh
+#   ./scripts/refresh-sidebar.sh [--full]
+#
+# --full does this run's fetch over every announced post rather than just
+# the recent ones. With moderation on, that is how a comment starred
+# under an old post reaches the site without waiting for the weekly pass.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -45,7 +50,7 @@ set +a
 # cron as SUCCESS. A monitored job then sees a clean run forever while
 # the sidebar has not refreshed for weeks.
 code=0
-ruby scripts/refresh_sidebar.rb || code=$?
+ruby scripts/refresh_sidebar.rb "$@" || code=$?
 [ "$code" -eq 3 ] && exit 0
 [ "$code" -ne 0 ] && exit "$code"
 
@@ -60,7 +65,7 @@ ruby scripts/refresh_sidebar.rb || code=$?
 # right here -- so every site configuring fewer than all five widgets
 # regenerated its JSONs and then silently never uploaded them.
 only=""
-for f in pixelfed.json toots.json commits.json bluesky.json rss.json stats.json; do
+for f in pixelfed.json toots.json commits.json bluesky.json rss.json stats.json comments.json; do
   [ -f "public.nosync/$f" ] || continue
   only="${only:+$only,}$f"
 done

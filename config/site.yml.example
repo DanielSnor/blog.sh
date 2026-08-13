@@ -352,6 +352,39 @@ mastodon:
 #   handle: "you.bsky.social"
 #   # pds: "https://bsky.social"   # only for a self-hosted PDS
 
+# Optional. Which replies are published under the article.
+#
+#   off   (default) all of them, read live from the network by the
+#         visitor's browser -- what every site did before this existed.
+#   fav   only the ones you favourite. You star a reply from whatever
+#         Mastodon or Bluesky client you already use, and it appears at
+#         the next cron run; everything else stays on the network and
+#         off the blog. Your own replies are published without starring.
+#
+# What "fav" costs, plainly:
+#   * It needs scripts/refresh-sidebar.sh in cron. "Did *I* favourite
+#     this" is a question only an authenticated request can ask, so the
+#     comments are prepared server-side and served from your own domain
+#     rather than fetched by the visitor. Without that cron nothing new
+#     ever appears. (The upside of the same change: the visitor's
+#     browser stops talking to the network entirely.)
+#   * On Mastodon the token in env.sh needs read:statuses as well as
+#     write:statuses. Reissue it if it predates this.
+#   * Approving is not instant -- up to one cron interval, and for a
+#     post older than ~90 days up to a week unless you run
+#     ./scripts/refresh-sidebar.sh --full.
+#   * A favourite is public on both networks. Anyone can see which
+#     replies you starred, and every reply you have ever starred out of
+#     politeness counts as approved.
+#   * Turning this on hides every existing comment until you go and star
+#     the ones you want kept.
+#   * It keeps replies off your blog. It cannot remove them from the
+#     network, where the thread stays public -- for that you still have
+#     block, mute and report.
+#
+# comments:
+#   approval: fav
+
 # Optional. The times posts usually go out. With this set, [s] in the
 # draft dialog offers the next FREE slot instead of an empty prompt, so
 # three drafts written in one evening go out on three consecutive slots

@@ -6,6 +6,21 @@
   // A post carries exactly one comments network (the build writes either
   // data-toot-url or data-bluesky-uri, never both) -- see
   // comments_attrs in build/build_blog.rb.
+  //
+  // There are two ways the comments under a post can arrive, and the
+  // build says which by putting data-moderated on the container:
+  //
+  //   without it  the live thread, read straight from the network's
+  //               public API -- what every site did before moderation
+  //               existed, and still the default.
+  //   with it     /comments.json, written by cron from the replies the
+  //               author favourited. The browser makes no third-party
+  //               request at all then: "did the author favourite this"
+  //               is an authenticated question, so it cannot be asked
+  //               from here, and the answer arrives already applied.
+  //
+  // Both paths render the same markup, so everything below the fetch is
+  // shared.
 
   function parseTootUrl(url) {
     var m = url.match(/^https?:\/\/([^/]+)\/@[^/]+\/(\d+)/) ||
@@ -20,9 +35,11 @@
   // Counts are read from /stats.json, filled in server-side by cron -- the
   // visitor's browser never talks to the network's API for this at all.
   //
-  // On a post's own page the thread is fetched anyway for the comments, so
-  // the comment count immediately gets overwritten with the live value --
-  // otherwise it could show something different from the list right below it.
+  // On a post's own page the live thread is fetched anyway for the
+  // comments, so the comment count immediately gets overwritten with the
+  // live value -- otherwise it could show something different from the
+  // list right below it. Under moderation there is nothing to reconcile:
+  // both numbers come from the same cron run.
   var threadCounts = {};
 
   function statsKey(el) {
@@ -57,56 +74,93 @@
     if (value) value.textContent = count;
   }
 
-  // --- Mastodon ---------------------------------------------------------
+  // --- rendering --------------------------------------------------------
 
-  // Everything except status.content is escaped: the name, profile URL and
-  // avatar address are set by the reply's author, i.e. anyone in the
-  // Fediverse. status.content itself is HTML sanitized by Mastodon and is
-  // deliberately inserted as HTML -- otherwise comments would be raw markup.
-  function renderComment(status) {
-    var acct = status.account;
-    var name = acct.display_name || acct.username;
-    var favs = status.favourites_count > 0
-      ? ' <span class="comment-favs">❤ ' + esc(status.favourites_count) + '</span>'
+  // Everything except the body is escaped: the name, profile URL and
+  // avatar address are set by the reply's author, i.e. anyone on the
+  // network.
+  //
+  // The body arrives in one of two fields, and the field name is what
+  // says how it may be treated. `html` is Mastodon's own sanitized status
+  // HTML and is deliberately inserted as HTML -- otherwise comments would
+  // be raw markup. `text` is Bluesky's plain text and is escaped here.
+  // Neither is ever guessed at: a payload carrying the wrong one renders
+  // nothing rather than the other one's assumptions.
+  function renderComment(comment) {
+    var favs = comment.favourites > 0
+      ? ' <span class="comment-favs">❤ ' + esc(comment.favourites) + '</span>'
       : '';
+    var body = typeof comment.html === 'string'
+      ? comment.html
+      : esc(comment.text || '').replace(/\n/g, '<br>');
     return (
       '<div class="comment">' +
         // 40x40 is what .comment-avatar is in the stylesheet, said here too
         // so the row is its right height before the picture arrives -- a
         // thread of twenty replies used to shuffle downwards as they landed.
-        '<img class="comment-avatar" src="' + esc(acct.avatar) + '" alt="" width="40" height="40" loading="lazy">' +
+        '<img class="comment-avatar" src="' + esc(comment.avatar) + '" alt="" width="40" height="40" loading="lazy">' +
         '<div class="comment-body">' +
           '<div class="comment-meta">' +
-            '<a href="' + esc(acct.url) + '" target="_blank" rel="noopener">' + esc(name) + '</a>' +
-            ' <a class="comment-date" href="' + esc(status.url) + '" target="_blank" rel="noopener">' + esc(formatDate(status.created_at)) + '</a>' +
+            '<a href="' + esc(comment.author_url) + '" target="_blank" rel="noopener">' + esc(comment.author) + '</a>' +
+            ' <a class="comment-date" href="' + esc(comment.url) + '" target="_blank" rel="noopener">' + esc(formatDate(comment.date)) + '</a>' +
             favs +
           '</div>' +
-          '<div class="comment-content">' + status.content + '</div>' +
+          '<div class="comment-content">' + body + '</div>' +
         '</div>' +
       '</div>'
     );
+  }
+
+  function replyLinkHtml(url, label) {
+    return '<p class="comments-reply"><a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label) + '</a></p>';
+  }
+
+  // The note is not decoration. Someone who replies and then finds
+  // nothing under the article concludes the site is broken and replies
+  // again -- so the page has to say that what it shows is a selection and
+  // where the whole thread is.
+  function render(container, key, replyLink, moderated, comments) {
+    var note = moderated
+      ? '<p class="comments-note">' + esc(i18n.comments_moderated) + '</p>'
+      : '';
+    container.innerHTML = note + replyLink + comments.map(renderComment).join('');
+    applyThreadCount(key, comments.length);
+  }
+
+  // --- Mastodon (live thread) -------------------------------------------
+
+  function mastodonComment(status) {
+    var acct = status.account || {};
+    return {
+      author: acct.display_name || acct.username,
+      author_url: acct.url,
+      avatar: acct.avatar,
+      url: status.url,
+      date: status.created_at,
+      favourites: status.favourites_count,
+      html: status.content
+    };
   }
 
   function loadMastodonThread(container, tootUrl) {
     var parsed = parseTootUrl(tootUrl);
     if (!parsed) return;
 
-    var replyLink = '<p class="comments-reply"><a href="' + esc(tootUrl) + '" target="_blank" rel="noopener">' + esc(i18n.reply_on_mastodon) + '</a></p>';
+    var replyLink = replyLinkHtml(tootUrl, i18n.reply_on_mastodon);
     var apiUrl = 'https://' + parsed.instance + '/api/v1/statuses/' + parsed.id + '/context';
 
     fetch(apiUrl)
       .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
       .then(function (ctx) {
         var replies = (ctx.descendants || []).filter(function (s) { return !s.sensitive; });
-        container.innerHTML = replyLink + replies.map(renderComment).join('');
-        applyThreadCount(tootUrl, replies.length);
+        render(container, tootUrl, replyLink, false, replies.map(mastodonComment));
       })
       .catch(function () {
         container.innerHTML = replyLink;
       });
   }
 
-  // --- Bluesky ----------------------------------------------------------
+  // --- Bluesky (live thread) --------------------------------------------
 
   // Replies arrive as a tree; flatten depth-first so a sub-conversation
   // stays grouped under the reply that started it. Placeholders for
@@ -127,39 +181,46 @@
     return 'https://bsky.app/profile/' + post.author.handle + '/post/' + rkey;
   }
 
-  // Bluesky reply text is plain text (not sanitized HTML like Mastodon's),
-  // so it's escaped wholesale; newlines become <br>.
-  function renderBlueskyComment(post) {
+  function blueskyComment(post) {
     var author = post.author || {};
-    var name = author.displayName || author.handle;
-    var favs = post.likeCount > 0
-      ? ' <span class="comment-favs">❤ ' + esc(post.likeCount) + '</span>'
-      : '';
-    return (
-      '<div class="comment">' +
-        '<img class="comment-avatar" src="' + esc(author.avatar) + '" alt="" width="40" height="40" loading="lazy">' +
-        '<div class="comment-body">' +
-          '<div class="comment-meta">' +
-            '<a href="' + esc('https://bsky.app/profile/' + author.handle) + '" target="_blank" rel="noopener">' + esc(name) + '</a>' +
-            ' <a class="comment-date" href="' + esc(blueskyPostUrl(post)) + '" target="_blank" rel="noopener">' + esc(formatDate(post.record.createdAt)) + '</a>' +
-            favs +
-          '</div>' +
-          '<div class="comment-content">' + esc(post.record.text).replace(/\n/g, '<br>') + '</div>' +
-        '</div>' +
-      '</div>'
-    );
+    return {
+      author: author.displayName || author.handle,
+      author_url: 'https://bsky.app/profile/' + author.handle,
+      avatar: author.avatar,
+      url: blueskyPostUrl(post),
+      date: post.record.createdAt,
+      favourites: post.likeCount,
+      text: post.record.text
+    };
   }
 
   function loadBlueskyThread(container, uri, humanUrl) {
-    var replyLink = '<p class="comments-reply"><a href="' + esc(humanUrl) + '" target="_blank" rel="noopener">' + esc(i18n.reply_on_bluesky) + '</a></p>';
+    var replyLink = replyLinkHtml(humanUrl, i18n.reply_on_bluesky);
     var apiUrl = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?depth=10&uri=' + encodeURIComponent(uri);
 
     fetch(apiUrl)
       .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
       .then(function (data) {
         var replies = flattenBlueskyReplies(data.thread && data.thread.replies, []);
-        container.innerHTML = replyLink + replies.map(renderBlueskyComment).join('');
-        applyThreadCount(uri, replies.length);
+        render(container, uri, replyLink, false, replies.map(blueskyComment));
+      })
+      .catch(function () {
+        container.innerHTML = replyLink;
+      });
+  }
+
+  // --- moderated (same-origin) ------------------------------------------
+
+  // Fails closed, and on purpose. A missing or unreadable comments.json
+  // means this page cannot tell approved replies from the rest, and the
+  // whole point of moderation is that the ones it cannot vouch for do not
+  // appear. The reply link stays either way, so the discussion is always
+  // one click away even when nothing renders.
+  function loadApproved(container, key, replyLink) {
+    fetch('/comments.json')
+      .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
+      .then(function (all) {
+        render(container, key, replyLink, true, all[key] || []);
       })
       .catch(function () {
         container.innerHTML = replyLink;
@@ -189,7 +250,13 @@
 
     var tootUrl = container.getAttribute('data-toot-url');
     var bskyUri = container.getAttribute('data-bluesky-uri');
-    if (tootUrl) {
+    var moderated = container.hasAttribute('data-moderated');
+
+    if (tootUrl && moderated) {
+      loadApproved(container, tootUrl, replyLinkHtml(tootUrl, i18n.reply_on_mastodon));
+    } else if (bskyUri && moderated) {
+      loadApproved(container, bskyUri, replyLinkHtml(container.getAttribute('data-bluesky-url'), i18n.reply_on_bluesky));
+    } else if (tootUrl) {
       loadMastodonThread(container, tootUrl);
     } else if (bskyUri) {
       loadBlueskyThread(container, bskyUri, container.getAttribute('data-bluesky-url'));

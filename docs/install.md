@@ -497,6 +497,51 @@ announcement (logged, not an error).
    and hashtags clickable. Comments are read from Bluesky's public
    AppView by the visitor's browser -- no token involved on the page.
 
+**Optional: publish only the replies you star.**
+
+By default every reply to the announcement appears under the article.
+`comments.approval: fav` in `config/site.yml` changes that to: a reply
+appears once *you* favourite it, from whatever Mastodon or Bluesky
+client you already use. Your own replies need no star. Everything else
+stays on the network and off the blog.
+
+```yaml
+comments:
+  approval: fav      # or "off" (the default)
+```
+
+Three things have to be true for it to work, and `./blog.sh doctor`
+(add `--online` for the token check) says so when they aren't:
+
+1. **`scripts/refresh-sidebar.sh` has to be in cron** (see
+   [operations.md](operations.md#cron-sidebar-widgets-and-post-stats)).
+   "Did *I* favourite this?" is a question only an authenticated request
+   can ask, and the token can't be shipped to a browser -- so cron reads
+   the thread and writes `public/comments.json`, and the page renders
+   from that. Without that cron job nothing new ever appears.
+2. **On Mastodon the token needs `read:statuses`** alongside
+   `write:statuses`. Reissue it under Preferences → Development if yours
+   predates this: a token without it gets a perfectly good answer with
+   the `favourited` field left out of it, which reads as "approved
+   nothing". On Bluesky the existing app password is enough.
+3. **You have to go and star the comments worth keeping.** Turning this
+   on hides everything already published until you do.
+
+Worth knowing before switching it on:
+
+- Approval is not instant -- up to one cron interval, and for a post
+  older than ~90 days up to a week, since old posts are only refreshed
+  occasionally. `./scripts/refresh-sidebar.sh --full` does it now.
+- A favourite is public on both networks. Anyone can see which replies
+  you starred, and replies starred in the past count as approved.
+- The side effect nobody asks for and everybody gets: with the thread
+  already read server-side, the visitor's browser stops contacting the
+  network at all, and the page's CSP drops its `connect-src` grant to
+  it. Avatars are still loaded from the instance hosting them.
+- It keeps replies off the blog. It cannot remove them from the network,
+  where the thread stays public and this site still links to it. Block,
+  mute and report remain the tools for that.
+
 ## 9. Updating the engine
 
 ```bash

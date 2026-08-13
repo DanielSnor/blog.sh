@@ -42,16 +42,56 @@ puts Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))
 # it there, but it lives alongside .deploy_manifest.json for consistency),
 # so it survives a restart.
 STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
+COMMENTS_PATH = File.join(PUBLIC_DIR, 'comments.json')
 FULL_REFRESH_PATH = File.join(ROOT, '.stats_full_refresh_at')
 FULL_REFRESH_INTERVAL = 7 * 24 * 60 * 60 # 1 week
 
+# --full forces the weekly pass now. It exists for moderation: starring a
+# reply under a post older than PostStats::RECENT_WINDOW_DAYS would
+# otherwise reach the site whenever that pass next came round -- up to a
+# week of wondering why an approved comment isn't showing.
+force_full = ARGV.include?('--full')
 last_full_refresh = File.exist?(FULL_REFRESH_PATH) ? File.read(FULL_REFRESH_PATH).to_f : 0
-full_refresh = (Time.now.to_f - last_full_refresh) >= FULL_REFRESH_INTERVAL
+full_refresh = force_full || (Time.now.to_f - last_full_refresh) >= FULL_REFRESH_INTERVAL
 
-previous = File.exist?(STATS_PATH) ? (JSON.parse(File.read(STATS_PATH)) rescue {}) : {}
+def previous_json(path)
+  return {} unless File.exist?(path)
+
+  JSON.parse(File.read(path))
+rescue StandardError
+  {}
+end
+
+previous_stats = previous_json(STATS_PATH)
+previous_comments = previous_json(COMMENTS_PATH)
 fetched = PostStats.fetch_all(recent_only: !full_refresh)
-File.write(STATS_PATH, previous.merge(fetched).to_json)
+
+stats = previous_stats.merge(fetched.transform_values { |result| result['stats'] })
+File.write(STATS_PATH, stats.to_json)
 File.write(FULL_REFRESH_PATH, Time.now.to_f.to_s) if full_refresh
 
-puts "stats.json: #{fetched.size} post(s) updated (#{previous.merge(fetched).size} total)" \
+puts "stats.json: #{fetched.size} post(s) updated (#{stats.size} total)" \
      "#{full_refresh ? ' [full refresh]' : ' [last ~90 days only]'}"
+
+# comments.json exists only while moderation is on -- with it off the
+# browser reads the live thread itself, and a copy nothing renders is
+# waste. Deleting it when moderation is switched back off is the part
+# that matters: a stale file left behind would keep a since-rejected
+# comment readable at a public URL long after the page stopped showing
+# it.
+if PostStats.approval.nil?
+  if File.exist?(COMMENTS_PATH)
+    File.delete(COMMENTS_PATH)
+    puts 'comments.json: removed (comments.approval is off)'
+  end
+else
+  # Merged, never replaced, exactly like the stats above: a post whose
+  # fetch failed this run -- an instance down, a token that lost its read
+  # scope -- keeps the comments it last published, instead of one bad
+  # request blanking a whole discussion.
+  approved = fetched.reject { |_key, result| result['comments'].nil? }
+  comments = previous_comments.merge(approved.transform_values { |result| result['comments'] })
+  File.write(COMMENTS_PATH, comments.to_json)
+  puts "comments.json: #{approved.size} thread(s) updated, " \
+       "#{comments.values.sum { |list| Array(list).size }} approved comment(s) total"
+end

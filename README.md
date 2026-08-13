@@ -77,7 +77,9 @@ deploy step around exactly that. A few of the choices that came out of it:
   replies to that announcement *are* the comments. The client fetches
   the thread from the network's public API at render time -- no database
   of comments to moderate or migrate, and the "comment count" next to a
-  post is just the reply count on its announcement.
+  post is just the reply count on its announcement. Optionally, only the
+  replies you favourite are published (`comments.approval: fav`) -- the
+  moderation interface is the app on your phone.
 - **Deploys default to paranoid.** `scripts/deploy-web.sh` diffs a SHA-256 +
   size + mtime manifest so it only ships what changed, and refuses to
   proceed if the file count or the total bytes swing too far versus the last
@@ -174,6 +176,13 @@ auto-announced on Mastodon *or* Bluesky -- exactly one network per site
 browser fetches the thread from the network's own public API, so there is
 no comment database to moderate, migrate or back up, and the reply, like
 and boost counts shown next to a post are that announcement's.
+
+Where an open thread isn't wanted, `comments.approval: fav` publishes
+only the replies you favourite -- you star one from whatever client you
+already use and it appears at the next cron run; the rest stays on the
+network. Off by default, and honest about what it costs: a favourite is
+public, approval takes a cron interval, and it keeps a reply off the
+blog without touching it on the network.
 → [install.md → Comments network](docs/install.md#8-comments-network-optional-mastodon-or-bluesky)
 
 **Sidebar widgets.** Latest toots, Bluesky posts, Pixelfed posts, GitHub

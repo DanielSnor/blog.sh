@@ -1170,6 +1170,11 @@ aside .card { margin-bottom: 1.5rem; }
 
 .comments-reply { margin: 0 0 1rem; }
 
+/* Only rendered where comments.approval is on -- it tells a reader that
+   what follows is a selection, so an answer that isn't there doesn't read
+   as the site having eaten it. */
+.comments-note { margin: 0 0 0.5rem; color: var(--meta-text); font-size: 0.85rem; }
+
 .comment {
   display: flex;
   gap: 0.75rem;

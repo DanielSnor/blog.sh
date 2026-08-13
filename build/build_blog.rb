@@ -214,6 +214,9 @@ MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 FEDIVERSE_CREATOR = fediverse_creator
 # Also enforces the mastodon/bluesky exclusivity right at build time.
 COMMENT_NETWORK = SiteConfig.comment_network
+# :fav means cron prepares the comments and the page reads them from this
+# origin, so the markup, the policy and the client all change together.
+COMMENTS_APPROVAL = SiteConfig.comments_approval
 
 # The color palette and the generated stylesheet live in
 # lib/colors_css.rb, shared with ./style.sh -- its palette preview must
@@ -236,6 +239,7 @@ def client_i18n_json
     stats_comments: t('js.stats_comments'),
     reply_on_mastodon: t('js.reply_on_mastodon'),
     reply_on_bluesky: t('js.reply_on_bluesky'),
+    comments_moderated: t('js.comments_moderated'),
     results_one: t('js.results_one'),
     results_few: t('js.results_few'),
     results_many: t('js.results_many'),
@@ -283,12 +287,19 @@ CLIENT_I18N_SCRIPT_HASH = "'sha256-#{Digest::SHA256.base64digest(CLIENT_I18N_SCR
 # refused by the browser: comments silently gone, with nothing in the build
 # to say so. The comment at post_stats_html claims posts survive a switch;
 # this is what makes that true.
+#
+# With comments.approval on, none of the comment origins are granted at
+# all: cron has already read the thread and the page fetches its comments
+# from here. That is the last third-party *data* request a visitor's
+# browser made, so moderation quietly tightens the policy for the whole
+# site. (Avatars are still loaded from wherever their instance hosts
+# them, under img-src -- see docs/decisions.md.)
 def csp_content(frame_origins = [], comment_origins = [])
   analytics_origin = ANALYTICS && ANALYTICS['src'] ? URI.parse(ANALYTICS['src']) : nil
   analytics_origin &&= "#{analytics_origin.scheme}://#{analytics_origin.host}"
-  mastodon_origin = MASTODON_INSTANCE ? "https://#{MASTODON_INSTANCE}" : nil
+  mastodon_origin = MASTODON_INSTANCE && COMMENTS_APPROVAL.nil? ? "https://#{MASTODON_INSTANCE}" : nil
   # Bluesky threads are read from the public AppView, no auth involved.
-  bluesky_origin = COMMENT_NETWORK == :bluesky ? 'https://public.api.bsky.app' : nil
+  bluesky_origin = COMMENT_NETWORK == :bluesky && COMMENTS_APPROVAL.nil? ? 'https://public.api.bsky.app' : nil
 
   script_src = ["'self'", CLIENT_I18N_SCRIPT_HASH, analytics_origin].compact.join(' ')
   connect_src = (["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact +
@@ -1197,10 +1208,13 @@ def post_stats_html(post)
 end
 
 def comments_attrs(post)
+  # data-moderated switches the client from reading the live thread to
+  # reading /comments.json -- see the header of assets/js/comments.js.
+  moderated = COMMENTS_APPROVAL ? ' data-moderated' : ''
   if post['mastodon_url']
-    %( data-toot-url="#{h(post['mastodon_url'])}")
+    %( data-toot-url="#{h(post['mastodon_url'])}"#{moderated})
   elsif post['bluesky_uri']
-    %( data-bluesky-uri="#{h(post['bluesky_uri'])}" data-bluesky-url="#{h(post['bluesky_url'])}")
+    %( data-bluesky-uri="#{h(post['bluesky_uri'])}" data-bluesky-url="#{h(post['bluesky_url'])}"#{moderated})
   end
 end
 
@@ -1687,6 +1701,11 @@ end
 # Embed.frame_origins_for -- a property of the posts on the page, not of
 # the engine's current configuration.
 def comment_origins_for(posts)
+  # Moderated comments come from this origin whatever instance a post was
+  # announced on, so the per-post grant that exists to survive a network
+  # switch has nothing left to allow.
+  return [] unless COMMENTS_APPROVAL.nil?
+
   Array(posts).filter_map do |post|
     next unless post.is_a?(Hash)
 

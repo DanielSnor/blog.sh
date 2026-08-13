@@ -102,6 +102,51 @@ presence on the chosen network, and deleting the announcement deletes
 the discussion (which `unpublish` does deliberately, to never leave an
 announcement pointing at a dead URL).
 
+**Moderation, where there is any, is a star on the reply -- and it is
+off by default.** The engine had no answer to a reply written to wound:
+the thread was published whole, and the only recourse was on the
+network. `comments.approval: fav` inverts it -- a reply appears under
+the article once the author favourites it, from whatever client they
+already have on their phone. No queue, no dashboard, no second identity
+system: the moderation interface is the social app the comments already
+live in, and the approval is one tap in the place you were reading
+anyway. Two rules keep the result readable rather than merely filtered:
+the author's own replies need no star (nobody stars themselves, and
+without it half of every exchange would vanish), and a reply is only
+shown if everything between it and the announcement is shown too (an
+approved answer to a rejected comment answers nothing).
+
+*Costs, and they are real:*
+- **A favourite is public**, on both networks. Approving is also
+  endorsing in the eyes of anyone who looks, and every star handed out
+  over the years is retroactively an approval. A private signal
+  (Mastodon bookmarks, Bluesky's saved posts) would not carry that, and
+  is the obvious second mode if this one chafes.
+- **Comments stop being live.** Which is the whole reason the engine
+  ever let the visitor's browser talk to a third party: "the actual live
+  discussion" was the justification for the one exception to
+  *no third-party requests* below. Under moderation that justification
+  is gone -- the page shows a curated subset either way -- so the
+  exception goes with it. Cron writes `comments.json` and the page reads
+  it from its own origin. The visitor's browser makes no third-party
+  *data* request at all then, and the CSP loses the `connect-src` grant
+  to the network. Avatars are still `<img>` to whatever host serves
+  them; mirroring those is a separate job with its own disk and pruning
+  questions, and until it is done "no third-party requests" is true of
+  data and not of images.
+- **The engine now stores other people's words.** Modestly: only what
+  was approved, rewritten from the source on every cron run, with no
+  interface that can edit it -- a cache, not a database. But the claim
+  above, that there is nothing to moderate or migrate, holds only while
+  this is off, and a deletion at the source takes a cron interval to
+  follow.
+- **Turning it on hides every existing comment** until the author goes
+  and stars the ones worth keeping. Which is why the default is off and
+  why it stays a per-site decision.
+- **It is not a defence, it is a filter.** The reply still stands on the
+  network, under an announcement this site links to. Block, mute and
+  report are still the only things that touch it there.
+
 **Everything starts as a draft, and drafts live on the public site
 behind a `SecureRandom` token with `noindex`.** The whole point is
 previewing from a phone or sending the link to a reviewer before
@@ -382,11 +427,14 @@ nowhere, GitHub's rate limit can't kill the sidebar, and a slow third
 party can't slow the page. Two exceptions are deliberate, and naming
 both matters -- an unlisted one reads later like an oversight somebody
 should "fix". The first is the comments thread, fetched client-side
-because it is the actual live discussion. The second is an analytics
-script, for a site that asks for one: `analytics:` is absent by
-default, nothing is added to any page without it, and the policy names
-that origin only while the section exists. Fonts are self-hosted for
-the same reason as the rest.
+because it is the actual live discussion -- and that one lapses the
+moment `comments.approval` is on, since a moderated thread is no longer
+live and cron has read it already (see *Publishing and comments*).
+Avatars in comments remain hotlinked either way. The second is an
+analytics script, for a site that asks for one: `analytics:` is absent
+by default, nothing is added to any page without it, and the policy
+names that origin only while the section exists. Fonts are self-hosted
+for the same reason as the rest.
 
 **CSP without `unsafe-inline`, delivered as a meta tag.** The single
 inline script (client i18n strings) is allowlisted by its SHA-256

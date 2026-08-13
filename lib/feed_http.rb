@@ -46,7 +46,17 @@ module FeedHttp
   # whole archive -- lib/import/feed.rb pulls entire WXR exports through
   # this same method, and a cap sized for a sidebar widget aborted those
   # imports at the door.
-  def get(url, redirects_left = MAX_REDIRECTS, deadline = now + TOTAL_TIMEOUT, max_body: MAX_BODY)
+  #
+  # bearer:/headers: are for the one caller that has to identify itself.
+  # Comment moderation asks each network "did *I* favourite this reply?",
+  # and both answer only an authenticated request -- Mastodon with a
+  # token, Bluesky with a session JWT plus the header that routes an
+  # app.bsky.* call through the PDS to the AppView (see lib/post_stats.rb).
+  # Both are dropped when a redirect leaves the host they were meant for:
+  # a Location is chosen by the remote, and following one with the
+  # credentials still attached would hand them to whatever host it names.
+  def get(url, redirects_left = MAX_REDIRECTS, deadline = now + TOTAL_TIMEOUT, max_body: MAX_BODY,
+          bearer: nil, headers: {})
     remaining = deadline - now
     raise "timed out after #{TOTAL_TIMEOUT}s (#{url})" if remaining <= 0
 
@@ -54,6 +64,8 @@ module FeedHttp
     req = Net::HTTP::Get.new(uri)
     req['User-Agent'] = USER_AGENT
     req['Accept'] = 'application/json, application/atom+xml, */*'
+    req['Authorization'] = "Bearer #{bearer}" unless bearer.to_s.empty?
+    headers.each { |name, value| req[name.to_s] = value.to_s }
 
     body = nil
     res = Timeout.timeout(remaining, nil, "timed out after #{TOTAL_TIMEOUT}s (#{url})") do
@@ -89,7 +101,9 @@ module FeedHttp
       target = URI.join(url, res['location'])
       raise "refusing a #{target.scheme.inspect} redirect (#{url})" unless %w[http https].include?(target.scheme)
 
-      get(target.to_s, redirects_left - 1, deadline, max_body: max_body)
+      same_host = target.host == uri.host && target.scheme == uri.scheme && target.port == uri.port
+      get(target.to_s, redirects_left - 1, deadline, max_body: max_body,
+                       bearer: same_host ? bearer : nil, headers: same_host ? headers : {})
     else
       raise "HTTP #{res.code} (#{url})"
     end

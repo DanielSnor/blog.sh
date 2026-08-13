@@ -580,6 +580,25 @@ network hiccup never blanks the sidebar. Systems without cron: a
 systemd timer or launchd job invoking the same script does the same
 thing. No widgets configured = no cron needed.
 
+**With `comments.approval: fav` this job stops being optional.** It is
+what reads which replies you favourited and writes `comments.json`, so
+without it a newly starred comment never reaches the site -- the pages
+keep whatever was uploaded last. The same "keeps the last known
+content" rule applies and matters more here: a failed fetch leaves the
+thread as last published rather than blanking a discussion.
+
+Two timings to know. A comment starred under a recent post appears at
+the next run, so within the cron interval. Under a post older than ~90
+days it waits for the weekly full pass -- run
+
+```
+./scripts/refresh-sidebar.sh --full
+```
+
+to do that pass now instead. And switching moderation back off deletes
+`comments.json` on the next run, so a rejected comment doesn't stay
+readable at a public URL after the page stops showing it.
+
 A second, optional job publishes scheduled drafts
 (`./blog.sh schedule`) once their date arrives -- it exits immediately
 when nothing is due, so a tight interval costs nothing:
@@ -679,6 +698,9 @@ whole), but restoring from the archive itself is exact.
 | `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer UI and update `SURFER_TOKEN`. |
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
 | `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
+| Every comment disappeared after turning on `comments.approval` | Expected until you star them: moderation publishes only favourited replies, and nothing was favourited yet. If starring changes nothing either, run `./blog.sh doctor --online` -- a Mastodon token without `read:statuses` gets an answer with the `favourited` field missing and approves nothing. |
+| A comment you starred still isn't on the site | It arrives with the next `refresh-sidebar.sh` run. Under a post older than ~90 days it waits for the weekly full pass -- `./scripts/refresh-sidebar.sh --full` does it now. Check the cron job is actually installed; with moderation on, nothing else publishes comments. |
+| `comments.approval is on but MASTODON_ACCESS_TOKEN is not set` | The cron run refused to publish rather than emptying every thread on the site. The pages keep their last known comments until the token is there. Same for `BLUESKY_APP_PASSWORD` on a Bluesky site. |
 | Sidebar widget disappeared from the page | Its fetch returned nothing repeatedly (`refresh-sidebar` logs say which) -- the widget card hides when its JSON is empty/unreachable. Check the instance/feed URL in `config/site.yml`. |
 | `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues, and a copy already uploaded stays on the site rather than being pruned, so the page keeps working until you fix it. |
 | `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |
