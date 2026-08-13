@@ -622,3 +622,29 @@ which resolve against a post's media directory or need more width than
 a 260px sidebar has), so a table pasted into a bio renders as a
 paragraph of pipes rather than a table. And the passthrough means a
 typo in hand-written HTML still reaches the page, exactly as before.
+
+**Keyboard focus is one ring for the whole site, not a design per
+control.** The alternative was to give each control its own indicator,
+matched to the ground it sits on. One ring is easier to recognise -- a
+reader learns what "you are here" looks like once -- and it is one rule
+to keep in step instead of a dozen. Where the ring has to move inside
+the control it is because the ground outside it is not something the
+stylesheet can vouch for (a banner photograph, the lightbox's black) or
+is the accent the ring is drawn in (the active menu item, the date
+badge), not because those controls wanted a look of their own. *Cost:*
+the ring is the accent, and it is not derived from what is behind it --
+a palette whose accent sits close to its card background gets a quiet
+ring on the page body, and a skin that repaints a control's ground has
+to look at the ring itself rather than getting a new one for free.
+
+**Reduced motion is answered with one blanket rule, not a list of the
+things that move.** `prefers-reduced-motion` switches off transitions
+and animations for everything, rather than naming the declarations that
+actually carry movement -- and most of the engine's do not, they fade a
+colour. A list would be more precise on the day it was written and
+wrong on the first day somebody added a rule and did not think of it,
+which is exactly the kind of upkeep a preference like this cannot
+depend on. *Cost:* a skin's own transitions go off with the engine's,
+whether or not they move anything, and an animation a site genuinely
+needs under that preference (a loading indicator that means something)
+has to ask for itself back in its own media query.

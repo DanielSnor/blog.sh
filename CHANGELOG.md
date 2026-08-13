@@ -295,6 +295,35 @@ byte-for-byte against the previous build.
   expressed there, and `hero` was in neither place. Opening an opted-out
   post in the editor silently gave it back the site's answer. It is a
   frontmatter attribute now, next to `pinned`.
+- **Keyboard focus can be seen again.** The stylesheet had nothing to say
+  about focus -- not one `:focus` rule in eleven hundred lines -- so a
+  reader moving through a page with Tab got whatever the browser draws by
+  default: a thin ring in the browser's own colour, landing on grounds it
+  was never picked for. On the four controls this engine draws itself it
+  was as good as invisible -- the appearance toggle is a saturated fill on
+  a photograph, the magnifier sits inside the search box, the hamburger and
+  the back-to-top button carry the menu bar's own shade. There is one ring
+  for the whole site now, in the accent, held 2px clear of the control so
+  it reads as a ring around it rather than a border on it. It goes inside
+  the control, in white, wherever a ring around it would land on something
+  this stylesheet cannot vouch for -- the banner photograph, the lightbox's
+  black -- or on the accent itself, which is what the listing you are
+  already in and the date badge are filled with right to their edge. Menu
+  items take it inside for a third reason: they stand 5px proud of the bar
+  at top and bottom, so a ring around one would start outside the bar. It
+  is `:focus-visible` rather than `:focus`, so a mouse click leaves nothing
+  behind -- the pointer has already said where the click went, and a ring
+  that outlives it is why so many sites turn focus off altogether.
+- **The site holds still for a reader who asked it to.** Nothing consulted
+  `prefers-reduced-motion`, the setting a phone or a Mac offers under
+  "reduce motion" and the one thing a reader who gets motion sickness from
+  a moving page can do about it. Every hover faded, and the back-to-top
+  button scrolled the whole page past them to get there. Both are off for
+  anyone who has asked: the transitions collapse to nothing and the button
+  puts them at the top rather than travelling there. The scroll had to be
+  handled in JavaScript, where it is asked for -- `scroll-behavior` in CSS
+  governs only the scrolling the browser decides on. Nothing changes for a
+  reader who has not asked.
 
 ### Upgrading
 

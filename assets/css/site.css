@@ -61,6 +61,72 @@ body {
   color: var(--text);
 }
 
+/* Keyboard focus, for the whole site in one rule. Until this block the
+   stylesheet said nothing about focus at all, which left every control
+   wearing the browser's own outline -- a thin ring in the browser's colour,
+   drawn on whatever ground the control happens to sit on. On the buttons
+   this site draws itself (appearance, back to top, the hamburger, search)
+   that ground is a saturated fill or a photograph, and the default ring
+   goes to work against it. So: the accent, which is already the colour
+   this site uses to say "this one", held 2px off the control so it reads
+   as a ring around it rather than a border on it.
+
+   :focus-visible rather than :focus, so a mouse click leaves nothing
+   behind. The pointer has already shown the reader where the click went;
+   a ring that outlives it is the reason so many sites turn focus off
+   altogether, and turning it off is what strands the keyboard. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Four controls the ring goes INSIDE instead of around, each for its own
+   reason -- and in every one of them the reason is that the ground just
+   outside the control is not something this stylesheet can vouch for.
+
+   The appearance toggle sits on a photograph and the lightbox controls on
+   a near-black overlay, so nothing can be assumed about what is behind
+   them. Plenty is known about what is inside them, though: an accent fill
+   under a white glyph, a pale disc under a white one. Both already carry
+   white as their own foreground, so the ring moves in and borrows it --
+   as readable as the label it belongs to, whatever the picture underneath
+   is doing. */
+#theme-toggle:focus-visible,
+.lightbox-close:focus-visible,
+.lightbox-nav:focus-visible {
+  outline-color: #ffffff;
+  outline-offset: -3px;
+}
+
+/* The banner link is the width of the page, and below 940px that is the
+   width of the window -- so a ring held 2px off it would have its left and
+   right sides drawn past the window edge and clipped away, leaving two
+   stray horizontals. (It would not scroll the page sideways: an outline is
+   ink, and ink overflow doesn't reach the scroll box. It would simply be
+   half a ring.) */
+.banner-link:focus-visible { outline-offset: -3px; }
+
+/* Nav items are 70px boxes in a 60px bar -- the 5px they stand proud top
+   and bottom is what lets a hovered link paint over the bar's own frame
+   (see nav li above). A ring around that box therefore starts outside the
+   bar, in the banner above it and the border below. Inside, it lands on
+   the item and reads as the same rectangle the active item wears filled. */
+nav a:focus-visible { outline-offset: -3px; }
+
+/* Two more accent-on-accent cases, where the base rule would draw the ring
+   in the exact colour of the ground it lands on and quietly do nothing:
+   the item whose listing you are already in, filled with the accent, and
+   the date badge, which is accent all the way to its edge with the link
+   filling it. Both take white -- the colour each already prints its own
+   text in. The badge holds its ring a further pixel in, so the corners
+   stay clear of the 4px radius rather than crossing it. */
+nav a[aria-current="page"]:focus-visible { outline-color: #ffffff; }
+
+.date-badge a:focus-visible {
+  outline-color: #ffffff;
+  outline-offset: -1px;
+}
+
 .wrap {
   max-width: 940px;
   margin: 30px auto;
@@ -1122,3 +1188,37 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 .file-label { display: block; font-size: 0.9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-sub { display: block; font-size: 0.75rem; margin-top: 0.15rem; color: var(--meta-text); }
 .file-arrow { flex: 0 0 auto; width: 18px; height: 18px; opacity: 0.5; }
+
+/* A reader who has asked the system for less movement gets the site with
+   its fades taken out. Most of what this switches off is colour -- the
+   fourteen `transition` declarations above, all but one of them the same
+   0.3s, nearly all of them a hover changing a background or a link
+   changing shade -- and colour on its own is not what the preference is
+   about. But `transition` with no property named animates every property
+   that changes, so the same declarations also carry the movement: the
+   appearance toggle changing width as its label goes from one glyph to
+   three, a nav item's borders arriving, a card's frame growing into
+   place. Naming which of the fourteen move and which only recolour would
+   be a list that goes stale the first time somebody adds a fifteenth, so
+   the whole set goes.
+
+   0.01ms rather than `none` because a duration of zero is still a
+   transition: it runs and it finishes, so anything that ever waits for
+   transitionend still gets its event. Nothing in assets/js does today.
+
+   Written last so it beats every rule above it on source order alone --
+   the !important is there for the shorthands, which would otherwise
+   re-set the duration they carry.
+
+   What this cannot reach is the one piece of genuine movement on the
+   site: the back-to-top button scrolls the page under the reader. That is
+   asked for in JavaScript (`behavior: 'smooth'`), and CSS scroll-behavior
+   does not govern a programmatic scroll -- so scroll-top.js reads the
+   preference itself. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
