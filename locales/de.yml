@@ -416,6 +416,7 @@ cli:
   versions_none: "Dieser Beitrag hat noch keine frühere Fassung -- bei jeder Bearbeitung wird eine abgelegt."
   versions_heading: "Was der Beitrag %{slug} vor den letzten Speicherungen sagte:"
   versions_media_note: "Nur der Text kommt zurück; Bilder werden nicht versioniert, eine alte Fassung des Beitrags kann also eines erwähnen, das er nicht mehr hat."
+  versions_menu_hint: "↑↓ bewegen · Enter Fassung wiederherstellen · Esc zurück"
   versions_prompt: "Welche Version wiederherstellen? [1-%{count}, Enter bricht ab]: "
   versions_unknown: "Keine Fassung mit dieser Nummer."
   versions_confirm: "Der aktuelle Text wird ebenfalls als Fassung abgelegt, das ist also umkehrbar. Tippe \"%{word}\" zum Wiederherstellen: "

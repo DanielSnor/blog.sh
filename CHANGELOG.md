@@ -211,6 +211,24 @@ byte-for-byte against the previous build.
   lines of explanation. The sections are also in the order the page reads
   now, the order its own header had been describing since before `layout`,
   `seo` and `nav` were added in the middle of the appearance ones.
+- **The publishing queue comes back to the post you just moved.** Moving a
+  post several slots means pressing `[u]` several times, and the queue used
+  to reopen on the first row after every one of them, so each slot cost
+  another walk down the list to find the post again. The cursor now returns
+  to the post it acted on -- by name, not by row number: `[u]` and `[d]`
+  trade the post's place with its neighbour's, so its old row now holds a
+  different post, and coming back by number would carry off the wrong one
+  on the next keypress. A post that has *left* the queue (published with
+  `[p]`, returned to drafts with `[n]`) leaves the cursor on its old place,
+  which is where the post behind it has just moved up to.
+- **Restoring an earlier version is a list you walk, not a number you
+  type.** Every other list in the wizard -- the queue, the old addresses,
+  the tags, the posts themselves -- is an arrow menu in a terminal and a
+  numbered list only when piped. This screen asked for a number even in a
+  terminal, so an arrow key landed in the prompt as `^[[B`. It now behaves
+  like the rest, and keeps the numbered prompt for piped input the way they
+  all do. The note about images not being versioned moved above the list,
+  where it is read before the choosing rather than after it.
 
 ### Fixed
 

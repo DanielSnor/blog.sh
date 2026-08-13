@@ -1393,9 +1393,12 @@ end
 # Row selection, in both faces the pickers already have: the arrow-key
 # menu in a terminal, a numbered list plus a read line when piped -- so
 # the queue stays scriptable the same way everything else is.
-def queue_pick(entries)
+#
+# `initial:` is where the cursor opens. Piped input ignores it, the same
+# way it ignores every other cursor: there the row is named by number.
+def queue_pick(entries, initial: 0)
   rows = entries.each_with_index.map { |entry, i| queue_row(entry, i) }
-  return Tui.menu(rows, hint: t('cli.queue_menu_hint')) if Tui.interactive?
+  return Tui.menu(rows, hint: t('cli.queue_menu_hint'), initial: initial) if Tui.interactive?
 
   rows.each { |row| puts "  #{row}" }
   puts
@@ -1413,6 +1416,7 @@ end
 # each.
 def cmd_queue
   dirty = false
+  focus = nil
   loop do
     entries = queue_entries
     if entries.empty?
@@ -1423,17 +1427,41 @@ def cmd_queue
 
     puts Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold)
     puts
-    index = queue_pick(entries)
+    index = queue_pick(entries, initial: queue_focus_index(entries, focus))
     if index.nil?
       puts
       break
     end
 
+    focus = { slug: entries[index][:slug], index: index }
     puts
     dirty = true if queue_act(entries, index)
   end
 
   rebuild_and_deploy(t('cli.updating_preview')) if dirty
+end
+
+# Where the cursor opens after an action, given the row it was on before.
+# By SLUG rather than by position: [u] and [d] move the picked post, so its
+# old row now holds the neighbour it traded with -- coming back by number
+# would leave the cursor behind, and a second [u] would carry off the wrong
+# post. Moving a post several slots is the ordinary case, and it used to
+# mean walking down from the top of the queue for every single slot.
+#
+# The remembered position is the fallback for a post that has LEFT the
+# queue ([p] publishes it, [n] returns it to drafts): there is no slug to
+# find any more, and its row now belongs to whoever moved up into it, which
+# is where the eye already is. Nearest-to-the-old-position among matches,
+# because the same slug in two different years is ordinary here (the rest
+# of this screen is careful about it too) and the first match may well be
+# the other one.
+def queue_focus_index(entries, focus)
+  return 0 if focus.nil? || entries.empty?
+
+  matches = entries.each_index.select { |i| entries[i][:slug] == focus[:slug] }
+  return matches.min_by { |i| (i - focus[:index]).abs } unless matches.empty?
+
+  focus[:index].clamp(0, entries.size - 1)
 end
 
 # Returns true when something changed that the closing rebuild must pick
@@ -1849,6 +1877,35 @@ def with_versions_key(prompt, path, slug)
   prompt.sub('[Enter]') { "#{t('cli.props_action_versions')}[Enter]" }
 end
 
+def version_row(file, index)
+  format('%2d.  %s', index + 1, PostVersions.human_stamp(File.basename(file, '.json')))
+end
+
+# Same two faces as every other picker here: arrow keys in a terminal, a
+# numbered list and a read line when piped. This screen was the one place
+# that asked for a number even in a terminal, which made it the only list
+# in the wizard a cursor could not walk.
+#
+# Unlike the other pickers it still says so when the number is out of range
+# instead of quietly going back: a piped caller that typed 9 for three
+# versions has made a mistake worth hearing about, and the sentence for it
+# already exists in every locale.
+def version_pick(rows)
+  return Tui.menu(rows, hint: t('cli.versions_menu_hint')) if Tui.interactive?
+
+  rows.each { |row| puts "  #{row}" }
+  puts
+  print t('cli.versions_prompt', count: rows.size)
+  line = $stdin.gets.to_s.strip
+  return nil if line.empty?
+
+  index = line.to_i - 1
+  return index if line =~ /\A\d+\z/ && (0...rows.size).cover?(index)
+
+  puts t('cli.versions_unknown')
+  nil
+end
+
 # The undo for editing. Lists what this post said before its recent saves
 # and puts one of them back -- keeping the current text as a version of its
 # own first, so choosing wrong is itself undoable.
@@ -1868,26 +1925,19 @@ def props_versions(path, slug)
 
   puts
   puts t('cli.versions_heading', slug: slug)
-  versions.each_with_index do |file, i|
-    stamp = File.basename(file, '.json')
-    puts "  #{i + 1}) #{PostVersions.human_stamp(stamp)}"
-  end
+  # Before the list rather than under it, which is where it used to sit: the
+  # arrow menu paints the rows itself and keeps its hint on the last line, so
+  # a note printed after the list would be scrolled away by the first
+  # keypress. It is a warning about the whole operation anyway, and a warning
+  # is worth more read before the choosing than after it.
   puts t('cli.versions_media_note')
-  print t('cli.versions_prompt', count: versions.size)
-  answer = $stdin.gets.to_s.strip
-  if answer.empty?
+  index = version_pick(versions.map.with_index { |file, i| version_row(file, i) })
+  if index.nil?
     puts
     return
   end
 
-  index = answer.to_i
-  unless index.between?(1, versions.size)
-    puts t('cli.versions_unknown')
-    puts
-    return
-  end
-
-  chosen = versions[index - 1]
+  chosen = versions[index]
   restored = JSON.parse(File.read(chosen, encoding: 'utf-8'))
   print t('cli.versions_confirm', word: t('cli.confirm_word'))
   unless $stdin.gets&.strip&.downcase == t('cli.confirm_word')

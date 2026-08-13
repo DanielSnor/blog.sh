@@ -406,6 +406,7 @@ cli:
   versions_none: "Tenhle post zatím žádnou starší verzi nemá — odkládá se při každé editaci."
   versions_heading: "Co příspěvek %{slug} říkal před posledními uloženími:"
   versions_media_note: "Vrací se jen text; obrázky se neverzují, takže stará kopie příspěvku může zmiňovat ten, který post už nemá."
+  versions_menu_hint: "↑↓ pohyb · Enter obnovit verzi · Esc zpět"
   versions_prompt: "Kterou verzi vrátit? [1-%{count}, Enter zruší]: "
   versions_unknown: "Verze s tímhle číslem není."
   versions_confirm: "Současný text se taky odloží jako verze, takže je to vratné. Napiš „%{word}“ pro obnovení: "

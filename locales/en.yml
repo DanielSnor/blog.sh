@@ -417,6 +417,7 @@ cli:
   versions_none: "This post has no earlier versions yet -- one is kept each time it is edited."
   versions_heading: "What the post %{slug} said before its recent saves:"
   versions_media_note: "Only the text comes back; images are not versioned, so an old copy of the post may mention one it no longer has."
+  versions_menu_hint: "↑↓ move · Enter restore the version · Esc back"
   versions_prompt: "Restore which version? [1-%{count}, Enter cancels]: "
   versions_unknown: "No version with that number."
   versions_confirm: "The current text is kept as a version too, so this is undoable. Type \"%{word}\" to restore: "
