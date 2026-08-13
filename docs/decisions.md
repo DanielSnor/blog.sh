@@ -657,10 +657,12 @@ the tab order of a photo-heavy post is only correct once the script has
 run, and a reader tabbing in the first few hundred milliseconds walks past
 images that are about to become buttons.
 
-**The menu repeated under the content is gone, and there is no key to
-bring it back.** A sticky bar answers the question that menu was invented
-for -- how does a reader who has just finished an article get anywhere --
-and answers it for the whole page rather than only at the end of it.
+**The sticky bar replaces the menu repeated under the content, and there
+is no key to keep both.** This is a swap, not a subtraction: the bar at
+the top answers the question that menu was invented for -- how does a
+reader who has just finished an article get anywhere -- and answers it
+for the whole page rather than only at the end of it, with the search
+field along for the ride, which the bottom menu never carried.
 Keeping both put two identical menus on one phone screen, one of them
 glued to the top. It was offered as a setting for about an hour, and the
 setting was the wrong answer: a repeat of a bar that is on screen the

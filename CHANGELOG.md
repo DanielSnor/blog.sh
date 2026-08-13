@@ -16,9 +16,9 @@ Dressing a site differently no longer means editing the engine. Four
 things that used to require a modified template are settings now: your own
 stylesheet, your own menu, the sidebar, and a lead image above the post's
 title. Every default is the layout the engine already had, with one
-deliberate exception: the menu bar follows you down the page now, and the
-menu that used to be repeated under the content -- which existed because
-it didn't -- is gone.
+deliberate exception: the menu bar follows you down the page now, and it
+takes over from the menu that used to be repeated under the content --
+which only existed because the bar didn't.
 
 ### New
 
@@ -441,14 +441,17 @@ it didn't -- is gone.
 ### Upgrading
 
 - Nothing to migrate. One thing does look different without being asked
-  for, and it is the only one: the menu that used to be repeated under the
-  content is gone. It was hardcoded into the layout, never a setting, and
-  it was there because the bar at the top used to stay at the top -- which
-  it no longer does. The line it drew between the content and the footer
-  was doing real work and is drawn without it now, in the same 5px. There
-  is no key to bring the bar back: a repeat of a bar that is on screen the
-  whole time is not a preference, it is two of the same thing. Everything
-  else a site gets without adding a key is the page it got before.
+  for, and it is the only one: the menu that was repeated under the content
+  has been replaced by the bar at the top, which now follows you down the
+  page. That menu was hardcoded into the layout, never a setting, and it
+  existed for one reason -- to give a reader who had reached the end of an
+  article a way out where they were standing. They have one the whole way
+  down now, and it carries the search field too, which the bottom one never
+  did. So this is a swap rather than a removal, and there is no key to put
+  the second bar back: two of the same menu on one screen is not a
+  preference. The line it drew between the content and the footer was doing
+  real work and is drawn without it now, in the same 5px. Everything else a
+  site gets without adding a key is the page it got before.
 - It is no longer the same *bytes*, though, and the next deploy is a full
   one rather than incremental. The banner's two overlay lines moved inside
   a wrapper element, which is in the layout every page shares, so the whole
