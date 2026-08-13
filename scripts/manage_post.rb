@@ -82,7 +82,7 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned hero page series series_part toc].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc].freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -643,7 +643,7 @@ def frontmatter_type_and_page(meta)
 end
 
 def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
-                      series: nil, series_part: nil, toc: nil)
+                      unlisted: nil, series: nil, series_part: nil, toc: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
@@ -660,6 +660,10 @@ def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
   # it can actually be acted on -- a site that uses heroes, or a post that
   # has already said something of its own.
   lines << "hero: #{hero}" unless hero.nil?
+  # Same rule as the pin: shown with its current value so the state can be
+  # read as well as changed, and left off a draft that has not claimed it
+  # -- a draft is unlisted already, by being a draft.
+  lines << "unlisted: #{unlisted}" unless unlisted.nil?
   lines << "series: #{series}" unless series.nil?
   lines << "series_part: #{series_part}" unless series_part.nil?
   lines << "toc: #{toc}" unless toc.nil?
@@ -812,6 +816,7 @@ def cmd_add
   # one into existence, never by writing one.
   post['page'] = true if page
   post['pinned'] = true if truthy_frontmatter?(meta['pinned'])
+  post['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
 
   path = PostWriter.write(post, media_files: media_files)
   discard_editor_buffer
@@ -1697,6 +1702,7 @@ def cmd_props(slug)
     props_line('type', ContentType.dominant(post))
     props_line('tags', (post['tags'] || []).join(', '))
     props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
+    props_line('unlisted', truthy_frontmatter?(post['unlisted']) ? t('cli.props_unlisted_yes') : nil)
     announced = post['mastodon_url'] || post['bluesky_url']
     props_line('announced', if announced then announced
                             elsif draft?(post) then t('cli.props_announces_on_publish')
@@ -2103,6 +2109,7 @@ def edit_post(slug, path: nil)
     # Offering it when set matters: without the line in the header, saving
     # would drop a pin the post had (unpublish keeps it).
     pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false'),
+    unlisted: (draft?(post) && !truthy_frontmatter?(post['unlisted'])) ? nil : truthy_frontmatter?(post['unlisted'] || 'false'),
     # Shown on a site that uses heroes, or on a post that has already said
     # something of its own -- and it has to be shown in the second case
     # even when the site doesn't, because a header without the line saves
@@ -2204,6 +2211,7 @@ def edit_post(slug, path: nil)
   }
   updated['type'] = new_type if new_type
   updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
+  updated['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
   # Stored only when it disagrees with the site, so an ordinary post stays
   # silent and follows layout.hero if that is ever flipped. Deleting the
   # line is therefore a way to say "no opinion", not a way to lose one.

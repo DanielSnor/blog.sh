@@ -181,6 +181,15 @@ cli:
       type   Beitragstyp -- text / quote / chat / image / video / audio /
              link (optional -- leer lassen, dann wird der Typ aus dem
              Inhalt abgeleitet)
+             page -> eine Seite: eigene Adresse, außerhalb der Listen,
+             der Archive und des Feeds (Über mich, Kontakt)
+      pinned true -> der Beitrag bleibt oben auf der ersten Listenseite
+      unlisted true -> der Beitrag behält seine Adresse, verschwindet aber
+             aus Listen, Feeds, Sitemap und Suche (ein Link für wenige,
+             kein Passwort)
+      series Name einer Serie; Beiträge mit gleichem Namen bilden eine
+      hero   true/false -> Leitbild über dem Titel für diesen Beitrag
+      toc    true/false -> Kapitelliste (ab vier Überschriften von selbst)
 
     Das Veröffentlichungsdatum wird hier nicht gesetzt -- [p] nimmt den
     Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit. Zum
@@ -388,6 +397,7 @@ cli:
   props_draft_banner: "Entwurf -- nicht auf der Website, nur Vorschau"
   props_state_published: "veröffentlicht, %{date}"
   props_pinned_yes: "ja -- bleibt oben auf der Startseite"
+  props_unlisted_yes: "ja -- über die eigene Adresse erreichbar, in keiner Liste, keinem Feed, keiner Sitemap und keiner Suche"
   props_announces_on_publish: "noch nicht -- geht mit der Veröffentlichung raus"
   props_not_announced: "nicht angekündigt"
   props_attributes_hint: "Typ und Tags werden im Kopf bearbeitet, wenn du den Text bearbeitest."

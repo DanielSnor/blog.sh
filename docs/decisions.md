@@ -109,6 +109,21 @@ publishing -- a localhost-only preview can't do either. *Cost:* the
 draft text physically exists on the host; the token (and staying out of
 every listing and index) is the fence.
 
+**A published post can be unlisted, and unlisted is as far as it goes.**
+`unlisted: true` keeps a post's ordinary address and date but takes it
+out of the listings, the archives, the feeds, the sitemap and the search
+index, and marks the page `noindex` -- the draft's hidden-address idea
+generalised to a post that is finished. What it deliberately is *not* is
+a password: a static host serves whatever it is asked for, so the only
+honest way to gate a page would be encrypting it in the browser, and
+that is a promise this engine will not make (the key would sit in the
+same page). *Cost:* anyone holding the link can read it and pass it on,
+which is exactly what "unlisted" says on every other platform that
+offers it. The truth test is the loose one, unlike `pinned`'s strict
+one, because the two typos are not worth the same: a mistyped pin costs
+a post its place at the top, a mistyped `unlisted` would put something
+into every listing its author meant to keep out of them.
+
 **The publish date comes from publishing, not from a field.** Publishing
 means "now", scheduling asks for a date -- so the frontmatter template
 offers no `date:` line, which would be a third path to the same decision

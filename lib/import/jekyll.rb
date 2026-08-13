@@ -132,7 +132,7 @@ module Import
                          created_at scheduled state page].freeze
     # The ones that sit flat, because a destination engine plausibly
     # understands them too -- Hugo has series, most engines have a pinned.
-    OWN_FLAT_KEYS = %w[series series_part pinned hero toc].freeze
+    OWN_FLAT_KEYS = %w[series series_part pinned hero toc unlisted].freeze
 
     def apply_own_keys(post, meta)
       own = meta['blogsh']

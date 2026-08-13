@@ -351,7 +351,7 @@ module Exporter
     # exporting a site.
     meta['redirect_from'] = redirects unless redirects.empty?
 
-    %w[series series_part pinned hero toc].each do |key|
+    %w[series series_part pinned hero toc unlisted].each do |key|
       meta[key] = post[key] unless post[key].nil?
     end
 

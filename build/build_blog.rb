@@ -1051,6 +1051,25 @@ def page?(post)
   truthy?(post['page'])
 end
 
+# A published post that is not in the stream: it keeps its ordinary
+# address and its date, but stays out of the listings, the archives, the
+# feeds, the sitemap and the search index. The only way to it is a link
+# somebody was given -- the draft's hidden address generalised to a post
+# that is finished.
+#
+# NOT a password. A static site cannot keep a secret from anyone holding
+# the URL, and pretending otherwise would be a promise the engine cannot
+# keep; what it can honestly offer is "not listed anywhere".
+#
+# The loose truth test, unlike `pinned`'s strict one, is deliberate and
+# the asymmetry is the point: a typo in `pinned` costs a post its place
+# at the top, while a typo here would put a post somebody meant to keep
+# out of the listings into all of them. The two failures are not worth
+# the same, so this one errs towards hiding.
+def unlisted?(post)
+  truthy?(post['unlisted'])
+end
+
 # "true"/"yes"/"1" as written by hand, and the real booleans YAML and JSON
 # produce. Same spellings `pinned` has always taken.
 def truthy?(value)
@@ -1388,8 +1407,15 @@ def render_post_html(post, template)
          path: post_path(post),
          image: post_og_image(post),
          og_type: 'article',
-         # Drafts must never end up in search engines or link previews.
-         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : post_structured_head(post),
+         # Drafts and unlisted posts must never end up in search engines
+         # or link previews -- for an unlisted post that is the whole
+         # point, since being out of the sitemap only stops the crawler
+         # being told, not the crawler arriving from a link.
+         extra_head: if draft?(post) || unlisted?(post)
+                       %(\n  <meta name="robots" content="noindex, nofollow">)
+                     else
+                       post_structured_head(post)
+                     end,
          frame_origins: Embed.frame_origins_for(post['content']),
          comment_origins: comment_origins_for([post]))
 end
@@ -1905,6 +1931,13 @@ drafts, posts = posts.partition { |p| draft?(p) }
 RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
                             robots.txt 404 favicon.ico].freeze
 pages, posts = posts.partition { |p| page?(p) }
+# Out of the stream on the same principle as pages, one step further:
+# a page is taken out of the listings but stays findable (sitemap,
+# search), while an unlisted post is out of those too. So it is
+# partitioned here and then added back BY NAME to the two things it is
+# still entitled to -- its own page, and the redirect stubs for
+# addresses it used to have.
+unlisted_posts, posts = posts.partition { |p| unlisted?(p) }
 pages.reject! do |page|
   next false unless RESERVED_ROOT_SEGMENTS.include?(page['slug'].to_s.downcase)
 
@@ -2029,7 +2062,7 @@ def referenced_media_filenames(post)
   end.compact
 end
 
-(posts + pages + drafts).each do |post|
+(posts + pages + unlisted_posts + drafts).each do |post|
   year = post_time(post).year
   dir = output_dir(post)
 
@@ -2099,7 +2132,7 @@ end
 # Pages are in here as well as posts: a renamed page owes its old
 # address exactly what a renamed post does. They are out of the
 # LISTINGS, not out of the engine's promises.
-(posts + pages).each do |post|
+(posts + pages + unlisted_posts).each do |post|
   Array(post['former_slugs']).each do |former|
     parts = former.to_s.split('/').reject(&:empty?)
     # "." and ".." can only arrive via a hand-edited JSON (slugify never
@@ -2323,7 +2356,7 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
 # Pages too, for the reason above -- and because a source like Substack
 # serves its pages under /p/<slug>, so the old address is a real one the
 # importer records and this loop is the only thing that answers it.
-(posts + pages).each do |post|
+(posts + pages + unlisted_posts).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
     if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }

@@ -66,6 +66,16 @@ byte-for-byte against the previous build.
   posts keep their identity, series, redirects and announcement URLs, so
   export plus re-import moves an installation instead of merely leaving
   one.
+- **Unlisted posts.** `unlisted: true` keeps a published post on its
+  ordinary address, with its date and its redirects, and takes it out of
+  the homepage, the tag and type archives, the feeds, the sitemap and the
+  search index; the page is `noindex`, so a crawler arriving from a link
+  does not index it either. It is the draft's hidden address generalised
+  to a finished post -- for something meant for the handful of people you
+  send the link to. It is deliberately not a password: a static host
+  serves what it is asked for, and encrypting in the browser would put
+  the key on the same page. The frontmatter line shows its current value
+  when you edit a published post, and `props` says so.
 - **`./blog.sh stats`.** What the archive actually is, counted from the
   posts on disk: how many there are split into published, drafts,
   scheduled and pages (the four add up, and a page that is also a draft

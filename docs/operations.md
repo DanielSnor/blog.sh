@@ -111,6 +111,18 @@ picker, so it can be found without remembering it. A plain draft shows
 no time on purpose: a draft has none until publishing or scheduling
 gives it one.
 
+**Keeping a post out of the listings** is the `unlisted: true` line in
+its frontmatter. The post keeps its ordinary address, its date and its
+redirects, and drops out of the homepage, the tag and type archives, the
+feeds, the sitemap and the search index; its page is `noindex`. It is
+the draft's hidden address, generalised to something finished -- for a
+post meant for the few people you send the link to. **It is not a
+password**: a static site hands over whatever is asked for, so anyone
+with the link can read it and forward it. If that is not good enough,
+the answer is not to publish it. `props` says so on an unlisted post,
+and the line comes back with its current value the next time you edit,
+so the state can be read as well as changed.
+
 **Renaming a slug** never breaks a link. The old address stays on the
 site as a one-page redirect to the new one, recorded in the post itself
 (`former_slugs`), so it survives edits, re-imports and full rebuilds. A

@@ -183,6 +183,15 @@ cli:
       type   post type -- text / quote / chat / image / video / audio / link
              (optional -- leave it blank and the type is inferred from the
              post's content)
+             page -> a page: its own address, out of the listings, the
+             archives and the feed (About, Contact)
+      pinned true -> the post is held at the top of the first listing page
+      unlisted true -> the post keeps its address but leaves the listings,
+             the feeds, the sitemap and the search (a link for a few
+             people, not a password)
+      series name of a series; posts sharing a name form one
+      hero   true/false -> lead image above the title for this post
+      toc    true/false -> chapter list (appears by itself from four headings)
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
     [s]chedule asks for a future date/time when you pick it. To backdate,
@@ -389,6 +398,7 @@ cli:
   props_draft_banner: "draft -- not on the site, preview only"
   props_state_published: "published, %{date}"
   props_pinned_yes: "yes -- held at the top of the front page"
+  props_unlisted_yes: "yes -- reachable by its address, in no listing, feed, sitemap or search"
   props_announces_on_publish: "not yet -- goes out when the post publishes"
   props_not_announced: "not announced"
   props_attributes_hint: "Type and tags are edited in the header when you edit the text."
