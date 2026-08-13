@@ -3596,35 +3596,73 @@ def wizard_header
   SiteHeader.render
 end
 
-def run_wizard
-  # In a terminal the wizard is an arrow-key menu (digits still work as
-  # quick select, Esc exits). Piped input keeps the numbered prompt.
-  if Tui.interactive?
-    loop do
-      # Reprinted every iteration, not just once at startup: each
-      # pause_and_clear wipes the screen, and without this the site
-      # identity (which blog am I even connected to?) would vanish
-      # from view after the very first action -- the whole point for
-      # anyone managing more than one site.
-      puts wizard_header
-      puts
-      puts t('cli.wizard_prompt_action')
-      puts
-      index = Tui.menu(WIZARD_MENU.map { |_, desc| desc },
-                       hint: t('cli.wizard_menu_hint', count: WIZARD_MENU.size))
-      # Esc leaves the cursor on the line right under the hint, so the shell
-      # prompt lands flush against the menu. One blank line to sit on the
-      # way out -- which is also what the piped branch below already does
-      # with its `puts` after reading the choice.
-      if index.nil?
-        puts
-        break
-      end
+# The identity block, the question, the choices and the keys, as one frame.
+# The identity is part of the frame rather than something printed once at
+# startup: it answers "which blog am I even connected to?", which is the
+# question of anyone who runs this against more than one site, and a frame
+# that is repainted cannot lose it the way a scrolling screen did.
+def wizard_frame_lines(selected)
+  lines = wizard_header.to_s.chomp.lines.map(&:chomp)
+  lines << ''
+  lines << t('cli.wizard_prompt_action')
+  lines << ''
+  WIZARD_MENU.each_with_index do |(_, desc), i|
+    lines << if i == selected
+               Tui.paint("› #{Tui.truncate_to_width(Tui.strip_ansi(desc), Tui.term_width - 2)}", :invert)
+             else
+               "  #{Tui.truncate_ansi(desc, Tui.term_width - 2)}"
+             end
+  end
+  lines << ''
+  hint = Tui.paint(t('cli.wizard_menu_hint', count: WIZARD_MENU.size), :dim)
+  lines.concat(Tui.fold_prompt(hint, Tui.term_width).lines.map(&:chomp))
+  lines
+end
 
-      puts
-      run_wizard_choice(WIZARD_MENU[index].first)
-      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
+def run_wizard_screen
+  selected = 0
+  Tui.screen do |screen|
+    loop do
+      screen.paint(wizard_frame_lines(selected))
+      key = screen.key
+      chosen = nil
+
+      case key
+      when :resize then next
+      when :up then selected = (selected - 1) % WIZARD_MENU.size
+      when :down then selected = (selected + 1) % WIZARD_MENU.size
+      when :home then selected = 0
+      when :end then selected = WIZARD_MENU.size - 1
+      when :enter then chosen = selected
+      when :escape then break
+      when String
+        break if %w[q 0].include?(key)
+
+        # Quick select keeps working, and moves the cursor as it goes, so
+        # the frame under the action names the same row the digit chose.
+        if key =~ /\A[1-9]\z/ && key.to_i <= WIZARD_MENU.size
+          selected = key.to_i - 1
+          chosen = selected
+        end
+      end
+      next if chosen.nil?
+
+      # The chosen action gets the terminal: some of them are screens of
+      # their own (the queue), some print more than a frame can hold (a
+      # build). Either way the wizard's frame comes back afterwards.
+      screen.leave(t('cli.wizard_continue_prompt')) { run_wizard_choice(WIZARD_MENU[chosen].first) }
     end
+  end
+  # A blank line to sit on the way out, so the shell prompt does not land
+  # flush against the last frame.
+  puts
+end
+
+def run_wizard
+  # In a terminal the wizard is a screen that stays put (digits still work
+  # as quick select, Esc exits). Piped input keeps the numbered prompt.
+  if Tui.interactive?
+    run_wizard_screen
     return
   end
 
