@@ -329,13 +329,39 @@ nav a[aria-current="page"]:hover {
   background: linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
 }
 
+/* Both overlay lines in one box, laid out as a column. They used to be
+   pinned to opposite corners of the picture, which meant the only thing
+   keeping them apart was there being enough picture between them -- and on
+   a phone there is not. A banner scaled to a 375px screen is around 100px
+   tall, and a 30px title with a claim wrapped onto two lines fills that on
+   its own: on blogsh.app the two printed across each other for 79px, both
+   unreadable, with the claim reaching under the appearance toggle as well.
+   Two items in a column cannot overlap however short the column gets.
+
+   The corners are the same as before. The title is simply the column's
+   first item; the claim is pushed to the far end by its own auto margin
+   rather than by justify-content: space-between, which would have sent a
+   site showing ONLY a claim to the top of the banner instead of the
+   bottom. The insets that used to be each line's own top/left/bottom/right
+   are the box's padding now, so there is one place to change them.
+
+   pointer-events sits on the box rather than on the two lines, so the
+   whole banner is still one click target for the link underneath -- the
+   padding between the lines would otherwise swallow a tap. */
+.banner-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  pointer-events: none;
+}
+
 .banner-title,
 .banner-claim {
-  position: absolute;
-  z-index: 2;
   margin: 0;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
 }
 
 /* Colors and fonts both come from colors.css (config/site.yml's
@@ -346,8 +372,6 @@ nav a[aria-current="page"]:hover {
    a stylesheet older than this rule still gets a monospace header rather
    than the browser's default serif. */
 .banner-title {
-  top: 20px;
-  left: 24px;
   max-width: 60%;
   font-family: var(--banner-title-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
   font-size: var(--banner-title-size, 45px);
@@ -357,9 +381,9 @@ nav a[aria-current="page"]:hover {
 }
 
 .banner-claim {
-  right: 24px;
-  bottom: 20px;
   max-width: 55%;
+  align-self: flex-end;
+  margin-top: auto;
   font-family: var(--banner-claim-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
   font-size: var(--banner-claim-size, 20px);
   font-weight: 400;
@@ -372,10 +396,36 @@ nav a[aria-current="page"]:hover {
    written out, so a site that sets its own size keeps the step down on a
    phone instead of overflowing the banner with it. The factors are the
    ratios the fixed values always had (30/45, 14/20), and calc() means the
-   configured value can be in any unit -- px, rem, even a clamp(). */
+   configured value can be in any unit -- px, rem, even a clamp().
+
+   The column now guarantees the two lines cannot meet, but a short banner
+   can still be asked to hold more text than it has room for, so the phone
+   also gets its insets back: 10px and 14px instead of 20 and 24 is another
+   20px of height to put the lines in, on a banner that has about a
+   hundred.
+
+   The claim gives up its width cap here, and that is what stops it needing
+   two lines in the first place -- 65% of a 375px screen is 244px, which is
+   where a claim of any length wraps. It has nothing to avoid at the bottom
+   of the column. The title keeps its cap for the opposite reason: the
+   appearance toggle sits in the corner it starts from, and 65% is what has
+   always kept it from running underneath. */
 @media (max-width: 700px) {
+  .banner-overlay { padding: 10px 14px; }
   .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); max-width: 65%; }
-  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 65%; }
+  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 100%; }
+
+  /* The claim's scrim follows it. A corner gradient darkens the corner a
+     corner-anchored text sits in, and the claim is no longer one: it runs
+     the width of the banner here, and its first words start where a
+     diagonal fading out at 45% has nothing left to give. On a bright
+     picture -- a sky, a screen, a whitewashed wall -- that end of the line
+     was being read off the photograph itself. So on a phone the scrim
+     becomes the shape the text became: a band across the bottom. The
+     title keeps the corner it was drawn for. */
+  .banner-wrap:has(.banner-claim)::after {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 55%);
+  }
 }
 
 #theme-toggle {

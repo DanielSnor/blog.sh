@@ -637,6 +637,20 @@ a palette whose accent sits close to its card background gets a quiet
 ring on the page body, and a skin that repaints a control's ground has
 to look at the ring itself rather than getting a new one for free.
 
+**The banner's overlay lines are a column, not two pinned corners.** The
+site name and the claim used to be positioned absolutely against opposite
+corners of the picture, which reads well and holds only as long as there
+is picture between them -- and the height of that picture is the one
+thing the engine does not decide. On a phone it runs out. Rather than
+buying a little room (smaller type, thinner insets) and hoping, the two
+went into one box laid out as a column, where overlapping is not a state
+the layout can reach. *Cost:* one more element in the markup of every
+page, and the insets moved out of the two lines into the box around them
+-- so a stylesheet that positioned `.banner-title` or `.banner-claim`
+itself has to be looked at. In return, the corners are described in one
+place instead of four, and a banner short enough to run out of room
+crowds its lines instead of printing one through the other.
+
 **Reduced motion is answered with one blanket rule, not a list of the
 things that move.** `prefers-reduced-motion` switches off transitions
 and animations for everything, rather than naming the declarations that

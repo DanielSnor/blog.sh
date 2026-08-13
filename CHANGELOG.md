@@ -324,17 +324,47 @@ byte-for-byte against the previous build.
   handled in JavaScript, where it is asked for -- `scroll-behavior` in CSS
   governs only the scrolling the browser decides on. Nothing changes for a
   reader who has not asked.
+- **The banner's two lines stop printing over each other on a phone.** The
+  site name went in the top left corner of the picture and the claim in the
+  bottom right, and the only thing that had ever kept them apart was there
+  being enough picture between them. On a phone there is not: a banner
+  scaled to a 375px screen is about a hundred pixels tall, and a title at
+  30px with a claim wrapped onto two lines fills that on its own. On
+  blogsh.app the two ran across each other for 79 pixels -- both of them
+  unreadable, with the claim reaching under the appearance toggle as well.
+  They share one box now, laid out as a column, and two things in a column
+  cannot overlap however short the column gets. The corners are where they
+  were. The phone also gets its insets back (10px and 14px instead of 20
+  and 24) and lets the claim use the full width instead of 65% of it, which
+  is what had it wrapping onto that second line in the first place; and
+  because the claim is a band across the bottom now rather than a corner,
+  the scrim that keeps it readable is a band too, so a claim over a bright
+  photograph no longer fades into it halfway along. Nothing changes above
+  700px: same corners, same insets, same picture.
+- **The menu on a phone closes with Escape and with a tap on the page.** It
+  covers 700 of the 812 pixels a phone has, and the only way back out was
+  the same button that opened it -- so a reader who had decided against the
+  menu had to go and find that button again, and one on a keyboard had no
+  way out at all. Escape hands focus back to the button on the way out,
+  since that is where the reader was before they opened it. A tap inside
+  the menu is left alone, the search field in there included.
 
 ### Upgrading
 
-- Nothing to migrate, and nothing new is on by default -- a site that adds
-  no keys gets the same bytes it got before, which is checked in the test
-  suite rather than assumed.
-- Two things rewrite existing pages, so the next deploy is a full one
-  rather than incremental: the heading above tag listings and search
-  results, and the post pages (reading time and the contents list appear
-  on the long ones). On an archive with many tags and posts that is most
-  of the site.
+- Nothing to migrate, and nothing new is on by default: a site that adds no
+  keys gets the page it got before, on every screen it already looked right
+  on.
+- It is no longer the same *bytes*, though, and the next deploy is a full
+  one rather than incremental. The banner's two overlay lines moved inside
+  a wrapper element, which is in the layout every page shares, so the whole
+  archive is rewritten -- and on top of that the heading above tag listings
+  and search results changed, and the post pages carry reading time and a
+  contents list.
+- A stylesheet of your own that positioned `.banner-title` or
+  `.banner-claim` wants a look before you upgrade. Neither is absolutely
+  positioned any more: the box around them is (`.banner-overlay`, which
+  holds the insets the two lines used to carry themselves), and they are
+  items in a column inside it.
 - To keep the old heading wording, put the word back with one CSS rule on
   `.listing-heading__kind` in a stylesheet of your own.
 - Post versions live in `content.nosync/versions/`. They are part of your

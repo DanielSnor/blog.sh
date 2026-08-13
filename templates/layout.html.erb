@@ -55,8 +55,10 @@
   <div class="wrap">
     <div class="banner-wrap">
       <a href="/" class="banner-link"><img class="banner" src="<%= h(BANNER['src']) %>" alt="<%= h(BANNER['alt']) %>" width="<%= BANNER['width'] %>" height="<%= BANNER['height'] %>"></a>
-      <% if BANNER_SHOW_TITLE %><p class="banner-title"><%= h(SITE_SHORT_NAME) %></p><% end %>
-      <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= banner_claim_html %></p><% end %>
+      <% if BANNER_SHOW_TITLE || BANNER_SHOW_CLAIM %><div class="banner-overlay"><%# One box holding both overlay lines, so the stylesheet can lay them out as a column instead of pinning each to its own corner of a picture whose height it does not control. Two items in a column cannot print over each other; two pinned corners can, and on a phone they did. The wrapper is skipped entirely when neither line is shown, so a site with both off keeps a banner with nothing over it. %>
+        <% if BANNER_SHOW_TITLE %><p class="banner-title"><%= h(SITE_SHORT_NAME) %></p><% end %>
+        <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= banner_claim_html %></p><% end %>
+      </div><% end %>
       <button id="theme-toggle" type="button" title="<%= h(t('ui.theme_auto')) %>" aria-label="<%= h(t('ui.theme_auto')) %>">☀︎/☾︎</button><%# Both the symbol and the label are what "follow the system" looks like --
       the page is built once and served to everyone, so the server can't know
       which of the three states a given reader is in. theme-toggle.js corrects
