@@ -511,11 +511,17 @@ module Tui
   #
   # Returns [:enter, index], [:key, character, index] or nil on Esc.
   # `state` is the caller's to keep between calls -- leaving the screen
-  # for a post and coming back lands on the same row instead of at the
-  # top -- and carries the height of the last frame, so a re-entry
-  # repaints over it. A caller that PRINTS anything in between (a submenu,
-  # an editor, a preview) must drop state[:lines] first, or the repaint
-  # would land in the middle of whatever it printed.
+  # for a post and coming back lands on the same row instead of at the top.
+  #
+  # It paints through `frame`, from the top of the viewport, like every
+  # other screen here. It used to repaint by counting its own lines and
+  # moving the cursor up over them, which was correct on its own and wrong
+  # as soon as it was entered FROM a screen: the wizard's frame was above
+  # it, the cursor-up landed in the middle of that frame, and walking into
+  # the archive and back out scrolled the view by fourteen lines. Painting
+  # from the top has no such arithmetic to get wrong, and it also retires
+  # the rule that a caller printing anything in between had to clear
+  # state[:lines] first.
   def browse(state, keys:, empty:, hot_keys: [], context: nil, search_hint: nil, cursor: true)
     query = state[:query].to_s
     searching = !state.delete(:searching).nil?
@@ -526,10 +532,6 @@ module Tui
     # Two of the lines are the status and the keys; one more is left for
     # whatever was on screen before, the same courtesy `menu` pays.
     window = [term_height - 4, 4].max
-    lines = window + 2
-    print "\e[#{state[:lines]}A" if state[:lines]
-    state[:lines] = lines
-    painted = false
 
     print "\e[?25l"
     # Raw for the WHOLE screen, not per keystroke: between two getch
@@ -546,7 +548,6 @@ module Tui
       row_window = ctx ? window - 1 : window
       state[:offset] = clamp_offset(state[:selected].to_i, state[:offset].to_i, row_window, rows.size)
 
-      print "\e[#{lines}A" if painted
       avail = term_width - 2
       shown = rows[state[:offset], row_window] || []
       out = []
@@ -565,23 +566,14 @@ module Tui
       left, right = Array(status)
       out << paint(pad_between(left.to_s, [right, position].compact.reject(&:empty?).join('  ·  '), term_width), :bold)
       out << paint(fit_keys(searching ? search_hint.to_s : keys, term_width), :dim)
-      # "\r\n", not "\n": this whole loop runs inside raw_screen, and raw
-      # mode clears OPOST, so the kernel no longer turns a newline into
-      # carriage-return + newline. With a bare LF every row starts where
-      # the previous one ended and the screen reads as a diagonal
-      # staircase. The carriage return has to be written by hand here.
-      # Control characters are stripped at the last moment, not at every
-      # call site that builds a row: a post title (or an imported feed
-      # title, which keeps newlines inside a wrapped <title>) carrying a
-      # newline or a tab painted its own line break inside the frame, so
-      # the screen ended up taller than the cursor-up count and drifted
-      # further with every keystroke. TAB is in the class too -- it is the
-      # character the note above names, and a tab expands to whatever
-      # stop width the terminal keeps, which no column arithmetic here
-      # can predict. ESC is the one exception: the rows carry the colour
-      # sequences this file wrote itself.
-      out.each { |line| print "\e[2K#{sanitize_row(line)}\r\n" }
-      painted = true
+      # frame writes the rows in one go, ends the last one without a
+      # newline (a full-height frame that ends in one scrolls the view by
+      # exactly the thing this avoids) and sanitizes control characters --
+      # a post title carrying a newline or a tab used to paint its own line
+      # break inside the frame and the screen drifted further with every
+      # keystroke. The keys are the two rows that must survive a window too
+      # short to hold everything.
+      frame(out, keep_last: 2)
 
       move = lambda do |delta|
         next if rows.empty?
@@ -673,9 +665,22 @@ module Tui
   #
   # \r\n, not \n -- callers paint inside raw_screen, where OPOST is off and
   # the kernel no longer turns a newline into carriage-return plus newline.
-  def frame(lines)
+  # `keep_last` names the rows that must survive a window too short to hold
+  # the frame -- the keys, normally. Without it the frame is simply cut at
+  # the bottom, which is where the way out is written: a 14-row frame in a
+  # 12-row window lost "Esc back" and the screen became a trap. What gets
+  # dropped instead is the end of the middle, which is a list the cursor can
+  # still scroll through.
+  def frame(lines, keep_last: 0)
     width = term_width
-    body = lines.first(term_height).map { |line| "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}" }
+    height = term_height
+    rows = if lines.size <= height || keep_last.zero?
+             lines.first(height)
+           else
+             tail = lines.last([keep_last, height].min)
+             lines.first(height - tail.size) + tail
+           end
+    body = rows.map { |line| "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}" }
     print "\e[H#{body.join("\r\n")}\e[J"
   end
 
@@ -718,9 +723,9 @@ module Tui
       end
     end
 
-    def paint(lines)
+    def paint(lines, keep_last: 0)
       @lines = lines
-      Tui.frame(lines)
+      Tui.frame(lines, keep_last: keep_last)
     end
 
     def key

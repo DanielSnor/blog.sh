@@ -1465,8 +1465,10 @@ def queue_frame_lines(entries, selected, offset, window, mode, status)
     lines << ''
   end
   keys = mode == :list ? t('cli.queue_menu_hint') : with_carry_key(t('cli.queue_actions', slug: entries[selected][:slug]))
-  lines.concat(Tui.fold_prompt(Tui.paint(keys, :dim), Tui.term_width).lines.map(&:chomp))
-  lines
+  rows = Tui.fold_prompt(Tui.paint(keys, :dim), Tui.term_width).lines.map(&:chomp)
+  # The second value is how many rows at the end are the keys, so a window
+  # too short for the frame drops queue rows rather than the way out.
+  [lines + rows, rows.size + 1]
 end
 
 # Runs one of the actions that speak in a single line ([u], [d], [m]) and
@@ -1506,7 +1508,8 @@ def cmd_queue_screen
     # the next frame with a different number of rows.
     window = [entries.size, [Tui.term_height - 7, 3].max].min
     offset = Tui.clamp_offset(selected, offset, window, entries.size)
-    screen.paint(queue_frame_lines(entries, selected, offset, window, mode, status))
+    lines, keep = queue_frame_lines(entries, selected, offset, window, mode, status)
+    screen.paint(lines, keep_last: keep)
 
     key = screen.key
     # A window resized while the screen waits repaints and changes nothing
@@ -3601,13 +3604,17 @@ end
 # startup: it answers "which blog am I even connected to?", which is the
 # question of anyone who runs this against more than one site, and a frame
 # that is repainted cannot lose it the way a scrolling screen did.
-def wizard_frame_lines(selected)
+# Returns the rows and how many of them at the end are the keys, which the
+# frame must not drop on a short window. The menu scrolls like the queue
+# does rather than running off the bottom: six entries fit almost anywhere,
+# but "almost" is what a split terminal on a laptop breaks.
+def wizard_frame_lines(selected, offset, window)
   lines = wizard_header.to_s.chomp.lines.map(&:chomp)
   lines << ''
   lines << t('cli.wizard_prompt_action')
   lines << ''
-  WIZARD_MENU.each_with_index do |(_, desc), i|
-    lines << if i == selected
+  WIZARD_MENU[offset, window].to_a.each_with_index do |(_, desc), i|
+    lines << if (offset + i) == selected
                Tui.paint("› #{Tui.truncate_to_width(Tui.strip_ansi(desc), Tui.term_width - 2)}", :invert)
              else
                "  #{Tui.truncate_ansi(desc, Tui.term_width - 2)}"
@@ -3615,15 +3622,21 @@ def wizard_frame_lines(selected)
   end
   lines << ''
   hint = Tui.paint(t('cli.wizard_menu_hint', count: WIZARD_MENU.size), :dim)
-  lines.concat(Tui.fold_prompt(hint, Tui.term_width).lines.map(&:chomp))
-  lines
+  keys = Tui.fold_prompt(hint, Tui.term_width).lines.map(&:chomp)
+  [lines + keys, keys.size + 1]
 end
 
 def run_wizard_screen
   selected = 0
+  offset = 0
   Tui.screen do |screen|
     loop do
-      screen.paint(wizard_frame_lines(selected))
+      # Three rows of identity, two blanks, the question, the blank above
+      # the keys and the keys themselves: what is left is the menu.
+      window = [WIZARD_MENU.size, [Tui.term_height - 9, 2].max].min
+      offset = Tui.clamp_offset(selected, offset, window, WIZARD_MENU.size)
+      lines, keep = wizard_frame_lines(selected, offset, window)
+      screen.paint(lines, keep_last: keep)
       key = screen.key
       chosen = nil
 
