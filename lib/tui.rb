@@ -387,7 +387,13 @@ module Tui
   # the caller just before calling this, which worked while the menu
   # repainted in place and stopped working the moment it started painting
   # from the top of the viewport: the frame would land on top of them.
-  def menu(items, hint: nil, header: [], allow_text: false, text_prompt: nil, initial: 0, numeric_pick: true)
+  # `context:` is a lambda given the selected index, returning one line to
+  # show under the cursor -- what the row IS, when the row itself can only
+  # say what it is called. It is called for the selected row only, so the
+  # cost is one lookup per keypress rather than one per item. Same idea and
+  # same shape as `browse`'s, which had it first.
+  def menu(items, hint: nil, header: [], allow_text: false, text_prompt: nil, initial: 0,
+           numeric_pick: true, context: nil)
     selected = initial.to_i.clamp(0, [items.size - 1, 0].max)
     header = Array(header)
     # The rows the list cannot have: the header, the blank line under the
@@ -397,12 +403,18 @@ module Tui
     budget = term_height - header.size - (hint ? 2 : 0) - 1
     window = [items.size, [budget, 3].max].min
     offset = clamp_offset(selected, 0, window, items.size)
-    scrollable = items.size > window
 
     loop do
       avail = term_width - 2 # "› " / "  " prefix
+      ctx = items.empty? || context.nil? ? nil : context.call(selected)
+      # The context line comes out of the WINDOW's budget, not out of the
+      # list: window is already the smaller of "what fits" and "how many
+      # there are", so taking one off it hid a row whenever the list was
+      # shorter than the screen -- two versions showed one.
+      row_window = ctx ? [items.size, [budget - 1, 2].max].min : window
+      offset = clamp_offset(selected, offset, row_window, items.size)
       rows = header.dup
-      items[offset, window].to_a.each_with_index do |item, i|
+      items[offset, row_window].to_a.each_with_index do |item, i|
         rows << if (offset + i) == selected
                   # Stripped here, and only here: the whole row is painted
                   # :invert, and a colour's own reset inside it would end the
@@ -415,13 +427,17 @@ module Tui
                   # showed them in plain grey.
                   "  #{truncate_ansi(item, avail)}"
                 end
+        rows << paint("      #{truncate_to_width(ctx, avail - 4)}", :dim) if ctx && (offset + i) == selected
       end
       if hint
         rows << ''
         # Numeric rather than worded ("16-31 of 50") on purpose: this file
         # deliberately depends on nothing but io/console -- no config, no
         # locales -- and a bare range reads the same in every language.
-        text = scrollable ? "#{hint} · #{offset + 1}-#{offset + window}/#{items.size}" : hint
+        # Counted from row_window, not window: with a context line under the
+        # cursor one fewer row is shown, and the counter has to say so.
+        shown = [row_window, items.size - offset].min
+        text = items.size > row_window ? "#{hint} · #{offset + 1}-#{offset + shown}/#{items.size}" : hint
         rows << paint(truncate_to_width(text, term_width), :dim)
       end
       print "\e[?25l"

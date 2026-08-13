@@ -2245,6 +2245,28 @@ def version_row(file, index)
   format('%2d.  %s', index + 1, PostVersions.human_stamp(File.basename(file, '.json')))
 end
 
+# What the version SAYS, for the line under the cursor. A stamp answers
+# "when", and until now that was the whole of it -- restoring meant picking
+# by time and hoping, on the one screen where the point is to recognise a
+# text you wrote. Title first because that is what a post is filed under
+# here; failing that the opening words, which is what an untitled post is
+# recognised by.
+#
+# Read on demand, for the selected row only: ten versions of a long post
+# are ten files nobody needs opened to walk past them.
+def version_preview(file)
+  post = JSON.parse(File.read(file, encoding: 'utf-8'))
+  title = post['title'].to_s.strip
+  return title unless title.empty?
+
+  text = Array(post['content']).filter_map { |b| b['text'] if b['type'] == 'text' }.join(' ')
+  text.strip.gsub(/\s+/, ' ')
+rescue StandardError
+  # A version that will not parse is exactly the one somebody may be trying
+  # to restore FROM, so it stays in the list, just without a preview.
+  nil
+end
+
 # Same two faces as every other picker here: arrow keys in a terminal, a
 # numbered list and a read line when piped. This screen was the one place
 # that asked for a number even in a terminal, which made it the only list
@@ -2254,8 +2276,12 @@ end
 # instead of quietly going back: a piped caller that typed 9 for three
 # versions has made a mistake worth hearing about, and the sentence for it
 # already exists in every locale.
-def version_pick(rows, header)
-  return Tui.menu(rows, header: header, hint: t('cli.versions_menu_hint')) if Tui.interactive?
+def version_pick(rows, header, versions)
+  if Tui.interactive?
+    return Tui.menu(rows, header: header, hint: t('cli.versions_menu_hint'),
+                          context: ->(i) { version_preview(versions[i]) })
+  end
+
 
   header.each { |line| puts line }
   rows.each { |row| puts "  #{row}" }
@@ -2296,7 +2322,7 @@ def props_versions(path, slug)
   # purpose: it is about the whole operation, and a warning is worth more
   # read before the choosing than after it.
   header = [t('cli.versions_heading', slug: slug), t('cli.versions_media_note'), '']
-  index = version_pick(versions.map.with_index { |file, i| version_row(file, i) }, header)
+  index = version_pick(versions.map.with_index { |file, i| version_row(file, i) }, header, versions)
   if index.nil?
     puts
     return
@@ -2304,8 +2330,15 @@ def props_versions(path, slug)
 
   chosen = versions[index]
   restored = JSON.parse(File.read(chosen, encoding: 'utf-8'))
-  print t('cli.versions_confirm', word: t('cli.confirm_word'))
-  unless $stdin.gets&.strip&.downcase == t('cli.confirm_word')
+  # One key, not a typed word. This engine keeps typing for what DISAPPEARS
+  # -- deleting a post and unpublishing one both ask for the slug -- and
+  # restoring a version loses nothing: the current text is kept as a version
+  # of its own first, which is what the sentence above the prompt says. A
+  # confirmation that explains the move is reversible and then asks you to
+  # write something out argues with itself. It stays a confirmation rather
+  # than becoming none, because Enter in the list is a single keystroke and
+  # this overwrites the text being worked on.
+  unless Tui.key_choice(t('cli.versions_confirm')).start_with?(t('cli.confirm_yes_char'))
     puts t('cli.cancelled_nothing_saved')
     puts
     return
