@@ -672,6 +672,8 @@ doctor:
   approval_boolean_fix: "Napiš režim jménem: comments.approval: fav. (off a no se rozumí, protože můžou znamenat jen jedno.)"
   approval_unknown: "Neznámá hodnota comments.approval %{value} — sestavení ji odmítne."
   approval_unknown_fix: "Možnosti jsou jen dvě: \"fav\" (zveřejnit odpovědi, kterým jsi dal hvězdu) a \"off\" (zveřejnit všechny)."
+  approval_key_unknown: "V config/site.yml je sekce comments:, ale nic v ní, co by moderace četla (je tam: %{keys}) — takže se zveřejňuje každá odpověď, bez moderace."
+  approval_key_unknown_fix: "Ten klíč se jmenuje comments.approval a hodnota \"fav\" zveřejní jen odpovědi, kterým jsi dal hvězdu. Jestli jsi moderovat nechtěl, tu sekci radši smaž: klíč, který nikdo nečte, není totéž co vypnutá moderace, a poznáš to až podle odpovědi na webu, kterou jsi neschválil."
   approval_no_network: "comments.approval je zapnuté, ale není nastavená síť, kam se posty oznamují."
   approval_no_network_fix: "Moderace vybírá z odpovědí na oznamovací post. Nastav mastodon: nebo bluesky:, nebo dej comments.approval: off."
   approval_needs_cron: "Moderované komentáře se na web dostanou jedině přes scripts/refresh-sidebar.sh."
@@ -802,6 +804,13 @@ check:
   summary_clean: "Archiv je v pořádku."
 
 stats:
+  # Odmítnutí, která vyhazuje lib/post_stats.rb na cronové cestě. K člověku
+  # se dostanou dvakrát — jako řádek v cronovém mailu a vložená doprostřed
+  # věty, kterou o tokenu píše doctor --online. Na webu, který není
+  # anglicky, z toho byla půlka věty v cizím jazyce.
+  no_mastodon_token: "comments.approval je zapnuté, ale MASTODON_ACCESS_TOKEN není nastavený — bez něj API nikdy neřekne, kterým odpovědím jsi dal hvězdu."
+  no_bluesky_password: "comments.approval je zapnuté, ale BLUESKY_APP_PASSWORD není nastavené — bez něj API nikdy neřekne, které odpovědi se ti líbí."
+  blind_answer: "comments.approval je zapnuté, ale odpověď ze sítě %{network} neřekla, které posty jsou označené hvězdou — požadavek nebyl přihlášený, nebo tokenu chybí read:statuses. Odmítám to místo toho, abych přes už schválené komentáře zapsal prázdné vlákno."
   unknown_option: "Neznámý přepínač: %{option}. stats bere jen --json, nic jiného."
   no_posts: "Zatím není co počítat."
   heading_archive: "Archiv"

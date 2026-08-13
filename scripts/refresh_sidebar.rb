@@ -54,11 +54,35 @@ force_full = ARGV.include?('--full')
 last_full_refresh = File.exist?(FULL_REFRESH_PATH) ? File.read(FULL_REFRESH_PATH).to_f : 0
 full_refresh = force_full || (Time.now.to_f - last_full_refresh) >= FULL_REFRESH_INTERVAL
 
+# Both files below are read only to be merged into, so anything this
+# cannot turn into a Hash has to end as an empty one -- but never in
+# silence, and never left on disk to be met again next tick.
+#
+# Unreadable text used to be swallowed into {} without a word: the merge
+# then dropped every entry outside the refreshed window (with
+# comments.json, whole discussions under older posts), and the run looked
+# exactly like a healthy one. deploy_web.rb's load_manifest meets the same
+# situation and says "treating it as empty" for precisely that reason.
+#
+# Valid JSON of the wrong shape -- `[]`, a number -- is the same corruption
+# from the other side, and worse: it passed the parse and then died on
+# Hash#merge, mid-run, after the widgets and stats.json had been written
+# but before anything was uploaded. Nothing rewrote the file, so every
+# cron tick from then on died in the same place, mailing a backtrace while
+# the live site stayed frozen and the local build looked current. Naming
+# the shape here turns that into one warning and a file the run replaces.
 def previous_json(path)
   return {} unless File.exist?(path)
 
-  JSON.parse(File.read(path))
-rescue StandardError
+  data = JSON.parse(File.read(path))
+  return data if data.is_a?(Hash)
+
+  raise JSON::ParserError, "not an object (#{data.class})"
+rescue StandardError => e
+  name = File.basename(path)
+  warn "⚠️  #{name} is unreadable (#{e.message.lines.first.to_s.strip[0, 60]}) -- ignoring it and writing a fresh one."
+  warn "   Whatever #{name} held for posts this run does not refetch is gone; " \
+       './scripts/refresh-sidebar.sh --full puts it back.'
   {}
 end
 

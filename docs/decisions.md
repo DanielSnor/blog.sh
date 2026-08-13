@@ -138,8 +138,14 @@ approved answer to a rejected comment answers nothing).
   was approved, rewritten from the source on every cron run, with no
   interface that can edit it -- a cache, not a database. But the claim
   above, that there is nothing to moderate or migrate, holds only while
-  this is off, and a deletion at the source takes a cron interval to
-  follow.
+  this is off, and a deletion at the source does not follow immediately.
+  Under a recent post it follows within a cron interval. Under one older
+  than ~90 days it waits for the weekly full pass, because the ordinary
+  tick does not read that far back -- so a reply somebody deleted on
+  Mastodon can stand on the blog for up to a week. `./scripts/refresh-sidebar.sh
+  --full` settles it on the spot, and this is the paragraph to know that
+  in: the two places that describe *approving* say the same thing, but
+  this is the one about holding words that are not yours.
 - **Turning it on hides every existing comment** until the author goes
   and stars the ones worth keeping. Which is why the default is off and
   why it stays a per-site decision.

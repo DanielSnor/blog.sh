@@ -692,6 +692,8 @@ doctor:
   approval_boolean_fix: "Write the mode by name: comments.approval: fav. (off and no are understood, since they can only mean one thing.)"
   approval_unknown: "Unknown comments.approval %{value} -- the build will refuse it."
   approval_unknown_fix: "The only values are \"fav\" (publish the replies you favourite) and \"off\" (publish all of them)."
+  approval_key_unknown: "config/site.yml has a comments: section, but nothing in it that moderation reads (found: %{keys}) -- so every reply is published, unmoderated."
+  approval_key_unknown_fix: "The key is comments.approval, and \"fav\" is the mode that publishes only the replies you favourite. If you meant not to moderate, delete the section instead: a key nobody reads is not the same as switching moderation off, and the two look identical until a reply you never approved is on the site."
   approval_no_network: "comments.approval is on, but no network is configured to announce posts on."
   approval_no_network_fix: "Moderation picks from the replies to an announcement. Configure mastodon: or bluesky:, or set comments.approval: off."
   approval_needs_cron: "Moderated comments reach the site only through scripts/refresh-sidebar.sh."
@@ -823,6 +825,13 @@ check:
   summary_clean: "The archive is sound."
 
 stats:
+  # Refusals raised by lib/post_stats.rb on the cron path. They reach a
+  # person twice -- as a line in the cron mail, and interpolated into what
+  # doctor --online says about the token -- so on a site that is not English
+  # they were half of a sentence in the wrong language.
+  no_mastodon_token: "comments.approval is on but MASTODON_ACCESS_TOKEN is not set -- without it the API never says which replies you favourited."
+  no_bluesky_password: "comments.approval is on but BLUESKY_APP_PASSWORD is not set -- without it the API never says which replies you liked."
+  blind_answer: "comments.approval is on but the %{network} answer did not say which posts are favourited -- the request was not authenticated, or the token is missing read:statuses. Refusing rather than publishing an empty thread over the comments already approved."
   unknown_option: "Unknown option: %{option}. stats takes --json, nothing else."
   no_posts: "There is nothing to count yet."
   heading_archive: "The archive"

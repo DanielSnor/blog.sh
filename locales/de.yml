@@ -682,6 +682,8 @@ doctor:
   approval_boolean_fix: "Schreibe den Modus beim Namen: comments.approval: fav. (off und no werden verstanden, sie können nur eines bedeuten.)"
   approval_unknown: "Unbekannter Wert für comments.approval %{value} -- der Build lehnt ihn ab."
   approval_unknown_fix: "Es gibt nur zwei Werte: \"fav\" (nur favorisierte Antworten veröffentlichen) und \"off\" (alle veröffentlichen)."
+  approval_key_unknown: "config/site.yml hat einen comments:-Abschnitt, aber nichts darin, was die Moderation liest (gefunden: %{keys}) -- es wird also jede Antwort veröffentlicht, unmoderiert."
+  approval_key_unknown_fix: "Der Schlüssel heißt comments.approval, und \"fav\" veröffentlicht nur die Antworten, die du favorisierst. Wolltest du gar nicht moderieren, lösche den Abschnitt lieber: ein Schlüssel, den niemand liest, ist nicht dasselbe wie abgeschaltete Moderation -- der Unterschied zeigt sich erst an einer Antwort auf der Website, die du nie freigegeben hast."
   approval_no_network: "comments.approval ist an, aber es ist kein Netzwerk für Ankündigungen eingerichtet."
   approval_no_network_fix: "Die Moderation wählt aus den Antworten auf eine Ankündigung aus. Richte mastodon: oder bluesky: ein, oder setze comments.approval: off."
   approval_needs_cron: "Moderierte Kommentare erreichen die Seite nur über scripts/refresh-sidebar.sh."
@@ -814,6 +816,13 @@ check:
   summary_clean: "Das Archiv ist in Ordnung."
 
 stats:
+  # Absagen, die lib/post_stats.rb auf dem Cron-Weg wirft. Sie erreichen
+  # einen Menschen zweimal -- als Zeile in der Cron-Mail und mitten im Satz,
+  # den doctor --online über das Token schreibt -- auf einer Website, die
+  # nicht englisch ist, war das ein halber Satz in der falschen Sprache.
+  no_mastodon_token: "comments.approval ist an, aber MASTODON_ACCESS_TOKEN ist nicht gesetzt -- ohne das sagt die API nie, welche Antworten du favorisiert hast."
+  no_bluesky_password: "comments.approval ist an, aber BLUESKY_APP_PASSWORD ist nicht gesetzt -- ohne das sagt die API nie, welche Antworten dir gefallen."
+  blind_answer: "comments.approval ist an, aber die Antwort von %{network} sagte nicht, welche Beiträge favorisiert sind -- die Anfrage war nicht authentifiziert, oder dem Token fehlt read:statuses. Wird abgelehnt, statt ein leeres Gespräch über die bereits freigegebenen Kommentare zu schreiben."
   unknown_option: "Unbekannte Option: %{option}. stats kennt nur --json."
   no_posts: "Es gibt noch nichts zu zählen."
   heading_archive: "Das Archiv"

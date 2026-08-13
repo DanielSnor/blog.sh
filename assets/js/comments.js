@@ -118,11 +118,15 @@
   // The note is not decoration. Someone who replies and then finds
   // nothing under the article concludes the site is broken and replies
   // again -- so the page has to say that what it shows is a selection and
-  // where the whole thread is.
+  // where the whole thread is. It is its own function because the note is
+  // owed to that reader whenever the page is moderated, including on the
+  // paths where no comment ever gets rendered.
+  function moderationNote() {
+    return '<p class="comments-note">' + esc(i18n.comments_moderated) + '</p>';
+  }
+
   function render(container, key, replyLink, moderated, comments) {
-    var note = moderated
-      ? '<p class="comments-note">' + esc(i18n.comments_moderated) + '</p>'
-      : '';
+    var note = moderated ? moderationNote() : '';
     container.innerHTML = note + replyLink + comments.map(renderComment).join('');
     applyThreadCount(key, comments.length);
   }
@@ -223,7 +227,19 @@
         render(container, key, replyLink, true, all[key] || []);
       })
       .catch(function () {
-        container.innerHTML = replyLink;
+        // Showing no comments here is right; dropping the note with them was
+        // not. Without it the article ended in a bare reply link, which reads
+        // as a discussion nobody joined -- exactly the misreading the note was
+        // written to prevent, and exactly the reader it was written for. It is
+        // also the ordinary state of a moderated site between a publish and
+        // the next cron tick, not a rare breakage.
+        //
+        // The comment counter is deliberately left as cron filled it in: this
+        // branch could not read the approved list, so it knows nothing about
+        // how many replies are in it and must not overwrite a known number
+        // with a guessed zero. The note is what explains the difference
+        // between the count above and the list below.
+        container.innerHTML = moderationNote() + replyLink;
       });
   }
 

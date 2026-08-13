@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
+require 'cgi'
 require 'json'
 require 'time'
 require 'uri'
 require_relative 'feed_http'
+require_relative 'i18n'
 require_relative 'site_config'
 
 # lib/post_stats.rb -- favourite/boost/comment counts for announced
@@ -66,6 +68,15 @@ module PostStats
   RECENT_WINDOW_DAYS = 90
   BLUESKY_APPVIEW = 'https://public.api.bsky.app'
 
+  # Run-scoped state for the Bluesky sign-in: the session, the error a
+  # failed sign-in must keep answering with instead of trying again, and
+  # whether the single permitted mid-run refresh has been spent. Declared
+  # here rather than sprung into being on first assignment because each of
+  # them is read before it is written.
+  @bluesky_session = nil
+  @bluesky_session_error = nil
+  @bluesky_session_refreshed = false
+
   module_function
 
   def approval
@@ -78,10 +89,36 @@ module PostStats
     m && { instance: m[1], id: m[2] }
   end
 
+  # An address in a shape the two patterns above do not know -- an import
+  # that carried a foreign permalink, an instance since renamed, a field
+  # filled in by hand -- used to end both callers in silence: fetch_mastodon
+  # returned nil, so that post simply never got comments and nothing said
+  # why, while approval_probe called the same input :blind and sent the
+  # author off to reissue a token that was never the problem. Raising says
+  # which address is unreadable in both places: fetch_one turns it into a
+  # warning naming the post, and doctor into approval_probe_failed, which
+  # quotes the message instead of accusing the credentials.
+  def parse_toot_url!(url)
+    parse_toot_url(url) ||
+      raise("mastodon_url #{url.to_s.inspect} is not an address this engine can read -- expected " \
+            'https://instance/@user/123 or https://instance/users/user/statuses/123, so no ' \
+            'engagement or comments can be fetched for that post.')
+  end
+
   def entries
     Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8'))
       raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
+
+      # Both files this feeds are served from the public site and both are
+      # keyed by the announcement's address, so an unpublished post landing
+      # in them publishes two things the author withheld: where the post was
+      # announced, and the whole discussion under it. A post taken back down
+      # is a draft again (PostWriter keeps unpublished_from on it), so this
+      # one test covers "not published yet" and "no longer published" alike.
+      # The test is build_blog.rb's draft?, deliberately -- comments.json
+      # must describe the site the build actually produced.
+      next if post['state'].to_s == 'draft'
 
       if post['mastodon_url']
         { kind: :mastodon, key: post['mastodon_url'], date: post['date'] }
@@ -109,14 +146,25 @@ module PostStats
   # nil with moderation off: the browser still reads the live thread
   # itself then, and writing a copy nothing renders would be waste.
   def fetch_mastodon(url)
-    parsed = parse_toot_url(url)
-    return nil unless parsed
+    parsed = parse_toot_url!(url)
 
     token = approval ? mastodon_token! : nil
     base = "https://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}"
     status = JSON.parse(FeedHttp.get(base, bearer: token))
     context = JSON.parse(FeedHttp.get("#{base}/context", bearer: token))
-    descendants = (context['descendants'] || []).reject { |s| s['sensitive'] }
+    # Whose decision hides a reply behind a content warning depends on
+    # whether anybody is moderating. With moderation off nothing human has
+    # looked at these replies before a reader does, so the blanket filter is
+    # the only protection there is -- and the client applies the same one on
+    # the path where the browser reads /context itself (assets/js/comments.js).
+    # With `comments.approval: fav` a person read that exact reply and
+    # starred it, and the automatic rule was quietly overruling them: a
+    # starred reply behind a warning could never appear, however many times
+    # it was starred, and nothing anywhere said so. An explicit approval
+    # outranks a blanket rule. The warning itself is not thrown away -- see
+    # mastodon_comment.
+    all_descendants = context['descendants'] || []
+    descendants = approval ? all_descendants : all_descendants.reject { |s| s['sensitive'] }
 
     unless approval
       return {
@@ -159,10 +207,7 @@ module PostStats
   # untouched. A thread nobody answered is still fine; the field is on the
   # announcement itself, so this asks the one status that always exists.
   def blind!(kind)
-    raise "comments.approval is on but the #{kind} answer did not say which posts are " \
-          "favourited -- the request was not authenticated, or the token is missing " \
-          '(Mastodon) read:statuses. Refusing rather than publishing an empty thread ' \
-          'over the comments already approved.'
+    raise I18n.t('stats.blind_answer', network: kind)
   end
 
   # `favourited` is absent, not false, on an unauthenticated response --
@@ -173,8 +218,7 @@ module PostStats
   def mastodon_token!
     token = ENV['MASTODON_ACCESS_TOKEN'].to_s
     if token.empty?
-      raise 'comments.approval is on but MASTODON_ACCESS_TOKEN is not set -- ' \
-            'without it the API never says which replies you favourited.'
+      raise I18n.t('stats.no_mastodon_token')
     end
 
     token
@@ -222,8 +266,25 @@ module PostStats
       'url' => status['url'].to_s,
       'date' => status['created_at'].to_s,
       'favourites' => status['favourites_count'].to_i,
-      'html' => status['content'].to_s
+      'html' => mastodon_body(status)
     }
+  end
+
+  # Now that a starred reply behind a content warning is published (see
+  # fetch_mastodon), the warning has to travel with it. The client renders
+  # `html` and knows nothing of spoiler_text, so leaving the field behind
+  # would show every reader exactly the text its author chose to fold away
+  # -- trading one silent failure for a worse one. <details> because it
+  # needs no stylesheet and no new interface string to work: the summary is
+  # the warning the reply's author wrote. Escaped, because spoiler_text is
+  # plain text from anyone in the Fediverse while `content` is markup
+  # Mastodon has already sanitised.
+  def mastodon_body(status)
+    content = status['content'].to_s
+    spoiler = status['spoiler_text'].to_s.strip
+    return content if spoiler.empty?
+
+    "<details class=\"comment-cw\"><summary>#{CGI.escapeHTML(spoiler)}</summary>#{content}</details>"
   end
 
   # --- Bluesky ----------------------------------------------------------
@@ -280,22 +341,67 @@ module PostStats
   # the route doesn't rest on the PDS's default. One session per run, not
   # per post: BlueskyPoster creates one per call because a blog publishes
   # rarely, but this runs over every announced post on every cron tick.
+  # Two createSession calls per run is the hard ceiling -- the sign-in and,
+  # if the PDS rejects the session part-way through, a single refresh.
   def bluesky_authed_get(path)
-    require_relative 'bluesky_poster'
-    @bluesky_session ||= begin
-      password = ENV['BLUESKY_APP_PASSWORD'].to_s
-      if password.empty?
-        raise 'comments.approval is on but BLUESKY_APP_PASSWORD is not set -- ' \
-              'without it the API never says which replies you liked.'
-      end
+    jwt = bluesky_session['accessJwt']
+    begin
+      JSON.parse(FeedHttp.get("#{BlueskyPoster::PDS}/#{path}",
+                              bearer: jwt,
+                              headers: { 'atproto-proxy' => 'did:web:api.bsky.app#bsky_appview' }))
+    rescue StandardError => e
+      # A session that expired mid-run was never noticed: the same dead JWT
+      # went out for the rest of the run and every post from there on was
+      # skipped. Safe -- nothing published gets overwritten -- but silent,
+      # and on a --full pass over hundreds of posts it costs the whole run.
+      #
+      # Exactly one refresh per run, which is the difference between fixing
+      # that and re-creating the storm the cache below exists to prevent: a
+      # 401 on a session minted seconds ago is not an expiry, it is wrong
+      # credentials or a route that never worked, and retrying it per post
+      # would hammer createSession just as hard as the old ||= did. An
+      # access token lasts hours and a refresh run minutes, so needing a
+      # second one inside one run means something else is wrong.
+      raise unless session_rejected?(e) && !@bluesky_session_refreshed
 
-      BlueskyPoster.xrpc_post('com.atproto.server.createSession',
-                              { identifier: BlueskyPoster::HANDLE, password: password })
+      @bluesky_session_refreshed = true
+      @bluesky_session = nil
+      bluesky_authed_get(path)
+    end
+  end
+
+  # One sign-in per run -- and, crucially, one ATTEMPT per run. `||=`
+  # remembered only success, so a REFUSED sign-in was repeated for every
+  # announced post: a single cron tick made as many createSession calls as
+  # the site has announcements, every half hour. Bluesky rate-limits that
+  # endpoint per account and temporarily locks an account that keeps
+  # failing -- and BlueskyPoster signs in the same way, so the lock would
+  # take publishing down with the sidebar. The failure is remembered and
+  # re-raised instead, which costs this run (every post is skipped rather
+  # than the first one) and keeps the account usable for the next.
+  def bluesky_session
+    return @bluesky_session if @bluesky_session
+    raise @bluesky_session_error if @bluesky_session_error
+
+    require_relative 'bluesky_poster'
+    password = ENV['BLUESKY_APP_PASSWORD'].to_s
+    if password.empty?
+      raise I18n.t('stats.no_bluesky_password')
     end
 
-    JSON.parse(FeedHttp.get("#{BlueskyPoster::PDS}/#{path}",
-                            bearer: @bluesky_session['accessJwt'],
-                            headers: { 'atproto-proxy' => 'did:web:api.bsky.app#bsky_appview' }))
+    @bluesky_session = BlueskyPoster.xrpc_post('com.atproto.server.createSession',
+                                               { identifier: BlueskyPoster::HANDLE, password: password })
+  rescue StandardError => e
+    @bluesky_session_error = e
+    raise
+  end
+
+  # FeedHttp turns any non-2xx into a RuntimeError whose message is the
+  # status line, so the text is the only channel there is for telling "this
+  # session is no longer accepted" apart from a request that was wrong for
+  # some other reason.
+  def session_rejected?(error)
+    error.message.to_s.start_with?('HTTP 401 ')
   end
 
   # Same filtering as the client (assets/js/comments.js): placeholders
@@ -320,7 +426,7 @@ module PostStats
       next unless post && post['record']
       next if (post['labels'] || []).any?
 
-      approved = !post.dig('viewer', 'like').nil? ||
+      approved = bluesky_liked?(post) ||
                  (!own_did.nil? && post.dig('author', 'did') == own_did)
       next unless approved
 
@@ -328,6 +434,19 @@ module PostStats
       approved_bluesky(item['replies'], own_did, out)
     end
     out
+  end
+
+  # What "the author liked this" looks like on the wire: viewer.like is the
+  # AT-URI of the like record, or the key is simply absent. The test used to
+  # be "the key is there and is not null", which let any value nobody
+  # defined -- an empty string above all -- publish a reply the author never
+  # picked. Mastodon's half of the same decision asks for `== true`, and the
+  # whole feature is "nothing gets out that I did not choose", so the two
+  # networks are held to the same strictness: a like is a reference to a
+  # like record, and an empty string is a reference to nothing.
+  def bluesky_liked?(post)
+    like = post.dig('viewer', 'like')
+    like.is_a?(String) && !like.strip.empty?
   end
 
   # `text` rather than `html`: Bluesky reply text is plain text, so it is
@@ -363,18 +482,34 @@ module PostStats
   # nothing" and empties every thread on the site. The probe asks about
   # the announcement rather than a reply so it works on a post nobody has
   # answered yet.
+  # :blind means one thing only: the network answered ABOUT THIS POST and
+  # left the viewer state out of the answer. It used to be returned for two
+  # situations the credentials have nothing to do with -- an address
+  # parse_toot_url could not read, and an announcement that is deleted or
+  # momentarily unreachable, where there is no post to carry a viewer at
+  # all. doctor renders :blind as "your credentials cannot see your
+  # favourites" with a fix that says reissue the token, so a post the author
+  # deleted last month came back as a bug report about env.sh. Both now
+  # raise, which doctor already handles: approval_probe_failed quotes the
+  # message instead of naming a culprit.
   def approval_probe(entry)
     if entry[:kind] == :mastodon
-      parsed = parse_toot_url(entry[:key])
-      return :blind unless parsed
-
+      parsed = parse_toot_url!(entry[:key])
       status = JSON.parse(FeedHttp.get("https://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}",
                                        bearer: mastodon_token!))
       status.key?('favourited') ? :ok : :blind
     else
       path = "xrpc/app.bsky.feed.getPostThread?depth=0&uri=#{URI.encode_www_form_component(entry[:key])}"
-      data = bluesky_authed_get(path)
-      data.dig('thread', 'post', 'viewer').nil? ? :blind : :ok
+      post = bluesky_authed_get(path).dig('thread', 'post')
+      # #notFoundPost and #blockedPost come back in place of a post, so
+      # there is no viewer to read and nothing here is a verdict on the
+      # credentials.
+      if post.nil?
+        raise "the announcement #{entry[:key]} did not come back from the network -- it was deleted, " \
+              'blocked or briefly unreachable, so there was no thread to test the app password against.'
+      end
+
+      post['viewer'].nil? ? :blind : :ok
     end
   end
 
