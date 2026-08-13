@@ -41,33 +41,99 @@ module Wizard
   # run that runs out of input must not silently blank the rest of the
   # config, so it raises and the caller's handler reports that nothing
   # was written.
-  def ask(label, current, hint: nil, suggested: false)
-    puts Tui.paint(label, :bold)
-    puts Tui.paint("   #{hint}", :dim) if hint
+  # The rows a question keeps above it: the section being filled in and the
+  # answers already given inside it. A frame repaints over the last one, so
+  # without this a setup run would show one question at a time with no
+  # record of what has already been decided -- which for a wizard whose
+  # whole job is filling in a config is the thing you most need on screen.
+  # The caller owns it: it starts a section, appends as answers land, and
+  # clears it when the section ends.
+  def context
+    @context ||= []
+  end
+
+  def context=(rows)
+    @context = Array(rows)
+  end
+
+  def remember(row)
+    context << row
+  end
+
+  # An answer, in the form it goes back on screen as: the question it
+  # answered and what it now says. Recorded by `ask` itself rather than by
+  # each of the two wizards, so every question in ./setup.sh and ./style.sh
+  # builds the running record without either of them being changed.
+  def record(label, value)
+    shown = value.to_s.empty? ? t('empty_value') : value.to_s
+    remember(format('  %s %s', Tui.paint("#{label}:", :dim), Tui.truncate_to_width(shown, 60)))
+  end
+
+  # The frame a question stands on, ending in a blank row for the prompt --
+  # frame leaves the cursor at the end of its last line, so the prompt and
+  # what gets typed after it land there.
+  #
+  # The record is trimmed from the TOP to whatever the window has room for:
+  # a long section would otherwise push its own question off the bottom,
+  # and the answers worth seeing are the ones just given.
+  def question_frame(label, hint, problem)
+    room = [Tui.term_height - 6, 2].max
+    rows = context.size > room ? context.last(room) : context.dup
+    rows << '' unless rows.empty?
+    rows << Tui.paint(label, :bold)
+    rows << Tui.paint("   #{hint}", :dim) if hint
+    rows << Tui.paint("   #{problem}", :red) if problem
+    rows << ''
+    Tui.frame(rows)
+  end
+
+  # `record:` is false when a caller answers for the record itself --
+  # ask_valid asks repeatedly and only the accepted answer belongs there.
+  def ask(label, current, hint: nil, suggested: false, problem: nil, record: true)
     shown = current.to_s.empty? ? t('empty_value') : current.to_s
-    print t(suggested ? 'prompt_with_suggestion' : 'prompt_with_current', current: shown)
+    prompt = t(suggested ? 'prompt_with_suggestion' : 'prompt_with_current', current: shown)
+
+    if Tui.interactive?
+      question_frame(label, hint, problem)
+      print prompt
+    else
+      puts Tui.paint(label, :bold)
+      puts Tui.paint("   #{hint}", :dim) if hint
+      puts Tui.paint("   #{problem}", :red) if problem
+      print prompt
+    end
     answer = $stdin.gets
     raise Interrupt if answer.nil?
 
     answer = answer.strip
-    puts
-    answer.empty? ? current : answer
+    puts unless Tui.interactive?
+    value = answer.empty? ? current : answer
+    self.record(label, value) if record && Tui.interactive?
+    value
   end
 
   # The same, with a check that runs before the answer is accepted. The
   # block returns nil when happy or the sentence explaining what is
   # wrong -- said immediately, while the answer is still in mind, rather
   # than saved up for a validation report at the end.
+  # The complaint travels INTO the next frame rather than being printed
+  # under the answer: printed, the repaint would wipe it before it had been
+  # read, and a validation message nobody sees is a question that seems to
+  # refuse answers for no reason.
   def ask_valid(label, current, hint: nil, suggested: false)
+    problem = nil
     loop do
-      answer = ask(label, current, hint: hint, suggested: suggested)
-      return answer if answer == current || answer.to_s.empty?
+      answer = ask(label, current, hint: hint, suggested: suggested, problem: problem, record: false)
+      if answer == current || answer.to_s.empty?
+        record(label, answer) if Tui.interactive?
+        return answer
+      end
 
       problem = yield(answer)
-      return answer unless problem
-
-      puts Tui.paint("   #{problem}", :red)
-      puts
+      unless problem
+        record(label, answer) if Tui.interactive?
+        return answer
+      end
     end
   end
 
@@ -76,8 +142,12 @@ module Wizard
   # unreadable ribbon. Returns the current value unchanged if the editor
   # is unavailable or the file comes back empty.
   def ask_text(label, current, hint: nil, comment: nil)
-    puts Tui.paint(label, :bold)
-    puts Tui.paint("   #{hint}", :dim) if hint
+    if Tui.interactive?
+      question_frame(label, hint, nil)
+    else
+      puts Tui.paint(label, :bold)
+      puts Tui.paint("   #{hint}", :dim) if hint
+    end
     unless Tui.interactive?
       # Piped runs have no editor to open; a single line is still better
       # than refusing the setting outright.
@@ -147,8 +217,9 @@ module Wizard
                      header: [Tui.paint(label, :bold), ''],
                      hint: t('menu_hint', count: [options.size, 9].min),
                      initial: current_index)
-    puts
-    index.nil? ? options[current_index].first : options[index].first
+    chosen = index || current_index
+    record(label, options[chosen].last)
+    options[chosen].first
   end
 
   # A menu that can be left, for wizards built as a set of sections
@@ -173,9 +244,17 @@ module Wizard
 
     index = Tui.menu(rows, header: [Tui.paint(label, :bold), ''],
                            hint: t('menu_hint_exit', count: [rows.size, 9].min))
-    puts
-    return nil if index.nil? || index >= options.size
+    if index.nil? || index >= options.size
+      self.context = []
+      return nil
+    end
 
+    # A section starts its own record. What the previous one answered is
+    # written and done with, and carrying it over would push the new
+    # section's questions off the bottom of the screen. The name stays at
+    # the top so every question in it says which section it belongs to --
+    # this menu is the only place that knows.
+    self.context = [Tui.paint(options[index].last, :bold), '']
     options[index].first
   end
 
@@ -185,6 +264,10 @@ module Wizard
   # things as they are, and for the banner's two overlays it silently
   # turned them off instead.
   def confirm(prompt, default: nil)
+    # The frame ends in a blank row and key_choice writes the prompt onto
+    # it, so the question stands on whatever the section has decided so far
+    # instead of appearing alone under a repaint.
+    Tui.frame(context.dup + ['', '']) if Tui.interactive? && !context.empty?
     answer = Tui.key_choice(prompt)
     return default if default != nil && answer.to_s.empty?
 

@@ -98,7 +98,24 @@ end
 # it by accident.
 PATH_PROMPTS = /_(path|dir|source)_prompt\z/.freeze
 
+# The rows an import question stands on: which source is being imported
+# from, and what has been answered about it so far. Same running record the
+# other three wizards keep -- a frame repaints over the last question, so
+# without it a two-question source would show the second one alone.
+def import_context
+  @import_context ||= []
+end
+
+def import_frame
+  return unless Tui.interactive?
+
+  room = [Tui.term_height - 4, 2].max
+  rows = import_context.size > room ? import_context.last(room) : import_context.dup
+  Tui.frame(rows + [''])
+end
+
 def ask(prompt_key)
+  import_frame
   value = if prompt_key.match?(PATH_PROMPTS)
             Tui.path_line(t(prompt_key))
           else
@@ -106,7 +123,11 @@ def ask(prompt_key)
             $stdin.gets
           end
   value = value.to_s.strip
-  value.empty? ? nil : value
+  return nil if value.empty?
+
+  import_context << format('  %s %s', Tui.paint("#{t(prompt_key).sub(/:\s*\z/, '')}:", :dim),
+                           Tui.truncate_to_width(value, 60))
+  value
 end
 
 def build_beehiiv
@@ -421,7 +442,7 @@ def ask_source
       # A group of one needs no second question.
       choices = members.map { |name| SOURCES.find { |k, _| k == name } }.compact
       if choices.size == 1
-        puts
+        import_context.replace([Tui.paint(source_name(choices.first.first), :bold), ''])
         return choices.first
       end
 
@@ -436,6 +457,9 @@ def ask_source
       # Backing out of a group is not backing out of the import --
       # return to the group question instead of quitting the wizard.
       next if index.nil?
+
+      # The chosen source opens the record every question below it stands on.
+      import_context.replace([Tui.paint(source_name(choices[index].first), :bold), ''])
 
       puts
       return choices[index]
