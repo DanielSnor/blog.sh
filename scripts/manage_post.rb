@@ -1457,8 +1457,13 @@ def queue_frame_lines(entries, selected, offset, window, mode, status)
              end
   end
   lines << ''
-  lines << (status.to_s.empty? ? '' : Tui.truncate_to_width(status.to_s, Tui.term_width))
-  lines << ''
+  # The status line only exists when it has something to say. Reserving a
+  # row for it left three blank lines stacked under the list on every
+  # ordinary frame, which reads as a gap rather than as breathing room.
+  unless status.to_s.empty?
+    lines << Tui.truncate_to_width(status.to_s, Tui.term_width)
+    lines << ''
+  end
   keys = mode == :list ? t('cli.queue_menu_hint') : with_carry_key(t('cli.queue_actions', slug: entries[selected][:slug]))
   lines.concat(Tui.fold_prompt(Tui.paint(keys, :dim), Tui.term_width).lines.map(&:chomp))
   lines
@@ -1533,10 +1538,29 @@ def cmd_queue_screen
         selected += key == 'u' ? -1 : 1
       end
     when 'm'
-      # queue_carry paints its own frame into this same screen and comes
-      # back with the cursor on the post it put down.
-      carried, status = queue_quiet_action { queue_carry(entries, selected) }
-      dirty ||= carried
+      # The carry SCREEN must not run inside queue_quiet_action: that
+      # redirects $stdout, and Tui.frame prints there -- so the screen was
+      # painted into the buffer instead of onto the terminal and [m] looked
+      # like a key that does nothing. Only the write afterwards is captured,
+      # because only the write has a line to say.
+      first_future = entries.index { |entry| entry[:time] > Time.now }
+      if first_future.nil? || selected < first_future
+        status = t('cli.queue_swap_overdue')
+      else
+        target = Tui.raw_screen do
+          print "\e[?25l"
+          queue_carry_screen(entries, selected, first_future)
+        ensure
+          print "\e[?25h"
+        end
+        if target && target != selected
+          carried, status = queue_quiet_action { queue_carry_apply(entries, selected, target) }
+          if carried
+            dirty = true
+            selected = target
+          end
+        end
+      end
     when 'p', 's', 'n'
       # These print more than a line -- a publish announces, a reschedule
       # asks. They get the terminal to themselves.
@@ -1707,6 +1731,13 @@ def queue_carry(entries, index)
   target = queue_carry_screen(entries, index, first_future)
   return false if target.nil? || target == index
 
+  queue_carry_apply(entries, index, target)
+end
+
+# The write half, split from the screen half so a caller that has already
+# painted its own frame (cmd_queue_screen) can run the two apart -- the
+# screen has to reach the terminal, the write only has a line to report.
+def queue_carry_apply(entries, index, target)
   order = entries.dup
   order.insert(target, order.delete_at(index))
   times = entries.map { |entry| entry[:time] }
