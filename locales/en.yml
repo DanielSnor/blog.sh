@@ -6,6 +6,8 @@
 # search index, sidebar widget JSON, CLI messages). The client-side
 # counterpart is js.date_locale below -- keep the two consistent so
 # build-time and runtime dates read the same.
+thousands_separator: ","
+decimal_point: "."
 date_format: "%b %-d, %Y"
 date_time_format: "%b %-d, %Y %H:%M"
 
@@ -333,6 +335,7 @@ cli:
       ./blog.sh check                walks the archive and says what is broken in it
       ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                      writes the whole archive out as a tree of markdown files (default tmp/export)
+      ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
@@ -769,6 +772,28 @@ check:
   and_more: "...and %{count} more of the same kind, not listed."
   summary: "%{errors} problem(s), %{warnings} thing(s) worth a look."
   summary_clean: "The archive is sound."
+
+stats:
+  unknown_option: "Unknown option: %{option}. stats takes --json, nothing else."
+  no_posts: "There is nothing to count yet."
+  heading_archive: "The archive"
+  heading_years: "By year"
+  heading_types: "What they are"
+  heading_words: "Words"
+  heading_tags: "Tags"
+  heading_media: "Media"
+  heading_sources: "Where it came from"
+  archive_line: "%{total} post(s): %{published} published, %{drafts} draft(s), %{scheduled} scheduled, %{pages} page(s)"
+  span_line: "%{first} - %{last}, which is %{days} days"
+  busiest_line: "the busiest year was %{year} (%{count} posts)"
+  words_line: "%{total} words in all, %{mean} per post on average, %{median} in the middle"
+  longest_line: "longest: %{slug} (%{words} words)"
+  reading_line: "reading the whole archive takes %{hours} hours"
+  reading_line_minutes: "reading the whole archive takes %{minutes} minutes"
+  media_none: "no media at all"
+  tags_line: "%{unique} different, %{per_post} per post"
+  media_line: "%{files} file(s), %{size}, across %{posts} post(s)"
+  media_referenced_line: "%{referenced} file(s) the posts ask for, across %{posts} post(s) -- media.nosync is not here"
 
 export:
   heading: "Writing this archive out to %{path}"

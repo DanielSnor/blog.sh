@@ -15,6 +15,7 @@
 #   ./blog.sh doctor [--online] [--strip-location]
 #   ./blog.sh check
 #   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+#   ./blog.sh stats [--json]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -86,6 +87,13 @@ case "${1:-}" in
   export)
     shift
     exec ruby scripts/export.rb "$@"
+    ;;
+  # Counts the archive on disk, so it needs no env.sh either -- and it is
+  # the command most likely to be piped somewhere (--json), which is
+  # another reason not to make it depend on a configuration being right.
+  stats)
+    shift
+    exec ruby scripts/stats.rb "$@"
     ;;
 esac
 

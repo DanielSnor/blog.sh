@@ -66,6 +66,17 @@ byte-for-byte against the previous build.
   posts keep their identity, series, redirects and announcement URLs, so
   export plus re-import moves an installation instead of merely leaving
   one.
+- **`./blog.sh stats`.** What the archive actually is, counted from the
+  posts on disk: how many there are split into published, drafts,
+  scheduled and pages (the four add up, and a page that is also a draft
+  counts once), a bar per year, what the posts are made of, words with
+  both the mean and the median, tags, media, and which platforms the
+  archive came from. The pair of averages is the point -- sean.cz reads
+  55 words per post on average and 19 in the middle, because half of it
+  is imported tweets, and either figure alone would mislead. `--json`
+  prints the same numbers unlocalized and unrounded for a cron job or a
+  graph. Like `check` it needs no build, no network and no `env.sh`, and
+  it answers in under two seconds on 4,400 posts.
 - **Editing a post is undoable.** The previous text is kept before an
   overwrite, by an edit or by a re-import, and `[v]` in the `props` dialog
   puts one back. Ten per post, oldest dropped; they travel to the trash

@@ -6,6 +6,8 @@
 # deutsche Anführungszeichen („…“), Datumsformat TT.MM.JJJJ -- passend zu
 # js.date_locale weiter unten, beide zusammen ändern.
 
+thousands_separator: "."
+decimal_point: ","
 date_format: "%d.%m.%Y"
 date_time_format: "%d.%m.%Y %H:%M"
 
@@ -332,6 +334,7 @@ cli:
       ./blog.sh check                geht das Archiv durch und nennt, was darin kaputt ist
       ./blog.sh export [<Verzeichnis>] [--no-drafts] [--dry-run] [--force]
                                      schreibt das ganze Archiv als Baum von Markdown-Dateien (Standard tmp/export)
+      ./blog.sh stats [--json]       zählt das Archiv -- Beiträge, Jahre, Wörter, Schlagwörter, Medien, Herkunft
       ./blog.sh help                 zeigt diese Hilfe
       ./blog.sh version              gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
@@ -766,6 +769,28 @@ check:
   and_more: "...und %{count} weitere derselben Art, nicht aufgeführt."
   summary: "%{errors} Problem(e), %{warnings} Sache(n) zum Nachsehen."
   summary_clean: "Das Archiv ist in Ordnung."
+
+stats:
+  unknown_option: "Unbekannte Option: %{option}. stats kennt nur --json."
+  no_posts: "Es gibt noch nichts zu zählen."
+  heading_archive: "Das Archiv"
+  heading_years: "Nach Jahr"
+  heading_types: "Was sie sind"
+  heading_words: "Wörter"
+  heading_tags: "Schlagwörter"
+  heading_media: "Medien"
+  heading_sources: "Woher es stammt"
+  archive_line: "%{total} Beiträge: %{published} veröffentlicht, %{drafts} Entwürfe, %{scheduled} geplant, %{pages} Seiten"
+  span_line: "%{first} - %{last}, das sind %{days} Tage"
+  busiest_line: "am meisten kam %{year} dazu (%{count} Beiträge)"
+  words_line: "%{total} Wörter insgesamt, %{mean} pro Beitrag im Schnitt, %{median} in der Mitte"
+  longest_line: "am längsten: %{slug} (%{words} Wörter)"
+  reading_line: "das ganze Archiv zu lesen dauert %{hours} Stunden"
+  reading_line_minutes: "das ganze Archiv zu lesen dauert %{minutes} Minuten"
+  media_none: "keinerlei Medien"
+  tags_line: "%{unique} verschiedene, %{per_post} pro Beitrag"
+  media_line: "%{files} Datei(en), %{size}, bei %{posts} Beiträgen"
+  media_referenced_line: "%{referenced} Datei(en) verlangen die Beiträge, bei %{posts} Beiträgen -- media.nosync liegt nicht hier"
 
 export:
   heading: "Das Archiv wird nach %{path} geschrieben"

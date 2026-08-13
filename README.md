@@ -361,6 +361,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh check                # walks the archive and says what is broken in it
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                # writes the whole archive out as a tree of markdown files
+./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```

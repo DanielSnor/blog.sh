@@ -373,6 +373,34 @@ Three things are worth knowing before you rely on the result:
   to another machine or another host -- and, run against a scratch
   copy, the way to check that an export really did come out whole.
 
+## Counting the archive
+
+```bash
+./blog.sh stats           # a screen: posts by year and kind, words, tags, media, sources
+./blog.sh stats --json    # the same figures, for whatever reads them next
+```
+
+Reads the archive on disk -- no build, no network, no `env.sh` -- and on
+4,400 posts comes back in under two seconds. What it says, and why each
+line is there:
+
+- **The archive**: posts split into published, drafts, scheduled and
+  pages. The four add up to the total; a page that is also a draft counts
+  once, as a page.
+- **By year** and **What they are**: where the archive is thickest, and
+  what it is made of (the dominant content type per post, the same one
+  the `/type/` listings use).
+- **Words**: total, mean and median. Both averages, deliberately --
+  sean.cz reads 55 words per post on average and 19 in the middle,
+  because half the archive is imported tweets, and only the pair says so.
+- **Tags**, **Media** (files on disk, or what the posts ask for when the
+  media directory is not here) and **Where it came from** -- the
+  platforms the archive is actually made of, which is a different number
+  from how many the importers support.
+
+`--json` prints the same figures unlocalized and unrounded, so the
+numbers can go into a post, a cron job or a graph.
+
 ## Deploying
 
 `./blog.sh rebuild` = build + deploy with `--prune` in one step; the

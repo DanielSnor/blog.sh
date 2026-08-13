@@ -5,6 +5,8 @@
 # strftime formáty pro všechna data renderovaná na serveru (datumové odznaky,
 # search index, JSON sidebar widgetů, hlášky CLI). Klientský protějšek je
 # js.date_locale níže — drž je konzistentní.
+thousands_separator: "\u00a0"
+decimal_point: ","
 date_format: "%-d. %-m. %Y"
 date_time_format: "%-d. %-m. %Y %H:%M"
 
@@ -330,6 +332,7 @@ cli:
       ./blog.sh check                projde archiv a řekne, co je v něm rozbité
       ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
                                      zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
+      ./blog.sh stats [--json]       spočítá archiv — posty, roky, slova, štítky, média, odkud to je
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -762,6 +765,28 @@ check:
   and_more: "...a dalších %{count} téhož druhu, nevypsaných."
   summary: "Problémů: %{errors}, věcí ke kouknutí: %{warnings}."
   summary_clean: "Archiv je v pořádku."
+
+stats:
+  unknown_option: "Neznámý přepínač: %{option}. stats bere jen --json, nic jiného."
+  no_posts: "Zatím není co počítat."
+  heading_archive: "Archiv"
+  heading_years: "Po letech"
+  heading_types: "Čím jsou"
+  heading_words: "Slova"
+  heading_tags: "Štítky"
+  heading_media: "Média"
+  heading_sources: "Odkud to je"
+  archive_line: "%{total} postů: %{published} publikovaných, %{drafts} rozepsaných, %{scheduled} naplánovaných, %{pages} stránek"
+  span_line: "%{first} – %{last}, to je %{days} dní"
+  busiest_line: "nejvíc toho přibylo v roce %{year} (%{count} postů)"
+  words_line: "%{total} slov celkem, %{mean} na post v průměru, %{median} uprostřed"
+  longest_line: "nejdelší: %{slug} (%{words} slov)"
+  reading_line: "přečíst celý archiv trvá %{hours} hodiny"
+  reading_line_minutes: "přečíst celý archiv trvá %{minutes} minut"
+  media_none: "žádná média"
+  tags_line: "%{unique} různých, %{per_post} na post"
+  media_line: "%{files} souborů, %{size}, u %{posts} postů"
+  media_referenced_line: "%{referenced} souborů si posty říká, u %{posts} postů — media.nosync tu není"
 
 export:
   heading: "Zapisuju archiv do %{path}"

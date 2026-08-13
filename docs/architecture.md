@@ -273,6 +273,23 @@ What is deliberately lost: `small`/`mention`/`color` spans keep their
 text and lose their styling, and a draft's preview URL is not exported
 (it is a private address, not a permalink).
 
+## Counting (`lib/stats.rb`)
+
+`./blog.sh stats` is the same shape as `check` and `export`: its own
+entry point, the archive on disk as its only input, no configuration it
+could die on. `lib/stats.rb` counts and returns a plain Hash -- it never
+prints, colours or translates -- and `scripts/stats.rb` renders that
+either as a screen for a person or, with `--json`, verbatim for whatever
+reads it next. That split is what keeps the two outputs from drifting:
+there is one set of numbers and two ways of showing it.
+
+It reuses what already answers each question rather than re-deriving it:
+`PostText.plain` for words (the same text the search index is built
+from), `ContentType.dominant` for what a post is, `FileSize.human` for
+sizes, and the build's own 200-words-per-minute constant for reading
+time -- two places telling a reader how long something takes must not
+disagree.
+
 ## Build pipeline (`build/build_blog.rb`)
 
 A single linear pass, no framework:
