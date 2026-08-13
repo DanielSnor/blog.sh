@@ -3,6 +3,7 @@ require 'json'
 require 'uri'
 require 'digest'
 require_relative 'site_config'
+require_relative 'i18n'
 
 # Posts a status to Mastodon on behalf of the blog, so each post can carry a
 # "reply here to comment" toot. Entirely optional: without a `mastodon:`
@@ -30,7 +31,7 @@ module MastodonPoster
 
     token = ENV['MASTODON_ACCESS_TOKEN']
     if token.to_s.empty?
-      warn 'MASTODON_ACCESS_TOKEN is not set, the toot was not created.'
+      warn I18n.t('poster.no_mastodon_token_post')
       return nil
     end
 
@@ -62,7 +63,7 @@ module MastodonPoster
 
     token = ENV['MASTODON_ACCESS_TOKEN']
     if token.to_s.empty?
-      warn 'MASTODON_ACCESS_TOKEN is not set, the toot was not deleted.'
+      warn I18n.t('poster.no_mastodon_token_delete')
       return false
     end
 

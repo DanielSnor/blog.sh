@@ -447,6 +447,18 @@ cli:
   rename_go: "Přejmenovat? [a/N] "
   renamed_label: "Přejmenováno: %{slug}"
 
+poster:
+  # Co se autor dozví, když oznámení neodešlo. Je to výsledek něčeho, co
+  # právě udělal — stisku [t] nebo publikace — takže to čte člověk, v CLI,
+  # ve svém jazyce. Diagnostika pod tím (HTTP kódy, text výjimky) zůstává
+  # anglicky: ta je pro toho, kdo se na to má podívat, a přeložený stavový
+  # řádek se nikomu nehledá.
+  no_mastodon_token_post: "MASTODON_ACCESS_TOKEN není nastavený, toot se neodeslal."
+  no_mastodon_token_delete: "MASTODON_ACCESS_TOKEN není nastavený, toot se nesmazal."
+  no_bluesky_password_post: "BLUESKY_APP_PASSWORD není nastavené, oznámení na Bluesky se neodeslalo."
+  no_bluesky_password_delete: "BLUESKY_APP_PASSWORD není nastavené, oznámení na Bluesky se nesmazalo."
+  stats_fetch_failed: "Načtení statistik selhalo (%{key}): %{message}"
+
 redirect:
   moved: "Tenhle příspěvek se přestěhoval:"
 

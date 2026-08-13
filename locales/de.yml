@@ -457,6 +457,18 @@ cli:
   rename_go: "Umbenennen? [j/N] "
   renamed_label: "Umbenannt: %{slug}"
 
+poster:
+  # Was die Autorin erfährt, wenn eine Ankündigung nicht rausging. Es ist
+  # das Ergebnis von etwas, das sie gerade getan hat -- [t] gedrückt oder
+  # veröffentlicht -- also liest das ein Mensch, in der CLI, in seiner
+  # Sprache. Die Diagnose darunter (HTTP-Codes, Ausnahmetext) bleibt
+  # englisch: die ist für den, der nachsehen soll.
+  no_mastodon_token_post: "MASTODON_ACCESS_TOKEN ist nicht gesetzt, der Toot wurde nicht erstellt."
+  no_mastodon_token_delete: "MASTODON_ACCESS_TOKEN ist nicht gesetzt, der Toot wurde nicht gelöscht."
+  no_bluesky_password_post: "BLUESKY_APP_PASSWORD ist nicht gesetzt, die Bluesky-Ankündigung wurde nicht gepostet."
+  no_bluesky_password_delete: "BLUESKY_APP_PASSWORD ist nicht gesetzt, die Bluesky-Ankündigung wurde nicht gelöscht."
+  stats_fetch_failed: "Das Laden der Statistiken schlug fehl (%{key}): %{message}"
+
 redirect:
   moved: "Dieser Beitrag ist umgezogen:"
 

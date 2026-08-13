@@ -464,6 +464,19 @@ cli:
   rename_go: "Rename? [y/N] "
   renamed_label: "Renamed: %{slug}"
 
+poster:
+  # What the author is told when an announcement did not go out. These are
+  # the outcome of something they just did -- pressing [t], or publishing --
+  # so a person reads them, in the CLI, in their own language. The
+  # diagnostics underneath (HTTP codes, exception text) stay English: those
+  # are for whoever is asked to look at it, and a translated status line
+  # helps nobody search for it.
+  no_mastodon_token_post: "MASTODON_ACCESS_TOKEN is not set, the toot was not created."
+  no_mastodon_token_delete: "MASTODON_ACCESS_TOKEN is not set, the toot was not deleted."
+  no_bluesky_password_post: "BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not posted."
+  no_bluesky_password_delete: "BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not deleted."
+  stats_fetch_failed: "Fetching the stats failed (%{key}): %{message}"
+
 # The one line on a renamed post's redirect stub -- the page a reader sees
 # for a fraction of a second (or with meta-refresh disabled) at an old
 # address.

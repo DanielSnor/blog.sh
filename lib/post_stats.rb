@@ -516,7 +516,7 @@ module PostStats
   def fetch_one(entry)
     entry[:kind] == :mastodon ? fetch_mastodon(entry[:key]) : fetch_bluesky(entry[:key])
   rescue StandardError => e
-    warn "Stats fetch failed (#{entry[:key]}): #{e.message}"
+    warn I18n.t('poster.stats_fetch_failed', key: entry[:key], message: e.message)
     nil
   end
 

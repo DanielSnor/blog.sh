@@ -5,6 +5,7 @@ require 'uri'
 require 'json'
 require 'time'
 require_relative 'site_config'
+require_relative 'i18n'
 
 # Posts the announcement to Bluesky via the AT Protocol, so each post can
 # carry a "reply here to comment" thread -- the Bluesky counterpart of
@@ -58,7 +59,7 @@ module BlueskyPoster
 
     password = ENV['BLUESKY_APP_PASSWORD']
     if password.to_s.empty?
-      warn 'BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not posted.'
+      warn I18n.t('poster.no_bluesky_password_post')
       return nil
     end
 
@@ -92,7 +93,7 @@ module BlueskyPoster
 
     password = ENV['BLUESKY_APP_PASSWORD']
     if password.to_s.empty?
-      warn 'BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not deleted.'
+      warn I18n.t('poster.no_bluesky_password_delete')
       return false
     end
 
