@@ -209,7 +209,13 @@ end
 # rather than a tmp/ path nobody on a server can open. Deploy runs
 # WITHOUT --prune -- a preview must never delete anything.
 def offer_palette_preview(colors, name)
-  return unless Wizard.confirm(t('q_palette_preview'), default: true)
+  # Declining is an ending too. Every other way out of this method closes on
+  # a blank line and this one closed on the question, so the palette section
+  # was the one section whose last line depended on the answer.
+  unless Wizard.confirm(t('q_palette_preview'), default: true)
+    puts
+    return
+  end
 
   require_relative '../lib/palette_preview'
   result = Tui.spinner(t('pv_building')) do
@@ -1076,6 +1082,12 @@ def run
     refresh_current
   end
 
+  # The blank line the review stands on. The section menu ends in the keys
+  # row and closes it without a blank -- Tui.menu prints one newline, no
+  # more, on the rule that whoever wants the blank writes it. Nobody did, so
+  # the run's whole verdict arrived glued to the bottom edge of the menu:
+  # "…· Esc dokončit" and under it, touching, "Nic se nezměnilo".
+  puts
   outcome = Wizard.review_and_write([[relative(SITE_YML), site]])
   return unless outcome == :written
 
@@ -1103,7 +1115,10 @@ end
 # ends by offering the look at it rather than describing what changed.
 def offer_rebuild
   puts
-  return unless Wizard.confirm(t('q_rebuild'))
+  unless Wizard.confirm(t('q_rebuild'))
+    puts
+    return
+  end
 
   puts
   # No shell: ROOT is an installation path, and every path with a space in
@@ -1118,6 +1133,11 @@ def offer_rebuild
   else
     puts Tui.paint("⚠️  #{t('rebuild_failed')}", :yellow)
   end
+  # This is the last line ./style.sh ever prints, on all four ways out of
+  # it, and every command reachable from the wizard ends on exactly one
+  # blank line. This one ended on none -- down a pipe it did not even end on
+  # a newline: the run stopped mid-row, on the rebuild question itself.
+  puts
 end
 
 Wizard.guard { run }

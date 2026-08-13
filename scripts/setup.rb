@@ -398,6 +398,13 @@ def ask_mastodon(site, env, current)
 
   puts t('token_where', instance: instance)
   token = Tui.password(t('q_token'))
+  # Tui.password closes the prompt row itself in a terminal -- it has to,
+  # nothing was echoed to close it. Down a pipe it takes the same silent
+  # route and does NOT, so the `puts` below stopped being the blank line it
+  # is here and became the row's line break instead: piped, "Bez tokenu."
+  # arrived hard against the question, and in a terminal a blank line above
+  # it. One shape or the other, not one per stream.
+  puts unless Tui.interactive?
   puts
   if token.empty?
     puts Tui.paint(t('token_skipped'), :dim)
@@ -442,6 +449,7 @@ def ask_bluesky(site, env, current)
   site.set(%w[bluesky handle], handle)
 
   password = Tui.password(t('q_app_password'))
+  puts unless Tui.interactive? # see the note by the Mastodon token above
   puts
   if password.empty?
     puts Tui.paint(t('password_skipped'), :dim)
@@ -501,6 +509,7 @@ def ask_deploy(env, _current)
       # from before asking for it.
       puts t('surfer_token_where') if name == 'SURFER_TOKEN'
       value = Tui.password(t("q_#{name.downcase}"))
+      puts unless Tui.interactive? # see the note by the Mastodon token above
       puts
     else
       value = ask(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}"))
@@ -559,6 +568,11 @@ def run_doctor
   problems = findings.reject { |f| f.level == :ok }
   if problems.empty?
     puts Tui.paint(t('doctor_clean'), :green)
+    # Doctor is the last thing ./setup.sh says, on either of its two ways
+    # out, so this is where the run's single trailing blank line belongs --
+    # the convention every command here follows. Both ways out ended flush
+    # against the shell prompt instead.
+    puts
     return
   end
 
@@ -571,6 +585,7 @@ def run_doctor
   end
   puts
   puts Tui.paint(t('doctor_hint'), :dim)
+  puts
 end
 
 Wizard.guard { run }

@@ -114,13 +114,41 @@ def import_frame
   Tui.frame(rows + [''])
 end
 
+# The prompt row, closed. A frame ends its last line without a newline so
+# the question can stand on it, and a question read with gets ends the same
+# way -- what closes the row is the Enter echoing back. Two runs never get
+# that echo: a piped one, where nothing is echoed at all, and a terminal one
+# ended with Ctrl-D, where nothing was typed. Both left the row open, and
+# whatever was said next landed ON the question:
+#
+#   Číslo zdroje, ze kterého importovat: Cesta k rozbalenému Substack
+#   exportu (adresář s posts.csv; prázdné = zrušit): Zrušeno, nic se nezapsalo.
+#
+# -- three questions and the verdict on one line, which is how the piped
+# wizard read from the beginning. Same `puts unless interactive?` Wizard.ask
+# makes at the same point in its own question, and for the same reason; the
+# nil is the EOF half, which ask does not have to handle because it raises.
+def close_prompt_row(answer)
+  puts if answer.nil? || !Tui.interactive?
+end
+
 def ask(prompt_key)
   import_frame
   value = if prompt_key.match?(PATH_PROMPTS)
-            Tui.path_line(t(prompt_key))
+            answer = Tui.path_line(t(prompt_key))
+            # The readline half is its own case: in a terminal path_line goes
+            # through readline, which breaks the line itself -- on Ctrl-D as
+            # much as on Enter -- so closing the row again here would put TWO
+            # blank lines under the question where every other prompt has one.
+            # Down a pipe path_line is the same print-and-gets as below and
+            # breaks nothing, which is the half that does need closing.
+            puts unless Tui.interactive?
+            answer
           else
             print t(prompt_key)
-            $stdin.gets
+            answer = $stdin.gets
+            close_prompt_row(answer)
+            answer
           end
   value = value.to_s.strip
   return nil if value.empty?
@@ -199,7 +227,9 @@ def build_jekyll
   end
 
   print t('import.jekyll_permalink_prompt')
-  pattern = $stdin.gets.to_s.strip
+  pattern = $stdin.gets
+  close_prompt_row(pattern)
+  pattern = pattern.to_s.strip
   Import::Jekyll.new(dir, permalink: pattern.empty? ? nil : pattern)
 end
 
@@ -268,7 +298,9 @@ def build_movabletype
   end
 
   print t('import.movabletype_pattern_prompt')
-  pattern = $stdin.gets.to_s.strip
+  pattern = $stdin.gets
+  close_prompt_row(pattern)
+  pattern = pattern.to_s.strip
   Import::MovableType.new(path, url_pattern: pattern.empty? ? nil : pattern)
 end
 
@@ -383,7 +415,9 @@ def build_substack
   end
 
   print t('import.substack_url_prompt')
-  url = $stdin.gets.to_s.strip
+  url = $stdin.gets
+  close_prompt_row(url)
+  url = url.to_s.strip
   url = nil if url.empty?
   if url && !url.start_with?('http://', 'https://')
     puts t('import.ghost_url_invalid', url: url)
@@ -443,6 +477,12 @@ def ask_source
       choices = members.map { |name| SOURCES.find { |k, _| k == name } }.compact
       if choices.size == 1
         import_context.replace([Tui.paint(source_name(choices.first.first), :bold), ''])
+        # The same blank line the two-question path below writes, and for the
+        # same reason: Tui.menu closes the row it left open but writes no
+        # blank, so a source that says something before its first question
+        # (a missing API key) would start hard against the menu's keys line
+        # in one branch and a line clear of it in the other.
+        puts
         return choices.first
       end
 
@@ -469,7 +509,9 @@ def ask_source
   SOURCES.each_with_index { |(key, _), i| puts "#{i + 1}) #{source_name(key)}" }
   puts
   print t('import.enter_number')
-  input = $stdin.gets.to_s.strip
+  input = $stdin.gets
+  close_prompt_row(input)
+  input = input.to_s.strip
   # Range-checked rather than indexed straight off to_i: "" and "abc" both
   # become 0, and SOURCES[-1] is the *last* source -- so a piped run with no
   # answer would silently start importing from whatever happens to be at the
@@ -584,7 +626,9 @@ end
 # so a wrong cancel costs a re-read, while a wrong confirm costs an archive.
 def confirmed?(count)
   print t('import.confirm_prompt', count: count)
-  $stdin.gets.to_s.strip == count.to_s
+  answer = $stdin.gets
+  close_prompt_row(answer)
+  answer.to_s.strip == count.to_s
 end
 
 def run_import(adapter)
@@ -635,7 +679,15 @@ def run_import(adapter)
   report(result, dry_run: false)
 
   puts
-  return if Tui.key_choice(t('import.rebuild_prompt')) == 'n'
+  rebuild = Tui.key_choice(t('import.rebuild_prompt'))
+  # Declining is where the import ends, so it owes the one trailing blank
+  # line every command here ends with. Without it the last thing on screen
+  # was the unfinished question itself -- and down a pipe the output ended
+  # mid-line, with no newline at all.
+  if rebuild == 'n'
+    puts
+    return
+  end
 
   Publishing.rebuild_and_deploy(t('import.rebuilding'))
 end
@@ -646,6 +698,12 @@ end
 
 source = ask_source
 if source.nil?
+  # A blank line before the verdict, the way the interrupt handler below and
+  # the cancelled confirmation in run_import both write one. The same
+  # sentence was reached three ways and framed three ways: once with a blank
+  # line above it and twice hard against whatever the screen last showed --
+  # the menu's keys line, or the question that had just been left empty.
+  puts
   puts t('import.cancelled')
   puts
   exit 0
@@ -653,6 +711,7 @@ end
 
 adapter = source[1].call
 if adapter.nil?
+  puts
   puts t('import.cancelled')
   puts
   exit 0

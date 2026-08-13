@@ -1517,8 +1517,11 @@ def cmd_queue_screen
   loop do
     entries = queue_entries
     if entries.empty?
+      # No blank line of its own: the tail below writes the one blank line
+      # this command ends with, whichever way the loop was left. Reached
+      # only from a cleared screen (the first pass, or after screen.leave
+      # published the last post), so there is no open frame row to close.
       puts t('cli.queue_empty')
-      puts
       break
     end
 
@@ -1549,7 +1552,15 @@ def cmd_queue_screen
       when :home then selected = 0
       when :end then selected = entries.size - 1
       when :enter then mode = :actions
-      when :escape then break
+      when :escape
+        # Tui.frame ends its last row WITHOUT a newline so the cursor can
+        # stand on it, and this is the one way out that leaves that frame
+        # standing -- so everything said afterwards was printed onto the
+        # keys line: "Esc zpětStiskni klávesu pro pokračování…". One
+        # newline closes the row; the blank line every wizard-reachable
+        # command ends with is written by the tail below.
+        puts
+        break
       end
       next
     end
@@ -1594,7 +1605,14 @@ def cmd_queue_screen
   end
   end
 
-  rebuild_and_deploy(t('cli.updating_preview')) if dirty
+  # The one blank line this command ends with. The rebuild opens with a
+  # blank line of its own and closes with another after "Done:", so it is
+  # only the silent way out that has to write one.
+  if dirty
+    rebuild_and_deploy(t('cli.updating_preview'))
+  else
+    puts
+  end
 end
 
 # The three actions that leave the screen. Split out of queue_act so the
@@ -1751,6 +1769,11 @@ def queue_carry(entries, index)
   end
 
   target = Tui.screen { |screen| queue_carry_screen(entries, index, first_future, screen) }
+  # The carry screen ends on a frame, whose last row Tui.frame leaves open
+  # for the cursor to stand on -- so the line the write reports below was
+  # printed onto the carry hint. cmd_queue_screen needs no such thing: it
+  # repaints over the frame instead of printing under it.
+  puts
   return false if target.nil? || target == index
 
   queue_carry_apply(entries, index, target)
@@ -2097,6 +2120,17 @@ def props_run(screen, &block)
   screen.leave(t('cli.wizard_continue_prompt'), &block)
 end
 
+# Leaving the dialog. Tui.frame ends its last line without a newline
+# (deliberately -- see the comment there), so a frame left standing has its
+# keys row still open, and the wizard's "press a key" was printed onto it:
+# "[Enter] zpět: Stiskni klávesu pro pokračování…". That first newline
+# closes the row; the piped face has already closed its own. The second is
+# the blank line every wizard-reachable command ends with.
+def props_close(screen)
+  puts if screen
+  puts
+end
+
 # One loop for both faces. The actions are the point of this dialog and
 # there is no version of "keep them in step" that survives two copies of
 # this case statement, so the difference between a frame and a scroll is
@@ -2137,6 +2171,12 @@ def props_loop(slug, screen)
       puts
       lines.each { |line| puts line }
       key = Tui.key_choice(prompt)
+      # A pipe echoes nothing back, so the prompt's own row is still open --
+      # closed here, before an action prints under it. Without it every
+      # answer this dialog gives landed ON the keys: "[Enter] zpět: Datum
+      # publikace…". The frame's row is closed on the way out instead (see
+      # props_close), because there the frame is what stays on screen.
+      puts
     end
 
     if draft?(post)
@@ -2166,7 +2206,7 @@ def props_loop(slug, screen)
         next unless gone
 
         return
-      when '' then return
+      when '' then return props_close(screen)
       else props_run(screen) { puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft') }
       end
     else
@@ -2199,7 +2239,7 @@ def props_loop(slug, screen)
         props_run(screen) { cmd_delete(slug) }
         # Cancelled (the post still exists) -> stay in the dialog.
         return unless find_post_path(slug)
-      when '' then return
+      when '' then return props_close(screen)
       else props_run(screen) { puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain') }
       end
     end
@@ -2311,6 +2351,10 @@ def version_pick(rows, header, versions)
   puts
   print t('cli.versions_prompt', count: rows.size)
   line = $stdin.gets.to_s.strip
+  # A pipe echoes nothing, so the prompt's own row is still open -- closed
+  # here, exactly as address_pick and queue_pick close theirs. Every caller
+  # then writes the blank line after the picker itself.
+  puts
   return nil if line.empty?
 
   index = line.to_i - 1
@@ -2346,10 +2390,11 @@ def props_versions(path, slug)
   # read before the choosing than after it.
   header = [t('cli.versions_heading', slug: slug), t('cli.versions_media_note'), '']
   index = version_pick(versions.map.with_index { |file, i| version_row(file, i) }, header, versions)
-  if index.nil?
-    puts
-    return
-  end
+  # The blank line after the picker, written here rather than in either of
+  # its two faces: Tui.menu only closes the row its frame left open. Without
+  # it the confirmation below stood on the row immediately under the keys.
+  puts
+  return if index.nil?
 
   chosen = versions[index]
   restored = JSON.parse(File.read(chosen, encoding: 'utf-8'))
@@ -2362,8 +2407,11 @@ def props_versions(path, slug)
   # than becoming none, because Enter in the list is a single keystroke and
   # this overwrites the text being worked on.
   unless Tui.yes?(Tui.key_choice(t('cli.versions_confirm')))
+    # No blank line of its own: cli.cancelled_nothing_saved ends in one
+    # already, which is how its other two callers (both aborts) get theirs.
+    # With this puts as well, cancelling a restore was the one place in the
+    # wizard that left two.
     puts t('cli.cancelled_nothing_saved')
-    puts
     return
   end
 
@@ -2396,6 +2444,7 @@ def props_addresses(path, slug)
     entries = Array(post['former_slugs']).map(&:to_s)
     if entries.empty?
       puts t('cli.addresses_none')
+      puts
       return
     end
 
@@ -2403,6 +2452,11 @@ def props_addresses(path, slug)
     rows = entries.each_with_index.map { |former, i| address_row(former, current, i) }
     # Into the frame, not above it -- see version_pick.
     index = address_pick(rows, [Tui.paint(t('cli.addresses_heading', count: entries.size), :dim), ''])
+    # The blank line after a picker is the caller's to write -- Tui.menu
+    # only closes the row its frame left open. Cancelling out of the list
+    # said nothing at all, so the wizard's "press a key" sat directly under
+    # the keys; the confirmation below had the same row to itself.
+    puts
     return if index.nil?
 
     former = entries[index]
@@ -2465,14 +2519,25 @@ def rename_post(path, post, raw: nil)
   puts
   print t('cli.rename_prompt')
   input = $stdin.gets&.strip.to_s
+  # A terminal echoes the Enter and closes the prompt's row; a pipe echoes
+  # nothing, so without this every answer below was printed onto the prompt
+  # itself -- "Přejmenovat na: Zrušeno." The same line Wizard.ask writes for
+  # the same reason.
+  puts unless Tui.interactive?
+  # Each of the five ways out below ends with one blank line, like every
+  # other command reachable from the wizard: this one is run from the
+  # properties dialog through screen.leave, and without it the "press a key"
+  # that follows sat flush against whatever was just refused.
   if input.empty?
     puts t('cli.cancelled')
+    puts
     return old_slug
   end
 
   new_slug = Slug.slugify(input)
   if new_slug.empty?
     puts t('cli.rename_unusable', input: input)
+    puts
     return old_slug
   end
   # A slug is a filename (<slug>.json) and a URL segment; slugify keeps it
@@ -2482,10 +2547,12 @@ def rename_post(path, post, raw: nil)
   # this caps by bytes for correctness, well under any filesystem's limit.
   if new_slug.bytesize > 200
     puts t('cli.rename_too_long')
+    puts
     return old_slug
   end
   if new_slug == old_slug
     puts t('cli.rename_same')
+    puts
     return old_slug
   end
 
@@ -2498,6 +2565,7 @@ def rename_post(path, post, raw: nil)
     # would overwrite it -- resolve manually", and a refused rename
     # neither continues nor needs resolving. Picking another slug does.
     puts t('cli.rename_taken', slug: new_slug)
+    puts
     return old_slug
   end
 
@@ -2508,6 +2576,7 @@ def rename_post(path, post, raw: nil)
   end
   unless Tui.key_choice(t('cli.rename_go')) == t('cli.confirm_yes_char')
     puts t('cli.cancelled')
+    puts
     return old_slug
   end
 
@@ -3381,7 +3450,14 @@ def cmd_browse(filters = {})
 
       # Everything below prints, so the frame this screen would repaint
       # over is gone -- the next pass starts a fresh one.
+      #
+      # Two newlines, not one. Tui.browse leaves its last row open on
+      # purpose (a newline per keypress would scroll the screen, which is
+      # the very thing the frame exists to stop), so the first one only
+      # closes the keys row -- the post's summary line was landing right
+      # against it. The second is the blank line the dialog stands on.
       state.delete(:lines)
+      puts
       puts
       post_crossroads(selected[:slug])
       Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
@@ -3432,6 +3508,12 @@ def cmd_browse(filters = {})
       print "\e[2J\e[H"
     end
   end
+  # Esc leaves the browser standing on its last frame, whose keys row
+  # Tui.browse deliberately left open. The first newline closes it, the
+  # second is the one blank line this command ends with -- without them
+  # the wizard's "press a key" was printed straight under the keys, with
+  # nothing between.
+  puts
   puts
 end
 
@@ -3474,8 +3556,12 @@ def pick_from_list(posts, empty_message)
   puts
   print t('cli.enter_number_or_slug')
   input = $stdin.gets&.strip.to_s
-  abort t('cli.cancelled_empty') if input.empty?
+  # Closing the prompt's row FIRST -- a pipe echoes nothing, so an abort
+  # taken before this printed its refusal onto the prompt itself. The other
+  # numbered pickers here (pick_among_years, address_pick) already close
+  # theirs on the line after the read, for the same reason.
   puts
+  abort t('cli.cancelled_empty') if input.empty?
 
   if input =~ /\A\d+\z/ && (1..posts.size).cover?(input.to_i)
     posts[input.to_i - 1][:slug]
@@ -3802,7 +3888,10 @@ def run_wizard_screen
     end
   end
   # A blank line to sit on the way out, so the shell prompt does not land
-  # flush against the last frame.
+  # flush against the last frame. It takes two: Tui.frame ends its last row
+  # without a newline, so the first only closes that row -- one alone left
+  # the shell prompt on the line immediately under the keys.
+  puts
   puts
 end
 

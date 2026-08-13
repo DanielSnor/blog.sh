@@ -273,7 +273,17 @@ module Tui
   def key_choice(prompt)
     unless interactive?
       print prompt
-      return $stdin.gets&.strip.to_s.downcase
+      answer = $stdin.gets
+      # The terminal branch below closes the row in all three of its cases,
+      # by echoing the key that was pressed. Down a pipe there is nothing to
+      # echo -- the newline the answer arrived with is consumed by gets and
+      # never reaches the output -- so the row stayed open and whatever was
+      # said next landed on the question: "Zapsat tyhle změny? [a/N] Nic se
+      # nezapsalo." on one line. Three callers had grown their own
+      # `puts unless interactive?` to patch it from outside; the row belongs
+      # to whoever printed the prompt, which is here.
+      puts
+      return answer&.strip.to_s.downcase
     end
 
     print fold_prompt(prompt, term_width)
@@ -526,6 +536,17 @@ module Tui
     end
   ensure
     print "\e[?25h"
+    # Close the row the frame deliberately left open. frame ends its last
+    # line without a newline so the cursor can stand on it while the menu
+    # waits -- but the menu is done waiting now, and everything the caller
+    # says next was landing ON the keys line: "Esc zpětZrušeno." Every
+    # picker in the wizard did it, because every picker ends here.
+    #
+    # One newline, not two. It closes the line and no more; a caller that
+    # wants the blank line this CLI puts before a result already writes it,
+    # and with the row closed that `puts` finally produces the blank it was
+    # always meant to be instead of the line break nobody got.
+    puts
   end
 
   # Two strings on one line, the second flush right -- the status line of

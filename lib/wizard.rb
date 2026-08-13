@@ -162,8 +162,14 @@ module Wizard
 
     return current unless confirm(t('edit_in_editor'))
 
+    # No blank line of its own on the way out. Every caller of this ends its
+    # section with one, and the branch just above -- the one where the
+    # editor is declined -- has never printed anything, so the two paths out
+    # of the same question were producing a different number of blank lines:
+    # one after "no", two after "yes". The row is already closed (key_choice
+    # closed it, and a full-screen editor restores the cursor where it found
+    # it), so there is nothing here left to close either.
     edited = edit_in_editor(current.to_s, comment)
-    puts
     edited.to_s.strip.empty? ? current : edited.strip
   end
 
@@ -246,7 +252,14 @@ module Wizard
       rows.each_with_index { |desc, i| puts "  #{i + 1}) #{desc}" }
       print t('choice_prompt')
       line = $stdin.gets
-      return nil if line.nil?
+      # A pipe that runs out here means "done", and the row still has the
+      # prompt on it -- every other way out of this branch closes it a few
+      # lines down, and this one left the review to be printed onto the
+      # question that asked for it.
+      if line.nil?
+        puts
+        return nil
+      end
 
       answer = line.strip
       index = answer.to_i - 1
@@ -300,7 +313,22 @@ module Wizard
     # The frame ends in a blank row and key_choice writes the prompt onto
     # it, so the question stands on whatever the section has decided so far
     # instead of appearing alone under a repaint.
-    Tui.frame(lines + ['', '']) if Tui.interactive? && !lines.empty?
+    #
+    # Trimmed from the TOP, exactly as question_frame trims and for the same
+    # reason. Tui.frame keeps the rows that FIT, counting from the first, so
+    # a record taller than the window lost the two blank rows at the end --
+    # and key_choice then wrote the question onto the last row of the
+    # record: "Otázka číslo 24: odpověď 24Zapsat tyhle změny? [a/N]". A
+    # question printed on top of an answer is the thing the blank row at the
+    # end of a frame exists to prevent. ./setup.sh reaches this on any
+    # ordinary window: it never clears the record, so by the last third of
+    # the run there are more answers than rows. The ones worth keeping are
+    # the last ones anyway -- the newest answers, and the note, which is
+    # appended here.
+    if Tui.interactive? && !lines.empty?
+      room = [Tui.term_height - 4, 2].max
+      Tui.frame((lines.size > room ? lines.last(room) : lines) + ['', ''])
+    end
     answer = Tui.key_choice(prompt)
     return default if default != nil && answer.to_s.empty?
 
@@ -337,6 +365,14 @@ module Wizard
     puts
     changed.each { |(label, writer)| show_diff(label, writer.diff) }
 
+    # The diff is what this question is about, so nothing may be painted
+    # over it -- and confirm builds a frame out of the record whenever there
+    # is one. ./setup.sh arrives here with every answer of the entire run
+    # still in it, so the diff that had just been printed was wiped by a
+    # list of twenty answers and the write was confirmed blind. The record
+    # has done its job by now: the section that started it is over, and what
+    # follows is the file, not the questions.
+    self.context = []
     unless confirm(t('q_write'))
       puts t('cancelled')
       puts
@@ -350,6 +386,10 @@ module Wizard
       # The writer has already put the file back; all that is left is to
       # say so in a way that does not read as "your config is ruined".
       puts Tui.paint("❌ #{t('write_failed', message: e.message)}", :red)
+      # Both wizards stop here, so this is the last thing either of them
+      # says -- and a command that stops on a failure owes the same single
+      # blank line at the end as one that stops on a success.
+      puts
       return :failed
     end
 
