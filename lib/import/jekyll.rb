@@ -20,9 +20,14 @@ module Import
   # it goes through the same MarkdownParser that authoring uses -- no
   # HTML round-trip -- and .html bodies take the HtmlBlocks path instead.
   #
-  # Unlike Ghost's Jekyll migrator, which downloads images from the live
-  # site, the images here come from the tree itself: the archive works
-  # for a site that died years ago.
+  # Images come from the tree where the tree has them -- a relative or
+  # root-relative path is read off disk, and that half really does work
+  # for a site that died years ago. An absolute URL goes to the network
+  # like anywhere else, and a tree exported from a hosted platform is
+  # mostly those: a real Hugo `content/` gave this 72 images to resolve
+  # and 70 were https:// links back to the WordPress it had been migrated
+  # from, of which 66 answered 404. The archive is only as complete as the
+  # old host is still willing to be, and the summary is where that is said.
   class Jekyll
     attr_accessor :keep_permalinks
 
@@ -36,6 +41,11 @@ module Import
       @keep_permalinks = keep_permalinks
       @rearranged = 0
       @liquid_links = 0
+      # Keyed by path rather than counted as they go: the wizard runs the
+      # same adapter over the tree twice (a preview pass, then the real
+      # one), and a counter would say everything twice.
+      @slugs = Hash.new { |h, k| h[k] = [] }
+      @authored = []
     end
 
     # Said out loud when the run rearranged anything -- see
@@ -44,6 +54,9 @@ module Import
       notes = []
       notes << I18n.t('import.note.ssg_images_freed', count: @rearranged) if @rearranged.positive?
       notes << I18n.t('import.note.ssg_liquid_links_dropped', count: @liquid_links) if @liquid_links.positive?
+      collisions = @slugs.count { |_, paths| paths.length > 1 }
+      notes << I18n.t('import.note.ssg_slug_collisions', count: collisions) if collisions.positive?
+      notes << I18n.t('import.note.ssg_author_dropped', count: @authored.length) unless @authored.empty?
       notes.empty? ? nil : notes.join("\n  ")
     end
 
@@ -103,6 +116,7 @@ module Import
                else
                  markdown_blocks(body)
                end
+      blocks = lead_image(meta, body) + blocks
       blocks = localize(blocks, media, path)
       return :empty if blocks.empty?
 
@@ -110,10 +124,13 @@ module Import
               meta['published'] == false || meta['draft'] == true
       date = item_date(meta, path)
       slug = slug_of(meta, path)
+      @slugs[slug] |= [path]
+      @authored |= [path] unless meta['author'].to_s.strip.empty?
+      title = clean_title(meta['title'])
 
       post = {
         'slug' => slug,
-        'title' => meta['title'].to_s.empty? ? slug : meta['title'].to_s,
+        'title' => title.empty? ? slug : title,
         'date' => date.iso8601,
         'state' => draft ? 'draft' : 'published',
         'tags' => tags_of(meta),
@@ -140,7 +157,7 @@ module Import
       post['page'] = true if @pages&.include?(path) && meta['type'].to_s.strip.empty?
 
       if @keep_permalinks && !draft
-        origin = origin_path(meta, slug, date)
+        origin = origin_path(meta, served_slug(meta, path, slug), date)
         # A page already lands at the root, so an origin of /<slug>/ would
         # redirect the address at itself -- which the build then complains
         # about once per build, forever. The Ghost importer has guarded
@@ -301,27 +318,39 @@ module Import
       # inline images) has no business reaching inside it.
       body = own_blocks_to_sentinels(body)
       body = resolve_references(body)
-      body = liquid_free(body)
+      # Everything from here down is a rewrite of PROSE, so all of it runs
+      # through outside_fences. A fence is the one place in a post where
+      # markdown, Liquid and shortcodes are the subject rather than the
+      # medium: an article explaining how Hugo writes an image showed the
+      # reader a code block, and the pass below planted its own sentinel
+      # inside it -- @@ssg-image:obrazek.jpg:...@@ went out on the article
+      # page, the front page, the tag pages and the feed. The same held
+      # for Liquid: a post about {% include %} lost the tag it was about.
+      body = outside_fences(body) { |prose| liquid_free(hugo_figures(prose)) }
       body = outside_fences(body) { |prose| join_lazy_list_lines(prose) }
-      body = free_inline_images(body)
-      # Three parts, and the third is why: markdown puts a picture's
-      # caption in the title position -- ![alt](path "caption") -- which
-      # is where `./blog.sh export` writes it and where CommonMark says
-      # it goes. Carrying only the path and the alt meant an export read
-      # back lost the caption outright AND filed the alt text as one, so
-      # a photograph came home described by words written for somebody
-      # who cannot see it. Every part is CGI-escaped, so a colon inside
-      # any of them arrives as %3A and the split stays unambiguous.
+      body = outside_fences(body) { |prose| free_inline_images(prose) }
+      body = outside_fences(body) { |prose| images_to_sentinels(prose) }
+      blocks, = MarkdownParser.parse_body(body, nil)
+      blocks
+    end
+
+    # Three parts, and the third is why: markdown puts a picture's
+    # caption in the title position -- ![alt](path "caption") -- which
+    # is where `./blog.sh export` writes it and where CommonMark says
+    # it goes. Carrying only the path and the alt meant an export read
+    # back lost the caption outright AND filed the alt text as one, so
+    # a photograph came home described by words written for somebody
+    # who cannot see it. Every part is CGI-escaped, so a colon inside
+    # any of them arrives as %3A and the split stays unambiguous.
+    def images_to_sentinels(body)
       body = body.gsub(MarkdownParser::IMAGE_RE) do
         image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
       end
       # Line-anchored form ([ \t], NOT \s -- \s eats the newlines and
       # with them the paragraph break after the image).
-      body = body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"([^"]*)")?\)[ \t]*$/) do
+      body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"([^"]*)")?\)[ \t]*$/) do
         image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
       end
-      blocks, = MarkdownParser.parse_body(body, nil)
-      blocks
     end
 
     # Hands BODY to the block a piece at a time, skipping fenced code: a
@@ -329,7 +358,7 @@ module Import
     # line inside one is somebody's EXAMPLE of markdown and must arrive
     # exactly as written. An unterminated fence runs to the end, the same
     # reading MarkdownParser gives it.
-    def outside_fences(body)
+    def outside_fences(body, &block)
       out = +''
       prose = +''
       fence = nil
@@ -339,14 +368,30 @@ module Import
           out << line
           fence = nil if marker && marker.length >= fence.length && line.strip == marker
         elsif marker
-          out << yield(prose) << line
+          out << rewritten(prose, &block) << line
           prose = +''
           fence = marker
         else
           prose << line
         end
       end
-      out << yield(prose)
+      out << rewritten(prose, &block)
+    end
+
+    # A fence marker only opens a fence when it stands at the start of its
+    # own line, and free_inline_images strips the paragraphs it rebuilds --
+    # so a chunk of prose that ENDED in a picture came back without its
+    # last newline and the ``` below it was glued onto the text. Every
+    # fence after that point in the post read as its own opposite: code
+    # became prose, prose became code, and the passes that skip fences
+    # skipped the wrong half of the article. Harmless while the whole body
+    # was rewritten in one piece; not once the rewriting happens chunk by
+    # chunk.
+    def rewritten(prose)
+      text = yield(prose)
+      return text if text.empty? || text.end_with?("\n") || !prose.end_with?("\n")
+
+      "#{text}\n"
     end
 
     # --- reference links -------------------------------------------------
@@ -433,6 +478,41 @@ module Import
     # still an address that resolves. Every other variable pointed
     # somewhere else entirely.
     SITE_ROOT = /\A\{\{\s*site\.(?:baseurl|url)\s*\}\}/
+
+    # --- Hugo shortcodes -------------------------------------------------
+
+    # {{< figure src="x.jpg" alt="..." >}} is how Hugo writes a picture --
+    # its one built-in shortcode that every theme's documentation leads
+    # with. To the blanket strip below it is just another {{ }}, so the
+    # line vanished and with it the photograph, which in a page bundle
+    # was lying on disk right next to the article. Nothing said so
+    # either: no file was named, so nothing could be reported missing.
+    #
+    # Read before the strip and turned straight into a sentinel rather
+    # than back into markdown: the caption is somebody else's sentence
+    # and may hold the quotes that markdown's title position cannot.
+    # Every other shortcode still falls through to the strip.
+    FIGURE = /\{\{[<%]\s*figure\s+(.*?)\s*\/?[>%]\}\}/m
+    FIGURE_ATTR = /([a-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/
+
+    def hugo_figures(text)
+      text.gsub(FIGURE) do
+        whole = Regexp.last_match(0)
+        attrs = {}
+        Regexp.last_match(1).scan(FIGURE_ATTR) { |key, dq, sq| attrs[key] = dq || sq }
+        src = attrs['src'].to_s.strip
+        # A figure with no src names no picture; let the strip have it.
+        next whole if src.empty?
+
+        # Hugo's caption is the line under the picture, its title a
+        # heading above -- either is a caption here, and the alt stays
+        # the alt. Blank lines around it because a figure is a block, and
+        # a shortcode may sit at the end of a paragraph.
+        caption = attrs['caption'].to_s.strip
+        caption = attrs['title'].to_s.strip if caption.empty?
+        "\n\n#{image_sentinel(src, attrs['alt'], caption)}\n\n"
+      end
+    end
 
     def liquid_free(body)
       out = +''
@@ -574,8 +654,8 @@ module Import
       while (m = INLINE_IMAGE.match(rest))
         before = m.pre_match
         pieces << before unless before.strip.empty?
-        pieces << m[0]
-        rest = m.post_match
+        image, rest = fold_caption(m[0], m.post_match)
+        pieces << image
         @rearranged += 1
       end
       pieces << rest unless rest.strip.empty?
@@ -583,6 +663,35 @@ module Import
       # picture follows it -- the image was last in the item anyway, so
       # nothing changes order.
       pieces.map(&:strip).join("\n\n")
+    end
+
+    # "![](photo.png)*co je na obrázku*" -- WordPress's caption, and what
+    # every conversion out of it writes. Moving the picture onto its own
+    # line left the italics behind as a paragraph, which reads as a
+    # sentence fragment even when the photograph arrives; when it does
+    # not (an archive whose images are on a domain that no longer
+    # answers) the picture is dropped and the fragment is all that is
+    # left -- an install guide down to three paragraphs reading "výběr
+    # jazyka", "výběr časového pásma", "rozložení klávesnice". It is a
+    # caption, so it goes where a caption goes, and it lives or dies with
+    # the picture it belongs to.
+    #
+    # Only italics that finish the line, and only onto a picture that has
+    # no caption of its own already.
+    TRAILING_CAPTION = /\A[ \t]*(?:\*([^*\n]+)\*|_([^_\n]+)_)[ \t]*(?=\n|\z)/
+
+    def fold_caption(image, rest)
+      return [image, rest] if image.match?(/\s"[^"]*"\)\z/)
+      return [image, rest] unless (m = TRAILING_CAPTION.match(rest))
+
+      caption = (m[1] || m[2]).strip
+      # The title position is quote-delimited, so a caption holding one
+      # would rewrite the picture's address. Rare enough to leave alone.
+      return [image, rest] if caption.empty? || caption.include?('"')
+
+      # Block form: a caption is prose, and sub's replacement string reads
+      # a backslash in it as a back-reference.
+      [image.sub(/\)\z/) { " \"#{caption}\")" }, m.post_match]
     end
 
     SENTINEL = /@@ssg-image:([^:@]*):([^:@]*):([^@]*)@@/
@@ -634,6 +743,27 @@ module Import
       block
     rescue JSON::ParserError
       nil
+    end
+
+    # `image:` in the front matter is how Hugo's themes -- Blowfish,
+    # Congo, PaperMod -- name the picture an article leads with. This
+    # engine has no such field, and the key was read by nobody: three
+    # articles in a real Hugo tree named one, and all three lost it.
+    # What it does have is a first image block, which is what a lead
+    # picture is; Ghost's feature image and Wix's cover come home the
+    # same way, and localize turns the name into a file in this archive.
+    #
+    # Not when the body already shows the same file: a theme's `image:`
+    # doubles as the social-card picture and is usually the very
+    # photograph the post opens with, so importing both shows it twice.
+    def lead_image(meta, body)
+      src = meta['image']
+      return [] unless src.is_a?(String)
+
+      src = src.strip
+      return [] if src.empty? || body.include?(src)
+
+      [{ 'type' => 'image', 'media' => [{ 'url' => src }] }]
     end
 
     def localize(blocks, media, post_path)
@@ -709,15 +839,60 @@ module Import
     # under this year.
     DATED_NAME = /\A(\d{4})-(\d{1,2})-(\d{1,2})-/
 
-    def slug_of(meta, path)
-      explicit = meta['slug'] || meta['basename']
-      return Slug.slugify(explicit.to_s) if explicit && !explicit.to_s.empty?
+    # A filename that has been through a URL keeps its escapes on disk --
+    # a WordPress export writes %ef%bf%bcawesomewm-basics.md, which is the
+    # object-replacement character U+FFFC and then the title. Slugified as
+    # written, the escaping itself became the address: ef-bf-bcawesomewm-
+    # basics. Decoded by hand rather than with CGI.unescape, which also
+    # reads "+" as a space and would take the plus out of c++-tutorial.md.
+    PERCENT_ESCAPE = /%[0-9A-Fa-f]{2}/
 
+    def percent_decode(name)
+      return name unless name.match?(PERCENT_ESCAPE)
+
+      name.gsub(PERCENT_ESCAPE) { |hex| hex[1, 2].hex.chr }
+          .force_encoding(Encoding::UTF_8).scrub('')
+    end
+
+    def base_name(path)
       base = File.basename(path).sub(/\.(md|markdown|html)\z/, '').sub(DATED_NAME, '')
       # A Hugo page bundle is a directory with an index.md -- the
       # directory is the name.
-      base = File.basename(File.dirname(path)) if base == 'index'
-      Slug.slugify(base)
+      base == 'index' ? File.basename(File.dirname(path)) : base
+    end
+
+    def explicit_slug(meta)
+      value = (meta['slug'] || meta['basename']).to_s
+      value.empty? ? nil : value
+    end
+
+    def slug_of(meta, path)
+      explicit = explicit_slug(meta)
+      return Slug.slugify(explicit) if explicit
+
+      Slug.slugify(percent_decode(base_name(path)))
+    end
+
+    # What the old site actually served, which is the only thing a
+    # redirect is worth writing about. Normally that is the slug -- but an
+    # escaped filename IS a URL path segment already, and the generator
+    # handed it out letter for letter. Redirecting from the decoded name
+    # would send visitors from an address nobody ever had.
+    def served_slug(meta, path, slug)
+      return slug if explicit_slug(meta)
+
+      raw = base_name(path)
+      raw.match?(PERCENT_ESCAPE) ? raw : slug
+    end
+
+    # Characters that occupy no space and say nothing. U+FFFC is what a
+    # WordPress export leaves where an embed used to be, and it rode into
+    # the title untouched: an archive entry, a heading and a <title> tag
+    # that all opened with a gap nobody could see, let alone delete.
+    INVISIBLE = /[\u00AD\u200B-\u200F\u202A-\u202E\u2060\uFEFF\uFFFC]/
+
+    def clean_title(value)
+      value.to_s.gsub(INVISIBLE, '').strip
     end
 
     def item_date(meta, path)
