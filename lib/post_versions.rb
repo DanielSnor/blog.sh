@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require 'json'
+require_relative 'i18n'
 
 # The undo the engine did not have. Deleting a post has always been
 # reversible -- it goes to trash/ and `restore` brings it back -- but
@@ -91,7 +92,15 @@ module PostVersions
     m = name.match(/\A(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/)
     return name unless m
 
-    "#{m[3]}.#{m[2]}.#{m[1]} #{m[4]}:#{m[5]}:#{m[6]}"
+    # Through the locale's own format, like every other date a person
+    # reads here. Written out as day.month.year it was the one human date
+    # in the engine that did not ask -- so on an English site the list you
+    # pick a version to restore from offered "02.01.2026", which reads as
+    # the 2nd of January to whoever wrote it and the 1st of February to
+    # whoever is looking. Seconds are kept: two saves a minute apart are
+    # what this list is usually telling apart.
+    at = Time.new(m[1].to_i, m[2].to_i, m[3].to_i, m[4].to_i, m[5].to_i, m[6].to_i)
+    "#{at.strftime(I18n.t('date_time_format'))}:#{m[6]}"
   end
 
   def prune(dir, cap)

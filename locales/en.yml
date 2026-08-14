@@ -861,7 +861,7 @@ stats:
   heading_sources: "Where it came from"
   archive_line: "%{total} post(s): %{published} published, %{drafts} draft(s), %{scheduled} scheduled, %{pages} page(s)"
   span_line: "%{first} - %{last}, which is %{days} days"
-  busiest_line: "the busiest year was %{year} (%{count} posts)"
+  busiest_line: "the busiest year was %{year} (%{count} post(s))"
   words_line: "%{total} words in all, %{mean} per post on average, %{median} in the middle"
   longest_line: "longest: %{slug} (%{words} words)"
   reading_line: "reading the whole archive takes %{hours} hours"
