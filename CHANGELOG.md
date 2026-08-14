@@ -396,13 +396,35 @@ which only existed because the bar didn't.
   opposite of what is on screen: a fixed light-then-dark cycle would have
   done nothing visible for a reader whose system is already light, and a
   button that does nothing on its first press reads as broken.
-- **A markdown tree's pages are no longer walked past.** The importer
-  read `_posts/` and `_drafts/` and nothing else, so a Jekyll site's
-  pages -- `about.md`, `colophon.md`, which live in the root by
-  convention -- were the one thing a tree could hold that never arrived.
-  Root-level markdown is now read too, minus the names that are never a
-  page (`index`, `404`, `feed`, `sitemap`, and friends). It also means an
-  archive exported from this engine comes back a page short of nothing.
+- **A markdown tree's pages are no longer walked past, and they arrive as
+  pages.** The importer read `_posts/` and `_drafts/` and nothing else, so
+  a Jekyll site's pages -- `about.md`, `colophon.md`, which live in the
+  root by convention -- were the one thing a tree could hold that never
+  arrived. Root-level markdown is now read too, minus the names that are
+  never a page (`index`, `404`, `feed`, `sitemap`, and friends).
+
+  Being a page then depended on the front matter saying `type: page`,
+  which is a key this engine's own export writes and no other generator
+  does -- so the feature worked on a round trip and on nothing else.
+  Measured on a real Hugo tree of 74 posts: not one page, and Kontakt,
+  Komunita and Podpořte nás went into the archive, the tags and the feed
+  as dated articles. What decides now is where the file sits. In a tree
+  with `_posts/`, the root is where the pages are, as it always was. In a
+  tree without one, the subdirectories answer the question: a site that
+  keeps its articles in `posts/` or `navody/` keeps pages at the top,
+  while a flat folder of markdown out of a converter is all posts and has
+  no subdirectories to speak of. A file whose front matter names a content
+  type keeps it -- that says what a post IS, not where it lives.
+
+  Hugo's `_index.md` and `home.md` are the section and home listings
+  rather than pages in the site, so they are left where they are; matched
+  literally, `_index` was not the `index` that list already knew about,
+  and the front page arrived as a page with the site's own introduction
+  in it. And a page gets no redirect to the address it already has: with
+  `KEEP_PERMALINKS` a page at `/kontakt/` was handed `/kontakt/` as its
+  old address, which the build then complains about once per build,
+  forever. The Ghost importer has guarded that since pages arrived; this
+  one had nothing to guard, because it never made a page.
 - **A re-imported post no longer collects a platform tag it has already
   got.** The tag is skipped for a post whose front matter carries its own
   `blogsh:` history, so exporting and importing back does not pin a

@@ -70,10 +70,27 @@ module Import
       # (_docs, _tutorials), which Jekyll allows and jekyll/jekyll's own
       # docs/ is. Same shape, wider net, minus the machinery.
       swept = posts.empty? && drafts.empty?
-      posts = wider_net if swept
-      files = (posts + drafts + (swept ? [] : root_pages)).sort
+
+      if swept
+        root, nested = wider_net.partition { |path| File.dirname(path) == @dir }
+        # Whether a file in the root of a swept tree is a page or a post is
+        # the one thing the tree does not say outright, and both answers
+        # are wrong somewhere: a Hugo export keeps its articles in posts/,
+        # navody/, zpravy/ and its standalone pages in the root, while a
+        # plain dump of markdown out of a converter is all posts and has no
+        # subdirectories at all. So the subdirectories are the answer: when
+        # the articles live somewhere else, what is left at the top is a
+        # page. When everything is at the top, it is all posts, exactly as
+        # before.
+        @pages = nested.empty? ? [] : root.reject { |path| not_a_page?(path) }
+        files = nested.empty? ? root : nested + @pages
+      else
+        @pages = root_pages
+        files = posts + drafts + @pages
+      end
+
       @total = files.size
-      files.each(&block)
+      files.sort.each(&block)
     end
 
     def map(path, media)
@@ -107,8 +124,29 @@ module Import
           'original_id' => path.delete_prefix("#{@dir}#{File::SEPARATOR}")
         }
       }
+      # A file the tree keeps at its root is a page, and saying so is the
+      # whole point of walking the root at all. It used to depend on the
+      # front matter carrying `type: page` -- which is a key this engine's
+      # own export writes and no other generator does, so the feature
+      # worked on a round trip and on nothing else. Measured on a real
+      # Hugo tree: 74 posts imported, none of them a page, and Kontakt,
+      # Komunita and Podpořte nás went into the archive, the tags and the
+      # feed as dated articles.
+      #
+      # The front matter still wins where it says something: `type:` is
+      # how a post declares its content type, and a root file that calls
+      # itself a quote is a quote. apply_own_keys reads that a few lines
+      # down, so this only sets the flag it does not touch.
+      post['page'] = true if @pages&.include?(path) && meta['type'].to_s.strip.empty?
+
       if @keep_permalinks && !draft
         origin = origin_path(meta, slug, date)
+        # A page already lands at the root, so an origin of /<slug>/ would
+        # redirect the address at itself -- which the build then complains
+        # about once per build, forever. The Ghost importer has guarded
+        # against this since pages arrived; this one had nothing to guard
+        # because it never made a page.
+        origin = nil if post['page'] && origin == "/#{slug}/"
         post['redirect_from'] = [origin] if origin
       end
       apply_own_keys(post, meta)
@@ -188,10 +226,21 @@ module Import
     NOT_A_PAGE = %w[index home 404 feed rss atom sitemap search tags categories archive robots].freeze
 
     def root_pages
-      Dir.glob(File.join(@dir, '*.{md,markdown}')).reject do |path|
-        base = File.basename(path, '.*').downcase
-        NOT_A_PAGE.include?(base) || NOT_A_POST.include?(base)
-      end
+      Dir.glob(File.join(@dir, '*.{md,markdown}')).reject { |path| not_a_page?(path) }
+    end
+
+    # The names that are furniture rather than a page, wherever the tree
+    # was walked from. Hugo's _index.md and home.md are the section and
+    # home listings -- pages of the SITE, not pages in it -- and importing
+    # them yields a post whose body is the front page.
+    def not_a_page?(path)
+      # The leading underscore comes off first: Hugo names a section's own
+      # listing `_index.md`, and matched literally that is not the "index"
+      # this list already knows about -- so the front page of an imported
+      # site arrived as a page called "index", with the site's own
+      # introduction as its body.
+      base = File.basename(path, '.*').downcase.delete_prefix('_')
+      NOT_A_PAGE.include?(base) || NOT_A_POST.include?(base)
     end
 
     # Markdown only, deliberately, even though a tree WITH _posts/ reads
