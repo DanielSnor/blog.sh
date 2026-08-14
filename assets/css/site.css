@@ -918,7 +918,7 @@ blockquote {
   color: var(--meta-text);
   font-size: 0.85rem;
 }
-.reading-time svg { vertical-align: -0.18em; margin-right: 0.3rem; }
+.reading-time svg { vertical-align: -0.16em; margin-right: 0.3rem; }
 
 .series-note { font-size: 0.85rem; margin: 0 0 1rem; }
 .series-note a { color: var(--meta-text); }
@@ -1058,7 +1058,18 @@ blockquote {
    browser's `normal`, which in Open Sans is nearer 1.36 -- a listing
    heading that grew a couple of pixels taller for no reason anyone could
    see in the markup. */
-.listing-heading { font-size: 1.6rem; font-weight: 600; line-height: 1.25; margin-bottom: 1.5rem; }
+.listing-heading { --listing-heading-gap: 0.45rem; font-size: 1.6rem; font-weight: 600; line-height: 1.25; margin-bottom: 1.5rem; }
+
+/* The kind and the value are two spans with no whitespace between them --
+   markup written that way so the space cannot end up inside a heading that
+   hides its kind. Every variant that HAS hidden it (tag, search, home) took
+   the gap out of the question, so nothing ever supplied one; a series, the
+   only listing that says its kind out loud, therefore read "SérieNový
+   Sean.cz". Stated for all of them rather than for the series alone: the
+   rule below takes it back out with `margin: -1px` where the kind is
+   hidden, so a variant added later is spaced by default instead of
+   depending on somebody noticing. */
+.listing-heading__kind { margin-right: var(--listing-heading-gap); }
 
 /* The kind of listing ("Tag", "Search") stays in the markup and is taken
    out of sight rather than out of the document -- clipped, never
@@ -1078,6 +1089,7 @@ blockquote {
    no space it did not already have. */
 .listing-heading--tag .listing-heading__kind,
 .listing-heading--search.has-query .listing-heading__kind,
+.listing-heading--series .listing-heading__kind,
 .listing-heading--home {
   position: absolute;
   width: 1px;
@@ -1091,19 +1103,17 @@ blockquote {
   border: 0;
 }
 
-/* The same shape tags wear everywhere else on the site, at heading size --
-   so "which listing am I in" is answered with a vocabulary the reader has
-   already met, and without a word for it. */
-.listing-heading--tag .listing-heading__value {
-  display: inline-block;
-  background: var(--pill-bg);
-  padding: 0.1rem 0.7rem;
-  border-radius: 8px;
-}
+/* The pill this used to wear is gone. It borrowed the shape tags have
+   everywhere else on the site, which was a good argument on paper and a
+   bad one at heading size: a tag under an article is a small quiet chip,
+   and the same shape blown up to 26px is a slab across the top of the
+   page. The label icon says the same thing at the weight the rest of the
+   listing headings say theirs -- and now the three of them, a tag, a
+   series and a search, are one family instead of two. */
 
 /* Stays put whether or not there is a query, so starting to type swaps the
    text beside it instead of shifting the whole line. */
-.listing-heading__icon { vertical-align: -0.15em; margin-right: 0.4rem; color: var(--meta-text); }
+.listing-heading__icon { vertical-align: -0.15em; margin-right: var(--listing-heading-gap); color: var(--meta-text); }
 
 .search-tagline { margin-bottom: 0.25rem; }
 .search-tip { color: var(--meta-text); font-size: 0.85rem; margin-bottom: 1.5rem; }

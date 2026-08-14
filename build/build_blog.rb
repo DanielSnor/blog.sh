@@ -1391,10 +1391,17 @@ end
 # The number is bare ("6 min") since the icon already says what it counts;
 # the full sentence stays as the accessible name, which is where a screen
 # reader needs it and where an icon says nothing at all.
-READING_TIME_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" ' \
+# 16px and a radius of 9, to match the star, the boost and the comment
+# bubble it stands in a row with (assets/js/comments.js). It was 18 with a
+# radius of 9.5, and the two compounded: a bigger box AND a shape filling
+# more of it, so the clock read about a fifth larger than its neighbours.
+# The other three are centred by the flex row; this one is `display: inline`
+# for the hero byline's baseline (see .post-stat.reading-time), so its
+# vertical-align carries the size change with it.
+READING_TIME_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" ' \
                     'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
                     'stroke-linejoin="round" aria-hidden="true">' \
-                    '<circle cx="12" cy="12" r="9.5"/><path d="M12 6.5V12l3.5 2"/></svg>'
+                    '<circle cx="12" cy="12" r="9"/><path d="M12 7V12l3.5 2"/></svg>'
 
 # What a post's reading time SAYS, short one included. Kept apart from the
 # markup because two callers need the same words and one of them (the hero
@@ -1826,11 +1833,37 @@ end
 LISTING_HEADING_ICONS = {
   search: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
           'fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' \
-          '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+          '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  # A stack of sheets: several parts that are one thing, which is what a
+  # series is and what the word it replaces was saying. It replaces the
+  # word rather than joining it -- the heading is the series' NAME, and
+  # "Série" in front of it was a label competing with the name for the
+  # start of the line. The word stays in the markup for a screen reader,
+  # the same arrangement a tag listing has used since it got its pill.
+  #
+  # The two sheets behind are an edge each rather than whole outlines:
+  # three complete pages at 20px close up into a grey block, and the
+  # folded corner is what says "page" once the rest has gone small.
+  series: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+          'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+          'stroke-linejoin="round" aria-hidden="true">' \
+          '<path d="M17 3h-6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7z"/>' \
+          '<path d="M17 3v3a1 1 0 0 0 1 1h3"/>' \
+          '<path d="M6 7v12a2 2 0 0 0 2 2h9"/>' \
+          '<path d="M3 11v8a2 2 0 0 0 2 2h8"/></svg>',
+  # The hole in the label is a circle rather than the zero-length line the
+  # shape is usually drawn with: that trick renders only under a round
+  # linecap, and one stylesheet override away it disappears without
+  # anything else looking wrong.
+  tag: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+       'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+       'stroke-linejoin="round" aria-hidden="true">' \
+       '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/>' \
+       '<circle cx="7" cy="7" r="1.2"/></svg>'
 }.freeze
 
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
-                  heading_kind: nil, heading_variant: nil, feed_path: nil,
+                  heading_kind: nil, heading_variant: nil, heading_icon: nil, feed_path: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
   pages, fixed = anchored_pages(posts)
   pages.each do |number, page_posts|
@@ -1850,7 +1883,8 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
-    heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant)
+    heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
+                                        icon: heading_icon)
     # Tags, series and content types all name themselves; the landing page is
     # the only listing that arrives here with nothing, and it is the only one
     # that would otherwise have no h1 (see home_heading_html).
@@ -2356,7 +2390,7 @@ tags_map.each do |slug, data|
   end
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
-                heading_kind: t('tag.kind'), heading_variant: 'tag',
+                heading_kind: t('tag.kind'), heading_variant: 'tag', heading_icon: :tag,
                 feed_path: FEED_TAG_SLUGS.include?(slug) ? "/tag/#{slug}/rss.xml" : nil,
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
@@ -2371,6 +2405,7 @@ SERIES_MAP.each do |slug, in_series|
   write_listing(in_series, index_template, File.join(PUBLIC_DIR, 'series', slug),
                 base_path: "/series/#{slug}", heading: name,
                 heading_kind: t('series.kind'), heading_variant: 'series',
+                heading_icon: :series,
                 title: t('series.title', name: name, short_name: SITE_SHORT_NAME),
                 description: t('series.description', name: name, author: SITE_AUTHOR))
 end
