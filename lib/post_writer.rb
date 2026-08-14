@@ -119,18 +119,42 @@ module PostWriter
     # importer that legitimately provides one still wins. `type` stays out:
     # absent, the build re-derives it from the (re-imported) blocks, so it
     # comes back on its own.
-    # redirect_from rides along too: the importer that understands the
-    # source platform writes it once, and a later re-import from an export
-    # that carries no URL history (or a different importer entirely) must
-    # not silently drop the addresses the post still answers for.
     # page, series and series_part joined the list in 1.3. Same rule as the
     # rest: carried over only when the importer said nothing itself, so an
     # adapter that DOES recognise a page still wins, and a series -- which
     # no source has a notion of -- survives every re-import.
     %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at
-       redirect_from page series series_part].each do |key|
+       page series series_part].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
+    # redirect_from is the one key where "the importer set it itself" is NOT
+    # a reason to drop what the post already carried, so it cannot ride in
+    # the list above. A post collects old addresses from several places --
+    # the importer that understands the source platform, scripts/backfill_
+    # redirects.rb, another platform's importer before this one, and an
+    # author typing in the addresses a dead blog used to answer for. Each of
+    # those knows about a different past, and none of them knows about the
+    # others. Under the old guard a re-import with KEEP_PERMALINKS=1 wrote
+    # its own single address over all of them, so the stubs the build had
+    # been serving stopped being built and every one of those addresses
+    # started answering 404 -- silently, with nothing in the summary. Union,
+    # old first, so once merged a further re-import adds nothing and the
+    # order never moves.
+    merged = (Array(old && old['redirect_from']) + Array(post['redirect_from']))
+             .map { |path| path.to_s.strip }.reject(&:empty?).uniq
+    # A page lives at /<slug>/, so that address redirecting to itself is a
+    # loop the build has to refuse -- and it warns about it once per build,
+    # forever. Ghost's adapter guards its own writes against this, but the
+    # guard reads the SOURCE: a post the platform calls a post and the
+    # author later promotes to a page slips past it, and no adapter can
+    # take the address back afterwards, because the merge above is what
+    # keeps re-imports from dropping addresses. So it comes off here, where
+    # both the slug and `page` are settled, which also repairs the sites
+    # that already have one import behind them. Only the post's own current
+    # address: a former slug redirecting to the page is exactly what
+    # former_slugs is for.
+    merged -= ["/#{slug}/"] if post['page']
+    merged.empty? ? post.delete('redirect_from') : post['redirect_from'] = merged
     # hero, toc and unlisted need presence rather than truth, and that
     # distinction is the whole point of them: `hero: false` is a post saying
     # "not me", and a guard that tests `old[key]` reads that as "nothing to

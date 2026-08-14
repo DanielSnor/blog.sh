@@ -53,6 +53,17 @@ module PostVersions
     year = File.basename(File.dirname(path))
     dir = File.join(versions_root(content_dir), year, slug)
     FileUtils.mkdir_p(dir)
+    # A copy of what is already the newest kept version is not a previous
+    # state, and ten of them are ten answers to nothing. Re-importing is
+    # exactly the thing somebody does over and over while moving a blog in,
+    # and every pass overwrites every post whether the source changed a byte
+    # or not -- so ten re-runs filled the whole cap with identical copies
+    # and pushed out the one version that predated the author's own edit.
+    # The question this list exists to answer, "what did it say before I
+    # broke it", was then answered with the broken text ten times over.
+    newest = Dir.glob(File.join(dir, '*.json')).max
+    return false if newest && FileUtils.compare_file(path, newest)
+
     FileUtils.cp(path, File.join(dir, "#{stamp}.json"))
     prune(dir, cap)
     true
