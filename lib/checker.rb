@@ -85,6 +85,7 @@ module Checker
     findings.concat(check_internal_links(posts, known))
     findings.concat(check_orphan_media(root, posts))
     findings.concat(check_redirects(posts))
+    findings.concat(check_series_names(posts))
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size)) if local_clean
 
@@ -254,6 +255,52 @@ module Checker
   # Two posts claiming one old address. The build answers with whichever it
   # rendered last, so the loser's readers land on the winner's post and no
   # warning is printed anywhere.
+  # Two series whose slugs differ by a character are usually one series
+  # with a typo in it -- and the archive keeps the mistake invisible: the
+  # misspelling founds its own series, and with fewer than two members it
+  # never even gets a page to be noticed on. The draft preview says this
+  # at writing time; this is the net for the typo made half a year ago.
+  #
+  # Two guards against crying wolf, because a check nobody believes is a
+  # check nobody runs. Slugs whose difference is digits only are left
+  # alone -- rok-2025 next to rok-2026 is two year-series, not a typo.
+  # And a distance of two only counts when one side has a single post:
+  # two established series that merely have similar names are not news.
+  def check_series_names(posts)
+    groups = posts.reject { |p| draft?(p) }
+                  .group_by { |p| Slug.slugify(p['series'].to_s) }
+                  .reject { |slug, _| slug.empty? }
+    findings = []
+    groups.keys.sort.combination(2) do |a, b|
+      next if a.delete('0-9') == b.delete('0-9')
+
+      distance = edit_distance(a, b)
+      next if distance > 2
+      next if distance == 2 && [groups[a].size, groups[b].size].min > 1
+
+      names = [a, b].map { |slug| groups[slug].map { |p| p['series'].to_s.strip }.uniq.first }
+      findings << warn(t('series_similar', a: names[0], count_a: groups[a].size,
+                                           b: names[1], count_b: groups[b].size),
+                       fix: t('series_similar_fix'))
+    end
+    findings
+  end
+
+  # Plain Levenshtein over two short slugs; nothing here is hot.
+  def edit_distance(a, b)
+    return (a.length - b.length).abs if a.empty? || b.empty?
+
+    previous = (0..b.length).to_a
+    a.each_char.with_index do |ca, i|
+      current = [i + 1]
+      b.each_char.with_index do |cb, j|
+        current << [previous[j + 1] + 1, current[j] + 1, previous[j] + (ca == cb ? 0 : 1)].min
+      end
+      previous = current
+    end
+    previous.last
+  end
+
   def check_redirects(posts)
     claims = Hash.new { |h, k| h[k] = [] }
     posts.each do |post|

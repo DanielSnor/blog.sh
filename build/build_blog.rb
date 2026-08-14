@@ -1462,7 +1462,29 @@ end
 # unrelated -- on an archive assembled from twenty-two sources, "next" is
 # a tweet from 2011 beside an essay from 2026, which is noise wearing the
 # clothes of navigation.
-def series_nav_html(slug, in_series, index, position)
+def series_nav_html(slug, in_series, index, position, post = nil)
+  # A draft is not in SERIES_MAP -- "part 3 of 7" is a fact about the
+  # published set and the draft is not in it. But saying NOTHING made a
+  # typo in the series name invisible until the address was live and the
+  # toot sent: a misspelling quietly founds a one-post series, and with
+  # fewer than two members it does not even get a page to notice it on.
+  # So a draft's preview answers the question that actually matters while
+  # previewing -- does this join something, or start something new?
+  if post && draft?(post) && position == :top
+    name = post['series'].to_s.strip
+    return '' if name.empty?
+
+    draft_slug = series_slug_of(post)
+    published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || 0) : 0
+    label = if published.positive?
+              spelled = (defined?(SERIES_NAMES) && SERIES_NAMES[draft_slug]) || name
+              t('post.series_draft_joins', name: spelled, count: published, number: published + 1)
+            else
+              t('post.series_draft_new', name: name)
+            end
+    return %(<p class="series-note series-note--draft">#{h(label)}</p>\n                )
+  end
+
   return '' if slug.nil? || in_series.size < 2
 
   if position == :top
@@ -2172,11 +2194,31 @@ SERIES_MAP = posts.group_by { |p| series_slug_of(p) }
                   .reject { |slug, group| slug.nil? || group.size < 2 }
                   .transform_values { |group| group.sort_by { |p| series_order_key(p) } }
                   .freeze
+# Published parts per series slug, singletons included -- SERIES_MAP
+# deliberately drops groups under two (a "series" of one is a post), and
+# that is exactly why a draft's preview cannot ask it whether the name it
+# carries joins anything: the one-post series a typo founds is the case
+# it needs to see.
+SERIES_PUBLISHED = posts.group_by { |p| series_slug_of(p) }
+                        .reject { |slug, _| slug.nil? }
+                        .transform_values(&:size)
+                        .freeze
 # The name as it was written, for the heading -- the slug is only an
-# address. The first spelling wins if a series is spelled two ways.
+# address. The first spelling wins if a series is spelled two ways, with
+# one exception: a spelling that IS its own slug loses to one that is not.
+# Slugify is idempotent, so `series: novy-sean-cz` has always grouped with
+# `series: Nový Sean.cz` -- writing the address was allowed, it just put
+# the address in the heading of the series page if that post happened to
+# be read first. Now the address only names the series when nobody
+# anywhere spelled it out.
 SERIES_NAMES = posts.each_with_object({}) do |post, acc|
   slug = series_slug_of(post)
-  acc[slug] ||= post['series'].to_s.strip if slug && SERIES_MAP.key?(slug)
+  next unless slug && SERIES_MAP.key?(slug)
+
+  name = post['series'].to_s.strip
+  if !acc.key?(slug) || (acc[slug] == slug && name != slug)
+    acc[slug] = name
+  end
 end.freeze
 
 PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
