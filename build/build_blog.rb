@@ -2089,6 +2089,18 @@ pages.reject! do |page|
   warn "⚠️  Page '#{page['slug']}' would sit on an address the engine already uses (/#{page['slug']}/) -- not built. Rename it."
   true
 end
+# `unlisted` on a PAGE means the same as it does on a post, and pages are
+# the likeliest thing to be marked with it: a migration leaves behind a
+# "Sample Page" and a "Privacy Policy" nobody wrote, and unlisted is what
+# somebody reaches for instead of deleting them. Taken out of `pages`
+# here, they join the same list, so the sitemap and the search index --
+# the only two things `pages` still feeds -- stop contradicting the
+# noindex the page's own <head> already carried.
+#
+# After the reserved-name refusal above, not before it: a page called
+# "posts" must be refused whether or not it is also unlisted.
+unlisted_pages, pages = pages.partition { |p| unlisted?(p) }
+unlisted_posts.concat(unlisted_pages)
 # A draft without its token would build at the GUESSABLE /draft//slug/ --
 # every writer in the engine guarantees the token, so a missing one means
 # a hand-copied or hand-edited JSON, and the unguessable-URL design must
