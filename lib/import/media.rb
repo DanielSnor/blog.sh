@@ -124,6 +124,7 @@ module Import
 
       path = File.join(@tmpdir, filename)
       File.binwrite(path, body)
+      path, filename = retype(path, filename)
       @files[path] = filename
       @by_source[url] = filename
       filename
@@ -330,6 +331,38 @@ module Import
     # trace of a fetch that failed.
     def uncount
       @registered -= 1
+    end
+
+    # The extension had to be guessed from the URL to allocate a name; now
+    # the bytes are here and they know better. One real archive of 420
+    # images held five files whose extension its own CDN contradicted --
+    # image/jpeg served for an AVIF, a favicon called .ico that is a PNG --
+    # and the wrong name follows the file onto the published site, where the
+    # web server reads it to pick the content type.
+    #
+    # Only a format MediaDimensions recognises beyond doubt overrules the
+    # URL, and only when the name isn't already one of that format's own
+    # spellings, so .jpeg is never rewritten to .jpg. The NUMBER never
+    # changes, which is what a re-import has to agree on, and the same bytes
+    # always yield the same extension, so every run of the same post lands
+    # on the same name.
+    #
+    # from_file is deliberately left out: what an export archive already has
+    # on disk is the author's own naming, and renaming their files is not
+    # this engine's business.
+    def retype(path, filename)
+      sniffed = MediaDimensions.sniff(path)
+      ext = File.extname(filename)
+      return [path, filename] if MediaDimensions.extension_agrees?(ext, sniffed)
+
+      renamed = "#{File.basename(filename, ext)}#{sniffed}"
+      dest = File.join(File.dirname(path), renamed)
+      File.rename(path, dest)
+      [dest, renamed]
+    rescue SystemCallError
+      # A rename that fails costs the file nothing: the bytes are still
+      # under the name the post already believes in.
+      [path, filename]
     end
 
     # Extension from the URL path, since that's all a CDN URL reliably

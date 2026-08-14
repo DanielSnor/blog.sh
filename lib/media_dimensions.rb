@@ -24,14 +24,18 @@ module MediaDimensions
   module_function
 
   # PNG (IHDR, fixed offset), GIF (logical screen descriptor), WebP (the
-  # RIFF chunk, in three flavours) and JPEG (scan the segment markers for
-  # the SOFn frame header). Only the first bytes are ever read.
+  # RIFF chunk, in three flavours), AVIF (the ISO box tree) and JPEG (scan
+  # the segment markers for the SOFn frame header). Only the first bytes
+  # are ever read.
   #
   # HEIC is deliberately absent: Chrome and Firefox don't render it at all,
   # so knowing its dimensions would only produce a page that works in
   # Safari and shows a broken image to everyone else. Converting it is a
   # separate, opt-in decision (`media.convert_heic`, in lib/heic_converter.rb),
-  # not something a dimension reader can paper over.
+  # not something a dimension reader can paper over. AVIF is the opposite
+  # case and had simply been missed: every current browser renders it, and
+  # CDNs hand it out to whoever asks -- one real archive of 420 images had
+  # exactly one file this reader could not measure, and it was the AVIF.
   def image(path)
     File.open(path, 'rb') do |f|
       head = f.read(30)
@@ -81,6 +85,11 @@ module MediaDimensions
             f.seek(len - 2, IO::SEEK_CUR)
           end
         end
+      # Last on purpose: this is the only branch that reads its marker at
+      # an offset rather than at byte 0, so anything with a real magic
+      # number of its own gets to answer first.
+      elsif head.byteslice(4, 4) == 'ftyp'.b
+        return sane(avif(f, head))
       end
     end
     nil
@@ -162,6 +171,140 @@ module MediaDimensions
       h = head.byteslice(27, 2).unpack1('v') | (head.getbyte(29) << 16)
       [w + 1, h + 1]
     end
+  end
+
+  # The brands that mean "still image this engine is willing to measure".
+  # Checked rather than the box structure alone, because HEIC is the very
+  # same container with a different brand and is unsupported on purpose.
+  AVIF_BRANDS = %w[avif avis].freeze
+
+  # AVIF keeps its size in a property, not at a fixed offset: meta > iprp >
+  # ipco > ispe, each box length-prefixed like MP4's. Walked down that path
+  # rather than searched for, because the four letters "ispe" turn up inside
+  # compressed image data too and a scan finds whichever comes first.
+  def avif(io, head)
+    return nil unless avif?(io, head)
+
+    ipco = avif_ipco(io)
+    return nil unless ipco
+
+    best = nil
+    rotated = false
+    each_box(io, ipco[0], ipco[1]) do |type, body, _finish|
+      case type
+      when 'ispe'
+        io.seek(body + 4) # FullBox: version and flags first
+        w, h = io.read(8).to_s.unpack('N2')
+        # A file may carry several: a thumbnail, an alpha plane, the tiles
+        # of a grid. Without parsing ipma's item associations the honest
+        # pick is the biggest, which is the picture in every one of those
+        # cases -- the others are all smaller than or equal to it.
+        best = [w, h] if w && h && (best.nil? || w * h > best[0] * best[1])
+      when 'irot'
+        # Same problem EXIF orientation solves for JPEG, and the same
+        # answer: the stored size describes the picture before the quarter
+        # turn, the page has to reserve the box the reader will see.
+        io.seek(body)
+        rotated = true if io.read(1).to_s.getbyte(0).to_i.odd?
+      end
+    end
+    return nil unless best
+
+    rotated ? best.reverse : best
+  end
+
+  def avif?(io, head)
+    size = head.byteslice(0, 4).unpack1('N').to_i
+    return false if size < 12 || size > 512
+
+    io.seek(0)
+    ftyp = io.read(size).to_s
+    # Major brand, then the compatible-brands list that follows the minor
+    # version: a file branded mif1 with avif among its compatible brands is
+    # an AVIF, and CDNs emit those.
+    brands = [ftyp.byteslice(8, 4)] + ftyp.byteslice(16..).to_s.scan(/..../m)
+    brands.compact.any? { |brand| AVIF_BRANDS.include?(brand) }
+  end
+
+  def avif_ipco(io)
+    # meta is a FullBox, so its children start four bytes into the body;
+    # iprp and ipco are plain containers.
+    meta = find_box(io, 0, io.size, 'meta')
+    meta = [meta[0] + 4, meta[1]] if meta
+    iprp = meta && find_box(io, meta[0], meta[1], 'iprp')
+    iprp && find_box(io, iprp[0], iprp[1], 'ipco')
+  end
+
+  def find_box(io, from, limit, want)
+    each_box(io, from, limit) { |type, body, finish| return [body, finish] if type == want }
+    nil
+  end
+
+  # One level of the box tree, yielding (type, first byte of body, first
+  # byte after the box). Guards against the sizes a truncated or hostile
+  # file reports -- a box that claims to end before its own body begins, or
+  # past the end of its parent, ends the walk instead of seeking wild.
+  def each_box(io, from, limit)
+    pos = from
+    while pos + 8 <= limit
+      io.seek(pos)
+      header = io.read(8)
+      break unless header && header.bytesize == 8
+
+      size, type = header.unpack('Na4')
+      body = pos + 8
+      if size == 1
+        size = io.read(8).unpack1('Q>').to_i
+        body = pos + 16
+      elsif size.zero?
+        size = limit - pos
+      end
+      finish = pos + size
+      break if finish < body || finish > limit
+
+      yield type, body, finish
+      pos = finish
+    end
+    nil
+  end
+
+  # What the bytes say the file is, as the extension it should carry, or nil
+  # for anything not recognised beyond doubt. Lives here because this is
+  # where the magic numbers already are, and it answers a question a URL
+  # cannot: an image host's filename is a name somebody else chose, and in
+  # one real archive five files in 420 carried an extension their bytes
+  # contradicted (a CDN serving image/jpeg for AVIF, a favicon named .ico
+  # that is a PNG).
+  #
+  # Deliberately short: only the formats the readers above genuinely
+  # recognise. Everything else answers nil, which means "keep whatever name
+  # you had" rather than a guess.
+  def sniff(path)
+    File.open(path, 'rb') do |f|
+      head = f.read(30)
+      return nil unless head && head.bytesize >= 12
+
+      return '.png' if head.byteslice(0, 8) == "\x89PNG\r\n\x1a\n".b
+      return '.gif' if head.byteslice(0, 4) == 'GIF8'.b
+      return '.jpg' if head.byteslice(0, 3) == "\xFF\xD8\xFF".b
+      return '.webp' if head.byteslice(0, 4) == 'RIFF'.b && head.byteslice(8, 4) == 'WEBP'.b
+      return '.avif' if head.byteslice(4, 4) == 'ftyp'.b && avif?(f, head)
+    end
+    nil
+  rescue StandardError
+    nil
+  end
+
+  # The spellings of one format that all mean the same thing, so a file
+  # already named correctly is never renamed -- .jpeg must not become .jpg.
+  # Renaming for tidiness would move media on re-import, which is the one
+  # thing the import numbering is careful about.
+  SYNONYMS = { '.jpg' => %w[.jpg .jpeg .jpe .jfif] }.freeze
+
+  def extension_agrees?(ext, sniffed)
+    return true if sniffed.nil?
+
+    SYNONYMS.fetch(sniffed, [sniffed]).include?(ext.to_s.downcase)
   end
 
   # MP4/MOV dimensions from the tkhd atom (moov > trak > tkhd). Without
