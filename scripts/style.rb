@@ -309,8 +309,13 @@ end
 # read the dimensions off their own file.
 def section_banner
   src = current.dig('banner', 'src') || '/assets/images/header.png'
-  puts Tui.paint(t('banner_current', path: src), :dim)
-  puts
+  # Into the frame, not onto the screen. Wizard.ask repaints from the top
+  # of the viewport, so a `puts` here was erased by the very question it
+  # was there to inform -- and this line names the file currently in place,
+  # which is the one thing you need in front of you when deciding whether
+  # to replace it. Left as a `puts` until now because the row would then
+  # have been truncated instead of erased; hints and notes wrap now.
+  Wizard.remember(Tui.paint(t('banner_current', path: src), :dim))
 
   answer = Wizard.ask(t('q_banner_file'), '', hint: t('h_banner_file'))
   unless answer.to_s.empty?
@@ -324,11 +329,14 @@ def section_banner
       # this is the one thing that touches a file, so it waits with them.
       @pending_banner = path
       src = ask_banner_src(src, path)
-      puts Tui.paint(t('banner_pending', path: src), :green)
-      puts
+      # Same reason as the line above: two more questions follow in this
+      # section, and each of them repaints over whatever was printed here.
+      # The one that says the file was not found matters most -- it is the
+      # answer to "why did nothing happen?", and it was the row most
+      # reliably erased.
+      Wizard.remember(Tui.paint(t('banner_pending', path: src), :green))
     else
-      puts Tui.paint("⚠️  #{t('banner_not_found', path: path)}", :yellow)
-      puts
+      Wizard.remember(Tui.paint("⚠️  #{t('banner_not_found', path: path)}", :yellow))
     end
   end
 

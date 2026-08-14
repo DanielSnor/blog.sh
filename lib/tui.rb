@@ -121,6 +121,61 @@ module Tui
     "#{out}…"
   end
 
+  # Wraps where the comment above truncates, for the one kind of row that
+  # is not load-bearing for any repaint: a wizard's hint, which sits in a
+  # frame with empty rows under it. Truncating those was silently costing
+  # 7,391 characters across 42 of 54 hints -- and the part that went was
+  # the end, which is where a hint says what it will cost you. One hint
+  # explaining that the page size can never be changed again showed the
+  # words "asked now and only now" and hid every reason why.
+  #
+  # German is the reason this cannot be solved by writing shorter: it runs
+  # 15-20% longer than the same sentence in English, so a hint edited to
+  # fit in one language goes on being cut in another.
+  def wrap_to_width(text, width)
+    text = sanitize_row(text)
+    return [text] if width <= 1 || display_width(text) <= width
+
+    lines = []
+    current = +''
+    split_long_words(text.split(' '), width).each do |word|
+      if current.empty?
+        current = +word
+      elsif display_width("#{current} #{word}") <= width
+        current << ' ' << word
+      else
+        lines << current
+        current = +word
+      end
+    end
+    lines << current unless current.empty?
+    lines
+  end
+
+  # A word with no line it can fit on -- the lookup URL one hint tells you
+  # to open, a deploy path -- is cut into pieces that do, rather than left
+  # to overrun the row and be truncated away by the frame. Cutting a URL
+  # across two lines is ugly; losing its tail is worse, because what is
+  # left still looks like a whole address.
+  def split_long_words(words, width)
+    words.flat_map do |word|
+      next word if display_width(word) <= width
+
+      pieces = []
+      piece = +''
+      word.each_char do |ch|
+        if display_width(piece + ch) > width
+          pieces << piece
+          piece = +ch
+        else
+          piece << ch
+        end
+      end
+      pieces << piece unless piece.empty?
+      pieces
+    end
+  end
+
   # The same, for text that carries colour: an ANSI string's length is not
   # its visible width, so only the printable characters are counted and the
   # escape sequences pass through untouched. A cut inside a colour gets a

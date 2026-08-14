@@ -81,10 +81,22 @@ module Wizard
     rows = context.size > room ? context.last(room) : context.dup
     rows << '' unless rows.empty?
     rows << Tui.paint(label, :bold)
-    rows << Tui.paint("   #{hint}", :dim) if hint
-    rows << Tui.paint("   #{problem}", :red) if problem
+    # Wrapped, not one row: the frame truncates every row it is given, and
+    # a hint is the one thing here written to be read rather than scanned.
+    # The three spaces go on each line so the block lines up under the
+    # question instead of the continuation starting at the margin.
+    indented(hint, :dim) { |row| rows << row }
+    indented(problem, :red) { |row| rows << row }
     rows << ''
     Tui.frame(rows)
+  end
+
+  def indented(text, colour)
+    return if text.nil? || text.to_s.empty?
+
+    Tui.wrap_to_width(text.to_s, Tui.term_width - 3).each do |line|
+      yield Tui.paint("   #{line}", colour)
+    end
   end
 
   # `record:` is false when a caller answers for the record itself --
@@ -206,7 +218,13 @@ module Wizard
   # distinction the section exists to make. Rows, not a string: the third
   # state is a list.
   def choose(label, options, current_index: 0, note: nil)
-    rows = Array(note)
+    # Wrapped for the reason question_frame wraps a hint -- Tui.menu paints
+    # a frame and the frame truncates. Rows that already carry colour are
+    # left alone: a caller that painted a row measured it as it meant it,
+    # and an ANSI string's length is not its width.
+    rows = Array(note).flat_map do |row|
+      row.to_s.include?("\e") ? [row] : Tui.wrap_to_width(row.to_s, Tui.term_width)
+    end
     unless Tui.interactive?
       rows.each { |row| puts row }
       puts unless rows.empty?
@@ -305,7 +323,11 @@ module Wizard
     if note
       if Tui.interactive?
         lines << '' unless lines.empty?
-        lines << Tui.paint("   #{note}", :yellow)
+        # Wrapped for the reason question_frame wraps a hint: this row goes
+        # into a frame, the frame truncates, and the end of the sentence is
+        # where a note says what a yes will cost. Down a pipe there is no
+        # frame, and a terminal wraps a `puts` by itself.
+        indented(note, :yellow) { |row| lines << row }
       else
         puts Tui.paint("   #{note}", :yellow)
       end
