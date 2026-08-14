@@ -304,13 +304,21 @@ module Import
       body = liquid_free(body)
       body = outside_fences(body) { |prose| join_lazy_list_lines(prose) }
       body = free_inline_images(body)
+      # Three parts, and the third is why: markdown puts a picture's
+      # caption in the title position -- ![alt](path "caption") -- which
+      # is where `./blog.sh export` writes it and where CommonMark says
+      # it goes. Carrying only the path and the alt meant an export read
+      # back lost the caption outright AND filed the alt text as one, so
+      # a photograph came home described by words written for somebody
+      # who cannot see it. Every part is CGI-escaped, so a colon inside
+      # any of them arrives as %3A and the split stays unambiguous.
       body = body.gsub(MarkdownParser::IMAGE_RE) do
-        "@@ssg-image:#{CGI.escape(Regexp.last_match(2).strip)}:#{CGI.escape(Regexp.last_match(1).to_s)}@@"
+        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
       end
       # Line-anchored form ([ \t], NOT \s -- \s eats the newlines and
       # with them the paragraph break after the image).
-      body = body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"[^"]*")?\)[ \t]*$/) do
-        "@@ssg-image:#{CGI.escape(Regexp.last_match(2).strip)}:#{CGI.escape(Regexp.last_match(1).to_s)}@@"
+      body = body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"([^"]*)")?\)[ \t]*$/) do
+        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
       end
       blocks, = MarkdownParser.parse_body(body, nil)
       blocks
@@ -577,7 +585,11 @@ module Import
       pieces.map(&:strip).join("\n\n")
     end
 
-    SENTINEL = /@@ssg-image:([^:@]*):([^@]*)@@/
+    SENTINEL = /@@ssg-image:([^:@]*):([^:@]*):([^@]*)@@/
+
+    def image_sentinel(src, alt, title)
+      "@@ssg-image:#{CGI.escape(src.to_s.strip)}:#{CGI.escape(alt.to_s)}:#{CGI.escape(title.to_s)}@@"
+    end
 
     # What `./blog.sh export` writes above the HTML it had to fall back
     # to for a block markdown cannot express -- video, audio, a link
@@ -629,10 +641,10 @@ module Import
         if block['type'] == 'text' && (m = block['text'].to_s.strip.match(OWN_BLOCK_SENTINEL))
           own_block(m[1], media)
         elsif block['type'] == 'text' && (m = block['text'].to_s.strip.match(/\A#{SENTINEL}\z/))
-          image_block(CGI.unescape(m[1]), CGI.unescape(m[2]), media, post_path)
+          image_block(CGI.unescape(m[1]), CGI.unescape(m[2]), CGI.unescape(m[3]), media, post_path)
         elsif block['type'] == 'image'
           # From the HtmlBlocks path: the URL is still the tree's own.
-          image_block(block.dig('media', 0, 'url').to_s, nil, media, post_path)
+          image_block(block.dig('media', 0, 'url').to_s, nil, nil, media, post_path)
         else
           block
         end
@@ -642,7 +654,7 @@ module Import
     # A root-relative path is looked up in the tree, a relative one next
     # to the post, an absolute URL downloaded -- in that order of
     # likelihood for a static site's own images.
-    def image_block(src, alt, media, post_path)
+    def image_block(src, alt, title, media, post_path)
       # A data: URI is the image itself, inline -- nothing to fetch,
       # nothing on disk, and no block form for inline bytes here. Dropped
       # quietly and without a number: handed to from_file it showed up in
@@ -673,7 +685,19 @@ module Import
       entry['width'] = width if width
       entry['height'] = height if height
       block = { 'type' => 'image', 'media' => [entry] }
-      block['caption'] = alt unless alt.to_s.empty?
+      # Each word where it belongs. The alt text is what a picture is for
+      # somebody who cannot see it; the caption is what it says to
+      # everybody. They are different sentences and the markdown keeps
+      # them apart, so this does too -- it used to file the alt as the
+      # caption and drop the caption, which printed the description under
+      # the photograph and left the screen reader with nothing.
+      #
+      # A picture with a title and no alt keeps the older behaviour of
+      # having something to say: with only one of the two written down,
+      # the caption is the one a reader sees.
+      block['alt_text'] = alt unless alt.to_s.empty?
+      block['caption'] = title.to_s.empty? ? alt : title
+      block.delete('caption') if block['caption'].to_s.empty?
       block
     end
 

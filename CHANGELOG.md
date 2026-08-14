@@ -61,8 +61,13 @@ which only existed because the bar didn't.
   though the authoring markdown has a form for them: `!![caption](url)`
   is this engine's own, and every other markdown parser reads it as an
   exclamation mark followed by an image. Verified over a real 118-post
-  archive -- 118 posts and 420 media files out and back with every field
-  identical, which is also how that video defect was found. Everything else the engine keeps and no other engine has a word
+  archive -- 118 posts and 420 media files out and back -- which is how
+  that video defect was found, and later a second one: a picture's caption
+  and its alt text are two different sentences in two different places of
+  the markdown, and the way back read the alt as the caption and dropped
+  the caption entirely. A photograph came home described by words written
+  for somebody who cannot see it, with nothing left for the screen reader
+  that needed them. Both travel now, each to its own field. Everything else the engine keeps and no other engine has a word
   for travels under one `blogsh:` key, which `./import.sh` reads back:
   posts keep their identity, series, redirects and announcement URLs, so
   export plus re-import moves an installation instead of merely leaving
