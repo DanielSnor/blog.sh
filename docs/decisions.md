@@ -324,8 +324,8 @@ hosts differ wildly -- GitHub Pages refuses a single file over 100 MiB, a
 plain rsync target refuses nothing -- but a per-backend limit would mean a
 post that saves today becomes undeployable the day the site moves. The
 strictest supported target therefore sets the rule for all of them, and
-the number is decimal (100 MB, ~4.7% under GitHub's limit) so the engine
-refuses before the host does. Refusal happens at save time, where the
+the number is decimal (100 MB, which sits under GitHub's binary
+100 MiB) so the engine refuses before the host does. Refusal happens at save time, where the
 author can still act, as well as at deploy time; a config key would only
 restate the question every installation would then answer differently,
 the same reasoning as the fixed JPEG quality in the HEIC converter.
@@ -567,7 +567,8 @@ render identically; tokens are meant to exist only where they're used.
 **Config written by the engine is edited as text, never dumped from a
 parsed hash.** Loading `config/site.yml`, changing a key and writing it
 back is one line of Ruby and would have destroyed the thing that makes
-the file usable: of its 277 example lines, only about 60 are keys. The
+the file usable: most of its lines are comments and commented-out
+blocks, only a fraction are keys. The
 rest is the documentation for every setting the engine has, plus the
 commented-out blocks you uncomment when you want a widget or a custom
 font -- and real sites hand-edit around it (sean.cz keeps an `<img>`

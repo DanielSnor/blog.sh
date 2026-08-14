@@ -614,9 +614,10 @@ which only existed because the bar didn't.
   listings are derived from the posts the way tag listings already were,
   and a page N is judged by the listing it belongs to -- so `/tag/x/page/2/`
   passes where the tag exists and is still reported where it does not.
-- **An unlisted post is not announced.** It is out of the listings, the
-  feeds, the sitemap and the search index by the author's own instruction,
-  and publishing it put its address into a public timeline anyway: by hand
+- **An unlisted post is not announced.** It is out of everything a
+  reader could find it in by the author's own instruction (see Unlisted
+  posts above), and publishing it put its address into a public timeline
+  anyway: by hand
   without a word, and from cron without anyone to ask. There is no
   half-measure worth having, since an announcement cannot be recalled once
   a server has it, so the rule holds on both paths and `--force` does not
@@ -839,17 +840,13 @@ because both ends of them are ours.
 ### Upgrading
 
 - Nothing to migrate. One thing does look different without being asked
-  for, and it is the only one, in the order it happened: the menu bar at
-  the top became sticky, the menu repeated under the content stopped making
-  sense, and it went. That second menu was hardcoded into the layout, never
-  a setting, and it existed for one reason -- to give a reader who had
-  reached the end of an article a way out where they were standing. They
-  have one the whole way down the page now, and it carries the search field
-  too, which the bottom one never did. There is no key to put it back: two
-  of the same menu on one screen is not a preference. The line it drew
-  between the content and the footer was doing real work and is drawn
-  without it now, in the same 5px. Everything else a site gets without
-  adding a key is the page it got before.
+  for, and it is the only one: the menu bar at the top became sticky, and
+  the menu repeated under the content went with it -- its one job is done
+  the whole way down the page now, search field included. There is no key
+  to put it back: two of the same menu on one screen is not a preference.
+  The line it drew between the content and the footer is drawn without it,
+  in the same 5px. Everything else a site gets without adding a key is the
+  page it got before.
 - It is no longer the same *bytes*, though, and the next deploy is a full
   one rather than incremental. The banner's two overlay lines moved inside
   a wrapper element, which is in the layout every page shares, so the whole

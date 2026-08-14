@@ -175,19 +175,10 @@ deploy accepted -- so a bad `--prune` can't quietly empty the site.
 → [install.md → Pick a deploy target](docs/install.md#6-pick-a-deploy-target),
 [the commands](#deploy)
 
-**Comments, without a comment system.** Every published post is
-auto-announced on Mastodon *or* Bluesky -- exactly one network per site
--- and the replies to that announcement are the comments. The visitor's
-browser fetches the thread from the network's own public API, so there is
-no comment database to moderate, migrate or back up, and the reply, like
-and boost counts shown next to a post are that announcement's.
-
-Where an open thread isn't wanted, `comments.approval: fav` publishes
-only the replies you favourite -- you star one from whatever client you
-already use and it appears at the next cron run; the rest stays on the
-network. Off by default, and honest about what it costs: a favourite is
-public, approval takes a cron interval, and it keeps a reply off the
-blog without touching it on the network.
+**Comments, without a comment system.** The announcement's replies are
+the thread and `comments.approval: fav` publishes only the ones you
+favourite -- both told in full under [Why this exists](#why-this-exists),
+and told once.
 → [install.md → Comments network](docs/install.md#8-comments-network-optional-mastodon-or-bluesky)
 
 **Sidebar widgets.** Latest toots, Bluesky posts, Pixelfed posts, GitHub
@@ -263,7 +254,7 @@ style.sh                 Appearance wizard -- palette, banner, menu, about, foot
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
-                           deploy-web.sh      standalone deploy of public.nosync/ to Surfer (no rebuild)
+                           deploy-web.sh      standalone deploy of public.nosync/ to the configured target (no rebuild)
                            refresh-sidebar.sh cron: refreshes only the sidebar widgets (no site rebuild)
                            migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
@@ -564,7 +555,7 @@ back.
 ```bash
 ruby build/build_blog.rb   # rebuild into public.nosync/
 ./scripts/deploy-web.sh            # uploads only new/changed files (SHA256 manifest)
-./scripts/deploy-web.sh --prune    # also deletes orphaned files on Surfer
+./scripts/deploy-web.sh --prune    # also deletes orphaned files on the target
 ```
 
 `./blog.sh rebuild` does both steps at once.
