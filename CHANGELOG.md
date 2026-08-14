@@ -660,11 +660,181 @@ which only existed because the bar didn't.
   now.
 
   This is a defect this cycle introduced: the screens are new, and
-  anything printed just before one is painted over. One place still has
-  it -- the banner section names the file currently set, and the question
-  that follows erases it -- and it is left because the fix is entangled
-  with a second unfixed defect, hints running to 344 columns and being
-  cut off by the same frame. Both belong to the same decision.
+  anything printed just before one is painted over.
+- **A wizard's hint is read, so it is wrapped rather than cut.** The frame
+  truncates every row it is handed and the hint was handed to it as one,
+  which cost 42 of the 54 hints in `./setup.sh` and `./style.sh` some of
+  their text -- 7,391 characters across the three languages, and always
+  the end, which is where a hint says what the answer will cost. The one
+  explaining that the page size can never be changed again showed "asked
+  now and only now" and hid every word of why. Five hints were also too
+  long to read even wrapped and were shortened; the rest were not touched,
+  because they were not badly written, only badly laid out.
+
+  German is why this could not be solved by writing shorter. It runs
+  15-20% longer than the same sentence in English, so a hint edited to fit
+  one language goes on being cut in another -- and the suite now checks all
+  three against three wrapped rows, and checks that the frame wraps at all.
+  Either check alone passes on a defect: short hints in a truncating frame,
+  or a wrapping frame full of hints nobody will read.
+
+  With that settled, the last place that printed onto a screen about to be
+  painted over is fixed too: the banner section names the file currently in
+  place, which is exactly what you need in front of you when deciding
+  whether to replace it, and it was erased by the question that followed.
+- **A series listing said "SérieNový Sean.cz".** The kind of a listing and
+  its value are two spans with no whitespace between them, so the gap is
+  the stylesheet's -- and every variant that existed hid its kind, a tag
+  wearing a pill and a search a magnifier, so no gap was ever written. The
+  series listing, the only one that showed the word, had no rule of its own
+  at all. It gets what the others get: an icon in place of the word, with
+  the word left in the markup for a reader who cannot see it. A kind that
+  IS shown -- a search before anything is typed -- is spaced from what
+  follows it now, which was the same defect one line further down.
+
+  The tag listing gives up its pill in the same pass. The pill borrowed the
+  shape a tag wears under an article, which is a good argument on paper and
+  a bad one at 26px: a small quiet chip becomes a slab across the top of the
+  page. A label icon says it at the weight the other two say theirs, and the
+  three listings are one family now instead of two. Both new icons match the
+  magnifier's size, and the gap in front of the value is one number instead
+  of the two that had been drifting apart.
+- **The clock in the meta row was a fifth larger than the row it stood in.**
+  Two things compounded: an 18px box against the star's, the boost's and the
+  comment bubble's 16, and a dial filling more of that box than any of them
+  fill theirs. Both are settled now. The three others are drawn by
+  `assets/js/comments.js` and the clock by the build, which is how a size
+  difference in a four-item row stayed invisible from either side; the suite
+  reads the built page and the script together so it cannot again.
+
+The rest of this section comes from running the importers over four real
+foreign archives rather than over fixtures -- a Ghost export of 118 posts
+and 419 images, a Hugo tree of 77 files, a WordPress WXR of 194 items, and
+this engine's own export read back in. Fixtures had agreed with the code
+because both ends of them are ours.
+
+- **A Hugo picture written as `{{< figure >}}` arrived as nothing at all.**
+  It is the most common way Hugo writes an image, and `strip_liquid` ate it
+  as a Liquid tag. Both of the ones in a real archive pointed at files
+  lying beside the article in its page bundle -- nothing to download,
+  nothing that could fail -- so they vanished with no line in the summary,
+  because nobody had tried to fetch them and therefore nobody had failed.
+  The shortcode is now read before Liquid is stripped, and its `alt`,
+  `title` and `caption` land where each belongs.
+- **An article that showed Markdown in a code block had its example eaten.**
+  The importer replaces images with an internal marker before parsing, and
+  did it over the whole body, fences included -- so a tutorial teaching the
+  reader how to write an image published `@@ssg-image:...@@` instead, on the
+  post, the front page, every tag page and the feed. Liquid had the same
+  hole: an article about Liquid lost the thing it was about. Both run
+  inside the fence-aware pass now.
+
+  Moving them there uncovered why they had been left out. The pass that
+  lifts an inline image onto its own line hands back a chunk with no
+  closing newline when the chunk ends in a picture, so the fence below it
+  stuck to the text and, from there down, every fence in the post was read
+  inside-out: code as prose and prose as code. On the real archive that
+  alone cost 30 of 72 images.
+- **Four ways an import stayed quiet about what it did.** Two files
+  claiming one address -- a Hugo tree that kept both the flat post and the
+  page bundle it grew into -- were both imported, the second renamed with
+  a `-2`, and nothing said so. A `image:` in the front matter, which
+  Blowfish, Congo and PaperMod all use for the lead picture, was dropped.
+  A caption whose picture failed to download stayed behind as an orphan
+  paragraph in italics; thirteen of them in one archive's installation
+  guides, "choosing a language" and "choosing a time zone" standing under
+  nothing. And 66 files named an author this engine has no field for:
+  single-author is a decision, not an accident, and the run says so now so
+  the person moving in can credit them by hand.
+- **A percent-escaped filename was slugified character by character**, so
+  an invisible U+FFFC left over from WordPress became a permanent address
+  reading `ef-bf-bcawesomewm-basics`. The name is decoded first now, and
+  the redirect still points at the address the old site served.
+- **A WordPress import's closing numbers described a different import.**
+  With `KEEP_PERMALINKS` a page that already sits at its old address
+  counted as an address that could not be read, and the sentence blamed
+  bare `?p=123` permalinks -- of which a real export had none. It also said
+  "posts" about pages, so a site with ten root pages was told ten posts had
+  gone wrong. The note listing where pages landed was built from the slug
+  the adapter proposed, before a collision had been resolved and regardless
+  of whether the build would put the page up at all: on a six-page copy it
+  offered `/about/` twice and three addresses the build then refused. That
+  note is what a person copies into `nav:`, so it now asks where each page
+  actually landed. Elements the HTML converter had to drop -- players,
+  forms -- were counted and the count thrown away, though the script's own
+  header promised otherwise; they are named now. A post protected by a
+  password kept its public address on WordPress and lost it here without a
+  word. And 112 pictures wrapped in a link the image block cannot carry
+  went unmentioned, which is the defect: the limit itself is the schema's.
+- **A video uploaded to Ghost was lost, and three lines of its player were
+  published in its place.** Ghost has two ways of putting a video in a
+  post; the adapter knew the embed card and not the file the author
+  uploaded, which fell through to the HTML converter, where `video` is on
+  the list of elements to drop. What survived was the furniture around it:
+  paragraphs reading "0:00", "/0:15" and a Google sign-in link. The mp4 was
+  never fetched and existed nowhere but on the Ghost about to be switched
+  off. A bookmark card lost its link, title and description the same way,
+  leaving a 32x32 favicon sized as a photograph in the middle of the
+  article. They become a video block and a link block.
+- **A second import took away what the first one brought.** `redirect_from`
+  is the one field several hands write to -- the adapter that knows the old
+  platform, `backfill_redirects.rb`, a previous platform's importer, and an
+  author typing in addresses a dead blog used to answer for -- and it was
+  carried over only when the importer said nothing itself. So a re-import
+  with `KEEP_PERMALINKS` wrote its single address over all of them, the
+  build stopped generating those stubs, and every one of those addresses
+  began answering 404 with nothing in the summary. They are merged now,
+  old first, so a further re-import adds nothing and the order never moves.
+
+  That merge then made a second problem permanent, and it is fixed with
+  it: a page sits at `/<slug>/`, so that address inside its own
+  `redirect_from` is a loop the build complains about once per build,
+  forever. The adapters guard their own writes against it by reading the
+  source, which a post promoted to a page by hand walks straight past.
+  It comes off at the point where the slug and `page` are both settled,
+  which also repairs the sites that already have an import behind them.
+- **Ten re-imports that changed nothing filled all ten version slots**, and
+  pushed out the state the author had edited by hand before the last run.
+  Versions are the undo this engine otherwise does not have; a version
+  identical to the newest one already stored is no longer written.
+- **An AVIF image came in with no dimensions**, so the page jumped while it
+  loaded, and five files out of 419 carried an extension their bytes
+  contradicted -- `.jpg` that was WebP, `.ico` that was PNG. None of it
+  invented here: the source serves them that way and the extension was
+  taken from the URL. It is settled by the bytes now, and AVIF is measured.
+- **`[](url)` -- what a WordPress-to-Markdown conversion leaves where a
+  heading anchor used to be -- was printed to the reader as raw markdown.**
+  The parser required at least one character of label. On one real archive
+  that is 153 heading blocks across 14 of 74 posts, a fifth of the site
+  showing square brackets and a full URL in its headings, and the heading
+  ids were derived from that text, so the table of contents linked to
+  anchors named after github.com. An empty label is allowed now and
+  swallowed: a link with nothing to click on is nothing a reader can use.
+- **`unlisted` on a page was honoured halfway**: the page got its noindex
+  and the sitemap alongside it went on advertising the address, with the
+  site's own search index keeping the page in it. Pages were set aside
+  before unlisted was considered, so only posts ever reached that branch.
+- **An attachment did not survive `export` and back.** Written as
+  `[label](/assets/2026/slug/file.pdf)`, it was no longer the bare filename
+  that tells the parser an attachment from a link, so it came home as a
+  paragraph with a link in it -- label, size and block type gone, and the
+  file left in the tree with nothing claiming it. The summary counted no
+  loss, because it counts blocks Markdown cannot express, and this one it
+  could. It goes out as HTML now, `download` and all.
+- **"Images come from the tree itself -- no network" was true of a Jekyll
+  site and repeated as a promise about markdown trees in general**, in four
+  places: the importing guide, the README's comparison table, the script's
+  header and the comment above the adapter. Of 79 image references in a real
+  Hugo archive, 72 were absolute URLs pointing back at the WordPress the
+  site had been migrated from years earlier -- 72 requests, 66 of them 404,
+  and 20 of 74 posts arrived with no pictures at all. The summary reported
+  that honestly; the documentation had said there was nothing to report, so
+  there was no reason to read it. All four now say which half needs the
+  network, and that an image which never arrived leaves no block behind --
+  the post reads as though it never had one, and `./blog.sh check` finds
+  nothing to report afterwards. The same pass found the Ghost section still
+  saying pages are skipped as site furniture, which stopped being true when
+  pages arrived.
 
 ### Upgrading
 
