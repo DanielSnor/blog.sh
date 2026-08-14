@@ -5,6 +5,11 @@ require 'uri'
 require_relative '../feed_http'
 require_relative '../i18n'
 require_relative '../slug'
+# Only the postscript needs this, and only to ask where a page actually
+# landed -- see #written_pages. The mapping itself stays writer-agnostic,
+# and post_writer pulls in nothing from the run layer, so an adapter is
+# still loadable (and testable) on its own.
+require_relative '../post_writer'
 require_relative 'html_blocks'
 require_relative 'pages_note'
 require_relative 'xml_repair'
@@ -46,6 +51,17 @@ module Import
     # file and has no business being printed as a summary line.
     POST_TYPE_SLUG = /\A[a-z0-9_-]{1,20}\z/.freeze
 
+    # The addresses the build keeps for itself: a page whose slug is one of
+    # them is refused there, out loud, and never put up. Repeated from
+    # build/build_blog.rb's RESERVED_ROOT_SEGMENTS -- which stays the
+    # authority -- because the pages note is the only thing pointing at
+    # imported pages, and a note that sends somebody to write /tag/ into
+    # `nav:` has earned a menu of 404s. A name added there and forgotten
+    # here only makes this note optimistic; the build still refuses and
+    # still says so.
+    RESERVED_PAGE_SLUGS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
+                             robots.txt 404 favicon.ico].freeze
+
     # keep_permalinks is a writer, not just an option, because the wizard
     # only learns the answer after the adapter exists: the question is
     # asked once the source is chosen, right before the dry-run.
@@ -55,7 +71,10 @@ module Import
       @source = source
       @keep_permalinks = keep_permalinks
       @unmapped_permalinks = 0
-      @page_paths = []
+      @unmapped_page_permalinks = 0
+      @dropped_elements = Hash.new(0)
+      @linked_images = 0
+      @pages = []
     end
 
     def label
@@ -122,6 +141,12 @@ module Import
       html = body_html(item)
       html = expand_shortcodes(html) if wordpress?
       parsed = HtmlBlocks.parse(html)
+      # HtmlBlocks names everything the block schema has no shape for
+      # instead of dropping it quietly, and nothing read the tally -- so an
+      # archive full of embedded video lost all of it while the summary
+      # said nothing, against what migrate_feed.rb's own header promises.
+      parsed.warnings.each { |name, count| @dropped_elements[name] += count }
+      @linked_images += linked_images(html)
       blocks = localize_images(parsed.blocks, media, item)
       # Registered AFTER the body's images, deliberately: media are
       # numbered in the order an adapter registers them, so registering
@@ -149,22 +174,44 @@ module Import
           'original_id' => item_id(item)
         }.compact
       }
+      # A record rather than a path, because everything the summary says
+      # about a page is settled later: where it landed is the writer's
+      # answer, not this one's.
+      page = nil
+      if is_page
+        post['page'] = true
+        @pages << (page = { post: post, already_home: false })
+      end
       # The WXR <link> is the post's real published address whatever the
       # site's permalink structure was -- better data than WordPress's own
       # importer reads. Drafts never had a public address, and a plain
       # "?p=123" permalink has its identity in the query string, which a
       # static stub can never answer -- those are counted, not guessed at.
-      if is_page
-        post['page'] = true
-        @page_paths << "/#{post['slug']}/"
-      end
-      if @keep_permalinks && state == 'published'
+      #
+      # published_at_source?, not the state above: a password-protected
+      # post lands here as a draft (see item_state) and WordPress had it
+      # PUBLISHED -- the shell was on the open web, only the body was
+      # behind the password. Read as a draft it lost its redirect and was
+      # not even counted, so a public address died with nothing said.
+      if @keep_permalinks && published_at_source?(item)
         path = Permalinks.local_path(item_link(item))
-        # A page that already lived at the root keeps that very address
-        # here, so a redirect from it would point the page at itself --
-        # which the build reports on every run and no edit ever clears.
-        path = nil if path && is_page && path == "/#{post['slug']}/"
-        path ? post['redirect_from'] = [path] : @unmapped_permalinks += 1
+        if path.nil?
+          # Split from the case below because they are opposite news. An
+          # address that could not be read is a loss; a page that already
+          # sits where it sat is the move working exactly as intended, and
+          # counting it as unreadable told everybody moving to their own
+          # domain -- the only people KEEP_PERMALINKS is for -- that
+          # something had not fitted, blaming a permalink shape their
+          # export does not contain.
+          is_page ? @unmapped_page_permalinks += 1 : @unmapped_permalinks += 1
+        elsif page && path == "/#{post['slug']}/"
+          # A page that already lived at the root keeps that very address
+          # here, so a redirect from it would point the page at itself --
+          # which the build reports on every run and no edit ever clears.
+          page[:already_home] = true
+        else
+          post['redirect_from'] = [path]
+        end
       end
       post
     end
@@ -181,12 +228,96 @@ module Import
         notes << I18n.t('import.note.feed_controls_dropped', count: @repaired.controls)
       end
       notes << I18n.t('import.note.feed_unmapped', count: @unmapped_permalinks) if @unmapped_permalinks.positive?
-      notes << Import.pages_note(@page_paths)
+      if @unmapped_page_permalinks.positive?
+        notes << I18n.t('import.note.feed_unmapped_pages', count: @unmapped_page_permalinks)
+      end
+      live, reserved = written_pages.partition { |page| !RESERVED_PAGE_SLUGS.include?(page[:slug].downcase) }
+      home = live.count { |page| page[:already_home] }
+      notes << I18n.t('import.note.feed_pages_home', count: home) if home.positive?
+      notes << dropped_note
+      notes << I18n.t('import.note.feed_linked_images', count: @linked_images) if @linked_images.positive?
+      notes << Import.pages_note(live.map { |page| "/#{page[:slug]}/" })
+      notes << reserved_pages_note(reserved)
       notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
     end
 
     private
+
+    # --- what the summary owes the author -------------------------------
+
+    # Sorted by count so the loudest loss is read first, and named element
+    # by element: "3 iframe" is a video the post no longer has, where a
+    # bare total says only that something went.
+    def dropped_note
+      return nil if @dropped_elements.empty?
+
+      listed = @dropped_elements.sort_by { |name, count| [-count, name] }
+                                .map { |name, count| "#{name} (#{count})" }.join(', ')
+      I18n.t('import.note.feed_dropped', listed: listed)
+    end
+
+    # An <a> wrapped around a picture, which an image block has nowhere to
+    # put: the picture arrives and the address it pointed at does not. Only
+    # counted -- where a link would live is a question about the block
+    # schema, not one this adapter gets to answer -- so at least the
+    # summary says how much of the post's wiring was left behind.
+    #
+    # Read from the markup rather than the blocks because by then it is
+    # already gone. The two cheap tests keep the second parse off every
+    # body that cannot possibly contain one, which on an archive of
+    # thousands is most of them.
+    def linked_images(html)
+      return 0 unless html.include?('<img') && html.include?('<a')
+
+      count_linked_images(HtmlBlocks::Tree.build(HtmlBlocks::Tokenizer.tokenize(html)))
+    end
+
+    def count_linked_images(node)
+      node.children.sum do |child|
+        next 0 if child.text?
+
+        own = linking_image?(child) ? 1 : 0
+        own + count_linked_images(child)
+      end
+    end
+
+    # One per LINK, not per picture: what is lost is the address, and a
+    # gallery thumbnail wrapped in one anchor loses it once.
+    def linking_image?(node)
+      node.name == 'a' && !node.attrs['href'].to_s.strip.empty? && holds_image?(node)
+    end
+
+    def holds_image?(node)
+      node.children.any? { |child| !child.text? && (child.name == 'img' || holds_image?(child)) }
+    end
+
+    # Every page paired with the slug it actually GOT. Both halves of the
+    # pages note were wrong before: the addresses were read off the slug
+    # the mapping proposed, before anything had been written, and a page
+    # sitting on an address the engine owns was listed as though the build
+    # would put it up. The note is the only thing pointing at these pages,
+    # and somebody copies it into `nav:`.
+    #
+    # Asked of the writer rather than worked out again here, so it cannot
+    # drift from what is on disk: PostWriter suffixes a slug already taken,
+    # and WordPress hands the same post_name to two pages under different
+    # parents often enough that /about/ and /about-2/ is the ordinary case.
+    # Nothing is written on a dry run, and then the proposed slug is the
+    # honest answer -- a preview is a prediction.
+    def written_pages
+      @written_pages ||= @pages.map do |page|
+        path = PostWriter.find_by_source(page[:post]['source'])
+        page.merge(slug: path ? File.basename(path, '.json') : page[:post]['slug'].to_s)
+      end
+    end
+
+    def reserved_pages_note(reserved)
+      return nil if reserved.empty?
+
+      I18n.t('import.note.feed_pages_reserved', count: reserved.size,
+                                                paths: reserved.map { |page| "/#{page[:slug]}/" }.join(', '))
+    end
 
     # --- reading and dialect detection ---------------------------------
 
@@ -478,6 +609,18 @@ module Import
       return 'draft' unless text_of(item, 'wp:post_password').empty?
 
       POST_STATES.fetch(text_of(item, 'wp:status'), 'published')
+    end
+
+    # What the OLD site published, which is a different question from what
+    # this one will -- and the right one to ask about an address. The
+    # password branch above is the whole gap: everything else this maps to
+    # a draft (pending, private, future) never had a public address, so the
+    # mapping is read here exactly as item_state reads it, minus the
+    # password.
+    def published_at_source?(item)
+      return true unless wordpress?
+
+      POST_STATES.fetch(text_of(item, 'wp:status'), 'published') == 'published'
     end
 
     def body_html(item)
