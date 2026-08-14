@@ -27,6 +27,11 @@ nav:
 post:
   reading_time: "Na čtení %{minutes} min"
   reading_minutes: "%{minutes} min"
+  # Cokoli pod hranicí, od které engine přestává postu říkat fotka
+  # s popiskem. Říká se to, místo aby se to vynechalo, aby každá karta
+  # ve výpisu nesla stejný řádek — viz docs/decisions.md.
+  reading_time_under: "Na čtení míň než minuta"
+  reading_minutes_under: "< 1 min"
   toc_heading: "Na téhle stránce"
   toc_label: "Obsah"
   series_part: "Díl %{number} ze %{total} — %{name}"

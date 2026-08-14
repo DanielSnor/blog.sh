@@ -1235,7 +1235,7 @@ def build_list_item(post, pinned: false)
   content_class = excerpt ? 'content excerpt' : 'content'
   read_more = excerpt ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
   title = post_heading_html(post, 'h2', prefix)
-  stats = post_stats_html(post)
+  stats = post_meta_html(post, reading_labels(post))
   <<~HTML
     <div class="card post-list-item">
       <div class="post-header">
@@ -1396,25 +1396,46 @@ READING_TIME_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none"
                     'stroke-linejoin="round" aria-hidden="true">' \
                     '<circle cx="12" cy="12" r="9.5"/><path d="M12 6.5V12l3.5 2"/></svg>'
 
-def reading_time_html(minutes)
-  return '' unless minutes
+# What a post's reading time SAYS, short one included. Kept apart from the
+# markup because two callers need the same words and one of them (the hero
+# byline) draws them somewhere else entirely.
+#
+# A post under the length at which the engine stops calling it a photo with
+# a caption has no minutes to report, and used to report nothing at all.
+# It says "under a minute" now, and that is a layout decision more than an
+# informational one: on an archive like sean.cz, eleven posts out of 4,394
+# carry an announcement, so from the second page of the archive onwards NO
+# card had a meta row -- and the few that did stood out as a break in the
+# rhythm rather than as a card with more to say. With this every card
+# carries exactly one row. See docs/decisions.md.
+def reading_labels(post)
+  minutes = reading_minutes(post)
+  return [t('post.reading_time_under'), t('post.reading_minutes_under')] unless minutes
 
-  %(<span class="post-stat reading-time" title="#{h(t('post.reading_time', minutes: minutes))}" ) +
-    %(aria-label="#{h(t('post.reading_time', minutes: minutes))}">#{READING_TIME_ICON}) +
-    %(<span>#{h(t('post.reading_minutes', minutes: minutes))}</span></span>)
+  [t('post.reading_time', minutes: minutes), t('post.reading_minutes', minutes: minutes)]
 end
 
-# '' when there is nothing to put in it: a site with no comments network
-# and a post too short to time has to come out exactly as it did before
-# this row existed.
-#
-# The template passes nil for the minutes when a hero is drawn, because
-# the hero carries the byline -- author and date -- and the reading time
-# belongs with them rather than orphaned above the text. Two facts about
-# the post in two places is one place too many.
-def post_meta_html(post, minutes)
+# nil means "not here" -- the one caller that passes it is the post page
+# with a lead image, where the byline under the picture carries the reading
+# time and a second copy above the text would be the same fact twice. It no
+# longer doubles as "this post is too short to time": that case has words of
+# its own now, and conflating the two is what would have printed the reading
+# time in both places on a short post with a hero.
+def reading_time_html(labels)
+  return '' unless labels
+
+  title, short = labels
+  %(<span class="post-stat reading-time" title="#{h(title)}" ) +
+    %(aria-label="#{h(title)}">#{READING_TIME_ICON}) +
+    %(<span>#{h(short)}</span></span>)
+end
+
+# '' when there is nothing to put in it: a site with no comments network and
+# a post whose reading time is drawn elsewhere has to come out exactly as it
+# did before this row existed.
+def post_meta_html(post, labels)
   stats = post_stats_html(post)
-  reading = reading_time_html(minutes)
+  reading = reading_time_html(labels)
   return '' if stats.empty? && reading.empty?
 
   %(<div class="post-meta">#{stats}#{reading}</div>)
@@ -1491,7 +1512,6 @@ def post_heading_html(post, level, self_href)
 end
 
 def render_post_html(post, template)
-  minutes = reading_minutes(post)
   toc = toc_for(post)
   series_slug, series_posts, series_index = series_context(post)
   hero_block, hero_media = hero_for(post)

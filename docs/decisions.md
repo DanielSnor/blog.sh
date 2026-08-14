@@ -89,6 +89,27 @@ posts survive their source platform dying (the Twitter/Tumblr archives
 this engine was born from are full of dead CDN links). *Cost:* disk
 space, and migrations must download everything up front.
 
+**Every card in a listing says how long its post takes to read, including
+the ones that take under a minute.** The threshold that decides the words
+is unchanged -- "1 min read" over twelve words would be noise, so a short
+post says "under a minute" instead -- but it no longer decides whether the
+row exists at all.
+
+The reason is the shape of a real archive rather than the information.
+Stars, boosts and comments come from an announcement, and on sean.cz
+eleven published posts out of 4,394 have one: the meta row existed on a
+handful of cards at the top of the front page and on nothing else, so from
+the second page down no card had one, and the few that did read as a break
+in the listing rather than as a card with more to say. A reading time is
+the one thing every post can report, so it is what makes the row constant.
+
+*Cost:* on an archive of short posts most cards carry the same three
+words, which is close to no information at all. That is the trade, and it
+was made deliberately: a listing is read as a column of cards before it is
+read as text, and a column that keeps its shape is worth more here than a
+field that earns its place on every row. The post's own page says the same
+thing for the same reason, so the two do not disagree.
+
 ## Publishing and comments
 
 **Comments are replies to an announcement post -- on exactly one

@@ -28,6 +28,11 @@ nav:
 post:
   reading_time: "%{minutes} min read"
   reading_minutes: "%{minutes} min"
+  # Anything under the length at which the engine stops calling a post a
+  # photo with a caption. Said rather than left out, so every card in a
+  # listing carries the same row -- see docs/decisions.md.
+  reading_time_under: "under a minute's read"
+  reading_minutes_under: "< 1 min"
   toc_heading: "On this page"
   toc_label: "Table of contents"
   series_part: "Part %{number} of %{total} of %{name}"

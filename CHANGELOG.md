@@ -366,6 +366,21 @@ which only existed because the bar didn't.
 - The comment count next to a post counts approved replies while
   moderation is on, so the number and the list under it agree.
 
+- **A listing card says how long its post takes to read.** It used to be
+  on the post's own page only, which is the page somebody has already
+  decided to open -- the deciding happens in the listing. The reason it
+  reaches every card rather than the long ones is what an archive looks
+  like: stars, boosts and comments come from an announcement, and on
+  sean.cz eleven published posts out of 4,394 carry one, so the meta row
+  existed at the top of the front page and nowhere else. From the second
+  page down no card had a row, and the few that did read as a break in the
+  listing rather than as a card with more to say. A reading time is the one
+  thing every post can report, so the row is constant now. Under the length
+  at which the engine stops calling a post a photo with a caption it says
+  "under a minute" rather than claiming a minute it does not have -- and
+  the post's own page says the same, so the two do not disagree. Two new
+  locale keys; the reasoning is in docs/decisions.md.
+
 ### Fixed
 
 - **The appearance toggle can find its way back to the system.** One click

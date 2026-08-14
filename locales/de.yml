@@ -28,6 +28,11 @@ nav:
 post:
   reading_time: "%{minutes} Min. Lesezeit"
   reading_minutes: "%{minutes} Min."
+  # Alles unter der Länge, ab der die Engine einen Beitrag nicht mehr Foto
+  # mit Bildunterschrift nennt. Gesagt statt weggelassen, damit jede Karte
+  # in einer Liste dieselbe Zeile trägt -- siehe docs/decisions.md.
+  reading_time_under: "weniger als eine Minute Lesezeit"
+  reading_minutes_under: "< 1 Min."
   toc_heading: "Auf dieser Seite"
   toc_label: "Inhaltsverzeichnis"
   series_part: "Teil %{number} von %{total} von %{name}"
