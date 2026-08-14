@@ -54,10 +54,25 @@ module Import
 
     module_function
 
+    # The run-wide ledger of what parse had to drop. Eleven adapters call
+    # parse and for years exactly one of them read `warnings` back -- the
+    # other ten threw the count away, while the header of migrate_feed.rb
+    # promised the opposite. Counting here, where the dropping happens,
+    # is the only place all eleven pay the same toll; Import::Run resets
+    # it and the summary reads it, so no adapter has to remember to.
+    def dropped
+      @dropped ||= Hash.new(0)
+    end
+
+    def reset_dropped!
+      @dropped = Hash.new(0)
+    end
+
     def parse(html)
       doc = Tree.build(Tokenizer.tokenize(html.to_s))
       builder = Builder.new
       builder.walk(doc)
+      builder.warnings.each { |name, count| dropped[name] += count }
       Result.new(blocks: builder.blocks, warnings: builder.warnings)
     end
 

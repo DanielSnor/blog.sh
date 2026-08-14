@@ -4,6 +4,7 @@ require 'tmpdir'
 require_relative '../post_writer'
 require_relative 'media'
 require_relative 'media_index'
+require_relative 'html_blocks'
 
 module Import
   # The half of an import that has nothing to do with the platform: walk
@@ -43,6 +44,7 @@ module Import
     # very different afternoons.
     Result = Struct.new(:written, :scanned, :skipped, :media, :media_reused,
                         :media_failures, :skipped_media_failures, :samples, :interrupted,
+                        :dropped_elements,
                         keyword_init: true)
 
     # `media_index` is what lets a re-import skip what it already has (see
@@ -73,6 +75,9 @@ module Import
     end
 
     def call
+      # A fresh ledger per run, or a second import in one process would
+      # report the first one's losses again.
+      HtmlBlocks.reset_dropped!
       written = 0
       scanned = 0
       skipped = Hash.new(0)
@@ -151,7 +156,8 @@ module Import
       Result.new(written: written, scanned: scanned, skipped: skipped, media: media_count,
                  media_reused: media_reused, media_failures: media_failures,
                  skipped_media_failures: skipped_media_failures,
-                 samples: samples, interrupted: interrupted)
+                 samples: samples, interrupted: interrupted,
+                 dropped_elements: HtmlBlocks.dropped.dup)
     end
 
     private

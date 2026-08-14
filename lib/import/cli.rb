@@ -106,6 +106,16 @@ module Import
       result.skipped.sort_by { |reason, _| reason.to_s }.each do |reason, count|
         puts "  #{count} skipped (#{reason})"
       end
+      # One line for all eleven adapters that parse HTML bodies: what the
+      # block schema could not hold. It used to be counted by exactly one
+      # of them (feed.rb) and thrown away by the rest, while the header of
+      # migrate_feed.rb promised the counting on everyone's behalf.
+      dropped = result.respond_to?(:dropped_elements) ? result.dropped_elements : nil
+      if dropped && !dropped.empty?
+        listed = dropped.sort_by { |name, count| [-count, name] }
+                        .map { |name, count| "#{name} (#{count})" }.join(', ')
+        puts "  #{I18n.t('import.note.feed_dropped', listed: listed)}"
+      end
       return if result.media_failures.empty?
 
       # Split, because these are two different losses: a written post

@@ -72,7 +72,6 @@ module Import
       @keep_permalinks = keep_permalinks
       @unmapped_permalinks = 0
       @unmapped_page_permalinks = 0
-      @dropped_elements = Hash.new(0)
       @linked_images = 0
       @pages = []
     end
@@ -145,7 +144,6 @@ module Import
       # instead of dropping it quietly, and nothing read the tally -- so an
       # archive full of embedded video lost all of it while the summary
       # said nothing, against what migrate_feed.rb's own header promises.
-      parsed.warnings.each { |name, count| @dropped_elements[name] += count }
       @linked_images += linked_images(html)
       blocks = localize_images(parsed.blocks, media, item)
       # Registered AFTER the body's images, deliberately: media are
@@ -234,7 +232,6 @@ module Import
       live, reserved = written_pages.partition { |page| !RESERVED_PAGE_SLUGS.include?(page[:slug].downcase) }
       home = live.count { |page| page[:already_home] }
       notes << I18n.t('import.note.feed_pages_home', count: home) if home.positive?
-      notes << dropped_note
       notes << I18n.t('import.note.feed_linked_images', count: @linked_images) if @linked_images.positive?
       notes << Import.pages_note(live.map { |page| "/#{page[:slug]}/" })
       notes << reserved_pages_note(reserved)
@@ -249,14 +246,6 @@ module Import
     # Sorted by count so the loudest loss is read first, and named element
     # by element: "3 iframe" is a video the post no longer has, where a
     # bare total says only that something went.
-    def dropped_note
-      return nil if @dropped_elements.empty?
-
-      listed = @dropped_elements.sort_by { |name, count| [-count, name] }
-                                .map { |name, count| "#{name} (#{count})" }.join(', ')
-      I18n.t('import.note.feed_dropped', listed: listed)
-    end
-
     # An <a> wrapped around a picture, which an image block has nowhere to
     # put: the picture arrives and the address it pointed at does not. Only
     # counted -- where a link would live is a question about the block
