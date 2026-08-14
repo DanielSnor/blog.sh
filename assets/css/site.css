@@ -920,8 +920,14 @@ blockquote {
 }
 .reading-time svg { vertical-align: -0.16em; margin-right: 0.3rem; }
 
-.series-note { font-size: 0.85rem; margin: 0 0 1rem; }
-.series-note a { color: var(--meta-text); }
+/* At the size of a subheading, and in the text's own colour. It used to be
+   0.85rem in --meta-text, which put it in the same voice as the star, the
+   boost and the reading time -- and it is not that kind of line at all:
+   those report on a post, this one says the post is part of something and
+   offers the way there. Underlined and muted, it read as a caption under
+   the counters rather than as the only navigation a series has. */
+.series-note { font-size: 1.1rem; margin: 0 0 1rem; }
+.series-note a { color: var(--text); }
 .series-note a:hover { color: var(--accent); }
 
 /* Two links that flow to opposite ends, and sit under each other on a
