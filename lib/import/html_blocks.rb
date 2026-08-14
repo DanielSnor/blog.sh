@@ -259,7 +259,8 @@ module Import
         when 'table' then emit_table(node)
         when 'hr' then @blocks << { 'type' => 'hr' }
         when 'img' then emit_image(node)
-        when 'figure' then emit_figure(node)
+        when 'figure'
+          class_names(node).include?(BOOKMARK_CARD) ? emit_bookmark(node) : emit_figure(node)
         when 'br' then nil
         when *DROPPED then @warnings[node.name] += 1
         else
@@ -439,6 +440,54 @@ module Import
         alt = node.attrs['alt'].to_s
         block['alt_text'] = alt unless alt.empty?
         @blocks << block
+      end
+
+      # A bookmark card is a link with a title and a description drawn as a
+      # panel: an <a> around the lot, two <div>s of text, a 32px favicon and
+      # a preview thumbnail. Read as an ordinary figure it lost every part
+      # that meant anything -- the address, the title and the description
+      # are markup this parser flattens away -- and published the favicon as
+      # a 32x32 picture in the middle of the post. The block schema has the
+      # exact shape for it, so the card becomes a link block and the card's
+      # own two pictures (chrome, not the author's photographs) go with the
+      # panel they were drawn on.
+      #
+      # Keyed on Ghost's class names, which is where these arrive from --
+      # a Ghost export, or any feed carrying a Ghost site's rendered HTML.
+      BOOKMARK_CARD = 'kg-bookmark-card'
+      BOOKMARK_LINK = 'kg-bookmark-container'
+      BOOKMARK_FIELDS = { 'title' => 'kg-bookmark-title',
+                          'description' => 'kg-bookmark-description' }.freeze
+
+      def emit_bookmark(node)
+        link = descendant_with_class(node, BOOKMARK_LINK)
+        url = link ? link.attrs['href'].to_s : ''
+        # No address, no link block -- whatever else it is, it is not this
+        # card, so it goes back to being an ordinary figure.
+        return emit_figure(node) if url.empty?
+
+        block = { 'type' => 'link', 'url' => url }
+        BOOKMARK_FIELDS.each do |key, class_name|
+          part = descendant_with_class(node, class_name)
+          text = part && normalize(Inline.render(part).first)
+          block[key] = text if text && !text.empty?
+        end
+        @blocks << block
+      end
+
+      def class_names(node)
+        node.attrs['class'].to_s.split(/\s+/)
+      end
+
+      def descendant_with_class(node, name)
+        node.children.each do |child|
+          next if child.text?
+          return child if class_names(child).include?(name)
+
+          found = descendant_with_class(child, name)
+          return found if found
+        end
+        nil
       end
 
       def emit_figure(node)
