@@ -6,6 +6,7 @@ require 'time'
 require 'yaml'
 require_relative 'markdown_writer'
 require_relative 'embed'
+require_relative 'file_size'
 
 # lib/exporter.rb -- the archive as a tree of markdown files: what
 # `./blog.sh export` writes, and the mirror of lib/import/. The engine
@@ -202,7 +203,17 @@ module Exporter
   # image, and re-importing the tree fetched YouTube's HTML page and filed
   # it in the archive as `02.jpg`. Caught against a real 118-post archive;
   # no fixture would have shown it, because both ends were ours.
-  HTML_ONLY = %w[video audio link].freeze
+  #
+  # An attachment is here for the same reason, one step further out. Its
+  # markdown form is `[label](file.pdf)` with a BARE filename -- that is
+  # what tells the parser an attachment from an ordinary link -- and the
+  # export has to write the path it really has, `/assets/<year>/<slug>/`.
+  # Read back, that is no longer a filename, so the block came home as a
+  # paragraph with a link in it: the label, the size and the block type
+  # gone, and the file itself left behind in the tree because nothing
+  # claimed it. The HTML form loses none of that, and a download link is
+  # what the block means on the destination site anyway.
+  HTML_ONLY = %w[video audio link file].freeze
 
   def render_blocks(blocks, media_rel)
     fallbacks = Hash.new(0)
@@ -267,12 +278,34 @@ module Exporter
       description = escape_html(block['description'].to_s)
       link = escape_html(block['url'].to_s)
       %(<p class="link-block"><a href="#{link}"><strong>#{title}</strong></a><br>#{description}</p>)
+    when 'file' then file_html(block, media_rel)
     when 'video', 'audio' then player_html(block, media_rel)
     else
       # What the build does with a block type it does not know: show it
       # rather than swallow it.
       "<pre>#{escape_html(block.to_json)}</pre>"
     end
+  end
+
+  # The build's file card, without the icon and the arrow that are only
+  # shapes in this site's stylesheet. `download` stays: it is the whole
+  # difference between an attachment and a link, and every browser reads
+  # it. The size rides along as text for the reason the block carries it
+  # at all -- so the page can say what a click costs -- and is left out
+  # when nothing knows it, rather than printed as "0 B".
+  #
+  # Falls through to the <pre> when there is no file to point at: a block
+  # counted as "written as HTML" that wrote nothing would be a lie told
+  # by the summary itself, the same rule player_html follows.
+  def file_html(block, media_rel)
+    file = (block['media'] || []).first
+    return "<pre>#{escape_html(block.to_json)}</pre>" unless file.is_a?(Hash) && !file['url'].to_s.empty?
+
+    href = escape_html(File.join(media_rel, file['url'].to_s))
+    label = block['label'].to_s.empty? ? File.basename(file['url'].to_s) : block['label'].to_s
+    size = FileSize.human(file['size'])
+    %(<p class="file-block"><a href="#{href}" download>#{escape_html(label)}</a>) +
+      (size ? " (#{escape_html(size)})" : '') + '</p>'
   end
 
   # The markup the build renders, minus what only means something inside
