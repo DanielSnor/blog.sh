@@ -28,6 +28,48 @@ duplicated.
   the page just jumps once while it loads). Downloads follow redirects and
   retry transient failures; a file that still can't be fetched costs that
   image, not the post, and the summary says so.
+- **A file already here is not downloaded twice.** Each media entry records
+  the address it came from, so a re-import recognises what the archive
+  already holds and fetches only what is missing -- the summary says how
+  many it did not have to fetch. It matters most on exactly the runs the
+  paragraph above recommends: a 118-post Ghost archive re-imported whole
+  used to spend four and a half minutes fetching 419 images and changing
+  not one file on disk, and on a few thousand posts that is hours of
+  traffic the source (or the CDN in front of it) may well start refusing.
+  Re-imported now, the same archive makes no requests at all.
+- **An import only ever ADDS media.** A file already in
+  `media.nosync/<year>/<slug>/` is never replaced -- not by a re-import,
+  not by any flag. The bytes an import brings come from somewhere it
+  cannot vouch for: a domain that has been sold answers an image address
+  with a parked page at a straight-faced `200`, a CDN that has had enough
+  answers with a line of HTML, and writing either of those over the
+  archive would destroy the last copy of a picture, quietly and at the
+  scale of a whole run. So `REFETCH_MEDIA=1` means one thing only: ignore
+  what the archive says it already has and ask the source for every
+  address again. What lands on disk is unchanged -- only files that are
+  missing get written -- so over a complete archive the flag costs the
+  traffic and changes nothing. And whichever way the fetching started, a
+  file the source no longer answers for keeps the copy the archive has:
+  the post never loses a picture because its source went off the air.
+  What none of this is, is a repair. Nothing an import does mends a media
+  file that is already damaged. `./blog.sh check` reports media a post
+  names that the archive doesn't have; putting a bad file right is a
+  separate job with your own copy of the original.
+- **The post describes the file that is really there.** Width and height
+  are re-read from the archive's own copy once the media is in place, so a
+  post cannot end up claiming 400x600 over a file that never arrived --
+  which is what it did whenever an import measured bytes the rule above
+  then declined to write.
+
+  When the archive's own copy answers nothing -- it is zero bytes, or
+  truncated, or a format this engine cannot read -- the post keeps what
+  IT said last time rather than what this run's download said. The
+  distinction matters both ways round: a picture that was fine and has
+  since been damaged still carries the last record of what it was, and a
+  re-import cannot stamp an entry with the size of bytes nobody kept. On
+  a first import there is no "last time" and nothing was discarded, so a
+  video or an SVG keeps the dimensions its source stated. An entry whose
+  file is missing entirely is left saying exactly what it said.
 - **A re-import updates, never duplicates.** Posts are matched on their
   source identity -- platform, account and the item's own id -- not on the
   title, so fixing a typo at the source and importing again updates the

@@ -44,15 +44,42 @@ module Import
     THROTTLED = [Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, Errno::ETIMEDOUT,
                  Net::OpenTimeout, Net::ReadTimeout].freeze
 
-    attr_reader :files, :failures
+    attr_reader :files, :failures, :reused
 
-    def initialize(tmpdir, dry_run: false)
+    # `index` is a MediaIndex (or nil): the archive's own answer to "have
+    # I already fetched this address?", built once per run. With it, a
+    # re-import over an archive that is already here costs no network at
+    # all -- see MediaIndex for why the question can only be asked from
+    # this side.
+    #
+    # `refetch` (REFETCH_MEDIA=1) stops the index being used to SKIP a
+    # download, and nothing else. It deliberately does not switch the index
+    # off: a refetch is exactly the run most likely to meet a source that
+    # has since died, and without the archive's own copy to fall back on it
+    # took 419 media entries out of 118 posts while all 419 files lay
+    # untouched on disk.
+    def initialize(tmpdir, dry_run: false, index: nil, refetch: false)
       @tmpdir = tmpdir
       @dry_run = dry_run
+      @index = index
+      @refetch = refetch
       @files = {}
       @failures = []
       @counter = 0
       @registered = 0
+      @reused = 0
+      # Dimensions the archive recorded for a file back when it was
+      # written, for the one case where the bytes cannot answer -- see
+      # dimensions.
+      @remembered = {}
+      # Files that live in the archive rather than in @tmpdir. Kept apart
+      # because discard() deletes what it un-registers, and these are not
+      # ours to delete.
+      @kept = {}
+      # allocated filename -> the address it came from, which the post
+      # records as `src`. Without it written down, the next run has nothing
+      # to look this file up by and downloads it all over again.
+      @sources = {}
       # source (url or path) -> allocated filename. @files can't serve this
       # purpose even though it looks like it should: it is keyed by source
       # too, so registering the same image twice used to OVERWRITE the
@@ -105,6 +132,12 @@ module Import
         return nil
       end
 
+      # What the archive already holds for this address. Asked before the
+      # number is spent, because reuse takes its extension from the FILE
+      # rather than from the address.
+      held = @index&.entry_for(url)
+      return reuse(url, held) if held && !@refetch
+
       filename = allocate(extension_for(url))
       if @dry_run
         @by_source[url] = filename
@@ -113,6 +146,15 @@ module Import
 
       body = self.class.fetch(url)
       if body.nil?
+        # A fetch that failed must not cost the post a picture that is
+        # lying on disk. Only REFETCH_MEDIA=1 reaches here with a file in
+        # the archive -- it walked past the reuse above on purpose -- and
+        # the copy it walked past is still the only copy there is.
+        # Dropping the entry would erase the picture from the post
+        # permanently, and on the next run just as surely, since there
+        # would be nothing left to look it up by.
+        return reuse(url, held, spent: filename) if held
+
         @failures << url
         # Remembered as a failure, not forgotten: a second reference to
         # the same dead URL in this post answers nil at once instead of
@@ -127,7 +169,58 @@ module Import
       path, filename = retype(path, filename)
       @files[path] = filename
       @by_source[url] = filename
+      @sources[filename] = url
       filename
+    end
+
+    # A file this archive already holds for that address: registered like a
+    # download, minus the download.
+    #
+    # The extension comes from the FILE, never from the URL. retype renames
+    # a download whose bytes contradict its address -- a .ico that is a PNG,
+    # five of them in one real archive of 420 -- so the two genuinely
+    # differ, and a name guessed from the URL would point the post at
+    # something that is not there.
+    #
+    # The archive's own path goes straight into @files, with no copy into
+    # the tmpdir: dimensions() reads the header from there just as happily,
+    # and PostWriter.copy_media skips a destination that already exists, so
+    # for the post the file belongs to source and destination are the same
+    # path and nothing moves. For a DIFFERENT post that shares the picture
+    # -- old blogs do this constantly -- it is copied across, which is
+    # exactly what that post needs.
+    #
+    # `spent` is the number from_url had already allocated before a fetch
+    # that then failed. Filenames must not depend on which fetches
+    # succeeded -- that is the whole point of `uncount` -- so the number is
+    # kept and only its extension is corrected to the one the bytes are
+    # really filed under.
+    def reuse(url, entry, spent: nil)
+      ext = File.extname(entry.path)
+      filename = spent ? "#{File.basename(spent, File.extname(spent))}#{ext}" : allocate(ext)
+      @by_source[url] = filename
+      @sources[filename] = url
+      @reused += 1
+      return filename if @dry_run
+
+      @files[entry.path] = filename
+      @kept[entry.path] = true
+      # The dimensions the post recorded when this file was written. The
+      # bytes are asked first and answer for nearly everything (see
+      # dimensions); this is what is left when they cannot -- a video, an
+      # SVG, or a picture some interrupted run left half-written. Handing
+      # back nil instead would cost the post its reserved space and, in
+      # Wayback's strip_fake_images, the image block itself.
+      dims = entry.dimensions
+      @remembered[filename] = dims if dims
+      filename
+    end
+
+    # The address a registered file was fetched from, so the post can write
+    # it down beside the local name. That record is the whole of what makes
+    # the next run able to recognise the file.
+    def source_of(filename)
+      @sources[filename]
     end
 
     # Pixel dimensions of something already registered, read straight from
@@ -140,11 +233,19 @@ module Import
     #
     # nil in dry-run, where nothing was fetched. That's fine: dimensions
     # don't affect a preview's counts, only the real write.
+    #
+    # Falls back on what the archive recorded for a file that was reused
+    # rather than downloaded: the bytes on disk are the only ones there
+    # are, some of them cannot be measured at all (a video, an SVG, a
+    # half-written picture), and the alternative is handing back nil --
+    # which costs the post its reserved space and, in Wayback's
+    # strip_fake_images, the image block itself.
     def dimensions(filename)
       return nil if @dry_run
 
       path = @files.key(filename)
-      path && MediaDimensions.image(path)
+      dims = path && MediaDimensions.image(path)
+      dims || @remembered[filename]
     end
 
     # Un-registers a downloaded file an adapter decided was not media
@@ -161,7 +262,18 @@ module Import
       # Or a later reference to the same source would resurrect a filename
       # whose bytes were just judged to not be media at all.
       @by_source.delete_if { |_, name| name == filename }
+      @sources.delete(filename)
+      @remembered.delete(filename)
       @registered -= 1
+      # A file that came out of the archive is not ours to delete. The
+      # judgement being made here is about bytes a fetch brought back, and
+      # for a reused file there was no fetch -- deleting it would take the
+      # picture off the post that already has it, on disk, for good.
+      if @kept.delete(path)
+        @reused -= 1
+        return
+      end
+
       begin
         File.delete(path)
       rescue SystemCallError
@@ -171,7 +283,13 @@ module Import
 
     # Registers a file the export already contains. Same contract as
     # from_url, minus the network.
-    def from_file(path)
+    #
+    # `src` is the address the file originally came from, where the export
+    # happens to know it -- a tree written by `./blog.sh export` carries one
+    # per file. Nothing can re-derive it from the bytes, so a re-import that
+    # dropped it would leave the archive unable to recognise its own files
+    # the next time round.
+    def from_file(path, src: nil)
       return nil if path.to_s.empty?
       return @by_source[path] if @by_source.key?(path)
 
@@ -201,6 +319,7 @@ module Import
       end
 
       @by_source[path] = filename
+      @sources[filename] = src.to_s unless src.to_s.empty?
       return filename if @dry_run
 
       @files[path] = filename

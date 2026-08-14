@@ -497,7 +497,11 @@ that know their posts' original URLs also take `KEEP_PERMALINKS=1`, which
 writes the `redirect_from` list that keeps the old site's links working;
 without it an archive imports with no redirects at all, and the only way
 back is another import. Movable Type/TypePad take `URL_PATTERN` instead and
-a markdown tree a `PERMALINK` pattern, for the same purpose. The full
+a markdown tree a `PERMALINK` pattern, for the same purpose. A re-run also
+fetches no media it already has -- each file records the address it came
+from -- so sampling first costs the network nothing twice. Media already in
+the archive is never replaced, only added to; `REFETCH_MEDIA=1` asks the
+source for every address again but still writes only what is missing. The full
 per-source guide, including undo and troubleshooting, is
 [docs/importing.md](docs/importing.md).
 They report progress as they go: the size of what they're about to read,

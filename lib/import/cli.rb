@@ -99,6 +99,10 @@ module Import
       else
         puts "Done. #{result.written} post(s) written, #{result.media} media file(s)."
       end
+      # Or the same sentence describes a run that downloaded 420 files and
+      # one that downloaded none -- which is what a re-import over an
+      # archive that is already here now costs.
+      puts "  #{I18n.t('import.media_reused', count: result.media_reused)}" if result.media_reused.to_i.positive?
       result.skipped.sort_by { |reason, _| reason.to_s }.each do |reason, count|
         puts "  #{count} skipped (#{reason})"
       end

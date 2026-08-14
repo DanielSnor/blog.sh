@@ -428,6 +428,41 @@ module Exporter
        state page].each do |key|
       keys[key] = post[key] unless post[key].nil?
     end
+    sources = media_sources(post)
+    keys['media_src'] = sources unless sources.empty?
     keys
+  end
+
+  # Exported filename -> the address the file was fetched from. The one
+  # thing about a media file that cannot be measured back out of it: an
+  # importer re-reads the width and the height from the bytes, but nothing
+  # in a JPEG says where it was downloaded. Dropped here, the tree would
+  # come home unable to say which of its files the archive already has --
+  # and the next import would fetch every one of them again, which is the
+  # exact loss this key was added to prevent.
+  #
+  # A flat map rather than a key per block, because it has to serve both
+  # kinds of block: video, audio and attachments ride home inside the
+  # `blogsh:block` comment with their entries intact, but an image is
+  # written as plain markdown and arrives back as nothing but a path.
+  def media_sources(post)
+    map = {}
+    Array(post['content']).each do |block|
+      next unless block.is_a?(Hash)
+
+      %w[media poster].each do |key|
+        entries = block[key]
+        next unless entries.is_a?(Array)
+
+        entries.each do |entry|
+          next unless entry.is_a?(Hash)
+
+          name = entry['url'].to_s
+          src = entry['src'].to_s
+          map[name] = src unless name.empty? || src.empty?
+        end
+      end
+    end
+    map
   end
 end

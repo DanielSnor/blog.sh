@@ -46,6 +46,9 @@ module Import
       # one), and a counter would say everything twice.
       @slugs = Hash.new { |h, k| h[k] = [] }
       @authored = []
+      # Per post, set by map before the blocks are built -- empty for any
+      # tree this engine did not write.
+      @own_media_src = {}
     end
 
     # Said out loud when the run rearranged anything -- see
@@ -110,6 +113,13 @@ module Import
       raw = File.read(path, encoding: 'utf-8')
       meta, body = front_matter(raw)
       return :bad_frontmatter if meta.nil?
+
+      # Read before the blocks are built, because localize is where each
+      # file is registered and the address has to be in hand by then.
+      # A tree from anywhere else has no such key and this stays empty.
+      own = meta['blogsh']
+      src_map = own.is_a?(Hash) ? own['media_src'] : nil
+      @own_media_src = src_map.is_a?(Hash) ? src_map : {}
 
       blocks = if path.end_with?('.html')
                  HtmlBlocks.parse(body).blocks
@@ -736,7 +746,7 @@ module Import
 
           src = entry['url'].to_s
           local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, @dir)
-          name = media.from_file(local)
+          name = media.from_file(local, src: entry['src'] || own_media_src(local))
           name ? entry.merge('url' => name) : nil
         end
       end
@@ -781,6 +791,17 @@ module Import
       end
     end
 
+    # Where the file in the tree was originally fetched from, if the tree
+    # says. `./blog.sh export` writes that under `blogsh: media_src:`,
+    # keyed by the file's own name -- the width and the height an importer
+    # can measure back out of the bytes, but nothing in a JPEG remembers
+    # the address it was downloaded from. Without it coming home, an
+    # archive exported and imported back would fetch every one of its
+    # images again on the next run.
+    def own_media_src(local_path)
+      @own_media_src[File.basename(local_path)]
+    end
+
     # A root-relative path is looked up in the tree, a relative one next
     # to the post, an absolute URL downloaded -- in that order of
     # likelihood for a static site's own images.
@@ -806,7 +827,7 @@ module Import
                    # Unconditionally: from_file spends the number and records
                    # the miss itself. Stat-ing here instead made numbering
                    # depend on which files happened to be present.
-                   media.from_file(local)
+                   media.from_file(local, src: own_media_src(local))
                  end
       return nil unless filename
 

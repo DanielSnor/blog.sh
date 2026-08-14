@@ -5,12 +5,14 @@ require 'time'
 require_relative 'atomic_write'
 require_relative 'post_versions'
 require_relative 'exif_location'
+require_relative 'media_dimensions'
 require_relative 'site_config'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
   CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
   MEDIA_DIR = File.join(ROOT, 'media.nosync')
+  MEDIA_KEYS = %w[media poster].freeze
 
   # post: hash matching the post schema (slug, title, date, state, tags, content, source)
   # media_files: { source_path => desired_filename } to copy into media/<year>/<slug>/
@@ -41,6 +43,7 @@ module PostWriter
     post = ensure_draft_token(post)
 
     copy_media(media_files, year, slug)
+    sync_media_dimensions(post, year, slug)
     path = File.join(dir, "#{slug}.json")
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
@@ -56,6 +59,16 @@ module PostWriter
     SiteConfig.get('media', 'strip_location', default: true) != false
   end
 
+  # Nothing here ever replaces a file the archive already holds, and that
+  # is a decision rather than an omission. An import brings bytes from
+  # somewhere nobody in this process can vouch for: a source that has been
+  # sold answers an image URL with a parked page at a straight-faced 200,
+  # a CDN that has had enough answers with 27 bytes of HTML, and a
+  # re-import that wrote those over the archive would destroy the only
+  # copy left of a picture -- quietly, at the scale of a whole run. So an
+  # import only ever ADDS what is missing. Repairing a damaged archive is
+  # a separate job with a separate confirmation; `./blog.sh check` is
+  # where it starts.
   def self.copy_media(media_files, year, slug)
     return if media_files.empty?
 
@@ -90,6 +103,109 @@ module PostWriter
         raise
       end
     end
+  end
+
+  # Makes the post describe the file that is actually in the archive.
+  #
+  # An importer measures the bytes it just fetched and writes the numbers
+  # into the block; copy_media above then declines to overwrite a file that
+  # is already there. Both are right on their own, and together they let a
+  # post state 400x600 over a 26-byte file -- with scripts/check.rb calling
+  # the archive healthy, because the file exists and the numbers are
+  # present. Nothing before this point can close that gap: the adapter does
+  # not know the year and the slug, so it cannot name the destination, and
+  # here is the first place both are settled.
+  #
+  # Only entries whose file IS in the archive; one whose file never
+  # arrived is left saying exactly what it said. When the bytes answer,
+  # they decide. When they do not, see the two cases below -- the answer
+  # is neither "keep" nor "drop" but "what this post said last time".
+  def self.sync_media_dimensions(post, year, slug, previous: nil)
+    media_dir = File.join(MEDIA_DIR, year, slug)
+    remembered = remembered_sizes(previous)
+    each_media_entry(post) do |entry, _block|
+      name = entry['url'].to_s
+      next unless plain_media_name?(name)
+
+      path = File.join(media_dir, name)
+      next unless File.file?(path)
+
+      width, height = MediaDimensions.image(path)
+      if width && height
+        entry['width'] = width
+        entry['height'] = height
+      elsif (was = remembered_for(remembered, name, entry))
+        # The file is here and its bytes say nothing about its size, and
+        # this post said something about it before today. What it said is
+        # what goes back, because the alternative is worse in both
+        # directions at once:
+        #
+        # Keeping what this run put there means a re-import can stamp the
+        # entry with the size of bytes it fetched and then did NOT write
+        # -- copy_media never replaces a file that exists -- so the post
+        # describes a picture the archive does not hold, and check calls
+        # the archive healthy because the file is present and the numbers
+        # are too.
+        #
+        # Dropping the numbers instead throws away the last record of what
+        # a picture WAS, for a file that is damaged rather than absent --
+        # and, worse, would take the dimensions off every video and SVG on
+        # a first import, where nothing was discarded and the size the
+        # source stated is the only one anybody will ever have. That is
+        # not a hypothetical: it is what the first attempt at this did,
+        # and 25 checks said so.
+        entry['width'] = was[0]
+        entry['height'] = was[1]
+      end
+    end
+  end
+
+  # What the copy of this post that is being replaced said about its own
+  # media, keyed the two ways an entry can be recognised again: by the
+  # address it came from, which survives a renumbering, and by the file
+  # name, which is all a post written before `src` existed carries.
+  def self.remembered_sizes(previous)
+    sizes = { 'src' => {}, 'url' => {} }
+    return sizes unless previous.is_a?(Hash)
+
+    each_media_entry(previous) do |entry, _block|
+      next unless entry['width'] && entry['height']
+
+      pair = [entry['width'], entry['height']]
+      sizes['src'][entry['src'].to_s] = pair unless entry['src'].to_s.empty?
+      sizes['url'][entry['url'].to_s] = pair unless entry['url'].to_s.empty?
+    end
+    sizes
+  end
+
+  def self.remembered_for(sizes, name, entry)
+    sizes['src'][entry['src'].to_s] || sizes['url'][name]
+  end
+
+  # Every media entry in a post: the files themselves, and a video's
+  # poster, which is a file with an address of its own. The block comes
+  # with it -- what an entry means depends on what it is part of, and a
+  # caller that has to guess from the filename is the guess this engine
+  # got wrong twice.
+  def self.each_media_entry(post)
+    Array(post['content']).each do |block|
+      next unless block.is_a?(Hash)
+
+      MEDIA_KEYS.each do |key|
+        entries = block[key]
+        next unless entries.is_a?(Array)
+
+        entries.each { |entry| yield entry, block if entry.is_a?(Hash) }
+      end
+    end
+  end
+
+  # A media url is a bare filename by construction (the importer allocates
+  # "01.jpg"), and callers join it onto a directory -- so anything with a
+  # separator or a leading dot in it is not a name to follow. A post JSON
+  # is a file on disk that people do edit by hand.
+  def self.plain_media_name?(name)
+    !name.empty? && !name.start_with?('.') && !name.include?('/') && !name.include?('\\')
   end
 
   # Overwrites the matched post in place -- or moves it when the source
@@ -231,6 +347,7 @@ module PostWriter
     end
 
     copy_media(media_files, year, slug)
+    sync_media_dimensions(post, year, slug, previous: old)
     # The other way a post's text gets replaced, and the more dangerous
     # one: a re-import overwrites in place across the whole archive at
     # once, and nobody reads a few thousand posts afterwards to see what
@@ -302,11 +419,50 @@ module PostWriter
   # {platform: manual} and nothing else, and matching them to each other
   # would overwrite one author-written post with another.
   def self.index
-    @index ||= Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).each_with_object({}) do |file, acc|
-      existing = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
-      key = existing && source_key(existing['source'])
-      acc[key] = file if key
+    return @index if @index
+
+    # The pass itself settles it -- see each_post.
+    each_post { |_path, _post| nil }
+    @index
+  end
+
+  # Every post in the archive, parsed once: yields [path, post hash].
+  #
+  # Two maps are built from exactly these bytes -- this one, and the
+  # importer's address-to-file index (Import::MediaIndex) -- and an import
+  # that ran both globbed and JSON-parsed a few thousand files twice, which
+  # on a large archive is a visible wait for nothing. So whichever of them
+  # asks first pays for the pass, and it settles `index` on the way past.
+  # Order is safe either way round: the media index is built at the first
+  # download, which happens while mapping the first item, and `index` at
+  # the first write, which happens after it.
+  #
+  # A post that will not parse is skipped rather than raised on: it is
+  # check's business to report, and an index that refused to build over one
+  # of them would take the whole import down with it.
+  def self.each_post(content_dir: CONTENT_DIR)
+    building = @index.nil?
+    acc = {}
+    Dir.glob(File.join(content_dir, '*', '*.json')).each do |file|
+      post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
+      next unless post.is_a?(Hash)
+
+      if building
+        key = source_key(post['source'])
+        acc[key] = file if key
+      end
+      yield file, post
     end
+    # Only once the pass finished: a block that raised halfway would
+    # otherwise leave a half-built index memoized for the rest of the
+    # process, and matching re-imports against it would duplicate posts.
+    @index = acc if building && content_dir == CONTENT_DIR
+  end
+
+  # Where a post's media lives, derived from the post's own JSON path --
+  # the same year/slug pair copy_media builds it from.
+  def self.media_dir_for(post_path)
+    File.join(MEDIA_DIR, File.basename(File.dirname(post_path)), File.basename(post_path, '.json'))
   end
 
   # An identity is only an identity when ALL THREE parts exist. Without the

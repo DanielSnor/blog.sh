@@ -2419,6 +2419,9 @@ def props_versions(path, slug)
   # the engine that cannot be walked back.
   PostVersions.keep(path, content_dir: CONTENT_DIR)
   current = JSON.parse(File.read(path, encoding: 'utf-8'))
+  # Held before the loop below replaces it: these blocks carry the only
+  # record of where each media file was downloaded from.
+  live_content = current['content']
   # Only what the author writes comes back. Everything the engine owns --
   # the announcement URLs, the draft token, the state, the redirects --
   # belongs to the post as it is NOW, and restoring an old copy of it would
@@ -2426,6 +2429,15 @@ def props_versions(path, slug)
   %w[title tags content type hero].each do |key|
     restored.key?(key) ? current[key] = restored[key] : current.delete(key)
   end
+  # `src` is engine-side too, and older than this dialog knows: every
+  # version written before media entries started carrying the address the
+  # file came from -- which is every version in every archive that predates
+  # it, i.e. the whole of any installation being upgraded -- restores a
+  # content array with the key simply missing. The post then cannot say
+  # which of the archive's files it already holds, and the next import
+  # fetches every one of them again. Taken from the copy being replaced,
+  # exactly as edit_post takes it from the stored post.
+  restore_media_src(current['content'], live_content)
   AtomicWrite.write_json(path, current)
   puts t('cli.versions_restored', path: path)
   puts
@@ -2705,6 +2717,7 @@ def edit_post(slug, path: nil)
   check_video_playback(media_files)
   fill_image_dimensions(blocks, media_files, media_dir)
   restore_posters(blocks, post['content'])
+  restore_media_src(blocks, post['content'])
   # Before the lookup, not after it: a player the post already has is not
   # worth a network call, and asking anyway is what made an edit depend on
   # a service answering.
@@ -3687,6 +3700,50 @@ def restore_embed_lookups(blocks, original_blocks)
 
     src = stored[block['url'].to_s]
     block['embed_src'] = src if src
+  end
+end
+
+# The address a media file was downloaded from, carried over from the
+# stored post exactly as a poster and an embed's player are -- and for the
+# same reason: markdown has no way to say it, so MarkdownParser hands the
+# blocks back without it.
+#
+# What it costs to lose is the next import. `src` is the only record of
+# where a file came from -- nothing in a JPEG remembers -- and it is what
+# lets a re-import recognise the files this archive already holds instead
+# of fetching every one of them again. Editing one imported post used to
+# quietly hand that post's images back to the network.
+#
+# Keyed per media entry rather than per block, because a gallery is one
+# block with many files and each of them came from its own address.
+def restore_media_src(blocks, original_blocks)
+  stored = {}
+  each_media_entry(original_blocks) do |entry|
+    name = entry['url'].to_s
+    stored[name] ||= entry['src'] if !name.empty? && entry['src']
+  end
+  return if stored.empty?
+
+  each_media_entry(blocks) do |entry|
+    next if entry['src']
+
+    src = stored[entry['url'].to_s]
+    entry['src'] = src if src
+  end
+end
+
+# Every media entry in a list of blocks -- the files themselves and a
+# video's poster, which is a file with an address of its own.
+def each_media_entry(blocks)
+  Array(blocks).each do |block|
+    next unless block.is_a?(Hash)
+
+    %w[media poster].each do |key|
+      entries = block[key]
+      next unless entries.is_a?(Array)
+
+      entries.each { |entry| yield entry if entry.is_a?(Hash) }
+    end
   end
 end
 

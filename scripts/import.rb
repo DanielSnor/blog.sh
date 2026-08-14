@@ -563,6 +563,10 @@ def report(result, dry_run:)
   # which the source had kept none. Said out loud, or the number above
   # reads as a delivery.
   puts Tui.paint(t('import.media_not_verified'), :cyan) if dry_run && result.media.positive?
+  # The number that separates a first import from a second one. Shown in
+  # the preview too, where it is the honest half of the media count above:
+  # some of them are already here and will not be fetched at all.
+  puts Tui.paint(t('import.media_reused', count: result.media_reused), :cyan) if result.media_reused.to_i.positive?
 
   unless result.samples.empty?
     puts t('import.sample_slugs')
