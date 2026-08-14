@@ -121,7 +121,10 @@ the camera, the moment and the tag that keeps a portrait photo standing up
 all stay. A post is either published or a draft, a draft has an
 unguessable preview URL, a published post can be pinned to the front
 page, and a post built around a file is filed as a document with a
-download card.
+download card. A post's header can also say which series it belongs to,
+whether it wants a table of contents, and whether its lead image runs full
+width above the title; every card and every post page says how long the
+post takes to read.
 → [architecture.md → Content model](docs/architecture.md#content-model)
 
 **Writing.** `./blog.sh` is a CLI, and run bare an interactive menu: add,
@@ -152,10 +155,12 @@ parser, so every example on it behaves exactly as it would in a post.
 
 **Build.** Static HTML from JSON through ERB templates, no framework:
 pagination anchored to the oldest post so page boundaries stay stable as
-new posts arrive, tag and content-type archives that exist only for the
-types the site actually has, RSS, a sitemap, `robots.txt`, a generated
-`/favicon.ico`, and a search index split into an eager recent half and a
-lazily loaded archive. Search itself is entirely client-side -- quoted
+new posts arrive, tag, series and content-type archives that exist only
+for the tags, series and types the site actually has, RSS, a sitemap,
+`robots.txt`, a generated `/favicon.ico`, a 404 page wearing the site's
+own chrome instead of the host's default, and a search index split into an
+eager recent half and a lazily loaded archive. Search itself is entirely
+client-side -- quoted
 phrases, `-word` exclusion, diacritics never deciding a match. Only
 changed files are written, and whatever the build didn't produce this run
 is removed afterwards.

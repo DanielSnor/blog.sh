@@ -22,6 +22,7 @@ guides that go deeper:
 | Writing and publishing posts | [operations.md → Writing and publishing](operations.md#writing-and-publishing) |
 | Moving content in from elsewhere | [importing.md](importing.md), then `./import.sh` |
 | Taking content out, or moving the whole site | [operations.md → Taking your content elsewhere](operations.md#taking-your-content-elsewhere), then `./blog.sh export` |
+| Checking that the archive itself is sound | [operations.md → Checking the archive](operations.md#checking-the-archive), then `./blog.sh check` |
 | Something failed | [operations.md → Troubleshooting](operations.md#troubleshooting) |
 | Understanding the internals | [architecture.md](architecture.md), then the source -- every `lib/` file opens with a design comment |
 | Translating the engine | [localization.md](localization.md) -- a partial locale is useful from day one |

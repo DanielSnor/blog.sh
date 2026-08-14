@@ -189,13 +189,26 @@ The example is fully commented. The short version:
   `widgets` (toots / pixelfed / commits / bluesky / rss, each
   independently), `mastodon` **or** `bluesky` (comments + auto-announce
   -- exactly one, see [step 8](#8-comments-network-optional-mastodon-or-bluesky)),
+  `comments` (which replies get published -- same step),
   `colors` (7 keys per light/dark mode -- omitted keys fall back to the
   built-in blue palette; whole palettes ship in `config/palettes.yml`, and
   `./style.sh` shows you a preview -- light and dark side by side -- and
   writes the one you pick into this section, so you never have to choose
   fourteen hex values by hand or blind), `fonts` (the banner title's and claim's font
   stack and size, plus any `.woff2` you put in `assets/fonts/` -- omitted
-  keys fall back to the built-in JetBrains Mono at 45px/20px).
+  keys fall back to the built-in JetBrains Mono at 45px/20px),
+  `nav` and `layout` (what the pages are made of --
+  [below](#the-menu-the-regions-and-a-stylesheet-of-your-own)),
+  `publishing.slots` (the times posts usually go out, so scheduling stops
+  asking for a date --
+  [operations.md](operations.md#publishing-slots)),
+  `media` (`convert_heic` and `strip_location`, both discussed under
+  [Writing from a phone](operations.md#writing-from-a-phone)), and `seo`
+  (`block_ai_crawlers` writes a maintained list of the crawlers that
+  collect text to train on into `robots.txt`, `robots_extra` is appended
+  verbatim -- off by default, because wanting to be findable in an answer
+  somebody gets from a machine is a legitimate position and the engine
+  does not take it on your behalf either way).
 
 `social` is the row of icons in the footer. Each entry takes `name`,
 `url` and either `icon` (a name from the built-in set) or `icon_svg`
@@ -254,6 +267,54 @@ into `assets/fonts/`, declare it under `fonts.faces`, and the header is
 in your own type; say nothing and it stays self-hosted JetBrains Mono at
 45px/20px. Narrow screens scale from whatever size is configured, so
 there is no second pair of keys to keep in sync.
+
+### The menu, the regions and a stylesheet of your own
+
+Four more settings decide what the pages are *made of* rather than what
+they look like. Each has a default that leaves a site saying nothing
+exactly as it was, so none of them has to be touched.
+
+`nav:` replaces the menu bar the build otherwise derives from the content
+types that actually have posts. An entry takes a `label` plus either a
+`tag` (a tag's slug, which becomes `/tag/<slug>/`) or a `url` taken as
+written -- so an item can point at a post, at a generated page, or off the
+site entirely:
+
+```yaml
+nav:
+  - { label: "Home", url: "/" }
+  - { label: "Photographs", tag: "photo" }
+```
+
+An entry missing either half is skipped rather than rendered as an empty
+link. An empty list is a decision rather than a mistake: the menu then
+renders nothing at all -- no bar, no toggle -- which is also how a site
+turns the menu off, so there is no second key for that.
+
+`layout.sidebar` and `layout.hero` switch whole regions on and off. The
+sidebar is on unless you say otherwise; the hero -- the post's first
+usable image lifted out of the text and run full width above the title --
+is off unless you ask, because it reshapes every post page it touches and
+a site is entitled to keep the shape it has. A single post can still ask
+for one either way with `hero:` in its own header (see
+[operations.md](operations.md#writing-and-publishing)). They are switches
+for regions, not for how a region looks: what things look like belongs in
+a stylesheet, and a key per visual property would turn this file into a
+stylesheet written in YAML.
+
+`site.extra_css` is that stylesheet -- one path, or a list of them, loaded
+after the site's own, so a skin can live in a file of yours instead of in
+an edited engine file with the pull conflicts that implies
+([step 9](#9-updating-the-engine)). Local paths only
+(`/assets/css/mine.css`): every page carries `style-src 'self'`, so a
+stylesheet on another host would be discarded by the browser without an
+error you would ever see -- the page would simply render undressed -- and
+the build refuses it out loud instead.
+
+`site.page_size` is how many posts a listing page holds; 10 without it.
+Worth setting once, before the first deploy: pagination is anchored to the
+oldest post precisely so page contents never change as new posts arrive,
+and changing the size later renumbers every page in the archive.
 
 ## 3. Configure the environment -- `env.sh`
 

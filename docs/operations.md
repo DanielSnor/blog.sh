@@ -43,6 +43,45 @@ built around drafts:
    typically an imported one that never had one. An existing
    announcement is never overwritten.
 
+**A post's header can say more than the template offers.** `add` prefills
+title, tags and type, because that is what every post needs; the parser
+accepts a few more keys, and `edit` brings back whichever ones the post
+already carries, so each can be read as well as changed:
+
+- **`series: Name`** files the post into a series. The build gives every
+  series a listing of its own at `/series/<slug>/` and puts "Part 2 of 5"
+  on each post in it, with the way to the part before and the part after
+  -- within the series only, since a post's chronological neighbours
+  across a whole archive are rarely what a reader wants next. Parts are
+  ordered by date, which is what a series written in order needs;
+  **`series_part: 3`** is for the one written out of order or inserted
+  afterwards.
+- **`toc: true` / `toc: false`** overrides the table of contents. A post
+  with four headings or more gets one on its own -- that is the length at
+  which a reader starts scrolling to look for something rather than
+  reading down. Say `false` on a post that has the headings but not the
+  shape, `true` to force one below the threshold.
+- **`hero: true` / `hero: false`** decides whether the post's first usable
+  image runs full width above the title, with the date moving into a
+  byline under the picture. Without the key the post follows
+  `layout.hero` for the whole site
+  ([install.md](install.md#the-menu-the-regions-and-a-stylesheet-of-your-own)).
+  A 1px image is never lifted, and a post with no usable picture simply
+  keeps the ordinary shape -- there is no second template to keep in step.
+
+**Two things the site says without being asked.** Every card and every
+post page carries how long the post takes to read, counted at 200 words a
+minute -- the same figure `./blog.sh stats` reports, because two places
+telling a reader how long something takes must not disagree. A post too
+short to time says "under a minute" rather than nothing at all, so every
+card has exactly one meta row instead of the handful with an announcement
+standing out as a break in the rhythm. And the build writes a `/404.html`
+for the host to serve at an address the site has nothing at: the site's
+own chrome, the menu and the search field, so a dead end is somewhere to
+go on from rather than the host's default page saying nothing about this
+site. It is `noindex`, because a 404 that gets indexed is worse than not
+having one.
+
 **Backdating** isn't part of that flow -- publishing means "now" -- but
 the frontmatter parser still honors a `date:` line you type in by hand
 (the template just doesn't offer one). To publish a draft into the
@@ -94,9 +133,11 @@ prints more than a screen can hold -- a build, a publish, a reschedule --
 takes the terminal for as long as it needs and hands it back. Nothing is
 hidden on the way out: this is not the alternate screen, so the last
 screen stays where it was drawn and everything above it is still in your
-scrollback. Resize the window and the screen repaints itself, even while
-it waits for an answer; on a window too short for everything, the rows
-telling you how to get out are the ones that survive.
+scrollback. Resize the window while the wizard menu, the queue or a post's
+properties is waiting for an answer and it straightens itself on the spot;
+a picker or the archive browser keeps the size it opened with until you
+leave it. On a window too short for everything, the rows telling you how
+to get out are the ones that survive.
 
 The three question-and-answer wizards -- `./setup.sh`, `./style.sh` and
 `./import.sh` -- keep the section you are in and the answers already given
@@ -434,6 +475,57 @@ Three things are worth knowing before you rely on the result:
   to another machine or another host -- and, run against a scratch
   copy, the way to check that an export really did come out whole.
 
+## Checking the archive
+
+```bash
+./blog.sh check            # walks every post and every media file
+./blog.sh check --online   # also asks whether the links that leave the site still answer
+```
+
+`doctor` asks whether the installation is sound and takes a second;
+this asks whether the *archive* is, and walks all of it. They are two
+commands rather than one because rolled together, the fast half would stop
+being run -- and it is the fast half that belongs before a deploy. `check`
+reads the content on disk, so it works before a build has ever run, and it
+names a post and a slug for every finding rather than a file under
+`public.nosync`: something to go and fix.
+
+Five things it looks for, each with a line saying what to do about it:
+
+- **Media a post asks for and hasn't got** -- usually an import whose
+  download failed. The page renders a hole.
+- **Images stored as 1px or smaller.** The build treats those as tracking
+  pixels and drops them *together with their caption*, so the page loses
+  both without saying so.
+- **Internal links pointing at nothing.** Typically a permalink left over
+  from an import, or a slug renamed back before renames left a redirect
+  behind.
+- **Media directories no post owns** -- left by a deleted or renamed post,
+  or an import that ran twice. Nothing links to them; they cost disk, not
+  correctness, which is why they are a warning.
+- **One old address claimed by two posts.** Whichever renders last wins
+  and the other's readers land on it.
+
+It only reports. Nothing here deletes a directory or rewrites a post: the
+value of the tool is that its output can be trusted, and a checker that
+also acts has to be trusted twice. Twenty findings of each kind are
+listed and the rest counted, so one bad import can't bury everything else.
+It exits non-zero on errors only, never on warnings, so it can hang off
+cron and speak up only when something is actually broken.
+
+**`--online` additionally asks the web about every link that leaves the
+site.** It takes minutes rather than a second, which is why it has to be
+asked for by name. What it reports is deliberately narrow: a host that no
+longer resolves, and a page answering 404 or 410. A timeout, a refused
+connection, a 5xx or a 403 is the web saying "not right now", and
+reporting those would turn one flaky evening into forty findings that are
+all fine tomorrow. Anything that looks dead is confirmed with a second
+request before it is believed, because some servers answer a HEAD with 404
+and a GET with 200 for the same address. Verdicts are remembered in
+`tmp/link-check.json` for two weeks, so running it again next week only
+asks about the links it hasn't seen lately; deleting that file just means
+the next run asks about everything.
+
 ## Counting the archive
 
 ```bash
@@ -652,6 +744,7 @@ everything generated is rebuildable:
 | Path | Why |
 | --- | --- |
 | `content.nosync/posts/` | the posts -- the one thing that's truly irreplaceable |
+| `content.nosync/versions/` | what each edited post said before its last ten saves, which is what `[v]` restores from ([Properties and actions](#properties-and-actions)). It sits beside the content and dies with it, so a backup of the posts alone keeps the archive and loses the undo |
 | `media.nosync/` | their images and videos |
 | `config/site.yml` | site identity and integrations |
 | `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
@@ -687,6 +780,7 @@ whole), but restoring from the archive itself is exact.
 | Anything at all, and you need to know what you're running | `./blog.sh version` -- it needs neither `env.sh` nor a config, on purpose. |
 | The site looks wrong, or you want to change how it looks | `./style.sh` -- a menu over the palette, banner, fonts, menu bar, about, footer, social icons, sidebar widgets and analytics. The bio, the footer note, the copyright line and the banner's claim are Markdown, the same as a post, and raw HTML still works in them -- an `<img>` is how a photo gets into the bio, since Markdown cannot carry the styles one needs. Picking a palette offers a preview (your site in the candidate colors, light and dark side by side) before anything is written, and the run ends by offering a rebuild, since appearance is the one thing a diff can't show you. The preview is also uploaded to the site so you can open it on a phone, and it is deliberately temporary: the build removes anything it did not produce itself, so the next build -- which a scheduled publish can start at any minute -- takes it back down. Look at it while you are standing there. |
 | Anything config-shaped, and you want the whole picture | `./blog.sh doctor` -- it reads whatever is on disk and reports every problem at once, each with a fix line. It runs on a config too broken for anything else to load, including one whose YAML won't parse, and needs neither `env.sh` nor a valid config. Add `--online` to also ask whether the feeds, the analytics script and the access token still answer, and `--strip-location` to remove the place of capture from photos saved before the engine started doing that on the way in -- the only thing doctor ever writes, which is why it has to be asked for by name. It cleans the sources, `media.nosync` and `assets/`, and the site follows on the next rebuild, since the site is built from them. |
+| Anything archive-shaped -- a hole where a picture should be, a link that leads nowhere | `./blog.sh check` -- it walks every post and every media file and says what is broken *inside the archive*, each finding with a fix line; `--online` additionally asks whether the links that leave the site still answer ([Checking the archive](#checking-the-archive)). It only ever reports: nothing is deleted or rewritten, so it is safe to run at any time, including from cron. |
 | `config/site.yml is not valid YAML` | The message names the line and column. Almost always a tab where spaces belong, a missing quote, or a colon inside an unquoted value (`title: Colon: here`). `./blog.sh doctor` says the same thing without stopping at the first problem. |
 | A save aborted and took your text with it | It didn't: the text is in `.last-edit.md`, and the next `add`/`edit` offers it back -- `[r]` opens the editor on it, `[d]` throws it away, `[c]` leaves it alone. Text from an interrupted `edit <slug>` is only offered to that same post: restoring it into an `add` would make a second post out of it, so the offer names the command that does continue it. |
 | `Missing env.sh` | `./setup.sh`, or copy the template by hand: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |

@@ -128,6 +128,44 @@ see it:
   `lib/post_writer.rb`, so an imported post and a hand-written one are
   indistinguishable downstream.
 
+## Undoing an edit (`lib/post_versions.rb`)
+
+Deleting a post was always reversible -- it goes to `trash/` and `restore`
+brings it back -- but editing one was not, and editing is what happens
+every day: a paragraph dropped and saved, a round-trip through markdown
+that could not express something, a paste into the wrong place. So the
+post as it stood is copied aside immediately before it is overwritten, by
+whoever is doing the overwriting: `PostWriter.write` for a re-import, the
+edit and restore paths in `scripts/manage_post.rb` for everything a person
+does by hand.
+
+The store is deliberately plain: `content.nosync/versions/<year>/<slug>/`,
+one whole post JSON per file, named for the second it was kept
+(`20260813-174204-118.json`) so that sorting the directory is sorting by
+time and no index has to be maintained. Ten per post; the eleventh drops
+the oldest, because the newest copy answers "what did this say before I
+broke it" in nine cases out of ten and an unbounded history of an archive
+this size is a second archive. `PostVersions.move` carries the directory
+into the trash with the post and back out on a restore, or a restored post
+would come back with amnesia and a deleted one would leave its history
+orphaned where nothing points at it.
+
+Three deliberate limits. It is **not configurable** -- a safety net with a
+switch is off exactly when it is needed, since nobody turns it on before
+the mistake, which is how this engine treats `trash/`, the slug-collision
+abort and the deploy guards too. Its **failures are swallowed**: a full
+disk or a read-only directory must not stop somebody saving their writing,
+and the point of this is to lose less. And it is **not git and not a
+backup** -- no branches, no diff between two arbitrary points, and it
+lives beside the content, so it dies with it. The backup list in
+[operations.md](operations.md#backup) still applies.
+
+Only the text is kept, never the media, which is the other half of why the
+cap is short: a version old enough to name a picture the post no longer
+has would restore a broken reference. The CLI side of this -- the `[v]`
+key, what the list shows and why restoring is itself undoable -- is in
+[operations.md](operations.md#properties-and-actions).
+
 ## Importing
 
 An import splits along the line between what every platform needs and what
@@ -274,6 +312,71 @@ What is deliberately lost: `small`/`mention`/`color` spans keep their
 text and lose their styling, and a draft's preview URL is not exported
 (it is a private address, not a permalink).
 
+## Checking the archive (`lib/checker.rb`)
+
+`./blog.sh check` is doctor's counterpart and deliberately a separate
+command: doctor answers "is this installation sound", reads a handful of
+config values and takes a second, while this walks every post and every
+media file there is. Rolled into one command the fast half would stop
+being run, which is the half somebody runs before every deploy.
+
+It reads the **content**, not the built site. A finding has to name a post
+and a slug -- something to go and fix -- rather than a file under
+`public.nosync`, and it has to work before a build has ever run. Judging a
+link still needs to know which addresses a build would produce, so those
+are derived in the checker from the same rules `build_blog.rb` follows.
+Five questions, in one pass: media a post asks for and hasn't got; images
+whose stored dimensions are 1px or smaller, which the build drops
+*together with their caption* and would otherwise lose silently; internal
+links pointing at an address nothing on this site answers at; media
+directories no post owns any more; and one old address claimed by two
+posts, where whichever renders last wins and the others' readers land on
+it.
+
+Two rules shape the output. **It only ever reports** -- nothing here
+deletes an orphaned directory or rewrites a post, because the whole value
+of the tool is that its output can be trusted, and a checker that also
+acts has to be trusted twice. And each kind is **capped at twenty**
+findings with the remainder counted (`more`), since a thousand identical
+lines is not more information than twenty and buries every other kind. The
+exit code is non-zero on errors only: an orphan directory costs disk
+rather than correctness, so a cron job hanging off this would be crying
+wolf if warnings failed it. Like `export` and `stats` it has its own entry
+point (`scripts/check.rb`) rather than going through `manage_post.rb`,
+which applies the site timezone as it loads and aborts on a config it
+cannot read -- a run that exits explaining the config has checked nothing.
+
+`--online` is the only part that leaves the machine, and it is asked for
+by name because it takes minutes rather than a second and, over an archive
+going back twenty years, will find things nobody can do anything about.
+What counts as a finding is narrow on purpose: a host that no longer
+resolves, and a 404 or 410, are the web saying "this is gone"; a timeout,
+a refusal, a 5xx, a TLS error or a 403 are the web saying "not right now",
+and reporting those turns one flaky evening into forty findings that are
+all fine again tomorrow. A checker nobody believes is worse than no
+checker.
+
+Three details make it usable on a real archive rather than only correct:
+
+- **HEAD first, GET to confirm anything fatal.** A link checker has no use
+  for the body, and HEAD over a few thousand links is the difference
+  between minutes and an afternoon -- but HEAD is never believed when it
+  says a page is gone. Some servers answer it with 405 or 501 while
+  serving GET perfectly; worse, some answer 404 to HEAD and 200 to GET for
+  the very same address (bsky.app does this on profile pages, and the
+  first run over a real archive reported thirty-four live links as dead
+  because of it). So `RETRY_WITH_GET` re-asks with a GET, one extra
+  request per apparently-dead link.
+- **Politeness rather than throughput.** One request at a time, and a
+  one-second pause between two requests to the same host: an archive with
+  two hundred links to one site should not read as an attack on it.
+- **A fortnight of memory.** `Checker::Cache` keeps every verdict in
+  `tmp/link-check.json` for 14 days, so a second run only asks about the
+  links it has not seen lately -- without it nobody runs this twice, since
+  a few thousand requests is minutes and most of the answers were the same
+  yesterday. A cache it cannot read or write is not an error: the check
+  simply asks the network, which is what it was going to do anyway.
+
 ## Counting (`lib/stats.rb`)
 
 `./blog.sh stats` is the same shape as `check` and `export`: its own
@@ -398,8 +501,13 @@ Two rules follow from painting at the top, and both are easy to get wrong.
 Anything a caller prints *just before* a picker is painted over, so the
 rows that belong above a list travel into it as `header:` rather than
 being printed first. And a list longer than the window scrolls inside it,
-with the window recomputed every frame rather than once per call, so a
-resized terminal is simply the next frame with a different number of rows.
+on a window measured once when the picker opens: `Tui.menu` and
+`Tui.browse` read the terminal's height before their loop and keep it,
+because the arithmetic deciding which rows are visible has to stay valid
+for the life of the call. Answering a resize mid-wait is therefore the
+privilege of the screens that own a `Screen` -- the wizard menu, the
+publishing queue and the props dialog -- and everywhere else a resized
+window straightens itself on the next screen rather than on the spot.
 `context:` adds one line under the cursor saying what the selected row
 *is* -- what a version said, where the row itself can only say when it was
 kept -- and it is called for the selected row only.
@@ -462,8 +570,31 @@ The deploy script owns the *what*; backends own the *how*:
 ## The client side
 
 Small single-purpose vanilla JS files, no framework, no third-party
-origins:
+origins. `util.js` loads first because everything else stands on it:
+`Blog.escapeHtml`, which every piece of foreign data goes through before
+it reaches `innerHTML`, and `Blog.formatDate`, which takes its locale from
+`window.BLOG_I18N` so a date the browser writes matches the ones the build
+wrote. Then, in load order:
 
+- **Theme** (`theme-toggle.js`): a button cycling three states -- follow
+  the system, light, dark -- with the reader's answer in `localStorage`
+  and nothing there while they are following the system. Anything else
+  found in storage is read as "no choice" rather than written onto the
+  root element, where it would match neither the light rules nor the dark
+  ones.
+- **The menu on a phone** (`nav-toggle.js`): opens and closes the bar, and
+  closes it on Escape or a tap on the page as well as on the button. The
+  open menu is 700 of a phone's 812 pixels, and a reader who has decided
+  against it reaches for one of those two before hunting for the 40px
+  button again; Escape hands focus back to the button, which is where they
+  were before they opened it.
+- **Back to top** (`scroll-top.js`): the button appears past 300 px of
+  scrolling, on a listener declared `passive` so the browser never waits
+  to see whether it cancels the scroll. It asks
+  `prefers-reduced-motion` at the click rather than at load, because the
+  setting can change while the page is open -- and it has to ask at all,
+  since CSS can take the site's transitions out but not a scroll this code
+  asks for.
 - **Comments** (`comments.js`): a published post's announcement
   reference is baked into the page (`data-toot-url` or
   `data-bluesky-uri` -- exactly one network per site, see
@@ -483,6 +614,11 @@ origins:
 - **Search** (`search.js`) runs entirely client-side over the two
   index files, with the same diacritic folding the build used to create
   them.
+- **Lightbox** (`lightbox.js`) opens a post's figures and gallery images
+  over the page as a real dialog: `aria-modal`, the body held still, Tab
+  kept inside it, the arrows walking the group the image belongs to, and
+  focus handed back to the picture it was opened from. Its labels come
+  from `window.BLOG_I18N` like every other string the client draws.
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.

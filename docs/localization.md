@@ -23,9 +23,13 @@ from both.
    | Section | Who sees it |
    | --- | --- |
    | `date_format`, `date_time_format` | everyone -- strftime formats for every rendered date |
-   | `nav`, `post`, `pagination`, `tag`, `type`, `index`, `search`, `markdown_page`, `ui` | site visitors |
+   | `thousands_separator`, `decimal_point` | nobody reads these as words: they are how a number is written, not a message. English keeps `,` and `.`, German swaps them, Czech separates thousands with a non-breaking space. Only `./blog.sh stats` formats numbers through them |
+   | `nav`, `post`, `pagination`, `tag`, `type`, `series`, `index`, `search`, `not_found`, `markdown_page`, `ui`, `redirect` | site visitors -- the chrome, the listings, a post's own furniture (reading time, contents, series navigation), the 404 page and the one line an old address shows while it forwards |
    | `js` | site visitors -- shipped into the browser for client-rendered strings; `js.date_locale` is a BCP-47 tag (`de-DE`) and must agree with `date_format`, or server- and client-rendered dates diverge |
    | `cli` | authors -- `./blog.sh`, the wizard, `$EDITOR` hints |
+   | `poster` | authors -- what the CLI says when an announcement cannot be sent or its numbers cannot be fetched |
+   | `doctor`, `check`, `stats`, `export` | authors -- the commands that report on the installation and the archive. `doctor` and `check` pair each finding with a fix line, and the fix is a sentence telling somebody what to do, so it is worth as much care as the finding |
+   | `setup`, `style`, `wizard` | authors -- the questions in `./setup.sh` and `./style.sh`, plus the plumbing both share |
    | `cron`, `import` | authors -- scheduled publishing and `./import.sh` |
 
 2. **`templates/markdown-cheat-sheet.<lang>.md`** -- the source of the
@@ -69,9 +73,10 @@ Then see it live: set `site.lang: <lang>` in `config/site.yml`, and
 
 ```bash
 ruby build/build_blog.rb        # the site side
-./blog.sh preview                # read a post page, /search/, /markdown/
+./blog.sh preview                # read a post page, /search/, /markdown/, /404.html
 ./blog.sh help                   # the CLI side
 ./blog.sh                        # the wizard menu
+./blog.sh doctor                 # and check, stats, export -- the reporting sections
 ./import.sh --help
 ```
 
