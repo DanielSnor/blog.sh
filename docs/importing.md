@@ -206,13 +206,16 @@ left to download from.
 Every post comes over, drafts included. Posts Ghost had scheduled arrive
 as drafts too, and the summary says how many: their publish times were a
 promise made to a different site, and this one's queue should not
-announce posts nobody here reviewed. Pages (about, contact, ...) are
-skipped and counted -- they are site furniture, not timeline entries. A
-custom excerpt becomes the post's first paragraph, the feature image its
-first image. YouTube embeds become the same video blocks a hand-written
-post gets; any other embedded player becomes a link to the embedded page,
-which outlives the player. Ghost's internal `#hashtag` tags are routing
-config, not labels, and are dropped.
+announce posts nobody here reviewed. Pages (about, contact, ...) arrive
+as pages, and the summary lists the addresses they landed on -- a real
+111-post export brought seven across. A page is out of the listings, the
+archive and the feed, which is what a page is for and also means nothing
+links to it: add the ones that belong in the menu under `nav:` in
+`config/site.yml`. A custom excerpt becomes the post's first paragraph,
+the feature image its first image. YouTube embeds become the same video
+blocks a hand-written post gets; any other embedded player becomes a link
+to the embedded page, which outlives the player. Ghost's internal
+`#hashtag` tags are routing config, not labels, and are dropped.
 
 ### Instagram
 
@@ -303,9 +306,19 @@ nothing is lost to an HTML round-trip. `.html` bodies take the HTML
 path instead. Liquid `{% highlight %}` becomes a code block; other
 Liquid tags are dropped.
 
-**Images come from the tree itself** -- root-relative paths resolve
-against the site root, relative ones against the post -- so this works
-with no network, for a site that died years ago.
+**Images come from the tree where the tree has them.** A root-relative
+path resolves against the site root and a relative one against the post,
+and neither needs the network: that half works for a site that died years
+ago. An **absolute URL is downloaded**, and a tree that came off a hosted
+platform is mostly those: a real Hugo site's `content/` gave this import
+72 images to resolve -- 70 of them `https://` links back to the WordPress
+the site had been migrated from, 2 files actually in the tree. So import
+**while the old host still answers**, or pull the images down beside the
+posts first and point the markdown at them; once that host is gone, those
+images are gone with it. The run's summary is the only place that will say
+so, because an image that never arrived leaves no block behind: the post
+reads as though it never had one, and `./blog.sh check` afterwards finds
+nothing to report. Read that number before you rebuild.
 
 One thing a tree cannot tell you is its old URL shape: pass the
 pattern (`PERMALINK='/:year/:month/:day/:title/'`, the wizard asks) to
@@ -707,6 +720,19 @@ posts keep their original dates, so they land in the archive rather than on
 the homepage, and dates a reader sees render in `site.timezone` -- set it
 before importing if the machine's clock isn't in your zone (see
 [install.md](install.md#2-configure-the-site----configsiteyml)).
+
+Then run **`./blog.sh check`** ([operations.md → Checking the
+archive](operations.md#checking-the-archive)), because a body's own links
+came across exactly as they were written. Where they point at your old
+posts that is right: with `KEEP_PERMALINKS` the import wrote a redirect at
+each of those addresses, so they answer here too and `check` accepts them.
+Where they point at the old platform's own furniture it is not -- a
+WordPress archive still carries `/wp-admin/...`, `/wp-content/...`,
+`/category/...` and `/feed/` inside its post bodies, and after the move
+those paths address the new site, which has nothing there. `check` names
+every one with its post ("links to X, which nothing on this site answers
+at"); on a blog that linked to itself a lot there will be dozens, and each
+is a decision -- rewrite it, drop it, or point it at the Wayback capture.
 
 Announcements are **not** sent for imported posts -- the auto-toot has a
 24-hour recency window, and imported dates are far outside it. That's the

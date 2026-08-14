@@ -12,8 +12,12 @@
 #   LIMIT=20 ruby scripts/migrate_jekyll.rb <dir>            # trial run
 #   KEEP_PERMALINKS=1 PERMALINK=... ruby scripts/migrate_jekyll.rb <dir>
 #
-# Images come from the tree itself -- no network, works for a site that
-# died years ago. PERMALINK is the old site's pattern (:year :month :day
+# Relative and root-relative image paths come from the tree itself and
+# need no network, so that half works for a site that died years ago. An
+# absolute URL is downloaded -- and a tree exported from a hosted platform
+# is mostly those, so run this while the old host still answers and read
+# the summary's count before rebuilding.
+# PERMALINK is the old site's pattern (:year :month :day
 # :title), needed because a Jekyll tree does not carry its own URL shape;
 # a post's explicit front matter permalink always wins over it.
 

@@ -448,7 +448,7 @@ Available sources:
 | Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | LiveJournal | `LJ_PASSWORD` (challenge digest, never plaintext) | every entry via the API — LJ has no export file; friends-only and private arrive as drafts, comments stay behind |
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
-| Jekyll/Hugo | the site tree (or any markdown folder) | posts and drafts with front matter, YAML or TOML; images come from the tree itself, no network; Liquid highlight becomes a code block |
+| Jekyll/Hugo | the site tree (or any markdown folder) | posts and drafts with front matter, YAML or TOML; relative image paths come from the tree, absolute URLs download -- import while the old host still answers; Liquid highlight becomes a code block |
 | Medium | an unpacked export | posts and drafts; images download from Medium's CDN, likely responses to other articles become drafts for review, newer exports carry no tags |
 | Movable Type/TypePad | the MT export file (gzip ok) | posts and drafts; comments and trackbacks in the file are counted and left behind; the format has no ids or URLs, so identity is minted from date+basename and redirects take a URL pattern |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
