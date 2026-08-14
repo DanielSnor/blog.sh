@@ -838,6 +838,8 @@ check:
   link_dead_fix: "Meist ein Permalink aus einem Import oder ein Slug, der umbenannt wurde, bevor Umbenennungen eine Weiterleitung behielten. Korrigiere den Link oder gib dem Zielbeitrag einen redirect_from-Eintrag."
   media_orphan: "Zum Medienverzeichnis %{dir} gehört kein Beitrag."
   media_orphan_fix: "Rest eines gelöschten oder umbenannten Beitrags oder eines doppelt gelaufenen Imports. Nichts verweist darauf; lösche es selbst, nachdem du hineingesehen hast."
+  media_stray: "Beitrag %{slug} nennt die Datei %{file} in seinem Medienverzeichnis nicht mehr."
+  media_stray_fix: "Übrig von einem Bild, das die Quelle zwischen Importen entfernt oder umbenannt hat. Der Beitrag verweist nicht darauf; sieh nach und lösche sie selbst."
   redirect_collision: "Auf %{origin} erheben mehrere Beiträge Anspruch: %{slugs}."
   redirect_collision_fix: "Der zuletzt gerenderte gewinnt, die Leser der anderen landen bei ihm. Belasse den Eintrag bei nur einem Beitrag."
   and_more: "...und %{count} weitere derselben Art, nicht aufgeführt."

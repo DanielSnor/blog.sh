@@ -84,6 +84,7 @@ module Checker
     findings.concat(check_degenerate_images(posts))
     findings.concat(check_internal_links(posts, known))
     findings.concat(check_orphan_media(root, posts))
+    findings.concat(check_stray_media(root, posts))
     findings.concat(check_redirects(posts))
     findings.concat(check_series_names(posts))
     local_clean = findings.none? { |f| f.error? || f.warn? }
@@ -250,6 +251,30 @@ module Checker
 
     orphans.first(20).map { |rel| warn(t('media_orphan', dir: rel), t('media_orphan_fix')) } +
       more(orphans.size - 20)
+  end
+
+  # The same leftovers one level down: files inside a directory a post
+  # DOES own, that the post no longer references. A source that dropped a
+  # picture leaves its file behind -- an import only ever adds -- and
+  # until now nothing anywhere could see it: check_media asks whether
+  # referenced files exist, never whether existing files are referenced.
+  # After the renumbering fix these strays are the one shape of orphan
+  # left standing, and they were invisible from every side.
+  def check_stray_media(root, posts)
+    strays = posts.flat_map do |post|
+      dir = File.join(root, 'media.nosync', post['__year'], post['slug'].to_s)
+      next [] unless Dir.exist?(dir)
+
+      referenced = media_urls(post).to_set
+      Dir.children(dir).reject { |f| f.start_with?('.') }
+         .reject { |f| referenced.include?(f) }
+         .map { |f| [post['slug'], f] }
+    end
+    return [] if strays.empty?
+
+    strays.first(20).map do |slug, file|
+      warn(t('media_stray', slug: slug, file: file), t('media_stray_fix'))
+    end + more(strays.size - 20)
   end
 
   # Two posts claiming one old address. The build answers with whichever it
@@ -457,11 +482,18 @@ module Checker
     remaining.positive? ? [warn(t('and_more', count: remaining))] : []
   end
 
+  # Both places a block keeps a file: the media themselves and a video's
+  # poster. The poster was missing from this list for as long as the list
+  # existed, which cut both ways at once -- a poster file that vanished
+  # was never reported missing, and the stray check below would have
+  # reported every poster that exists as a leftover.
   def media_urls(post)
     (post['content'] || []).flat_map do |block|
       next [] unless block.is_a?(Hash)
 
-      Array(block['media']).filter_map { |m| m['url'].to_s if m.is_a?(Hash) }
+      %w[media poster].flat_map do |key|
+        Array(block[key]).filter_map { |m| m['url'].to_s if m.is_a?(Hash) }
+      end
     end
   end
 

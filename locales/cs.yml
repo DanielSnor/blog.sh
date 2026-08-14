@@ -826,6 +826,8 @@ check:
   link_dead_fix: "Obvykle permalink zbylý po importu, nebo slug přejmenovaný dřív, než si přejmenování začalo držet přesměrování. Oprav odkaz, nebo cílovému postu přidej redirect_from."
   media_orphan: "K adresáři médií %{dir} nepatří žádný post."
   media_orphan_fix: "Zbytek po smazaném nebo přejmenovaném postu, případně po importu, který běžel dvakrát. Nic na něj neodkazuje; smaž si ho sám, až se na něj podíváš."
+  media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
+  media_stray_fix: "Zbylo po obrázku, který zdroj mezi importy odebral nebo přejmenoval. Post na něj neodkazuje; až se podíváš, smaž ho sám."
   redirect_collision: "Na adresu %{origin} si dělá nárok víc postů: %{slugs}."
   redirect_collision_fix: "Vyhraje ten, který se vysází později, a čtenáři ostatních skončí u něj. Nech ten záznam jen u jednoho postu."
   and_more: "...a dalších %{count} téhož druhu, nevypsaných."

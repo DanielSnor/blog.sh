@@ -848,6 +848,8 @@ check:
   link_dead_fix: "Usually a permalink left over from an import, or a slug renamed before renames kept a redirect. Fix the link, or give the target post a redirect_from entry."
   media_orphan: "No post owns the media directory %{dir}."
   media_orphan_fix: "Left over from a deleted or renamed post, or an import that ran twice. Nothing links to it; delete it yourself once you have looked."
+  media_stray: "Post %{slug} no longer names the file %{file} in its media directory."
+  media_stray_fix: "Left behind by a picture the source dropped or renamed between imports. The post does not reference it; delete it yourself once you have looked."
   redirect_collision: "%{origin} is claimed by more than one post: %{slugs}."
   redirect_collision_fix: "Whichever renders last wins and the others' readers land on it. Leave the entry on one post only."
   and_more: "...and %{count} more of the same kind, not listed."
