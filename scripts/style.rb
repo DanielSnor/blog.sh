@@ -169,13 +169,15 @@ def section_palette
   %w[light dark].each do |mode|
     COLOR_KEYS.each { |key| site.set(['colors', mode, key], data[mode][key]) }
   end
-  puts Tui.paint(t('palette_set', name: palette_name(chosen, data)), :green)
+  # Into the frame (Wizard.say): the preview question follows immediately
+  # and repaints the screen, and what it asks about is exactly these rows.
+  Wizard.say(t('palette_set', name: palette_name(chosen, data)), :green)
   # Shown rather than described: the seven values are the whole palette,
   # and a reader who wants to tweak one now knows which line to open.
   %w[light dark].each do |mode|
-    puts Tui.paint("   #{mode}: #{COLOR_KEYS.map { |k| data[mode][k] }.join('  ')}", :dim)
+    Wizard.say("   #{mode}: #{COLOR_KEYS.map { |k| data[mode][k] }.join('  ')}", :dim)
   end
-  puts
+  Wizard.say('')
   offer_palette_preview(data, palette_name(chosen, data))
 end
 
@@ -185,8 +187,8 @@ end
 def section_colors_by_hand
   candidate = { 'light' => {}, 'dark' => {} }
   %w[light dark].each do |mode|
-    puts Tui.paint(t("colors_#{mode}"), :bold)
-    puts
+    Wizard.say(t("colors_#{mode}"), :bold)
+    Wizard.say('')
     COLOR_KEYS.each do |key|
       value = Wizard.ask_valid("colors.#{mode}.#{key}", current.dig('colors', mode, key),
                                hint: t("color_#{key}")) do |answer|
@@ -232,12 +234,15 @@ def offer_palette_preview(colors, name)
     show_preview_online(url, result[:local])
   else
     shown = relative(result[:local])
-    puts Tui.paint(t(open_in_browser(result[:local]) ? 'pv_opened' : 'pv_written', path: shown), :green)
+    # Wizard.say down to the end of this method and the next: the section
+    # returns to the section menu, whose repaint used to erase the one
+    # line saying where the preview went.
+    Wizard.say(t(open_in_browser(result[:local]) ? 'pv_opened' : 'pv_written', path: shown), :green)
   end
-  puts
+  Wizard.say('')
 rescue StandardError => e
-  puts Tui.paint("⚠️  #{t('pv_failed', message: e.message.to_s.lines.first.to_s.strip)}", :yellow)
-  puts
+  Wizard.say("⚠️  #{t('pv_failed', message: e.message.to_s.lines.first.to_s.strip)}", :yellow)
+  Wizard.say('')
 end
 
 # The address the uploaded preview will answer on -- only when there is
@@ -267,22 +272,22 @@ def show_preview_online(url, local_fallback)
     # Tuesday. Same distinction Publishing.finish_later makes for the
     # publishing path; this one shells out to the deploy on its own.
     if RunLock.busy_exit?($CHILD_STATUS)
-      puts Tui.paint("⏳  #{t('pv_upload_busy', path: relative(local_fallback))}", :cyan)
+      Wizard.say("⏳  #{t('pv_upload_busy', path: relative(local_fallback))}", :cyan)
     else
-      puts Tui.paint("⚠️  #{t('pv_upload_failed', path: relative(local_fallback))}", :yellow)
+      Wizard.say("⚠️  #{t('pv_upload_failed', path: relative(local_fallback))}", :yellow)
     end
     open_in_browser(local_fallback)
     return
   end
 
-  puts Tui.paint(t('pv_online', url: url), :cyan)
+  Wizard.say(t('pv_online', url: url), :cyan)
   # Said with the address rather than under the QR code: a piped run gets no
   # QR and still deserves to know. The page really is temporary -- the build
   # removes anything it did not produce itself (prune_public), and the deploy
   # then takes it off the site as an orphan. That is the build doing its job,
   # not a defect; what was missing was anybody saying so. Somebody
   # photographed the QR one evening and found it dead the next morning.
-  puts Tui.paint(t('pv_temporary'), :dim)
+  Wizard.say(t('pv_temporary'), :dim)
   if Tui.interactive? && (qr = QrCode.render(url))
     puts
     puts qr
@@ -468,9 +473,12 @@ end
 
 def measure_banner(src, source_file = nil)
   target = source_file || File.join(ROOT, src.sub(%r{\A/}, ''))
+  # Wizard.say throughout: two more questions follow in the banner
+  # section and each repaints the screen, so the measurement -- or the
+  # warning saying why there is none -- was erased before it was read.
   unless File.file?(target)
-    puts Tui.paint("⚠️  #{t('banner_missing', path: src)}", :yellow)
-    puts
+    Wizard.say("⚠️  #{t('banner_missing', path: src)}", :yellow)
+    Wizard.say('')
     return
   end
 
@@ -480,16 +488,16 @@ def measure_banner(src, source_file = nil)
     nil
   end
   unless dims
-    puts Tui.paint("⚠️  #{t('banner_unmeasurable')}", :yellow)
-    puts
+    Wizard.say("⚠️  #{t('banner_unmeasurable')}", :yellow)
+    Wizard.say('')
     return
   end
 
   site.set(%w[banner src], src)
   site.set(%w[banner width], dims[0])
   site.set(%w[banner height], dims[1])
-  puts Tui.paint(t('banner_measured', width: dims[0], height: dims[1]), :green)
-  puts
+  Wizard.say(t('banner_measured', width: dims[0], height: dims[1]), :green)
+  Wizard.say('')
 end
 
 # --- words -----------------------------------------------------------
@@ -525,18 +533,20 @@ def section_extra_css
   touched = false
 
   loop do
-    puts Tui.paint(t('css_current'), :bold)
+    # Into the menu as `note:` rows, the way section_nav carries its state:
+    # printed, the menu's own repaint erased the list at the moment of
+    # choosing what to do with it.
+    state = [Tui.paint(t('css_current'), :bold)]
     if entries.empty?
-      puts Tui.paint("   #{t('list_empty')}", :dim)
+      state << Tui.paint("   #{t('list_empty')}", :dim)
     else
-      entries.each_with_index { |e, i| puts "   #{i + 1}) #{e}#{css_exists?(e) ? '' : "  #{t('css_missing_mark')}"}" }
+      entries.each_with_index { |e, i| state << "   #{i + 1}) #{e}#{css_exists?(e) ? '' : "  #{t('css_missing_mark')}"}" }
     end
-    puts
 
     options = [['add', t('list_add')]]
     options << ['remove', t('list_remove')] unless entries.empty?
     options << ['keep', t('list_keep')]
-    case Wizard.choose(t('q_css_action'), options, current_index: options.size - 1)
+    case Wizard.choose(t('q_css_action'), options, current_index: options.size - 1, note: state)
     when 'add'
       entry = ask_css_entry
       next unless entry
@@ -575,8 +585,10 @@ def ask_css_entry
   return nil if answer.empty?
 
   if answer.include?('://')
-    puts Tui.paint("   #{t('css_remote')}", :yellow)
-    puts
+    # The list menu repaints right after this returns; the reason the
+    # entry was refused has to ride in with it.
+    Wizard.say("   #{t('css_remote')}", :yellow)
+    Wizard.say('')
     return nil
   end
 
@@ -594,7 +606,7 @@ def ask_css_entry
   end
 
   href = "/assets/css/#{File.basename(source)}"
-  puts Tui.paint("   #{t('file_will_go', path: href)}", :green)
+  Wizard.say("   #{t('file_will_go', path: href)}", :green)
   queue_file(source, href)
 end
 
@@ -632,18 +644,19 @@ def section_social
   entries = [] unless entries.is_a?(Array)
 
   loop do
-    puts Tui.paint(t('social_current'), :bold)
+    # `note:` for the reason section_nav's state rows ride there -- see
+    # section_extra_css.
+    state = [Tui.paint(t('social_current'), :bold)]
     if entries.empty?
-      puts Tui.paint("   #{t('list_empty')}", :dim)
+      state << Tui.paint("   #{t('list_empty')}", :dim)
     else
-      entries.each_with_index { |e, i| puts "   #{i + 1}) #{e['name']} (#{e['icon']}) #{e['url']}#{e['rel'] ? "  rel=#{e['rel']}" : ''}" }
+      entries.each_with_index { |e, i| state << "   #{i + 1}) #{e['name']} (#{e['icon']}) #{e['url']}#{e['rel'] ? "  rel=#{e['rel']}" : ''}" }
     end
-    puts
     action = Wizard.choose(t('q_social_action'), [
                              ['add', t('list_add')],
                              ['remove', t('list_remove')],
                              ['keep', t('list_keep')]
-                           ], current_index: 2)
+                           ], current_index: 2, note: state)
     case action
     when 'add' then entries << ask_social_entry
     when 'remove' then entries = remove_from(entries) { |e| "#{e['name']} #{e['url']}" }
@@ -701,7 +714,10 @@ def section_nav
     when 'add'
       # Said before the first item and not after it: adding one entry to a
       # derived menu does not add one entry, it replaces the whole menu.
-      puts Tui.paint(t('nav_replaces_derived'), :yellow) if derived && entries.empty?
+      # Through the frame context (Wizard.say), because the label question
+      # that follows repaints the screen -- printed, the one sentence
+      # explaining the destructive part of this choice was never readable.
+      Wizard.say(t('nav_replaces_derived'), :yellow) if derived && entries.empty?
       entry = ask_nav_entry
       next unless entry
 
@@ -716,8 +732,8 @@ def section_nav
       entries = []
       derived = false
       touched = true
-      puts Tui.paint(t('nav_off_note'), :green)
-      puts
+      Wizard.say(t('nav_off_note'), :green)
+      Wizard.say('')
     else
       break
     end
@@ -860,10 +876,9 @@ WIDGETS = {
 def section_widgets
   loop do
     active = (current['widgets'] || {}).keys
-    puts Tui.paint(t('widgets_current', list: active.empty? ? t('list_empty') : active.join(', ')), :dim)
-    puts
+    state = [Tui.paint(t('widgets_current', list: active.empty? ? t('list_empty') : active.join(', ')), :dim)]
     options = WIDGETS.keys.map { |name| [name, t("widget_#{name}")] } + [['keep', t('list_keep')]]
-    chosen = Wizard.choose(t('q_widget'), options, current_index: options.size - 1)
+    chosen = Wizard.choose(t('q_widget'), options, current_index: options.size - 1, note: state)
     break if chosen == 'keep'
 
     configure_widget(chosen)
@@ -892,8 +907,10 @@ def configure_widget(name)
 
     site.set(['widgets', name, key], key == 'limit' ? value.to_i : value)
   end
-  puts Tui.paint(t('widget_set', name: name), :green)
-  puts
+  # Into the frame: the widget menu repaints as soon as this returns, and
+  # the sentence names the cron job without which the widget stays empty.
+  Wizard.say(t('widget_set', name: name), :green)
+  Wizard.say('')
 end
 
 def default_for(key)
@@ -903,8 +920,8 @@ end
 # --- fonts and analytics ---------------------------------------------
 
 def section_fonts
-  puts Tui.paint(t('fonts_intro'), :dim)
-  puts
+  Wizard.say(t('fonts_intro'), :dim)
+  Wizard.say('')
   {
     'banner_title' => t('q_font_title'), 'banner_title_size' => t('q_font_title_size'),
     'banner_claim' => t('q_font_claim'), 'banner_claim_size' => t('q_font_claim_size')
@@ -927,21 +944,21 @@ def section_font_faces
   touched = false
 
   loop do
-    puts Tui.paint(t('faces_current'), :bold)
+    # `note:` -- see section_extra_css.
+    state = [Tui.paint(t('faces_current'), :bold)]
     if entries.empty?
-      puts Tui.paint("   #{t('list_empty')}", :dim)
+      state << Tui.paint("   #{t('list_empty')}", :dim)
     else
       entries.each_with_index do |e, i|
         mark = font_file_exists?(e['file']) ? '' : "  #{t('faces_missing_mark')}"
-        puts "   #{i + 1}) #{e['family']} -- #{e['file']}#{mark}"
+        state << "   #{i + 1}) #{e['family']} -- #{e['file']}#{mark}"
       end
     end
-    puts
 
     options = [['add', t('list_add')]]
     options << ['remove', t('list_remove')] unless entries.empty?
     options << ['keep', t('list_keep')]
-    case Wizard.choose(t('q_faces_action'), options, current_index: options.size - 1)
+    case Wizard.choose(t('q_faces_action'), options, current_index: options.size - 1, note: state)
     when 'add'
       entry = ask_font_face
       next unless entry
@@ -983,7 +1000,7 @@ def ask_font_face
     source = resolve_source(answer)
     if source && File.file?(source)
       href = "/assets/fonts/#{file}"
-      puts Tui.paint("   #{t('file_will_go', path: href)}", :green)
+      Wizard.say("   #{t('file_will_go', path: href)}", :green)
       queue_file(source, href)
     else
       return nil unless Wizard.confirm(t('q_faces_anyway'),
@@ -1002,8 +1019,8 @@ end
 def section_analytics
   src = Wizard.ask(t('q_analytics_src'), current.dig('analytics', 'src'), hint: t('h_analytics_src'))
   if src.to_s.empty?
-    puts Tui.paint(t('analytics_skipped'), :dim)
-    puts
+    Wizard.say(t('analytics_skipped'), :dim)
+    Wizard.say('')
     return
   end
 
@@ -1018,18 +1035,18 @@ end
 def edit_list(entries, fields)
   entries = [] unless entries.is_a?(Array)
   loop do
-    puts Tui.paint(t('list_current'), :bold)
+    # `note:` -- see section_extra_css.
+    state = [Tui.paint(t('list_current'), :bold)]
     if entries.empty?
-      puts Tui.paint("   #{t('list_empty')}", :dim)
+      state << Tui.paint("   #{t('list_empty')}", :dim)
     else
-      entries.each_with_index { |e, i| puts "   #{i + 1}) #{yield(e)}" }
+      entries.each_with_index { |e, i| state << "   #{i + 1}) #{yield(e)}" }
     end
-    puts
     action = Wizard.choose(t('q_list_action'), [
                              ['add', t('list_add')],
                              ['remove', t('list_remove')],
                              ['keep', t('list_keep')]
-                           ], current_index: 2)
+                           ], current_index: 2, note: state)
     case action
     when 'add'
       entry = {}
@@ -1073,10 +1090,13 @@ SECTIONS = [
 def run
   puts SiteHeader.render(tool: './style.sh')
   puts
-  puts t('intro')
-  puts
-  puts Tui.paint(t('intro_skip'), :dim)
-  puts
+  # Into the frame context: the section menu is the next thing on screen
+  # and repaints from the top, so a printed intro was gone before it had
+  # said what Enter and Esc mean here.
+  Wizard.say(t('intro'))
+  Wizard.say('')
+  Wizard.say(t('intro_skip'), :dim)
+  Wizard.say('')
 
   loop do
     options = SECTIONS.map { |(key, _)| [key, t("menu_#{key}")] }

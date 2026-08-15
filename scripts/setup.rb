@@ -88,6 +88,10 @@ def confirm(prompt)
   Wizard.confirm(prompt)
 end
 
+def say(text, *styles)
+  Wizard.say(text, *styles)
+end
+
 # --- detection -------------------------------------------------------
 
 # The machine's own zone, so the timezone question arrives already
@@ -175,11 +179,14 @@ def run
 
   puts SiteHeader.render(tool: './setup.sh')
   puts
-  puts t('intro')
-  puts
-  puts Tui.paint(t('intro_skip'), :dim)
-  puts Tui.paint(t('intro_expert'), :dim)
-  puts
+  # Into the frame context, not onto the screen: the language menu is the
+  # very next thing and repaints from the top, so a printed intro was
+  # erased before anyone could read what Enter means here.
+  say(t('intro'))
+  say('')
+  say(t('intro_skip'), :dim)
+  say(t('intro_expert'), :dim)
+  say('')
 
   site = ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
   env = ConfigWriter::EnvFile.new(ENV_SH, template: ENV_SH_EXAMPLE)
@@ -258,8 +265,8 @@ def ask_language(site, current)
 end
 
 def ask_identity(site, current)
-  puts Tui.paint(t('section_identity'), :bold)
-  puts
+  say(t('section_identity'), :bold)
+  say('')
 
   title = ask(t('q_title'), current.dig('site', 'title'), hint: t('h_title'),
               suggested: template?(current, 'site', 'title'))
@@ -327,19 +334,25 @@ end
 # install either -- it stays quiet while the queue is empty, so the first
 # hint would otherwise be a post that did not go out.
 def tell_about_scheduler
-  puts Tui.paint(t('section_scheduler'), :bold)
-  puts
-  puts t('section_scheduler_intro')
-  puts
-  puts Tui.paint("  */15 * * * * #{File.join(ROOT, 'scripts', 'publish-scheduled.sh')}", :green)
-  puts
-  puts Tui.paint(t('scheduler_note'), :dim)
-  puts
+  # Said into the frame context (Wizard.say), not printed: the comments
+  # menu paints right after this and repaints from the top of the window,
+  # so a printed cron line was erased in the same instant it appeared --
+  # and this line exists to be copied out, character by character. In the
+  # context it is on screen while the next question waits and stays in
+  # the section's record after it.
+  say(t('section_scheduler'), :bold)
+  say('')
+  say(t('section_scheduler_intro'))
+  say('')
+  say("  */15 * * * * #{File.join(ROOT, 'scripts', 'publish-scheduled.sh')}", :green)
+  say('')
+  say(t('scheduler_note'), :dim)
+  say('')
 end
 
 def ask_address(site, env, current)
-  puts Tui.paint(t('section_address'), :bold)
-  puts
+  say(t('section_address'), :bold)
+  say('')
 
   url = ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url'),
                   suggested: template?(current, 'site', 'base_url')) do |answer|
@@ -356,13 +369,14 @@ def ask_address(site, env, current)
 end
 
 def ask_network(site, env, current)
-  puts Tui.paint(t('section_network'), :bold)
-  puts
+  say(t('section_network'), :bold)
+  say('')
   # The one place the wizard explains a concept before asking: that the
   # comments ARE a social network's replies is the engine's central
-  # arrangement, and nothing on a fresh install has shown it yet.
-  puts t('section_network_intro')
-  puts
+  # arrangement, and nothing on a fresh install has shown it yet. Which is
+  # exactly why it goes into the frame -- printed, its own menu wiped it.
+  say(t('section_network_intro'))
+  say('')
 
   now = if current['mastodon'] then 'mastodon'
         elsif current['bluesky'] then 'bluesky'
@@ -418,7 +432,9 @@ def ask_mastodon(site, env, current)
     puts Tui.paint("⚠️  #{result[:error]}", :yellow)
     puts Tui.paint(result[:rejected] ? t('token_kept_rejected') : t('token_kept_anyway'), :dim)
   else
-    puts Tui.paint(t('token_ok', handle: "@#{result[:handle]}@#{instance}"), :green)
+    # Into the frame: the toots-widget question right under this repaints
+    # the screen, and the verdict on the token is its whole premise.
+    say(t('token_ok', handle: "@#{result[:handle]}@#{instance}"), :green)
     # The numeric account id is the toots widget's one required value and
     # the single most common thing people fill in wrong (the @handle goes
     # in, nothing comes out, nothing says why). We are holding it: offer
@@ -477,10 +493,10 @@ BACKENDS = [
 SECRET_VALUES = %w[SURFER_TOKEN].freeze
 
 def ask_deploy(env, _current)
-  puts Tui.paint(t('section_deploy'), :bold)
-  puts
-  puts t('section_deploy_intro')
-  puts
+  say(t('section_deploy'), :bold)
+  say('')
+  say(t('section_deploy_intro'))
+  say('')
 
   now = ENV['DEPLOY_BACKEND'].to_s
   now = 'surfer' unless now.empty? || BACKENDS.any? { |b| b.first == now }
@@ -496,8 +512,8 @@ def ask_deploy(env, _current)
     # URLs) stay, commented out by unset's convention, so choosing the
     # backend again later finds them.
     env.unset('DEPLOY_BACKEND')
-    puts t('backend_skipped')
-    puts
+    say(t('backend_skipped'))
+    say('')
     return
   end
 
@@ -527,12 +543,16 @@ def check_local_target(env)
   dir = env.value('DEPLOY_TARGET_DIR')
   return if dir.to_s.empty?
 
+  # The verdict rides in the frame context: the next thing on screen is
+  # the comments menu, whose repaint used to erase it -- and a warning
+  # about a typo'd deploy path that nobody can read is precisely the
+  # silent success it exists to prevent.
   if File.directory?(dir)
-    puts Tui.paint(t('target_ok', dir: dir), :green)
+    say(t('target_ok', dir: dir), :green)
   else
-    puts Tui.paint("⚠️  #{t('target_missing', dir: dir)}", :yellow)
+    say("⚠️  #{t('target_missing', dir: dir)}", :yellow)
   end
-  puts
+  say('')
 end
 
 # --- writing ---------------------------------------------------------

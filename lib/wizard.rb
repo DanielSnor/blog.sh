@@ -69,6 +69,40 @@ module Wizard
     remember(format('  %s %s', Tui.paint("#{label}:", :dim), Tui.truncate_to_width(shown, 60)))
   end
 
+  # A row said between questions, in the wizard's own voice: a verdict on
+  # a directory, a cron line to copy, a warning about what the next answer
+  # will do. Interactively it goes into the frame context rather than onto
+  # the screen -- every question repaints from the top of the viewport, so
+  # a plain `puts` here is erased at the exact moment the question it was
+  # informing arrives. Down a pipe there is no repaint and the plain line
+  # stays what it always was. Wrapped like a hint, because frames truncate
+  # every row they are given and prose is written to be read to the end.
+  def say(text, *styles)
+    unless Tui.interactive?
+      puts text
+      return
+    end
+
+    Tui.wrap_to_width(text.to_s, Tui.term_width).each do |line|
+      remember(styles.empty? ? line : Tui.paint(line, *styles))
+    end
+  end
+
+  # The record a menu keeps above itself, trimmed from the TOP exactly as
+  # question_frame trims and for the same reason: the rows worth keeping
+  # are the newest -- the verdict or the value a section said an instant
+  # before this menu would otherwise have painted over it. `taken` is what
+  # the menu already spends on its own rows, so the record never squeezes
+  # the options off the screen. Trailing blank rows go: the menu writes
+  # its own separator, and a section that closed on say('') would
+  # otherwise open the next frame on two.
+  def context_above(taken)
+    room = [Tui.term_height - taken - 6, 0].max
+    rows = context.size > room ? context.last(room) : context.dup
+    rows.pop while !rows.empty? && Tui.strip_ansi(rows.last.to_s).strip.empty?
+    rows.empty? ? [] : rows + ['']
+  end
+
   # The frame a question stands on, ending in a blank row for the prompt --
   # frame leaves the cursor at the end of its last line, so the prompt and
   # what gets typed after it land there.
@@ -250,7 +284,13 @@ module Wizard
 
     # The section's label belongs in the frame: the menu paints from the top
     # of the viewport, so a label printed before it would be painted over.
+    # The record goes in above it, for the same reason question_frame and
+    # confirm carry it: this repaint was the one that still ate everything
+    # a section said just before a menu -- the cron line ./setup.sh asks to
+    # be copied, the verdict on a deploy directory -- at the exact moment
+    # the person needed it in front of them.
     header = rows.empty? ? [] : rows + ['']
+    header = context_above(options.size + header.size) + header
     index = Tui.menu(options.map { |(_, desc)| desc },
                      header: header + [Tui.paint(label, :bold), ''],
                      hint: t('menu_hint', count: [options.size, 9].min),
@@ -287,7 +327,11 @@ module Wizard
       return options[index].first
     end
 
-    index = Tui.menu(rows, header: [Tui.paint(label, :bold), ''],
+    # The record here is the section just finished -- its answers and
+    # whatever it said on the way out. This menu is the frame that used to
+    # wipe them; carried in, they read as the receipt for the section while
+    # the next one is being chosen.
+    index = Tui.menu(rows, header: context_above(rows.size) + [Tui.paint(label, :bold), ''],
                            hint: t('menu_hint_exit', count: [rows.size, 9].min))
     if index.nil? || index >= options.size
       self.context = []
