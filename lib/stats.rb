@@ -104,8 +104,11 @@ module Stats
     total = counts.values.sum
     sorted = counts.values.sort
     longest = counts.max_by { |_, count| count }
+    # One decimal, like tags.per_post: integer division called a 2.7-word
+    # average "2", and the two averages on the same screen should not
+    # round by different rules.
     { 'total' => total,
-      'mean' => posts.empty? ? 0 : total / posts.size,
+      'mean' => posts.empty? ? 0.0 : (total.to_f / posts.size).round(1),
       'median' => median(sorted),
       'longest' => { 'slug' => longest[0]['slug'].to_s, 'words' => longest[1] },
       'reading_hours' => (total.to_f / READING_WORDS_PER_MINUTE / 60).round(1) }

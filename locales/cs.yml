@@ -1015,7 +1015,7 @@ style:
   menu_social: "Sociální sítě — řádek ikon v patičce a ověření na Mastodonu"
   menu_widgets: "Postranní panel — tooty, Pixelfed, commity, Bluesky, jakýkoli RSS feed"
   menu_fonts: "Písma — písmo a velikost názvu a popisu na hlavičce"
-  menu_layout: "Rozvrzeni - ktere casti stranky vubec jsou, a vlastni stylopis"
+  menu_layout: "Rozvržení — které části stránky vůbec jsou, a vlastní stylopis"
   menu_nav: "Menu — co stojí v pruhu pod bannerem"
   menu_analytics: "Měření návštěvnosti — skript, jestli nějaký máš"
 

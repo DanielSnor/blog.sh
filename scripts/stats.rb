@@ -81,6 +81,22 @@ def bar(count, max, width = 24)
   ('█' * [filled, 1].max).ljust(width)
 end
 
+# Whole percentages that really add up to 100. Rounded one by one they
+# drift: 87.5 and 12.5 both round up and the type column said 101 %.
+# Largest remainder instead -- floors first, then the missing points go
+# where truncation cut the most (ties to the earlier row, which the
+# caller has sorted by size).
+def percent_shares(counts)
+  total = counts.sum
+  return counts.map { 0 } if total.zero?
+
+  exact = counts.map { |count| count * 100.0 / total }
+  shares = exact.map(&:floor)
+  order = counts.each_index.sort_by { |i| [shares[i] - exact[i], i] }
+  (100 - shares.sum).clamp(0, counts.size).times { |n| shares[order[n]] += 1 }
+  shares
+end
+
 def heading(key)
   puts
   puts Tui.paint(I18n.t("stats.#{key}"), :bold)
@@ -107,10 +123,10 @@ max_year = data['years'].values.max
 data['years'].each { |year, count| puts "  #{year}  #{bar(count, max_year)} #{num(count)}" }
 
 heading('heading_types')
-total = posts['total']
 max_type = data['types'].values.max
-data['types'].each do |type, count|
-  share = (count * 100.0 / total).round
+shares = percent_shares(data['types'].values)
+data['types'].each_with_index do |(type, count), i|
+  share = shares[i]
   puts "  #{type.ljust(9)} #{bar(count, max_type, 18)} #{num(count)}#{share.positive? ? " (#{share} %)" : ''}"
 end
 

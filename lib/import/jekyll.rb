@@ -9,7 +9,11 @@ require 'yaml'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative '../markdown_parser'
+# Only the postscript needs these, and only to say where a page actually
+# landed -- the same pair (and the same reason) as feed.rb.
+require_relative '../post_writer'
 require_relative 'html_blocks'
+require_relative 'pages_note'
 require_relative 'permalinks'
 
 module Import
@@ -46,6 +50,10 @@ module Import
       # one), and a counter would say everything twice.
       @slugs = Hash.new { |h, k| h[k] = [] }
       @authored = []
+      # Published pages, keyed by path for the same two-pass reason as
+      # @slugs; the value is what the postscript needs to name the page's
+      # address after the run has written it.
+      @page_notes = {}
       # Per post, set by map before the blocks are built -- empty for any
       # tree this engine did not write.
       @own_media_src = {}
@@ -60,6 +68,8 @@ module Import
       collisions = @slugs.count { |_, paths| paths.length > 1 }
       notes << I18n.t('import.note.ssg_slug_collisions', count: collisions) if collisions.positive?
       notes << I18n.t('import.note.ssg_author_dropped', count: @authored.length) unless @authored.empty?
+      notes << Import.pages_note(page_paths)
+      notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
     end
 
@@ -177,10 +187,29 @@ module Import
         post['redirect_from'] = [origin] if origin
       end
       apply_own_keys(post, meta)
+      # After apply_own_keys on purpose: `type: page` in the front matter
+      # and a returning export's own `state` both land there, and either
+      # can change the answer. Only a published page goes on the list --
+      # a draft lives under /draft/<token>/, so its root address in `nav:`
+      # would be a menu item leading to 404 (the rule ghost.rb set).
+      @page_notes[path] = { source: post['source'], slug: post['slug'] } if post['page'] && post['state'] == 'published'
       post
     end
 
     private
+
+    # The addresses as WRITTEN, not as proposed: PostWriter suffixes a
+    # slug that is already taken, and this sentence is what somebody
+    # copies into `nav:` -- a predicted address that was never written
+    # points the menu at a 404. Nothing is written on a dry run, and then
+    # the proposed slug is the honest prediction; feed.rb reads its pages
+    # back the same way and for the same reason.
+    def page_paths
+      @page_notes.values.map do |entry|
+        written = PostWriter.find_by_source(entry[:source])
+        "/#{written ? File.basename(written, '.json') : entry[:slug]}/"
+      end
+    end
 
     # Front matter this engine wrote itself. `./blog.sh export` writes
     # everything markdown has no word for under a single `blogsh:` key,
