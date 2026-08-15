@@ -306,7 +306,7 @@ module Checker
       names = [a, b].map { |slug| groups[slug].map { |p| p['series'].to_s.strip }.uniq.first }
       findings << warn(t('series_similar', a: names[0], count_a: groups[a].size,
                                            b: names[1], count_b: groups[b].size),
-                       fix: t('series_similar_fix'))
+                       t('series_similar_fix'))
     end
     findings
   end

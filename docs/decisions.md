@@ -143,8 +143,10 @@ approved answer to a rejected comment answers nothing).
   interface that can edit it -- a cache, not a database. But the claim
   above, that there is nothing to moderate or migrate, holds only while
   this is off, and a deletion at the source follows at the refresh
-  cron's cadence rather than immediately -- how long that can be, and
-  how to settle it on the spot, is in
+  cron's cadence rather than immediately -- under an old post, somebody's
+  deleted reply can outlive its deletion here by up to a week. That lag
+  is part of this decision's price, not a tunable; the cadences behind
+  it, and how to settle a deletion on the spot, are in
   [operations.md](operations.md#cron-sidebar-widgets-and-post-stats).
 - **Turning it on hides every existing comment** until the author goes
   and stars the ones worth keeping. Which is why the default is off and
