@@ -336,12 +336,14 @@ it.
 Two rules shape the output. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value
 of the tool is that its output can be trusted, and a checker that also
-acts has to be trusted twice. And each kind is **capped at twenty**
-findings with the remainder counted (`more`), since a thousand identical
-lines is not more information than twenty and buries every other kind. The
-exit code is non-zero on errors only: an orphan directory costs disk
-rather than correctness, so a cron job hanging off this would be crying
-wolf if warnings failed it. Like `export` and `stats` it has its own entry
+acts has to be trusted twice. And each kind of finding is **capped**, the
+remainder counted (`more`), since a thousand identical lines is not more
+information than a screenful and buries every other kind -- the cap, with
+the rest of the command's day-to-day surface, is in
+[operations.md](operations.md#checking-the-archive). The exit code is
+non-zero on errors only: an orphan directory costs disk rather than
+correctness, so a cron job hanging off this would be crying wolf if
+warnings failed it. Like `export` and `stats` it has its own entry
 point (`scripts/check.rb`) rather than going through `manage_post.rb`,
 which applies the site timezone as it loads and aborts on a config it
 cannot read -- a run that exits explaining the config has checked nothing.
@@ -364,18 +366,20 @@ Three details make it usable on a real archive rather than only correct:
   says a page is gone. Some servers answer it with 405 or 501 while
   serving GET perfectly; worse, some answer 404 to HEAD and 200 to GET for
   the very same address (bsky.app does this on profile pages, and the
-  first run over a real archive reported thirty-four live links as dead
+  first run over a real archive reported dozens of live links as dead
   because of it). So `RETRY_WITH_GET` re-asks with a GET, one extra
   request per apparently-dead link.
 - **Politeness rather than throughput.** One request at a time, and a
   one-second pause between two requests to the same host: an archive with
   two hundred links to one site should not read as an attack on it.
-- **A fortnight of memory.** `Checker::Cache` keeps every verdict in
-  `tmp/link-check.json` for 14 days, so a second run only asks about the
-  links it has not seen lately -- without it nobody runs this twice, since
-  a few thousand requests is minutes and most of the answers were the same
-  yesterday. A cache it cannot read or write is not an error: the check
-  simply asks the network, which is what it was going to do anyway.
+- **Memory between runs.** `Checker::Cache` keeps every verdict in
+  `tmp/link-check.json` for a while (how long, see
+  [operations.md](operations.md#checking-the-archive)), so a second run
+  only asks about the links it has not seen lately -- without it nobody
+  runs this twice, since a few thousand requests is minutes and most of
+  the answers were the same yesterday. A cache it cannot read or write
+  is not an error: the check simply asks the network, which is what it
+  was going to do anyway.
 
 ## Counting (`lib/stats.rb`)
 
@@ -547,18 +551,11 @@ The deploy script owns the *what*; backends own the *how*:
   the build -- which is why it carries no per-backend suffix.
 - **Safeguards** run before any backend, and measure the build against
   that baseline rather than against the manifest: an upload failure must
-  not be able to move the yardstick. Four of them -- file count and total
-  bytes, each in both directions -- with percentages plus absolute floors,
-  since 20% of a small build is a couple of files. A drop stops the
-  deploy, as does a jump in file count; a jump in bytes only prints a
-  notice, because attaching media is authoring. A drop may also measure
-  against the manifest when that is larger (every entry in it is a file
-  that really uploaded, so it can only understate the site); growth never
-  does, because the manifest legitimately lags the build. Alongside them a
-  **per-file limit** (`lib/file_size.rb`) refuses a single file over
-  100 MB, both when a post is saved and before a deploy sends it.
-  `--prune` is the only deleting flag, `--force` the only override -- and
-  it does not override the per-file limit, which no target would accept.
+  not be able to move the yardstick. Which checks run, at which
+  thresholds, and what `--prune` and `--force` do and do not override is
+  in [operations.md](operations.md#deploying) -- so is the single
+  per-file size limit alongside them, enforced by `lib/file_size.rb`
+  when a post is saved as well as here.
 - **Backends** implement one of two shapes: per-file
   `session`/`upload`/`delete` (Surfer's HTTP API, local copies) or a
   single batch `sync` (rsync, rclone and git diff against the target
@@ -584,8 +581,8 @@ wrote. Then, in load order:
   ones.
 - **The menu on a phone** (`nav-toggle.js`): opens and closes the bar, and
   closes it on Escape or a tap on the page as well as on the button. The
-  open menu is 700 of a phone's 812 pixels, and a reader who has decided
-  against it reaches for one of those two before hunting for the 40px
+  open menu covers most of a phone's screen, and a reader who has decided
+  against it reaches for one of those two before hunting for the small
   button again; Escape hands focus back to the button, which is where they
   were before they opened it.
 - **Back to top** (`scroll-top.js`): the button appears past 300 px of

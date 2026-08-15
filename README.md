@@ -92,17 +92,12 @@ deploy step around exactly that. A few of the choices that came out of it:
   to a third party on every page load, and no widget can slow down or
   break the page for a visitor.
 
-Concretely, against the tools this would otherwise be: **Hugo and
-Jekyll** are build steps -- they turn a folder of Markdown into HTML and
-stop there, leaving writing, publishing, announcing and deploying to be
-assembled from an editor, git and whatever CI you wire up. **Ghost** does
-cover all of that, but wants a Node server, a database and an admin
-interface to do it, and its comments and newsletter are its own.
-`blog.sh` is the third shape: a build *and* the authoring tool *and* the
-deploy step, with the database replaced by a directory of JSON files and
-the comment system replaced by a social network you already post to.
-What you give up is what those two are good at -- a theme ecosystem,
-plugins, and more than one author.
+Concretely: **Hugo and Jekyll** are build steps, **Ghost** is a server
+with a database and an admin interface. `blog.sh` is the third shape --
+the build *and* the authoring tool *and* the deploy step in one, with
+the database replaced by a directory of JSON files and the comment
+system by a social network you already post to. What you give up is a
+theme ecosystem, plugins, and more than one author.
 
 ## What it does
 
@@ -196,9 +191,9 @@ The menu bar follows the reader down the page, so the way out of an
 article is wherever they finished it rather than back at the top, and it
 carries the search field on a phone as well as on a desktop.
 The whole palette is seven config keys per mode, compiled into a
-stylesheet at build time -- seven ready-made palettes ship with the
-engine, and the header's typeface and size are configuration too, not a
-file to edit. The site's own words -- the bio in the sidebar, the note and
+stylesheet at build time -- ready-made palettes ship with the engine,
+and the header's typeface and size are configuration too, not a file to
+edit. The site's own words -- the bio in the sidebar, the note and
 the copyright line in the footer, the claim over the banner -- are written
 in the same Markdown a post is, and raw HTML still works in them, which is
 how a photo gets into a bio. No framework anywhere; the JavaScript is
@@ -481,6 +476,10 @@ ruby scripts/migrate_wix.rb <posts.csv>
 ruby scripts/migrate_feed.rb <export.xml | feed-url>
 ```
 
+There is no `migrate_wordpress.rb`: a WordPress WXR export is RSS
+underneath, so `migrate_feed.rb` reads both
+(→ [importing.md → WordPress](docs/importing.md#wordpress-or-any-rssatom-feed)).
+
 All of them take `LIMIT=n` to import only the first *n* posts, which is the
 way to sample a large archive before committing hours to it -- a later full
 run overwrites those posts in place rather than duplicating them. The ones
@@ -495,10 +494,6 @@ the archive is never replaced, only added to; `REFETCH_MEDIA=1` asks the
 source for every address again but still writes only what is missing. The full
 per-source guide, including undo and troubleshooting, is
 [docs/importing.md](docs/importing.md).
-They report progress as they go: the size of what they're about to read,
-how many items were found and filtered, then a `12/847` counter per post,
-because downloading every image of an archive runs for hours and a silent
-terminal is indistinguishable from a stuck one.
 
 Two limits worth knowing before you start: only a Bluesky self-thread's
 opening post is imported (the continuations are replies), and Bluesky
@@ -511,44 +506,17 @@ imported as its poster frame with the original linked from `source`.
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
 ```
 
-The other direction, and the point of the twenty-two importers: an
-archive you cannot take with you is not yours. This writes the whole
-thing out as a tree of markdown files with YAML front matter, in
-Jekyll's layout because that is the one the most other engines read --
-`_posts/2026-05-01-slug.md`, `_drafts/slug.md`, pages at the root, media
-copied under `assets/<year>/<slug>/`. Without a directory it writes to
-`tmp/export`. `--dry-run` counts everything and writes nothing. Nothing
-is ever deleted, and a target with something already in it is refused
-until the command is repeated with `--force`.
-
-The front matter comes in three layers: what every engine understands
-(`title`, `date`, `tags`, `published`), what some do (`permalink`, plus
-`redirect_from` in exactly the shape the `jekyll-redirect-from` plugin
-reads -- so every address a post has ever had, on the old platform and
-on this site, goes on answering), and under a single `blogsh:` key what
-only this engine has a word for: `source`, `former_slugs`, the
-announcement URLs, a draft's token. A destination engine ignores that
-last layer. `./import.sh` reads it back, which is what makes export plus
-re-import a way to *move* an installation rather than only a way to
-leave one.
-
-What markdown cannot write down is written as HTML instead: video,
-audio and the link card. Video and audio go that way even though the
-authoring markdown has a form for them -- `!![caption](url)` is this
-engine's own syntax, and to CommonMark it reads as an exclamation mark
-followed by an image, so a YouTube clip exported as markdown would land
-on the destination site as a broken image. As HTML they arrive as the
-player the build renders.
-
-None of that is lost on the way home: above each one the export writes
-the block's own definition in an HTML comment, which every other engine
-drops on the floor and `./import.sh` reads back -- so a video returns as
-a video, with its file, its dimensions and its caption, not as a
-paragraph of markup. They are still counted in the summary, because the
-destination gets HTML where the rest of the post is markdown, and that
-is worth knowing. Inline `small`, `mention` and `color` spans keep their
-text and lose their styling; those have no comment and do not come
-back.
+The other direction, and the point of the importers: an archive you
+cannot take with you is not yours. The whole thing comes out as a tree
+of markdown files with YAML front matter in Jekyll's layout, because
+that is the one the most other engines read -- and `./import.sh` reads
+the tree back, posts keeping their identity, series, redirects and
+media, which makes export plus re-import the supported way to *move* an
+installation rather than only a way to leave one. Usage, flags and what
+to expect:
+→ [operations.md → Taking your content elsewhere](docs/operations.md#taking-your-content-elsewhere);
+how the round trip works inside:
+→ [architecture.md → Exporting](docs/architecture.md#exporting-libexporterrb).
 
 ## Deploy
 

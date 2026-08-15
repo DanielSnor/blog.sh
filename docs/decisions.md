@@ -26,7 +26,7 @@ caption-deep.** The `/type/` listings need every post filed exactly
 once, and asking the author to pick a type on every post would be one
 more prompt that's usually inferable -- so the type is derived, with an
 explicit `type:` in the frontmatter as the override for the post that
-disagrees. The rules, measured against a 3281-post archive before
+disagrees. The rules, measured against a real archive before
 choosing: media (video > audio > image) win only while the post's text
 stays under 500 characters -- past that it's an article and the media
 are illustrations; a quote post is one that *opens* with a quote, so a
@@ -47,14 +47,13 @@ seven items was the budget.
 **The bar sizes itself instead of being sized for a label set.** That
 "budget" was a count, and a count is the wrong unit: the `document` type
 made it nine items, and a site that uses all of them ran its longest
-label under the search field -- measured at 906px (en), 927 (cs) and 899
-(de) against the 908 available, so one locale overflowed and the other
-two had single-digit slack. Anywhere between the mobile breakpoint and
-the full width, every locale did. Three rules replace the budget: the
-menu may wrap to a second row, the search box never shrinks or is
-overlapped, and the gap between items is 1.25rem rather than 1.875rem
-(eight gaps at nine items -- 80px, more than the whole overflow, without
-shortening a single label). A tenth type, a longer translation or a
+label under the search field -- measured, one locale overflowed at the
+full width and the other two had almost no slack, and anywhere between
+the mobile breakpoint and the full width every locale did. Three rules
+replace the budget: the menu may wrap to a second row, the search box
+never shrinks or is overlapped, and the gap between items is tighter --
+across eight gaps that recovers more than the whole overflow without
+shortening a single label. A tenth type, a longer translation or a
 different font now costs a taller bar rather than a hidden item.
 *Cost:* a denser menu, and a two-row bar in the narrow band where the
 longest locale still doesn't fit on one.
@@ -90,25 +89,14 @@ this engine was born from are full of dead CDN links). *Cost:* disk
 space, and migrations must download everything up front.
 
 **Every card in a listing says how long its post takes to read, including
-the ones that take under a minute.** The threshold that decides the words
-is unchanged -- "1 min read" over twelve words would be noise, so a short
-post says "under a minute" instead -- but it no longer decides whether the
-row exists at all.
-
-The reason is the shape of a real archive rather than the information.
-Stars, boosts and comments come from an announcement, and on sean.cz
-eleven published posts out of 4,394 have one: the meta row existed on a
-handful of cards at the top of the front page and on nothing else, so from
-the second page down no card had one, and the few that did read as a break
-in the listing rather than as a card with more to say. A reading time is
-the one thing every post can report, so it is what makes the row constant.
-
-*Cost:* on an archive of short posts most cards carry the same three
-words, which is close to no information at all. That is the trade, and it
-was made deliberately: a listing is read as a column of cards before it is
-read as text, and a column that keeps its shape is worth more here than a
-field that earns its place on every row. The post's own page says the same
-thing for the same reason, so the two do not disagree.
+the ones that take under a minute.** Stars, boosts and comments come from
+an announcement, which on a real archive almost no post has -- so a meta
+row fed by those appeared on a handful of cards and read as a break in the
+listing, while a reading time is the one thing every post can report,
+which is what keeps the row (and the column of cards) constant. *Cost:* on
+an archive of short posts most cards carry the same three words -- a
+column that keeps its shape was judged worth more than a field that earns
+its place on every row.
 
 ## Publishing and comments
 
@@ -143,30 +131,21 @@ approved answer to a rejected comment answers nothing).
   over the years is retroactively an approval. A private signal
   (Mastodon bookmarks, Bluesky's saved posts) would not carry that, and
   is the obvious second mode if this one chafes.
-- **Comments stop being live.** Which is the whole reason the engine
-  ever let the visitor's browser talk to a third party: "the actual live
-  discussion" was the justification for the one exception to
-  *no third-party requests* below. Under moderation that justification
-  is gone -- the page shows a curated subset either way -- so the
-  exception goes with it. Cron writes `comments.json` and the page reads
-  it from its own origin. The visitor's browser makes no third-party
-  *data* request at all then, and the CSP loses the `connect-src` grant
-  to the network. Avatars are still `<img>` to whatever host serves
-  them; mirroring those is a separate job with its own disk and pruning
-  questions, and until it is done "no third-party requests" is true of
-  data and not of images.
+- **Comments stop being live.** The live thread was the justification
+  for the one client-side exception to *no third-party requests from
+  the visitor's browser* (below), and a moderated thread is no longer
+  live -- the page shows a curated subset either way -- so the exception
+  lapses with it: cron writes `comments.json` and the page reads it
+  from its own origin. What that changes, and what avatars still do, is
+  said once, there.
 - **The engine now stores other people's words.** Modestly: only what
   was approved, rewritten from the source on every cron run, with no
   interface that can edit it -- a cache, not a database. But the claim
   above, that there is nothing to moderate or migrate, holds only while
-  this is off, and a deletion at the source does not follow immediately.
-  Under a recent post it follows within a cron interval. Under one older
-  than ~90 days it waits for the weekly full pass, because the ordinary
-  tick does not read that far back -- so a reply somebody deleted on
-  Mastodon can stand on the blog for up to a week. `./scripts/refresh-sidebar.sh
-  --full` settles it on the spot, and this is the paragraph to know that
-  in: the two places that describe *approving* say the same thing, but
-  this is the one about holding words that are not yours.
+  this is off, and a deletion at the source follows at the refresh
+  cron's cadence rather than immediately -- how long that can be, and
+  how to settle it on the spot, is in
+  [operations.md](operations.md#cron-sidebar-widgets-and-post-stats).
 - **Turning it on hides every existing comment** until the author goes
   and stars the ones worth keeping. Which is why the default is off and
   why it stays a per-site decision.
@@ -182,16 +161,14 @@ draft text physically exists on the host; the token (and staying out of
 every listing and index) is the fence.
 
 **A published post can be unlisted, and unlisted is as far as it goes.**
-`unlisted: true` keeps a post's ordinary address and date but takes it
-out of the listings, the archives, the feeds, the sitemap and the search
-index, and marks the page `noindex` -- the draft's hidden-address idea
-generalised to a post that is finished. What it deliberately is *not* is
-a password: a static host serves whatever it is asked for, so the only
-honest way to gate a page would be encrypting it in the browser, and
-that is a promise this engine will not make (the key would sit in the
-same page). *Cost:* anyone holding the link can read it and pass it on,
-which is exactly what "unlisted" says on every other platform that
-offers it. The truth test is the loose one, unlike `pinned`'s strict
+`unlisted: true` is the draft's hidden-address idea generalised to a
+post that is finished -- what it reaches is in
+[operations.md](operations.md#properties-and-actions). It stops short of
+being a password deliberately: a static host serves whatever it is asked
+for, so the only honest way to gate a page would be encrypting it in the
+browser, and that is a promise this engine will not make (the key would
+sit in the same page). *Cost:* anyone holding the link can read it and
+pass it on. The truth test is the loose one, unlike `pinned`'s strict
 one, because the two typos are not worth the same: a mistyped pin costs
 a post its place at the top, a mistyped `unlisted` would put something
 into every listing its author meant to keep out of them.
@@ -223,8 +200,8 @@ published near midnight on December 31 into another year, changing a live
 URL. Feeds and the sitemap stay on it for the same reason in reverse --
 they carry absolute instants for machines, where the offset is noise.
 *Cost:* stored dates aren't rewritten, so a site adopting this re-renders
-only the posts whose local day actually differs (73 of sean.cz's 3281,
-none of them changing year).
+only the posts whose local day actually differs -- a handful on a real
+archive, none of them changing year.
 
 **Importing gets its own wizard, and always previews before it writes.**
 `./import.sh` is separate from `./blog.sh` because the two have opposite
@@ -302,7 +279,9 @@ backs up and restores with the post and can never orphan.
 bytes aborts (a broken build must never be mirrored), deletion is opt-in
 (`--prune`), manifests are per-backend so switching targets can't inherit
 foreign state, and every manifest is disposable -- deleting one costs one
-full re-upload, never correctness.
+full re-upload, never correctness. The guards themselves -- what trips
+them and how to prove them by hand -- are in
+[operations.md](operations.md#deploying).
 
 **The guards measure the build against the build.** They used to compare
 it against the manifest, which is the state of the *target* -- so any
@@ -320,15 +299,17 @@ transferred bytes that the next `--prune` reclaims, a missed drop deletes
 live pages.
 
 **One file-size limit for every backend, and no key to loosen it.** The
-hosts differ wildly -- GitHub Pages refuses a single file over 100 MiB, a
+hosts differ wildly -- a git pages host refuses large files outright, a
 plain rsync target refuses nothing -- but a per-backend limit would mean a
 post that saves today becomes undeployable the day the site moves. The
-strictest supported target therefore sets the rule for all of them, and
-the number is decimal (100 MB, which sits under GitHub's binary
-100 MiB) so the engine refuses before the host does. Refusal happens at save time, where the
-author can still act, as well as at deploy time; a config key would only
-restate the question every installation would then answer differently,
-the same reasoning as the fixed JPEG quality in the HEIC converter.
+strictest supported target therefore sets the rule for all of them, with
+the engine's line drawn just under that host's so it refuses before the
+host does (the limit itself is in
+[operations.md](operations.md#deploying)). Refusal happens at save time,
+where the author can still act, as well as at deploy time; a config key
+would only restate the question every installation would then answer
+differently, the same reasoning as the fixed JPEG quality in the HEIC
+converter.
 
 **Six deploy backends behind one small contract.** The manifest logic
 is target-independent; backends only move bytes. Self-diffing targets
@@ -422,8 +403,8 @@ for a measurable reason.** A HEIC photo displays in Safari and nowhere
 else; HEVC video plays in the large majority of browsers, so refusing it
 would take away a video most readers could watch. The genuinely
 undeployable files are already stopped by the per-file size limit, and on
-real footage the two almost coincide: of twelve clips straight off a
-phone, exactly one was HEVC -- and it was also the only one over 100 MB.
+real footage the two almost coincide -- the clip that is HEVC tends to be
+the one over the limit anyway.
 What was missing was a sentence at the moment the author can still act,
 so `lib/video_probe.rb` reads the video track's codec out of the file's
 own boxes (no ffprobe, the same box walk `MediaDimensions` already does)
@@ -490,7 +471,7 @@ what this needs. *Cost:* no complex layouts -- deliberately not the goal.
 **A screen that repaints, but not the alternate screen.** Every keypress
 in a dialog used to leave another full copy of it behind: walking three
 rows down the queue, opening the actions and moving a post three slots
-scrolled the view by 37 lines and buried the terminal in identical
+scrolled the view by dozens of lines and buried the terminal in identical
 screens. Frames are painted from the top of the viewport instead, so the
 same sequence scrolls it by none. The alternate screen (`\e[?1049h`) would
 have been the obvious way and is deliberately not used: it discards its
@@ -498,8 +479,8 @@ plane on exit, and this CLI prints things worth keeping -- a draft's
 address, what a deploy uploaded, what refused. Painting in place keeps
 both properties, the screen holding still *and* the scrollback intact.
 *Cost:* a full frame per keypress is about a third more bytes over the
-wire than the old partial repaint (9129 vs 6942 for that sequence);
-repainting only changed rows is the obvious answer if that ever matters.
+wire than the old partial repaint; repainting only changed rows is the
+obvious answer if that ever matters.
 
 **Action rows fold; navigation keys are trimmed.** The keys under a post
 run to 137 characters in German, so on 80 columns -- or a phone over SSH
@@ -621,9 +602,7 @@ a directory of its own. It would answer every wish at once, which is
 exactly why it is the wrong shape here -- it is not "a setting", it is a
 fork with better manners, and a forked template is frozen in time. The
 site quietly stops receiving whatever the engine adds to that template
-later, and nothing says so. If it is ever built, `doctor` has to
-remember which version each override was written against and say when
-the original has moved on.
+later, and nothing says so.
 
 **Editing a post is undoable, and not because a setting says so.**
 Deleting a post has always gone to `trash/`; editing one was final, and
@@ -646,14 +625,14 @@ of it. Ordering is by date with `series_part:` as the override, the same
 shape `type:` uses -- publishing out of order is rare enough that the
 date is the right default and common enough that there has to be a way to
 say otherwise. Previous and next are offered only *within* a series and
-never across the archive: on a site assembled from twenty-two sources the
-chronological neighbour of an essay is a tweet from fifteen years
-earlier, and calling that "next" is noise wearing the clothes of
-navigation. *Cost:* one more field, and a series of one is silently not a
-series (it is a post).
+never across the archive: on a site assembled from many imported
+platforms the chronological neighbour of an essay is a tweet from
+fifteen years earlier, and calling that "next" is noise wearing the
+clothes of navigation. *Cost:* one more field, and a series of one is
+silently not a series (it is a post).
 
 **A feed per tag, only for the tags the menu names.** Generating one for
-every tag means 1761 files on a real archive, rebuilt and re-diffed on
+every tag means thousands of files on a real archive, rebuilt and re-diffed on
 every build, that nobody will ever fetch -- the exact inverse of "nothing
 renders that wasn't asked for". A tag in `nav:` is the site saying this
 is a subject it publishes on, which is the same statement as "somebody
@@ -764,28 +743,15 @@ run, and a reader tabbing in the first few hundred milliseconds walks past
 images that are about to become buttons.
 
 **Once the top bar became sticky, the menu repeated under the content
-stopped making sense, so it went.** That is the order the decision came
-in, and it is the whole argument: the bar now answers the question the
-second menu was invented for -- how does a reader who has just finished
-an article get anywhere -- and answers it for the whole page rather than
-only at the end of it, with the search field along for the ride, which
-the bottom menu never carried. Nothing was subtracted; one thing took
-over from another and does more.
-Keeping both put two identical menus on one phone screen, one of them
-glued to the top. It was offered as a setting for about an hour, and the
-setting was the wrong answer: a repeat of a bar that is on screen the
-whole time is not a preference somebody might hold, it is two of the same
-thing, and a key nobody would ever have a reason to set is a key that
-rots. It had never shipped -- it was invented in this cycle and removed in
-it -- so nothing had to be deprecated. What did depend on the bar is the
-line between the content and the footer: that was its own frame, and
-without it the article ran into the colophon with the same background and
-no seam, so the stylesheet draws that line now, the same 5px the bar
-carried. *Cost:* the one thing in this release that changes a site's
-appearance without being asked, and this time with no way back -- a site
-that genuinely wanted a second menu under its posts has to put it in a
-template of its own, which is exactly the thing the rest of this release
-is trying to make unnecessary.
+went.** The bar answers the question the bottom menu existed for -- how a
+reader who has just finished an article gets anywhere -- for the whole
+page, search field included, and keeping both put two identical menus on
+one phone screen. There is no key to bring it back: a repeat of a bar
+that is always on screen is not a preference somebody might hold, and a
+key nobody would ever set is a key that rots. The line the bottom menu
+drew between content and footer is drawn by the stylesheet now. *Cost:*
+an appearance change that arrives unasked and has no way back short of a
+site carrying its own template.
 
 **The sticky rule is scoped to the page's own bar, not to `nav`.** A post
 carries a second `<nav>` inside `<main>` for its pagination, and there is
@@ -794,14 +760,12 @@ menu bar. *Cost:* a structural selector rather than a class -- move the
 bar out of `.wrap` and the stickiness follows the markup instead of the
 intent.
 
-**Search ranks with four numbers, and draws fifty.** Chronological
-results were defended for a while on the grounds that an archive is a
-diary and a diary is read by date -- but that only holds when the answers
-are equally good, and they are not: a post whose title is the query is a
-better answer than one that mentioned the word once, whatever their
-dates. So the hits are scored (title above text, whole word above part of
-a word) and date decides the ties, which is the part of the old argument
-that was right. The scale is four constants rather than a term-frequency
+**Search ranks with four numbers, and draws fifty.** A post whose title
+is the query is a better answer than one that mentioned the word once,
+whatever their dates -- so the hits are scored (title above text, whole
+word above part of a word) and date decides only the ties, which is
+where the archive-is-a-diary argument for chronological results was
+right. The scale is four constants rather than a term-frequency
 model, because the whole of it has to be explainable in one sentence to
 be maintainable in a 150-line script. *Cost:* no BM25, no term
 frequency -- forty mentions do not beat one, and the index's single
@@ -822,9 +786,10 @@ somebody and come back to, and it is not worth having at the price of the
 back button.
 
 **A result list has a ceiling, and the count above it does not.** Fifty
-cards, with "4371 results" still printed above them. Showing everything
-was 619ms and 21 855 elements on a real archive; showing fifty and lying
-about the total would be worse than either. There is no "show more" and
+cards, with the true total still printed above them. Showing everything
+cost a real archive visible time and tens of thousands of page elements;
+showing fifty and lying about the total would be worse than either.
+There is no "show more" and
 no pagination: a reader who has not found it in fifty ranked answers is
 better served by narrowing the query, and every extra control here is one
 more thing to translate and maintain. *Cost:* the 51st answer is
