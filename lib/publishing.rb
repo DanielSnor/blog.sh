@@ -9,6 +9,7 @@ require 'English'
 require_relative 'site_config'
 require_relative 'atomic_write'
 require_relative 'post_writer'
+require_relative 'post_versions'
 require_relative 'mastodon_poster'
 require_relative 'bluesky_poster'
 require_relative 'i18n'
@@ -57,6 +58,14 @@ module Publishing
 
     PostWriter.move_media_dir(File.join(MEDIA_DIR, from_year, slug),
                               File.join(MEDIA_DIR, to_year, slug))
+    # The edit history is keyed by year/slug exactly like the media, so it
+    # crosses the year boundary with the post too. Left behind, the [v]
+    # dialog went silent and the orphaned directory sat waiting to be
+    # inherited by whichever future post is born under the same year/slug
+    # -- the trash has always moved versions with the post (delete and
+    # restore both do); a date change owes them the same ride.
+    PostVersions.move(slug, from_year, from_content_dir: CONTENT_DIR,
+                      to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), to_year, slug))
   end
 
   # Rewrites a draft as published under `date`: drops the draft-only

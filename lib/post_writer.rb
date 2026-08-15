@@ -450,6 +450,15 @@ module PostWriter
     new_dir = File.join(CONTENT_DIR, year)
     new_path = File.join(new_dir, "#{slug}.json")
 
+    # The other way a post's text gets replaced, and the more dangerous
+    # one: a re-import overwrites in place across the whole archive at
+    # once, and nobody reads a few thousand posts afterwards to see what
+    # the source decided to change. Keyed on the OLD location, since that
+    # is the copy about to stop existing -- and kept BEFORE the year move
+    # below, so the copy travels with the rest of the history instead of
+    # stranding in the year the post is leaving.
+    PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
+
     if File.expand_path(new_path) != File.expand_path(existing_path)
       # The same guard Publishing.publish and edit_post have, for the same
       # reason: a DIFFERENT post can already own <new_year>/<slug> -- the
@@ -481,17 +490,17 @@ module PostWriter
 
       FileUtils.mkdir_p(new_dir)
       move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
+      # The edit history is keyed by year/slug exactly like the media, and
+      # owes the post the same journey -- left behind, the [v] dialog went
+      # silent and the orphaned directory waited to be inherited by a
+      # future post under the same year/slug.
+      PostVersions.move(slug, old_year, from_content_dir: CONTENT_DIR,
+                        to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
     end
 
     media_files = reconcile_media_names(post, old, year, slug, media_files)
     copy_media(media_files, year, slug)
     sync_media_dimensions(post, year, slug, previous: old)
-    # The other way a post's text gets replaced, and the more dangerous
-    # one: a re-import overwrites in place across the whole archive at
-    # once, and nobody reads a few thousand posts afterwards to see what
-    # the source decided to change. Keyed on the OLD location, since that
-    # is the copy about to stop existing.
-    PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
     # Write first, delete second -- same ordering as Publishing.publish, so
     # a failure in between leaves the post twice (recoverable) rather than
     # not at all.

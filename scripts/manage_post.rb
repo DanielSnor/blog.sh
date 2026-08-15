@@ -834,6 +834,21 @@ def cmd_add
   post['page'] = true if page
   post['pinned'] = true if truthy_frontmatter?(meta['pinned'])
   post['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
+  # The same four keys edit_post persists, under the same rules -- the
+  # editor template offers them here too, and a key the editor offers must
+  # not vanish on the first save only to start working on the second. The
+  # series name is written as typed (its address slug is derived at build
+  # time), the part is an integer override for out-of-order publishing,
+  # and hero/toc are presence-based: only stored where they carry an
+  # opinion of their own.
+  post['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
+  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  post['series_part'] = part if part
+  if meta.key?('hero')
+    hero_wanted = truthy_frontmatter?(meta['hero'])
+    post['hero'] = hero_wanted unless hero_wanted == SITE_HERO
+  end
+  post['toc'] = truthy_frontmatter?(meta['toc']) if meta.key?('toc') && !meta['toc'].to_s.strip.empty?
 
   path = PostWriter.write(post, media_files: media_files)
   discard_editor_buffer
@@ -2611,6 +2626,13 @@ def rename_post(path, post, raw: nil)
   # edit_post uses, for the same reason: no step may remove the only copy
   # of anything before its replacement exists.
   PostWriter.move_media_dir(File.join(MEDIA_DIR, year, old_slug), new_media_dir)
+  # The edit history is keyed by year/slug like the media, so it renames
+  # with the post -- the trash has always taken it along (delete and
+  # restore both do). Left under the old slug, the [v] dialog went dark
+  # and the orphaned directory waited to be inherited by a future post
+  # born under that name.
+  PostVersions.move(old_slug, year, from_content_dir: CONTENT_DIR,
+                    to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, new_slug))
   AtomicWrite.write_json(new_path, updated)
   File.delete(path)
 
@@ -2827,6 +2849,17 @@ def edit_post(slug, path: nil)
     abort t('cli.post_changed_while_editing', slug: slug)
   end
 
+  # The one place a post's TEXT is replaced by a person, so the one place
+  # the previous text is worth keeping. Field-only writes elsewhere
+  # (pinning, announcing, scheduling) deliberately make no version: a
+  # history of pin toggles would bury the one entry anybody ever wants.
+  #
+  # Kept BEFORE the relocation below, and keyed on the old path on
+  # purpose: relocate_media moves the whole versions directory across a
+  # year change, so a copy kept there first travels with the rest --
+  # kept after the move, it would strand in the year the post just left.
+  PostVersions.keep(path, content_dir: CONTENT_DIR)
+
   # Media move first, replacement JSON second, old JSON last. The old
   # order deleted the post's only file and *then* moved its media -- so a
   # date edit into a year with no media.nosync/<year>/ yet (the mv raises
@@ -2853,12 +2886,6 @@ def edit_post(slug, path: nil)
   # a restore from trash would otherwise come back without its image.
   keep = (blocks.flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
           post['content'].map { |b| b.dig('poster', 0, 'url') }).compact.to_set
-
-  # The one place a post's TEXT is replaced by a person, so the one place
-  # the previous text is worth keeping. Field-only writes elsewhere
-  # (pinning, announcing, scheduling) deliberately make no version: a
-  # history of pin toggles would bury the one entry anybody ever wants.
-  PostVersions.keep(path, content_dir: CONTENT_DIR)
 
   # The post first, its unreferenced media second. Pruning ahead of the
   # write meant a failure in between left a post that still names files
