@@ -111,18 +111,27 @@ module Wizard
   # a long section would otherwise push its own question off the bottom,
   # and the answers worth seeing are the ones just given.
   def question_frame(label, hint, problem)
-    room = [Tui.term_height - 6, 2].max
-    rows = context.size > room ? context.last(room) : context.dup
-    rows << '' unless rows.empty?
-    rows << Tui.paint(label, :bold)
+    # The tail is built first and measured, because the tail is the
+    # question: label, hint, complaint, and the blank row the prompt
+    # lands on. Reserving a flat six rows for it worked until say()
+    # could fill the context to the ceiling -- then a hint or a
+    # validation error that wrapped past the allowance was cut from the
+    # BOTTOM, which is mid-sentence with the prompt glued on ("...and
+    # carry aSugg>"). The record above the question is the part that can
+    # shrink; the question never is, and keep_last makes the frame
+    # enforce that even if this arithmetic is ever wrong again.
+    tail = [Tui.paint(label, :bold)]
     # Wrapped, not one row: the frame truncates every row it is given, and
     # a hint is the one thing here written to be read rather than scanned.
     # The three spaces go on each line so the block lines up under the
     # question instead of the continuation starting at the margin.
-    indented(hint, :dim) { |row| rows << row }
-    indented(problem, :red) { |row| rows << row }
-    rows << ''
-    Tui.frame(rows)
+    indented(hint, :dim) { |row| tail << row }
+    indented(problem, :red) { |row| tail << row }
+    tail << ''
+    room = [Tui.term_height - tail.size - 1, 2].max
+    rows = context.size > room ? context.last(room) : context.dup
+    rows << '' unless rows.empty?
+    Tui.frame(rows + tail, keep_last: tail.size)
   end
 
   def indented(text, colour)

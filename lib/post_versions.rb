@@ -82,10 +82,18 @@ module PostVersions
   # its history orphaned in a directory nothing points at.
   def move(slug, year, from_content_dir:, to_dir:)
     src = File.join(versions_root(from_content_dir), year.to_s, slug.to_s)
+    return true if File.expand_path(src) == File.expand_path(to_dir)
+
+    # The destination is cleared even when there is nothing to move. An
+    # orphaned history already sitting there is somebody else's past, and
+    # a post renamed onto that name inherited it -- [v] offered a
+    # stranger's versions and restore would write a stranger's text over
+    # the post. The early return used to come first, which preserved
+    # exactly that for the one shape of post with no history of its own.
+    FileUtils.rm_rf(to_dir)
     return false unless Dir.exist?(src)
 
     FileUtils.mkdir_p(File.dirname(to_dir))
-    FileUtils.rm_rf(to_dir)
     FileUtils.mv(src, to_dir)
     true
   rescue SystemCallError, IOError

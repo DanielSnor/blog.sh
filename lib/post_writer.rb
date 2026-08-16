@@ -457,21 +457,24 @@ module PostWriter
     # is the copy about to stop existing -- and kept BEFORE the year move
     # below, so the copy travels with the rest of the history instead of
     # stranding in the year the post is leaving.
+    # The same guard Publishing.publish and edit_post have, for the same
+    # reason: a DIFFERENT post can already own <new_year>/<slug> -- the
+    # real archive has the same slug in two years today -- and writing
+    # there would replace it wholesale while this post's old file gets
+    # deleted, so the build's duplicate check never fires. Raised as a
+    # StandardError on purpose: inside an import the per-item rescue
+    # counts it and names it, and the rest of the run continues; nothing
+    # here has been moved or deleted yet. Hoisted ABOVE the version keep:
+    # a re-import about to be refused must refuse with no side effects,
+    # and it used to leave one spare version behind on its way out.
+    if File.expand_path(new_path) != File.expand_path(existing_path) && File.exist?(new_path)
+      raise "cannot move '#{slug}' into #{year}: a different post already owns " \
+            "#{new_path} -- resolve the slug clash by hand"
+    end
+
     PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
 
     if File.expand_path(new_path) != File.expand_path(existing_path)
-      # The same guard Publishing.publish and edit_post have, for the same
-      # reason: a DIFFERENT post can already own <new_year>/<slug> -- the
-      # real archive has the same slug in two years today -- and writing
-      # there would replace it wholesale while this post's old file gets
-      # deleted, so the build's duplicate check never fires. Raised as a
-      # StandardError on purpose: inside an import the per-item rescue
-      # counts it and names it, and the rest of the run continues; nothing
-      # here has been moved or deleted yet.
-      if File.exist?(new_path)
-        raise "cannot move '#{slug}' into #{year}: a different post already owns " \
-              "#{new_path} -- resolve the slug clash by hand"
-      end
 
       # A published post that moves years vacates its public address, and
       # the redirect for it has to be recorded here exactly as edit_post
@@ -652,7 +655,11 @@ module PostWriter
       # picture, at its stated size, with nothing anywhere to say so.
       # manage_post's `add` has counted an occupied media directory as an
       # occupied slug all along; the importers now agree with it.
-      elsif !orphaned_media?(year, candidate)
+      elsif !orphaned_media?(year, candidate) &&
+            PostVersions.list(candidate, year, content_dir: CONTENT_DIR).empty?
+        # Orphaned versions are refused for the same reason as orphaned
+        # media one branch up: a new post on that name would inherit a
+        # stranger's history, [v] and all.
         return candidate
       end
 
