@@ -96,7 +96,9 @@ which only existed because the bar didn't.
   key on your behalf. Field reference in
   [architecture.md](docs/architecture.md#field-reference).
 - **A 404 page**, built by the site rather than left to the host: the
-  menu and the search field on a dead end, `noindex`.
+  menu and the search field on a dead end, `noindex` -- and a signpost
+  above the heading, drawn inline in the palette's own colors, its one
+  accent arrow pointing the way on.
 - **Series.** `series:` groups posts, `series_part:` orders the one
   published out of order; each series gets a listing, and every post in
   one links to the previous and next part -- within the series only. A

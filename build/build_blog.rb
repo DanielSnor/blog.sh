@@ -2508,8 +2508,25 @@ emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
 # one page 1.3 added was the one page the promise "every page has an h1" did
 # not hold for. Nothing is drawn differently; the markup is what the helper
 # was already producing everywhere else.
+# The signpost above the heading: blank boards, one accent arrow pointing
+# on -- the page's own sentence ("the way on is the menu and the search")
+# drawn once. Inline, in the page's own colors (currentColor and the
+# accent variable), so every palette and both themes paint it themselves
+# and no request leaves for a picture. aria-hidden: it decorates the
+# heading, it does not say anything the heading doesn't.
+NOT_FOUND_SIGN =
+  %(<svg class="not-found-sign" width="120" height="104" viewBox="0 0 120 104") +
+  %( fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round") +
+  %( stroke-linejoin="round" aria-hidden="true">) +
+  %(<line x1="60" y1="14" x2="60" y2="98"/>) +
+  %(<path d="M60 22 h34 l12 8 -12 8 h-34 z" stroke="var(--accent)"/>) +
+  %(<path d="M60 48 h-30 l-12 8 12 8 h30 z"/>) +
+  %(<line x1="46" y1="98" x2="74" y2="98"/>) +
+  %(</svg>)
+
 emit(File.join(PUBLIC_DIR, '404.html'),
-     layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
+     layout(%(        #{NOT_FOUND_SIGN}\n) +
+            %(        #{listing_heading_html(t('not_found.heading'))}\n) +
             %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
             title: t('not_found.page_title', site_title: SITE_TITLE),
             description: t('not_found.page_description'),
