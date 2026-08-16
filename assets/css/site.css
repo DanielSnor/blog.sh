@@ -1124,8 +1124,18 @@ blockquote {
 .search-tagline { margin-bottom: 0.25rem; }
 
 /* The 404 signpost inherits the quiet meta color; its one accent arrow
-   is colored in the markup, so the palette decides both. */
-.not-found-sign { color: var(--meta-text); margin: 0.6rem 0 0.4rem; }
+   is colored in the markup, so the palette decides both. Centred under
+   the heading; the desktop gets the larger of the two sizes. */
+.not-found-sign {
+  display: block;
+  width: 360px;
+  max-width: 100%;
+  height: auto;
+  margin: 1.2rem auto 1rem;
+}
+@media (max-width: 700px) {
+  .not-found-sign { width: 240px; }
+}
 .search-tip { color: var(--meta-text); font-size: 0.85rem; margin-bottom: 1.5rem; }
 .search-status { color: var(--meta-text); font-size: 0.9rem; }
 .search-archive-pending { font-style: italic; }
