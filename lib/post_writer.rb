@@ -233,23 +233,21 @@ module PostWriter
 
     used = (on_disk + rename.values + keeps).to_h { |n| [n, true] }
     arrivals.uniq.each do |name|
-      unless used.key?(name)
-        used[name] = true
-        next
-      end
-      # A collision with a file nobody claims is not always a stranger:
-      # a picture dropped in one re-import and brought back in the next
-      # arrives as a fresh download, and the file it collides with is its
-      # own orphaned copy. The bytes decide: identical means reunion (the
-      # copy is then skipped as always), different means the name belongs
-      # to somebody else. The arrival's own positional name is asked
-      # first; failing that, every name on disk that nothing claims --
-      # which is what reunites a return with a copy parked under some
-      # OTHER name once the kept versions have forgotten the address.
-      # Only a claimed name outranks matching bytes: the address decides
-      # ownership, the bytes only ever decide identity.
+      # An arrival is not always a stranger: a picture dropped in one
+      # re-import and brought back in the next arrives as a fresh
+      # download, and an unclaimed file on disk may be its own orphaned
+      # copy. The bytes decide: identical means reunion (the copy is then
+      # skipped as always), different means the file belongs to somebody
+      # else. The arrival's own positional name is asked first; failing
+      # that, every name on disk that nothing claims -- and that pass
+      # runs whether or not the arrival's allocated name collides,
+      # because a dead URL in the batch burns a number and hands the
+      # return a FREE name, which used to slip past the reunion and mint
+      # a byte-identical duplicate of the orphan. Only a claimed name
+      # outranks matching bytes: the address decides ownership, the
+      # bytes only ever decide identity.
       src_path = plan_source(media_files, name)
-      if !taken.key?(name) && on_disk.include?(name) &&
+      if used.key?(name) && !taken.key?(name) && on_disk.include?(name) &&
          same_bytes?(src_path, File.join(dir, name), sha_cache)
         used[name] = true
         taken[name] = true
@@ -263,6 +261,10 @@ module PostWriter
         rename[name] = reunion
         taken[reunion] = true
         used[reunion] = true
+        next
+      end
+      unless used.key?(name)
+        used[name] = true
         next
       end
       ext = File.extname(name)
@@ -290,7 +292,13 @@ module PostWriter
   # being replaced always outranks its own history. Read only when some
   # addressed entry is otherwise unrecognised: versions are a directory of
   # files, and every other write has no reason to open them. A version
-  # somebody has hand-mangled is skipped, not obeyed and not fatal.
+  # that will not parse is skipped, not obeyed and not fatal. A version
+  # that parses but LIES -- hand-forged to map an address at an orphan
+  # holding some other picture's bytes -- is obeyed: from here it is
+  # indistinguishable from the legitimate case this memory exists for, a
+  # source that re-encoded a picture whose old bytes the archive keeps.
+  # The same boundary the previous copy has always had under hand
+  # corruption, with the same repair: delete the file, REFETCH_MEDIA=1.
   #
   # A name a newer memory has already promised to some other address is
   # off limits, and not only as a key: a stale version can remember a name
@@ -429,8 +437,14 @@ module PostWriter
   end
 
   def self.tally_superseded(media_files, dir, sha_cache)
+    # Anything sourced from inside the archive -- this post's directory
+    # or any other post's -- is a REUSE the index served, not a download:
+    # counting it said "the source has drifted" on a plain re-import that
+    # fetched nothing, once per run, forever. Only bytes brought in from
+    # outside the archive can be news about the source.
+    archive = File.expand_path(MEDIA_DIR) + File::SEPARATOR
     media_files.each do |src_path, name|
-      next if File.dirname(src_path) == dir
+      next if File.expand_path(src_path).start_with?(archive)
 
       dest = File.join(dir, name)
       next unless File.file?(src_path) && File.file?(dest)
