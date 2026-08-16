@@ -106,7 +106,9 @@ which only existed because the bar didn't.
   something new, so a typo is caught while it is free to fix; a series
   written as its own slug groups correctly and never retitles the
   listing away from a spelled-out name; and `check` warns about two
-  series slugs a few characters apart. See
+  series slugs a few characters apart -- but not about a series named
+  after a release standing beside its own patch release, which differ by
+  a separator and a digit and are two series on purpose. See
   [operations.md](docs/operations.md#writing-and-publishing).
 - **Reading time and a table of contents.** The first on every post
   page; the second from four headings up, or whenever a post asks with

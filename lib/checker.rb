@@ -311,7 +311,7 @@ module Checker
                   .reject { |slug, _| slug.empty? }
     findings = []
     groups.keys.sort.combination(2) do |a, b|
-      next if a.delete('0-9') == b.delete('0-9')
+      next if numberless(a) == numberless(b)
 
       distance = edit_distance(a, b)
       next if distance > 2
@@ -323,6 +323,22 @@ module Checker
                        t('series_similar_fix'))
     end
     findings
+  end
+
+  # What is left of a slug once its numbers are gone -- and once the
+  # separators those numbers were holding apart have closed up behind
+  # them. Dropping the digits alone was not enough: a version suffix
+  # takes a separator with it, so "blog-sh-v1-2" and "blog-sh-v1-2-1"
+  # came out as "blog-sh-v-" and "blog-sh-v--", which is a difference,
+  # and every series named after a release was reported as a typo of the
+  # patch release beside it. Found on this engine's own site, on the day
+  # its posts were first grouped by version.
+  #
+  # It stays narrow on purpose: only runs of digits and the separators
+  # they leave behind are collapsed, so "photo-2024" and "photos-2024"
+  # -- a real typo, one letter apart -- are still two different things.
+  def numberless(slug)
+    slug.gsub(/\d+/, '').squeeze('-').chomp('-')
   end
 
   # Plain Levenshtein over two short slugs; nothing here is hot.
