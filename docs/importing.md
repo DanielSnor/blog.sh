@@ -32,16 +32,24 @@ duplicated.
   the address it came from, so a re-import recognises what the archive
   already holds and fetches only what is missing -- the summary says how
   many it did not have to fetch, and over a complete archive that is no
-  requests at all.
+  requests at all. A picture that leaves a post and later returns finds
+  its old file again -- the post's kept versions remember the address,
+  and failing those the file's own bytes do -- so a drop-and-return
+  cycle does not grow the post's directory.
 - **An import only ever ADDS media.** A file already in
   `media.nosync/<year>/<slug>/` is never replaced -- not by a re-import,
   not by any flag -- because the bytes an import brings come from
   somewhere it cannot vouch for. `REFETCH_MEDIA=1` only makes the run ask
   the source about every address again instead of trusting the archive's
   records; what lands on disk is still just the files that were missing.
-  And nothing an import does repairs a damaged file: `./blog.sh check`
-  reports media a post names that the archive doesn't have, and putting
-  it right is a separate job with your own copy of the original.
+  When a download no longer matches the copy the archive keeps -- a
+  source that re-encoded a picture under its old address -- the
+  archive's copy wins and the summary counts the discarded download,
+  which is the one signal that the source has drifted away from this
+  archive. And nothing an import does repairs a damaged file:
+  `./blog.sh check` reports media a post names that the archive doesn't
+  have, and putting it right is a separate job with your own copy of the
+  original.
 - **The post describes the file that is really there.** Width and height
   are re-read from the archive's own copy once the media is in place, so
   a post cannot end up claiming dimensions over a file that never
