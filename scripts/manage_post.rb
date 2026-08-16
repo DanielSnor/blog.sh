@@ -3082,11 +3082,14 @@ def cmd_restore(slug)
     PostWriter.move_media_dir(trash_media, File.join(MEDIA_DIR, year, slug))
   end
   # ...and the history comes back with it, so a restored post can still be
-  # walked back to what it said before its last edit.
+  # walked back to what it said before its last edit. The destination is
+  # cleared even when the trash carries no versions -- an orphaned history
+  # left there by an older deletion belongs to nobody, and a restored post
+  # must not inherit it as its own past.
   trash_versions = File.join(trash_dir, 'versions')
+  FileUtils.rm_rf(File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
   if Dir.exist?(trash_versions)
     FileUtils.mkdir_p(File.join(PostVersions.versions_root(CONTENT_DIR), year))
-    FileUtils.rm_rf(File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
     FileUtils.mv(trash_versions, File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
   end
   FileUtils.rm_rf(trash_dir)
