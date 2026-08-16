@@ -86,6 +86,24 @@
   // be raw markup. `text` is Bluesky's plain text and is escaped here.
   // Neither is ever guessed at: a payload carrying the wrong one renders
   // nothing rather than the other one's assumptions.
+  // Pictures a reply carries. Same-origin pages already hotlink the
+  // commenter's avatar from their instance, so the thumbnails follow the
+  // same road; each links out to the full picture. Images only -- a video
+  // rendered as a still LOOKS like an image and then refuses to play,
+  // which reads as broken, and the link to the reply is right above.
+  function mediaHtml(media) {
+    if (!media || !media.length) return '';
+    return (
+      '<div class="comment-media">' +
+      media.map(function (m) {
+        return '<a href="' + esc(m.href) + '" target="_blank" rel="noopener">' +
+          '<img src="' + esc(m.src) + '" alt="' + esc(m.alt || '') + '" loading="lazy">' +
+        '</a>';
+      }).join('') +
+      '</div>'
+    );
+  }
+
   function renderComment(comment) {
     var favs = comment.favourites > 0
       ? ' <span class="comment-favs">❤ ' + esc(comment.favourites) + '</span>'
@@ -106,6 +124,7 @@
             favs +
           '</div>' +
           '<div class="comment-content">' + body + '</div>' +
+          mediaHtml(comment.media) +
         '</div>' +
       '</div>'
     );
@@ -135,6 +154,15 @@
 
   function mastodonComment(status) {
     var acct = status.account || {};
+    // Attachments live outside the sanitised content, so without this
+    // mapping an approved picture reply rendered as just its words. A
+    // reply marked sensitive keeps its pictures to itself -- the fold
+    // holds the text, and a thumbnail would sit outside it.
+    var media = status.sensitive ? [] : (status.media_attachments || [])
+      .filter(function (a) { return a.type === 'image' && a.preview_url; })
+      .map(function (a) {
+        return { src: a.preview_url, href: a.url || a.remote_url || status.url, alt: a.description || '' };
+      });
     return {
       author: acct.display_name || acct.username,
       author_url: acct.url,
@@ -142,7 +170,8 @@
       url: status.url,
       date: status.created_at,
       favourites: status.favourites_count,
-      html: status.content
+      html: status.content,
+      media: media
     };
   }
 
@@ -187,6 +216,16 @@
 
   function blueskyComment(post) {
     var author = post.author || {};
+    // The view embed carries the images (thumb + fullsize, alt included);
+    // a labelled post keeps them folded away, same instinct as Mastodon's
+    // sensitive flag.
+    var embed = post.embed || {};
+    var images = embed.images || (embed.media && embed.media.images) || [];
+    var media = (post.labels || []).length ? [] : images
+      .filter(function (img) { return img.thumb; })
+      .map(function (img) {
+        return { src: img.thumb, href: img.fullsize || blueskyPostUrl(post), alt: img.alt || '' };
+      });
     return {
       author: author.displayName || author.handle,
       author_url: 'https://bsky.app/profile/' + author.handle,
@@ -194,7 +233,8 @@
       url: blueskyPostUrl(post),
       date: post.record.createdAt,
       favourites: post.likeCount,
-      text: post.record.text
+      text: post.record.text,
+      media: media
     };
   }
 

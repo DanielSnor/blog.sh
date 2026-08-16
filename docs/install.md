@@ -525,7 +525,11 @@ variant:
 ## 8. Comments network (optional): Mastodon or Bluesky
 
 Every published post is announced on the configured network, and
-replies to that announcement are the post's comments. Configure
+replies to that announcement are the post's comments. A reply's
+pictures appear under its words -- thumbnails linking out to the full
+image, loaded from the commenter's own network the same way their
+avatar already is; a reply marked sensitive keeps its pictures to
+itself. Configure
 **exactly one** of the two -- the build refuses a config with both,
 since a discussion split across two networks serves nobody. Without
 either section, everything else still works; publishing just skips the

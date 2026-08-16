@@ -1226,6 +1226,14 @@ aside .card { margin-bottom: 1.5rem; }
 .comment-content p { margin: 0.3rem 0; }
 .comment-content a { word-break: break-word; }
 
+.comment-media { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; }
+.comment-media img {
+  display: block;
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: 6px;
+}
+
 footer {
   background: var(--nav-bg);
   border-radius: 4px;

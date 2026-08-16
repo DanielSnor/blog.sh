@@ -258,7 +258,7 @@ module PostStats
   # escapes all of it (assets/js/comments.js).
   def mastodon_comment(status)
     account = status['account'] || {}
-    {
+    record = {
       'id' => status['id'].to_s,
       'author' => (account['display_name'].to_s.empty? ? account['username'] : account['display_name']).to_s,
       'author_url' => account['url'].to_s,
@@ -268,6 +268,26 @@ module PostStats
       'favourites' => status['favourites_count'].to_i,
       'html' => mastodon_body(status)
     }
+    media = mastodon_comment_media(status)
+    record['media'] = media unless media.empty?
+    record
+  end
+
+  # The pictures of an approved reply, which live outside the sanitised
+  # content -- without this an approved picture reply was published as
+  # just its words. Images only (a still that will not play reads as
+  # broken), and none at all for a sensitive reply: the fold holds its
+  # text, and a thumbnail would sit outside the fold.
+  def mastodon_comment_media(status)
+    return [] if status['sensitive']
+
+    Array(status['media_attachments']).filter_map do |a|
+      next unless a.is_a?(Hash) && a['type'] == 'image' && !a['preview_url'].to_s.empty?
+
+      { 'src' => a['preview_url'].to_s,
+        'href' => (a['url'] || a['remote_url'] || status['url']).to_s,
+        'alt' => a['description'].to_s }
+    end
   end
 
   # Now that a starred reply behind a content warning is published (see
@@ -457,16 +477,36 @@ module PostStats
     author = post['author'] || {}
     handle = author['handle'].to_s
     rkey = post['uri'].to_s.split('/').last
-    {
+    url = "https://bsky.app/profile/#{handle}/post/#{rkey}"
+    record = {
       'id' => post['uri'].to_s,
       'author' => (author['displayName'].to_s.empty? ? handle : author['displayName']).to_s,
       'author_url' => "https://bsky.app/profile/#{handle}",
       'avatar' => author['avatar'].to_s,
-      'url' => "https://bsky.app/profile/#{handle}/post/#{rkey}",
+      'url' => url,
       'date' => post.dig('record', 'createdAt').to_s,
       'favourites' => post['likeCount'].to_i,
       'text' => post.dig('record', 'text').to_s
     }
+    media = bluesky_comment_media(post, url)
+    record['media'] = media unless media.empty?
+    record
+  end
+
+  # Same words as the Mastodon side: the view embed carries thumb,
+  # fullsize and alt; a labelled post keeps its pictures to itself.
+  def bluesky_comment_media(post, url)
+    return [] if Array(post['labels']).any?
+
+    embed = post['embed'] || {}
+    images = embed['images'] || embed.dig('media', 'images') || []
+    Array(images).filter_map do |img|
+      next unless img.is_a?(Hash) && !img['thumb'].to_s.empty?
+
+      { 'src' => img['thumb'].to_s,
+        'href' => (img['fullsize'].to_s.empty? ? url : img['fullsize'].to_s),
+        'alt' => img['alt'].to_s }
+    end
   end
 
   # --- driver -----------------------------------------------------------
