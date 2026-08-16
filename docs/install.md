@@ -575,6 +575,14 @@ comments:
   approval: fav      # or "off" (the default)
 ```
 
+**The moment you switch this on, every comment already on the site
+disappears.** Moderation publishes only what you have starred, and at
+that moment that is nothing -- a site with years of replies goes quiet
+in one rebuild. They come back one star at a time, so plan the switch
+for a moment when you can go and star the keepers right away, and run
+`./scripts/refresh-sidebar.sh --full` once afterwards to settle old
+posts on the spot instead of within the week.
+
 Three things have to be true for it to work, and `./blog.sh doctor`
 (add `--online` for the token check) says so when they aren't:
 
@@ -589,8 +597,8 @@ Three things have to be true for it to work, and `./blog.sh doctor`
    predates this: a token without it gets a perfectly good answer with
    the `favourited` field left out of it, which reads as "approved
    nothing". On Bluesky the existing app password is enough.
-3. **You have to go and star the comments worth keeping.** Turning this
-   on hides everything already published until you do.
+3. **You have to go and star the comments worth keeping** -- see the
+   warning above the list.
 
 Worth knowing before switching it on:
 
