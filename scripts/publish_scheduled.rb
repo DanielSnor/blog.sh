@@ -19,6 +19,10 @@ require_relative '../lib/atomic_write'
 require_relative '../lib/i18n'
 require_relative '../lib/site_config'
 
+# Cron mail reads stdout and stderr as one stream, and a block-buffered
+# stdout lets every warning overtake the lines it belongs after.
+$stdout.sync = true
+
 SiteConfig.use_site_timezone!
 
 # Held for the whole run -- publishing, the rebuild and the deploy are one

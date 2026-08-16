@@ -58,7 +58,7 @@ dedup by `source`).
 | `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
 | `former_slugs` | array of strings | every address the post used to have, as `"year/slug"` frozen at rename time; the build emits a redirect stub for each (see `props` → rename). Engine-side history like the announcement URLs: edits and re-imports carry it over untouched |
 | `unpublished_from` | string | drafts only -- the `"year/slug"` address the post vacated when it was unpublished. Publishing consumes it: back under a different slug it becomes a `former_slugs` redirect, back under the same one it just disappears |
-| `series` | string | the series this post belongs to; the build gives every series its own listing at `/series/<slug>/` and puts "part 2 of 5" navigation on the post |
+| `series` | string | the series this post belongs to; with two or more published parts the build gives it a listing at `/series/<slug>/` and puts "part 2 of 5" navigation on the post |
 | `series_part` | integer | position within the series -- without it, parts are ordered by date, which is the usual case; the number is for the rare insert |
 | `pinned` | string/boolean | one post held at the top of the front page. Truth test is strict (`true`/`yes`/`1`), so a hand-edited `false` cannot pin by accident; more than one pinned post warns and the newest wins. Listings past page one, the archives and the feeds ignore it |
 | `toc` | string/boolean | table of contents on the post page. Absent = automatic (from 4 headings up); an explicit false suppresses it, an explicit true forces it below that threshold |
@@ -325,13 +325,15 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Five questions, in one pass: media a post asks for and hasn't got; images
+Seven questions, in one pass: media a post asks for and hasn't got; images
 whose stored dimensions are 1px or smaller, which the build drops
 *together with their caption* and would otherwise lose silently; internal
 links pointing at an address nothing on this site answers at; media
-directories no post owns any more; and one old address claimed by two
-posts, where whichever renders last wins and the others' readers land on
-it.
+directories no post owns any more; files in a post's own directory the
+post no longer names; two series whose names sit an edit or two apart,
+which is usually one series and a typo; and one old address claimed by
+two posts, where whichever renders last wins and the others' readers land
+on it.
 
 Two rules shape the output. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value

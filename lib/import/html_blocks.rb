@@ -677,6 +677,18 @@ module Import
 
         close(stack, 'p') if open == 'p' && CLOSES_P.include?(name)
         close(stack, 'li') if stack.last.name == 'li' && name == 'li'
+        # Anchors never nest: a second <a> while one is open closes the
+        # first, which is what a browser does with the invalid markup.
+        # Left nested, one run of text came out under two link spans --
+        # duplicated when the targets matched, fighting when they didn't.
+        # Only within inline content, though: an <a> wrapping whole blocks
+        # (the card link) is walked as a wrapper and never renders a span,
+        # so it has no duplicate to make -- and closing it from here would
+        # pop the paragraph the inner link sits in and split it.
+        if name == 'a' && (index = stack.rindex { |n| n.name == 'a' }) &&
+           stack[(index + 1)..].none? { |n| Builder::BLOCK_LEVEL.include?(n.name) }
+          close(stack, 'a')
+        end
         # Omitting </td> and </tr> is valid HTML5 and the house style of
         # the hand-written archives page mode imports. Without these, each
         # next cell NESTED inside the previous one, and the recursive cell

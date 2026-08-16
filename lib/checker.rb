@@ -25,7 +25,10 @@ require_relative 'i18n'
 # rewrites a post: the whole value of the tool is that its output can be
 # trusted, and a checker that also acts is one that has to be trusted twice.
 module Checker
-  Finding = Struct.new(:level, :text, :fix, keyword_init: true) do
+  # `count` is how many findings the line stands for: 1 for an ordinary
+  # finding, and for a "...and N more" line the N that was not printed --
+  # which is what lets the summary total the archive instead of the screen.
+  Finding = Struct.new(:level, :text, :fix, :count, keyword_init: true) do
     def error?
       level == :error
     end
@@ -63,15 +66,15 @@ module Checker
   end
 
   def ok(text)
-    Finding.new(level: :ok, text: text)
+    Finding.new(level: :ok, text: text, count: 1)
   end
 
   def warn(text, fix = nil)
-    Finding.new(level: :warn, text: text, fix: fix)
+    Finding.new(level: :warn, text: text, fix: fix, count: 1)
   end
 
   def error(text, fix = nil)
-    Finding.new(level: :error, text: text, fix: fix)
+    Finding.new(level: :error, text: text, fix: fix, count: 1)
   end
 
   def run(root:, progress: nil, online: false, online_progress: nil)
@@ -140,6 +143,16 @@ module Checker
   # therefore accepted without inspection.
   def known_paths(posts)
     paths = Set.new(FIXED_PATHS)
+    # How many posts in the STREAM carry each series -- the same set the
+    # build groups into SERIES_MAP, so drafts, pages and unlisted posts do
+    # not count towards a series page existing.
+    series_sizes = Hash.new(0)
+    posts.each do |post|
+      next if draft?(post) || post['page'] || post['unlisted']
+
+      slug = Slug.slugify(post['series'].to_s)
+      series_sizes[slug] += 1 unless slug.empty?
+    end
     posts.each do |post|
       paths << post_path(post)
       (post['tags'] || []).each do |tag|
@@ -154,12 +167,13 @@ module Checker
       end
       # Series listings are derived the same way tag listings are -- from a
       # key the post carries -- so unlike the content types there is nothing
-      # to guess and no second opinion to drift. They were simply forgotten
-      # when series arrived in this cycle, which made every link to one a
-      # reported dead link and gave `check` a non-zero exit over a healthy
-      # archive.
+      # to guess and no second opinion to drift. One rule of the build does
+      # carry over, though: a series only gets a page once two posts in the
+      # stream share it -- a "series" of one is a post. Accepting the
+      # address for every carrier of the key waved through dead links to
+      # pages the build never writes.
       series = Slug.slugify(post['series'].to_s)
-      paths << "/series/#{series}/" unless series.empty?
+      paths << "/series/#{series}/" if series_sizes[series] >= 2
       Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
       Array(post['redirect_from']).each { |origin| paths << origin.to_s }
     end
@@ -186,7 +200,7 @@ module Checker
 
     missing.first(20).map do |slug, url|
       error(t('media_missing', slug: slug, file: url), t('media_missing_fix'))
-    end + more(missing.size - 20)
+    end + more(missing.size - 20, :error)
   end
 
   # Images the build will drop on the floor: a size of 1px or less is the
@@ -209,7 +223,7 @@ module Checker
 
     found.first(20).map do |slug, url, w, h|
       warn(t('image_degenerate', slug: slug, file: url, width: w, height: h), t('image_degenerate_fix'))
-    end + more(found.size - 20)
+    end + more(found.size - 20, :warn)
   end
 
   # Links from one post to another address on this site that nothing will
@@ -233,7 +247,7 @@ module Checker
     return [] if dead.empty?
 
     dead.first(20).map { |slug, url| error(t('link_dead', slug: slug, url: url), t('link_dead_fix')) } +
-      more(dead.size - 20)
+      more(dead.size - 20, :error)
   end
 
   # Media directories no post claims. Pure disk, invisible from anywhere --
@@ -250,7 +264,7 @@ module Checker
     return [] if orphans.empty?
 
     orphans.first(20).map { |rel| warn(t('media_orphan', dir: rel), t('media_orphan_fix')) } +
-      more(orphans.size - 20)
+      more(orphans.size - 20, :warn)
   end
 
   # The same leftovers one level down: files inside a directory a post
@@ -274,7 +288,7 @@ module Checker
 
     strays.first(20).map do |slug, file|
       warn(t('media_stray', slug: slug, file: file), t('media_stray_fix'))
-    end + more(strays.size - 20)
+    end + more(strays.size - 20, :warn)
   end
 
   # Two posts claiming one old address. The build answers with whichever it
@@ -394,7 +408,7 @@ module Checker
     gone.keys.first(20).map do |url|
       error(t('link_gone', slug: owners[url].to_s, url: url, reason: gone[url][:reason]),
             t('link_gone_fix'))
-    end + more(gone.size - 20)
+    end + more(gone.size - 20, :error)
   end
 
   # HEAD first: a link checker has no use for the body, and a HEAD over a
@@ -477,9 +491,15 @@ module Checker
   # Long lists are capped rather than printed in full: a thousand identical
   # findings is not more information than twenty, and it buries every other
   # kind. The count of what was left out is part of the report, though --
-  # silently truncating would read as "that was all of it".
-  def more(remaining)
-    remaining.positive? ? [warn(t('and_more', count: remaining))] : []
+  # silently truncating would read as "that was all of it". The line takes
+  # the level of the kind it truncates, so twenty-five missing files do not
+  # end in a tail that reads as housekeeping, and it carries the count of
+  # what it stands for, so the summary can say how big the problem is
+  # rather than how long the printout was.
+  def more(remaining, level)
+    return [] unless remaining.positive?
+
+    [Finding.new(level: level, text: t('and_more', count: remaining), count: remaining)]
   end
 
   # Both places a block keeps a file: the media themselves and a video's

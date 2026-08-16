@@ -348,7 +348,11 @@ matter carries a `blogsh:` block -- the post's identity and everything
 else no other engine has a word for -- and this importer reads it back,
 which makes export + import the supported way to move an installation
 between machines or hosts; such a post is coming home, so it collects no
-platform tag. The mechanics, and the little that is deliberately lost,
+platform tag. The first round does normalise formatting spans markdown
+has no way to write -- two identical link spans over the same text, a
+span cut at a link's boundary, the order of spans covering the same run
+-- into one canonical shape; the visible text does not change. The
+mechanics, and the little that is deliberately lost,
 live in [architecture.md → Exporting](architecture.md#exporting-libexporterrb).
 
 The pattern understands `:year`, `:month`, `:day`, `:title` and

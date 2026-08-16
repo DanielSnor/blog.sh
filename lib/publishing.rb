@@ -304,6 +304,7 @@ module Publishing
   # them. Which KIND of no it was decides the wording and the marker, not
   # the return value.
   def rebuild_and_deploy(reason)
+    @stopped_on_busy_lock = false
     puts
     puts "#{reason}…"
     unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
@@ -324,8 +325,18 @@ module Publishing
   # the next scheduled run picks the site back up.
   def finish_later(step, status)
     busy = RunLock.busy_exit?(status)
+    @stopped_on_busy_lock = busy
     warn I18n.t("cli.#{step}_#{busy ? 'busy' : 'failed'}")
     mark_deploy_pending
     warn I18n.t('cli.deploy_pending_marked')
+  end
+
+  # Whether the most recent rebuild_and_deploy came back false because
+  # another run held the lock, told apart from "something broke". A
+  # separate question on purpose: the return value stays a plain yes/no
+  # (see rebuild_and_deploy), and the caller whose EXIT CODE has to tell
+  # the two apart -- ./blog.sh rebuild -- asks here after reading the no.
+  def stopped_on_busy_lock?
+    @stopped_on_busy_lock == true
   end
 end

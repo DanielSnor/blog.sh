@@ -13,6 +13,12 @@ require_relative '../lib/sidebar'
 require_relative '../lib/post_stats'
 require_relative '../lib/site_config'
 
+# Under cron stdout is a pipe, which Ruby block-buffers while warn goes
+# straight out -- every warning in the mail then jumps ahead of the
+# output it belongs under. Unbuffered here at the entry point; the
+# libraries stay quiet about how their caller's stdout is wired.
+$stdout.sync = true
+
 SiteConfig.use_site_timezone!
 
 ROOT = File.expand_path('..', __dir__)

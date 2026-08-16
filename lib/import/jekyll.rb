@@ -57,6 +57,13 @@ module Import
       # Per post, set by map before the blocks are built -- empty for any
       # tree this engine did not write.
       @own_media_src = {}
+      # Origin -> the file it belongs to, keyed by path for the same
+      # two-pass reason as @slugs. A redirect is one address pointing at
+      # one place, so the first claim wins and stays won across passes.
+      @origins = {}
+      # Files the tree names but does not hold, keyed by path for the
+      # two-pass reason again -- the postscript says how many.
+      @missing_media = {}
     end
 
     # Said out loud when the run rearranged anything -- see
@@ -65,6 +72,7 @@ module Import
       notes = []
       notes << I18n.t('import.note.ssg_images_freed', count: @rearranged) if @rearranged.positive?
       notes << I18n.t('import.note.ssg_liquid_links_dropped', count: @liquid_links) if @liquid_links.positive?
+      notes << I18n.t('import.note.ssg_media_missing', count: @missing_media.length) unless @missing_media.empty?
       collisions = @slugs.count { |_, paths| paths.length > 1 }
       notes << I18n.t('import.note.ssg_slug_collisions', count: collisions) if collisions.positive?
       notes << I18n.t('import.note.ssg_author_dropped', count: @authored.length) unless @authored.empty?
@@ -108,11 +116,14 @@ module Import
         # the articles live somewhere else, what is left at the top is a
         # page. When everything is at the top, it is all posts, exactly as
         # before.
-        @pages = nested.empty? ? [] : root.reject { |path| not_a_page?(path) }
-        files = nested.empty? ? root : nested + @pages
+        @furniture = nested.empty? ? [] : root.select { |path| not_a_page?(path) }
+        @pages = nested.empty? ? [] : root - @furniture
+        files = nested.empty? ? root : nested + @pages + @furniture
       else
-        @pages = root_pages
-        files = posts + drafts + @pages
+        candidates = Dir.glob(File.join(@dir, '*.{md,markdown}'))
+        @furniture = candidates.select { |path| not_a_page?(path) }
+        @pages = candidates - @furniture
+        files = posts + drafts + @pages + @furniture
       end
 
       @total = files.size
@@ -120,6 +131,12 @@ module Import
     end
 
     def map(path, media)
+      # The furniture is refused, as ever -- but through the ledger, not
+      # by silence: left out of the walk entirely, a root _index.md
+      # holding real prose was missing from the totals, and the tree read
+      # as imported in full when it was not.
+      return :site_furniture if @furniture&.include?(path)
+
       raw = File.read(path, encoding: 'utf-8')
       meta, body = front_matter(raw)
       return :bad_frontmatter if meta.nil?
@@ -177,14 +194,18 @@ module Import
       post['page'] = true if @pages&.include?(path) && meta['type'].to_s.strip.empty?
 
       if @keep_permalinks && !draft
-        origin = origin_path(meta, served_slug(meta, path, slug), date)
+        # `type: page` is read by apply_own_keys a few lines down -- too
+        # late for the decisions here, where an exported page carrying it
+        # must already count as one.
+        page = post['page'] == true || meta['type'].to_s.strip == 'page'
+        origin = origin_path(meta, served_slug(meta, path, slug), date, page: page)
         # A page already lands at the root, so an origin of /<slug>/ would
         # redirect the address at itself -- which the build then complains
         # about once per build, forever. The Ghost importer has guarded
         # against this since pages arrived; this one had nothing to guard
         # because it never made a page.
-        origin = nil if post['page'] && origin == "/#{slug}/"
-        post['redirect_from'] = [origin] if origin
+        origin = nil if page && origin == "/#{slug}/"
+        post['redirect_from'] = [origin] if origin && claim_origin(origin, path)
       end
       apply_own_keys(post, meta)
       # After apply_own_keys on purpose: `type: page` in the front matter
@@ -280,10 +301,6 @@ module Import
     # files over twice. And only files, never directories -- a Hugo page
     # bundle in the root is a post, and comes in through wider_net.
     NOT_A_PAGE = %w[index home 404 feed rss atom sitemap search tags categories archive robots].freeze
-
-    def root_pages
-      Dir.glob(File.join(@dir, '*.{md,markdown}')).reject { |path| not_a_page?(path) }
-    end
 
     # The names that are furniture rather than a page, wherever the tree
     # was walked from. Hugo's _index.md and home.md are the section and
@@ -849,6 +866,7 @@ module Import
       # in this tree, and joining it onto @dir named a local file the
       # archive never had. from_url's failure line tells the real story
       # -- a remote resource that could not be fetched.
+      local = nil
       filename = if src.match?(/\A[A-Za-z][A-Za-z0-9+.-]*:/)
                    media.from_url(src)
                  else
@@ -858,12 +876,27 @@ module Import
                    # depend on which files happened to be present.
                    media.from_file(local, src: own_media_src(local))
                  end
-      return nil unless filename
-
-      entry = { 'url' => filename }
-      width, height = media.dimensions(filename)
-      entry['width'] = width if width
-      entry['height'] = height if height
+      if filename
+        entry = { 'url' => filename }
+        width, height = media.dimensions(filename)
+        entry['width'] = width if width
+        entry['height'] = height if height
+      elsif local
+        # A file the tree names but does not hold. Dropping the block
+        # dropped more than the picture -- its alt text and caption went
+        # with it, and a post whose ONLY block it was vanished from the
+        # import whole. The build already lives with a named file that is
+        # not there (it says MISSING and renders the alt), so the block
+        # stays, under the name the tree used: put the file into the
+        # post's media folder and the next build picks it up. from_file
+        # above has recorded the miss; the postscript counts these.
+        @missing_media[local] = true
+        entry = { 'url' => File.basename(local) }
+        known = own_media_src(local)
+        entry['src'] = known if known
+      else
+        return nil
+      end
       block = { 'type' => 'image', 'media' => [entry] }
       # Each word where it belongs. The alt text is what a picture is for
       # somebody who cannot see it; the caption is what it says to
@@ -872,12 +905,13 @@ module Import
       # caption and drop the caption, which printed the description under
       # the photograph and left the screen reader with nothing.
       #
-      # A picture with a title and no alt keeps the older behaviour of
-      # having something to say: with only one of the two written down,
-      # the caption is the one a reader sees.
+      # And never one from the other: markdown renders no alt text, so a
+      # picture that has only an alt shows no caption on the site it came
+      # from. Copying the alt in printed a sentence under the photograph
+      # that the original page never showed -- and an export read back
+      # stopped matching itself on exactly the alt-only images.
       block['alt_text'] = alt unless alt.to_s.empty?
-      block['caption'] = title.to_s.empty? ? alt : title
-      block.delete('caption') if block['caption'].to_s.empty?
+      block['caption'] = title unless title.to_s.empty?
       block
     end
 
@@ -972,16 +1006,34 @@ module Import
     # The front matter's own permalink wins, then the pattern given at
     # the door. No pattern, no redirect -- a guessed address would 404
     # with a straight face.
-    def origin_path(meta, slug, date)
+    #
+    # The pattern never applies to a page: it says where the old site
+    # kept its POSTS, and a root page never lived on a dated address --
+    # a /:year/:month/:day/:title/ pattern gave kontakt a redirect from
+    # /2021/12/11/kontakt/, an address the old site never served, and
+    # the build wrote a stub on it.
+    def origin_path(meta, slug, date, page: false)
       explicit = meta['permalink'] || meta['url']
       return explicit.to_s if explicit && !explicit.to_s.empty?
-      return nil unless @permalink
+      return nil if page || !@permalink
 
       @permalink.gsub(':year', format('%04d', date.year))
                 .gsub(':month', format('%02d', date.month))
                 .gsub(':day', format('%02d', date.day))
                 .gsub(':title', slug)
                 .gsub(':slug', slug)
+    end
+
+    # One old address redirects to one place. A tree that holds two files
+    # for one slug -- the flat post and the page bundle it grew into --
+    # derives the same origin for both, and handing it to both makes the
+    # build choose. The first file in walk order gets it, which is also
+    # the file PostWriter writes first, i.e. the one that keeps the
+    # unsuffixed slug the origin used to serve; the later copy arrives
+    # with no redirect, exactly like a post that never had an address.
+    def claim_origin(origin, path)
+      @origins[origin] ||= path
+      @origins[origin] == path
     end
   end
 end

@@ -447,6 +447,7 @@ cli:
   addresses_menu_hint: "↑↓ bewegen · Enter Adresse aufgeben · Esc zurück"
   addresses_pick_prompt: "Nummer der Adresse, die weg soll (alles andere geht zurück): "
   addresses_taken: "-- von einem anderen Beitrag belegt, diese Weiterleitung passiert nie"
+  addresses_taken_draft: "-- von einem Entwurf belegt, die Weiterleitung funktioniert noch; mit seiner Veröffentlichung übernimmt er sie"
   addresses_unusable: "-- unbrauchbar, erwartet wird \"Jahr/Slug\""
   addresses_drop_confirm: "%{address} aufgeben? Dieser Link hört endgültig auf zu funktionieren. [j/N] "
   addresses_dropped: "🔗 %{address} aufgegeben -- leitet nirgendwo mehr hin."
@@ -609,6 +610,7 @@ import:
     bad_date: "die DATE-Zeile war nicht lesbar -- Movable Type schreibt MM/TT/JJJJ HH:MM:SS, AM/PM optional"
     misaligned_row: "die Zeile passt nicht zur Kopfzeile -- weiter vorn blieb ein Anführungszeichen offen"
     unparsed: "die archivierte Seite ließ sich nicht als Beitrag lesen"
+    site_furniture: "das eigene Inventar der Website -- eine Übersicht (_index, home), ein Feed, eine 404 -- keine Inhaltsseite"
   # Adapter-Postscripts -- die Hinweise unter Vorschau und Zusammenfassung. Der
   # Skript-Weg (migrate_*.rb) gibt sie auf Englisch aus, siehe lib/import/cli.rb.
   note:
@@ -616,6 +618,7 @@ import:
     pages_and_more: " und %{count} weitere"
     ssg_images_freed: "%{count} Bild(er) standen mitten in einer Textzeile, wo ein Beitrag sie nicht zeigen kann -- jedes bekam eine eigene Zeile, und ein Bild, das nur Zierde eines Links war, wurde zum Linktext."
     ssg_liquid_links_dropped: "%{count} Link(s) waren über Liquid adressiert ({{ site.repository }}, {% link %}, {% post_url %}) -- eine Adresse, die außerhalb von Jekyll nichts bedeutet. Die Worte blieben, die Adresse fiel weg, statt auf eine Seite dieses Blogs zu zeigen, die es nie gab."
+    ssg_media_missing: "%{count} Bild(er) nannten eine Datei, die der Baum nicht hat. Jedes behielt seinen Platz im Beitrag, mit Alt-Text und Bildunterschrift, und zeigt auf den fehlenden Namen -- es fehlt nur die Datei selbst, und der Build sagt es, bis sie im Medienordner des Beitrags liegt."
     ssg_slug_collisions: "%{count} Adresse(n) wurden von mehr als einer Datei beansprucht -- ein Hugo-Baum, der sowohl den flachen Beitrag als auch das daraus gewachsene Page Bundle behalten hat, oder derselbe Artikel zweimal abgelegt. Alle wurden importiert, die späteren mit \"-2\" am Ende, es ging also nichts verloren; sieh dir diese Paare an und lösche, was du nicht behalten willst."
     ssg_author_dropped: "%{count} Beitrag/Beiträge nennen im Front Matter einen Autor. Diese Engine ist bewusst für eine Person gebaut und hat kein Feld dafür, der Name kam also nicht mit -- wenn im Archiv Texte anderer Leute liegen, nenne sie vor dem Veröffentlichen im Text."
     substack_paid: "%{count} Beitrag/Beiträge waren auf Substack nur für Abonnenten -- vollständig importiert (der Export gehört dir) und mit \"substack-paid\" getaggt, damit du sie vor dem Veröffentlichen findest."

@@ -44,6 +44,10 @@ require_relative '../lib/deploy_backend'
 require_relative '../lib/atomic_write'
 require_relative '../lib/file_size'
 
+# Runs at the end of the cron chain too, where stdout is a block-buffered
+# pipe and warn would otherwise overtake the progress lines around it.
+$stdout.sync = true
+
 DRY = ARGV.include?('--dry-run')
 FORCE = ARGV.include?('--force')
 PRUNE = ARGV.include?('--prune')

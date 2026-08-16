@@ -454,6 +454,7 @@ cli:
   addresses_menu_hint: "↑↓ move · Enter drop the address · Esc back"
   addresses_pick_prompt: "Number of the address to drop (anything else goes back): "
   addresses_taken: "-- taken by another post, this redirect never happens"
+  addresses_taken_draft: "-- taken by a draft, the redirect still works; publishing that draft takes it over"
   addresses_unusable: "-- unusable, expected \"year/slug\""
   addresses_drop_confirm: "Drop %{address}? That link stops working for good. [y/N] "
   addresses_dropped: "🔗 %{address} dropped -- it no longer redirects anywhere."
@@ -621,6 +622,7 @@ import:
     bad_date: "the DATE line could not be read -- Movable Type writes MM/DD/YYYY HH:MM:SS, with AM/PM optional"
     misaligned_row: "the row does not line up with the header -- a quote left open earlier in the line"
     unparsed: "the archived page could not be read as a post"
+    site_furniture: "the site's own furniture -- a listing (_index, home), a feed, a 404 -- not a page of content"
   # Adapter postscripts -- the notes under the preview and the summary. The
   # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.
   note:
@@ -628,6 +630,7 @@ import:
     pages_and_more: " and %{count} more"
     ssg_images_freed: "%{count} image(s) sat inside a line of text, where a post cannot show them -- each was moved onto a line of its own, and a picture that was only a link's decoration became the link's text."
     ssg_liquid_links_dropped: "%{count} link(s) were addressed through Liquid ({{ site.repository }}, {% link %}, {% post_url %}) -- an address that means nothing outside Jekyll. The words were kept and the address dropped, rather than left pointing at a page of this blog that was never there."
+    ssg_media_missing: "%{count} image(s) named a file the tree does not have. Each kept its place in its post, with its alt text and caption, pointing at the missing name -- only the file itself is absent, and the build will say so until it arrives in the post's media folder."
     ssg_slug_collisions: "%{count} address(es) were claimed by more than one file -- a Hugo tree that kept both the flat post and the page bundle it grew into, or the same article filed twice. All of them were imported and the later ones got \"-2\" on the end, so nothing was lost; go through those pairs and delete the one you don't want."
     ssg_author_dropped: "%{count} post(s) named an author in their front matter. This engine is single-author by design and has no field for one, so the name did not come across -- if the archive holds somebody else's writing, credit them in the text before you publish."
     substack_paid: "%{count} post(s) were subscribers-only on Substack -- imported in full (the export is yours) and tagged \"substack-paid\", so you can find them before you publish."

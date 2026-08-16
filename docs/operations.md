@@ -48,8 +48,10 @@ title, tags and type, because that is what every post needs; the parser
 accepts a few more keys, and `edit` brings back whichever ones the post
 already carries, so each can be read as well as changed:
 
-- **`series: Name`** files the post into a series. The build gives every
-  series a listing of its own at `/series/<slug>/` and puts "Part 2 of 5"
+- **`series: Name`** files the post into a series. A series with two or
+  more published parts gets a listing of its own at `/series/<slug>/` --
+  a series of one is just a post, and the listing appears when the
+  second part does. The build puts "Part 2 of 5"
   on each post in it, with the way to the part before and the part after
   -- within the series only, since a post's chronological neighbours
   across a whole archive are rarely what a reader wants next. Parts are
@@ -319,8 +321,8 @@ slot and blocks nobody, nothing moves a post that already has a time,
 and without the key in `config/site.yml` the prompt is the plain one it
 always was. Times follow `site.timezone`, daylight saving included --
 "mon 09:30" is 09:30 on the wall clock on both sides of the change. The
-cron still runs every 15 minutes, so a slot publishes within that window
-of its time.
+[publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) still runs
+on its interval, so a slot publishes within one tick of its time.
 
 ### Working the queue
 
@@ -658,7 +660,11 @@ files** -- no site rebuild:
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh
 ```
 
-Every 30 minutes is plenty. Post stats refresh live for posts younger
+Every 30 minutes is plenty. The crontab lines in this section are
+recommendations; what actually runs is whatever the installation's own
+crontab says -- installing it is step 7 of
+[install.md](install.md#7-running-on-a-server). Post stats refresh
+live for posts younger
 than ~90 days; older posts get a full refresh about once a week
 (tracked in `.stats_full_refresh_at`). A failed fetch **keeps the last
 known content** rather than publishing an empty widget -- a one-minute
@@ -711,14 +717,15 @@ skipped; the rest of the batch still publishes.
 
 Building and deploying take an advisory lock (`.blog-sh.lock` in the
 project root), because two of the things that write `public.nosync` run
-from cron: the scheduled publish every 15 minutes and the sidebar refresh
-every 30. On a large archive a build plus a full deploy takes longer than
+from cron: the scheduled publish and the sidebar refresh
+([Cron](#cron-sidebar-widgets-and-post-stats)). On a large archive a
+build plus a full deploy takes longer than
 a tick, so overlapping runs are ordinary -- and what they do to each other
 is not: a deploy walking a tree that is being rewritten, or pruning as an
 orphan a page the other run has just published.
 
 A run that finds the lock held does not wait for it. A cron tick says so
-and leaves with exit 0 -- cron is back in fifteen minutes, and a queue of
+and leaves with exit 0 -- cron is back within its interval, and a queue of
 blocked publishes would all wake up and do the same work at once. A run
 you started reports it and exits non-zero, so `./blog.sh` doesn't tell you
 a deploy happened when it didn't. The scheduled publish holds the lock for

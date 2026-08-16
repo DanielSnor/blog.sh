@@ -11,6 +11,10 @@ require_relative '../i18n'
 # site.yml answers.
 I18n.force_lang('en')
 
+# Same cron-log audience: piped, stdout is block-buffered and a per-item
+# `warn` from the run would overtake the progress line it refers to.
+$stdout.sync = true
+
 module Import
   # The non-interactive front end: what `scripts/migrate_*.rb` need so each
   # one is a handful of lines rather than its own copy of progress reporting

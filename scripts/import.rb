@@ -539,7 +539,7 @@ end
 TRANSLATED_REASONS = %w[
   reply repost quote empty attachment not_a_post trashed boost reblog error undated comment
   retweet crosspost checkin no_content thread missing_html bad_frontmatter no_identity
-  no_audio media_unfetchable unparsed bad_date misaligned_row
+  no_audio media_unfetchable unparsed bad_date misaligned_row site_furniture
 ].freeze
 
 def reason_label(reason)

@@ -2509,16 +2509,33 @@ end
 # vacated is precisely the one another post can take.
 def address_row(former, current, index)
   parts = former.split('/').reject(&:empty?)
-  taken = parts.size == 2 && former != current &&
-          File.exist?(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"))
+  occupant = parts.size == 2 && former != current ? address_occupant(parts) : nil
   note = if parts.size != 2
            "  #{t('cli.addresses_unusable')}"
-         elsif taken
+         elsif occupant == :draft
+           "  #{t('cli.addresses_taken_draft')}"
+         elsif occupant
            "  #{t('cli.addresses_taken')}"
          else
            ''
          end
   format('%2d.  %s%s', index + 1, former, note)
+end
+
+# Which kind of post owns year/slug today; nil when nobody does. The kind
+# matters: a draft emits no page, so the build still writes the redirect
+# stub there and the old link keeps working -- the takeover only happens
+# when that draft publishes. Told "this redirect never happens", the
+# owner's next move is dropping an address that is doing its job.
+def address_occupant(parts)
+  raw = File.read(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"), encoding: 'utf-8')
+  draft?(JSON.parse(raw)) ? :draft : :published
+rescue Errno::ENOENT
+  nil
+rescue StandardError
+  # An occupant that will not read or parse still owns the path --
+  # promising a live redirect on its account would be a guess.
+  :published
 end
 
 # Same two faces as every other picker here: arrow keys in a terminal, a
@@ -3824,7 +3841,16 @@ end
 # A manual build+deploy not tied to a specific post -- e.g. after a manual
 # template edit, when nothing else would otherwise trigger a rebuild.
 def cmd_rebuild
-  rebuild_and_deploy
+  return if rebuild_and_deploy
+
+  # The lock's own exit code, same as the build and deploy scripts leave
+  # with: somebody ran this by hand, and exit 0 reads as "a deploy
+  # happened" to whatever invoked it. A genuine failure keeps exit 0 --
+  # the .deploy-pending marker means the next scheduled run finishes the
+  # job, which is what the lines above have just promised. In the wizard
+  # the SystemExit is caught like every other cmd_* abort and only ends
+  # this menu entry, not the session.
+  exit RunLock::BUSY_EXIT if Publishing.stopped_on_busy_lock?
 end
 
 def print_usage

@@ -437,6 +437,7 @@ cli:
   addresses_menu_hint: "↑↓ pohyb · Enter zrušit adresu · Esc zpět"
   addresses_pick_prompt: "Číslo adresy ke zrušení (cokoliv jiného = zpět): "
   addresses_taken: "— adresu převzal jiný post, tohle přesměrování nikdy nenastane"
+  addresses_taken_draft: "— adresu zabral draft, přesměrování zatím funguje; převezme ji až jeho publikace"
   addresses_unusable: "— nepoužitelné, čekám \"rok/slug\""
   addresses_drop_confirm: "Zrušit %{address}? Ten odkaz tím přestane fungovat natrvalo. [a/N] "
   addresses_dropped: "🔗 %{address} zrušeno — už nikam nepřesměrovává."
@@ -600,6 +601,7 @@ import:
     bad_date: "nepodařilo se přečíst řádek DATE — Movable Type píše MM/DD/RRRR HH:MM:SS, AM/PM volitelně"
     misaligned_row: "řádek nesedí na hlavičku — dřív na řádku zůstala otevřená uvozovka"
     unparsed: "archivovanou stránku nešlo přečíst jako post"
+    site_furniture: "vlastní vybavení webu — výpis (_index, home), feed, 404 — ne stránka s obsahem"
   # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
   # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.
   note:
@@ -607,6 +609,7 @@ import:
     pages_and_more: " a dalších %{count}"
     ssg_images_freed: "Obrázků uvnitř řádku textu, kde je post neumí ukázat: %{count} — každý dostal vlastní řádek, a obrázek, který byl jen ozdobou odkazu, se stal jeho textem."
     ssg_liquid_links_dropped: "Odkazů adresovaných přes Liquid ({{ site.repository }}, {% link %}, {% post_url %}): %{count} — taková adresa mimo Jekyll nic neznamená. Slova zůstala, adresa šla pryč; lepší než odkaz mířící na stránku tohohle blogu, která tu nikdy nebyla."
+    ssg_media_missing: "Obrázků, které jmenují soubor, jenž ve stromu není: %{count} — každý si v postu podržel místo, alt text i popisek a míří na chybějící jméno. Chybí jen samotný soubor; build to bude hlásit, dokud ho do složky médií postu nedodáš."
     ssg_slug_collisions: "Adres, o které se hlásí víc než jeden soubor: %{count} — strom z Huga, který si nechal plochý post i page bundle, co z něj vyrostl, nebo tentýž článek podaný dvakrát. Naimportovaly se všechny a ty pozdější dostaly na konec „-2“, takže nic nechybí; ty dvojice si projdi a nechtěnou smaž."
     ssg_author_dropped: "Postů, které ve frontmatteru uvádějí autora: %{count} — tenhle engine je záměrně jednoautorský a pole pro autora nemá, jméno se tedy nepřeneslo. Jestli v archivu leží texty někoho jiného, uveď ho před publikací v textu."
     substack_paid: "Postů jen pro předplatitele Substacku: %{count} — naimportovány celé (export je tvůj) a označené štítkem „substack-paid“, ať je před publikací najdeš."

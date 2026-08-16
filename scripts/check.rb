@@ -93,8 +93,12 @@ findings.sort_by.with_index { |f, i| [order.fetch(f.level, 3), i] }.each do |fin
   puts Tui.paint("   #{finding.fix}", :dim) if finding.fix
 end
 
-errors = findings.count(&:error?)
-warnings = findings.count(&:warn?)
+# Totalled through each finding's count rather than by counting lines:
+# long lists are capped at twenty lines and the rest rides along in a
+# "...and N more" finding, so the number of lines on the screen says how
+# much was printed, not how much is wrong.
+errors = findings.select(&:error?).sum(&:count)
+warnings = findings.select(&:warn?).sum(&:count)
 
 puts
 if errors.zero? && warnings.zero?
