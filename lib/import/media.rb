@@ -6,11 +6,11 @@ require 'fileutils'
 require_relative '../media_dimensions'
 
 module Import
-  # Collects one post's media on its way to PostWriter, which expects a
-  # { source_path => desired_filename } hash. Two sources, because that's
-  # the split every importer falls on: a platform API hands out URLs to
-  # download (Tumblr, Bluesky), while an official export archive already
-  # has the files on disk (Twitter, WordPress attachments).
+  # Collects one post's media on its way to PostWriter, which expects
+  # [source_path, desired_filename] pairs (see #files). Two sources,
+  # because that's the split every importer falls on: a platform API hands
+  # out URLs to download (Tumblr, Bluesky), while an official export
+  # archive already has the files on disk (Twitter, WordPress attachments).
   #
   # Filenames are numbered per post (01.jpg, 02.png, ...) in the order the
   # adapter registers them. That numbering is deterministic for a given
@@ -44,7 +44,7 @@ module Import
     THROTTLED = [Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, Errno::ETIMEDOUT,
                  Net::OpenTimeout, Net::ReadTimeout].freeze
 
-    attr_reader :files, :failures, :reused
+    attr_reader :failures, :reused
 
     # `index` is a MediaIndex (or nil): the archive's own answer to "have
     # I already fetched this address?", built once per run. With it, a
@@ -80,6 +80,13 @@ module Import
       # records as `src`. Without it written down, the next run has nothing
       # to look this file up by and downloads it all over again.
       @sources = {}
+      # Copy-plan pairs @files cannot hold: one archive file standing in
+      # for a SECOND name at once. A hand-mangled previous copy can leave
+      # the index answering two different addresses with the same file,
+      # and a plan keyed by source path then forgot one of the two names
+      # -- the post kept the entry, and nothing anywhere was instructed
+      # to put a file under it. See #files.
+      @extra = []
       # source (url or path) -> allocated filename. @files can't serve this
       # purpose even though it looks like it should: it is keyed by source
       # too, so registering the same image twice used to OVERWRITE the
@@ -103,6 +110,18 @@ module Import
     # had kept none, and a bare number here read as a promise.
     def count
       @registered
+    end
+
+    # The copy plan for PostWriter: [source_path, desired_filename] pairs.
+    # A list rather than a hash, because a source path is not unique in
+    # the plan -- one archive file can owe the post TWO names (reuse over
+    # a hand-corrupted previous copy, where the index answers two
+    # addresses with the same file). A hash keyed by source path could
+    # only remember one of them, and the entry wearing the forgotten name
+    # then hung in the post with no instruction to ever create its file.
+    # Names stay unique; only sources repeat.
+    def files
+      @files.to_a + @extra
     end
 
     # Lets an adapter tell a preview from a real run -- in dry-run no
@@ -203,7 +222,14 @@ module Import
       @reused += 1
       return filename if @dry_run
 
-      @files[entry.path] = filename
+      # A second name for a file the plan already carries goes into the
+      # extra pairs, never over the first: overwriting here is what used
+      # to leave the first entry's name with no copy instruction at all.
+      if @files.key?(entry.path) && @files[entry.path] != filename
+        @extra << [entry.path, filename]
+      else
+        @files[entry.path] = filename
+      end
       @kept[entry.path] = true
       # The dimensions the post recorded when this file was written. The
       # bytes are asked first and answer for nearly everything (see
@@ -243,7 +269,7 @@ module Import
     def dimensions(filename)
       return nil if @dry_run
 
-      path = @files.key(filename)
+      path = @files.key(filename) || @extra.find { |_, name| name == filename }&.first
       dims = path && MediaDimensions.image(path)
       dims || @remembered[filename]
     end
@@ -256,7 +282,21 @@ module Import
       return if @dry_run
 
       path = @files.key(filename)
-      return unless path
+      if path.nil?
+        # A name living in an extra pair: only the pair is un-registered.
+        # Its path is the archive's own file -- and possibly still the
+        # primary pair's source -- so nothing on disk is touched.
+        idx = @extra.index { |_, name| name == filename }
+        return unless idx
+
+        @extra.delete_at(idx)
+        @by_source.delete_if { |_, name| name == filename }
+        @sources.delete(filename)
+        @remembered.delete(filename)
+        @registered -= 1
+        @reused -= 1
+        return
+      end
 
       @files.delete(path)
       # Or a later reference to the same source would resurrect a filename

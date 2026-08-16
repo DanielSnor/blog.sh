@@ -545,6 +545,7 @@ import:
   would_write: "Würde %{count} Beitrag/Beiträge schreiben; Medien darin: %{media}."
   media_not_verified: "Eine Vorschau lädt nichts herunter -- wie viele davon wirklich ankommen, sagt erst der echte Lauf."
   media_reused: "Davon hat das Archiv %{count} bereits; sie kommen von dort und nicht von der Quelle."
+  media_superseded: "%{count} heruntergeladene Datei(en) stimmen nicht mehr mit der Archivkopie überein und wurden verworfen -- das Archiv behält seine eigenen Bytes."
   written: "%{count} Beitrag/Beiträge und %{media} Mediendatei(en) geschrieben."
   sample_slugs: "Die ersten Slugs:"
   skipped: "  %{count} übersprungen (%{reason})"

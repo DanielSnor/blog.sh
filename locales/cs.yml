@@ -536,6 +536,7 @@ import:
   would_write: "Zapsalo by se postů: %{count}; médií v nich: %{media}."
   media_not_verified: "Náhled nestahuje — kolik médií doopravdy dorazí, řekne až ostrý běh."
   media_reused: "Z toho %{count} archiv už má a bere si je z něj, ne ze zdroje."
+  media_superseded: "Stažených souborů, které už neodpovídají kopii v archivu: %{count} — zahodily se, archiv si nechává vlastní bajty."
   written: "Zapsáno postů: %{count}, souborů médií: %{media}."
   sample_slugs: "Prvních několik slugů:"
   skipped: "  přeskočeno (%{reason}): %{count}"

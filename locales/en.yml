@@ -557,6 +557,7 @@ import:
   would_write: "Would write %{count} post(s); media in them: %{media}."
   media_not_verified: "A preview downloads nothing -- the real run reports how many of those actually arrive."
   media_reused: "%{count} of them are already in this archive and come from there, not from the source."
+  media_superseded: "%{count} downloaded file(s) no longer match the archive's copy and were discarded -- the archive keeps its own bytes."
   written: "Wrote %{count} post(s) and %{media} media file(s)."
   sample_slugs: "First few slugs:"
   skipped: "  %{count} skipped (%{reason})"

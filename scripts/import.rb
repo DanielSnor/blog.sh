@@ -567,6 +567,13 @@ def report(result, dry_run:)
   # the preview too, where it is the honest half of the media count above:
   # some of them are already here and will not be fetched at all.
   puts Tui.paint(t('import.media_reused', count: result.media_reused), :cyan) if result.media_reused.to_i.positive?
+  # Downloads that no longer matched the archive's copy under their name
+  # and were discarded for it -- the source has drifted, and this line is
+  # the only place that fact surfaces. Never set on a dry run, which
+  # downloads nothing.
+  if result.respond_to?(:media_superseded) && result.media_superseded.to_i.positive?
+    puts Tui.paint(t('import.media_superseded', count: result.media_superseded), :yellow)
+  end
 
   unless result.samples.empty?
     puts t('import.sample_slugs')

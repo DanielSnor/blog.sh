@@ -42,9 +42,15 @@ module Import
     # the old summary said "420 media file(s)" for a run that fetched all
     # 420 and for one that fetched none, which is the same sentence for two
     # very different afternoons.
+    #
+    # `media_superseded` counts the fetches this run threw away because
+    # the archive already held DIFFERENT bytes under the entry's name --
+    # a source that re-encodes its pictures and keeps the addresses. The
+    # archive's copy wins by rule; the number is here so the summary can
+    # say the source has drifted, which is the operator's only signal.
     Result = Struct.new(:written, :scanned, :skipped, :media, :media_reused,
                         :media_failures, :skipped_media_failures, :samples, :interrupted,
-                        :dropped_elements,
+                        :dropped_elements, :media_superseded,
                         keyword_init: true)
 
     # `media_index` is what lets a re-import skip what it already has (see
@@ -78,6 +84,10 @@ module Import
       # A fresh ledger per run, or a second import in one process would
       # report the first one's losses again.
       HtmlBlocks.reset_dropped!
+      # PostWriter counts per process; the run owns only its own delta --
+      # same reason as the ledger above, without a reset that would zero
+      # another run's tally mid-flight.
+      superseded_before = PostWriter.superseded_downloads
       written = 0
       scanned = 0
       skipped = Hash.new(0)
@@ -157,7 +167,8 @@ module Import
                  media_reused: media_reused, media_failures: media_failures,
                  skipped_media_failures: skipped_media_failures,
                  samples: samples, interrupted: interrupted,
-                 dropped_elements: HtmlBlocks.dropped.dup)
+                 dropped_elements: HtmlBlocks.dropped.dup,
+                 media_superseded: PostWriter.superseded_downloads - superseded_before)
     end
 
     private

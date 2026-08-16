@@ -16,8 +16,15 @@ module PostWriter
   MEDIA_KEYS = %w[media poster].freeze
 
   # post: hash matching the post schema (slug, title, date, state, tags, content, source)
-  # media_files: { source_path => desired_filename } to copy into media/<year>/<slug>/
+  # media_files: [source_path, desired_filename] pairs to copy into
+  # media/<year>/<slug>/. A list, not a hash, because one source file can
+  # owe the post two names at once (Import::Media#files); a hash -- which
+  # the authoring CLI still hands over -- converts on the way in, and its
+  # one-name-per-source shape loses nothing there, where every source is a
+  # distinct file of the author's own. Names are unique either way; only
+  # sources may repeat.
   def self.write(post, media_files: {})
+    media_files = media_files.to_a
     date = Time.parse(post.fetch('date'))
     year = date.year.to_s
 
@@ -125,12 +132,14 @@ module PostWriter
   # twice and passed another off as a third. Measured on a real Ghost
   # post, not conjectured.
   #
-  # So before anything is copied, an entry whose address the previous copy
-  # of this post already knew takes back the filename it had, and a
-  # genuinely new file is steered clear of every name anything answers
-  # for -- on disk or in this run. Entries with no address keep their
-  # positional names: there is nothing to recognise them by, and renaming
-  # them would mint fresh files on every run of a tree import.
+  # So before anything is copied, an entry whose address any copy of this
+  # post has ever known -- the one being replaced, or a kept version of it
+  # -- takes back the filename it had, and a genuinely new file is steered
+  # clear of every name anything answers for, on disk or in this run.
+  # Entries with no address are recognised by their BYTES where the plan
+  # still has them (see reconcile_positional); only when the bytes answer
+  # nothing does the positional name stand, because renaming on a guess
+  # would mint fresh files on every run of a tree import.
   def self.reconcile_media_names(post, previous, year, slug, media_files)
     dir = File.join(MEDIA_DIR, year, slug)
     old_names = {}
@@ -139,13 +148,10 @@ module PostWriter
       name = entry['url'].to_s
       old_names[src] = name if !src.empty? && plain_media_name?(name) && !old_names.key?(src)
     end
-    # The durable half of the memory. `previous` only remembers the
-    # CURRENT set, so a picture dropped in one re-import and returned in
-    # the next is missing from it -- and treating the return as an arrival
-    # minted a fresh copy of a file the archive held all along, once per
-    # cycle, growing the directory in silence. But an entry whose bytes
-    # are being taken from this post's own directory already has a name
-    # there: the path in media_files says so.
+    # An entry whose bytes are being taken from this post's own directory
+    # already has a name there: the path in media_files says so. This is
+    # what recognises a reuse the index served out of the post's own
+    # directory, address or no address.
     own = {}
     media_files.each do |src_path, alloc|
       next unless File.dirname(src_path) == dir
@@ -153,13 +159,30 @@ module PostWriter
       base = File.basename(src_path)
       own[alloc] = base if plain_media_name?(base)
     end
-    return media_files if old_names.empty? && own.empty?
-
     on_disk = Dir.exist?(dir) ? Dir.children(dir).reject { |f| f.start_with?('.') } : []
+    # Only a post with no remembered names, no reused files AND an empty
+    # directory has nothing to reconcile against. The directory is part of
+    # that test on purpose: a previous copy with no media at all (the
+    # source dropped every picture for one cycle) used to slip through
+    # here, and the returning pictures were then never confronted with the
+    # files lying on disk -- [pes, kocka] -> drop -> [kocka, pes] swapped
+    # the two identities in place.
+    return media_files if old_names.empty? && own.empty? && on_disk.empty?
 
+    # The durable half of the memory. `previous` only remembers the
+    # CURRENT set, so a picture dropped in one re-import and returned in
+    # the next is missing from it -- and treating the return as an arrival
+    # minted a fresh copy (or, after a re-encode at the source, a copy per
+    # cycle) of a file the archive held all along. The kept versions of
+    # this post remember what `previous` has forgotten. Loaded lazily:
+    # only an addressed entry nothing else recognises is worth the read.
+    version_names(post, old_names, slug, year)
+
+    sha_cache = {}
     rename = {}
     keeps = []
     arrivals = []
+    positional = []
     each_media_entry(post) do |entry, _block|
       name = entry['url'].to_s
       src = entry['src'].to_s
@@ -167,7 +190,12 @@ module PostWriter
 
       wanted = (old_names[src] unless src.empty?) || own[name]
       if wanted.nil?
-        (src.empty? ? keeps : arrivals) << name
+        if src.empty?
+          keeps << name
+          positional << name
+        else
+          arrivals << name
+        end
       elsif wanted == name
         keeps << name
       else
@@ -175,14 +203,23 @@ module PostWriter
       end
     end
 
-    # A rename target has to be free. An entry with no address keeps its
-    # positional name and cannot be argued with -- so a recognised entry
-    # whose old name is now held by one of those, or already claimed by an
-    # earlier rename (two entries of a hand-edited previous copy claiming
-    # one name), is demoted to an arrival instead: a fresh name, its own
+    # Entries with no address, recognised by their bytes -- resolved
+    # BEFORE the rename claims are settled, so a positional entry that
+    # moves to the file it matches vacates a name an addressed entry may
+    # be waiting for. Addressed claims keep their precedence: the moves
+    # only ever target names no keep and no pending rename answers for.
+    moves = reconcile_positional(positional, keeps, rename, media_files, dir, on_disk, sha_cache)
+
+    # A rename target has to be free. An entry with no address whose bytes
+    # settle nothing keeps its positional name -- so a recognised entry
+    # whose old name is now held by one of those, or claimed by an earlier
+    # rename (two entries of a hand-edited previous copy claiming one
+    # name, or a kept version remembering a name that has since changed
+    # hands), is demoted to an arrival instead: a fresh name, its own
     # bytes. Two entries must never end up sharing a name; that was the
     # gallery defect this method exists to prevent.
     taken = keeps.to_h { |n| [n, true] }
+    moves.each_value { |target| taken[target] = true }
     rename.keys.sort.each do |name|
       target = rename[name]
       if taken.key?(target)
@@ -192,6 +229,7 @@ module PostWriter
         taken[target] = true
       end
     end
+    rename.merge!(moves)
 
     used = (on_disk + rename.values + keeps).to_h { |n| [n, true] }
     arrivals.uniq.each do |name|
@@ -202,26 +240,30 @@ module PostWriter
       # A collision with a file nobody claims is not always a stranger:
       # a picture dropped in one re-import and brought back in the next
       # arrives as a fresh download, and the file it collides with is its
-      # own orphaned copy -- the index forgot the address the moment no
-      # post carried it, so no cheaper memory exists. The bytes decide:
-      # identical means reunion (the copy is then skipped as always),
-      # different means the name belongs to somebody else and the
-      # newcomer moves on. Without this, a plain drop-and-return cycle
-      # minted one more byte-identical file each time, in silence. Only
-      # the arrival's own positional name is consulted: a copy parked
-      # under some OTHER name (the leavings of a source that re-encoded
-      # a picture and later dropped and returned it) is not searched for,
-      # so that narrower corner still grows -- adversarially measured,
-      # accepted, and older than this method.
-      if !taken.key?(name) && on_disk.include?(name)
-        src_path = media_files.key(name)
-        disk_path = File.join(dir, name)
-        if src_path && File.file?(src_path) && File.file?(disk_path) &&
-           File.size(src_path) == File.size(disk_path) &&
-           Digest::SHA256.file(src_path) == Digest::SHA256.file(disk_path)
-          used[name] = true
-          next
-        end
+      # own orphaned copy. The bytes decide: identical means reunion (the
+      # copy is then skipped as always), different means the name belongs
+      # to somebody else. The arrival's own positional name is asked
+      # first; failing that, every name on disk that nothing claims --
+      # which is what reunites a return with a copy parked under some
+      # OTHER name once the kept versions have forgotten the address.
+      # Only a claimed name outranks matching bytes: the address decides
+      # ownership, the bytes only ever decide identity.
+      src_path = plan_source(media_files, name)
+      if !taken.key?(name) && on_disk.include?(name) &&
+         same_bytes?(src_path, File.join(dir, name), sha_cache)
+        used[name] = true
+        taken[name] = true
+        next
+      end
+      reunion = src_path && File.file?(src_path) && on_disk.sort.find do |cand|
+        cand != name && !taken.key?(cand) && plain_media_name?(cand) &&
+          same_bytes?(src_path, File.join(dir, cand), sha_cache)
+      end
+      if reunion
+        rename[name] = reunion
+        taken[reunion] = true
+        used[reunion] = true
+        next
       end
       ext = File.extname(name)
       n = 1
@@ -230,13 +272,171 @@ module PostWriter
       rename[name] = fresh
       used[fresh] = true
     end
-    return media_files if rename.empty?
+
+    final = rename.empty? ? media_files : media_files.map { |src_path, name| [src_path, rename.fetch(name, name)] }
+    tally_superseded(final, dir, sha_cache)
+    return final if rename.empty?
 
     each_media_entry(post) do |entry, _block|
       to = rename[entry['url'].to_s]
       entry['url'] = to if to
     end
-    media_files.transform_values { |name| rename.fetch(name, name) }
+    final
+  end
+
+  # The names this post's kept versions remember for addresses `previous`
+  # no longer carries, merged into old_names -- first seen wins, newest
+  # version first, and nothing already known is overwritten, so the copy
+  # being replaced always outranks its own history. Read only when some
+  # addressed entry is otherwise unrecognised: versions are a directory of
+  # files, and every other write has no reason to open them. A version
+  # somebody has hand-mangled is skipped, not obeyed and not fatal.
+  #
+  # A name a newer memory has already promised to some other address is
+  # off limits, and not only as a key: a stale version can remember a name
+  # that has since changed hands, and taking its word would let the OLD
+  # claim win whenever the numbering happened to deal it that name as a
+  # keep -- evicting the rightful entry into a fresh copy. The newer
+  # memory decides; the address the version spoke of arrives instead, and
+  # the reunion pass in the caller still finds its bytes where they lie.
+  def self.version_names(post, old_names, slug, year)
+    unknown = false
+    each_media_entry(post) do |entry, _block|
+      src = entry['src'].to_s
+      unknown ||= !src.empty? && !old_names.key?(src)
+    end
+    return unless unknown
+
+    promised = old_names.values.to_h { |name| [name, true] }
+    PostVersions.list(slug, year, content_dir: CONTENT_DIR).each do |path|
+      version = begin
+        JSON.parse(File.read(path, encoding: 'utf-8'))
+      rescue StandardError
+        nil
+      end
+      next unless version.is_a?(Hash)
+
+      each_media_entry(version) do |entry, _block|
+        src = entry['src'].to_s
+        name = entry['url'].to_s
+        next if src.empty? || !plain_media_name?(name)
+        next if old_names.key?(src) || promised.key?(name)
+
+        old_names[src] = name
+        promised[name] = true
+      end
+    end
+  end
+
+  # Entries with no address, recognised by the second identity: their
+  # bytes. A tree import hands these over by position, and a source-side
+  # swap of two local files used to swap their identities in the post --
+  # each entry took the other's name, dimensions and bytes, forever,
+  # because "no address" read as "nothing to recognise them by". The plan
+  # still has the file itself, and when the bytes under the positional
+  # name disagree, a file in the post's directory with the SAME bytes says
+  # which name this entry has carried all along.
+  #
+  # Addressed claims come first: a keep and a pending rename target are
+  # both off limits. Two identical no-address entries cannot both have the
+  # matched file -- the first (in post order) takes it, the next stays
+  # where it is. And an entry the bytes cannot place FALLS BACK to its
+  # positional name, never to a fresh mint: minting here would create new
+  # files on every run of a tree import, which is the one thing positional
+  # naming has always been careful not to do. The cancellation loop keeps
+  # the fallbacks honest -- a move onto the position of an entry that
+  # stayed put would make two entries share a name.
+  #
+  # Returns {current name => matched name}; `keeps` loses the movers.
+  def self.reconcile_positional(positional, keeps, rename, media_files, dir, on_disk, sha_cache)
+    return {} if positional.empty?
+
+    movable = {}
+    positional.each do |name|
+      src_path = plan_source(media_files, name)
+      # Bytes to compare are only in hand for a file the plan takes from
+      # OUTSIDE the post's directory: a reuse from inside it is already
+      # recognised (own), and a failed fetch left nothing to measure.
+      next unless src_path && File.file?(src_path) && File.dirname(src_path) != dir
+      # Bytes in place -- the everyday tree re-import. Nothing to solve.
+      next if same_bytes?(src_path, File.join(dir, name), sha_cache)
+
+      movable[name] = src_path
+    end
+    return {} if movable.empty?
+
+    claimed = (keeps - movable.keys).to_h { |n| [n, true] }
+    rename.each_value { |target| claimed[target] = true }
+
+    moves = {}
+    movable.each do |name, src_path|
+      match = on_disk.sort.find do |cand|
+        cand != name && !claimed.key?(cand) && !moves.value?(cand) && plain_media_name?(cand) &&
+          same_bytes?(src_path, File.join(dir, cand), sha_cache)
+      end
+      moves[name] = match if match
+    end
+
+    # An entry that found no match stays on its position -- and every move
+    # onto a STAYING entry's position is cancelled, which can strand the
+    # mover on its own position and cancel another move in turn. Swaps and
+    # rotations survive this loop untouched: every member of the cycle
+    # moves, so no target is a name anybody kept.
+    loop do
+      staying = movable.keys.reject { |n| moves.key?(n) }
+      clash = moves.find { |_, target| staying.include?(target) }
+      break unless clash
+
+      moves.delete(clash[0])
+    end
+
+    moves.each_key { |name| keeps.delete(name) }
+    moves
+  end
+
+  # The plan pair behind an allocated name. media_files is a list of
+  # pairs rather than a hash -- one source file can owe the post two
+  # names -- so Hash#key has no direct equivalent; names are unique in
+  # the plan, so the first pair carrying the name is the only one.
+  def self.plan_source(media_files, name)
+    pair = media_files.find { |_, alloc| alloc == name }
+    pair && pair[0]
+  end
+
+  # Byte identity, sized first so the hash is only ever paid for files
+  # that could be the same file. The cache is per reconcile call: the same
+  # on-disk file gets asked about by several entries in one pass, and once
+  # per pass is what a hash of it is worth.
+  def self.same_bytes?(a, b, cache)
+    return false unless a && b && File.file?(a) && File.file?(b)
+    return false unless File.size(a) == File.size(b)
+
+    sha = ->(path) { cache[path] ||= Digest::SHA256.file(path).hexdigest }
+    sha.call(a) == sha.call(b)
+  end
+
+  # How many incoming files this write discarded in favour of the
+  # archive's own copy under the same name -- a source that re-encoded a
+  # picture and kept its address, mostly. copy_media skips those silently
+  # (an import only ever adds), and silence here cost an operator the one
+  # fact worth acting on: the source no longer serves what the archive
+  # holds. Counted per process, read as a delta by Import::Run, said in
+  # the summary. Byte-identical skips are not counted -- a plain re-import
+  # discards every download it was told to make, and that is reuse, not
+  # news.
+  def self.superseded_downloads
+    @superseded_downloads ||= 0
+  end
+
+  def self.tally_superseded(media_files, dir, sha_cache)
+    media_files.each do |src_path, name|
+      next if File.dirname(src_path) == dir
+
+      dest = File.join(dir, name)
+      next unless File.file?(src_path) && File.file?(dest)
+
+      @superseded_downloads = superseded_downloads + 1 unless same_bytes?(src_path, dest, sha_cache)
+    end
   end
 
   # Makes the post describe the file that is actually in the archive.
