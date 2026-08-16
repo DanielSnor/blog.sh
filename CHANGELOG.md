@@ -29,7 +29,10 @@ which only existed because the bar didn't.
   built site, only ever reports, and exits non-zero on errors alone, so
   it can hang off cron. `--online` also asks the web about the links
   that leave the site -- deliberately narrow, and nothing is called dead
-  on a single request. Details in
+  on a single request. The summary totals the archive, not the screen:
+  long lists are capped at twenty lines, the counts are not. And a link
+  to a one-post series is reported dead, because a series page only
+  exists from the second published part on. Details in
   [operations.md](docs/operations.md#checking-the-archive).
 - **`check` also sees the file a post no longer names.** An import only
   ever adds, so a source that drops a picture between runs leaves its
@@ -53,8 +56,12 @@ which only existed because the bar didn't.
   `REFETCH_MEDIA=1` asks the source again but never overwrites, a
   returning file takes back the name it had here rather than landing on
   another file's bytes, and the post describes the file that is really
-  in the archive. The whole contract is in
-  [importing.md](docs/importing.md#what-every-import-does).
+  in the archive. The post's kept versions remember an address the
+  current copy dropped, identical bytes reunite a return with the copy
+  already here, an entry with no address is recognised by its bytes --
+  and a download the archive's copy outranks is counted in the summary,
+  which is the one signal the source has drifted. The whole contract is
+  in [importing.md](docs/importing.md#what-every-import-does).
 - **Carrying a post through the publishing queue.** `[m]` picks the post
   up, the arrows carry it, Enter puts it down and Escape changes
   nothing; the times belong to the queue, so a long move is one
@@ -145,6 +152,14 @@ which only existed because the bar didn't.
   [operations.md](docs/operations.md#cron-sidebar-widgets-and-post-stats);
   the decision and its price in
   [decisions.md](docs/decisions.md#publishing-and-comments).
+- **A reply's pictures appear with it.** Both networks hand a reply's
+  images over outside its text, so a picture reply used to render as
+  just its words -- in the live thread and the moderated list alike.
+  Thumbnails now sit under the words, linking out to the full image and
+  loading from the commenter's own network the way their avatar always
+  has. Images only, on purpose, and a reply marked sensitive keeps its
+  pictures to itself. See
+  [install.md](docs/install.md#8-comments-network-optional-mastodon-or-bluesky).
 
 ### Changed
 
@@ -348,6 +363,33 @@ because both ends of them are ours.
   left years earlier. All four places that said it now say which half
   needs the network, and that an image which never arrived leaves no
   block behind -- `./blog.sh check` finds nothing to report afterwards.
+- **`props` stopped condemning a redirect a draft is holding.** The
+  address list called an old address taken by a draft "a redirect that
+  never happens" -- but the build writes the stub as long as the
+  occupant is unpublished, so the redirect works, and dropping the
+  address on that advice threw a working one away. The row now says the
+  takeover happens when that draft publishes.
+- **`./blog.sh rebuild` under a held lock exits non-zero**, as
+  operations.md had promised all along -- with the lock's own code, so
+  whatever invoked it no longer hears "a deploy happened". The cron
+  paths keep their deliberate exit 0.
+- **Five corrections to the tree import.** An alt text is no longer
+  copied into a visible caption -- markdown renders no alt, so the copy
+  printed a sentence the original site never showed, and broke the
+  export round trip on exactly those images. A post whose only
+  picture's file is missing from the tree keeps its place, name, alt
+  and caption instead of vanishing whole, and the postscript counts the
+  miss. A PERMALINK pattern never applies to root pages. A
+  slug-collision pair hands its shared origin to the first file written
+  instead of to both. And the site's own furniture (`_index.md`,
+  `home.md`) shows up in the counts as skipped instead of vanishing
+  from the total.
+- **A nested `<a>` closes the open one**, as a browser reads the
+  invalid markup some Ghost exports carry -- one run of text is one
+  link span now, not two identical ones fighting.
+- **A warning no longer outruns the output it belongs under.** The cron
+  entry points sync stdout, so in the mail a piped run's warnings land
+  where they happened instead of opening the report.
 
 ### Upgrading
 
