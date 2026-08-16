@@ -1026,6 +1026,11 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
       # checked against.
       puts t('cli.schedule_slots_taken')
       passed.each { |time, slug| puts "     #{time.strftime(t('date_time_format'))} → '#{slug}'" }
+      # The road to an EARLIER slot, said exactly where the author is
+      # looking at a full queue and an offer a month out. The two-step is
+      # by design (the queue owns the ordering), but a design nobody
+      # mentions at this prompt reads as "the queue is full, tough luck".
+      puts Tui.paint("   #{t('cli.schedule_queue_hint')}", :dim)
       puts
     end
     puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))

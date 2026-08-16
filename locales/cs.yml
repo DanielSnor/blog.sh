@@ -227,6 +227,7 @@ cli:
   schedule_slot_keys: "  [Enter] přijmout  ·  vlastní datum (YYYY-MM-DD HH:MM)  ·  „%{cancel_word}“ = zpět"
   schedule_queue_position: "  %{count}. post ve frontě (předchozí: '%{slug}', %{date})."
   schedule_slots_taken: "  Dřívější sloty jsou obsazené:"
+  schedule_queue_hint: "Chceš ho dřív — třeba v dnešním slotu? Přijmi nabídnutý čas a ve frontě (./blog.sh queue) ho přenes na začátek: časy zůstanou slotům a zbytek ustoupí o jeden."
   props_queue_heading: "Fronta (naplánovaných: %{count}):"
   queue_empty: "Fronta je prázdná — draft naplánuješ přes [s] v jeho náhledu, nebo ./blog.sh schedule."
   queue_overdue: "(čeká na cron)"

@@ -244,6 +244,7 @@ cli:
   schedule_slot_keys: "  [Enter] accept  ·  your own date (YYYY-MM-DD HH:MM)  ·  \"%{cancel_word}\" = back"
   schedule_queue_position: "  Post %{count} in the queue (previous: '%{slug}', %{date})."
   schedule_slots_taken: "  Earlier slots are taken:"
+  schedule_queue_hint: "Want it sooner -- today's slot, say? Accept the offered time, then carry the post to the front of the queue (./blog.sh queue): the times stay with the slots and the rest step back one."
   props_queue_heading: "The queue (%{count} scheduled):"
   queue_empty: "The queue is empty -- a draft is scheduled via [s] in its preview, or ./blog.sh schedule."
   queue_overdue: "(waiting for the cron)"

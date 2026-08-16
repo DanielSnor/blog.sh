@@ -66,7 +66,9 @@ which only existed because the bar didn't.
   up, the arrows carry it, Enter puts it down and Escape changes
   nothing; the times belong to the queue, so a long move is one
   confirmed write instead of one per slot. `[u]`/`[d]` remain for the
-  single slot and for piped input. See
+  single slot and for piped input. And the schedule prompt says so when
+  the slot you want is taken: accept the offered time, carry the post to
+  the front -- a full queue is a two-step, not a dead end. See
   [operations.md](docs/operations.md#working-the-queue).
 - **Unlisted posts.** `unlisted: true` keeps a published post on its
   ordinary address and takes it out of every listing, feed and index,

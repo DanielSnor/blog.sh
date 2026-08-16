@@ -237,6 +237,7 @@ cli:
   schedule_slot_keys: "  [Enter] übernehmen  ·  eigenes Datum (JJJJ-MM-TT HH:MM)  ·  „%{cancel_word}“ = zurück"
   schedule_queue_position: "  %{count}. Beitrag in der Warteschlange (davor: '%{slug}', %{date})."
   schedule_slots_taken: "  Frühere Slots sind belegt:"
+  schedule_queue_hint: "Früher gewünscht -- etwa im heutigen Slot? Den angebotenen Termin annehmen und den Beitrag in der Warteschlange (./blog.sh queue) an den Anfang tragen: Die Zeiten bleiben bei den Slots, der Rest rückt um einen zurück."
   props_queue_heading: "Die Warteschlange (%{count} geplant):"
   queue_empty: "Die Warteschlange ist leer -- ein Entwurf wird über [s] in seiner Vorschau geplant, oder ./blog.sh schedule."
   queue_overdue: "(wartet auf den Cron)"
