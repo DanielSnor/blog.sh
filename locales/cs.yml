@@ -285,6 +285,8 @@ cli:
   still_draft_toot: "Post '%{slug}' je pořád draft — nejdřív publikuj (./blog.sh publish %{slug}), teprve pak má toot na co odkazovat."
   already_has_toot: "Post už toot má, neposílám druhý: %{url}"
   toot_failed: "Toot se nepodařilo poslat (viz výš)."
+  no_network_toot: "Nic se neoznámilo: config/site.yml nemá sekci mastodon: ani bluesky:, takže tenhle web nikam neoznamuje. Jestli jsi ji chtěl nastavit, zkontroluj, že hlavička sekce je živý řádek, a ne komentář — klíče pod zakomentovanou hlavičkou patří tomu, co bylo před ní. Samotný token patří do env.sh."
+  toot_declined: "Neoznámeno, jak jsi chtěl."
   tooted: "Otootováno: %{url}"
 
   already_draft: "Post '%{slug}' je už draft: %{url}"
@@ -675,7 +677,7 @@ doctor:
   site_yml_syntax: "config/site.yml není platné YAML: %{message}."
   site_yml_unreadable: "config/site.yml existuje, ale nejde přečíst: %{message}."
   site_yml_unreadable_fix: "Zkontroluj vlastníka a práva souboru (ls -l config/site.yml). Obvykle pomůže: chmod 644 config/site.yml — a pokud soubor vlastní root po průvodci spuštěném přes sudo, taky chown."
-  site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek."
+  site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek. Když ten řádek vypadá v pořádku, příčina je jinde — nejčastěji zakomentovaná hlavička sekce, pod kterou zůstaly její klíče, nebo dřív neuzavřená uvozovka."
 
   identity_ok: "Identita webu je vyplněná."
   key_missing: "V config/site.yml chybí %{key}."
@@ -716,6 +718,8 @@ doctor:
   approval_probe_blind_fix: "Mastodonní token potřebuje kromě write:statuses i rozsah read:statuses — vytvoř ho znovu v Nastavení -> Pro vývojáře. U Bluesky zkontroluj, že BLUESKY_APP_PASSWORD je app password pro handle z config/site.yml."
   approval_probe_failed: "Nepodařilo se ověřit, jestli token vidí tvoje hvězdy: %{message}"
   no_network: "Není nastavená žádná síť pro komentáře — posty se nikam neoznamují."
+  credentials_no_network: "%{vars} je v env.sh nastavený, ale žádná sekce sítě nakonfigurovaná není — takže se nic neoznamuje a nečtou se žádné komentáře."
+  credentials_no_network_fix: "Token, který nemá sekci, kde by se použil, obvykle znamená, že sama hlavička je pořád zakomentovaná: zkontroluj, že %{sections} v config/site.yml je živý řádek, ne komentář, a že pod ní sedí její klíče. Když web opravdu nikam neoznamuje, smaž ten údaj z env.sh."
   both_networks: "Jsou nastavené obě sekce, mastodon: i bluesky:, a sestavení to odmítá."
   both_networks_fix: "Komentáře i oznamovací post žijí přesně na jedné síti. Tu, kterou nechceš, zakomentuj."
   mastodon_instance_shape: "mastodon.instance je \"%{value}\" — patří tam jen jméno serveru, bez https:// a bez cesty."

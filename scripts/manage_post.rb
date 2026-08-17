@@ -705,6 +705,19 @@ def announce_post(post, year:, date:, force: false)
     return nil
   end
 
+  # The one path that used to say nothing. Publishing.announce is a `case`
+  # over the configured network, so with neither section it matched no
+  # branch and returned nil -- and the callers, which cannot tell "did not
+  # try" from "tried and failed", printed "Failed to send the toot (see
+  # above)" over an empty screen. A reader who has just filled in an
+  # instance and a token believes the config and starts reading the
+  # engine's source instead, which is exactly what the first person to hit
+  # this did. The reason is knowable here, so it gets said here.
+  if SiteConfig.comment_network.nil?
+    warn t('cli.no_network_toot')
+    return nil
+  end
+
   if !force && (date - Time.now).abs > TOOT_RECENCY_WINDOW
     warn t('cli.backdated_no_toot')
     return nil
@@ -1086,10 +1099,27 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
 end
 
 def announce_on_publish(post, year, date)
+  # Before the question, not after it: with no network there is nothing the
+  # answer could change, and being asked to confirm an announcement that
+  # cannot happen -- then being told it did not happen -- is two screens of
+  # ceremony over one missing section. announce_post keeps the same guard
+  # for any future caller that does not come through here.
+  if SiteConfig.comment_network.nil?
+    warn t('cli.no_network_toot')
+    return nil
+  end
+
   force = false
   if (date - Time.now).abs > TOOT_RECENCY_WINDOW
     answer = Tui.key_choice(t('cli.date_outside_window_prompt', date: date.strftime(t('date_format'))))
-    return nil unless Tui.yes?(answer)
+    # Saying no here is a decision, and it used to be reported as a
+    # failure: the question scrolled away, "Failed to send the toot (see
+    # above)" took its place, and above it was the question the author had
+    # just answered. It says what happened instead.
+    unless Tui.yes?(answer)
+      warn t('cli.toot_declined')
+      return nil
+    end
 
     force = true
   end
@@ -1242,8 +1272,18 @@ def cmd_toot(slug)
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
   fields = announce_on_publish(post, year, date)
-  unless fields
+  # false means the network was asked and said no -- the poster has already
+  # printed what it heard, so "see above" has an above. nil means nobody
+  # was asked, and whichever guard declined to ask said why: unlisted, no
+  # base URL, no network configured, a date outside the window the author
+  # then refused. Printing "Failed" over those is a second, wrong answer to
+  # a question already answered -- and over the silent ones it was the only
+  # answer, pointing at nothing.
+  if fields == false
     warn t('cli.toot_failed')
+    warn ''
+    return
+  elsif fields.nil?
     warn ''
     return
   end
@@ -1295,8 +1335,13 @@ def cmd_bluesky(slug)
   end
 
   fields = announce_on_publish(post, year, date)
-  unless fields
+  # Same contract as `toot` above: false was refused by the network, nil was
+  # never attempted and said why.
+  if fields == false
     warn t('cli.bluesky_failed')
+    warn ''
+    return
+  elsif fields.nil?
     warn ''
     return
   end

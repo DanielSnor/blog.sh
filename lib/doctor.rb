@@ -361,7 +361,22 @@ module Doctor
     # -- and sorted by severity the two land twenty lines apart, so the
     # reader gets the diagnosis and then a green line denying it.
     elsif !moderation_wanted?(data)
-      findings << ok(t('no_network'))
+      # "No network configured" is the truth about a site that wanted none,
+      # and a lie about a site whose owner filled in an instance and a token
+      # under a header they left commented out: the section is absent, so
+      # every check here agrees the site is fine, and the tick confirms the
+      # one belief that is wrong. A credential in env.sh is the evidence
+      # that somebody meant to have a network -- nobody issues an access
+      # token for a site that announces nothing -- so with one of those in
+      # hand, silence stops being an answer.
+      stranded = { 'MASTODON_ACCESS_TOKEN' => 'mastodon:', 'BLUESKY_APP_PASSWORD' => 'bluesky:' }
+                 .reject { |var, _| ENV[var].to_s.empty? }
+      findings << if stranded.empty?
+                    ok(t('no_network'))
+                  else
+                    warn(t('credentials_no_network', vars: stranded.keys.join(', ')),
+                         t('credentials_no_network_fix', sections: stranded.values.join(' / ')))
+                  end
     end
     findings.concat(check_comments(data, mastodon || bluesky, credentials: credentials))
     findings

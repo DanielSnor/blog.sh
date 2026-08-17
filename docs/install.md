@@ -180,6 +180,15 @@ and the deploy target; `./style.sh` covers `banner`, `about`, `footer`,
 `social`, `colors`, `fonts`, `widgets` and `nav`. Both are re-runnable and
 neither takes anything away from editing the file directly.
 
+If you do edit it directly -- which is a first-class way to use this
+engine, not a fallback -- run **`./blog.sh doctor`** when you are done. It
+reads the file you just wrote and reports every problem in it at once,
+which is the half a hand edit does not get for free: an unclosed quote, a
+tab, a value in the wrong section, a token in `env.sh` with no section to
+use it. It is also the answer when a YAML error names a line that looks
+perfectly fine -- the parser stops where things stop fitting, which can be
+a long way from the mistake.
+
 The example is fully commented. The short version:
 
 - **Required:** `site` (title, short_name, description, author, lang,

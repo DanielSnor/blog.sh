@@ -302,6 +302,8 @@ cli:
   still_draft_toot: "Post '%{slug}' is still a draft -- publish it first (./blog.sh publish %{slug}); only then does a toot have something to link to."
   already_has_toot: "Post already has a toot, not sending a second one: %{url}"
   toot_failed: "Failed to send the toot (see above)."
+  no_network_toot: "Nothing was announced: config/site.yml has no mastodon: or bluesky: section, so this site announces nowhere. If you meant to set one up, check that the section header is a live line rather than a comment -- keys under a commented-out header belong to whatever came before it. The token itself goes in env.sh."
+  toot_declined: "Left unannounced, as asked."
   tooted: "Tooted: %{url}"
 
   already_draft: "Post '%{slug}' is already a draft: %{url}"
@@ -696,7 +698,7 @@ doctor:
   site_yml_syntax: "config/site.yml is not valid YAML: %{message}."
   site_yml_unreadable: "config/site.yml exists but cannot be read: %{message}."
   site_yml_unreadable_fix: "Check the file's owner and permissions (ls -l config/site.yml). Usually: chmod 644 config/site.yml — and if the file is owned by root after a wizard ran under sudo, chown it too."
-  site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value."
+  site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. If that line looks fine, the cause is elsewhere -- most often a section header commented out with its keys left behind, or a quote left open earlier."
 
   identity_ok: "The site's identity is filled in."
   key_missing: "%{key} is missing from config/site.yml."
@@ -737,6 +739,8 @@ doctor:
   approval_probe_blind_fix: "The Mastodon token needs the read:statuses scope as well as write:statuses -- reissue it under Preferences -> Development. On Bluesky, check BLUESKY_APP_PASSWORD is an app password for the handle in config/site.yml."
   approval_probe_failed: "Could not check whether the token sees your favourites: %{message}"
   no_network: "No comments network configured -- posts are not announced anywhere."
+  credentials_no_network: "%{vars} is set in env.sh, but no network section is configured -- so nothing is announced and no comments are read."
+  credentials_no_network_fix: "A token with no section to use it usually means the header itself is still commented out: check that %{sections} in config/site.yml is a live line, not a comment, and that its keys sit under it. Delete the credential from env.sh if the site really announces nowhere."
   both_networks: "Both mastodon: and bluesky: are configured, and the build refuses that."
   both_networks_fix: "Comments and the announcement post live on exactly one network. Comment out the section you do not want."
   mastodon_instance_shape: "mastodon.instance is \"%{value}\" -- it takes a host name only, with no https:// and no path."

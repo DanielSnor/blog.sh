@@ -57,8 +57,17 @@ module SiteConfig
     # read the file first -- an unreadable answer to the single most
     # common way this file breaks. The line number is what fixes it, and
     # Psych knew it all along.
+    # The line is where the parser gave up, which is not always where the
+    # mistake is: an indented block whose header got commented out, or a
+    # quote left open, breaks at the first thing that no longer fits --
+    # often further down the file, and sometimes further up, inside the
+    # section before it. Said out loud, because the first person to report
+    # this had read the named line, found it blameless, and gone looking
+    # through the engine's source instead.
     abort("❌ #{path} is not valid YAML: #{e.problem} at line #{e.line}, column #{e.column}. " \
           "Usually indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. " \
+          "If that line looks fine, the cause is elsewhere -- most often a commented-out section header " \
+          "with its keys left behind, or an unclosed quote earlier. " \
           "Run ./blog.sh doctor for the full picture.")
   end
 

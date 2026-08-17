@@ -295,6 +295,8 @@ cli:
   still_draft_toot: "Beitrag '%{slug}' ist noch ein Entwurf -- veröffentliche ihn zuerst (./blog.sh publish %{slug}); erst dann hat ein Toot etwas zu verlinken."
   already_has_toot: "Der Beitrag hat schon einen Toot, es wird kein zweiter verschickt: %{url}"
   toot_failed: "Der Toot ließ sich nicht verschicken (siehe oben)."
+  no_network_toot: "Es wurde nichts angekündigt: config/site.yml hat weder einen mastodon:- noch einen bluesky:-Abschnitt, diese Website kündigt also nirgends an. Wolltest du einen einrichten, prüfe, ob der Abschnittskopf eine echte Zeile ist und kein Kommentar -- Schlüssel unter einem auskommentierten Kopf gehören zu dem, was davor stand. Das Token selbst gehört in env.sh."
+  toot_declined: "Bleibt unangekündigt, wie gewünscht."
   tooted: "Getrötet: %{url}"
 
   already_draft: "Beitrag '%{slug}' ist schon ein Entwurf: %{url}"
@@ -685,7 +687,7 @@ doctor:
   site_yml_syntax: "config/site.yml ist kein gültiges YAML: %{message}."
   site_yml_unreadable: "config/site.yml existiert, lässt sich aber nicht lesen: %{message}."
   site_yml_unreadable_fix: "Prüfe Eigentümer und Rechte der Datei (ls -l config/site.yml). Meist hilft: chmod 644 config/site.yml — und wenn die Datei nach einem mit sudo gestarteten Assistenten root gehört, auch chown."
-  site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen."
+  site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen. Wenn diese Zeile in Ordnung aussieht, liegt die Ursache anderswo -- meist ein auskommentierter Abschnittskopf, dessen Schlüssel stehen geblieben sind, oder ein weiter oben offen gelassenes Anführungszeichen."
 
   identity_ok: "Die Identität der Website ist ausgefüllt."
   key_missing: "%{key} fehlt in config/site.yml."
@@ -726,6 +728,8 @@ doctor:
   approval_probe_blind_fix: "Der Mastodon-Token braucht neben write:statuses auch die Berechtigung read:statuses -- erstelle ihn unter Einstellungen -> Entwicklung neu. Bei Bluesky prüfe, ob BLUESKY_APP_PASSWORD ein App-Passwort für das Handle aus config/site.yml ist."
   approval_probe_failed: "Konnte nicht prüfen, ob der Token deine Favoriten sieht: %{message}"
   no_network: "Kein Netzwerk für Kommentare eingerichtet -- Beiträge werden nirgends angekündigt."
+  credentials_no_network: "%{vars} ist in env.sh gesetzt, aber es ist kein Netzwerk-Abschnitt eingerichtet -- also wird nichts angekündigt und es werden keine Kommentare gelesen."
+  credentials_no_network_fix: "Ein Token ohne Abschnitt, der ihn benutzt, heißt meist, dass der Kopf selbst noch auskommentiert ist: prüfe, dass %{sections} in config/site.yml eine echte Zeile ist und kein Kommentar, und dass die Schlüssel darunter stehen. Wenn die Website wirklich nirgends ankündigt, lösche die Zugangsdaten aus env.sh."
   both_networks: "Beide Abschnitte sind eingerichtet, mastodon: und bluesky:, und der Build lehnt das ab."
   both_networks_fix: "Kommentare und der Ankündigungsbeitrag leben auf genau einem Netzwerk. Kommentiere den aus, den du nicht willst."
   mastodon_instance_shape: "mastodon.instance ist \"%{value}\" -- dort gehört nur der Hostname hin, ohne https:// und ohne Pfad."

@@ -217,6 +217,31 @@ which only existed because the bar didn't.
 
 ### Fixed
 
+- **An announcement that does not happen says why.** `Publishing.announce`
+  is a choice between the configured networks, so with neither section in
+  `config/site.yml` it matched nothing and returned "no" -- and `toot`,
+  which cannot tell "did not try" from "tried and was refused", printed
+  *Failed to send the toot (see above)* with nothing above it. It now names
+  the missing section, and says what a filled-in instance and token under a
+  commented-out header actually do: they join the section before them.
+  Refusing the backdating question is reported as the decision it is rather
+  than as a failure, and the question is not asked at all when there is no
+  network to announce to. The three ways this could end quietly were
+  reported from the outside, by the first person to install this engine who
+  had not written it.
+- **`doctor` stops agreeing with that mistake.** A missing network section
+  used to be a green tick -- correct for a site that wanted none, and
+  reassurance for the one whose owner had just filled in a token. A
+  credential in `env.sh` with no section to use it is a warning now,
+  pointing at the header. What a hand-edited config gets checked by is also
+  said where hand-editing is documented, which it was not before:
+  [install.md](docs/install.md#2-configure-the-site----configsiteyml).
+- **A YAML error admits the line may not be the mistake.** The parser stops
+  where things stop fitting, which for a commented-out section header with
+  its keys left behind is *inside the section above it* -- on one real
+  config, line 64 for a mistake on line 80. Both messages, the abort and
+  `doctor`'s, now say the cause can be elsewhere and name the two shapes
+  that do it.
 - **The appearance toggle can find its way back to the system.** One
   click used to pin the choice in `localStorage` forever; the button now
   cycles system / light / dark and says which it is on, and the first
