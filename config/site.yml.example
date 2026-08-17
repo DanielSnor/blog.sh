@@ -12,6 +12,24 @@
 # working site. Everything else is optional, and a section left out means
 # the engine's own default -- never a broken page.
 #
+# HOW TO READ THE '#' LINES. This file uses them for two different jobs,
+# and telling them apart is the one thing worth knowing before you edit:
+#
+#   # like this sentence      documentation. Prose, never a setting.
+#   # layout:                 a SETTING that is switched off. Drop the
+#   #   sidebar: true         '# ' from every line of the block to use it.
+#   #   # instance: "..."     two '#': stays off even after you switch
+#                             its block on -- an optional key inside an
+#                             optional section.
+#
+# So one '#' in front of a key means "uncomment me", and two mean "still
+# optional". Where a switched-off section ENDS is marked with its own
+# '# --- end of ... ---' line, because once both are commented, a
+# paragraph of prose and a block of settings look exactly alike -- and
+# uncommenting half a section leaves the keys you did uncomment belonging
+# to whatever section came before it, with no error to tell you so.
+# ./blog.sh doctor reads the file you wrote and says what it found.
+#
 # EVERY SETTING THERE IS, in the order they appear below. A key shown in
 # (brackets) is optional and commented out where it lives; the rest of
 # this file explains each one where it stands.
@@ -193,6 +211,7 @@ colors:
 #   banner_title_size: "52px"
 #   banner_claim: '"Open Sans", Arial, Helvetica, sans-serif'
 #   banner_claim_size: "20px"
+# --- end of fonts ---
 
 # Optional. Which structural regions of the page exist at all. Every key
 # defaults to the layout the engine has always had, so omitting the whole
@@ -214,6 +233,7 @@ colors:
 #   # that doesn't use them. A post with no usable image (or only a 1x1
 #   # tracking pixel out of an old import) keeps the ordinary layout.
 #   hero: false
+# --- end of layout ---
 
 # Optional. The menu across the top. Without this key the menu is what the
 # engine derives: All, then one entry per content type the site actually
@@ -234,6 +254,7 @@ colors:
 #   - { label: "Home", url: "/" }
 #   - { label: "Photography", tag: "photography" }
 #   - { label: "Syntax", url: "/markdown/" }
+# --- end of nav ---
 
 about:
   heading: "About"
@@ -284,6 +305,7 @@ about:
 #     # podcast -- or X through a self-hosted Nitter instance.
 #     feed_url: "https://example.com/feed.xml"
 #     limit: 3
+# --- end of widgets ---
 
 footer:
   links_heading: "Links"
@@ -310,13 +332,13 @@ footer:
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is
-# what earns the green check mark next to your site on a Mastodon
-# profile: Mastodon fetches the address you put in a profile metadata
-# field and verifies it only if that page links back with rel="me" to
-# the profile. Since the icons sit in the footer, every page carries the
-# link -- put your home page in the profile field and it just works. The
-# url: here has to be your profile as Mastodon shows it
-# (https://instance/@handle). More than one entry may carry rel: "me".
+# what earns the green check mark next to your site on a Mastodon profile:
+# Mastodon fetches the address you put in a profile metadata field and
+# verifies it only if that page links back with rel="me" to the profile.
+# Since the icons sit in the footer, every page carries the link -- put
+# your home page in the profile field and it just works. The url: here
+# has to be your profile as Mastodon shows it (https://instance/@handle).
+# More than one entry may carry rel: "me".
 social:
   - name: "Mastodon"
     url: "https://mastodon.social/@yourname"
@@ -347,10 +369,13 @@ mastodon:
   # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
   # toot_length: 500
 
-# The Bluesky alternative (uncomment this and remove mastodon: above):
+# The Bluesky alternative. Delete the mastodon: block above, then
+# uncomment the two lines below -- the header included, which is the half
+# that is easy to miss:
 # bluesky:
 #   handle: "you.bsky.social"
 #   # pds: "https://bsky.social"   # only for a self-hosted PDS
+# --- end of bluesky ---
 
 # Optional. Which replies are published under the article.
 #
@@ -384,6 +409,7 @@ mastodon:
 #
 # comments:
 #   approval: fav
+# --- end of comments ---
 
 # Optional. The times posts usually go out. With this set, [s] in the
 # draft dialog offers the next FREE slot instead of an empty prompt, so
@@ -397,6 +423,7 @@ mastodon:
 #     - "mon 09:30"
 #     - "wed 09:30"
 #     - "fri 09:30"
+# --- end of publishing ---
 
 # Optional. HEIC photos (the iPhone default) display only in Safari --
 # every other browser shows a broken image. Off (the default), attaching
@@ -422,6 +449,7 @@ mastodon:
 # media:
 #   convert_heic: true
 #   strip_location: false
+# --- end of media ---
 
 # Optional. What robots.txt says beyond "everything is allowed".
 #
@@ -442,6 +470,7 @@ mastodon:
 #   robots_extra: |
 #     User-agent: SomeOtherBot
 #     Disallow: /
+# --- end of seo ---
 
 # Optional. Omit this whole section for a site with no analytics script.
 # Commented out so a fresh build doesn't reference a script that isn't
@@ -449,3 +478,4 @@ mastodon:
 # analytics:
 #   src: "https://analytics.example.com/script.js"
 #   website_id: "00000000-0000-0000-0000-000000000000"
+# --- end of analytics ---

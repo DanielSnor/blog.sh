@@ -229,6 +229,19 @@ which only existed because the bar didn't.
   network to announce to. The three ways this could end quietly were
   reported from the outside, by the first person to install this engine who
   had not written it.
+- **`config/site.yml.example` says how to read itself.** The file uses `#`
+  for two different jobs -- prose, and settings that are switched off --
+  and the engine only copes because the wizards anchor on key paths they
+  already know. A reader has no such anchor: a paragraph of documentation
+  and a block of commented-out keys look exactly alike, and uncommenting
+  half a section leaves the keys you did uncomment belonging to whatever
+  section came before, with nothing to say so. The header now states the
+  convention that was always there (one `#` before a key means uncomment
+  me, two mean still optional), every switched-off section marks where it
+  ends, and two sentences of prose that happened to begin with `profile:`
+  and `url:` -- parsing as keys, which is the same trap from the other
+  side -- are rewrapped. Suggested by the first person to set this engine
+  up from the outside.
 - **`doctor` stops agreeing with that mistake.** A missing network section
   used to be a green tick -- correct for a site that wanted none, and
   reassurance for the one whose owner had just filled in a token. A
