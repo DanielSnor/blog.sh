@@ -580,7 +580,7 @@ What isn't built yet, and what building it would take:
   have carried whole archives onto live sites (Twitter, Tumblr and
   b2evolution among them), and Ghost, WordPress and Hugo have each been
   run against a real foreign archive since, one of them as a complete
-  site migration that is live today. What still rests on sample exports
+  site migration now running in trial. What still rests on sample exports
   alone: pages from Squarespace and Substack. And LiveJournal has never
   run against the live service at all -- it has no export file, so the
   adapter talks to the API, and exercising that needs a real account.
