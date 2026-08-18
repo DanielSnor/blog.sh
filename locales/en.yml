@@ -255,6 +255,7 @@ cli:
   queue_already_first: "The post is already first in the queue."
   queue_already_last: "The post is already last in the queue."
   queue_swap_overdue: "A post whose time has passed can't be reordered -- wait for the cron to publish it."
+  queue_busy: "The publishing run is going right now, so nothing was moved -- it holds the queue for a few seconds at a time. Press the key again in a moment."
   queue_swapped: "Moved: '%{slug}' publishes %{date}."
   queue_action_carry: "[m] carry it elsewhere  "
   queue_carry_hint: "↑↓ carry the post · Enter put it down · Esc cancel"

@@ -238,6 +238,7 @@ cli:
   queue_already_first: "Post už je první ve frontě."
   queue_already_last: "Post už je poslední ve frontě."
   queue_swap_overdue: "S postem, jehož čas už prošel, nejde měnit pořadí — počkej, až ho cron publikuje."
+  queue_busy: "Zrovna běží publikování, takže se nic nepřesunulo — frontu si drží pár vteřin. Za chvíli zkus klávesu znovu."
   queue_swapped: "Přesunuto: '%{slug}' se publikuje %{date}."
   queue_action_carry: "[m] přenést jinam  "
   queue_carry_hint: "↑↓ nést post · Enter položit · Esc zrušit"

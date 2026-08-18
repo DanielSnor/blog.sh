@@ -31,6 +31,7 @@ require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
 require_relative '../lib/publishing'
+require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
 require_relative '../lib/tui'
 require_relative '../lib/site_header'
@@ -1774,13 +1775,15 @@ def queue_act(entries, index)
   end
 end
 
-# Runs a queue's writes in order and, when one dies partway, names what
-# did and did not move before the failure travels on. The pre-flights in
-# queue_swap and queue_offer_compact catch what they can SEE -- a stale
-# file, a taken path -- but a full disk, a permission error or a Ctrl-C
-# BETWEEN the writes is invisible to them, and the half-moved queue it
-# leaves behind was only ever discovered by the cron publishing the
-# wrong post. Nothing is rolled back: the disk that just refused one
+# Runs a queue's writes in order -- under the lock, after checking every
+# one of them -- and, when one dies partway, names what did and did not
+# move before the failure travels on. The pre-flight below catches what it
+# can SEE -- a stale file, a taken path -- and the lock keeps the one run
+# that could invalidate an answer out of the gap between the checking and
+# the writing. Neither reaches the rest: a full disk, a permission error
+# or a Ctrl-C BETWEEN the writes is invisible to both, and the half-moved
+# queue it leaves behind was only ever discovered by the cron publishing
+# the wrong post. Nothing is rolled back: the disk that just refused one
 # write is not owed a second chance with another, and a wrong guess
 # here doubles the damage. rescue Exception, not StandardError, because
 # the deaths this must outlive long enough to speak are exactly the
@@ -1790,21 +1793,57 @@ end
 # times are the ISO form the JSON carries, since repairing that file by
 # hand is what the report is for.
 def apply_queue_moves(moves)
-  done = 0
-  moves.each do |entry, target|
-    yield entry, target
-    done += 1
-  end
-rescue Exception
-  if done.positive?
-    warn ''
-    warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
-    moves.each_with_index do |(entry, target), i|
-      warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+  held = RunLock.hold(ROOT, label: 'queue') do
+    # Checked here rather than in the three callers that used to each keep
+    # a copy of this loop: above the lock these answers could stop being
+    # true between the asking and the writing, and the thing that makes
+    # them stop being true is not a person -- it is the publishing cron,
+    # which runs every fifteen minutes and does not wait for anyone to
+    # finish reading a screen. A tick landing in that gap publishes a due
+    # post and then has a draft's schedule written back over it: state
+    # reverted, announcement URL dropped, the same post queued to go out
+    # (and be announced) a second time.
+    #
+    # The byte compare stays what it always was, and still earns its keep
+    # inside the lock: it catches the tick that finished a moment BEFORE
+    # the lock was taken, which no lock can do anything about.
+    moves.each do |entry, target|
+      abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
+      target_path = File.join(CONTENT_DIR, target.year.to_s, "#{entry[:post]['slug']}.json")
+      next if File.expand_path(target_path) == File.expand_path(entry[:path])
+
+      abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
     end
-    warn ''
+
+    done = 0
+    begin
+      moves.each do |entry, target|
+        yield entry, target
+        done += 1
+      end
+    rescue Exception
+      if done.positive?
+        warn ''
+        warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
+        moves.each_with_index do |(entry, target), i|
+          warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+        end
+        warn ''
+      end
+      raise
+    end
+    true
   end
-  raise
+  return true unless held == RunLock::BUSY
+
+  # Nothing was written and nothing is broken -- the run in the way is
+  # almost always the publishing cron, which is gone within a minute. The
+  # queue is re-read on the next frame anyway, so trying again costs a
+  # keypress. (RunLock says the same thing on stderr, naming the holder;
+  # this line is the one the queue screen can put on its status row.)
+  puts t('cli.queue_busy')
+  puts
+  false
 end
 
 # Picking the post up and carrying it, instead of trading places with one
@@ -1853,20 +1892,14 @@ def queue_carry_apply(entries, index, target)
     [entry, times[i]] unless entry[:time] == times[i]
   end
 
-  # Every half checked before any of it is written -- the whole reason
-  # queue_swap does the same, only here the run is longer and a failure
+  # Every half is checked before any of it is written, and both halves of
+  # that happen under the lock -- see apply_queue_moves, which holds it and
+  # does the checking. Here the run is longer than a swap's, so a failure
   # partway through would leave more of the queue half-moved.
-  moves.each do |entry, target_time|
-    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
-    target_path = File.join(CONTENT_DIR, target_time.year.to_s, "#{entry[:post]['slug']}.json")
-    next if File.expand_path(target_path) == File.expand_path(entry[:path])
-
-    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
-  end
-
-  apply_queue_moves(moves) do |entry, target_time|
+  applied = apply_queue_moves(moves) do |entry, target_time|
     write_scheduled_date(entry[:path], entry[:post], target_time, raw: entry[:raw])
   end
+  return false unless applied
   puts Tui.paint(t('cli.queue_carried', slug: entries[index][:slug], position: target + 1,
                                         date: times[target].getlocal.strftime(t('date_time_format'))), :green)
   puts
@@ -1942,27 +1975,21 @@ def queue_swap(entries, index, other_index)
     return false
   end
 
-  # Both halves are checked BEFORE either is written. write_scheduled_date
-  # aborts the process on a stale file or a target path that is taken, and
-  # a swap is two independent writes -- so an abort on the second left the
-  # first applied: the moved post sat on a slot the un-moved post still
-  # held, and the cron published both. In the [u] direction the surviving
-  # half moved the picked post EARLIER, publishing it months before the
-  # date that had just been confirmed, with nothing on screen but the
-  # abort. A same-slug-in-two-years collision makes that deterministic,
-  # and the engine treats those as ordinary.
+  # Both halves are checked BEFORE either is written (in apply_queue_moves,
+  # under the lock). write_scheduled_date aborts the process on a stale
+  # file or a target path that is taken, and a swap is two independent
+  # writes -- so an abort on the second left the first applied: the moved
+  # post sat on a slot the un-moved post still held, and the cron published
+  # both. In the [u] direction the surviving half moved the picked post
+  # EARLIER, publishing it months before the date that had just been
+  # confirmed, with nothing on screen but the abort. A same-slug-in-two-
+  # years collision makes that deterministic, and the engine treats those
+  # as ordinary.
   moves = [[entry, other[:time]], [other, entry[:time]]]
-  moves.each do |e, target|
-    abort_if_post_changed(e[:path], e[:raw], e[:post]['slug']) if e[:raw]
-    target_path = File.join(CONTENT_DIR, target.year.to_s, "#{e[:post]['slug']}.json")
-    next if File.expand_path(target_path) == File.expand_path(e[:path])
-
-    abort t('cli.post_already_exists', slug: e[:post]['slug'], path: target_path) if File.exist?(target_path)
-  end
-
-  apply_queue_moves(moves) do |e, target|
+  applied = apply_queue_moves(moves) do |e, target|
     write_scheduled_date(e[:path], e[:post], target, raw: e[:raw])
   end
+  return false unless applied
   puts Tui.paint(t('cli.queue_swapped', slug: entry[:slug],
                                         date: other[:time].getlocal.strftime(t('date_time_format'))), :green)
   puts
@@ -1988,17 +2015,12 @@ def queue_offer_compact(freed_time, rest)
   # queue_swap is: write_scheduled_date ABORTS the process, and an abort
   # partway through N writes left the queue half-shifted -- some posts
   # moved forward, some not -- while the message on the way out says
-  # nothing was saved.
-  rest.each_with_index do |entry, i|
-    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
-    target = File.join(CONTENT_DIR, times[i].year.to_s, "#{entry[:post]['slug']}.json")
-    next if File.expand_path(target) == File.expand_path(entry[:path])
-
-    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target) if File.exist?(target)
-  end
-  apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
+  # nothing was saved. (Both the checking and the writing are in
+  # apply_queue_moves now, which does them holding the cron's lock.)
+  applied = apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
     entry[:path] = write_scheduled_date(entry[:path], entry[:post], target, raw: entry[:raw])
   end
+  return false unless applied
   puts Tui.paint(t('cli.queue_compacted'), :green)
   puts
   true

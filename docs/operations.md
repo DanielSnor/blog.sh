@@ -366,6 +366,11 @@ only offers: a hand-picked date further down may be deliberate, and
 nothing moves a post's time except you. A post whose time already passed
 is waiting for the cron and can't be reordered.
 
+If the publishing cron happens to be running at the moment you move
+something, the move is refused rather than written: the two would be
+writing the same files, and the cron holds them for a few seconds at a
+time. Press the key again in a moment.
+
 The preview rebuilds once, when you leave the screen, not after every
 move.
 
@@ -743,6 +748,12 @@ a deploy happened when it didn't. The scheduled publish holds the lock for
 its whole run (publish, rebuild, deploy are one operation as far as the
 site is concerned), and the build and deploy it shells out to inherit it
 rather than deadlock against their own parent.
+
+Reordering the queue takes the same lock, for a different reason: it does
+not write `public.nosync` at all, it writes the same post files the
+scheduled publish is publishing from. It holds the lock only for the moment
+of the move -- the checks and the writes together -- never while a prompt
+is open, so a queue left on screen never keeps the cron out.
 
 If the filesystem can't do advisory locks -- some network mounts -- the
 lock degrades to no lock, which is where every installation was before

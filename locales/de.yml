@@ -248,6 +248,7 @@ cli:
   queue_already_first: "Der Post ist bereits der erste in der Warteschlange."
   queue_already_last: "Der Post ist bereits der letzte in der Warteschlange."
   queue_swap_overdue: "Ein Post, dessen Zeit bereits verstrichen ist, lässt sich nicht umsortieren -- warte, bis der Cron ihn veröffentlicht."
+  queue_busy: "Gerade läuft die Veröffentlichung, deshalb wurde nichts verschoben -- sie hält die Warteschlange jeweils ein paar Sekunden. Drücke die Taste gleich noch einmal."
   queue_swapped: "Verschoben: '%{slug}' erscheint %{date}."
   queue_action_carry: "[m] woandershin tragen  "
   queue_carry_hint: "↑↓ Post tragen · Enter absetzen · Esc abbrechen"
