@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.3 -- unreleased
+## 1.3 -- 2026-08-19
 
 Dressing a site differently no longer means editing the engine -- your
 own stylesheet, menu, sidebar and a lead image are settings now, and
