@@ -116,6 +116,17 @@ just mean "publish now", and `publish` is for that). Running `schedule`
 on an already scheduled draft cancels it; `list` shows scheduled drafts
 as `[SCHEDULED]`.
 
+Two kinds of post are published by that cron without being announced, and
+it says so per post, naming `./blog.sh toot <slug>` for sending the
+announcement by hand: a post dated more than a day from now (a backfill --
+an old thread given a page, a post imported and then queued -- reads as
+news in a live timeline), and a post that already carries an announcement
+of its own, which happens when it was published once, unpublished and put
+back in the queue. Announcing that one again would leave the first thread
+live with its replies while the post pointed at a second, empty one.
+Several posts falling due in the same tick -- after the cron has been down,
+say -- are published oldest first, in the order the queue was arranged in.
+
 ### In the terminal
 
 The CLI adapts to where it runs. In an interactive terminal you get

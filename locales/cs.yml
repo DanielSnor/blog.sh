@@ -477,6 +477,8 @@ cron:
   no_scheduled_due: "Žádný naplánovaný post není na řadě."
   published_scheduled: "Publikován naplánovaný post '%{slug}' (datum %{date})."
   unlisted_not_announced: "Post '%{slug}' je nezalistovaný, oznámení se neposílalo."
+  already_announced: "Post '%{slug}' už jednou oznámený byl, takže se neoznamoval znovu — původní vlákno i s odpověďmi zůstává to, na které post odkazuje. Ruční oznámení: ./blog.sh toot %{slug} (nebo ./blog.sh bluesky %{slug})."
+  backdated_not_announced: "Post '%{slug}' je datovaný víc než den od teď, publikoval se tedy bez oznámení — zpětně doplněný post působí na živé časové ose jako novinka. Když ho přesto chceš oznámit: ./blog.sh toot %{slug} (nebo ./blog.sh bluesky %{slug})."
   publishing_scheduled: "Publikuji naplánované posty (%{count})"
   publish_failed: "❌ '%{slug}' se nepodařilo publikovat: %{error}. Ostatních postů na řadě se to nedotklo; po opravě se publikuje v dalším běhu."
   announce_failed: "⚠️  '%{slug}' je publikovaný, ale oznámení selhalo — post je venku a nic na něj neodkazuje, a samo se to znovu nepokusí. Zkontroluj token a oznam ho ručně: ./blog.sh toot (nebo ./blog.sh bluesky)."

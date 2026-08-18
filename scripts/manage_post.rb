@@ -681,8 +681,6 @@ end
 # raises: a failed announcement must not block publishing the post
 # itself. Composition and dispatch live in lib/publishing.rb, shared
 # with the scheduled-publish cron.
-TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old thread) don't get an auto announcement
-
 def announce_post(post, year:, date:, force: false)
   # An unlisted post is not announced, and force does not open this door the
   # way it opens the backdating one. The whole point of `unlisted` is a post
@@ -718,7 +716,7 @@ def announce_post(post, year:, date:, force: false)
     return nil
   end
 
-  if !force && (date - Time.now).abs > TOOT_RECENCY_WINDOW
+  if !force && !Publishing.within_recency_window?(date)
     warn t('cli.backdated_no_toot')
     return nil
   end
@@ -1110,7 +1108,7 @@ def announce_on_publish(post, year, date)
   end
 
   force = false
-  if (date - Time.now).abs > TOOT_RECENCY_WINDOW
+  unless Publishing.within_recency_window?(date)
     answer = Tui.key_choice(t('cli.date_outside_window_prompt', date: date.strftime(t('date_format'))))
     # Saying no here is a decision, and it used to be reported as a
     # failure: the question scrolled away, "Failed to send the toot (see

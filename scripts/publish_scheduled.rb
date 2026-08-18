@@ -6,11 +6,15 @@
 # scheduling itself happens interactively (./blog.sh schedule <slug>).
 #
 # Decisions were all made at schedule time, so this runs without a single
-# prompt: the scheduled date is kept (that's the point of scheduling),
-# and the toot is sent without the CLI's recency check -- there is nobody
-# at a terminal to answer it, and a schedule is explicit intent even if
-# cron was down for a while and the date is now days in the past. One
-# rebuild+deploy at the end regardless of how many posts were due.
+# prompt: the scheduled date is kept (that's the point of scheduling).
+# One rebuild+deploy at the end regardless of how many posts were due.
+#
+# Publishing and announcing are separate questions here, and only the
+# first one is answered by the schedule. Three kinds of post are published
+# and NOT announced -- unlisted, backdated, already announced -- because
+# an announcement is the one thing this script does that cannot be taken
+# back: a server that has it has it, and there is nobody at a terminal to
+# ask. Each says so out loud and names the way to send it by hand.
 
 require 'json'
 require 'time'
@@ -63,6 +67,16 @@ due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do 
   end
 end
 
+# Dir.glob answers in directory order, which is the alphabet by slug and has
+# nothing to do with when these posts were meant to go out. On an ordinary
+# tick that is invisible -- one post is due, and one post in any order is the
+# same order. It shows up after cron has been down: a morning's worth of
+# posts comes back all at once, is published in the order of their names and
+# announced in that order too. The timeline then reads backwards,
+# permanently, and the queue the author arranged by hand was the one thing
+# that said what the order should be.
+due.sort_by! { |_path, _post, date| date }
+
 # Written on EVERY tick, before anything is decided -- including the ticks
 # where nothing is due, which are almost all of them. That is the point:
 # a queue that never fires looks exactly like a queue whose time has not
@@ -92,11 +106,52 @@ due.each do |path, post, date|
   # the exit code must not say it did, or the one mail that matters gets
   # lost among the ones that do not.
   unlisted = [true, 'true', 'yes', 1].include?(updated['unlisted'])
-  fields = unlisted ? nil : Publishing.announce(updated, year: date.year.to_s)
+  # An announcement that has already happened is not repeated. The post's
+  # own fields are the record of it, and a second toot does not replace
+  # the first -- it stands beside it, live, while the URL that gets stored
+  # points at the new one and the older thread's replies become
+  # unreachable from the page they belong to. A post arrives here carrying
+  # those fields when it was announced once and later put back into the
+  # queue: unpublish and re-schedule, or a date edited by hand or by a
+  # script. Rarer than the window above, and worse when it happens, which
+  # is why it is checked even though the window would usually catch it
+  # first -- a backfilled post given today's date is inside the window and
+  # still must not be announced twice.
+  announced = Publishing.announced?(updated)
+  # A post dated well outside the recency window is a backfill, not news:
+  # an old thread rebuilt, an archive imported, a release post written
+  # down after the fact. The interactive publish has asked about this
+  # since 1.0 (it prompts, and the author can say yes); cron cannot ask,
+  # so it declines on the author's behalf and says how to override. The
+  # cost of being wrong here is one command; the cost the other way is a
+  # timeline full of years-old posts that cannot be recalled.
+  #
+  # A cron that was down longer than the window is the case this trades
+  # away: those posts publish silently. That is the deliberate half of the
+  # bargain -- said out loud, per post, with the command that fixes it.
+  backdated = !Publishing.within_recency_window?(date)
+  silent = unlisted || announced || backdated
+  fields = silent ? nil : Publishing.announce(updated, year: date.year.to_s)
   AtomicWrite.write_json(new_path, updated.merge(fields)) if fields
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
-  puts I18n.t('cron.unlisted_not_announced', slug: updated['slug']) if unlisted
+  # One line, not three: a post can be all of unlisted, backdated and
+  # already announced at once, and three reasons for one silence read as
+  # three silences. The order is which reason to give when they overlap --
+  # the author's own instruction first, then the fact that the
+  # announcement already exists, then the date.
+  #
+  # Loud, but not a failure: nothing went wrong, and an exit code that
+  # said otherwise would put this run in the same mail as a broken deploy
+  # -- which is how the one mail that matters gets lost among the ones
+  # that do not (the same reasoning as the unlisted skip above).
+  if unlisted
+    puts I18n.t('cron.unlisted_not_announced', slug: updated['slug'])
+  elsif announced
+    puts I18n.t('cron.already_announced', slug: updated['slug'])
+  elsif backdated
+    puts I18n.t('cron.backdated_not_announced', slug: updated['slug'])
+  end
   # The post is published either way -- that part worked, and undoing it
   # would be worse. But an announcement that was attempted and failed is a
   # failure of this run: counted, so the exit code is non-zero and cron

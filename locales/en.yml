@@ -498,6 +498,8 @@ cron:
   no_scheduled_due: "No scheduled post is due."
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
   unlisted_not_announced: "Post '%{slug}' is unlisted, so nothing was announced."
+  already_announced: "Post '%{slug}' has been announced before, so it was not announced again -- the earlier thread and its replies stay the one this post points at. To send another by hand: ./blog.sh toot %{slug} (or ./blog.sh bluesky %{slug})."
+  backdated_not_announced: "Post '%{slug}' is dated more than a day from now, so it was published without an announcement -- a backfilled post in a live timeline reads as news. To announce it anyway: ./blog.sh toot %{slug} (or ./blog.sh bluesky %{slug})."
   publishing_scheduled: "Publishing %{count} scheduled post(s)"
   publish_failed: "❌ '%{slug}' could not be published: %{error}. The other due posts were not affected; fix this one and it will publish on the next run."
   announce_failed: "⚠️  '%{slug}' is published, but announcing it failed -- the post is public with nothing pointing at it, and nothing will try again. Check the token, then announce it by hand with ./blog.sh toot (or ./blog.sh bluesky)."
