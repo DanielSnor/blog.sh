@@ -576,11 +576,14 @@ What isn't built yet, and what building it would take:
   `each_item`, `map`) -- everything else (media, dedup, dry-run,
   reporting, HTML → blocks) is already shared.
   That table says what is covered, not how hard each one has been leaned
-  on. Some of these have carried somebody's whole archive onto a live
-  site; others have met a sample export and no more. LiveJournal is the
-  one that has never run against the live service at all -- it has no
-  export file, so the adapter talks to the API, and exercising that
-  needs a real account.
+  on -- though that gap is narrower than it used to be: several sources
+  have carried whole archives onto live sites (Twitter, Tumblr and
+  b2evolution among them), and Ghost, WordPress and Hugo have each been
+  run against a real foreign archive since, one of them as a complete
+  site migration that is live today. What still rests on sample exports
+  alone: pages from Squarespace and Substack. And LiveJournal has never
+  run against the live service at all -- it has no export file, so the
+  adapter talks to the API, and exercising that needs a real account.
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:
