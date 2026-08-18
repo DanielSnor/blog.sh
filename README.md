@@ -555,6 +555,16 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 
 What isn't built yet, and what building it would take:
 
+- **Next, as a patch release** -- small, already-decided corrections:
+  the scheduled-publish cron learns the restraint the interactive
+  publish already has (a backdated post publishes without announcing;
+  a post that carries an announcement URL is never announced again --
+  its comment thread is the thing being protected), plus a handful of
+  edge fixes the release audit chose to defer rather than rush.
+- **Further out** -- importing sport activities is the working theme
+  for a future release: GPX/TCX/FIT from whatever tracker you use, a
+  post with the map and the numbers, no account on anybody's platform
+  required. Investigated; not yet designed. It moves when it moves.
 - **Imports** -- twenty-two sources are covered (the table under
   [Importing existing content](#importing-existing-content)). Some of
   those share an adapter: WordPress and feeds, because they are one
@@ -616,3 +626,9 @@ looks like in practice.
 [blogsh.app](https://blogsh.app) is the second one: the project's own site,
 running the same unmodified engine and publishing its documentation as
 ordinary posts.
+
+[blog.elegantlich.com](https://blog.elegantlich.com) is the first
+deployment in hands other than the author's -- the planning blog of the
+*Elegant Lich* magazine. Its owner's first-install feedback is already
+in the engine: an announcement that cannot happen now says why, and the
+example config explains its own comment conventions.
