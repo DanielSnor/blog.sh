@@ -12,13 +12,19 @@ prints what an installation is running.
 
 ## 1.3 -- unreleased
 
-Dressing a site differently no longer means editing the engine. Four
-things that used to require a modified template are settings now: your own
-stylesheet, your own menu, the sidebar, and a lead image above the post's
-title. Every default is the layout the engine already had, with one
-deliberate exception: the menu bar follows you down the page now, and it
-takes over from the menu that used to be repeated under the content --
-which only existed because the bar didn't.
+Dressing a site differently no longer means editing the engine -- your
+own stylesheet, menu, sidebar and a lead image are settings now, and
+`./style.sh` can write every one of them. Around that grew a release
+about trusting the archive: `check` reads it and says what is broken,
+`export` walks all of it back out as a markdown tree, `stats` counts it,
+a media file's identity survives re-imports, and every edit is undoable
+ten versions deep. Posts learned to be pages, series and unlisted
+addresses; replies you star can become the only comments the page shows;
+and a dead end got a page of its own, signpost included. Every default
+is the layout the engine already had, with one deliberate exception: the
+menu bar follows you down the page now, and it takes over from the menu
+that used to be repeated under the content -- which only existed because
+the bar didn't.
 
 ### New
 
@@ -460,6 +466,15 @@ because both ends of them are ours.
 - Post versions live in `content.nosync/versions/`. They are part of
   your content, not of the engine -- a backup of `content.nosync/`
   already covers them.
+- A script that wraps `./blog.sh rebuild` and reads its exit code sees
+  a change: a rebuild that stepped aside for a held lock used to exit 0
+  and now exits 3, the lock's own code -- "come back in a minute" told
+  apart from "it worked". Cron paths are untouched.
+- A markdown-tree re-import no longer copies an image's alt text into a
+  visible caption, so a caption an earlier import invented that way
+  disappears with the post's next re-import. If you liked one, it was
+  always the picture's title: write it in the markdown as
+  `![alt](file "title")` and it stays yours.
 
 ## 1.2.1 -- 2026-08-12
 
