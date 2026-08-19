@@ -858,6 +858,8 @@ check:
   image_degenerate_fix: "Anything 1px or smaller is treated as a tracking pixel and dropped WITH its caption, so the page silently loses both. Replace the image or remove the block."
   link_dead: "%{slug}: links to %{url}, which nothing on this site answers at."
   link_dead_fix: "Usually a permalink left over from an import, or a slug renamed before renames kept a redirect. Fix the link, or give the target post a redirect_from entry."
+  link_relative: "%{slug}: links to %{url}, which is read relative to the post itself, not to the site."
+  link_relative_fix: "A shape a dynamic site could afford: on a static one the address resolves inside the post's own URL, and a query string a static host ignores answers 200 with the very page the reader is standing on -- so nothing breaks and nobody arrives. Rewrite it as a rooted path, /posts/<year>/<slug>/."
   media_orphan: "No post owns the media directory %{dir}."
   media_orphan_fix: "Left over from a deleted or renamed post, or an import that ran twice. Nothing links to it; delete it yourself once you have looked."
   media_stray: "Post %{slug} no longer names the file %{file} in its media directory."

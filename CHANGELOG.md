@@ -46,6 +46,17 @@ is reading it. Nothing to migrate -- `git pull`, rebuild, deploy.
   morning's worth of posts comes back at once and is published, and
   announced, backwards. They go out oldest first now, in the order the
   queue was arranged in.
+- **`check` could not see a link written relative to the post.** It kept
+  what starts with a slash as internal and what carries a scheme as
+  external, so `./?item=another-post` or `photo/index.php?gallery=3` was
+  neither, and no run looked at it -- `--online` included. These are not
+  dead links, which is why they outlive audits: a static host ignores the
+  query string, so the address answers 200 with the very post the reader
+  is standing on. Nothing fails and nobody arrives. They are reported as
+  errors now, with the rooted form to rewrite them to; a bare `#fragment`
+  stays quiet, since resolving against its own page is what it is for.
+  (Found on an archive that had just been declared sound: 73 of them, in
+  61 posts.)
 - **A config the filesystem refused to write arrived as a backtrace.**
   `./style.sh` and `./setup.sh` copy the file to a `.bak` before they write
   it, so a backup left behind by a run made as another user -- root, most

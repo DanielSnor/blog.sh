@@ -848,6 +848,8 @@ check:
   image_degenerate_fix: "Alles mit 1px oder weniger gilt als Zählpixel und wird MITSAMT Bildunterschrift verworfen, die Seite verliert also beides stillschweigend. Tausche das Bild aus oder entferne den Block."
   link_dead: "%{slug}: verweist auf %{url}, wo diese Website nichts ausliefert."
   link_dead_fix: "Meist ein Permalink aus einem Import oder ein Slug, der umbenannt wurde, bevor Umbenennungen eine Weiterleitung behielten. Korrigiere den Link oder gib dem Zielbeitrag einen redirect_from-Eintrag."
+  link_relative: "%{slug}: verweist auf %{url}, was relativ zum Beitrag selbst gelesen wird, nicht zur Website."
+  link_relative_fix: "Eine Form, die sich eine dynamische Website leisten konnte: auf einer statischen wird die Adresse innerhalb der URL des Beitrags aufgelöst, und einen Query-String ignoriert ein statischer Host -- er antwortet mit 200 und genau der Seite, auf der die Leserin bereits steht. Nichts geht kaputt, und niemand kommt an. Schreibe ihn als Pfad ab der Wurzel, /posts/<Jahr>/<Slug>/."
   media_orphan: "Zum Medienverzeichnis %{dir} gehört kein Beitrag."
   media_orphan_fix: "Rest eines gelöschten oder umbenannten Beitrags oder eines doppelt gelaufenen Imports. Nichts verweist darauf; lösche es selbst, nachdem du hineingesehen hast."
   media_stray: "Beitrag %{slug} nennt die Datei %{file} in seinem Medienverzeichnis nicht mehr."

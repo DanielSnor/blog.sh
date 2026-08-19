@@ -507,6 +507,14 @@ What it looks for, each with a line saying what to do about it:
 - **Internal links pointing at nothing.** Typically a permalink left over
   from an import, or a slug renamed back before renames left a redirect
   behind.
+- **Links written relative to the post rather than to the site** --
+  `./?item=another-post`, `photo/index.php?gallery=3`, `../about/`. A
+  dynamic site could afford those; a static one resolves them inside the
+  post's own address, and a static host ignores a query string, so the
+  link answers 200 with the page the reader is already on. Nothing breaks
+  and nobody arrives, which is why these survive audits: rewrite them as
+  rooted paths. A bare `#fragment` is left alone -- resolving against its
+  own page is the point of it.
 - **Media directories no post owns** -- left by a deleted or renamed post,
   or an import that ran twice. Nothing links to them; they cost disk, not
   correctness, which is why they are a warning.

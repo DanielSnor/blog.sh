@@ -86,6 +86,7 @@ module Checker
     findings.concat(check_media(root, posts, progress))
     findings.concat(check_degenerate_images(posts))
     findings.concat(check_internal_links(posts, known))
+    findings.concat(check_relative_links(posts))
     findings.concat(check_orphan_media(root, posts))
     findings.concat(check_stray_media(root, posts))
     findings.concat(check_redirects(posts))
@@ -248,6 +249,30 @@ module Checker
 
     dead.first(20).map { |slug, url| error(t('link_dead', slug: slug, url: url), t('link_dead_fix')) } +
       more(dead.size - 20, :error)
+  end
+
+  # Links that are written relative to wherever they happen to be read
+  # from. `./?item=other-post`, `photo/index.php?gallery=3`, `../about/` --
+  # the shapes a dynamic site could afford and a static one cannot.
+  #
+  # These were invisible here until now, and not because nobody looked:
+  # internal_links keeps what starts with a slash and external_links keeps
+  # what carries a scheme, so a relative address fell between the two and
+  # was checked by neither, `--online` included.
+  #
+  # What makes it worth its own kind is that these are not 404s. A static
+  # host ignores the query string, so /posts/2005/a-post/?item=another-post
+  # answers 200 with the post the reader is already on. Nothing fails,
+  # nothing is logged, and the reader simply never arrives -- which is why
+  # 73 of them sat in one archive through every audit it ever had.
+  def check_relative_links(posts)
+    found = posts.flat_map do |post|
+      all_links(post).select { |url| relative_link?(url) }.map { |url| [post['slug'], url] }
+    end
+    return [] if found.empty?
+
+    found.first(20).map { |slug, url| error(t('link_relative', slug: slug, url: url), t('link_relative_fix')) } +
+      more(found.size - 20, :error)
   end
 
   # Media directories no post claims. Pure disk, invisible from anywhere --
@@ -535,6 +560,23 @@ module Checker
 
   def internal_links(post)
     all_links(post).select { |url| url.start_with?('/') }
+  end
+
+  # A scheme is anything up to the first colon that looks like one, so this
+  # keeps http, https, mailto, tel and data out of the relative bucket
+  # without naming them: a link the browser hands to another program is not
+  # this check's business.
+  SCHEME = /\A[a-z][a-z0-9+.\-]*:/i
+
+  # Everything that is neither rooted at the site (check_internal_links
+  # owns those) nor absolute (check_external_links, and only with
+  # --online). A bare fragment is left alone on purpose: `#footnote-2`
+  # resolving against the page it is written on is the whole point of it.
+  def relative_link?(url)
+    text = url.to_s.strip
+    return false if text.empty? || text.start_with?('/', '#')
+
+    !text.match?(SCHEME)
   end
 
   # Both places a link can live: a block that is a link card, and a

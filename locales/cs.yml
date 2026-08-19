@@ -836,6 +836,8 @@ check:
   image_degenerate_fix: "Cokoli 1px a menší se bere jako sledovací pixel a zahodí se I S POPISKEM, takže stránka tiše přijde o obojí. Vyměň obrázek, nebo blok smaž."
   link_dead: "%{slug}: odkazuje na %{url}, kde na tomhle webu nic není."
   link_dead_fix: "Obvykle permalink zbylý po importu, nebo slug přejmenovaný dřív, než si přejmenování začalo držet přesměrování. Oprav odkaz, nebo cílovému postu přidej redirect_from."
+  link_relative: "%{slug}: odkazuje na %{url}, což se čte vůči postu samotnému, ne vůči webu."
+  link_relative_fix: "Tvar, který si mohl dovolit dynamický web: na statickém se adresa vyhodnotí uvnitř URL toho postu, a dotaz za otazníkem statický hosting ignoruje — vrátí 200 a tutéž stránku, na které čtenář stojí. Nic se nerozbije a nikdo nikam nedojde. Přepiš to na cestu od kořene, /posts/<rok>/<slug>/."
   media_orphan: "K adresáři médií %{dir} nepatří žádný post."
   media_orphan_fix: "Zbytek po smazaném nebo přejmenovaném postu, případně po importu, který běžel dvakrát. Nic na něj neodkazuje; smaž si ho sám, až se na něj podíváš."
   media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
