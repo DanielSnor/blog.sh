@@ -837,7 +837,7 @@ check:
   link_dead: "%{slug}: odkazuje na %{url}, kde na tomhle webu nic není."
   link_dead_fix: "Obvykle permalink zbylý po importu, nebo slug přejmenovaný dřív, než si přejmenování začalo držet přesměrování. Oprav odkaz, nebo cílovému postu přidej redirect_from."
   link_relative: "%{slug}: odkazuje na %{url}, což se čte vůči postu samotnému, ne vůči webu."
-  link_relative_fix: "Tvar, který si mohl dovolit dynamický web: na statickém se adresa vyhodnotí uvnitř URL toho postu, a dotaz za otazníkem statický hosting ignoruje — vrátí 200 a tutéž stránku, na které čtenář stojí. Nic se nerozbije a nikdo nikam nedojde. Přepiš to na cestu od kořene, /posts/<rok>/<slug>/."
+  link_relative_fix: "Tři tvary, tři různé opravy: odkaz na jiný post tohohle webu (přepiš na /posts/<rok>/<slug>/), holý název hostu, kterému chybí jen protokol (adresa je napsaná správně — doplň https://), a absolutní adresa se zbloudilým znakem vepředu (\" nebo :). Všechny tři se vyhodnotí uvnitř URL toho postu, a dotaz za otazníkem statický hosting ignoruje — vrátí 200 a tutéž stránku, na které čtenář stojí. Nic se nerozbije a nikdo nikam nedojde. Jestli cíl ještě odpovídá, je otázka pro check --online."
   media_orphan: "K adresáři médií %{dir} nepatří žádný post."
   media_orphan_fix: "Zbytek po smazaném nebo přejmenovaném postu, případně po importu, který běžel dvakrát. Nic na něj neodkazuje; smaž si ho sám, až se na něj podíváš."
   media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
