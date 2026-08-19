@@ -520,7 +520,8 @@ CDN, so import while the old site is still up. Kept permalinks record
 the `/blog/<slug>` paths from the export itself.
 
 The not-quite-XML repair described under
-[WordPress](#wordpress-or-any-rssatom-feed) applies here too.
+[WordPress](#wordpress-or-any-rssatom-feed) applies here too -- a bare `&`
+printed into a `<title>` is the Squarespace case it was written for.
 
 ### Substack
 
@@ -714,6 +715,17 @@ skipped. Post bodies arrive as HTML and are converted to content blocks in
 the conservative subset the schema supports; what the conversion cannot
 keep is dropped **and counted**, as everywhere. Images referenced in the
 markup are downloaded and measured.
+
+**A file that is very nearly XML is read anyway.** Exports are printed by
+templating engines, not by XML writers, so a raw query string left inside an
+element or a bare `&` in a title is ordinary -- and it makes a conforming
+parser refuse the entire archive over one character. Four of the twelve
+fixtures that Ghost's own migration tools ship are refused this way. Only
+characters that had to be escaped and were not are repaired, never structure
+and never inside a post body (where `&` is already an ordinary character),
+and the summary says how many. A file with a real defect -- a missing end
+tag, a download that stopped halfway -- still fails, and the refusal names
+*that* rather than the ampersand it just proved it can handle.
 
 **A file that is very nearly XML is read anyway.** Exports are printed by
 templating engines, not by XML writers, so a raw query string left inside an
