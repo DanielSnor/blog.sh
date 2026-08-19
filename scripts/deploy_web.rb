@@ -43,6 +43,22 @@ require 'time'
 require_relative '../lib/deploy_backend'
 require_relative '../lib/atomic_write'
 require_relative '../lib/file_size'
+# This script talks to the author too (an unconfigured target below says
+# so out loud), and until 1.3.1 it said it in English on a Czech install
+# -- the only entry point that did. i18n arrives the way scripts/doctor.rb
+# takes it, not through SiteConfig: a deploy ships a build that is ALREADY
+# sitting in public.nosync, so a config too broken to parse must not be
+# what stops it. An unreadable language means English, not an abort.
+require 'yaml'
+require_relative '../lib/yaml_compat'
+require_relative '../lib/i18n'
+deploy_lang = begin
+  site = YamlCompat.load_file(File.join(File.expand_path('..', __dir__), 'config', 'site.yml'))
+  site.is_a?(Hash) ? site.dig('site', 'lang') : nil
+rescue StandardError
+  nil
+end
+I18n.force_lang(deploy_lang.to_s.empty? ? 'en' : deploy_lang.to_s)
 
 # Runs at the end of the cron chain too, where stdout is a block-buffered
 # pipe and warn would otherwise overtake the progress lines around it.
@@ -209,14 +225,15 @@ unless DRY || BACKEND.configured?
   # have never heard of is misconfigured -- on their very first post.
   # doctor already draws this line and says "No deploy target chosen";
   # these two describe the same install and have to agree.
+  #
+  # The first branch borrows doctor's own two lines instead of keeping a
+  # copy of them: the comment above says the two have to agree, and texts
+  # that merely started out identical are exactly how they stop agreeing.
   message =
     if ENV['DEPLOY_BACKEND'].to_s.strip.empty?
-      'ℹ️  No deploy target chosen, so the site is built locally and goes nowhere. ' \
-      'View it with ./blog.sh preview; run ./setup.sh when you want it online.'
+      "ℹ️  #{I18n.t('doctor.backend_unset')} #{I18n.t('doctor.backend_unset_fix')}"
     else
-      "ℹ️  Deploy backend '#{BACKEND.label}' is not configured -- skipping the upload. " \
-      'The build in public.nosync/ is complete; view it with ./blog.sh preview. ' \
-      'To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example).'
+      "ℹ️  #{I18n.t('cli.deploy_backend_incomplete', name: BACKEND.label)}"
     end
   puts message
   exit 0

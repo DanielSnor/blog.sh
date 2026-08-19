@@ -12,9 +12,11 @@ prints what an installation is running.
 
 ## 1.3.1 -- unreleased
 
-A bug-fix release about the publishing queue: what the cron may announce,
+A bug-fix release about the publishing queue -- what the cron may announce,
 what order it publishes in, and who may write the queue while somebody else
-is reading it. Nothing to migrate -- `git pull`, rebuild, deploy.
+is reading it -- and about the first hour of an install: what a site with no
+deploy target yet is told about where it is, and in which language. Nothing
+to migrate -- `git pull`, rebuild, deploy.
 
 ### Fixed
 
@@ -57,6 +59,29 @@ is reading it. Nothing to migrate -- `git pull`, rebuild, deploy.
   stays quiet, since resolving against its own page is what it is for.
   (Found on an archive that had just been declared sound: 73 of them, in
   61 posts.)
+- **A fresh install was told its site is at `example.com`.** Before a deploy
+  target is chosen, the address in the config is still the template's, and
+  both the draft preview line and the `Done:` line after a publish printed
+  it -- a domain the author does not own, so the one thing a first post
+  wants to do could not be done. The build is right there in
+  `public.nosync/`, and `./blog.sh preview` serves it; both lines now say so
+  underneath, with the address that actually opens. Only while the config
+  carries the template's address: a site with a real one is not told twice
+  where it is. The QR code under a draft preview is dropped in that state
+  for the same reason -- it exists to carry the draft to a phone, and a
+  phone that scans it would land on `example.com`.
+- **The deploy said "the site goes nowhere" in English on a site that is
+  not English.** `scripts/deploy_web.rb` was the one entry point that never
+  loaded the translations, so the line printed after every single save on
+  an install with no deploy target -- the state every install starts in --
+  came out in English while the rest of the flow spoke the site's language.
+  It is translated now, in the same words `doctor` uses for the same state.
+  The language is read the way `doctor` reads it, tolerantly: a config too
+  broken to parse still deploys the build that is already built.
+- **The editor template's body was English on every site.** The header
+  above it had been translated for releases; the one line under it,
+  "First paragraph's text.", was written into the code. It is the first
+  thing an author sees inside the editor.
 - **A config the filesystem refused to write arrived as a backtrace.**
   `./style.sh` and `./setup.sh` copy the file to a `.bak` before they write
   it, so a backup left behind by a run made as another user -- root, most

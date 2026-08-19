@@ -70,11 +70,49 @@ end
 # iPad, which is the whole reason this exists), but it can't be guessed or
 # reached from anywhere else. The build also adds noindex to it.
 def draft_url(post)
-  "#{SITE_BASE_URL.to_s.chomp('/')}/draft/#{post['draft_token']}/#{post['slug']}/"
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{draft_path(post)}"
 end
 
 def published_url(slug, year)
-  "#{SITE_BASE_URL.to_s.chomp('/')}/posts/#{year}/#{slug}/"
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{published_path(slug, year)}"
+end
+
+# The site-relative halves, split off so the local-preview hint below can
+# put the SAME page under a different origin. Split rather than derived by
+# string surgery on the finished URL: a base_url that itself contained
+# "/posts/" would make that surgery cut in the wrong place.
+def draft_path(post)
+  "/draft/#{post['draft_token']}/#{post['slug']}/"
+end
+
+def published_path(slug, year)
+  "/posts/#{year}/#{slug}/"
+end
+
+# An install that never answered "where does this go?" still carries the
+# template's address, so every URL printed above says example.com -- a
+# domain the author does not own and cannot open. doctor already names
+# this state (base_url_placeholder) and the two have to agree on what
+# counts as it, hence the same literal comparison.
+PLACEHOLDER_BASE_URL = 'https://example.com'
+
+def placeholder_base_url?
+  SITE_BASE_URL.to_s.chomp('/') == PLACEHOLDER_BASE_URL
+end
+
+# `./blog.sh preview` serves the build on 8000 unless told otherwise. The
+# number is repeated here rather than shared with that command on purpose:
+# what this prints is the address of the DEFAULT invocation, which is the
+# one the hint is telling somebody to run.
+LOCAL_PREVIEW_PORT = 8000
+
+# Printed under a preview or a publish line, and only where the canonical
+# address is still the template's: on a real site that address IS the
+# answer, and a second one under every post would be noise.
+def puts_local_preview_hint(site_path)
+  return unless placeholder_base_url?
+
+  puts Tui.paint(t('cli.local_preview_hint', url: "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}"), :dim)
 end
 
 # --- frontmatter ------------------------------------------------------
@@ -742,7 +780,7 @@ def cmd_add
   # Offered before the template is built, because restoring means opening
   # the editor on the recovered text INSTEAD of the template.
   restored = offer_editor_buffer('add')
-  template = restored || build_frontmatter(title: '', tags: '', type: '') + "First paragraph's text.\n"
+  template = restored || build_frontmatter(title: '', tags: '', type: '') + "#{t('cli.template_body_placeholder')}\n"
   raw = edit_in_editor(template, FRONTMATTER_HINT, { 'kind' => 'add' })
 
   # Editor closed without saving (or saved untouched) leaves the template
@@ -912,7 +950,12 @@ def draft_decision_loop(slug, path: nil)
     # before this, whether from cmd_add or the 'e' branch below) already
     # ended with a blank line after "Done:", so another one would double up.
     puts Tui.paint(t('cli.preview_label', url: draft_url(post)), :cyan)
-    if Tui.interactive? && (qr = QrCode.render(draft_url(post)))
+    puts_local_preview_hint(draft_path(post))
+    # No QR under a placeholder address: the code is there to carry the
+    # draft to a phone, and a phone that scans example.com lands on a
+    # domain this author does not own. A localhost code is no better --
+    # it resolves to the phone itself.
+    if Tui.interactive? && !placeholder_base_url? && (qr = QrCode.render(draft_url(post)))
       puts
       puts qr
       puts Tui.paint(t('cli.qr_hint'), :dim)
@@ -1175,6 +1218,7 @@ def publish_draft(slug, path: nil)
   # line after its own "Done: uploaded...", same doubling as
   # draft_decision_loop above.
   puts Tui.paint(t('cli.done_label', url: published_url(slug, new_year)), :green)
+  puts_local_preview_hint(published_path(slug, new_year))
   puts t('cli.backdated_note') unless untouched
   puts
 end

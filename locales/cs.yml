@@ -218,6 +218,9 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
   preview_label: "Náhled: %{url}"
+  local_preview_hint: "Web zatím nikam neputuje — spusť ./blog.sh preview a otevři %{url} (výchozí port 8000)."
+  template_body_placeholder: "Text prvního odstavce."
+  deploy_backend_incomplete: "Cíl nasazení „%{name}“ nemá v env.sh vyplněné hodnoty — nahrávání přeskakuji. Sestavený web v public.nosync/ je hotový, ukáže ho ./blog.sh preview. Až ho budeš chtít nahrávat, doplň hodnoty do env.sh (vzor je v env.sh.example)."
   what_next_prompt: "Co dál? [d] nechat draftem  [e] upravit  [p] publikovat  [s] naplánovat  [x] smazat: "
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nerozumím, zkus d / e / p / s / x."
