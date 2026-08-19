@@ -510,7 +510,7 @@ import:
   pixelfed_path_prompt: "Pfad zur Pixelfed-Status-JSON (leer = abbrechen): "
   pixelfed_path_invalid: "%{path} existiert nicht."
   instagram_dir_prompt: "Pfad zum entpackten Instagram-Export, HTML oder JSON (leer = abbrechen): "
-  instagram_dir_invalid: "Unter %{dir} finden sich keine Beiträge -- gib das entpackte Exportverzeichnis selbst an, das mit your_instagram_activity/."
+  instagram_dir_invalid: "Unter %{dir} finden sich keine Beiträge -- gib das entpackte Exportverzeichnis selbst an, das mit your_instagram_activity/. Achtung auf den Unterordner: der JSON-Export legt posts_*.json unter media/ ab, der HTML-Export unter content/."
   feed_source_prompt: "Feed-URL oder Pfad zu einer WordPress-Exportdatei (leer = abbrechen): "
   facebook_dir_prompt: "Pfad zum entpackten Facebook-Export, HTML oder JSON (leer = abbrechen): "
   facebook_dir_invalid: "%{dir} enthält keine your_posts*.json und keine your_posts*.html -- auf das entpackte Exportverzeichnis zeigen."

@@ -277,8 +277,10 @@ avatar history; and stories, likes and comments, which aren't posts. A
 carousel becomes one image block per photo, which the build then renders as
 a photo grid.
 
-Captions lose their trailing hashtags -- the tail is already the post's
-tags, and as prose it would be a wall of one-word links under every photo.
+Captions lose their trailing hashtag lines -- lines at the caption's end
+made of nothing but hashtags. That tail is already the post's tags, and
+as prose it would be a wall of one-word links under every photo; a
+hashtag inside a sentence is prose and stays where it was written.
 Two things neither export contains, so neither does the import: **post
 URLs** (`source.post_url` stays unset; a guessed one would 404 while
 looking authoritative) and **alt text**. Neither states pixel sizes
