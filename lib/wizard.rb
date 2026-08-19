@@ -457,6 +457,15 @@ module Wizard
 
     begin
       changed.each { |(_, writer)| writer.save! }
+    rescue ConfigWriter::NotWritable => e
+      # Nothing was written and nothing was lost: the refusal happens on
+      # the first file the filesystem says no to, before any of them is
+      # replaced. What the reader needs is which file and the fact that
+      # the backup is written first -- a config they own is still stuck
+      # behind a .bak they do not, which is the shape this arrives in.
+      puts Tui.paint("❌ #{t('write_denied', message: e.message)}", :red)
+      puts
+      return :failed
     rescue ConfigWriter::VerificationFailed => e
       # The writer has already put the file back; all that is left is to
       # say so in a way that does not read as "your config is ruined".

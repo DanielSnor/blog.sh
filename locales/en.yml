@@ -1029,6 +1029,7 @@ wizard:
   q_write: "Write these changes? [y/N] "
   cancelled: "Nothing written."
   write_failed: "The result did not read back the way it was asked for, so nothing was changed: %{message}"
+  write_denied: "Nothing was written: %{message}. The backup (.bak) is written before the file itself, so one left behind by another user blocks the write as surely as the file would -- check who owns both."
   section_review: "What this would change"
   done: "Done -- review and write"
   menu_hint_exit: "↑↓ move · Enter select · 1-%{count} quick pick · Esc finish"

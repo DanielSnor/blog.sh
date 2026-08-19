@@ -46,6 +46,16 @@ is reading it. Nothing to migrate -- `git pull`, rebuild, deploy.
   morning's worth of posts comes back at once and is published, and
   announced, backwards. They go out oldest first now, in the order the
   queue was arranged in.
+- **A config the filesystem refused to write arrived as a backtrace.**
+  `./style.sh` and `./setup.sh` copy the file to a `.bak` before they write
+  it, so a backup left behind by a run made as another user -- root, most
+  often -- blocks the write although the config itself is perfectly
+  writable. The refusal was a raw `Errno`, and neither the wizard (which
+  handles only a failed verification) nor its guard (only Ctrl-C) expected
+  one: the run died mid-write with a Ruby stack trace and no hint of what
+  to do. It says which file refused and that the backup is written first,
+  and nothing is left half-written -- the refusal happens before any file
+  is replaced.
 - **Reordering the queue wrote without the lock the cron holds.** Every
   write the queue screen makes is guarded by a byte compare against what
   was read before the prompt, but the compare and the write were separate

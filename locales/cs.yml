@@ -1007,6 +1007,7 @@ wizard:
   q_write: "Zapsat tyhle změny? [a/N] "
   cancelled: "Nic se nezapsalo."
   write_failed: "Výsledek se nenačetl zpátky tak, jak byl zadaný, takže se nic nezměnilo: %{message}"
+  write_denied: "Nic se nezapsalo: %{message}. Záloha (.bak) se píše dřív než samotný soubor, takže ta po jiném uživateli blokuje zápis stejně spolehlivě jako soubor sám — zkontroluj, komu patří obojí."
   section_review: "Co by se změnilo"
   done: "Hotovo — projít a zapsat"
   menu_hint_exit: "↑↓ pohyb · Enter vybrat · 1-%{count} rychlá volba · Esc dokončit"

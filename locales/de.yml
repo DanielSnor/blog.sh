@@ -1019,6 +1019,7 @@ wizard:
   q_write: "Diese Änderungen schreiben? [j/N] "
   cancelled: "Nichts geschrieben."
   write_failed: "Das Ergebnis ließ sich nicht so zurücklesen, wie es angefordert wurde, deshalb wurde nichts geändert: %{message}"
+  write_denied: "Es wurde nichts geschrieben: %{message}. Die Sicherung (.bak) wird vor der Datei selbst geschrieben, deshalb blockiert eine von einem anderen Benutzer hinterlassene den Schreibvorgang genauso wie die Datei -- prüfe, wem beides gehört."
   section_review: "Was sich ändern würde"
   done: "Fertig -- ansehen und schreiben"
   menu_hint_exit: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc abschließen"
