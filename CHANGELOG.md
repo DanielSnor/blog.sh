@@ -59,6 +59,37 @@ to migrate -- `git pull`, rebuild, deploy.
   stays quiet, since resolving against its own page is what it is for.
   (Found on an archive that had just been declared sound: 73 of them, in
   61 posts.)
+- **A `links:` key left standing without a list under it ended the build in
+  a stack trace.** `Hash#fetch` answers its default for a key that is
+  missing, not for one that is present and nil, so a footer written by
+  hand -- or one whose last entry was deleted and the key left behind --
+  reached `.map` on nil: `NoMethodError`, no page regenerated, and
+  `./blog.sh doctor` calling the very same file healthy. An empty answer is
+  an answer, and it is now read as one, the way `social:` always has been.
+  The same held one level up: a deleted (or emptied) `about:` or `footer:`
+  block aborted the build outright, over sections whose every key the
+  templates guard individually. Both now read as empty, like `widgets:`
+  always has.
+- **`doctor` failed an install over states the templates support on
+  purpose.** An emptied `footer.copyright` drops the copyright line and an
+  emptied `about` drops its card -- both deliberate, both guarded in the
+  templates -- and doctor answered them with "is missing from
+  config/site.yml" and exit 1. A check that calls a supported state a fault
+  teaches its reader to ignore the red. Neither goes unwatched: both are
+  still flagged while they hold the template's own text, as something worth
+  a look rather than as a fault.
+- **An emptied `about` drew an empty card on every page.** The footer drops
+  a heading whose content is gone and the five sidebar widgets appear only
+  when configured -- but the about card was unconditional, so a site that
+  had not written a bio (or had removed one) carried `<h3></h3>` over an
+  empty box, site-wide. A site that HAS an about text renders byte for
+  byte what it did before.
+- **Four places promised that an empty menu leaves no bar.** `nav: []`
+  removes the entries and the button that opens them, but the bar itself
+  stays, because the search field is rendered inside it and there is no key
+  to turn search off. `config/site.yml.example`, `docs/install.md` and the
+  engine's comments in the build and in the nav template all said "no bar,
+  no toggle"; they now say what happens.
 - **A fresh install was told its site is at `example.com`.** Before a deploy
   target is chosen, the address in the config is still the template's, and
   both the draft preview line and the `Done:` line after a publish printed

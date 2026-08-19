@@ -296,9 +296,10 @@ nav:
 ```
 
 An entry missing either half is skipped rather than rendered as an empty
-link. An empty list is a decision rather than a mistake: the menu then
-renders nothing at all -- no bar, no toggle -- which is also how a site
-turns the menu off, so there is no second key for that.
+link. An empty list is a decision rather than a mistake: the entries and
+the button that opens them are gone, which is also how a site turns the
+menu off, so there is no second key for that. The bar itself stays, since
+the search field is rendered inside it.
 
 `layout.sidebar` and `layout.hero` switch whole regions on and off. The
 sidebar is on unless you say otherwise; the hero -- the post's first
