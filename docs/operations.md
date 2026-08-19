@@ -116,6 +116,17 @@ just mean "publish now", and `publish` is for that). Running `schedule`
 on an already scheduled draft cancels it; `list` shows scheduled drafts
 as `[SCHEDULED]`.
 
+Two kinds of post are published by that cron without being announced, and
+it says so per post, naming `./blog.sh toot <slug>` for sending the
+announcement by hand: a post dated more than a day from now (a backfill --
+an old thread given a page, a post imported and then queued -- reads as
+news in a live timeline), and a post that already carries an announcement
+of its own, which happens when it was published once, unpublished and put
+back in the queue. Announcing that one again would leave the first thread
+live with its replies while the post pointed at a second, empty one.
+Several posts falling due in the same tick -- after the cron has been down,
+say -- are published oldest first, in the order the queue was arranged in.
+
 ### In the terminal
 
 The CLI adapts to where it runs. In an interactive terminal you get
@@ -354,6 +365,11 @@ forward into the gap, every one taking over its predecessor's time. It
 only offers: a hand-picked date further down may be deliberate, and
 nothing moves a post's time except you. A post whose time already passed
 is waiting for the cron and can't be reordered.
+
+If the publishing cron happens to be running at the moment you move
+something, the move is refused rather than written: the two would be
+writing the same files, and the cron holds them for a few seconds at a
+time. Press the key again in a moment.
 
 The preview rebuilds once, when you leave the screen, not after every
 move.
@@ -732,6 +748,12 @@ a deploy happened when it didn't. The scheduled publish holds the lock for
 its whole run (publish, rebuild, deploy are one operation as far as the
 site is concerned), and the build and deploy it shells out to inherit it
 rather than deadlock against their own parent.
+
+Reordering the queue takes the same lock, for a different reason: it does
+not write `public.nosync` at all, it writes the same post files the
+scheduled publish is publishing from. It holds the lock only for the moment
+of the move -- the checks and the writes together -- never while a prompt
+is open, so a queue left on screen never keeps the cron out.
 
 If the filesystem can't do advisory locks -- some network mounts -- the
 lock degrades to no lock, which is where every installation was before

@@ -10,6 +10,54 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.3.1 -- unreleased
+
+A bug-fix release about the publishing queue: what the cron may announce,
+what order it publishes in, and who may write the queue while somebody else
+is reading it. Nothing to migrate -- `git pull`, rebuild, deploy.
+
+### Fixed
+
+- **The scheduled-publish cron announced backdated posts as if they were
+  news.** The recency window that keeps a post dated far from today from
+  being announced automatically was a constant inside the interactive CLI,
+  so only the path with somebody at a terminal ever honoured it. Putting an
+  old post through the queue -- an archived thread given a page of its own,
+  a release written up after the fact -- therefore dropped years-old pages
+  into a live timeline, and an announcement cannot be recalled. The cron
+  declines on the author's behalf now: the post is published, the skip is
+  said out loud per post, and the line names `./blog.sh toot <slug>` for
+  sending it by hand. A cron that has been down longer than a day is the
+  deliberate cost of that -- those posts publish without announcements, and
+  say so.
+- **A post that had already been announced could be announced a second
+  time.** The second toot does not replace the first: it stands beside it,
+  live, while the URL stored on the post points at the new one and the
+  original thread's replies stop being reachable from the page they belong
+  to. A post reaches the cron in that state after being unpublished and
+  re-scheduled, or re-dated by hand. Any post carrying an announcement of
+  its own (`mastodon_url`, `bluesky_url`, `bluesky_uri`) is now published
+  and left alone. This is the half the window above cannot cover: a
+  backfilled post given today's date sits inside it.
+- **Posts that came due in the same tick were published in alphabetical
+  order.** The queue was read with `Dir.glob` and never sorted, so the
+  order was the order of the file names. On an ordinary tick that is
+  invisible -- one post is due. It shows after the cron has been down: a
+  morning's worth of posts comes back at once and is published, and
+  announced, backwards. They go out oldest first now, in the order the
+  queue was arranged in.
+- **Reordering the queue wrote without the lock the cron holds.** Every
+  write the queue screen makes is guarded by a byte compare against what
+  was read before the prompt, but the compare and the write were separate
+  instructions, and the run that changes these files with nobody at the
+  keyboard arrives every fifteen minutes. A tick landing in between
+  published a due post and then had a draft's schedule written back over
+  it: the state reverted to draft, the announcement URL dropped (so
+  `unpublish` could no longer delete the toot), and the post queued to go
+  out -- and be announced -- a second time. Moving a post now takes the
+  same lock for the checks and the writes together, and a reshuffle that
+  meets a running publish moves nothing and says why.
+
 ## 1.3 -- 2026-08-19
 
 Dressing a site differently no longer means editing the engine -- your

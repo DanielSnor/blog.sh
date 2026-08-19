@@ -18,10 +18,16 @@ require_relative 'run_lock'
 # lib/publishing.rb -- the mechanics of making a draft public, shared by
 # the interactive CLI (scripts/manage_post.rb) and the scheduled-publish
 # cron (scripts/publish_scheduled.rb). The split is decisions vs
-# execution: the CLI owns every prompt and choice (which date to use,
-# whether to toot outside the recency window), the cron owns none (a
-# schedule IS the decision) -- and both execute through here, so the two
-# paths can't drift apart.
+# execution: the CLI owns every prompt (which date to use, whether to toot
+# outside the recency window), the cron owns no prompt at all -- a schedule
+# IS the decision -- and both execute through here, so the two paths can't
+# drift apart.
+#
+# What the cron does have to decide alone is whether to ANNOUNCE, which is
+# the one thing here that cannot be undone. The rules it decides by live in
+# this file rather than in either caller (TOOT_RECENCY_WINDOW and the two
+# predicates under it): the window was a constant inside the CLI once, and
+# the caller that could not ask anybody was the caller that did not have it.
 module Publishing
   ROOT = File.expand_path('..', __dir__)
   CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
@@ -217,6 +223,38 @@ module Publishing
     end
 
     [title, perex_by_graphemes(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
+  end
+
+  # How far a post's date may sit from "now" and still be announced by
+  # itself. A post dated outside it is being backfilled -- an old thread
+  # rebuilt, an archive imported, a release post written down after the
+  # fact -- and an announcement would put a years-old page into a live
+  # timeline as if it had just been written.
+  #
+  # It lives here, with the announcement it governs, because BOTH callers
+  # need it and only one of them used to have it: the window was a
+  # constant inside the interactive CLI, so the scheduled-publish cron --
+  # the one caller with nobody at a terminal to catch the mistake --
+  # announced whatever it published, however old. That is not theory; it
+  # happened, to five backdated release posts in one tick.
+  TOOT_RECENCY_WINDOW = 24 * 60 * 60
+
+  # Deliberately symmetric: a date far in the FUTURE is the same kind of
+  # mistake as one far in the past (a typo'd year, most often), and the
+  # interactive path has always asked about both.
+  def within_recency_window?(date)
+    (date - Time.now).abs <= TOOT_RECENCY_WINDOW
+  end
+
+  # Whether this post has already been announced once. The fields are the
+  # announcement: they are what `unpublish` deletes the toot by, what the
+  # page renders its comment thread from, and what a second announcement
+  # would overwrite -- leaving the first thread live, with its replies,
+  # and nothing anywhere pointing at it. Any of them counts, because a
+  # site that changed networks has the other one's field still on its
+  # older posts, and neither wants announcing twice.
+  def announced?(post)
+    %w[mastodon_url bluesky_url bluesky_uri].any? { |field| !post[field].to_s.strip.empty? }
   end
 
   # Sends the announcement to whichever network the site configured and
