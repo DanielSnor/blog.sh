@@ -88,6 +88,10 @@ def confirm(prompt)
   Wizard.confirm(prompt)
 end
 
+def say(text, *styles)
+  Wizard.say(text, *styles)
+end
+
 # --- detection -------------------------------------------------------
 
 # The machine's own zone, so the timezone question arrives already
@@ -175,11 +179,14 @@ def run
 
   puts SiteHeader.render(tool: './setup.sh')
   puts
-  puts t('intro')
-  puts
-  puts Tui.paint(t('intro_skip'), :dim)
-  puts Tui.paint(t('intro_expert'), :dim)
-  puts
+  # Into the frame context, not onto the screen: the language menu is the
+  # very next thing and repaints from the top, so a printed intro was
+  # erased before anyone could read what Enter means here.
+  say(t('intro'))
+  say('')
+  say(t('intro_skip'), :dim)
+  say(t('intro_expert'), :dim)
+  say('')
 
   site = ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
   env = ConfigWriter::EnvFile.new(ENV_SH, template: ENV_SH_EXAMPLE)
@@ -190,8 +197,10 @@ def run
   # an optional integration -- it goes last, like in the config file.
   ask_language(site, current)
   ask_identity(site, current)
+  ask_page_size(site, current)
   ask_address(site, env, current)
   ask_deploy(env, current)
+  tell_about_scheduler
   ask_network(site, env, current)
 
   review_and_write(site, env)
@@ -256,8 +265,8 @@ def ask_language(site, current)
 end
 
 def ask_identity(site, current)
-  puts Tui.paint(t('section_identity'), :bold)
-  puts
+  say(t('section_identity'), :bold)
+  say('')
 
   title = ask(t('q_title'), current.dig('site', 'title'), hint: t('h_title'),
               suggested: template?(current, 'site', 'title'))
@@ -295,9 +304,55 @@ end
 # site that still calls itself example.com everywhere. Setting both to
 # the same value is the only answer that cannot surprise anyone; the
 # override stays available for whoever actually wants it.
+# Asked on a FIRST RUN only, and that is the whole point of it being
+# here: pagination is anchored to the oldest post, so old listing pages
+# never change -- and that immutability rests on the page size staying
+# what it was. Change it after the first deploy and every boundary moves,
+# every listing page in the archive is rewritten, and an address somebody
+# saved points at different posts.
+#
+# On a re-run the question is therefore not asked at all. Somebody who
+# really means it can still edit the key by hand, where the comment in
+# config/site.yml.example says the same thing at more length.
+def ask_page_size(site, current)
+  return unless @fresh
+
+  value = ask_valid(t('q_page_size'), current.dig('site', 'page_size') || 10,
+                    hint: t('h_page_size')) do |answer|
+    t('e_page_size') unless answer.to_s.match?(/\A[1-9]\d*\z/)
+  end
+  site.set(%w[site page_size], value.to_i) if value
+end
+
+# Nothing to write here -- a cron entry lives in the machine's crontab,
+# not in this repository, and installing one on somebody's behalf is a
+# change to their system rather than to their site.
+#
+# It is said all the same, because the failure it prevents is silent:
+# ./blog.sh schedule accepts a date, the post waits, and without this job
+# nothing ever publishes it. Doctor cannot warn about it on a fresh
+# install either -- it stays quiet while the queue is empty, so the first
+# hint would otherwise be a post that did not go out.
+def tell_about_scheduler
+  # Said into the frame context (Wizard.say), not printed: the comments
+  # menu paints right after this and repaints from the top of the window,
+  # so a printed cron line was erased in the same instant it appeared --
+  # and this line exists to be copied out, character by character. In the
+  # context it is on screen while the next question waits and stays in
+  # the section's record after it.
+  say(t('section_scheduler'), :bold)
+  say('')
+  say(t('section_scheduler_intro'))
+  say('')
+  say("  */15 * * * * #{File.join(ROOT, 'scripts', 'publish-scheduled.sh')}", :green)
+  say('')
+  say(t('scheduler_note'), :dim)
+  say('')
+end
+
 def ask_address(site, env, current)
-  puts Tui.paint(t('section_address'), :bold)
-  puts
+  say(t('section_address'), :bold)
+  say('')
 
   url = ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url'),
                   suggested: template?(current, 'site', 'base_url')) do |answer|
@@ -314,13 +369,14 @@ def ask_address(site, env, current)
 end
 
 def ask_network(site, env, current)
-  puts Tui.paint(t('section_network'), :bold)
-  puts
+  say(t('section_network'), :bold)
+  say('')
   # The one place the wizard explains a concept before asking: that the
   # comments ARE a social network's replies is the engine's central
-  # arrangement, and nothing on a fresh install has shown it yet.
-  puts t('section_network_intro')
-  puts
+  # arrangement, and nothing on a fresh install has shown it yet. Which is
+  # exactly why it goes into the frame -- printed, its own menu wiped it.
+  say(t('section_network_intro'))
+  say('')
 
   now = if current['mastodon'] then 'mastodon'
         elsif current['bluesky'] then 'bluesky'
@@ -356,6 +412,13 @@ def ask_mastodon(site, env, current)
 
   puts t('token_where', instance: instance)
   token = Tui.password(t('q_token'))
+  # Tui.password closes the prompt row itself in a terminal -- it has to,
+  # nothing was echoed to close it. Down a pipe it takes the same silent
+  # route and does NOT, so the `puts` below stopped being the blank line it
+  # is here and became the row's line break instead: piped, "Bez tokenu."
+  # arrived hard against the question, and in a terminal a blank line above
+  # it. One shape or the other, not one per stream.
+  puts unless Tui.interactive?
   puts
   if token.empty?
     puts Tui.paint(t('token_skipped'), :dim)
@@ -369,7 +432,9 @@ def ask_mastodon(site, env, current)
     puts Tui.paint("⚠️  #{result[:error]}", :yellow)
     puts Tui.paint(result[:rejected] ? t('token_kept_rejected') : t('token_kept_anyway'), :dim)
   else
-    puts Tui.paint(t('token_ok', handle: "@#{result[:handle]}@#{instance}"), :green)
+    # Into the frame: the toots-widget question right under this repaints
+    # the screen, and the verdict on the token is its whole premise.
+    say(t('token_ok', handle: "@#{result[:handle]}@#{instance}"), :green)
     # The numeric account id is the toots widget's one required value and
     # the single most common thing people fill in wrong (the @handle goes
     # in, nothing comes out, nothing says why). We are holding it: offer
@@ -400,6 +465,7 @@ def ask_bluesky(site, env, current)
   site.set(%w[bluesky handle], handle)
 
   password = Tui.password(t('q_app_password'))
+  puts unless Tui.interactive? # see the note by the Mastodon token above
   puts
   if password.empty?
     puts Tui.paint(t('password_skipped'), :dim)
@@ -427,10 +493,10 @@ BACKENDS = [
 SECRET_VALUES = %w[SURFER_TOKEN].freeze
 
 def ask_deploy(env, _current)
-  puts Tui.paint(t('section_deploy'), :bold)
-  puts
-  puts t('section_deploy_intro')
-  puts
+  say(t('section_deploy'), :bold)
+  say('')
+  say(t('section_deploy_intro'))
+  say('')
 
   now = ENV['DEPLOY_BACKEND'].to_s
   now = 'surfer' unless now.empty? || BACKENDS.any? { |b| b.first == now }
@@ -446,8 +512,8 @@ def ask_deploy(env, _current)
     # URLs) stay, commented out by unset's convention, so choosing the
     # backend again later finds them.
     env.unset('DEPLOY_BACKEND')
-    puts t('backend_skipped')
-    puts
+    say(t('backend_skipped'))
+    say('')
     return
   end
 
@@ -459,6 +525,7 @@ def ask_deploy(env, _current)
       # from before asking for it.
       puts t('surfer_token_where') if name == 'SURFER_TOKEN'
       value = Tui.password(t("q_#{name.downcase}"))
+      puts unless Tui.interactive? # see the note by the Mastodon token above
       puts
     else
       value = ask(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}"))
@@ -476,12 +543,16 @@ def check_local_target(env)
   dir = env.value('DEPLOY_TARGET_DIR')
   return if dir.to_s.empty?
 
+  # The verdict rides in the frame context: the next thing on screen is
+  # the comments menu, whose repaint used to erase it -- and a warning
+  # about a typo'd deploy path that nobody can read is precisely the
+  # silent success it exists to prevent.
   if File.directory?(dir)
-    puts Tui.paint(t('target_ok', dir: dir), :green)
+    say(t('target_ok', dir: dir), :green)
   else
-    puts Tui.paint("⚠️  #{t('target_missing', dir: dir)}", :yellow)
+    say("⚠️  #{t('target_missing', dir: dir)}", :yellow)
   end
-  puts
+  say('')
 end
 
 # --- writing ---------------------------------------------------------
@@ -517,6 +588,11 @@ def run_doctor
   problems = findings.reject { |f| f.level == :ok }
   if problems.empty?
     puts Tui.paint(t('doctor_clean'), :green)
+    # Doctor is the last thing ./setup.sh says, on either of its two ways
+    # out, so this is where the run's single trailing blank line belongs --
+    # the convention every command here follows. Both ways out ended flush
+    # against the shell prompt instead.
+    puts
     return
   end
 
@@ -529,6 +605,7 @@ def run_doctor
   end
   puts
   puts Tui.paint(t('doctor_hint'), :dim)
+  puts
 end
 
 Wizard.guard { run }

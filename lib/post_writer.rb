@@ -1,19 +1,30 @@
 require 'json'
 require 'fileutils'
 require 'securerandom'
+require 'digest'
 require 'time'
 require_relative 'atomic_write'
+require_relative 'post_versions'
 require_relative 'exif_location'
+require_relative 'media_dimensions'
 require_relative 'site_config'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
   CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
   MEDIA_DIR = File.join(ROOT, 'media.nosync')
+  MEDIA_KEYS = %w[media poster].freeze
 
   # post: hash matching the post schema (slug, title, date, state, tags, content, source)
-  # media_files: { source_path => desired_filename } to copy into media/<year>/<slug>/
+  # media_files: [source_path, desired_filename] pairs to copy into
+  # media/<year>/<slug>/. A list, not a hash, because one source file can
+  # owe the post two names at once (Import::Media#files); a hash -- which
+  # the authoring CLI still hands over -- converts on the way in, and its
+  # one-name-per-source shape loses nothing there, where every source is a
+  # distinct file of the author's own. Names are unique either way; only
+  # sources may repeat.
   def self.write(post, media_files: {})
+    media_files = media_files.to_a
     date = Time.parse(post.fetch('date'))
     year = date.year.to_s
 
@@ -35,11 +46,22 @@ module PostWriter
 
     dir = File.join(CONTENT_DIR, year)
     FileUtils.mkdir_p(dir)
-    slug = unique_slug(post.fetch('slug'), dir, post['source'])
+    slug = unique_slug(post.fetch('slug'), dir, post['source'], year)
     post = post.merge('slug' => slug)
     post = ensure_draft_token(post)
 
+    # The slug can be settled and STILL have a past: unique_slug hands the
+    # same name back when the source id matches the file already sitting
+    # there (the cold-index fallback), and that file is a previous copy in
+    # every sense the two calls below care about.
+    previous = begin
+      JSON.parse(File.read(File.join(dir, "#{slug}.json"), encoding: 'utf-8'))
+    rescue StandardError
+      nil
+    end
+    media_files = reconcile_media_names(post, previous, year, slug, media_files)
     copy_media(media_files, year, slug)
+    sync_media_dimensions(post, year, slug, previous: previous)
     path = File.join(dir, "#{slug}.json")
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
@@ -55,6 +77,16 @@ module PostWriter
     SiteConfig.get('media', 'strip_location', default: true) != false
   end
 
+  # Nothing here ever replaces a file the archive already holds, and that
+  # is a decision rather than an omission. An import brings bytes from
+  # somewhere nobody in this process can vouch for: a source that has been
+  # sold answers an image URL with a parked page at a straight-faced 200,
+  # a CDN that has had enough answers with 27 bytes of HTML, and a
+  # re-import that wrote those over the archive would destroy the only
+  # copy left of a picture -- quietly, at the scale of a whole run. So an
+  # import only ever ADDS what is missing. Repairing a damaged archive is
+  # a separate job with a separate confirmation; `./blog.sh check` is
+  # where it starts.
   def self.copy_media(media_files, year, slug)
     return if media_files.empty?
 
@@ -91,6 +123,442 @@ module PostWriter
     end
   end
 
+  # A media file's identity is the address it came from, not its position
+  # in the post. Importers number files in the order the source lists them
+  # (01, 02, ...) and copy_media never replaces an existing file -- two
+  # rules that are each right alone and together mis-attributed pictures
+  # the moment the source dropped, added or reordered one: the new "01"
+  # landed on the old 01's bytes, so a gallery showed its first picture
+  # twice and passed another off as a third. Measured on a real Ghost
+  # post, not conjectured.
+  #
+  # So before anything is copied, an entry whose address any copy of this
+  # post has ever known -- the one being replaced, or a kept version of it
+  # -- takes back the filename it had, and a genuinely new file is steered
+  # clear of every name anything answers for, on disk or in this run.
+  # Entries with no address are recognised by their BYTES where the plan
+  # still has them (see reconcile_positional); only when the bytes answer
+  # nothing does the positional name stand, because renaming on a guess
+  # would mint fresh files on every run of a tree import.
+  def self.reconcile_media_names(post, previous, year, slug, media_files)
+    dir = File.join(MEDIA_DIR, year, slug)
+    old_names = {}
+    each_media_entry(previous || {}) do |entry, _block|
+      src = entry['src'].to_s
+      name = entry['url'].to_s
+      old_names[src] = name if !src.empty? && plain_media_name?(name) && !old_names.key?(src)
+    end
+    # An entry whose bytes are being taken from this post's own directory
+    # already has a name there: the path in media_files says so. This is
+    # what recognises a reuse the index served out of the post's own
+    # directory, address or no address.
+    own = {}
+    media_files.each do |src_path, alloc|
+      next unless File.dirname(src_path) == dir
+
+      base = File.basename(src_path)
+      own[alloc] = base if plain_media_name?(base)
+    end
+    on_disk = Dir.exist?(dir) ? Dir.children(dir).reject { |f| f.start_with?('.') } : []
+    # Only a post with no remembered names, no reused files AND an empty
+    # directory has nothing to reconcile against. The directory is part of
+    # that test on purpose: a previous copy with no media at all (the
+    # source dropped every picture for one cycle) used to slip through
+    # here, and the returning pictures were then never confronted with the
+    # files lying on disk -- [pes, kocka] -> drop -> [kocka, pes] swapped
+    # the two identities in place.
+    return media_files if old_names.empty? && own.empty? && on_disk.empty?
+
+    # The durable half of the memory. `previous` only remembers the
+    # CURRENT set, so a picture dropped in one re-import and returned in
+    # the next is missing from it -- and treating the return as an arrival
+    # minted a fresh copy (or, after a re-encode at the source, a copy per
+    # cycle) of a file the archive held all along. The kept versions of
+    # this post remember what `previous` has forgotten. Loaded lazily:
+    # only an addressed entry nothing else recognises is worth the read.
+    version_names(post, old_names, slug, year)
+
+    sha_cache = {}
+    rename = {}
+    keeps = []
+    arrivals = []
+    positional = []
+    each_media_entry(post) do |entry, _block|
+      name = entry['url'].to_s
+      src = entry['src'].to_s
+      next unless plain_media_name?(name)
+
+      wanted = (old_names[src] unless src.empty?) || own[name]
+      if wanted.nil?
+        if src.empty?
+          keeps << name
+          positional << name
+        else
+          arrivals << name
+        end
+      elsif wanted == name
+        keeps << name
+      else
+        rename[name] = wanted
+      end
+    end
+
+    # Entries with no address, recognised by their bytes -- resolved
+    # BEFORE the rename claims are settled, so a positional entry that
+    # moves to the file it matches vacates a name an addressed entry may
+    # be waiting for. Addressed claims keep their precedence: the moves
+    # only ever target names no keep and no pending rename answers for.
+    moves = reconcile_positional(positional, keeps, rename, media_files, dir, on_disk, sha_cache)
+
+    # A rename target has to be free. An entry with no address whose bytes
+    # settle nothing keeps its positional name -- so a recognised entry
+    # whose old name is now held by one of those, or claimed by an earlier
+    # rename (two entries of a hand-edited previous copy claiming one
+    # name, or a kept version remembering a name that has since changed
+    # hands), is demoted to an arrival instead: a fresh name, its own
+    # bytes. Two entries must never end up sharing a name; that was the
+    # gallery defect this method exists to prevent.
+    taken = keeps.to_h { |n| [n, true] }
+    moves.each_value { |target| taken[target] = true }
+    rename.keys.sort.each do |name|
+      target = rename[name]
+      if taken.key?(target)
+        rename.delete(name)
+        arrivals << name
+      else
+        taken[target] = true
+      end
+    end
+    rename.merge!(moves)
+
+    used = (on_disk + rename.values + keeps).to_h { |n| [n, true] }
+    arrivals.uniq.each do |name|
+      # An arrival is not always a stranger: a picture dropped in one
+      # re-import and brought back in the next arrives as a fresh
+      # download, and an unclaimed file on disk may be its own orphaned
+      # copy. The bytes decide: identical means reunion (the copy is then
+      # skipped as always), different means the file belongs to somebody
+      # else. The arrival's own positional name is asked first; failing
+      # that, every name on disk that nothing claims -- and that pass
+      # runs whether or not the arrival's allocated name collides,
+      # because a dead URL in the batch burns a number and hands the
+      # return a FREE name, which used to slip past the reunion and mint
+      # a byte-identical duplicate of the orphan. Only a claimed name
+      # outranks matching bytes: the address decides ownership, the
+      # bytes only ever decide identity.
+      src_path = plan_source(media_files, name)
+      if used.key?(name) && !taken.key?(name) && on_disk.include?(name) &&
+         same_bytes?(src_path, File.join(dir, name), sha_cache)
+        used[name] = true
+        taken[name] = true
+        next
+      end
+      reunion = src_path && File.file?(src_path) && on_disk.sort.find do |cand|
+        cand != name && !taken.key?(cand) && plain_media_name?(cand) &&
+          same_bytes?(src_path, File.join(dir, cand), sha_cache)
+      end
+      if reunion
+        rename[name] = reunion
+        taken[reunion] = true
+        used[reunion] = true
+        next
+      end
+      unless used.key?(name)
+        used[name] = true
+        next
+      end
+      ext = File.extname(name)
+      n = 1
+      n += 1 while used.key?(format('%02d%s', n, ext))
+      fresh = format('%02d%s', n, ext)
+      rename[name] = fresh
+      used[fresh] = true
+    end
+
+    final = rename.empty? ? media_files : media_files.map { |src_path, name| [src_path, rename.fetch(name, name)] }
+    tally_superseded(final, dir, sha_cache)
+    return final if rename.empty?
+
+    each_media_entry(post) do |entry, _block|
+      to = rename[entry['url'].to_s]
+      entry['url'] = to if to
+    end
+    final
+  end
+
+  # The names this post's kept versions remember for addresses `previous`
+  # no longer carries, merged into old_names -- first seen wins, newest
+  # version first, and nothing already known is overwritten, so the copy
+  # being replaced always outranks its own history. Read only when some
+  # addressed entry is otherwise unrecognised: versions are a directory of
+  # files, and every other write has no reason to open them. A version
+  # that will not parse is skipped, not obeyed and not fatal. A version
+  # that parses but LIES -- hand-forged to map an address at an orphan
+  # holding some other picture's bytes -- is obeyed: from here it is
+  # indistinguishable from the legitimate case this memory exists for, a
+  # source that re-encoded a picture whose old bytes the archive keeps.
+  # The same boundary the previous copy has always had under hand
+  # corruption, with the same repair: delete the file, REFETCH_MEDIA=1.
+  #
+  # A name a newer memory has already promised to some other address is
+  # off limits, and not only as a key: a stale version can remember a name
+  # that has since changed hands, and taking its word would let the OLD
+  # claim win whenever the numbering happened to deal it that name as a
+  # keep -- evicting the rightful entry into a fresh copy. The newer
+  # memory decides; the address the version spoke of arrives instead, and
+  # the reunion pass in the caller still finds its bytes where they lie.
+  def self.version_names(post, old_names, slug, year)
+    unknown = false
+    each_media_entry(post) do |entry, _block|
+      src = entry['src'].to_s
+      unknown ||= !src.empty? && !old_names.key?(src)
+    end
+    return unless unknown
+
+    promised = old_names.values.to_h { |name| [name, true] }
+    PostVersions.list(slug, year, content_dir: CONTENT_DIR).each do |path|
+      version = begin
+        JSON.parse(File.read(path, encoding: 'utf-8'))
+      rescue StandardError
+        nil
+      end
+      next unless version.is_a?(Hash)
+
+      each_media_entry(version) do |entry, _block|
+        src = entry['src'].to_s
+        name = entry['url'].to_s
+        next if src.empty? || !plain_media_name?(name)
+        next if old_names.key?(src) || promised.key?(name)
+
+        old_names[src] = name
+        promised[name] = true
+      end
+    end
+  end
+
+  # Entries with no address, recognised by the second identity: their
+  # bytes. A tree import hands these over by position, and a source-side
+  # swap of two local files used to swap their identities in the post --
+  # each entry took the other's name, dimensions and bytes, forever,
+  # because "no address" read as "nothing to recognise them by". The plan
+  # still has the file itself, and when the bytes under the positional
+  # name disagree, a file in the post's directory with the SAME bytes says
+  # which name this entry has carried all along.
+  #
+  # Addressed claims come first: a keep and a pending rename target are
+  # both off limits. Two identical no-address entries cannot both have the
+  # matched file -- the first (in post order) takes it, the next stays
+  # where it is. And an entry the bytes cannot place FALLS BACK to its
+  # positional name, never to a fresh mint: minting here would create new
+  # files on every run of a tree import, which is the one thing positional
+  # naming has always been careful not to do. The cancellation loop keeps
+  # the fallbacks honest -- a move onto the position of an entry that
+  # stayed put would make two entries share a name.
+  #
+  # Returns {current name => matched name}; `keeps` loses the movers.
+  def self.reconcile_positional(positional, keeps, rename, media_files, dir, on_disk, sha_cache)
+    return {} if positional.empty?
+
+    movable = {}
+    positional.each do |name|
+      src_path = plan_source(media_files, name)
+      # Bytes to compare are only in hand for a file the plan takes from
+      # OUTSIDE the post's directory: a reuse from inside it is already
+      # recognised (own), and a failed fetch left nothing to measure.
+      next unless src_path && File.file?(src_path) && File.dirname(src_path) != dir
+      # Bytes in place -- the everyday tree re-import. Nothing to solve.
+      next if same_bytes?(src_path, File.join(dir, name), sha_cache)
+
+      movable[name] = src_path
+    end
+    return {} if movable.empty?
+
+    claimed = (keeps - movable.keys).to_h { |n| [n, true] }
+    rename.each_value { |target| claimed[target] = true }
+
+    moves = {}
+    movable.each do |name, src_path|
+      match = on_disk.sort.find do |cand|
+        cand != name && !claimed.key?(cand) && !moves.value?(cand) && plain_media_name?(cand) &&
+          same_bytes?(src_path, File.join(dir, cand), sha_cache)
+      end
+      moves[name] = match if match
+    end
+
+    # An entry that found no match stays on its position -- and every move
+    # onto a STAYING entry's position is cancelled, which can strand the
+    # mover on its own position and cancel another move in turn. Swaps and
+    # rotations survive this loop untouched: every member of the cycle
+    # moves, so no target is a name anybody kept.
+    loop do
+      staying = movable.keys.reject { |n| moves.key?(n) }
+      clash = moves.find { |_, target| staying.include?(target) }
+      break unless clash
+
+      moves.delete(clash[0])
+    end
+
+    moves.each_key { |name| keeps.delete(name) }
+    moves
+  end
+
+  # The plan pair behind an allocated name. media_files is a list of
+  # pairs rather than a hash -- one source file can owe the post two
+  # names -- so Hash#key has no direct equivalent; names are unique in
+  # the plan, so the first pair carrying the name is the only one.
+  def self.plan_source(media_files, name)
+    pair = media_files.find { |_, alloc| alloc == name }
+    pair && pair[0]
+  end
+
+  # Byte identity, sized first so the hash is only ever paid for files
+  # that could be the same file. The cache is per reconcile call: the same
+  # on-disk file gets asked about by several entries in one pass, and once
+  # per pass is what a hash of it is worth.
+  def self.same_bytes?(a, b, cache)
+    return false unless a && b && File.file?(a) && File.file?(b)
+    return false unless File.size(a) == File.size(b)
+
+    sha = ->(path) { cache[path] ||= Digest::SHA256.file(path).hexdigest }
+    sha.call(a) == sha.call(b)
+  end
+
+  # How many incoming files this write discarded in favour of the
+  # archive's own copy under the same name -- a source that re-encoded a
+  # picture and kept its address, mostly. copy_media skips those silently
+  # (an import only ever adds), and silence here cost an operator the one
+  # fact worth acting on: the source no longer serves what the archive
+  # holds. Counted per process, read as a delta by Import::Run, said in
+  # the summary. Byte-identical skips are not counted -- a plain re-import
+  # discards every download it was told to make, and that is reuse, not
+  # news.
+  def self.superseded_downloads
+    @superseded_downloads ||= 0
+  end
+
+  def self.tally_superseded(media_files, dir, sha_cache)
+    # Anything sourced from inside the archive -- this post's directory
+    # or any other post's -- is a REUSE the index served, not a download:
+    # counting it said "the source has drifted" on a plain re-import that
+    # fetched nothing, once per run, forever. Only bytes brought in from
+    # outside the archive can be news about the source.
+    archive = File.expand_path(MEDIA_DIR) + File::SEPARATOR
+    media_files.each do |src_path, name|
+      next if File.expand_path(src_path).start_with?(archive)
+
+      dest = File.join(dir, name)
+      next unless File.file?(src_path) && File.file?(dest)
+
+      @superseded_downloads = superseded_downloads + 1 unless same_bytes?(src_path, dest, sha_cache)
+    end
+  end
+
+  # Makes the post describe the file that is actually in the archive.
+  #
+  # An importer measures the bytes it just fetched and writes the numbers
+  # into the block; copy_media above then declines to overwrite a file that
+  # is already there. Both are right on their own, and together they let a
+  # post state 400x600 over a 26-byte file -- with scripts/check.rb calling
+  # the archive healthy, because the file exists and the numbers are
+  # present. Nothing before this point can close that gap: the adapter does
+  # not know the year and the slug, so it cannot name the destination, and
+  # here is the first place both are settled.
+  #
+  # Only entries whose file IS in the archive; one whose file never
+  # arrived is left saying exactly what it said. When the bytes answer,
+  # they decide. When they do not, see the two cases below -- the answer
+  # is neither "keep" nor "drop" but "what this post said last time".
+  def self.sync_media_dimensions(post, year, slug, previous: nil)
+    media_dir = File.join(MEDIA_DIR, year, slug)
+    remembered = remembered_sizes(previous)
+    each_media_entry(post) do |entry, _block|
+      name = entry['url'].to_s
+      next unless plain_media_name?(name)
+
+      path = File.join(media_dir, name)
+      next unless File.file?(path)
+
+      width, height = MediaDimensions.image(path)
+      if width && height
+        entry['width'] = width
+        entry['height'] = height
+      else
+        was = remembered_for(remembered, name, entry)
+        if was.nil?
+          # Nothing was ever said about this name or address: the file
+          # just landed for the first time, nothing was discarded, and
+          # whatever numbers the entry carries are the source's own
+          # metadata -- a video's stated size, which no image reader here
+          # ever measured. Kept.
+        elsif was[0] && was[1]
+          # The file is here, its bytes say nothing, and this post spoke
+          # about it before. What it said is the last record of what the
+          # picture was -- and this run's numbers, if different, were
+          # measured from a download copy_media then did not write.
+          entry['width'] = was[0]
+          entry['height'] = was[1]
+        else
+          # The previous copy knew this file and said nothing, because it
+          # could not be measured then either. This run's numbers describe
+          # bytes the archive does not hold; the honest answer is the one
+          # the post already gave.
+          entry.delete('width')
+          entry.delete('height')
+        end
+      end
+    end
+  end
+
+  # What the copy of this post that is being replaced said about its own
+  # media, keyed the two ways an entry can be recognised again: by the
+  # address it came from, which survives a renumbering, and by the file
+  # name, which is all a post written before `src` existed carries.
+  def self.remembered_sizes(previous)
+    sizes = { 'src' => {}, 'url' => {} }
+    return sizes unless previous.is_a?(Hash)
+
+    each_media_entry(previous) do |entry, _block|
+      # [nil, nil] is an answer too: "this post knew the file and said
+      # nothing about its size". Skipping those made a file seen before
+      # indistinguishable from a file seen for the first time -- which is
+      # exactly the gap a REFETCH run stamped its discarded numbers into.
+      pair = [entry['width'], entry['height']]
+      sizes['src'][entry['src'].to_s] = pair unless entry['src'].to_s.empty?
+      sizes['url'][entry['url'].to_s] = pair unless entry['url'].to_s.empty?
+    end
+    sizes
+  end
+
+  def self.remembered_for(sizes, name, entry)
+    sizes['src'][entry['src'].to_s] || sizes['url'][name]
+  end
+
+  # Every media entry in a post: the files themselves, and a video's
+  # poster, which is a file with an address of its own. The block comes
+  # with it -- what an entry means depends on what it is part of, and a
+  # caller that has to guess from the filename is the guess this engine
+  # got wrong twice.
+  def self.each_media_entry(post)
+    Array(post['content']).each do |block|
+      next unless block.is_a?(Hash)
+
+      MEDIA_KEYS.each do |key|
+        entries = block[key]
+        next unless entries.is_a?(Array)
+
+        entries.each { |entry| yield entry, block if entry.is_a?(Hash) }
+      end
+    end
+  end
+
+  # A media url is a bare filename by construction (the importer allocates
+  # "01.jpg"), and callers join it onto a directory -- so anything with a
+  # separator or a leading dot in it is not a name to follow. A post JSON
+  # is a file on disk that people do edit by hand.
+  def self.plain_media_name?(name)
+    !name.empty? && !name.start_with?('.') && !name.include?('/') && !name.include?('\\')
+  end
+
   # Overwrites the matched post in place -- or moves it when the source
   # changed the item's date across a year boundary, since the build derives
   # both the URL and the media lookup from the date, and a file left in the
@@ -118,12 +586,60 @@ module PostWriter
     # importer that legitimately provides one still wins. `type` stays out:
     # absent, the build re-derives it from the (re-imported) blocks, so it
     # comes back on its own.
-    # redirect_from rides along too: the importer that understands the
-    # source platform writes it once, and a later re-import from an export
-    # that carries no URL history (or a different importer entirely) must
-    # not silently drop the addresses the post still answers for.
-    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at redirect_from].each do |key|
+    # page, series and series_part joined the list in 1.3. Same rule as the
+    # rest: carried over only when the importer said nothing itself, so an
+    # adapter that DOES recognise a page still wins, and a series -- which
+    # no source has a notion of -- survives every re-import.
+    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at
+       page series series_part].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
+    end
+    # redirect_from is the one key where "the importer set it itself" is NOT
+    # a reason to drop what the post already carried, so it cannot ride in
+    # the list above. A post collects old addresses from several places --
+    # the importer that understands the source platform, scripts/backfill_
+    # redirects.rb, another platform's importer before this one, and an
+    # author typing in the addresses a dead blog used to answer for. Each of
+    # those knows about a different past, and none of them knows about the
+    # others. Under the old guard a re-import with KEEP_PERMALINKS=1 wrote
+    # its own single address over all of them, so the stubs the build had
+    # been serving stopped being built and every one of those addresses
+    # started answering 404 -- silently, with nothing in the summary. Union,
+    # old first, so once merged a further re-import adds nothing and the
+    # order never moves.
+    merged = (Array(old && old['redirect_from']) + Array(post['redirect_from']))
+             .map { |path| path.to_s.strip }.reject(&:empty?).uniq
+    # A page lives at /<slug>/, so that address redirecting to itself is a
+    # loop the build has to refuse -- and it warns about it once per build,
+    # forever. Ghost's adapter guards its own writes against this, but the
+    # guard reads the SOURCE: a post the platform calls a post and the
+    # author later promotes to a page slips past it, and no adapter can
+    # take the address back afterwards, because the merge above is what
+    # keeps re-imports from dropping addresses. So it comes off here, where
+    # both the slug and `page` are settled, which also repairs the sites
+    # that already have one import behind them. Only the post's own current
+    # address: a former slug redirecting to the page is exactly what
+    # former_slugs is for.
+    merged -= ["/#{slug}/"] if post['page']
+    merged.empty? ? post.delete('redirect_from') : post['redirect_from'] = merged
+    # hero, toc and unlisted need presence rather than truth, and that
+    # distinction is the whole point of them: `hero: false` is a post saying
+    # "not me", and a guard that tests `old[key]` reads that as "nothing to
+    # carry" and throws it away -- which is exactly how the field went
+    # missing from the editor before it was a frontmatter key. Only what the
+    # importer itself did not set, as above.
+    #
+    # unlisted was left out of both lists when it arrived in this cycle, and
+    # of the three it is the one that costs something to lose: no source has
+    # a notion of it, so no adapter ever sets it, and a re-import therefore
+    # put a post the author had taken out of the listings back into every
+    # one of them -- the homepage, the feeds, the sitemap and the search
+    # index. Silently, and against a promise the import summary makes out
+    # loud, that re-running is safe because posts are matched on their
+    # source id. A post is unlisted for people, not for search engines, so
+    # the failure is quiet on the one side that matters.
+    %w[hero toc unlisted].each do |key|
+      post[key] = old[key] if old&.key?(key) && !post.key?(key)
     end
     # A re-imported draft keeps its preview URL: the token is engine-side
     # state like the announcement URLs above, and minting a fresh one per
@@ -148,19 +664,31 @@ module PostWriter
     new_dir = File.join(CONTENT_DIR, year)
     new_path = File.join(new_dir, "#{slug}.json")
 
+    # The other way a post's text gets replaced, and the more dangerous
+    # one: a re-import overwrites in place across the whole archive at
+    # once, and nobody reads a few thousand posts afterwards to see what
+    # the source decided to change. Keyed on the OLD location, since that
+    # is the copy about to stop existing -- and kept BEFORE the year move
+    # below, so the copy travels with the rest of the history instead of
+    # stranding in the year the post is leaving.
+    # The same guard Publishing.publish and edit_post have, for the same
+    # reason: a DIFFERENT post can already own <new_year>/<slug> -- the
+    # real archive has the same slug in two years today -- and writing
+    # there would replace it wholesale while this post's old file gets
+    # deleted, so the build's duplicate check never fires. Raised as a
+    # StandardError on purpose: inside an import the per-item rescue
+    # counts it and names it, and the rest of the run continues; nothing
+    # here has been moved or deleted yet. Hoisted ABOVE the version keep:
+    # a re-import about to be refused must refuse with no side effects,
+    # and it used to leave one spare version behind on its way out.
+    if File.expand_path(new_path) != File.expand_path(existing_path) && File.exist?(new_path)
+      raise "cannot move '#{slug}' into #{year}: a different post already owns " \
+            "#{new_path} -- resolve the slug clash by hand"
+    end
+
+    PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
+
     if File.expand_path(new_path) != File.expand_path(existing_path)
-      # The same guard Publishing.publish and edit_post have, for the same
-      # reason: a DIFFERENT post can already own <new_year>/<slug> -- the
-      # real archive has the same slug in two years today -- and writing
-      # there would replace it wholesale while this post's old file gets
-      # deleted, so the build's duplicate check never fires. Raised as a
-      # StandardError on purpose: inside an import the per-item rescue
-      # counts it and names it, and the rest of the run continues; nothing
-      # here has been moved or deleted yet.
-      if File.exist?(new_path)
-        raise "cannot move '#{slug}' into #{year}: a different post already owns " \
-              "#{new_path} -- resolve the slug clash by hand"
-      end
 
       # A published post that moves years vacates its public address, and
       # the redirect for it has to be recorded here exactly as edit_post
@@ -179,9 +707,17 @@ module PostWriter
 
       FileUtils.mkdir_p(new_dir)
       move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
+      # The edit history is keyed by year/slug exactly like the media, and
+      # owes the post the same journey -- left behind, the [v] dialog went
+      # silent and the orphaned directory waited to be inherited by a
+      # future post under the same year/slug.
+      PostVersions.move(slug, old_year, from_content_dir: CONTENT_DIR,
+                        to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
     end
 
+    media_files = reconcile_media_names(post, old, year, slug, media_files)
     copy_media(media_files, year, slug)
+    sync_media_dimensions(post, year, slug, previous: old)
     # Write first, delete second -- same ordering as Publishing.publish, so
     # a failure in between leaves the post twice (recoverable) rather than
     # not at all.
@@ -247,11 +783,50 @@ module PostWriter
   # {platform: manual} and nothing else, and matching them to each other
   # would overwrite one author-written post with another.
   def self.index
-    @index ||= Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).each_with_object({}) do |file, acc|
-      existing = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
-      key = existing && source_key(existing['source'])
-      acc[key] = file if key
+    return @index if @index
+
+    # The pass itself settles it -- see each_post.
+    each_post { |_path, _post| nil }
+    @index
+  end
+
+  # Every post in the archive, parsed once: yields [path, post hash].
+  #
+  # Two maps are built from exactly these bytes -- this one, and the
+  # importer's address-to-file index (Import::MediaIndex) -- and an import
+  # that ran both globbed and JSON-parsed a few thousand files twice, which
+  # on a large archive is a visible wait for nothing. So whichever of them
+  # asks first pays for the pass, and it settles `index` on the way past.
+  # Order is safe either way round: the media index is built at the first
+  # download, which happens while mapping the first item, and `index` at
+  # the first write, which happens after it.
+  #
+  # A post that will not parse is skipped rather than raised on: it is
+  # check's business to report, and an index that refused to build over one
+  # of them would take the whole import down with it.
+  def self.each_post(content_dir: CONTENT_DIR)
+    building = @index.nil?
+    acc = {}
+    Dir.glob(File.join(content_dir, '*', '*.json')).each do |file|
+      post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
+      next unless post.is_a?(Hash)
+
+      if building
+        key = source_key(post['source'])
+        acc[key] = file if key
+      end
+      yield file, post
     end
+    # Only once the pass finished: a block that raised halfway would
+    # otherwise leave a half-built index memoized for the rest of the
+    # process, and matching re-imports against it would duplicate posts.
+    @index = acc if building && content_dir == CONTENT_DIR
+  end
+
+  # Where a post's media lives, derived from the post's own JSON path --
+  # the same year/slug pair copy_media builds it from.
+  def self.media_dir_for(post_path)
+    File.join(MEDIA_DIR, File.basename(File.dirname(post_path)), File.basename(post_path, '.json'))
   end
 
   # An identity is only an identity when ALL THREE parts exist. Without the
@@ -280,16 +855,35 @@ module PostWriter
     path if path && File.exist?(path)
   end
 
-  def self.unique_slug(base_slug, dir, source)
+  def self.unique_slug(base_slug, dir, source, year)
     n = 1
     loop do
       candidate = n == 1 ? base_slug : "#{base_slug}-#{n}"
       existing_path = File.join(dir, "#{candidate}.json")
-      return candidate unless File.exist?(existing_path)
-      return candidate if same_source?(existing_path, source)
+      if File.exist?(existing_path)
+        return candidate if same_source?(existing_path, source)
+      # A media directory with files in it and no post behind it is what a
+      # deleted or half-imported post leaves. Handing a NEW post that name
+      # publishes the orphan's pictures as its own: copy_media declines to
+      # replace files, so the stranger's 01.jpg becomes this post's first
+      # picture, at its stated size, with nothing anywhere to say so.
+      # manage_post's `add` has counted an occupied media directory as an
+      # occupied slug all along; the importers now agree with it.
+      elsif !orphaned_media?(year, candidate) &&
+            PostVersions.list(candidate, year, content_dir: CONTENT_DIR).empty?
+        # Orphaned versions are refused for the same reason as orphaned
+        # media one branch up: a new post on that name would inherit a
+        # stranger's history, [v] and all.
+        return candidate
+      end
 
       n += 1
     end
+  end
+
+  def self.orphaned_media?(year, slug)
+    dir = File.join(MEDIA_DIR, year, slug)
+    Dir.exist?(dir) && Dir.children(dir).any? { |f| !f.start_with?('.') }
   end
 
   # The by-slug fallback behind the index. Requires an original_id for the

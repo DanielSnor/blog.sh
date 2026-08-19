@@ -10,6 +10,472 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.3 -- 2026-08-19
+
+Dressing a site differently no longer means editing the engine -- your
+own stylesheet, menu, sidebar and a lead image are settings now, and
+`./style.sh` can write every one of them. Around that grew a release
+about trusting the archive: `check` reads it and says what is broken,
+`export` walks all of it back out as a markdown tree, `stats` counts it,
+a media file's identity survives re-imports, and every edit is undoable
+ten versions deep. Posts learned to be pages, series and unlisted
+addresses; replies you star can become the only comments the page shows;
+and a dead end got a page of its own, signpost included. Every default
+is the layout the engine already had, with one deliberate exception: the
+menu bar follows you down the page now, and it takes over from the menu
+that used to be repeated under the content -- which only existed because
+the bar didn't.
+
+### New
+
+- **`./blog.sh check`.** Walks the archive and reports what is broken in
+  it: missing media, degenerate images the build drops caption and all,
+  internal links nothing answers at, media directories no post owns, one
+  old address claimed by two posts. It reads the content rather than the
+  built site, only ever reports, and exits non-zero on errors alone, so
+  it can hang off cron. `--online` also asks the web about the links
+  that leave the site -- deliberately narrow, and nothing is called dead
+  on a single request. The summary totals the archive, not the screen:
+  long lists are capped at twenty lines, the counts are not. And a link
+  to a one-post series is reported dead, because a series page only
+  exists from the second published part on. Details in
+  [operations.md](docs/operations.md#checking-the-archive).
+- **`check` also sees the file a post no longer names.** An import only
+  ever adds, so a source that drops a picture between runs leaves its
+  file stranded in the post's own directory -- reported per post and per
+  file now, as a warning. Answering that honestly meant counting a
+  video's poster among the media a post uses: an existing poster is not
+  a stray, and a missing one is finally reported like any other file.
+- **`./blog.sh export`.** The other direction of the importers: the
+  whole archive as a tree of markdown files with YAML front matter in
+  Jekyll's layout, media included, redirects in the shape
+  `jekyll-redirect-from` reads. What markdown has no syntax for travels
+  as HTML carrying its definition in a comment `./import.sh` reads back,
+  so export plus re-import moves an installation instead of merely
+  leaving one. It reads only the archive on disk, so it works when the
+  config no longer parses. Details in
+  [operations.md](docs/operations.md#taking-your-content-elsewhere).
+- **Media is fetched once, and a file's identity is its address.** Every
+  media entry records where its file came from (`src`), so a re-import
+  fetches only what the archive does not hold -- a second run of the
+  same import makes no requests. An import only ever ADDS:
+  `REFETCH_MEDIA=1` asks the source again but never overwrites, a
+  returning file takes back the name it had here rather than landing on
+  another file's bytes, and the post describes the file that is really
+  in the archive. The post's kept versions remember an address the
+  current copy dropped, identical bytes reunite a return with the copy
+  already here, an entry with no address is recognised by its bytes --
+  and a download the archive's copy outranks is counted in the summary,
+  which is the one signal the source has drifted. The whole contract is
+  in [importing.md](docs/importing.md#what-every-import-does).
+- **Carrying a post through the publishing queue.** `[m]` picks the post
+  up, the arrows carry it, Enter puts it down and Escape changes
+  nothing; the times belong to the queue, so a long move is one
+  confirmed write instead of one per slot. `[u]`/`[d]` remain for the
+  single slot and for piped input. And the schedule prompt says so when
+  the slot you want is taken: accept the offered time, carry the post to
+  the front -- a full queue is a two-step, not a dead end. See
+  [operations.md](docs/operations.md#working-the-queue).
+- **Unlisted posts.** `unlisted: true` keeps a published post on its
+  ordinary address and takes it out of every listing, feed and index,
+  `noindex` included -- the draft's hidden address generalised to a
+  finished post. Deliberately not a password. What it covers:
+  [operations.md](docs/operations.md#properties-and-actions); why it
+  goes no further: [decisions.md](docs/decisions.md#content).
+- **`./blog.sh stats`.** The archive counted from the posts on disk:
+  published, drafts, scheduled and pages, a bar per year, what the posts
+  are made of, words with both mean and median (either alone would
+  mislead on an archive of imported tweets), tags, media, platforms.
+  `--json` prints the same numbers unrounded. No build, no network, no
+  `env.sh`. Details in
+  [operations.md](docs/operations.md#counting-the-archive).
+- **Editing a post is undoable.** The previous text is kept before every
+  overwrite -- an edit or a re-import -- and `[v]` in `props` puts one
+  back. Ten per post, text only, travelling with the post to the trash
+  and back. See
+  [operations.md](docs/operations.md#properties-and-actions).
+- **Pages.** `page: true` gives a post a permanent address at the root
+  (`/about/`), out of the listings and feeds but in the sitemap and the
+  search index. Ghost, WordPress, Squarespace and Substack import them
+  as pages instead of skips, and the import says where they landed and
+  that nothing links to them yet -- the engine will not write a `nav:`
+  key on your behalf. Field reference in
+  [architecture.md](docs/architecture.md#field-reference).
+- **A 404 page**, built by the site rather than left to the host: the
+  menu and the search field on a dead end, `noindex` -- and a signpost
+  above the heading, drawn inline in the palette's own colors, its one
+  accent arrow pointing the way on.
+- **Series.** `series:` groups posts, `series_part:` orders the one
+  published out of order; each series gets a listing, and every post in
+  one links to the previous and next part -- within the series only. A
+  draft's preview says whether its series name joins something or founds
+  something new, so a typo is caught while it is free to fix; a series
+  written as its own slug groups correctly and never retitles the
+  listing away from a spelled-out name; and `check` warns about two
+  series slugs a few characters apart -- but not about a series named
+  after a release standing beside its own patch release, which differ by
+  a separator and a digit and are two series on purpose. See
+  [operations.md](docs/operations.md#writing-and-publishing).
+- **Reading time and a table of contents.** The first on every post
+  page; the second from four headings up, or whenever a post asks with
+  `toc:`.
+- **`fediverse:creator`.** Mastodon puts the author's account on a
+  shared link's preview card. No new key -- it is the `social:` entry
+  pointing at a profile on the instance the site already announces to.
+- **A feed per tag, for the tags the menu names**, with autodiscovery on
+  the tag's own page. Why only those:
+  [decisions.md](docs/decisions.md#configuration).
+- **`seo.block_ai_crawlers` and `seo.robots_extra`.** A maintained list
+  of training crawlers for robots.txt, plus free text for the rest. Off
+  by default; robots.txt is a request, not a fence. See
+  [install.md](docs/install.md#2-configure-the-site----configsiteyml).
+- **`site.extra_css`.** Stylesheets loaded after the engine's own, which
+  is where a skin belongs -- previously the only way in was an edit that
+  `git pull` took away. Paths on this site only, because of the site's
+  own CSP; the build and `doctor` both name a line they had to skip. See
+  [install.md](docs/install.md#the-menu-the-regions-and-a-stylesheet-of-your-own).
+- **Your own menu (`nav:`).** Entries the site names -- a tag's listing
+  or any address -- instead of the derived content types. Without the
+  key nothing changes; an empty list turns the menu off. `./style.sh`
+  edits it, offering your busiest tags and your pages by name, and
+  `doctor` reports an entry whose target has since gone missing, plus
+  the `url: "about"` spelling that only works from the front page. See
+  [install.md](docs/install.md#the-menu-the-regions-and-a-stylesheet-of-your-own).
+- **`layout.sidebar` and `layout.hero`.** The right-hand column can be
+  switched off, the content taking the full width; a post's first usable
+  image can run above the title, per site or per post (`hero:`), with a
+  tracking pixel never promoted to lead picture. Same document as
+  `nav:` above.
+- **`./style.sh` can set everything about how the site looks.** A
+  Layout section for the region switches and your stylesheets, plus the
+  banner's filename, the claim text and self-hosted font faces -- a site
+  can be dressed entirely from the wizard, which was the point of making
+  all of this configuration. Enter through any section changes nothing.
+- **Only the comments you star, if you want it that way.**
+  `comments.approval: fav` publishes a reply once you favourite it, from
+  the client you already have open -- no queue, no dashboard. It needs
+  the sidebar cron; on Mastodon a token with `read:statuses` (`doctor
+  --online` checks it); a favourite is public; and turning it on hides
+  every existing comment until you star the keepers, with
+  `./scripts/refresh-sidebar.sh --full` (new) settling old posts on the
+  spot. A moderated post also stops making any third-party request: the
+  comments arrive from the site's own domain and the page's CSP drops
+  its grant to the instance. Operation and timings in
+  [operations.md](docs/operations.md#cron-sidebar-widgets-and-post-stats);
+  the decision and its price in
+  [decisions.md](docs/decisions.md#publishing-and-comments).
+- **A reply's pictures appear with it.** Both networks hand a reply's
+  images over outside its text, so a picture reply used to render as
+  just its words -- in the live thread and the moderated list alike.
+  Thumbnails now sit under the words, linking out to the full image and
+  loading from the commenter's own network the way their avatar always
+  has. Images only, on purpose, and a reply marked sensitive keeps its
+  pictures to itself. See
+  [install.md](docs/install.md#8-comments-network-optional-mastodon-or-bluesky).
+
+### Changed
+
+- **A listing's heading marks what it is instead of saying it twice.** A
+  tag heading is the tag itself and a search shows its query behind a
+  magnifier; the word stays in the markup for a screen reader --
+  clipped, not removed.
+- **`config/site.yml.example` opens with an index** of every section and
+  key, optional ones in brackets, in the order the page reads.
+- **The publishing queue comes back to the post you just moved** -- by
+  name, not by row, so repeating `[u]` carries the same post further
+  instead of whichever post now sits in its old row.
+- **Restoring an earlier version is a list you walk, not a number you
+  type**, like every other list in the wizard; the row under the cursor
+  shows that version's title or opening words, and confirming is one
+  keypress -- a restore loses nothing, since the current text is kept as
+  a version of its own. See
+  [operations.md](docs/operations.md#properties-and-actions).
+- **Action rows fold instead of wrapping mid-word** on a narrow
+  terminal, breaking between items and keeping each one whole; nothing
+  is dropped. And Page Up, Page Down, Home and End work in the pickers,
+  as they already did on the browse screen.
+- **Tab completes paths in the import wizard**, directories with spaces
+  in their names included; questions asking for a handle or a URL do
+  not complete.
+- **The wizard holds still.** Every interactive screen repaints over
+  itself instead of printing another copy per keypress, across all four
+  entry points; anything long still gets the terminal to itself, the
+  last screen stays in your scrollback, and piped runs are untouched.
+  The three question-and-answer wizards keep the section and the answers
+  already given above the question. See
+  [operations.md](docs/operations.md#in-the-terminal).
+- **"yes" is a keypress, not any word that starts with one.** Piped
+  answers to the four confirmations are matched whole against the
+  locale's yes key and the three shipped ones, so on a Czech site
+  "abort" no longer means yes.
+- **Moderation housekeeping.** `refresh_sidebar.rb` writes
+  `comments.json` while moderation is on and deletes it when moderation
+  is switched off; merged rather than replaced, so a failed fetch keeps
+  a thread as last published. `doctor` names the three ways moderation
+  can be configured into silence, and the comment count next to a post
+  counts approved replies, so the number and the list agree.
+- **A listing card says how long its post takes to read.** The deciding
+  happens in the listing, and reading time is the one thing every post
+  can report, so the meta row is constant now instead of appearing only
+  under the few posts with an announcement. A post too short to time
+  says "under a minute", on the card and on its own page alike. The
+  reasoning is in [decisions.md](docs/decisions.md#content).
+
+### Fixed
+
+- **An announcement that does not happen says why.** `Publishing.announce`
+  is a choice between the configured networks, so with neither section in
+  `config/site.yml` it matched nothing and returned "no" -- and `toot`,
+  which cannot tell "did not try" from "tried and was refused", printed
+  *Failed to send the toot (see above)* with nothing above it. It now names
+  the missing section, and says what a filled-in instance and token under a
+  commented-out header actually do: they join the section before them.
+  Refusing the backdating question is reported as the decision it is rather
+  than as a failure, and the question is not asked at all when there is no
+  network to announce to. The three ways this could end quietly were
+  reported from the outside, by the first person to install this engine who
+  had not written it.
+- **`config/site.yml.example` says how to read itself.** The file uses `#`
+  for two different jobs -- prose, and settings that are switched off --
+  and the engine only copes because the wizards anchor on key paths they
+  already know. A reader has no such anchor: a paragraph of documentation
+  and a block of commented-out keys look exactly alike, and uncommenting
+  half a section leaves the keys you did uncomment belonging to whatever
+  section came before, with nothing to say so. The header now states the
+  convention that was always there (one `#` before a key means uncomment
+  me, two mean still optional), every switched-off section marks where it
+  ends, and two sentences of prose that happened to begin with `profile:`
+  and `url:` -- parsing as keys, which is the same trap from the other
+  side -- are rewrapped. Suggested by the first person to set this engine
+  up from the outside.
+- **`doctor` stops agreeing with that mistake.** A missing network section
+  used to be a green tick -- correct for a site that wanted none, and
+  reassurance for the one whose owner had just filled in a token. A
+  credential in `env.sh` with no section to use it is a warning now,
+  pointing at the header. What a hand-edited config gets checked by is also
+  said where hand-editing is documented, which it was not before:
+  [install.md](docs/install.md#2-configure-the-site----configsiteyml).
+- **A YAML error admits the line may not be the mistake.** The parser stops
+  where things stop fitting, which for a commented-out section header with
+  its keys left behind is *inside the section above it* -- on one real
+  config, line 64 for a mistake on line 80. Both messages, the abort and
+  `doctor`'s, now say the cause can be elsewhere and name the two shapes
+  that do it.
+- **The appearance toggle can find its way back to the system.** One
+  click used to pin the choice in `localStorage` forever; the button now
+  cycles system / light / dark and says which it is on, and the first
+  click still flips to the opposite of what is on screen.
+- **A markdown tree's pages arrive, and arrive as pages.** The importer
+  read `_posts/` and `_drafts/` and nothing else, so a Jekyll site's
+  `about.md` never arrived; and being a page depended on a front-matter
+  key only this engine's own export writes. Root-level markdown is read
+  now, minus the names that are never a page; where the file sits
+  decides, Hugo's `_index.md` stays with the listings it describes, and
+  no redirect is written from a page to itself.
+- **A re-imported post no longer collects a platform tag it has already
+  got**, so exporting and importing back does not pin a "jekyll" pill on
+  the whole archive.
+- **`hero:` survived a save.** An edit rebuilt the post without it, so
+  opening an opted-out post silently gave it back the site's answer.
+- **Keyboard focus can be seen again.** One `:focus-visible` ring for
+  the whole site, in the accent, moved inside the control wherever what
+  is underneath cannot be vouched for; a mouse click leaves nothing
+  behind.
+- **The site holds still for a reader who asked it to.**
+  `prefers-reduced-motion` is honoured: transitions collapse to nothing
+  and the back-to-top button jumps instead of scrolling.
+- **The banner's two lines stop printing over each other on a phone.**
+  Title and claim share one column now, and two things in a column
+  cannot overlap however short it gets; the scrim keeping the claim
+  readable is a band across the bottom. Nothing changes on a desktop.
+- **The menu on a phone closes with Escape and with a tap on the page**,
+  with Escape handing focus back to the button that opened it.
+- **Search answers with its best results, not its most recent ones.**
+  Results are scored -- a title over the text, a whole word over the
+  same letters inside a longer one -- and ties keep their date order.
+  The matching itself is unchanged.
+- **A search no longer draws a card for every post it found.** Only the
+  best-ranked results get cards, and the count above them still says how
+  many there were -- a cap that is only honest because the list is
+  ranked.
+- **On a phone the search field is in the bar, not folded into the
+  menu**, sized for a finger, and the bar hugs its contents instead of
+  holding a fixed height that shifted the row as the menu opened.
+- **The lightbox can be opened, walked and closed without a mouse.** The
+  images that open it are buttons -- made so by the script, so a page
+  without JavaScript keeps plain pictures -- the overlay is a dialog
+  that keeps Tab inside itself, and closing returns to the image that
+  was opened.
+- **Small things, one sweep.** A passive scroll listener, comment
+  avatars with their dimensions reserved, and two tap targets grown to
+  what a finger needs.
+- **A search has an address again.** `?q=` follows the query as it is
+  typed, so a search can be sent, bookmarked and returned to -- and Back
+  still leaves the page instead of walking the query backwards.
+- **Every page has an h1.** Listing headings were level two; the front
+  page had none and now carries the site's title, clipped by the
+  stylesheet; a post with no title of its own is headed by the date
+  every listing already calls it by; and the 404 page follows. A reader
+  who moves through a page by its headings has a way in everywhere.
+- **`check` no longer calls a working address dead.** The files every
+  build writes, listing pages and series listings are known now, so a
+  healthy archive no longer exits non-zero on cron.
+- **Unlisted is unlisted the whole way round.** Publishing one no longer
+  announces it -- on either path, and `--force` does not open this door;
+  take the flag off first, so the decision is explicit. A re-import no
+  longer quietly puts one back into every listing. And on a page the
+  flag now also covers the sitemap and the search index, which had
+  advertised the address the page itself noindexed.
+- **`export` sees a directory that holds only dotfiles** -- a freshly
+  cloned repository no longer reads as empty and written into without
+  the `--force` the guard is there to require.
+- **What a wizard prints is no longer erased by the screen it paints.**
+  The repainting screens this cycle introduced were swallowing the
+  reason above a confirmation, the state of the menu section and the
+  banner's current filename -- and every hint was truncated rather than
+  wrapped, which cost most of them their endings in all three languages.
+  Reasons and hints travel inside the frame now, wrapped; the suite
+  checks all three languages against wrapped rows, and that the frame
+  wraps at all.
+- **A series listing said "SérieNový Sean.cz".** The one listing that
+  showed its kind as a word had no spacing rule of its own; it gets an
+  icon like the others, the word stays for a screen reader, and the tag
+  listing's oversized pill becomes an icon in the same pass.
+- **The clock in the meta row was a fifth larger than the row it stood
+  in.** Settled -- and the suite now reads the built page and the script
+  together, so the two halves of that row cannot drift apart unseen.
+
+The rest of this section comes from running the importers over four real
+foreign archives rather than over fixtures -- a Ghost export of 118 posts
+and 419 images, a Hugo tree of 77 files, a WordPress WXR of 194 items, and
+this engine's own export read back in. Fixtures had agreed with the code
+because both ends of them are ours.
+
+- **A Hugo picture written as `{{< figure >}}` arrived as nothing at
+  all** -- eaten as a Liquid tag before anything tried to fetch it, so
+  nothing failed and nothing was reported. The shortcode is read first
+  now, its alt, title and caption each landing where it belongs.
+- **An article that showed Markdown in a code block had its example
+  eaten.** Image and Liquid stripping ran over fences too; both now run
+  inside the fence-aware pass, and the chunk-joining defect that had
+  kept them out of it -- which read every fence below an inline image
+  inside-out -- is fixed with them.
+- **Four ways an import stayed quiet about what it did.** Two files
+  claiming one address, a front-matter `image:` dropped, a caption left
+  orphaned by a failed download, an author this engine has no field for
+  -- each is now either kept or said out loud.
+- **What the body could not keep is counted for everyone.** Elements the
+  HTML converter has to drop -- players, iframes, forms -- were counted
+  by exactly one of the eleven adapters that use it and thrown away by
+  the other ten, so a WordPress import named its losses and a Jekyll
+  import of the same body said "Done." The count lives in the converter
+  itself now, and the summary says it whichever adapter was driving. See
+  [importing.md](docs/importing.md#wordpress-or-any-rssatom-feed).
+- **A percent-escaped filename was slugified character by character**,
+  minting permanent addresses like `ef-bf-bc...`; the name is decoded
+  first now, and the redirect still points at what the old site served.
+- **A WordPress import's closing numbers described a different import.**
+  Pages already at their address were blamed on `?p=` permalinks, pages
+  were called posts, and the note listing where pages landed named slugs
+  that later changed or never built -- it now asks where each page
+  actually landed. A password-protected post losing its public address
+  is said out loud, as are pictures whose linking wrapper the image
+  block cannot carry.
+- **A video uploaded to Ghost was lost, and three lines of its player
+  were published in its place.** The adapter knew the embed card and not
+  the uploaded file, which fell through to the HTML converter's drop
+  list; uploaded video and bookmark cards become video and link blocks.
+- **A second import took away what the first one brought.**
+  `redirect_from` is written by several hands and was carried over only
+  when the importer said nothing itself, so a re-import could overwrite
+  every old address with its one. The addresses are merged now, old
+  first. The merge also removes a page's own address from its redirects
+  -- a loop the build complained about on every build -- including on
+  sites that already have an import behind them.
+- **Ten re-imports that changed nothing filled all ten version slots**,
+  pushing out the hand-edited state they exist to protect; a version
+  identical to the newest one stored is no longer written.
+- **An AVIF image came in with no dimensions**, and some files carried
+  extensions their bytes contradicted; the bytes decide now, and AVIF is
+  measured.
+- **`[](url)` -- what a WordPress-to-Markdown conversion leaves where a
+  heading anchor used to be -- was printed to the reader as raw
+  markdown, and heading ids were derived from it. An empty label is
+  allowed and swallowed now: a link with nothing to click on is nothing
+  a reader can use.
+- **An attachment did not survive `export` and back.** Written with a
+  path it stopped being an attachment on the way home -- label, size and
+  block type gone, and the loss never counted. It goes out as HTML now,
+  `download` and all.
+- **"Images come from the tree itself -- no network" was true of a
+  Jekyll site and promised about markdown trees in general.** A real
+  Hugo archive pointed most of its images back at the WordPress it had
+  left years earlier. All four places that said it now say which half
+  needs the network, and that an image which never arrived leaves no
+  block behind -- `./blog.sh check` finds nothing to report afterwards.
+- **`props` stopped condemning a redirect a draft is holding.** The
+  address list called an old address taken by a draft "a redirect that
+  never happens" -- but the build writes the stub as long as the
+  occupant is unpublished, so the redirect works, and dropping the
+  address on that advice threw a working one away. The row now says the
+  takeover happens when that draft publishes.
+- **`./blog.sh rebuild` under a held lock exits non-zero**, as
+  operations.md had promised all along -- with the lock's own code, so
+  whatever invoked it no longer hears "a deploy happened". The cron
+  paths keep their deliberate exit 0.
+- **Five corrections to the tree import.** An alt text is no longer
+  copied into a visible caption -- markdown renders no alt, so the copy
+  printed a sentence the original site never showed, and broke the
+  export round trip on exactly those images. A post whose only
+  picture's file is missing from the tree keeps its place, name, alt
+  and caption instead of vanishing whole, and the postscript counts the
+  miss. A PERMALINK pattern never applies to root pages. A
+  slug-collision pair hands its shared origin to the first file written
+  instead of to both. And the site's own furniture (`_index.md`,
+  `home.md`) shows up in the counts as skipped instead of vanishing
+  from the total.
+- **A nested `<a>` closes the open one**, as a browser reads the
+  invalid markup some Ghost exports carry -- one run of text is one
+  link span now, not two identical ones fighting.
+- **A warning no longer outruns the output it belongs under.** The cron
+  entry points sync stdout, so in the mail a piped run's warnings land
+  where they happened instead of opening the report.
+
+### Upgrading
+
+- Nothing to migrate. One thing looks different without being asked for,
+  and it is the only one: the menu bar at the top became sticky, and the
+  menu repeated under the content went with it -- its one job is done
+  the whole way down the page now, search field included. There is no
+  key to put it back: two of the same menu on one screen is not a
+  preference. The line it drew above the footer is drawn without it, and
+  anything that scrolls a target into view stops short of the bar rather
+  than under it.
+- The next deploy is a full one rather than incremental: the banner's
+  overlay moved inside a wrapper element in the layout every page
+  shares, every listing heading became an h1, and post pages carry
+  reading time and a contents list.
+- The front page (and its `/page/N/` continuations) now carries the
+  site's title as a clipped heading -- nothing is drawn, but a tool that
+  reads the page as text will see the title where it saw nothing.
+- A stylesheet of your own that positioned `.banner-title` or
+  `.banner-claim` wants a look before you upgrade: the box around them
+  (`.banner-overlay`) is the positioned one now, and they are items in a
+  column inside it. To keep the old listing-heading wording, put the
+  word back with one rule on `.listing-heading__kind`.
+- Post versions live in `content.nosync/versions/`. They are part of
+  your content, not of the engine -- a backup of `content.nosync/`
+  already covers them.
+- A script that wraps `./blog.sh rebuild` and reads its exit code sees
+  a change: a rebuild that stepped aside for a held lock used to exit 0
+  and now exits 3, the lock's own code -- "come back in a minute" told
+  apart from "it worked". Cron paths are untouched.
+- A markdown-tree re-import no longer copies an image's alt text into a
+  visible caption, so a caption an earlier import invented that way
+  disappears with the post's next re-import. If you liked one, it was
+  always the picture's title: write it in the markdown as
+  `![alt](file "title")` and it stays yours.
+
 ## 1.2.1 -- 2026-08-12
 
 A bug-fix release with two things added to it: the site's own words are

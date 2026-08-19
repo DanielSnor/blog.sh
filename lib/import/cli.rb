@@ -11,6 +11,10 @@ require_relative '../i18n'
 # site.yml answers.
 I18n.force_lang('en')
 
+# Same cron-log audience: piped, stdout is block-buffered and a per-item
+# `warn` from the run would overtake the progress line it refers to.
+$stdout.sync = true
+
 module Import
   # The non-interactive front end: what `scripts/migrate_*.rb` need so each
   # one is a handful of lines rather than its own copy of progress reporting
@@ -99,8 +103,29 @@ module Import
       else
         puts "Done. #{result.written} post(s) written, #{result.media} media file(s)."
       end
+      # Or the same sentence describes a run that downloaded 420 files and
+      # one that downloaded none -- which is what a re-import over an
+      # archive that is already here now costs.
+      puts "  #{I18n.t('import.media_reused', count: result.media_reused)}" if result.media_reused.to_i.positive?
+      # The one signal that the source has drifted away from this archive:
+      # bytes were fetched, they no longer match the copy under the
+      # entry's name, and the copy won -- by the no-replace rule. Silent,
+      # this looked exactly like a re-import that did nothing.
+      if result.respond_to?(:media_superseded) && result.media_superseded.to_i.positive?
+        puts "  #{I18n.t('import.media_superseded', count: result.media_superseded)}"
+      end
       result.skipped.sort_by { |reason, _| reason.to_s }.each do |reason, count|
         puts "  #{count} skipped (#{reason})"
+      end
+      # One line for all eleven adapters that parse HTML bodies: what the
+      # block schema could not hold. It used to be counted by exactly one
+      # of them (feed.rb) and thrown away by the rest, while the header of
+      # migrate_feed.rb promised the counting on everyone's behalf.
+      dropped = result.respond_to?(:dropped_elements) ? result.dropped_elements : nil
+      if dropped && !dropped.empty?
+        listed = dropped.sort_by { |name, count| [-count, name] }
+                        .map { |name, count| "#{name} (#{count})" }.join(', ')
+        puts "  #{I18n.t('import.note.feed_dropped', listed: listed)}"
       end
       return if result.media_failures.empty?
 

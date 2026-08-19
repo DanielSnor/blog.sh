@@ -58,6 +58,13 @@ module MarkdownParser
   # The link target allows one level of balanced parentheses
   # ("/Page(ID-123).aspx"), matching what CommonMark does; the writer
   # percent-encodes the pathological rest.
+  #
+  # The label may be EMPTY -- "[](url)" is a real shape, not a typo.
+  # Converters out of WordPress write the anchor they once put in a
+  # heading that way, and one 74-post Hugo tree had 161 of them across
+  # 14 posts. Required to have a character, the whole thing missed and
+  # the reader was shown the brackets and the address in the heading;
+  # what parse_inline does with the match instead is written there.
   # Six extra alternatives carry the star collisions the writer
   # legitimately produces when bold and italic meet. A run of stars is
   # not one delimiter: three of them between two letters can close one
@@ -92,7 +99,7 @@ module MarkdownParser
   # three spans -- permutations and repeated types included; that matrix
   # is what these positions were settled against, and what will notice
   # if they move.
-  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\*)\*(?!\*)|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])+)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\*)\*(?!\*)|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])*)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -166,12 +173,22 @@ module MarkdownParser
         result << m[:code]
         formatting << { 'type' => 'code', 'start' => start, 'end' => result.length }
       elsif m[:ltext]
-        inner_text, inner_formatting = parse_inline(m[:ltext])
-        result << inner_text
-        entry = { 'type' => 'link', 'url' => m[:lurl], 'start' => start, 'end' => result.length }
-        entry['title'] = unescape_title(m[:ltitle]) if m[:ltitle] && !m[:ltitle].empty?
-        formatting << entry
-        formatting.concat(shift_formatting(inner_formatting, start))
+        # A label-less link is consumed and NOTHING is put in its place.
+        # It has no reading that helps anybody: there is no text to click,
+        # a screen reader announces a link and then falls silent, and
+        # putting the address in as the label would print a github.com URL
+        # in the middle of a heading -- and into the anchor id derived from
+        # that heading, so the article's own table of contents would point
+        # at "#https-github-com-...". Dropping it costs a link nobody could
+        # follow; keeping it costs every heading it sits in.
+        unless m[:ltext].empty?
+          inner_text, inner_formatting = parse_inline(m[:ltext])
+          result << inner_text
+          entry = { 'type' => 'link', 'url' => m[:lurl], 'start' => start, 'end' => result.length }
+          entry['title'] = unescape_title(m[:ltitle]) if m[:ltitle] && !m[:ltitle].empty?
+          formatting << entry
+          formatting.concat(shift_formatting(inner_formatting, start))
+        end
       end
       pos = m.end(0)
     end
@@ -782,6 +799,14 @@ module MarkdownParser
       return [{ 'type' => 'hr' }, counter]
     elsif !para.include?("\n") && (m = HEADING_RE.match(para))
       text, formatting = parse_inline(m[2])
+      # A heading line whose whole content was a label-less anchor has no
+      # words left once parse_inline has swallowed it -- 24 of them in one
+      # imported post. Dropped rather than kept: "#### " with nothing after
+      # it is not a heading here either (HEADING_RE wants a character), and
+      # an <h4> with no accessible name is a heading a reader can neither
+      # see nor be told about.
+      return [nil, counter] if text.strip.empty?
+
       block = { 'type' => 'text', 'subtype' => "heading#{m[1].length}", 'text' => text }
       block['formatting'] = formatting unless formatting.empty?
       return [block, counter]
@@ -830,7 +855,9 @@ module MarkdownParser
 
       segment[:text].split(/\n\s*\n/).map(&:strip).reject(&:empty?).each do |para|
         block, counter = parse_prose_block(para, media_dir, media_files, counter, incoming_dir: incoming_dir)
-        blocks << block
+        # nil is a paragraph that turned out to hold nothing a reader could
+        # see -- see the heading branch. Every other path returns a block.
+        blocks << block if block
       end
     end
 

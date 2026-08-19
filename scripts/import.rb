@@ -89,10 +89,73 @@ def source_name(key)
   t("import.source.#{key}")
 end
 
+# Which answers are paths is decided from the prompt's own NAME rather than
+# from a flag repeated at twenty-two call sites: every path question here is
+# `*_path_prompt` or `*_dir_prompt`, and `*_source_prompt` takes either a
+# path or a URL (where completion simply finds nothing and costs nothing).
+# An importer added later gets Tab completion by following the naming, and
+# the five questions that ask for a handle, a blog name or a URL never get
+# it by accident.
+PATH_PROMPTS = /_(path|dir|source)_prompt\z/.freeze
+
+# The rows an import question stands on: which source is being imported
+# from, and what has been answered about it so far. Same running record the
+# other three wizards keep -- a frame repaints over the last question, so
+# without it a two-question source would show the second one alone.
+def import_context
+  @import_context ||= []
+end
+
+def import_frame
+  return unless Tui.interactive?
+
+  room = [Tui.term_height - 4, 2].max
+  rows = import_context.size > room ? import_context.last(room) : import_context.dup
+  Tui.frame(rows + [''])
+end
+
+# The prompt row, closed. A frame ends its last line without a newline so
+# the question can stand on it, and a question read with gets ends the same
+# way -- what closes the row is the Enter echoing back. Two runs never get
+# that echo: a piped one, where nothing is echoed at all, and a terminal one
+# ended with Ctrl-D, where nothing was typed. Both left the row open, and
+# whatever was said next landed ON the question:
+#
+#   Číslo zdroje, ze kterého importovat: Cesta k rozbalenému Substack
+#   exportu (adresář s posts.csv; prázdné = zrušit): Zrušeno, nic se nezapsalo.
+#
+# -- three questions and the verdict on one line, which is how the piped
+# wizard read from the beginning. Same `puts unless interactive?` Wizard.ask
+# makes at the same point in its own question, and for the same reason; the
+# nil is the EOF half, which ask does not have to handle because it raises.
+def close_prompt_row(answer)
+  puts if answer.nil? || !Tui.interactive?
+end
+
 def ask(prompt_key)
-  print t(prompt_key)
-  value = $stdin.gets.to_s.strip
-  value.empty? ? nil : value
+  import_frame
+  value = if prompt_key.match?(PATH_PROMPTS)
+            answer = Tui.path_line(t(prompt_key))
+            # The readline half is its own case: in a terminal path_line goes
+            # through readline, which breaks the line itself -- on Ctrl-D as
+            # much as on Enter -- so closing the row again here would put TWO
+            # blank lines under the question where every other prompt has one.
+            # Down a pipe path_line is the same print-and-gets as below and
+            # breaks nothing, which is the half that does need closing.
+            puts unless Tui.interactive?
+            answer
+          else
+            print t(prompt_key)
+            answer = $stdin.gets
+            close_prompt_row(answer)
+            answer
+          end
+  value = value.to_s.strip
+  return nil if value.empty?
+
+  import_context << format('  %s %s', Tui.paint("#{t(prompt_key).sub(/:\s*\z/, '')}:", :dim),
+                           Tui.truncate_to_width(value, 60))
+  value
 end
 
 def build_beehiiv
@@ -164,7 +227,9 @@ def build_jekyll
   end
 
   print t('import.jekyll_permalink_prompt')
-  pattern = $stdin.gets.to_s.strip
+  pattern = $stdin.gets
+  close_prompt_row(pattern)
+  pattern = pattern.to_s.strip
   Import::Jekyll.new(dir, permalink: pattern.empty? ? nil : pattern)
 end
 
@@ -233,7 +298,9 @@ def build_movabletype
   end
 
   print t('import.movabletype_pattern_prompt')
-  pattern = $stdin.gets.to_s.strip
+  pattern = $stdin.gets
+  close_prompt_row(pattern)
+  pattern = pattern.to_s.strip
   Import::MovableType.new(path, url_pattern: pattern.empty? ? nil : pattern)
 end
 
@@ -348,7 +415,9 @@ def build_substack
   end
 
   print t('import.substack_url_prompt')
-  url = $stdin.gets.to_s.strip
+  url = $stdin.gets
+  close_prompt_row(url)
+  url = url.to_s.strip
   url = nil if url.empty?
   if url && !url.start_with?('http://', 'https://')
     puts t('import.ghost_url_invalid', url: url)
@@ -407,19 +476,30 @@ def ask_source
       # A group of one needs no second question.
       choices = members.map { |name| SOURCES.find { |k, _| k == name } }.compact
       if choices.size == 1
+        import_context.replace([Tui.paint(source_name(choices.first.first), :bold), ''])
+        # The same blank line the two-question path below writes, and for the
+        # same reason: Tui.menu closes the row it left open but writes no
+        # blank, so a source that says something before its first question
+        # (a missing API key) would start hard against the menu's keys line
+        # in one branch and a line clear of it in the other.
         puts
         return choices.first
       end
 
-      puts
-      puts t("import.group.#{key}")
+      # The group's name goes into the frame rather than being printed
+      # above it -- the menu paints from the top of the viewport now, so
+      # anything printed first is painted over.
       # Single-key pick reaches row 9 at most -- with more rows (blogs has
       # 13) the hint stops at 9 rather than promising keys that don't exist.
       index = Tui.menu(choices.map { |k, _| source_name(k) },
+                       header: [t("import.group.#{key}"), ''],
                        hint: t('import.menu_hint', count: [choices.size, 9].min))
       # Backing out of a group is not backing out of the import --
       # return to the group question instead of quitting the wizard.
       next if index.nil?
+
+      # The chosen source opens the record every question below it stands on.
+      import_context.replace([Tui.paint(source_name(choices[index].first), :bold), ''])
 
       puts
       return choices[index]
@@ -429,7 +509,9 @@ def ask_source
   SOURCES.each_with_index { |(key, _), i| puts "#{i + 1}) #{source_name(key)}" }
   puts
   print t('import.enter_number')
-  input = $stdin.gets.to_s.strip
+  input = $stdin.gets
+  close_prompt_row(input)
+  input = input.to_s.strip
   # Range-checked rather than indexed straight off to_i: "" and "abc" both
   # become 0, and SOURCES[-1] is the *last* source -- so a piped run with no
   # answer would silently start importing from whatever happens to be at the
@@ -455,9 +537,9 @@ end
 # if a reason it can return is missing here or from any of the three
 # locales, so the next source cannot repeat it.
 TRANSLATED_REASONS = %w[
-  reply repost quote empty attachment page not_a_post trashed boost reblog error undated comment
+  reply repost quote empty attachment not_a_post trashed boost reblog error undated comment
   retweet crosspost checkin no_content thread missing_html bad_frontmatter no_identity
-  no_audio media_unfetchable unparsed bad_date misaligned_row
+  no_audio media_unfetchable unparsed bad_date misaligned_row site_furniture
 ].freeze
 
 def reason_label(reason)
@@ -481,6 +563,17 @@ def report(result, dry_run:)
   # which the source had kept none. Said out loud, or the number above
   # reads as a delivery.
   puts Tui.paint(t('import.media_not_verified'), :cyan) if dry_run && result.media.positive?
+  # The number that separates a first import from a second one. Shown in
+  # the preview too, where it is the honest half of the media count above:
+  # some of them are already here and will not be fetched at all.
+  puts Tui.paint(t('import.media_reused', count: result.media_reused), :cyan) if result.media_reused.to_i.positive?
+  # Downloads that no longer matched the archive's copy under their name
+  # and were discarded for it -- the source has drifted, and this line is
+  # the only place that fact surfaces. Never set on a dry run, which
+  # downloads nothing.
+  if result.respond_to?(:media_superseded) && result.media_superseded.to_i.positive?
+    puts Tui.paint(t('import.media_superseded', count: result.media_superseded), :yellow)
+  end
 
   unless result.samples.empty?
     puts t('import.sample_slugs')
@@ -544,7 +637,9 @@ end
 # so a wrong cancel costs a re-read, while a wrong confirm costs an archive.
 def confirmed?(count)
   print t('import.confirm_prompt', count: count)
-  $stdin.gets.to_s.strip == count.to_s
+  answer = $stdin.gets
+  close_prompt_row(answer)
+  answer.to_s.strip == count.to_s
 end
 
 def run_import(adapter)
@@ -595,7 +690,15 @@ def run_import(adapter)
   report(result, dry_run: false)
 
   puts
-  return if Tui.key_choice(t('import.rebuild_prompt')) == 'n'
+  rebuild = Tui.key_choice(t('import.rebuild_prompt'))
+  # Declining is where the import ends, so it owes the one trailing blank
+  # line every command here ends with. Without it the last thing on screen
+  # was the unfinished question itself -- and down a pipe the output ended
+  # mid-line, with no newline at all.
+  if rebuild == 'n'
+    puts
+    return
+  end
 
   Publishing.rebuild_and_deploy(t('import.rebuilding'))
 end
@@ -606,6 +709,12 @@ end
 
 source = ask_source
 if source.nil?
+  # A blank line before the verdict, the way the interrupt handler below and
+  # the cancelled confirmation in run_import both write one. The same
+  # sentence was reached three ways and framed three ways: once with a blank
+  # line above it and twice hard against whatever the screen last showed --
+  # the menu's keys line, or the question that had just been left empty.
+  puts
   puts t('import.cancelled')
   puts
   exit 0
@@ -613,6 +722,7 @@ end
 
 adapter = source[1].call
 if adapter.nil?
+  puts
   puts t('import.cancelled')
   puts
   exit 0

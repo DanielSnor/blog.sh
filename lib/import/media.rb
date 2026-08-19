@@ -6,11 +6,11 @@ require 'fileutils'
 require_relative '../media_dimensions'
 
 module Import
-  # Collects one post's media on its way to PostWriter, which expects a
-  # { source_path => desired_filename } hash. Two sources, because that's
-  # the split every importer falls on: a platform API hands out URLs to
-  # download (Tumblr, Bluesky), while an official export archive already
-  # has the files on disk (Twitter, WordPress attachments).
+  # Collects one post's media on its way to PostWriter, which expects
+  # [source_path, desired_filename] pairs (see #files). Two sources,
+  # because that's the split every importer falls on: a platform API hands
+  # out URLs to download (Tumblr, Bluesky), while an official export
+  # archive already has the files on disk (Twitter, WordPress attachments).
   #
   # Filenames are numbered per post (01.jpg, 02.png, ...) in the order the
   # adapter registers them. That numbering is deterministic for a given
@@ -44,15 +44,49 @@ module Import
     THROTTLED = [Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EPIPE, Errno::ETIMEDOUT,
                  Net::OpenTimeout, Net::ReadTimeout].freeze
 
-    attr_reader :files, :failures
+    attr_reader :failures, :reused
 
-    def initialize(tmpdir, dry_run: false)
+    # `index` is a MediaIndex (or nil): the archive's own answer to "have
+    # I already fetched this address?", built once per run. With it, a
+    # re-import over an archive that is already here costs no network at
+    # all -- see MediaIndex for why the question can only be asked from
+    # this side.
+    #
+    # `refetch` (REFETCH_MEDIA=1) stops the index being used to SKIP a
+    # download, and nothing else. It deliberately does not switch the index
+    # off: a refetch is exactly the run most likely to meet a source that
+    # has since died, and without the archive's own copy to fall back on it
+    # took 419 media entries out of 118 posts while all 419 files lay
+    # untouched on disk.
+    def initialize(tmpdir, dry_run: false, index: nil, refetch: false)
       @tmpdir = tmpdir
       @dry_run = dry_run
+      @index = index
+      @refetch = refetch
       @files = {}
       @failures = []
       @counter = 0
       @registered = 0
+      @reused = 0
+      # Dimensions the archive recorded for a file back when it was
+      # written, for the one case where the bytes cannot answer -- see
+      # dimensions.
+      @remembered = {}
+      # Files that live in the archive rather than in @tmpdir. Kept apart
+      # because discard() deletes what it un-registers, and these are not
+      # ours to delete.
+      @kept = {}
+      # allocated filename -> the address it came from, which the post
+      # records as `src`. Without it written down, the next run has nothing
+      # to look this file up by and downloads it all over again.
+      @sources = {}
+      # Copy-plan pairs @files cannot hold: one archive file standing in
+      # for a SECOND name at once. A hand-mangled previous copy can leave
+      # the index answering two different addresses with the same file,
+      # and a plan keyed by source path then forgot one of the two names
+      # -- the post kept the entry, and nothing anywhere was instructed
+      # to put a file under it. See #files.
+      @extra = []
       # source (url or path) -> allocated filename. @files can't serve this
       # purpose even though it looks like it should: it is keyed by source
       # too, so registering the same image twice used to OVERWRITE the
@@ -76,6 +110,18 @@ module Import
     # had kept none, and a bare number here read as a promise.
     def count
       @registered
+    end
+
+    # The copy plan for PostWriter: [source_path, desired_filename] pairs.
+    # A list rather than a hash, because a source path is not unique in
+    # the plan -- one archive file can owe the post TWO names (reuse over
+    # a hand-corrupted previous copy, where the index answers two
+    # addresses with the same file). A hash keyed by source path could
+    # only remember one of them, and the entry wearing the forgotten name
+    # then hung in the post with no instruction to ever create its file.
+    # Names stay unique; only sources repeat.
+    def files
+      @files.to_a + @extra
     end
 
     # Lets an adapter tell a preview from a real run -- in dry-run no
@@ -105,6 +151,12 @@ module Import
         return nil
       end
 
+      # What the archive already holds for this address. Asked before the
+      # number is spent, because reuse takes its extension from the FILE
+      # rather than from the address.
+      held = @index&.entry_for(url)
+      return reuse(url, held) if held && !@refetch
+
       filename = allocate(extension_for(url))
       if @dry_run
         @by_source[url] = filename
@@ -113,6 +165,15 @@ module Import
 
       body = self.class.fetch(url)
       if body.nil?
+        # A fetch that failed must not cost the post a picture that is
+        # lying on disk. Only REFETCH_MEDIA=1 reaches here with a file in
+        # the archive -- it walked past the reuse above on purpose -- and
+        # the copy it walked past is still the only copy there is.
+        # Dropping the entry would erase the picture from the post
+        # permanently, and on the next run just as surely, since there
+        # would be nothing left to look it up by.
+        return reuse(url, held, spent: filename) if held
+
         @failures << url
         # Remembered as a failure, not forgotten: a second reference to
         # the same dead URL in this post answers nil at once instead of
@@ -124,9 +185,68 @@ module Import
 
       path = File.join(@tmpdir, filename)
       File.binwrite(path, body)
+      path, filename = retype(path, filename)
       @files[path] = filename
       @by_source[url] = filename
+      @sources[filename] = url
       filename
+    end
+
+    # A file this archive already holds for that address: registered like a
+    # download, minus the download.
+    #
+    # The extension comes from the FILE, never from the URL. retype renames
+    # a download whose bytes contradict its address -- a .ico that is a PNG,
+    # five of them in one real archive of 420 -- so the two genuinely
+    # differ, and a name guessed from the URL would point the post at
+    # something that is not there.
+    #
+    # The archive's own path goes straight into @files, with no copy into
+    # the tmpdir: dimensions() reads the header from there just as happily,
+    # and PostWriter.copy_media skips a destination that already exists, so
+    # for the post the file belongs to source and destination are the same
+    # path and nothing moves. For a DIFFERENT post that shares the picture
+    # -- old blogs do this constantly -- it is copied across, which is
+    # exactly what that post needs.
+    #
+    # `spent` is the number from_url had already allocated before a fetch
+    # that then failed. Filenames must not depend on which fetches
+    # succeeded -- that is the whole point of `uncount` -- so the number is
+    # kept and only its extension is corrected to the one the bytes are
+    # really filed under.
+    def reuse(url, entry, spent: nil)
+      ext = File.extname(entry.path)
+      filename = spent ? "#{File.basename(spent, File.extname(spent))}#{ext}" : allocate(ext)
+      @by_source[url] = filename
+      @sources[filename] = url
+      @reused += 1
+      return filename if @dry_run
+
+      # A second name for a file the plan already carries goes into the
+      # extra pairs, never over the first: overwriting here is what used
+      # to leave the first entry's name with no copy instruction at all.
+      if @files.key?(entry.path) && @files[entry.path] != filename
+        @extra << [entry.path, filename]
+      else
+        @files[entry.path] = filename
+      end
+      @kept[entry.path] = true
+      # The dimensions the post recorded when this file was written. The
+      # bytes are asked first and answer for nearly everything (see
+      # dimensions); this is what is left when they cannot -- a video, an
+      # SVG, or a picture some interrupted run left half-written. Handing
+      # back nil instead would cost the post its reserved space and, in
+      # Wayback's strip_fake_images, the image block itself.
+      dims = entry.dimensions
+      @remembered[filename] = dims if dims
+      filename
+    end
+
+    # The address a registered file was fetched from, so the post can write
+    # it down beside the local name. That record is the whole of what makes
+    # the next run able to recognise the file.
+    def source_of(filename)
+      @sources[filename]
     end
 
     # Pixel dimensions of something already registered, read straight from
@@ -139,11 +259,19 @@ module Import
     #
     # nil in dry-run, where nothing was fetched. That's fine: dimensions
     # don't affect a preview's counts, only the real write.
+    #
+    # Falls back on what the archive recorded for a file that was reused
+    # rather than downloaded: the bytes on disk are the only ones there
+    # are, some of them cannot be measured at all (a video, an SVG, a
+    # half-written picture), and the alternative is handing back nil --
+    # which costs the post its reserved space and, in Wayback's
+    # strip_fake_images, the image block itself.
     def dimensions(filename)
       return nil if @dry_run
 
-      path = @files.key(filename)
-      path && MediaDimensions.image(path)
+      path = @files.key(filename) || @extra.find { |_, name| name == filename }&.first
+      dims = path && MediaDimensions.image(path)
+      dims || @remembered[filename]
     end
 
     # Un-registers a downloaded file an adapter decided was not media
@@ -154,13 +282,38 @@ module Import
       return if @dry_run
 
       path = @files.key(filename)
-      return unless path
+      if path.nil?
+        # A name living in an extra pair: only the pair is un-registered.
+        # Its path is the archive's own file -- and possibly still the
+        # primary pair's source -- so nothing on disk is touched.
+        idx = @extra.index { |_, name| name == filename }
+        return unless idx
+
+        @extra.delete_at(idx)
+        @by_source.delete_if { |_, name| name == filename }
+        @sources.delete(filename)
+        @remembered.delete(filename)
+        @registered -= 1
+        @reused -= 1
+        return
+      end
 
       @files.delete(path)
       # Or a later reference to the same source would resurrect a filename
       # whose bytes were just judged to not be media at all.
       @by_source.delete_if { |_, name| name == filename }
+      @sources.delete(filename)
+      @remembered.delete(filename)
       @registered -= 1
+      # A file that came out of the archive is not ours to delete. The
+      # judgement being made here is about bytes a fetch brought back, and
+      # for a reused file there was no fetch -- deleting it would take the
+      # picture off the post that already has it, on disk, for good.
+      if @kept.delete(path)
+        @reused -= 1
+        return
+      end
+
       begin
         File.delete(path)
       rescue SystemCallError
@@ -170,7 +323,13 @@ module Import
 
     # Registers a file the export already contains. Same contract as
     # from_url, minus the network.
-    def from_file(path)
+    #
+    # `src` is the address the file originally came from, where the export
+    # happens to know it -- a tree written by `./blog.sh export` carries one
+    # per file. Nothing can re-derive it from the bytes, so a re-import that
+    # dropped it would leave the archive unable to recognise its own files
+    # the next time round.
+    def from_file(path, src: nil)
       return nil if path.to_s.empty?
       return @by_source[path] if @by_source.key?(path)
 
@@ -200,6 +359,7 @@ module Import
       end
 
       @by_source[path] = filename
+      @sources[filename] = src.to_s unless src.to_s.empty?
       return filename if @dry_run
 
       @files[path] = filename
@@ -330,6 +490,38 @@ module Import
     # trace of a fetch that failed.
     def uncount
       @registered -= 1
+    end
+
+    # The extension had to be guessed from the URL to allocate a name; now
+    # the bytes are here and they know better. One real archive of 420
+    # images held five files whose extension its own CDN contradicted --
+    # image/jpeg served for an AVIF, a favicon called .ico that is a PNG --
+    # and the wrong name follows the file onto the published site, where the
+    # web server reads it to pick the content type.
+    #
+    # Only a format MediaDimensions recognises beyond doubt overrules the
+    # URL, and only when the name isn't already one of that format's own
+    # spellings, so .jpeg is never rewritten to .jpg. The NUMBER never
+    # changes, which is what a re-import has to agree on, and the same bytes
+    # always yield the same extension, so every run of the same post lands
+    # on the same name.
+    #
+    # from_file is deliberately left out: what an export archive already has
+    # on disk is the author's own naming, and renaming their files is not
+    # this engine's business.
+    def retype(path, filename)
+      sniffed = MediaDimensions.sniff(path)
+      ext = File.extname(filename)
+      return [path, filename] if MediaDimensions.extension_agrees?(ext, sniffed)
+
+      renamed = "#{File.basename(filename, ext)}#{sniffed}"
+      dest = File.join(File.dirname(path), renamed)
+      File.rename(path, dest)
+      [dest, renamed]
+    rescue SystemCallError
+      # A rename that fails costs the file nothing: the bytes are still
+      # under the name the post already believes in.
+      [path, filename]
     end
 
     # Extension from the URL path, since that's all a CDN URL reliably

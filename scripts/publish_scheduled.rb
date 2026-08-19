@@ -19,6 +19,10 @@ require_relative '../lib/atomic_write'
 require_relative '../lib/i18n'
 require_relative '../lib/site_config'
 
+# Cron mail reads stdout and stderr as one stream, and a block-buffered
+# stdout lets every warning overtake the lines it belongs after.
+$stdout.sync = true
+
 SiteConfig.use_site_timezone!
 
 # Held for the whole run -- publishing, the rebuild and the deploy are one
@@ -79,10 +83,20 @@ due.each do |path, post, date|
   # announced in this same run (they would stay off the site until a human
   # noticed, with their announcements already public).
   new_path, updated = Publishing.publish(path, post, date: date)
-  fields = Publishing.announce(updated, year: date.year.to_s)
+  # An unlisted post is published but never announced. It is out of the
+  # listings, the feeds, the sitemap and the search index by the author's
+  # own instruction, and this loop is the one place that would have put its
+  # address into a public timeline anyway -- without asking, because cron
+  # has nobody to ask, and irreversibly, because a server that has the
+  # announcement has it. Skipped rather than failed: nothing went wrong and
+  # the exit code must not say it did, or the one mail that matters gets
+  # lost among the ones that do not.
+  unlisted = [true, 'true', 'yes', 1].include?(updated['unlisted'])
+  fields = unlisted ? nil : Publishing.announce(updated, year: date.year.to_s)
   AtomicWrite.write_json(new_path, updated.merge(fields)) if fields
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
+  puts I18n.t('cron.unlisted_not_announced', slug: updated['slug']) if unlisted
   # The post is published either way -- that part worked, and undoing it
   # would be worse. But an announcement that was attempted and failed is a
   # failure of this run: counted, so the exit code is non-zero and cron

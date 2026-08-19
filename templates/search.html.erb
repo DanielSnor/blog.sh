@@ -1,4 +1,7 @@
-        <h2 id="search-heading" class="tag-heading"><%= h(t('search.heading')) %></h2>
+        <%# The value starts empty and search.js fills it from ?q= -- so the page
+            opened without a query shows just the word, and with one shows the
+            query behind a magnifier. The class the script toggles (has-query) is
+            what tells the stylesheet which of those two states to render. %><%= listing_heading_html('', kind: t('search.kind'), variant: 'search', value_id: 'search-heading-value', icon: :search) %>
         <p class="search-tagline"><%= t('search.tagline') %></p>
         <p class="search-tip"><%= t('search.tip') %></p>
         <div id="search-results"><p class="search-status"><%= h(t('search.prompt')) %></p></div>

@@ -43,6 +43,46 @@ built around drafts:
    typically an imported one that never had one. An existing
    announcement is never overwritten.
 
+**A post's header can say more than the template offers.** `add` prefills
+title, tags and type, because that is what every post needs; the parser
+accepts a few more keys, and `edit` brings back whichever ones the post
+already carries, so each can be read as well as changed:
+
+- **`series: Name`** files the post into a series. A series with two or
+  more published parts gets a listing of its own at `/series/<slug>/` --
+  a series of one is just a post, and the listing appears when the
+  second part does. The build puts "Part 2 of 5"
+  on each post in it, with the way to the part before and the part after
+  -- within the series only, since a post's chronological neighbours
+  across a whole archive are rarely what a reader wants next. Parts are
+  ordered by date, which is what a series written in order needs;
+  **`series_part: 3`** is for the one written out of order or inserted
+  afterwards. The draft preview answers the series question at writing
+  time: a name with published parts shows how many and which part this
+  would become, and a name no published post carries yet is called out
+  as "a typo, or the first part?" -- so a misspelling doesn't quietly
+  found a second series. `check` catches the older ones
+  ([below](#checking-the-archive)).
+- **`toc: true` / `toc: false`** overrides the table of contents. A post
+  with four headings or more gets one on its own -- that is the length at
+  which a reader starts scrolling to look for something rather than
+  reading down. Say `false` on a post that has the headings but not the
+  shape, `true` to force one below the threshold.
+- **`hero: true` / `hero: false`** decides whether the post's first usable
+  image runs full width above the title, with the date moving into a
+  byline under the picture. Without the key the post follows
+  `layout.hero` for the whole site
+  ([install.md](install.md#the-menu-the-regions-and-a-stylesheet-of-your-own)).
+  A 1px image is never lifted, and a post with no usable picture simply
+  keeps the ordinary shape -- there is no second template to keep in step.
+
+**Two things the site says without being asked.** Every card and every
+post page carries how long the post takes to read, counted at 200 words
+a minute -- the same figure `./blog.sh stats` reports; a post too short
+to time says "under a minute". And the build writes a `noindex`
+`/404.html` in the site's own chrome, menu and search field included, so
+a dead end is somewhere to go on from.
+
 **Backdating** isn't part of that flow -- publishing means "now" -- but
 the frontmatter parser still honors a `date:` line you type in by hand
 (the template just doesn't offer one). To publish a draft into the
@@ -83,7 +123,20 @@ arrow-key menus (digits still quick-select, typing a slug still works),
 single-keypress answers without Enter, colored state markers and a
 **QR code of the draft preview URL** -- point your phone's camera at
 the screen instead of retyping a token. A menu longer than the terminal
-is tall scrolls, showing your position in the list next to the hint.
+is tall scrolls, showing your position in the list next to the hint;
+`Page Up`, `Page Down`, `Home` and `End` work in every list.
+
+**The screens hold still.** Menus, the queue, the archive, a post's
+properties and every picker repaint over themselves instead of printing
+another copy on each keypress -- and not on the alternate screen, so the
+last screen and your scrollback survive. Resizing straightens a waiting
+menu, the queue or the properties screen on the spot; a picker or the
+archive browser keeps the size it opened with until you leave it.
+
+The three question-and-answer wizards -- `./setup.sh`, `./style.sh` and
+`./import.sh` -- keep the section you are in and the answers already given
+above the question, so a half-finished run says where you are.
+
 Piped, scripted or cron runs get the plain line-based prompts unchanged,
 with no escape codes in the output. Colors honor `NO_COLOR` and
 `TERM=dumb`.
@@ -100,7 +153,23 @@ the announcement -- and offers the guarded actions:
 - **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
   review the old addresses that redirect here, delete;
 - **draft**: publish, schedule (or reschedule, or cancel the schedule),
-  rename the slug, delete.
+  rename the slug, delete;
+- **either, once there is one**: `[v]` restores what the post said before
+  one of its recent saves.
+
+**Undoing an edit** is what `[v]` is for. Every `edit` keeps the previous
+text first, up to ten of them per post, and `[v]` lists them newest first
+with the line under the cursor showing what that version said -- its
+title, or its opening words when it has none -- so the choice is made by
+recognising the text rather than by reading timestamps. The key appears
+only on a post that has been edited at least once.
+
+Choosing one is itself undoable: the current text is kept as a version
+before it is replaced, so a wrong choice is one `[v]` away from being
+walked back -- which is why a single key confirms it. Only the text comes
+back -- images are not versioned, and the line above the list says so. A
+version that will not parse stays in the list without a preview. Versions
+travel with the post into the trash and back out again.
 
 Type and tags are shown here but *edited* in the frontmatter of `edit`,
 prefilled with their current values -- one keystroke away from the text
@@ -110,6 +179,21 @@ too). The pinned post is also marked `[PINNED]` in every list and
 picker, so it can be found without remembering it. A plain draft shows
 no time on purpose: a draft has none until publishing or scheduling
 gives it one.
+
+**Keeping a post out of the listings** is the `unlisted: true` line in
+its frontmatter. The post keeps its ordinary address, its date and its
+redirects, and drops out of the homepage, the tag and type archives, the
+feeds, the sitemap and the search index; its page is `noindex`. It is
+the draft's hidden address, generalised to something finished -- for a
+post meant for the few people you send the link to. **It is not a
+password**: a static site hands over whatever is asked for, so anyone
+with the link can read it and forward it. If that is not good enough,
+the answer is not to publish it. Publishing an unlisted post announces
+nothing -- by hand or from cron, and `--force` does not open that door,
+because an announcement cannot be recalled once a server has it; to
+announce the post, take the flag off first. `props` says so on an
+unlisted post, and the line comes back with its current value the next
+time you edit, so the state can be read as well as changed.
 
 **Renaming a slug** never breaks a link. The old address stays on the
 site as a one-page redirect to the new one, recorded in the post itself
@@ -172,6 +256,13 @@ is caught too; AVIF, which browsers do display, is left alone). The
 simplest fix is on the phone itself: Settings → Camera → Formats →
 Most Compatible.
 
+**A photo's GPS position never reaches the site.** Saving strips the
+place of capture from the file's metadata (`media.strip_location`, on
+unless `config/site.yml` turns it off -- the notes there say why); the
+camera, the moment and the orientation stay. `./blog.sh doctor
+--strip-location` cleans photos saved before the engine did this -- the
+only thing doctor ever writes.
+
 **Video from the same phone is mentioned, not refused.** The same
 setting decides the codec, and the save says one line when it matters:
 that a clip is HEVC (most browsers play it, the rest show an empty
@@ -195,10 +286,10 @@ page 2 lists it in its normal place, unmarked.
 
 Only the front page. Type and tag listings, the RSS feed, the sitemap
 and the search index stay strictly chronological -- a pin is a statement
-about the front page, not about the archive. Toggling it costs one or
-two files in a deploy, because pagination is anchored and the front page
-is the only flexible one. Pin a second post and the newest of them wins,
-with a warning in the build output.
+about the front page, not about the archive. Toggling it is a small
+deploy, because pagination is anchored and the front page is the only
+flexible one. Pin a second post and the newest of them wins, with a
+warning in the build output.
 
 ## Publishing slots
 
@@ -220,30 +311,18 @@ aimed at that exact time, so three drafts written in one evening queue
 onto three consecutive slots instead of publishing together, and the
 confirmation says which post goes out before this one.
 
-The offer also names the slots it had to walk past, and the post sitting
-in each:
-
-```
-Publish when?
-  Next free slot: Aug 9, 2026 17:30
-  Earlier slots are taken:
-     Aug 6, 2026 17:30 → 'a-post'
-     Aug 8, 2026 08:30 → 'another'
-```
-
-Without that line an offer of Sunday evening on a site whose slots
-include Saturday morning reads as a queue that skips Saturdays -- the
-answer being that Saturday was already taken. The properties dialog of a
-scheduled draft prints the whole queue for the same reason, with an arrow
-on the post you are looking at.
+The offer also names the earlier slots it had to walk past and the post
+sitting in each, so a queue that seems to skip a day explains itself.
+The properties dialog of a scheduled draft prints the whole queue for
+the same reason, with an arrow on the post you are looking at.
 
 Slots only ever suggest. A post scheduled by hand for 14:17 occupies no
 slot and blocks nobody, nothing moves a post that already has a time,
 and without the key in `config/site.yml` the prompt is the plain one it
 always was. Times follow `site.timezone`, daylight saving included --
 "mon 09:30" is 09:30 on the wall clock on both sides of the change. The
-cron still runs every 15 minutes, so a slot publishes within that window
-of its time.
+[publish-scheduled cron](#cron-sidebar-widgets-and-post-stats) still runs
+on its interval, so a slot publishes within one tick of its time.
 
 ### Working the queue
 
@@ -253,6 +332,16 @@ in publish order and acts on the one you pick:
 - `[u]` / `[d]` move it a slot earlier or later. Moving exchanges times
   with the neighbouring post -- the set of occupied times never changes,
   only which post sits in which. A hand-scheduled 14:17 stays a 14:17.
+  The cursor follows the post you moved, so pressing `[u]` again carries
+  the same post further.
+- `[m]` picks the post up and carries it: the arrows then move the post
+  itself through the queue, Enter puts it down and Escape leaves the queue
+  as it was. Carrying from the eighth slot to the second steps the six in
+  between back one slot each, so the same times stay occupied and the
+  whole move is one write instead of one per slot. For a single slot
+  `[u]`/`[d]` are quicker; `[m]` is for the longer trip, and it is offered
+  in a terminal only -- a piped run has `[u]`/`[d]` and no screen to carry
+  anything across.
 - `[p]` publishes it right now, the same flow as publishing a draft by
   hand (announcement included).
 - `[s]` asks for a different time, same prompt as scheduling.
@@ -289,7 +378,9 @@ longer article that attaches its data stays an article with a file on it.
 `./import.sh` opens its own wizard: pick a source, and it reads the whole
 thing in dry-run first and tells you what *would* be written -- how many
 posts and media files, the first few slugs, and how many items it skipped
-and why. Nothing is written until you confirm, and confirming means typing the number of posts rather than pressing a key -- an answer you can't give without having read the preview. Sources are twenty-two: blog and newsletter
+and why. Nothing is written until you confirm, and confirming means typing the
+number of posts rather than pressing a key -- an answer you can't give
+without having read the preview. The sources cover blog and newsletter
 platforms (WordPress, Blogger, Ghost, Medium, Substack, a Jekyll/Hugo
 tree, ...), the social networks (Twitter/X, Mastodon, Bluesky, Instagram,
 ...), podcast feeds, and the Wayback Machine for a blog whose platform no
@@ -317,19 +408,150 @@ Two things to expect on a real archive:
 - **The deploy guard will stop you afterwards**, because a bulk import is
   exactly the "file count swung wildly" shape it watches for. That's
   working as intended: check the numbers, then re-run with `--force`.
+- **The summary names what HTML could not become blocks.** Every adapter
+  that parses HTML bodies counts the elements it had to drop -- embeds
+  and forms, usually -- and the summary lists them by name and count, so
+  a silent summary means nothing was lost, not that nobody counted.
 
 Per-source walkthroughs -- where to get each export, what is kept and
 skipped, undo, troubleshooting -- live in [importing.md](importing.md).
 
-Re-running an import is safe. Posts are matched on
-`source.platform`/`account`/`original_id` and overwritten in place, so a
-second pass fixes a bad first one rather than doubling it. That same triple
-is the safe way to undo an import: select on it rather than on "everything
-except the posts I wrote".
+Re-running an import is safe -- posts are matched on their source
+identity and overwritten in place, never duplicated
+([importing.md](importing.md#what-every-import-does)); the same identity
+is the safe selector when [undoing an
+import](importing.md#undoing-an-import).
 
 Back up `content.nosync/` before the first real import
 (`tar czf ../content-backup-$(date +%F).tar.gz content.nosync`) -- it isn't
 in git, and on a server there's nothing else to fall back on.
+
+## Taking your content elsewhere
+
+```bash
+./blog.sh export ~/my-blog-export        # everything, drafts included
+./blog.sh export ~/public-copy --no-drafts
+./blog.sh export ~/somewhere --dry-run   # counts, writes nothing
+```
+
+Writes the archive as a tree of markdown files with YAML front matter,
+in Jekyll's layout: `_posts/2026-05-01-slug.md`, `_drafts/slug.md`,
+pages at the root, media copied under `assets/<year>/<slug>/`. Without a
+directory it writes to `tmp/export`. A directory that already has
+something in it is refused until you repeat the command with `--force`,
+which writes alongside what is there -- an export never deletes
+anything, at either end.
+
+It reads only the archive on disk -- deliberately, so it works on an
+installation whose `env.sh` is gone or whose config no longer parses.
+
+Three things are worth knowing before you rely on the result:
+
+- **The summary counts what could not stay markdown.** Video, audio and
+  link cards are written as HTML -- video and audio deliberately, because
+  the engine's own `!![caption](url)` reads as an exclamation mark and an
+  image to everybody else's markdown parser. Every engine that passes
+  HTML through renders them properly, and importing the tree back gives
+  them again as blocks -- each carries its own definition in a comment
+  above it, which other engines ignore.
+- **`redirect_from` is written in the shape `jekyll-redirect-from`
+  reads,** and it merges both kinds of old address -- where the post
+  lived on the platform it came from, and where it lived here before a
+  rename. On a Jekyll site with that plugin, every address the post has
+  ever had goes on answering.
+- **An export can be imported back.** `./import.sh` → *Markdown tree*
+  reads the `blogsh:` block the export writes, so posts keep their
+  identity (`source`), their series, their redirects and their
+  announcement URLs. That is the supported way to move an installation
+  to another machine or another host -- and, run against a scratch
+  copy, the way to check that an export really did come out whole.
+
+## Checking the archive
+
+```bash
+./blog.sh check            # walks every post and every media file
+./blog.sh check --online   # also asks whether the links that leave the site still answer
+```
+
+`doctor` asks whether the installation is sound and takes a second;
+this asks whether the *archive* is, and walks all of it -- two commands
+so the fast half keeps being run, and it is the fast half that belongs
+before a deploy. `check` reads the content on disk, so it works before a
+build has ever run, and it names a post and a slug for every finding
+rather than a file under `public.nosync`: something to go and fix.
+
+What it looks for, each with a line saying what to do about it:
+
+- **Media a post asks for and hasn't got** -- a video's poster image
+  included -- usually an import whose download failed. The page renders
+  a hole.
+- **Images stored as 1px or smaller.** The build treats those as tracking
+  pixels and drops them *together with their caption*, so the page loses
+  both without saying so.
+- **Internal links pointing at nothing.** Typically a permalink left over
+  from an import, or a slug renamed back before renames left a redirect
+  behind.
+- **Media directories no post owns** -- left by a deleted or renamed post,
+  or an import that ran twice. Nothing links to them; they cost disk, not
+  correctness, which is why they are a warning.
+- **Files in a post's own media directory that the post no longer
+  names** -- a source that dropped a picture leaves its file behind,
+  because an import only ever adds. A warning too; dotfiles are left
+  alone.
+- **Two series whose names differ by a character or two** -- usually one
+  series with a typo that quietly founded its own. A warning; names
+  differing only in digits are left alone (`rok-2025` next to `rok-2026`
+  is two year-series, not a typo).
+- **One old address claimed by two posts.** Whichever renders last wins
+  and the other's readers land on it.
+
+It only reports. Nothing here deletes a directory or rewrites a post: the
+value of the tool is that its output can be trusted, and a checker that
+also acts has to be trusted twice. Twenty findings of each kind are
+listed and the rest counted, so one bad import can't bury everything else.
+It exits non-zero on errors only, never on warnings, so it can hang off
+cron and speak up only when something is actually broken.
+
+**`--online` additionally asks the web about every link that leaves the
+site.** It takes minutes rather than a second, which is why it has to be
+asked for by name. What it reports is deliberately narrow: a host that no
+longer resolves, and a page answering 404 or 410. A timeout, a refused
+connection, a 5xx or a 403 is the web saying "not right now", and
+reporting those would turn one flaky evening into forty findings that are
+all fine tomorrow. Anything that looks dead is confirmed with a second
+request before it is believed, because some servers answer a HEAD with 404
+and a GET with 200 for the same address. Verdicts are remembered in
+`tmp/link-check.json` for two weeks, so running it again next week only
+asks about the links it hasn't seen lately; deleting that file just means
+the next run asks about everything.
+
+## Counting the archive
+
+```bash
+./blog.sh stats           # a screen: posts by year and kind, words, tags, media, sources
+./blog.sh stats --json    # the same figures, for whatever reads them next
+```
+
+Reads the archive on disk -- no build, no network, no `env.sh` -- and
+comes back in seconds even on a large archive. What it says, and why
+each line is there:
+
+- **The archive**: posts split into published, drafts, scheduled and
+  pages. The four add up to the total; a page that is also a draft counts
+  once, as a page.
+- **By year** and **What they are**: where the archive is thickest, and
+  what it is made of (the dominant content type per post, the same one
+  the `/type/` listings use).
+- **Words**: total, mean and median. Both averages, deliberately -- an
+  archive half made of imported tweets pulls the mean far above the
+  middle, and only the pair says so.
+- **Tags**, **Media** (files on disk, or what the posts ask for when the
+  media directory is not here) and **Where it came from** -- the
+  platforms the archive is actually made of, which is a different number
+  from how many the importers support.
+
+`--json` prints the same figures unlocalized and unrounded, so the
+numbers can go into a post, a cron job or a graph.
 
 ## Deploying
 
@@ -365,10 +587,8 @@ Things worth knowing:
   name (below). If a swing is genuinely intended (bulk import, mass
   deletion), rerun with `--force`. An empty build is always refused.
 
-  The percentages need those absolute floors to be usable on a small
-  site: 20% of a 32-file build is six files, so two posts published at
-  once would otherwise read as an explosion -- and abort a flow that
-  `./blog.sh` runs for you, which cannot pass `--force`.
+  The absolute floors keep the percentages usable on a small site, where
+  two posts published at once would otherwise read as an explosion.
 
   A drop also measures against the manifest when that is larger, since
   every entry in it is a file that really did upload. Growth never does:
@@ -389,9 +609,8 @@ Things worth knowing:
   snapshot and prunes implicitly -- the log says "(snapshot deploy)".
 - **The previous run's outcome is reported, not acted on.** A deploy that
   failed or was interrupted says so at the top of the next one, and after
-  three unfinished runs in a row it says that too -- something is being
-  refused every time. Deliberately a warning however high that count
-  goes: stopping after N attempts would be its own dead end.
+  three unfinished runs in a row it says that too -- however high the
+  count, since stopping after N attempts would be its own dead end.
 - **Manifests are disposable.** `.deploy_manifest*.json` (one per
   backend) records what the target already has. Deleting one is always
   safe -- the next deploy re-uploads everything once and rebuilds it. The
@@ -441,13 +660,36 @@ files** -- no site rebuild:
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh
 ```
 
-Every 30 minutes is plenty. Post stats refresh live for posts younger
+Every 30 minutes is plenty. The crontab lines in this section are
+recommendations; what actually runs is whatever the installation's own
+crontab says -- installing it is step 7 of
+[install.md](install.md#7-running-on-a-server). Post stats refresh
+live for posts younger
 than ~90 days; older posts get a full refresh about once a week
 (tracked in `.stats_full_refresh_at`). A failed fetch **keeps the last
 known content** rather than publishing an empty widget -- a one-minute
 network hiccup never blanks the sidebar. Systems without cron: a
 systemd timer or launchd job invoking the same script does the same
 thing. No widgets configured = no cron needed.
+
+**With `comments.approval: fav` this job stops being optional.** It is
+what reads which replies you favourited and writes `comments.json`, so
+without it a newly starred comment never reaches the site -- the pages
+keep whatever was uploaded last. The same "keeps the last known
+content" rule applies and matters more here: a failed fetch leaves the
+thread as last published rather than blanking a discussion.
+
+Two timings to know. A comment starred under a recent post appears at
+the next run, so within the cron interval. Under a post older than ~90
+days it waits for the weekly full pass -- run
+
+```
+./scripts/refresh-sidebar.sh --full
+```
+
+to do that pass now instead. And switching moderation back off deletes
+`comments.json` on the next run, so a rejected comment doesn't stay
+readable at a public URL after the page stops showing it.
 
 A second, optional job publishes scheduled drafts
 (`./blog.sh schedule`) once their date arrives -- it exits immediately
@@ -475,14 +717,15 @@ skipped; the rest of the batch still publishes.
 
 Building and deploying take an advisory lock (`.blog-sh.lock` in the
 project root), because two of the things that write `public.nosync` run
-from cron: the scheduled publish every 15 minutes and the sidebar refresh
-every 30. On a large archive a build plus a full deploy takes longer than
+from cron: the scheduled publish and the sidebar refresh
+([Cron](#cron-sidebar-widgets-and-post-stats)). On a large archive a
+build plus a full deploy takes longer than
 a tick, so overlapping runs are ordinary -- and what they do to each other
 is not: a deploy walking a tree that is being rewritten, or pruning as an
 orphan a page the other run has just published.
 
 A run that finds the lock held does not wait for it. A cron tick says so
-and leaves with exit 0 -- cron is back in fifteen minutes, and a queue of
+and leaves with exit 0 -- cron is back within its interval, and a queue of
 blocked publishes would all wake up and do the same work at once. A run
 you started reports it and exits non-zero, so `./blog.sh` doesn't tell you
 a deploy happened when it didn't. The scheduled publish holds the lock for
@@ -502,6 +745,7 @@ everything generated is rebuildable:
 | Path | Why |
 | --- | --- |
 | `content.nosync/posts/` | the posts -- the one thing that's truly irreplaceable |
+| `content.nosync/versions/` | what each edited post said before its last ten saves, which is what `[v]` restores from ([Properties and actions](#properties-and-actions)). It sits beside the content and dies with it, so a backup of the posts alone keeps the archive and loses the undo |
 | `media.nosync/` | their images and videos |
 | `config/site.yml` | site identity and integrations |
 | `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
@@ -524,24 +768,34 @@ archive it.
 **Restore** = fresh clone + copy those paths back + `./blog.sh rebuild`.
 The same list is exactly what to move when changing machines.
 
+A backup is those paths as they are -- not an export. `./blog.sh export`
+([Taking your content elsewhere](#taking-your-content-elsewhere)) is for
+leaving, and it converts: what markdown cannot write down comes out as
+HTML. Restoring from an export is possible (`./import.sh` reads it back
+whole), but restoring from the archive itself is exact.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
 | --- | --- |
 | Anything at all, and you need to know what you're running | `./blog.sh version` -- it needs neither `env.sh` nor a config, on purpose. |
-| The site looks wrong, or you want to change how it looks | `./style.sh` -- a menu over the palette, banner, about, footer, social icons, sidebar widgets, fonts and analytics. The bio, the footer note, the copyright line and the banner's claim are Markdown, the same as a post, and raw HTML still works in them -- an `<img>` is how a photo gets into the bio, since Markdown cannot carry the styles one needs. Picking a palette offers a preview (your site in the candidate colors, light and dark side by side) before anything is written, and the run ends by offering a rebuild, since appearance is the one thing a diff can't show you. The preview is also uploaded to the site so you can open it on a phone, and it is deliberately temporary: the build removes anything it did not produce itself, so the next build -- which a scheduled publish can start at any minute -- takes it back down. Look at it while you are standing there. |
-| Anything config-shaped, and you want the whole picture | `./blog.sh doctor` -- it reads whatever is on disk and reports every problem at once, each with a fix line. It runs on a config too broken for anything else to load, including one whose YAML won't parse, and needs neither `env.sh` nor a valid config. Add `--online` to also ask whether the feeds, the analytics script and the access token still answer, and `--strip-location` to remove the place of capture from photos saved before the engine started doing that on the way in -- the only thing doctor ever writes, which is why it has to be asked for by name. It cleans the sources, `media.nosync` and `assets/`, and the site follows on the next rebuild, since the site is built from them. |
+| The site looks wrong, or you want to change how it looks | `./style.sh` -- a menu over everything that decides how the site looks and what it says about itself; it lists its own sections. The bio, the footer note, the copyright line and the banner's claim are Markdown, the same as a post, and raw HTML still works in them; a multi-paragraph value needs YAML's literal block (`|-`) -- the notes in `config/site.yml.example` show why. Picking a palette offers a preview (light and dark side by side, uploaded to the site too so a phone can see it) before anything is written -- temporary on purpose, the next build takes it down -- and the run ends by offering a rebuild. |
+| Anything config-shaped, and you want the whole picture | `./blog.sh doctor` -- it reads whatever is on disk and reports every problem at once, each with a fix line. It runs on a config too broken for anything else to load, including one whose YAML won't parse, and needs neither `env.sh` nor a valid config. Add `--online` to also ask whether the feeds, the analytics script and the access token still answer, and `--strip-location` to clean the location out of photos saved before the engine did it on the way in ([Writing from a phone](#writing-from-a-phone)); rebuild afterwards, since the site is built from what it cleans. |
+| Anything archive-shaped -- a hole where a picture should be, a link that leads nowhere | `./blog.sh check` -- it walks every post and every media file and says what is broken *inside the archive*, each finding with a fix line; `--online` additionally asks whether the links that leave the site still answer ([Checking the archive](#checking-the-archive)). It only ever reports: nothing is deleted or rewritten, so it is safe to run at any time, including from cron. |
 | `config/site.yml is not valid YAML` | The message names the line and column. Almost always a tab where spaces belong, a missing quote, or a colon inside an unquoted value (`title: Colon: here`). `./blog.sh doctor` says the same thing without stopping at the first problem. |
 | A save aborted and took your text with it | It didn't: the text is in `.last-edit.md`, and the next `add`/`edit` offers it back -- `[r]` opens the editor on it, `[d]` throws it away, `[c]` leaves it alone. Text from an interrupted `edit <slug>` is only offered to that same post: restoring it into an `add` would make a second post out of it, so the offer names the command that does continue it. |
 | `Missing env.sh` | `./setup.sh`, or copy the template by hand: `cp env.sh.example env.sh && chmod 600 env.sh`. An unedited copy works locally. |
 | `Missing config/site.yml` | Same two ways: `./setup.sh`, or `cp config/site.yml.example config/site.yml` and fill it in -- the build refuses to guess. |
 | `Duplicate year/slug ... build stopped` | Two posts resolve to the same URL and media directory. Rename one slug; the build aborts rather than silently overwriting one with the other. |
-| Deploy stopped with a "% drop/increase" message | One of the four guards -- see [Deploying](#deploying). Broken build until proven otherwise; `--force` only when the change is intended. The message names what it compared against, and when. |
-| Deploy or save stopped naming a file over 100 MB | One limit for every backend, so the site stays portable ([Deploying](#deploying)). Shrink the file, or take it out of the post and link to it instead. `--force` does not lift this -- the target would refuse it every run. |
-| `N deploys in a row have not finished` | Something is refused every time: an oversized file, expired credentials, a target that is gone. The guards are still on; the failures listed under that line say which. |
+| Deploy stopped with a "% drop/increase" message | One of the four guards ([Deploying](#deploying)) -- broken build until proven otherwise, `--force` only when the change is intended. |
+| Deploy or save stopped naming an oversized file | The one file-size limit ([Deploying](#deploying)) -- shrink the file, or take it out of the post and link to it instead. |
+| `N deploys in a row have not finished` | Something is refused every time; the failures listed under that line say which ([Deploying](#deploying)). |
 | `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer UI and update `SURFER_TOKEN`. |
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
 | `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
+| Every comment disappeared after turning on `comments.approval` | Expected until you star them -- moderation publishes only favourited replies ([Cron](#cron-sidebar-widgets-and-post-stats)). If starring changes nothing either, `./blog.sh doctor --online` catches the usual cause: a token without `read:statuses`. |
+| A comment you starred still isn't on the site | It arrives with the next `refresh-sidebar.sh` run; an older post waits for the full pass, which `--full` does now ([Cron](#cron-sidebar-widgets-and-post-stats)). Check the cron job is actually installed. |
+| `comments.approval is on but MASTODON_ACCESS_TOKEN is not set` | The cron run refused to publish rather than emptying every thread; the pages keep their last known comments until the token is there ([Cron](#cron-sidebar-widgets-and-post-stats)). Same for `BLUESKY_APP_PASSWORD` on a Bluesky site. |
 | Sidebar widget disappeared from the page | Its fetch returned nothing repeatedly (`refresh-sidebar` logs say which) -- the widget card hides when its JSON is empty/unreachable. Check the instance/feed URL in `config/site.yml`. |
 | `MISSING media: <slug> -> <file>` during build | A post references a file that isn't in `media.nosync/<year>/<slug>/` -- restore the file or edit the post. The build continues, and a copy already uploaded stays on the site rather than being pruned, so the page keeps working until you fix it. |
 | `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |

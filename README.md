@@ -52,6 +52,7 @@ MIT licensed (see [LICENSE](LICENSE)).
 [Authoring](#blogsh----authoring) ·
 [Configuration](#configuration-envsh-per-deployment-never-in-git) ·
 [Importing existing content](#importing-existing-content) ·
+[Exporting](#exporting) ·
 [Deploy](#deploy) · [Roadmap](#roadmap) ·
 [Example deployments](#example-deployments)
 
@@ -76,7 +77,9 @@ deploy step around exactly that. A few of the choices that came out of it:
   replies to that announcement *are* the comments. The client fetches
   the thread from the network's public API at render time -- no database
   of comments to moderate or migrate, and the "comment count" next to a
-  post is just the reply count on its announcement.
+  post is just the reply count on its announcement. Optionally, only the
+  replies you favourite are published (`comments.approval: fav`) -- the
+  moderation interface is the app on your phone.
 - **Deploys default to paranoid.** `scripts/deploy-web.sh` diffs a SHA-256 +
   size + mtime manifest so it only ships what changed, and refuses to
   proceed if the file count or the total bytes swing too far versus the last
@@ -89,17 +92,12 @@ deploy step around exactly that. A few of the choices that came out of it:
   to a third party on every page load, and no widget can slow down or
   break the page for a visitor.
 
-Concretely, against the tools this would otherwise be: **Hugo and
-Jekyll** are build steps -- they turn a folder of Markdown into HTML and
-stop there, leaving writing, publishing, announcing and deploying to be
-assembled from an editor, git and whatever CI you wire up. **Ghost** does
-cover all of that, but wants a Node server, a database and an admin
-interface to do it, and its comments and newsletter are its own.
-`blog.sh` is the third shape: a build *and* the authoring tool *and* the
-deploy step, with the database replaced by a directory of JSON files and
-the comment system replaced by a social network you already post to.
-What you give up is what those two are good at -- a theme ecosystem,
-plugins, and more than one author.
+Concretely: **Hugo and Jekyll** are build steps, **Ghost** is a server
+with a database and an admin interface. `blog.sh` is the third shape --
+the build *and* the authoring tool *and* the deploy step in one, with
+the database replaced by a directory of JSON files and the comment
+system by a social network you already post to. What you give up is a
+theme ecosystem, plugins, and more than one author.
 
 ## What it does
 
@@ -118,7 +116,10 @@ the camera, the moment and the tag that keeps a portrait photo standing up
 all stay. A post is either published or a draft, a draft has an
 unguessable preview URL, a published post can be pinned to the front
 page, and a post built around a file is filed as a document with a
-download card.
+download card. A post's header can also say which series it belongs to,
+whether it wants a table of contents, and whether its lead image runs full
+width above the title; every card and every post page says how long the
+post takes to read.
 → [architecture.md → Content model](docs/architecture.md#content-model)
 
 **Writing.** `./blog.sh` is a CLI, and run bare an interactive menu: add,
@@ -149,10 +150,12 @@ parser, so every example on it behaves exactly as it would in a post.
 
 **Build.** Static HTML from JSON through ERB templates, no framework:
 pagination anchored to the oldest post so page boundaries stay stable as
-new posts arrive, tag and content-type archives that exist only for the
-types the site actually has, RSS, a sitemap, `robots.txt`, a generated
-`/favicon.ico`, and a search index split into an eager recent half and a
-lazily loaded archive. Search itself is entirely client-side -- quoted
+new posts arrive, tag, series and content-type archives that exist only
+for the tags, series and types the site actually has, RSS, a sitemap,
+`robots.txt`, a generated `/favicon.ico`, a 404 page wearing the site's
+own chrome instead of the host's default, and a search index split into an
+eager recent half and a lazily loaded archive. Search itself is entirely
+client-side -- quoted
 phrases, `-word` exclusion, diacritics never deciding a match. Only
 changed files are written, and whatever the build didn't produce this run
 is removed afterwards.
@@ -167,12 +170,10 @@ deploy accepted -- so a bad `--prune` can't quietly empty the site.
 → [install.md → Pick a deploy target](docs/install.md#6-pick-a-deploy-target),
 [the commands](#deploy)
 
-**Comments, without a comment system.** Every published post is
-auto-announced on Mastodon *or* Bluesky -- exactly one network per site
--- and the replies to that announcement are the comments. The visitor's
-browser fetches the thread from the network's own public API, so there is
-no comment database to moderate, migrate or back up, and the reply, like
-and boost counts shown next to a post are that announcement's.
+**Comments, without a comment system.** The announcement's replies are
+the thread and `comments.approval: fav` publishes only the ones you
+favourite -- both told in full under [Why this exists](#why-this-exists),
+and told once.
 → [install.md → Comments network](docs/install.md#8-comments-network-optional-mastodon-or-bluesky)
 
 **Sidebar widgets.** Latest toots, Bluesky posts, Pixelfed posts, GitHub
@@ -182,17 +183,34 @@ calls a third party for them, so no widget can slow down or break a page.
 → [operations.md → Cron](docs/operations.md#cron-sidebar-widgets-and-post-stats)
 
 **Appearance.** Light and dark from CSS custom properties and
-`prefers-color-scheme`, with a manual toggle; a lightbox, collapsible
+`prefers-color-scheme`, with a toggle that cycles through three states --
+follow the system, light, dark -- so a reader who tries the other mode can
+hand the decision back; a lightbox, collapsible
 mobile navigation, and photo galleries assembled from adjacent images.
+The menu bar follows the reader down the page, so the way out of an
+article is wherever they finished it rather than back at the top, and it
+carries the search field on a phone as well as on a desktop.
 The whole palette is seven config keys per mode, compiled into a
-stylesheet at build time -- seven ready-made palettes ship with the
-engine, and the header's typeface and size are configuration too, not a
-file to edit. The site's own words -- the bio in the sidebar, the note and
+stylesheet at build time -- ready-made palettes ship with the engine,
+and the header's typeface and size are configuration too, not a file to
+edit. The site's own words -- the bio in the sidebar, the note and
 the copyright line in the footer, the claim over the banner -- are written
 in the same Markdown a post is, and raw HTML still works in them, which is
 how a photo gets into a bio. No framework anywhere; the JavaScript is
 small single-purpose files.
 → [install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)
+
+**Reachable without a mouse, and quiet if you ask.** One focus ring for
+the whole site, in the site's own accent, so a reader moving by keyboard
+can always see where they are -- and it goes inside the control wherever
+the ground behind it is a photograph or a fill it would disappear into.
+The lightbox opens with Enter, walks with the arrows, keeps Tab inside
+itself while it is up and hands focus back to the picture it was opened
+from; the menu on a phone closes with Escape or a tap on the page. Every
+page has exactly one `h1`. A reader whose system asks for less movement
+gets the site with its transitions off and the back-to-top button putting
+them at the top rather than travelling there.
+→ [decisions.md](docs/decisions.md)
 
 **Security.** A Content-Security-Policy on every page, self-hosted fonts,
 no third-party tracking in post data, consistent escaping of everything
@@ -227,11 +245,11 @@ them, and the built site then answers at every old path.
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
 setup.sh                 Setup wizard -- identity, address, comments network, deploy target
-style.sh                 Appearance wizard -- palette, banner, about, footer, sidebar
+style.sh                 Appearance wizard -- palette, banner, menu, about, footer, sidebar
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
-                           deploy-web.sh      standalone deploy of public.nosync/ to Surfer (no rebuild)
+                           deploy-web.sh      standalone deploy of public.nosync/ to the configured target (no rebuild)
                            refresh-sidebar.sh cron: refreshes only the sidebar widgets (no site rebuild)
                            migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
@@ -357,6 +375,10 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
+./blog.sh check                # walks the archive and says what is broken in it
+./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+                               # writes the whole archive out as a tree of markdown files
+./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```
@@ -408,23 +430,23 @@ Available sources:
 | Blogger | the Atom backup file | posts and drafts; the comments and settings the backup mixes in are skipped and counted, images download full-size (the markup only points at thumbnails), YouTube embeds become video blocks |
 | Bluesky | nothing (public API) | your own standalone posts; replies, reposts and quote-posts are skipped |
 | Facebook | an unpacked export, HTML or JSON | your own posts with photos and videos from the archive; crossposts from Twitter/Posterous are skipped and counted by default (their own imports carry the originals), as are wordless check-ins and app stories |
-| Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages are skipped, images download from the live site |
+| Ghost | the JSON export + the still-running site's URL | every post, drafts included, scheduled become drafts; pages arrive as pages, images download from the live site |
 | Instagram | an unpacked export, HTML or JSON | your grid and IGTV; archived posts, profile photos and stories are skipped, media comes from the export itself |
 | LiveJournal | `LJ_PASSWORD` (challenge digest, never plaintext) | every entry via the API — LJ has no export file; friends-only and private arrive as drafts, comments stay behind |
 | Mastodon | an unpacked account archive | standalone posts; boosts and replies are skipped, media comes from the archive itself |
-| Jekyll/Hugo | the site tree (or any markdown folder) | posts and drafts with front matter, YAML or TOML; images come from the tree itself, no network; Liquid highlight becomes a code block |
+| Jekyll/Hugo | the site tree (or any markdown folder) | posts and drafts with front matter, YAML or TOML; relative image paths come from the tree, absolute URLs download -- import while the old host still answers; Liquid highlight becomes a code block |
 | Medium | an unpacked export | posts and drafts; images download from Medium's CDN, likely responses to other articles become drafts for review, newer exports carry no tags |
 | Movable Type/TypePad | the MT export file (gzip ok) | posts and drafts; comments and trackbacks in the file are counted and left behind; the format has no ids or URLs, so identity is minted from date+basename and redirects take a URL pattern |
 | Pixelfed | a statuses export | standalone posts; photos are downloaded, trailing hashtag lines dropped (they're already tags) |
 | Podcast | a feed URL (Libsyn, Buzzsprout, ...) | every episode: the file and artwork download and are hosted locally, audio as a player and video as video -- the preview says how many gigabytes that means; items without an enclosure are skipped |
-| Squarespace | the "WordPress format" XML export | posts and drafts, feature images included; images, audio and video markup that a plain parse would lose is restored, pages and attachments are counted as skips |
-| Substack | an unpacked export | newsletters and podcasts, drafts included, full text of subscribers-only posts (the export is the author's), tagged `substack-paid` so you can find them; threads and pages are skipped, tags don't exist in the export |
+| Squarespace | the "WordPress format" XML export | posts and drafts, feature images included; images, audio and video markup that a plain parse would lose is restored, pages arrive as pages, attachments are counted as skips |
+| Substack | an unpacked export | newsletters and podcasts, drafts included, full text of subscribers-only posts (the export is the author's), tagged `substack-paid` so you can find them; pages arrive as pages, threads are skipped, tags don't exist in the export |
 | Threads | an unpacked export, HTML or JSON | your own standalone posts with media from the archive; replies to other people's threads are skipped and counted, bare URLs become links |
 | Tumblr | `TUMBLR_API_KEY` | every published post on a blog; a reblog keeps the trail with each part credited to the blog it came from. Drafts, the queue and private posts sit behind endpoints an API key cannot reach |
 | Twitter/X | an extracted archive export | standalone tweets only; replies, RTs and quote-tweets are skipped |
 | Wix | the blog CSV export | posts and drafts; the rich-content JSON converts to blocks directly, nodes with no equivalent (video, galleries, polls) are counted by name; images download from the CDN. A CSV that lost a quote to Excel is read anyway, and only the rows that slid out of line are skipped |
 | Wayback Machine | the dead blog's old URL | the Archive's feed captures reassembled oldest-first; blogs with no archived feed fall through to page mode (platform packs — blog.cz built in — or `POST_PATTERN`); what the Archive never saved is counted as lost |
-| WordPress | a WXR export file | every post, with its featured image and its captions; a password-protected post arrives as a draft rather than published; pages, attachments and menu items are skipped, and a custom post type is skipped under its own name so you can see what stayed behind |
+| WordPress | a WXR export file | every post, with its featured image and its captions; a password-protected post arrives as a draft rather than published; pages arrive as pages, attachments and menu items are skipped, and a custom post type is skipped under its own name so you can see what stayed behind |
 | RSS/Atom | a feed URL | whatever the feed carries -- usually only its last few dozen items |
 
 Every source is also reachable without the wizard, for a cron job or a
@@ -454,6 +476,10 @@ ruby scripts/migrate_wix.rb <posts.csv>
 ruby scripts/migrate_feed.rb <export.xml | feed-url>
 ```
 
+There is no `migrate_wordpress.rb`: a WordPress WXR export is RSS
+underneath, so `migrate_feed.rb` reads both
+(→ [importing.md → WordPress](docs/importing.md#wordpress-or-any-rssatom-feed)).
+
 All of them take `LIMIT=n` to import only the first *n* posts, which is the
 way to sample a large archive before committing hours to it -- a later full
 run overwrites those posts in place rather than duplicating them. The ones
@@ -461,25 +487,43 @@ that know their posts' original URLs also take `KEEP_PERMALINKS=1`, which
 writes the `redirect_from` list that keeps the old site's links working;
 without it an archive imports with no redirects at all, and the only way
 back is another import. Movable Type/TypePad take `URL_PATTERN` instead and
-a markdown tree a `PERMALINK` pattern, for the same purpose. The full
+a markdown tree a `PERMALINK` pattern, for the same purpose. A re-run also
+fetches no media it already has -- each file records the address it came
+from -- so sampling first costs the network nothing twice. Media already in
+the archive is never replaced, only added to; `REFETCH_MEDIA=1` asks the
+source for every address again but still writes only what is missing. The full
 per-source guide, including undo and troubleshooting, is
 [docs/importing.md](docs/importing.md).
-They report progress as they go: the size of what they're about to read,
-how many items were found and filtered, then a `12/847` counter per post,
-because downloading every image of an archive runs for hours and a silent
-terminal is indistinguishable from a stuck one.
 
 Two limits worth knowing before you start: only a Bluesky self-thread's
 opening post is imported (the continuations are replies), and Bluesky
 serves video as an HLS playlist rather than a file, so a video post is
 imported as its poster frame with the original linked from `source`.
 
+## Exporting
+
+```bash
+./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+```
+
+The other direction, and the point of the importers: an archive you
+cannot take with you is not yours. The whole thing comes out as a tree
+of markdown files with YAML front matter in Jekyll's layout, because
+that is the one the most other engines read -- and `./import.sh` reads
+the tree back, posts keeping their identity, series, redirects and
+media, which makes export plus re-import the supported way to *move* an
+installation rather than only a way to leave one. Usage, flags and what
+to expect:
+→ [operations.md → Taking your content elsewhere](docs/operations.md#taking-your-content-elsewhere);
+how the round trip works inside:
+→ [architecture.md → Exporting](docs/architecture.md#exporting-libexporterrb).
+
 ## Deploy
 
 ```bash
 ruby build/build_blog.rb   # rebuild into public.nosync/
 ./scripts/deploy-web.sh            # uploads only new/changed files (SHA256 manifest)
-./scripts/deploy-web.sh --prune    # also deletes orphaned files on Surfer
+./scripts/deploy-web.sh --prune    # also deletes orphaned files on the target
 ```
 
 `./blog.sh rebuild` does both steps at once.
@@ -511,6 +555,16 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 
 What isn't built yet, and what building it would take:
 
+- **Next, as a patch release** -- small, already-decided corrections:
+  the scheduled-publish cron learns the restraint the interactive
+  publish already has (a backdated post publishes without announcing;
+  a post that carries an announcement URL is never announced again --
+  its comment thread is the thing being protected), plus a handful of
+  edge fixes the release audit chose to defer rather than rush.
+- **Further out** -- importing sport activities is the working theme
+  for a future release: GPX/TCX/FIT from whatever tracker you use, a
+  post with the map and the numbers, no account on anybody's platform
+  required. Investigated; not yet designed. It moves when it moves.
 - **Imports** -- twenty-two sources are covered (the table under
   [Importing existing content](#importing-existing-content)). Some of
   those share an adapter: WordPress and feeds, because they are one
@@ -522,11 +576,14 @@ What isn't built yet, and what building it would take:
   `each_item`, `map`) -- everything else (media, dedup, dry-run,
   reporting, HTML → blocks) is already shared.
   That table says what is covered, not how hard each one has been leaned
-  on. Some of these have carried somebody's whole archive onto a live
-  site; others have met a sample export and no more. LiveJournal is the
-  one that has never run against the live service at all -- it has no
-  export file, so the adapter talks to the API, and exercising that
-  needs a real account.
+  on -- though that gap is narrower than it used to be: several sources
+  have carried whole archives onto live sites (Twitter, Tumblr and
+  b2evolution among them), and Ghost, WordPress and Hugo have each been
+  run against a real foreign archive since, one of them as a complete
+  site migration now running in trial. What still rests on sample exports
+  alone: pages from Squarespace and Substack. And LiveJournal has never
+  run against the live service at all -- it has no export file, so the
+  adapter talks to the API, and exercising that needs a real account.
 - **More comments backends** -- Mastodon and Bluesky are in
   (`lib/mastodon_poster.rb` / `lib/bluesky_poster.rb`, one network per
   site). X and Threads were investigated (July 2026) and settled:
@@ -572,3 +629,9 @@ looks like in practice.
 [blogsh.app](https://blogsh.app) is the second one: the project's own site,
 running the same unmodified engine and publishing its documentation as
 ordinary posts.
+
+[blog.elegantlich.com](https://blog.elegantlich.com) is the first
+deployment in hands other than the author's -- the planning blog of the
+*Elegant Lich* magazine. Its owner's first-install feedback is already
+in the engine: an announcement that cannot happen now says why, and the
+example config explains its own comment conventions.

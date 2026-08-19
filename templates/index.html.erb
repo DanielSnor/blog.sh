@@ -1,4 +1,4 @@
-        <% if heading %><h2 class="tag-heading"><%= h(heading) %></h2><% end %>
+        <%= heading_html %>
         <% if list_html.strip.empty? %>
           <p class="search-status"><%= h(t('index.empty')) %></p>
         <% else %>

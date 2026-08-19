@@ -61,6 +61,72 @@ body {
   color: var(--text);
 }
 
+/* Keyboard focus, for the whole site in one rule. Until this block the
+   stylesheet said nothing about focus at all, which left every control
+   wearing the browser's own outline -- a thin ring in the browser's colour,
+   drawn on whatever ground the control happens to sit on. On the buttons
+   this site draws itself (appearance, back to top, the hamburger, search)
+   that ground is a saturated fill or a photograph, and the default ring
+   goes to work against it. So: the accent, which is already the colour
+   this site uses to say "this one", held 2px off the control so it reads
+   as a ring around it rather than a border on it.
+
+   :focus-visible rather than :focus, so a mouse click leaves nothing
+   behind. The pointer has already shown the reader where the click went;
+   a ring that outlives it is the reason so many sites turn focus off
+   altogether, and turning it off is what strands the keyboard. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Four controls the ring goes INSIDE instead of around, each for its own
+   reason -- and in every one of them the reason is that the ground just
+   outside the control is not something this stylesheet can vouch for.
+
+   The appearance toggle sits on a photograph and the lightbox controls on
+   a near-black overlay, so nothing can be assumed about what is behind
+   them. Plenty is known about what is inside them, though: an accent fill
+   under a white glyph, a pale disc under a white one. Both already carry
+   white as their own foreground, so the ring moves in and borrows it --
+   as readable as the label it belongs to, whatever the picture underneath
+   is doing. */
+#theme-toggle:focus-visible,
+.lightbox-close:focus-visible,
+.lightbox-nav:focus-visible {
+  outline-color: #ffffff;
+  outline-offset: -3px;
+}
+
+/* The banner link is the width of the page, and below 940px that is the
+   width of the window -- so a ring held 2px off it would have its left and
+   right sides drawn past the window edge and clipped away, leaving two
+   stray horizontals. (It would not scroll the page sideways: an outline is
+   ink, and ink overflow doesn't reach the scroll box. It would simply be
+   half a ring.) */
+.banner-link:focus-visible { outline-offset: -3px; }
+
+/* Nav items are 70px boxes in a 60px bar -- the 5px they stand proud top
+   and bottom is what lets a hovered link paint over the bar's own frame
+   (see nav li above). A ring around that box therefore starts outside the
+   bar, in the banner above it and the border below. Inside, it lands on
+   the item and reads as the same rectangle the active item wears filled. */
+nav a:focus-visible { outline-offset: -3px; }
+
+/* Two more accent-on-accent cases, where the base rule would draw the ring
+   in the exact colour of the ground it lands on and quietly do nothing:
+   the item whose listing you are already in, filled with the accent, and
+   the date badge, which is accent all the way to its edge with the link
+   filling it. Both take white -- the colour each already prints its own
+   text in. The badge holds its ring a further pixel in, so the corners
+   stay clear of the 4px radius rather than crossing it. */
+nav a[aria-current="page"]:focus-visible { outline-color: #ffffff; }
+
+.date-badge a:focus-visible {
+  outline-color: #ffffff;
+  outline-offset: -1px;
+}
+
 .wrap {
   max-width: 940px;
   margin: 30px auto;
@@ -97,6 +163,35 @@ nav {
   border-top: 5px solid var(--nav-border);
   border-bottom: 5px solid var(--nav-border);
 }
+
+/* The bar follows the reader down the page. On an archive listing -- and
+   more so on a post, where the way out is the menu and the menu was at the
+   top of an article they have just read to the bottom of -- that is the
+   difference between changing your mind about what to read and scrolling
+   all the way back to be allowed to.
+
+   Scoped to the page's own bar rather than to `nav`: a post also carries a
+   pagination nav inside <main>, and there is nothing sticky about "older
+   posts".
+
+   Above the page, below the two things meant to cover it: the back-to-top
+   button at 10 and the lightbox at 100. The bar paints its own opaque
+   background, or the text would show through as it passed underneath. */
+.wrap > nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+/* What a bar that covers the top of the window owes to everything that
+   scrolls something into view: a heading reached from the contents list, a
+   link reached with Tab, any anchor followed from anywhere. Without this
+   they are all scrolled to the top of the window, which is exactly where
+   the bar is, and arrive underneath it. The number is the bar's own height,
+   and it is the same on both sides of the breakpoint: a 60px row and two
+   5px borders on a desktop, a 44px row with 8px of padding and the same two
+   borders on a phone. */
+html { scroll-padding-top: 70px; }
 
 nav ul { list-style: none; display: flex; flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; }
 
@@ -179,12 +274,16 @@ nav a[aria-current="page"]:hover {
   border-color: transparent;
 }
 
+/* 44px, which is the smallest a finger reliably hits, and 4px more than
+   this was. It costs nothing to look at: the button has no background and
+   no border, so all that grows is the area that answers to a tap around a
+   24px glyph that has not moved. */
 .nav-toggle {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   align-self: center;
   background: none;
   border: none;
@@ -263,13 +362,39 @@ nav a[aria-current="page"]:hover {
   background: linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
 }
 
+/* Both overlay lines in one box, laid out as a column. They used to be
+   pinned to opposite corners of the picture, which meant the only thing
+   keeping them apart was there being enough picture between them -- and on
+   a phone there is not. A banner scaled to a 375px screen is around 100px
+   tall, and a 30px title with a claim wrapped onto two lines fills that on
+   its own: on blogsh.app the two printed across each other for 79px, both
+   unreadable, with the claim reaching under the appearance toggle as well.
+   Two items in a column cannot overlap however short the column gets.
+
+   The corners are the same as before. The title is simply the column's
+   first item; the claim is pushed to the far end by its own auto margin
+   rather than by justify-content: space-between, which would have sent a
+   site showing ONLY a claim to the top of the banner instead of the
+   bottom. The insets that used to be each line's own top/left/bottom/right
+   are the box's padding now, so there is one place to change them.
+
+   pointer-events sits on the box rather than on the two lines, so the
+   whole banner is still one click target for the link underneath -- the
+   padding between the lines would otherwise swallow a tap. */
+.banner-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  pointer-events: none;
+}
+
 .banner-title,
 .banner-claim {
-  position: absolute;
-  z-index: 2;
   margin: 0;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
 }
 
 /* Colors and fonts both come from colors.css (config/site.yml's
@@ -280,8 +405,6 @@ nav a[aria-current="page"]:hover {
    a stylesheet older than this rule still gets a monospace header rather
    than the browser's default serif. */
 .banner-title {
-  top: 20px;
-  left: 24px;
   max-width: 60%;
   font-family: var(--banner-title-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
   font-size: var(--banner-title-size, 45px);
@@ -291,9 +414,9 @@ nav a[aria-current="page"]:hover {
 }
 
 .banner-claim {
-  right: 24px;
-  bottom: 20px;
   max-width: 55%;
+  align-self: flex-end;
+  margin-top: auto;
   font-family: var(--banner-claim-font, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace);
   font-size: var(--banner-claim-size, 20px);
   font-weight: 400;
@@ -306,10 +429,36 @@ nav a[aria-current="page"]:hover {
    written out, so a site that sets its own size keeps the step down on a
    phone instead of overflowing the banner with it. The factors are the
    ratios the fixed values always had (30/45, 14/20), and calc() means the
-   configured value can be in any unit -- px, rem, even a clamp(). */
+   configured value can be in any unit -- px, rem, even a clamp().
+
+   The column now guarantees the two lines cannot meet, but a short banner
+   can still be asked to hold more text than it has room for, so the phone
+   also gets its insets back: 10px and 14px instead of 20 and 24 is another
+   20px of height to put the lines in, on a banner that has about a
+   hundred.
+
+   The claim gives up its width cap here, and that is what stops it needing
+   two lines in the first place -- 65% of a 375px screen is 244px, which is
+   where a claim of any length wraps. It has nothing to avoid at the bottom
+   of the column. The title keeps its cap for the opposite reason: the
+   appearance toggle sits in the corner it starts from, and 65% is what has
+   always kept it from running underneath. */
 @media (max-width: 700px) {
+  .banner-overlay { padding: 10px 14px; }
   .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); max-width: 65%; }
-  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 65%; }
+  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 100%; }
+
+  /* The claim's scrim follows it. A corner gradient darkens the corner a
+     corner-anchored text sits in, and the claim is no longer one: it runs
+     the width of the banner here, and its first words start where a
+     diagonal fading out at 45% has nothing left to give. On a bright
+     picture -- a sky, a screen, a whitewashed wall -- that end of the line
+     was being read off the photograph itself. So on a phone the scrim
+     becomes the shape the text became: a band across the bottom. The
+     title keeps the corner it was drawn for. */
+  .banner-wrap:has(.banner-claim)::after {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 55%);
+  }
 }
 
 #theme-toggle {
@@ -325,8 +474,28 @@ nav a[aria-current="page"]:hover {
   font-size: 0.85rem;
   cursor: pointer;
   transition: 0.3s ease-in-out;
+  /* The label is one glyph when a reader has picked light or dark and three
+     when it follows the system, so without a floor the button would resize
+     under the cursor on every click -- and the transition above would animate
+     it doing so. Just past the three-glyph state, which is what the button
+     measured before it had states at all, so the banner keeps its old look. */
+  min-width: 3.6em;
+  text-align: center;
 }
 #theme-toggle:hover { background: var(--hover-invert); border-color: var(--hover-invert); color: var(--badge-hover-text); }
+
+/* The button is 32px tall and a finger wants 44. Growing it would be the
+   obvious answer and the wrong one: this thing sits on the banner of every
+   site built with the engine, and 12px of extra height is a visible change
+   to a corner nobody asked to have redecorated. So the target grows and
+   the button does not -- 6px of reach above and below, which is part of
+   the button for a tap and invisible to the eye. Width needs nothing: the
+   three-glyph floor already keeps it past 44. */
+#theme-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
 
 .banner { display: block; width: 100%; height: auto; }
 
@@ -345,6 +514,11 @@ nav a[aria-current="page"]:hover {
   padding: 1.5rem 1rem;
 }
 
+/* With layout.sidebar off there is no second column to reserve room for,
+   so the content takes the whole width instead of leaving a 260px gap
+   where the aside used to be. */
+.layout--no-aside { grid-template-columns: minmax(0, 1fr); }
+
 @media (max-width: 700px) {
   .wrap { margin-top: 0; margin-bottom: 0; }
 
@@ -358,16 +532,51 @@ nav a[aria-current="page"]:hover {
 
   .nav-toggle { display: flex; }
 
+  /* The bar hugs what it holds instead of standing 60px tall regardless.
+     That floor was worth having when the bar held one 40px hamburger and
+     nothing else; with the search field beside it there is nothing left to
+     prop up, and the floor had become the reason the top row moved: closed,
+     the spare 16px was shared out above and below the row, and the moment
+     the menu opened there was no spare (the 1rem gap between flex lines had
+     taken it), so the button and the field slid 8px up as the menu came
+     down. Hugging, the row sits at the same offset in both states -- and
+     the bar comes out 70px, exactly what it is on a desktop. */
   nav {
     flex-wrap: wrap;
     height: auto;
-    min-height: 60px;
+    min-height: 0;
     padding: 0.5rem 1rem;
   }
 
-  nav ul, .search-form { display: none; width: 100%; }
+  /* The search field stays in the bar on a phone. It used to be folded away
+     with the menu, which put the archive's only way in behind a button that
+     says nothing about search -- on a site with four thousand posts that is
+     the wrong thing to hide, and it was hidden in the emptiest bar on the
+     site: one 44px button and the rest of the width doing nothing.
+
+     `order` puts it beside that button rather than after the menu. Without
+     it the field is the third item in the row, so opening the menu -- which
+     is 100% wide and wraps to its own line -- would push the field down to a
+     third line, moving the thing the reader was about to tap. The cost of
+     ordering is the usual one, that Tab follows the markup and not the eye:
+     with the menu open, Tab goes from the button to the menu items below
+     before reaching the field above them. Closed, the items are display:none
+     and there is nothing to disagree about -- and open is a state the reader
+     has just asked for, with the items being what they asked for. */
+  nav ul { display: none; width: 100%; order: 1; }
   nav.nav-open ul { display: flex; flex-direction: column; margin-top: 0.5rem; }
-  nav.nav-open .search-form { display: flex; margin-top: 0.75rem; padding-bottom: 0.75rem; }
+
+  /* Takes what the button leaves. min-width: 0 because a flex item will not
+     shrink below its content by default, and the field carries a
+     placeholder. */
+  .search-form { flex: 1 1 auto; min-width: 0; }
+
+  /* 40px rather than the 30 it has on a desktop: the bar is 60px with 8px
+     of padding, so 44 is what fits, and a 30px-tall target in the middle of
+     a phone screen is the same complaint the hamburger and the appearance
+     toggle just answered. 40 keeps a hair of air above and below. */
+  .search-form input[type="search"] { height: 40px; }
+  .search-form button { width: 40px; height: 40px; }
 
   nav li { float: none; margin-left: 0; line-height: normal; }
 
@@ -635,6 +844,13 @@ blockquote {
 
 .video-unavailable { color: var(--meta-text); font-style: italic; }
 
+/* The link block is body text and stays body text. A link post's title is
+   no longer in here -- it is the post's heading now, in an h1 or an h2 like
+   every other title (see post_heading_html in build_blog.rb) -- so what is
+   left in the block is the description, or an ordinary inline link where a
+   titled post quotes something mid-article. */
+.link-block { margin: 1rem 0; }
+
 .embed-responsive { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1rem 0; }
 .embed-responsive iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
 
@@ -647,6 +863,14 @@ blockquote {
 .post-header { display: flex; gap: 1rem; align-items: flex-start; margin: -1.5rem -1.5rem 0 -1.5rem; }
 .post-body { flex: 1 1 auto; min-width: 0; }
 
+/* margin and font-weight are declared here only because this tile is an h1
+   on a post with no title of its own -- the date is what such a post is
+   called, so the thing already saying it is the heading rather than a
+   second one being added above it. Everything else in this rule already
+   beat the h1 element styles on specificity; these two were not declared at
+   all, so the heading would have arrived bold and with a browser default
+   margin under it, moving the content down on every untitled post. Which,
+   on an archive of imported tweets and photographs, is most of them. */
 .date-badge {
   flex: 0 0 auto;
   width: 72px;
@@ -656,12 +880,159 @@ blockquote {
   border-radius: 4px;
   padding: 0.6rem 0.25rem;
   font-size: 0.75rem;
+  font-weight: inherit;
   line-height: 1.3;
+  margin: 0;
   transition: 0.3s ease-in-out;
 }
 .date-badge:hover { background: var(--hover-invert); color: var(--badge-hover-text); }
 .date-badge svg { display: block; width: 40px; height: 40px; margin: 0 auto 0.35rem; }
 .date-badge a { color: inherit; text-decoration: none; display: block; }
+
+/* How long a post is, what is in it, and where it sits in a series --
+   three ways of answering "is this worth starting" before the reader
+   commits, all in the quiet colour the other metadata uses. */
+/* Everything worth knowing before reading: how many people marked it, how
+   long it takes. One row, one gap, and the reading time is simply the
+   fourth item -- it wraps onto a second line on a narrow screen like any
+   other. The row is an element rather than two loose inline boxes because
+   the contents list floats beside it, and a float takes the top of the
+   line it lands in: unwrapped, the contents began level with the star
+   instead of level with the article. */
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.1rem;
+  margin: 0.5rem 0 1rem;
+}
+/* Laid out inline rather than as a flex chip, and that is about alignment,
+   not tidiness: the baseline of a flex box is the baseline of its FIRST
+   item, which here is the icon -- so anywhere the neighbours are aligned
+   on their baselines (the hero's byline is), the whole thing rode 5px
+   above the author and the date. Inline, its baseline is the text's own,
+   which is what everything around it is aligned to. */
+.post-stat.reading-time {
+  display: inline;
+  white-space: nowrap;
+  color: var(--meta-text);
+  font-size: 0.85rem;
+}
+.reading-time svg { vertical-align: -0.16em; margin-right: 0.3rem; }
+
+/* At the size of a subheading, and in the text's own colour. It used to be
+   0.85rem in --meta-text, which put it in the same voice as the star, the
+   boost and the reading time -- and it is not that kind of line at all:
+   those report on a post, this one says the post is part of something and
+   offers the way there. Underlined and muted, it read as a caption under
+   the counters rather than as the only navigation a series has. */
+.series-note { font-size: 1.1rem; margin: 0 0 1rem; }
+.series-note a { color: var(--text); }
+.series-note a:hover { color: var(--accent); }
+
+/* Two links that flow to opposite ends, and sit under each other on a
+   narrow screen rather than being squeezed into one line. */
+.series-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+}
+.series-nav .series-next { margin-left: auto; text-align: right; }
+
+/* Both of these are <nav> for the landmark, so both have to undo what the
+   bar at the top of every page sets on the element itself -- the same
+   reset .pagination has carried since it was written. Without it a table
+   of contents comes out as an uppercase, right-aligned, 60px-per-row menu
+   with the site's nav background behind it. */
+.toc, .series-nav {
+  min-height: 0;
+  box-sizing: border-box;
+  border: none;
+  background: none;
+  padding: 0;
+  gap: 0;
+  align-items: initial;
+  justify-content: initial;
+}
+.toc li, .toc a, .series-nav a { height: auto; text-transform: none; letter-spacing: normal; }
+/* An explicit line-height, on the ITEM as well as the anchor. `inherit`
+   was here and was exactly wrong: on the anchor it inherits from the item,
+   and the item is what carries the menu bar's 60px. The engine's own
+   site.css sets that on `nav li`, so this was not a skin's doing -- every
+   default site had eight chapters spread over 547px. Found on sean.cz
+   after 1.3 went live, not in a test. */
+.toc li, .toc a, .series-nav a { line-height: 1.55; }
+.toc a, .series-nav a {
+  height: auto;
+  display: inline;
+  margin-top: 0;
+  border: none;
+  color: var(--accent);
+}
+
+/* Half the column, floated, with the article beginning to its left -- so
+   the contents are a sidebar to the text rather than a gate in front of
+   it. No fill: a tinted panel is at the mercy of whatever pill_bg the
+   site's palette carries (on sean.cz that is #ccc, which lands as a slab),
+   while a rule in the accent colour reads the same in every palette and
+   in both schemes. */
+.toc {
+  display: block;
+  float: right;
+  width: 40%;
+  box-sizing: border-box;
+  margin: 0 0 1rem 1.5rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  background: none;
+  border-left: 3px solid var(--accent);
+}
+.toc-heading { margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--meta-text); }
+.toc ol { margin: 0; padding-left: 1.15rem; font-size: 0.9rem; }
+.toc li { margin: 0.12rem 0; }
+/* Whatever follows the article -- the tag pills, the next/previous nav --
+   must not ride up beside a contents list taller than the text. */
+.post-body::after { content: ""; display: block; clear: both; }
+
+/* On a phone the two cannot sit side by side, so the contents go back to
+   being a block: first the chapters, then the article under them. */
+@media (max-width: 700px) {
+  .toc { float: none; width: auto; margin: 0 0 1.5rem; }
+}
+/* Depth shown by indentation only: a numbered outline that restates the
+   heading levels would compete with the headings themselves. */
+.toc .toc-l3 { margin-left: 0.75rem; }
+.toc .toc-l4, .toc .toc-l5, .toc .toc-l6 { margin-left: 1.5rem; }
+
+/* layout.hero: the post's lead image above its title, instead of a date
+   badge beside the text. The header stops being a row and becomes a
+   column, and the negative margins .post-header already carries are what
+   let the image reach the card's edges -- so everything under it puts its
+   own horizontal padding back.
+   Deliberately plain. The engine supplies the shape (image, then title,
+   then a byline); anything beyond that -- a card overlapping the photo, a
+   tint, a raster -- is a stylesheet's business, which is exactly the line
+   site.extra_css exists to draw. */
+.card.has-hero .post-header { display: block; }
+.post-hero__media img { display: block; width: 100%; height: auto; }
+.post-hero__content { padding: 1.5rem 1.5rem 0; }
+.post-hero__content h1 { margin: 0 0 0.5rem; }
+.post-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+  color: var(--meta-text);
+  font-size: 0.9rem;
+}
+/* In the hero the reading time is one of the byline's own items, so it
+   takes the byline's size and colour instead of the body row's -- and a
+   skin that restyles .post-hero__meta gets the clock restyled with it,
+   without having to know the clock exists. */
+.post-hero__meta .reading-time { color: inherit; font-size: inherit; letter-spacing: inherit; }
+.card.has-hero .post-body { padding: 1.5rem 1.5rem 0; }
 
 .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: 1rem 0; }
 /* The figure is a column and the image flexes into whatever space a
@@ -688,9 +1059,83 @@ blockquote {
 }
 .tag-pill:hover { background: var(--accent); color: #ffffff; }
 
-.tag-heading { font-size: 1.6rem; font-weight: 600; margin-bottom: 1.5rem; }
+/* line-height is written out because this heading used to be an h2 and took
+   the 1.25 from that rule with it. As an h1 it would fall back to the
+   browser's `normal`, which in Open Sans is nearer 1.36 -- a listing
+   heading that grew a couple of pixels taller for no reason anyone could
+   see in the markup. */
+.listing-heading { --listing-heading-gap: 0.45rem; font-size: 1.6rem; font-weight: 600; line-height: 1.25; margin-bottom: 1.5rem; }
+
+/* The kind and the value are two spans with no whitespace between them --
+   markup written that way so the space cannot end up inside a heading that
+   hides its kind. Every variant that HAS hidden it (tag, search, home) took
+   the gap out of the question, so nothing ever supplied one; a series, the
+   only listing that says its kind out loud, therefore read "SérieNový
+   Sean.cz". Stated for all of them rather than for the series alone: the
+   rule below takes it back out with `margin: -1px` where the kind is
+   hidden, so a variant added later is spaced by default instead of
+   depending on somebody noticing. */
+.listing-heading__kind { margin-right: var(--listing-heading-gap); }
+
+/* The kind of listing ("Tag", "Search") stays in the markup and is taken
+   out of sight rather than out of the document -- clipped, never
+   display:none, because that would also take it out of the accessibility
+   tree, which is the one thing this markup exists to prevent. A site that
+   wants the word visible only has to undo this rule.
+   It is hidden exactly where the value can speak for itself: a tag name
+   arrives dressed as a pill, a query arrives behind a magnifier. The
+   search page opened WITHOUT a query has no value to show, so the word
+   stays and the page keeps a heading.
+
+   The landing page's own heading is clipped here for the same reason and
+   the whole way down: it says the site's name, which the banner is already
+   saying in much larger type, so there is nothing for it to show -- but a
+   page with no h1 is a page a reader who moves by headings cannot get into,
+   and until now the front page was one. Out of flow, so it costs that page
+   no space it did not already have. */
+.listing-heading--tag .listing-heading__kind,
+.listing-heading--search.has-query .listing-heading__kind,
+.listing-heading--series .listing-heading__kind,
+.listing-heading--home {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The pill this used to wear is gone. It borrowed the shape tags have
+   everywhere else on the site, which was a good argument on paper and a
+   bad one at heading size: a tag under an article is a small quiet chip,
+   and the same shape blown up to 26px is a slab across the top of the
+   page. The label icon says the same thing at the weight the rest of the
+   listing headings say theirs -- and now the three of them, a tag, a
+   series and a search, are one family instead of two. */
+
+/* Stays put whether or not there is a query, so starting to type swaps the
+   text beside it instead of shifting the whole line. */
+.listing-heading__icon { vertical-align: -0.15em; margin-right: var(--listing-heading-gap); color: var(--meta-text); }
 
 .search-tagline { margin-bottom: 0.25rem; }
+
+/* The 404 signpost inherits the quiet meta color; its one accent arrow
+   is colored in the markup, so the palette decides both. Centred under
+   the heading; the desktop gets the larger of the two sizes. */
+.not-found-sign {
+  display: block;
+  width: 360px;
+  max-width: 100%;
+  height: auto;
+  margin: 1.2rem auto 1rem;
+}
+@media (max-width: 700px) {
+  .not-found-sign { width: 240px; }
+}
 .search-tip { color: var(--meta-text); font-size: 0.85rem; margin-bottom: 1.5rem; }
 .search-status { color: var(--meta-text); font-size: 0.9rem; }
 .search-archive-pending { font-style: italic; }
@@ -755,6 +1200,11 @@ aside .card { margin-bottom: 1.5rem; }
 
 .comments-reply { margin: 0 0 1rem; }
 
+/* Only rendered where comments.approval is on -- it tells a reader that
+   what follows is a selection, so an answer that isn't there doesn't read
+   as the site having eaten it. */
+.comments-note { margin: 0 0 0.5rem; color: var(--meta-text); font-size: 0.85rem; }
+
 .comment {
   display: flex;
   gap: 0.75rem;
@@ -775,10 +1225,13 @@ aside .card { margin-bottom: 1.5rem; }
 .comment-date { color: var(--meta-text); font-size: 0.78rem; }
 .comment-favs { color: var(--meta-text); font-size: 0.78rem; }
 
+/* Inside the row it is a flex item and carries no margins of its own; the
+   row owns the spacing. Still a flex container, so the three counts keep
+   their own gap. */
 .post-stats {
   display: flex;
   gap: 1.1rem;
-  margin: 0.5rem 0 1rem;
+  margin: 0;
   color: var(--meta-text);
   font-size: 0.85rem;
 }
@@ -787,14 +1240,32 @@ aside .card { margin-bottom: 1.5rem; }
 .comment-content p { margin: 0.3rem 0; }
 .comment-content a { word-break: break-word; }
 
+.comment-media { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; }
+.comment-media img {
+  display: block;
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: 6px;
+}
+
 footer {
-  background: var(--card-bg);
+  background: var(--nav-bg);
   border-radius: 4px;
   padding: 1.5rem;
   display: grid;
   grid-template-columns: 1fr 2fr 1fr;
   gap: 1.5rem;
 }
+
+/* Where the content ends and the footer begins. The two carry the same
+   background and sit flush against each other, which nobody had cause to
+   notice while a repeated menu bar stood between them: what did the
+   dividing was that bar's own frame. When the bar went, the article ran
+   straight into the colophon with nothing to mark the seam.
+   So the line stays and the bar goes -- the same line, not a new one:
+   5px of --nav-border, which is what that bar carried above and below
+   itself and what the page's own frame is drawn in. */
+footer { border-top: 5px solid var(--nav-border); }
 
 @media (max-width: 700px) {
   footer { grid-template-columns: 1fr; }
@@ -814,13 +1285,18 @@ footer .chrome-text ol > li::before { content: none; }
 footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 
 .social-icons { display: flex; gap: 0.6rem; }
+/* The tiles take the tag pills' ground, not the bar's. They used to be
+   --nav-bg, which was a shade off the white card they sat on -- and became
+   invisible the moment the footer took that same colour for itself. The
+   pills are the site's other small raised thing, and they are raised
+   against exactly this background. */
 .social-icons a {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: var(--nav-bg);
+  background: var(--pill-bg);
   color: var(--text);
   border-radius: 4px;
   font-size: 0.8rem;
@@ -840,16 +1316,21 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   height: 30px;
   align-items: center;
   justify-content: center;
+  /* The same tile the social icons are: pill ground, body text, no frame.
+     The colours were already identical -- --nav-text is literally --text in
+     the generated palette -- so all that set this apart was a 1px border in
+     the metadata grey, which made one small square on the page look like a
+     different kind of thing from the others. */
   background: var(--pill-bg);
-  border: 1px solid var(--nav-border);
-  border-radius: 5px;
-  color: var(--nav-text);
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
   cursor: pointer;
   transition: 0.3s ease-in-out;
   z-index: 10;
 }
 #scroll-top.visible { display: flex; }
-#scroll-top:hover { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+#scroll-top:hover { background: var(--accent); color: #ffffff; }
 #scroll-top svg { width: 16px; height: 16px; }
 
 /* Placed last so it wins the cascade over the base .date-badge/h1 rules
@@ -864,7 +1345,7 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 
   .post-body h1 { font-size: 1.3rem; }
   .post-list-item h2 { font-size: 1.3rem; }
-  .tag-heading { font-size: 1.3rem; }
+  .listing-heading { font-size: 1.3rem; }
 }
 
 /* The pinned post's copy at the top of the first listing page. The mark
@@ -931,3 +1412,37 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 .file-label { display: block; font-size: 0.9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-sub { display: block; font-size: 0.75rem; margin-top: 0.15rem; color: var(--meta-text); }
 .file-arrow { flex: 0 0 auto; width: 18px; height: 18px; opacity: 0.5; }
+
+/* A reader who has asked the system for less movement gets the site with
+   its fades taken out. Most of what this switches off is colour -- the
+   fourteen `transition` declarations above, all but one of them the same
+   0.3s, nearly all of them a hover changing a background or a link
+   changing shade -- and colour on its own is not what the preference is
+   about. But `transition` with no property named animates every property
+   that changes, so the same declarations also carry the movement: the
+   appearance toggle changing width as its label goes from one glyph to
+   three, a nav item's borders arriving, a card's frame growing into
+   place. Naming which of the fourteen move and which only recolour would
+   be a list that goes stale the first time somebody adds a fifteenth, so
+   the whole set goes.
+
+   0.01ms rather than `none` because a duration of zero is still a
+   transition: it runs and it finishes, so anything that ever waits for
+   transitionend still gets its event. Nothing in assets/js does today.
+
+   Written last so it beats every rule above it on source order alone --
+   the !important is there for the shorthands, which would otherwise
+   re-set the duration they carry.
+
+   What this cannot reach is the one piece of genuine movement on the
+   site: the back-to-top button scrolls the page under the reader. That is
+   asked for in JavaScript (`behavior: 'smooth'`), and CSS scroll-behavior
+   does not govern a programmatic scroll -- so scroll-top.js reads the
+   preference itself. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

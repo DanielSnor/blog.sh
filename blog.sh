@@ -13,6 +13,9 @@
 #   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
 #   ./blog.sh doctor [--online] [--strip-location]
+#   ./blog.sh check
+#   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+#   ./blog.sh stats [--json]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -69,6 +72,28 @@ case "${1:-}" in
       set +a
     fi
     exec ruby scripts/doctor.rb "$@"
+    ;;
+  # Reads the archive rather than the configuration, so it needs no env.sh
+  # at all -- everything it looks at is on disk in content.nosync and
+  # media.nosync. Its own script for the same reason doctor has one.
+  check)
+    shift
+    exec ruby scripts/check.rb "$@"
+    ;;
+  # Same door as check, for the same reason and one more: leaving with
+  # your posts has to work on the installation you are leaving. A config
+  # that no longer parses, a token that expired, a deploy target that is
+  # gone -- none of that is a reason to be unable to take the archive out.
+  export)
+    shift
+    exec ruby scripts/export.rb "$@"
+    ;;
+  # Counts the archive on disk, so it needs no env.sh either -- and it is
+  # the command most likely to be piped somewhere (--json), which is
+  # another reason not to make it depend on a configuration being right.
+  stats)
+    shift
+    exec ruby scripts/stats.rb "$@"
     ;;
 esac
 

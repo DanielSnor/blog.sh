@@ -54,10 +54,25 @@ module Import
 
     module_function
 
+    # The run-wide ledger of what parse had to drop. Eleven adapters call
+    # parse and for years exactly one of them read `warnings` back -- the
+    # other ten threw the count away, while the header of migrate_feed.rb
+    # promised the opposite. Counting here, where the dropping happens,
+    # is the only place all eleven pay the same toll; Import::Run resets
+    # it and the summary reads it, so no adapter has to remember to.
+    def dropped
+      @dropped ||= Hash.new(0)
+    end
+
+    def reset_dropped!
+      @dropped = Hash.new(0)
+    end
+
     def parse(html)
       doc = Tree.build(Tokenizer.tokenize(html.to_s))
       builder = Builder.new
       builder.walk(doc)
+      builder.warnings.each { |name, count| dropped[name] += count }
       Result.new(blocks: builder.blocks, warnings: builder.warnings)
     end
 
@@ -259,7 +274,8 @@ module Import
         when 'table' then emit_table(node)
         when 'hr' then @blocks << { 'type' => 'hr' }
         when 'img' then emit_image(node)
-        when 'figure' then emit_figure(node)
+        when 'figure'
+          class_names(node).include?(BOOKMARK_CARD) ? emit_bookmark(node) : emit_figure(node)
         when 'br' then nil
         when *DROPPED then @warnings[node.name] += 1
         else
@@ -441,6 +457,54 @@ module Import
         @blocks << block
       end
 
+      # A bookmark card is a link with a title and a description drawn as a
+      # panel: an <a> around the lot, two <div>s of text, a 32px favicon and
+      # a preview thumbnail. Read as an ordinary figure it lost every part
+      # that meant anything -- the address, the title and the description
+      # are markup this parser flattens away -- and published the favicon as
+      # a 32x32 picture in the middle of the post. The block schema has the
+      # exact shape for it, so the card becomes a link block and the card's
+      # own two pictures (chrome, not the author's photographs) go with the
+      # panel they were drawn on.
+      #
+      # Keyed on Ghost's class names, which is where these arrive from --
+      # a Ghost export, or any feed carrying a Ghost site's rendered HTML.
+      BOOKMARK_CARD = 'kg-bookmark-card'
+      BOOKMARK_LINK = 'kg-bookmark-container'
+      BOOKMARK_FIELDS = { 'title' => 'kg-bookmark-title',
+                          'description' => 'kg-bookmark-description' }.freeze
+
+      def emit_bookmark(node)
+        link = descendant_with_class(node, BOOKMARK_LINK)
+        url = link ? link.attrs['href'].to_s : ''
+        # No address, no link block -- whatever else it is, it is not this
+        # card, so it goes back to being an ordinary figure.
+        return emit_figure(node) if url.empty?
+
+        block = { 'type' => 'link', 'url' => url }
+        BOOKMARK_FIELDS.each do |key, class_name|
+          part = descendant_with_class(node, class_name)
+          text = part && normalize(Inline.render(part).first)
+          block[key] = text if text && !text.empty?
+        end
+        @blocks << block
+      end
+
+      def class_names(node)
+        node.attrs['class'].to_s.split(/\s+/)
+      end
+
+      def descendant_with_class(node, name)
+        node.children.each do |child|
+          next if child.text?
+          return child if class_names(child).include?(name)
+
+          found = descendant_with_class(child, name)
+          return found if found
+        end
+        nil
+      end
+
       def emit_figure(node)
         images = collect(node, 'img')
         caption_node = collect(node, 'figcaption').first
@@ -613,6 +677,18 @@ module Import
 
         close(stack, 'p') if open == 'p' && CLOSES_P.include?(name)
         close(stack, 'li') if stack.last.name == 'li' && name == 'li'
+        # Anchors never nest: a second <a> while one is open closes the
+        # first, which is what a browser does with the invalid markup.
+        # Left nested, one run of text came out under two link spans --
+        # duplicated when the targets matched, fighting when they didn't.
+        # Only within inline content, though: an <a> wrapping whole blocks
+        # (the card link) is walked as a wrapper and never renders a span,
+        # so it has no duplicate to make -- and closing it from here would
+        # pop the paragraph the inner link sits in and split it.
+        if name == 'a' && (index = stack.rindex { |n| n.name == 'a' }) &&
+           stack[(index + 1)..].none? { |n| Builder::BLOCK_LEVEL.include?(n.name) }
+          close(stack, 'a')
+        end
         # Omitting </td> and </tr> is valid HTML5 and the house style of
         # the hand-written archives page mode imports. Without these, each
         # next cell NESTED inside the previous one, and the recursive cell

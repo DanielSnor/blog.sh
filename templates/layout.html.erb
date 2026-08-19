@@ -25,14 +25,19 @@
   <title><%= h(page_title) %></title>
   <meta name="description" content="<%= h(page_description) %>">
   <link rel="canonical" href="<%= h(page_url) %>">
-  <link rel="icon" type="image/png" href="/assets/images/favicon.png">
-  <%# Same file: iOS scales it down, so adding a home-screen icon doesn't mean
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png"><%# Same file: iOS scales it down, so adding a home-screen icon doesn't mean
       maintaining a second image. Without this link iOS uses a screenshot of
       the page instead. /favicon.ico needs no link -- the clients that want it
-      probe the root path blindly (see build_favicon_ico). %>
+      probe the root path blindly (see build_favicon_ico).
+
+      It opens at the END of the line above rather than on one of its own,
+      and that is not formatting: these templates compile without ERB trim
+      mode, so a comment sitting on its own line leaves its indentation and
+      its newline in the output -- two spaces on every page of every site
+      built with this engine. %>
   <link rel="apple-touch-icon" href="/assets/images/favicon.png">
   <link rel="stylesheet" href="/assets/css/colors.css">
-  <link rel="stylesheet" href="/assets/css/site.css">
+  <link rel="stylesheet" href="/assets/css/site.css"><%= extra_css_links %>
   <link rel="alternate" type="application/rss+xml" title="<%= h(SITE_SHORT_NAME) %> RSS" href="/rss.xml">
   <meta property="og:type" content="<%= og_type %>">
   <meta property="og:site_name" content="<%= h(SITE_SHORT_NAME) %>">
@@ -41,7 +46,7 @@
   <meta property="og:description" content="<%= h(page_description) %>">
   <meta property="og:url" content="<%= h(page_url) %>">
   <meta property="og:image" content="<%= h(og_image) %>">
-  <meta name="twitter:card" content="summary_large_image"><%= extra_head %>
+  <meta name="twitter:card" content="summary_large_image"><%= fediverse_creator_meta %><%= extra_head %>
 <% if ANALYTICS %>
   <script defer src="<%= h(ANALYTICS['src']) %>" data-website-id="<%= h(ANALYTICS['website_id']) %>"></script>
 <% end %>
@@ -50,21 +55,25 @@
   <div class="wrap">
     <div class="banner-wrap">
       <a href="/" class="banner-link"><img class="banner" src="<%= h(BANNER['src']) %>" alt="<%= h(BANNER['alt']) %>" width="<%= BANNER['width'] %>" height="<%= BANNER['height'] %>"></a>
-      <% if BANNER_SHOW_TITLE %><p class="banner-title"><%= h(SITE_SHORT_NAME) %></p><% end %>
-      <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= banner_claim_html %></p><% end %>
-      <button id="theme-toggle" type="button">☀︎/☾︎</button>
+      <% if BANNER_SHOW_TITLE || BANNER_SHOW_CLAIM %><div class="banner-overlay"><%# One box holding both overlay lines, so the stylesheet can lay them out as a column instead of pinning each to its own corner of a picture whose height it does not control. Two items in a column cannot print over each other; two pinned corners can, and on a phone they did. The wrapper is skipped entirely when neither line is shown, so a site with both off keeps a banner with nothing over it. %>
+        <% if BANNER_SHOW_TITLE %><p class="banner-title"><%= h(SITE_SHORT_NAME) %></p><% end %>
+        <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= banner_claim_html %></p><% end %>
+      </div><% end %>
+      <button id="theme-toggle" type="button" title="<%= h(t('ui.theme_auto')) %>" aria-label="<%= h(t('ui.theme_auto')) %>">☀︎/☾︎</button><%# Both the symbol and the label are what "follow the system" looks like --
+      the page is built once and served to everyone, so the server can't know
+      which of the three states a given reader is in. theme-toggle.js corrects
+      both on load. Without the label a screen reader announces the raw sun and
+      moon glyphs. %>
     </div>
     <%= partial('nav', search: true, active: nav_active) %>
 
-    <div class="layout">
+    <div class="layout<%= LAYOUT_SIDEBAR ? '' : ' layout--no-aside' %>">
       <main>
 <%= main_html %>
       </main>
 
-      <%= partial('aside') %>
+      <% if LAYOUT_SIDEBAR %><%= partial('aside') %><% end %>
     </div>
-
-    <%= partial('nav', search: false, active: nav_active) %>
 
     <%= partial('footer') %>
   </div>

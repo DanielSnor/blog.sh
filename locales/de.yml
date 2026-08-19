@@ -6,6 +6,8 @@
 # deutsche Anführungszeichen („…“), Datumsformat TT.MM.JJJJ -- passend zu
 # js.date_locale weiter unten, beide zusammen ändern.
 
+thousands_separator: "."
+decimal_point: ","
 date_format: "%d.%m.%Y"
 date_time_format: "%d.%m.%Y %H:%M"
 
@@ -24,6 +26,20 @@ nav:
   search_placeholder: "Suchen…"
 
 post:
+  reading_time: "%{minutes} Min. Lesezeit"
+  reading_minutes: "%{minutes} Min."
+  # Alles unter der Länge, ab der die Engine einen Beitrag nicht mehr Foto
+  # mit Bildunterschrift nennt. Gesagt statt weggelassen, damit jede Karte
+  # in einer Liste dieselbe Zeile trägt -- siehe docs/decisions.md.
+  reading_time_under: "weniger als eine Minute Lesezeit"
+  reading_minutes_under: "< 1 Min."
+  toc_heading: "Auf dieser Seite"
+  toc_label: "Inhaltsverzeichnis"
+  series_part: "Teil %{number} von %{total} von %{name}"
+  series_draft_joins: "Serie %{name} -- veröffentlichte Teile: %{count}; veröffentlicht wäre dies Teil %{number}."
+  series_draft_new: "Noch kein veröffentlichter Beitrag trägt die Serie „%{name}“ -- Tippfehler oder erster Teil?"
+  series_previous: "← %{title}"
+  series_next: "%{title} →"
   comments_heading: "Kommentare"
   back_to_list: "← zurück zur Übersicht"
   read_more: "Weiterlesen"
@@ -40,9 +56,19 @@ pagination:
   page: "Seite %{number}"
 
 tag:
-  heading: "Schlagwort: %{name}"
+  feed_title: "%{name} – %{site_title}"
+  # In der Überschrift der Liste steht das Schlagwort selbst; dies ist das
+  # Wort, das sagt, um welche Art Liste es sich handelt -- es bleibt für
+  # Screenreader erhalten und ist standardmäßig unsichtbar (siehe
+  # .listing-heading__kind in site.css).
+  kind: "Schlagwort"
   title: "Schlagwort: %{name} – %{short_name}"
   description: "Beiträge mit dem Schlagwort %{name} auf der persönlichen Seite von %{author}."
+
+series:
+  kind: "Serie"
+  title: "%{name} – %{short_name}"
+  description: "Die Serie %{name} auf der persönlichen Seite von %{author}, in Lesereihenfolge."
 
 type:
   text: "Text"
@@ -60,12 +86,20 @@ index:
   empty: "Noch keine Beiträge dieses Typs."
 
 search:
-  heading: "Suche"
+  # Dient zugleich als Überschrift der Seite, solange keine Suchanfrage
+  # eingegeben wurde.
+  kind: "Suche"
   tagline: "Durchsucht alle Beitragstypen — unabhängig von Akzenten und Umlauten."
   tip: "Tipp: bei mehreren Wörtern müssen alle vorkommen;<br>eine exakte Wendung in Anführungszeichen setzen („…“);<br>ein Wort mit Minus ausschließen (-wort)."
   prompt: "Gib eine Suchanfrage ein."
   page_title: "Suche – %{site_title}"
   page_description: "Volltextsuche über alle Beiträge, unabhängig von Akzenten."
+
+not_found:
+  heading: "Hier ist nichts"
+  body: "Diese Adresse zeigt auf dieser Website auf nichts -- vielleicht ein Tippfehler, vielleicht etwas, das inzwischen umgezogen ist. Das Menü oben und das Suchfeld sind der Weg weiter."
+  page_title: "Hier ist nichts – %{site_title}"
+  page_description: "Die Seite, auf die diese Adresse zeigt, existiert nicht."
 
 markdown_page:
   default_title: "Markdown"
@@ -73,6 +107,13 @@ markdown_page:
 
 ui:
   scroll_top: "Nach oben"
+  # Beschriftung des Erscheinungsbild-Umschalters. Wird zweimal gelesen: das
+  # Layout setzt sie auf die Seite, assets/js/theme-toggle.js schreibt sie bei
+  # jedem Klick neu -- deshalb läuft sie auch über window.BLOG_I18N
+  # (client_i18n_json in build/build_blog.rb).
+  theme_auto: "Erscheinungsbild: wie im System"
+  theme_light: "Erscheinungsbild: hell"
+  theme_dark: "Erscheinungsbild: dunkel"
 
 js:
   date_locale: "de-DE"
@@ -81,19 +122,22 @@ js:
   stats_comments: "Kommentare"
   reply_on_mastodon: "Auf Mastodon antworten"
   reply_on_bluesky: "Auf Bluesky antworten"
+  comments_moderated: "Vom Autor ausgewählte Kommentare. Die ganze Diskussion steht im Netzwerk."
   results_one: "Treffer"
   results_few: "Treffer"
   results_many: "Treffer"
+  results_capped: " — die besten %{count} werden angezeigt"
   no_results_pending: "Noch keine Treffer,"
   no_results_final: "Keine Treffer."
   try_other_words: " Versuch es mit anderen oder allgemeineren Wörtern."
   searching_archive: " (das ältere Archiv wird noch durchsucht…)"
-  search_prefix: "Suche: "
   loading_index: "Index wird geladen…"
   index_unavailable: "Suchindex nicht verfügbar."
   lightbox_close: "Schließen"
   lightbox_prev: "Zurück"
   lightbox_next: "Weiter"
+  lightbox_label: "Bildansicht"
+  lightbox_open: "Bild öffnen"
 
 cli:
   cancel_word: "abbrechen"
@@ -155,6 +199,15 @@ cli:
       type   Beitragstyp -- text / quote / chat / image / video / audio /
              link (optional -- leer lassen, dann wird der Typ aus dem
              Inhalt abgeleitet)
+             page -> eine Seite: eigene Adresse, außerhalb der Listen,
+             der Archive und des Feeds (Über mich, Kontakt)
+      pinned true -> der Beitrag bleibt oben auf der ersten Listenseite
+      unlisted true -> der Beitrag behält seine Adresse, verschwindet aber
+             aus Listen, Feeds, Sitemap und Suche (ein Link für wenige,
+             kein Passwort)
+      series Name einer Serie; Beiträge mit gleichem Namen bilden eine
+      hero   true/false -> Leitbild über dem Titel für diesen Beitrag
+      toc    true/false -> Kapitelliste (ab vier Überschriften von selbst)
 
     Das Veröffentlichungsdatum wird hier nicht gesetzt -- [p] nimmt den
     Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit. Zum
@@ -169,6 +222,7 @@ cli:
   template_unchanged: "Vorlage unverändert (nicht gespeichert?), es wurde kein Beitrag angelegt."
   empty_content: "Leerer Inhalt, nichts geschrieben."
   wrote_draft: "Als Entwurf gespeichert: %{path}"
+  incoming_not_cleaned: "In incoming/ geblieben: %{files} — die Kopie steckt im Beitrag, das Original ließ sich nicht löschen (keine Schreibrechte auf incoming/). Räume es von Hand weg, damit ein leeres incoming/ weiterhin heißt: nichts steht aus."
   generating_preview: "Erzeuge Vorschau"
   draft_saved_preview_pending: "Der Entwurf ist gespeichert. Die Vorschau erscheint nach einem erfolgreichen Deploy -- dann ./blog.sh edit %{slug} ausführen"
 
@@ -180,9 +234,10 @@ cli:
   schedule_date_prompt: "Veröffentlichen am (JJJJ-MM-TT HH:MM, leer = abbrechen): "
   what_next_prompt_slot: "Wie weiter? [d] Entwurf lassen  [e] bearbeiten  [p] veröffentlichen  [s] planen (%{slot})  [x] löschen: "
   schedule_slot_offer: "Veröffentlichen wann?\n  Nächster freier Slot: %{slot}"
-  schedule_slot_keys: "  [Enter] übernehmen  ·  eigenes Datum (JJJJ-MM-TT HH:MM)  ·  „%{cancel_word}\" = zurück"
+  schedule_slot_keys: "  [Enter] übernehmen  ·  eigenes Datum (JJJJ-MM-TT HH:MM)  ·  „%{cancel_word}“ = zurück"
   schedule_queue_position: "  %{count}. Beitrag in der Warteschlange (davor: '%{slug}', %{date})."
   schedule_slots_taken: "  Frühere Slots sind belegt:"
+  schedule_queue_hint: "Früher gewünscht -- etwa im heutigen Slot? Den angebotenen Termin annehmen und den Beitrag in der Warteschlange (./blog.sh queue) an den Anfang tragen: Die Zeiten bleiben bei den Slots, der Rest rückt um einen zurück."
   props_queue_heading: "Die Warteschlange (%{count} geplant):"
   queue_empty: "Die Warteschlange ist leer -- ein Entwurf wird über [s] in seiner Vorschau geplant, oder ./blog.sh schedule."
   queue_overdue: "(wartet auf den Cron)"
@@ -194,6 +249,9 @@ cli:
   queue_already_last: "Der Post ist bereits der letzte in der Warteschlange."
   queue_swap_overdue: "Ein Post, dessen Zeit bereits verstrichen ist, lässt sich nicht umsortieren -- warte, bis der Cron ihn veröffentlicht."
   queue_swapped: "Verschoben: '%{slug}' erscheint %{date}."
+  queue_action_carry: "[m] woandershin tragen  "
+  queue_carry_hint: "↑↓ Post tragen · Enter absetzen · Esc abbrechen"
+  queue_carried: "Getragen: '%{slug}' steht jetzt an %{position}. Stelle und erscheint %{date}."
   queue_compact_prompt: "Den Rest der Warteschlange (%{count}) einen Slot nach vorn rücken? [j/N] "
   queue_compacted: "Warteschlange gerückt: jeder folgende Post übernahm den früheren Slot."
   menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
@@ -218,6 +276,7 @@ cli:
   bluesky_recovered: "Dieser Beitrag war bereits angekündigt -- die Ankündigung wurde im Konto gefunden und ihre Adresse eingetragen, statt eine zweite zu senden: %{url}"
   deleting_bluesky: "Lösche die Bluesky-Ankündigung: %{url}"
   delete_bluesky_failed: "Löschen der Bluesky-Ankündigung fehlgeschlagen -- lösch sie von Hand."
+  unlisted_no_toot: "Der Beitrag ist ungelistet, es wurde nichts angekündigt. Nimm zuerst die Markierung weg, wenn du eine Ankündigung willst."
   backdated_no_toot: "Das Beitragsdatum ist nicht aktuell (rückdatierter Beitrag), die Ankündigung wurde nicht verschickt."
   schedule_only_drafts: "Beitrag '%{slug}' ist schon veröffentlicht -- planen lassen sich nur Entwürfe."
   scheduled_label: "Geplant: '%{slug}' wird automatisch veröffentlicht am %{date}."
@@ -236,6 +295,8 @@ cli:
   still_draft_toot: "Beitrag '%{slug}' ist noch ein Entwurf -- veröffentliche ihn zuerst (./blog.sh publish %{slug}); erst dann hat ein Toot etwas zu verlinken."
   already_has_toot: "Der Beitrag hat schon einen Toot, es wird kein zweiter verschickt: %{url}"
   toot_failed: "Der Toot ließ sich nicht verschicken (siehe oben)."
+  no_network_toot: "Es wurde nichts angekündigt: config/site.yml hat weder einen mastodon:- noch einen bluesky:-Abschnitt, diese Website kündigt also nirgends an. Wolltest du einen einrichten, prüfe, ob der Abschnittskopf eine echte Zeile ist und kein Kommentar -- Schlüssel unter einem auskommentierten Kopf gehören zu dem, was davor stand. Das Token selbst gehört in env.sh."
+  toot_declined: "Bleibt unangekündigt, wie gewünscht."
   tooted: "Getrötet: %{url}"
 
   already_draft: "Beitrag '%{slug}' ist schon ein Entwurf: %{url}"
@@ -304,6 +365,10 @@ cli:
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
       ./blog.sh doctor [--online] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
+      ./blog.sh check                geht das Archiv durch und nennt, was darin kaputt ist
+      ./blog.sh export [<Verzeichnis>] [--no-drafts] [--dry-run] [--force]
+                                     schreibt das ganze Archiv als Baum von Markdown-Dateien (Standard tmp/export)
+      ./blog.sh stats [--json]       zählt das Archiv -- Beiträge, Jahre, Wörter, Schlagwörter, Medien, Herkunft
       ./blog.sh help                 zeigt diese Hilfe
       ./blog.sh version              gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
@@ -314,7 +379,7 @@ cli:
   wizard_unknown_choice: "Unbekannte Auswahl, versuch es nochmal."
   wizard_menu_add: "Neuer Beitrag"
   wizard_menu_post: "Ein Beitrag -- den Text bearbeiten, seine Eigenschaften und die Aktionen dazu"
-  wizard_menu_queue: "Die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, entfernen"
+  wizard_menu_queue: "Geplante Posts -- Reihenfolge, sofort veröffentlichen, entfernen"
   wizard_menu_restore: "Papierkorb -- gelöschte Beiträge wiederherstellen"
   wizard_menu_browse: "Das Archiv -- Filter, Suche, Vorschau"
   wizard_menu_rebuild: "Die Website -- nach einer Einstellungsänderung neu bauen und ausliefern"
@@ -352,18 +417,30 @@ cli:
   props_label_type: "Typ"
   props_label_tags: "Tags"
   props_label_pinned: "angepinnt"
+  props_label_unlisted: "ungelistet"
   props_label_announced: "Ankündigung"
   props_label_addresses: "alte Links"
   props_draft_banner: "Entwurf -- nicht auf der Website, nur Vorschau"
   props_state_published: "veröffentlicht, %{date}"
   props_pinned_yes: "ja -- bleibt oben auf der Startseite"
+  props_unlisted_yes: "ja -- über die eigene Adresse erreichbar, in keiner Liste, keinem Feed, keiner Sitemap und keiner Suche"
   props_announces_on_publish: "noch nicht -- geht mit der Veröffentlichung raus"
+  props_announces_never_unlisted: "nie -- ein ungelisteter Beitrag wird nicht angekündigt"
   props_not_announced: "nicht angekündigt"
   props_attributes_hint: "Typ und Tags werden im Kopf bearbeitet, wenn du den Text bearbeitest."
   props_actions_draft: "[p] veröffentlichen  [s] planen  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
   props_actions_scheduled: "[p] sofort veröffentlichen  [s] umplanen  [n] Plan aufheben  [r] Slug umbenennen  [x] löschen  [Enter] zurück: "
   props_actions_published: "[u] zurück auf Entwurf  [t] ankündigen (%{network})  [c] anpinnen/lösen  [r] Slug umbenennen  [a] alte Links  [x] löschen  [Enter] zurück: "
   props_actions_published_plain: "[u] zurück auf Entwurf  [c] anpinnen/lösen  [r] Slug umbenennen  [a] alte Links  [x] löschen  [Enter] zurück: "
+  props_action_versions: "[v] frühere Fassungen  "
+  versions_none: "Dieser Beitrag hat noch keine frühere Fassung -- bei jeder Bearbeitung wird eine abgelegt."
+  versions_heading: "Was der Beitrag %{slug} vor den letzten Speicherungen sagte:"
+  versions_media_note: "Nur der Text kommt zurück; Bilder werden nicht versioniert, eine alte Fassung des Beitrags kann also eines erwähnen, das er nicht mehr hat."
+  versions_menu_hint: "↑↓ bewegen · Enter Fassung wiederherstellen · Esc zurück"
+  versions_prompt: "Welche Version wiederherstellen? [1-%{count}, Enter bricht ab]: "
+  versions_unknown: "Keine Fassung mit dieser Nummer."
+  versions_confirm: "Der aktuelle Text wird ebenfalls als Fassung abgelegt, das ist also umkehrbar. Wiederherstellen? [j/N] "
+  versions_restored: "Wiederhergestellt: %{path}"
   props_unknown_draft: "Nicht verstanden, versuch p / s / r / x."
   props_unknown_scheduled: "Nicht verstanden, versuch p / s / n / r / x."
   props_unknown_published: "Nicht verstanden, versuch u / t / c / r / a / x."
@@ -373,6 +450,7 @@ cli:
   addresses_menu_hint: "↑↓ bewegen · Enter Adresse aufgeben · Esc zurück"
   addresses_pick_prompt: "Nummer der Adresse, die weg soll (alles andere geht zurück): "
   addresses_taken: "-- von einem anderen Beitrag belegt, diese Weiterleitung passiert nie"
+  addresses_taken_draft: "-- von einem Entwurf belegt, die Weiterleitung funktioniert noch; mit seiner Veröffentlichung übernimmt er sie"
   addresses_unusable: "-- unbrauchbar, erwartet wird \"Jahr/Slug\""
   addresses_drop_confirm: "%{address} aufgeben? Dieser Link hört endgültig auf zu funktionieren. [j/N] "
   addresses_dropped: "🔗 %{address} aufgegeben -- leitet nirgendwo mehr hin."
@@ -390,12 +468,25 @@ cli:
   rename_go: "Umbenennen? [j/N] "
   renamed_label: "Umbenannt: %{slug}"
 
+poster:
+  # Was die Autorin erfährt, wenn eine Ankündigung nicht rausging. Es ist
+  # das Ergebnis von etwas, das sie gerade getan hat -- [t] gedrückt oder
+  # veröffentlicht -- also liest das ein Mensch, in der CLI, in seiner
+  # Sprache. Die Diagnose darunter (HTTP-Codes, Ausnahmetext) bleibt
+  # englisch: die ist für den, der nachsehen soll.
+  no_mastodon_token_post: "MASTODON_ACCESS_TOKEN ist nicht gesetzt, der Toot wurde nicht erstellt."
+  no_mastodon_token_delete: "MASTODON_ACCESS_TOKEN ist nicht gesetzt, der Toot wurde nicht gelöscht."
+  no_bluesky_password_post: "BLUESKY_APP_PASSWORD ist nicht gesetzt, die Bluesky-Ankündigung wurde nicht gepostet."
+  no_bluesky_password_delete: "BLUESKY_APP_PASSWORD ist nicht gesetzt, die Bluesky-Ankündigung wurde nicht gelöscht."
+  stats_fetch_failed: "Das Laden der Statistiken schlug fehl (%{key}): %{message}"
+
 redirect:
   moved: "Dieser Beitrag ist umgezogen:"
 
 cron:
   no_scheduled_due: "Kein geplanter Beitrag ist fällig."
   published_scheduled: "Geplanten Beitrag '%{slug}' veröffentlicht (Datum %{date})."
+  unlisted_not_announced: "Beitrag '%{slug}' ist ungelistet, es wurde nichts angekündigt."
   publishing_scheduled: "Veröffentliche %{count} geplante(n) Beitrag/Beiträge"
   publish_failed: "❌ '%{slug}' konnte nicht veröffentlicht werden: %{error}. Die übrigen fälligen Beiträge sind nicht betroffen; nach der Korrektur erscheint dieser im nächsten Lauf."
   announce_failed: "⚠️  '%{slug}' ist veröffentlicht, aber die Ankündigung schlug fehl -- der Beitrag ist öffentlich, ohne dass etwas darauf zeigt, und es wird kein zweiter Versuch unternommen. Prüfe das Token und kündige ihn von Hand an: ./blog.sh toot (oder ./blog.sh bluesky)."
@@ -454,8 +545,10 @@ import:
   scanned: "%{count} Eintrag/Einträge gelesen…"
   dry_run_running: "Lese %{label} -- noch wird nichts geschrieben…"
   keep_permalinks_prompt: "Wird diese Seite unter DERSELBEN Domain antworten wie das alte Blog? Wenn ja, behält jeder Beitrag seine alte Adresse als Weiterleitung. [j/N] "
-  would_write: "Würde %{count} Beitrag/Beiträge schreiben; abzuholende Mediendateien: %{media}."
+  would_write: "Würde %{count} Beitrag/Beiträge schreiben; Medien darin: %{media}."
   media_not_verified: "Eine Vorschau lädt nichts herunter -- wie viele davon wirklich ankommen, sagt erst der echte Lauf."
+  media_reused: "Davon hat das Archiv %{count} bereits; sie kommen von dort und nicht von der Quelle."
+  media_superseded: "%{count} heruntergeladene Datei(en) stimmen nicht mehr mit der Archivkopie überein und wurden verworfen -- das Archiv behält seine eigenen Bytes."
   written: "%{count} Beitrag/Beiträge und %{media} Mediendatei(en) geschrieben."
   sample_slugs: "Die ersten Slugs:"
   skipped: "  %{count} übersprungen (%{reason})"
@@ -501,7 +594,6 @@ import:
     quote: "Zitat-Post"
     empty: "kein verwertbarer Inhalt"
     attachment: "Anhang, kein Beitrag"
-    page: "Seite, kein Beitrag"
     not_a_post: "kein Beitrag"
     trashed: "im Papierkorb"
     boost: "Boost"
@@ -522,16 +614,27 @@ import:
     bad_date: "die DATE-Zeile war nicht lesbar -- Movable Type schreibt MM/TT/JJJJ HH:MM:SS, AM/PM optional"
     misaligned_row: "die Zeile passt nicht zur Kopfzeile -- weiter vorn blieb ein Anführungszeichen offen"
     unparsed: "die archivierte Seite ließ sich nicht als Beitrag lesen"
+    site_furniture: "das eigene Inventar der Website -- eine Übersicht (_index, home), ein Feed, eine 404 -- keine Inhaltsseite"
   # Adapter-Postscripts -- die Hinweise unter Vorschau und Zusammenfassung. Der
   # Skript-Weg (migrate_*.rb) gibt sie auf Englisch aus, siehe lib/import/cli.rb.
   note:
+    pages_imported: "%{count} Seite(n) kamen mit und liegen unter %{paths}. Noch verweist nichts auf der Website auf sie -- das Menü wird aus deinen Inhaltstypen abgeleitet, solange du nichts anderes sagst; trage sie also unter `nav:` in config/site.yml ein, wenn sie dorthin gehören."
+    pages_and_more: " und %{count} weitere"
     ssg_images_freed: "%{count} Bild(er) standen mitten in einer Textzeile, wo ein Beitrag sie nicht zeigen kann -- jedes bekam eine eigene Zeile, und ein Bild, das nur Zierde eines Links war, wurde zum Linktext."
     ssg_liquid_links_dropped: "%{count} Link(s) waren über Liquid adressiert ({{ site.repository }}, {% link %}, {% post_url %}) -- eine Adresse, die außerhalb von Jekyll nichts bedeutet. Die Worte blieben, die Adresse fiel weg, statt auf eine Seite dieses Blogs zu zeigen, die es nie gab."
+    ssg_media_missing: "%{count} Bild(er) nannten eine Datei, die der Baum nicht hat. Jedes behielt seinen Platz im Beitrag, mit Alt-Text und Bildunterschrift, und zeigt auf den fehlenden Namen -- es fehlt nur die Datei selbst, und der Build sagt es, bis sie im Medienordner des Beitrags liegt."
+    ssg_slug_collisions: "%{count} Adresse(n) wurden von mehr als einer Datei beansprucht -- ein Hugo-Baum, der sowohl den flachen Beitrag als auch das daraus gewachsene Page Bundle behalten hat, oder derselbe Artikel zweimal abgelegt. Alle wurden importiert, die späteren mit \"-2\" am Ende, es ging also nichts verloren; sieh dir diese Paare an und lösche, was du nicht behalten willst."
+    ssg_author_dropped: "%{count} Beitrag/Beiträge nennen im Front Matter einen Autor. Diese Engine ist bewusst für eine Person gebaut und hat kein Feld dafür, der Name kam also nicht mit -- wenn im Archiv Texte anderer Leute liegen, nenne sie vor dem Veröffentlichen im Text."
     substack_paid: "%{count} Beitrag/Beiträge waren auf Substack nur für Abonnenten -- vollständig importiert (der Export gehört dir) und mit \"substack-paid\" getaggt, damit du sie vor dem Veröffentlichen findest."
     facebook_crossposts: "%{count} Beitrag/Beiträge waren Crossposts von anderen Plattformen (Twitter, Posterous, …) -- übersprungen, damit sie die eigenen Importe jener Plattformen nicht doppeln. FACEBOOK_CROSSPOSTS=1 nimmt sie mit."
     feed_ampersands_escaped: "%{count} allein stehende \"&\"-Zeichen machten diese Datei zu ungültigem XML -- maskiert, damit sie überhaupt gelesen werden konnte. Text in CDATA, wo die Beitragstexte stehen, blieb genau so, wie er exportiert wurde."
     feed_controls_dropped: "%{count} von XML nicht erlaubte(s) Steuerzeichen wurde(n) entfernt, damit die Datei gelesen werden konnte."
     feed_unmapped: "%{count} Beitrag/Beiträge hatten keine brauchbare Originaladresse (nackte „?p=123“-Permalinks tragen ihre Identität im Query-String) -- ohne Weiterleitung importiert."
+    feed_unmapped_pages: "%{count} Seite(n) hatten keine brauchbare Originaladresse (nackte „?page_id=12“-Permalinks tragen ihre Identität im Query-String) -- ohne Weiterleitung importiert."
+    feed_pages_home: "%{count} Seite(n) liegen bereits auf der Adresse, die sie auf der alten Website hatten, und brauchen keine Weiterleitung -- beim Umzug auf dieselbe Domain funktionieren ihre Links unverändert weiter."
+    feed_pages_reserved: "%{count} Seite(n) kamen auf Adressen an, die diese Engine für sich selbst nutzt (%{paths}) -- der Build stellt sie erst online, wenn sie umbenannt sind; trage sie so nicht unter `nav:` ein."
+    feed_dropped: "Inhalt, für den das Blockschema keine Form hat, wurde aus den Beitragstexten entfernt: %{listed}. Meist sind das Embeds und Formulare -- braucht ein Beitrag sein Video, setze den Link von Hand zurück."
+    feed_linked_images: "%{count} Bild(er) waren in einen Link gehüllt, den ein Bildblock nicht tragen kann -- die Bilder kamen an, die Adressen, auf die sie zeigten, nicht."
     ghost_scheduled: "%{count} Beitrag/Beiträge waren in Ghost geplant -- als Entwürfe importiert; plane sie hier, wenn du so weit bist."
     livejournal_nonpublic: "%{count} Eintrag/Einträge waren nur für Freunde oder privat -- als Entwürfe importiert, öffentlich waren sie nie."
     medium_responses: "%{count} Beitrag/Beiträge sahen aus wie Antworten unter fremden Artikeln -- zur Durchsicht als Entwürfe importiert."
@@ -584,7 +687,7 @@ doctor:
   site_yml_syntax: "config/site.yml ist kein gültiges YAML: %{message}."
   site_yml_unreadable: "config/site.yml existiert, lässt sich aber nicht lesen: %{message}."
   site_yml_unreadable_fix: "Prüfe Eigentümer und Rechte der Datei (ls -l config/site.yml). Meist hilft: chmod 644 config/site.yml — und wenn die Datei nach einem mit sudo gestarteten Assistenten root gehört, auch chown."
-  site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen."
+  site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen. Wenn diese Zeile in Ordnung aussieht, liegt die Ursache anderswo -- meist ein auskommentierter Abschnittskopf, dessen Schlüssel stehen geblieben sind, oder ein weiter oben offen gelassenes Anführungszeichen."
 
   identity_ok: "Die Identität der Website ist ausgefüllt."
   key_missing: "%{key} fehlt in config/site.yml."
@@ -608,7 +711,25 @@ doctor:
   timezone_unknown: "site.timezone \"%{zone}\" ist keine Zeitzone, die dieser Rechner kennt."
   timezone_unknown_fix: "Nimm einen IANA-Namen wie Europe/Prague oder America/New_York (siehe /usr/share/zoneinfo), oder UTC. Ein Tippfehler würde jeden Beitrag stillschweigend falsch datieren."
 
+  approval_ok: "Kommentare werden moderiert -- veröffentlicht wird nur, was du favorisierst."
+  approval_boolean: "comments.approval steht auf on (oder yes), was YAML als Wahrheitswert liest, nicht als Modus."
+  approval_boolean_fix: "Schreibe den Modus beim Namen: comments.approval: fav. (off und no werden verstanden, sie können nur eines bedeuten.)"
+  approval_unknown: "Unbekannter Wert für comments.approval %{value} -- der Build lehnt ihn ab."
+  approval_unknown_fix: "Es gibt nur zwei Werte: \"fav\" (nur favorisierte Antworten veröffentlichen) und \"off\" (alle veröffentlichen)."
+  approval_key_unknown: "config/site.yml hat einen comments:-Abschnitt, aber nichts darin, was die Moderation liest (gefunden: %{keys}) -- es wird also jede Antwort veröffentlicht, unmoderiert."
+  approval_key_unknown_fix: "Der Schlüssel heißt comments.approval, und \"fav\" veröffentlicht nur die Antworten, die du favorisierst. Wolltest du gar nicht moderieren, lösche den Abschnitt lieber: ein Schlüssel, den niemand liest, ist nicht dasselbe wie abgeschaltete Moderation -- der Unterschied zeigt sich erst an einer Antwort auf der Website, die du nie freigegeben hast."
+  approval_no_network: "comments.approval ist an, aber es ist kein Netzwerk für Ankündigungen eingerichtet."
+  approval_no_network_fix: "Die Moderation wählt aus den Antworten auf eine Ankündigung aus. Richte mastodon: oder bluesky: ein, oder setze comments.approval: off."
+  approval_needs_cron: "Moderierte Kommentare erreichen die Seite nur über scripts/refresh-sidebar.sh."
+  approval_needs_cron_fix: "Trage es in cron ein (*/30 * * * * /pfad/zu/blog.sh/scripts/refresh-sidebar.sh). Ohne das behält die Seite die zuletzt hochgeladenen Kommentare, und ein neu freigegebener erscheint nie."
+  approval_probe_ok: "Der Token sieht, welche Antworten du favorisiert hast."
+  approval_probe_nothing: "Es ist noch nichts angekündigt, also gab es keinen Thread, um den Token zu prüfen."
+  approval_probe_blind: "Das Netzwerk antwortet, ohne zu sagen, welche Antworten du favorisiert hast -- jeder Thread der Seite käme leer heraus."
+  approval_probe_blind_fix: "Der Mastodon-Token braucht neben write:statuses auch die Berechtigung read:statuses -- erstelle ihn unter Einstellungen -> Entwicklung neu. Bei Bluesky prüfe, ob BLUESKY_APP_PASSWORD ein App-Passwort für das Handle aus config/site.yml ist."
+  approval_probe_failed: "Konnte nicht prüfen, ob der Token deine Favoriten sieht: %{message}"
   no_network: "Kein Netzwerk für Kommentare eingerichtet -- Beiträge werden nirgends angekündigt."
+  credentials_no_network: "%{vars} ist in env.sh gesetzt, aber es ist kein Netzwerk-Abschnitt eingerichtet -- also wird nichts angekündigt und es werden keine Kommentare gelesen."
+  credentials_no_network_fix: "Ein Token ohne Abschnitt, der ihn benutzt, heißt meist, dass der Kopf selbst noch auskommentiert ist: prüfe, dass %{sections} in config/site.yml eine echte Zeile ist und kein Kommentar, und dass die Schlüssel darunter stehen. Wenn die Website wirklich nirgends ankündigt, lösche die Zugangsdaten aus env.sh."
   both_networks: "Beide Abschnitte sind eingerichtet, mastodon: und bluesky:, und der Build lehnt das ab."
   both_networks_fix: "Kommentare und der Ankündigungsbeitrag leben auf genau einem Netzwerk. Kommentiere den aus, den du nicht willst."
   mastodon_instance_shape: "mastodon.instance ist \"%{value}\" -- dort gehört nur der Hostname hin, ohne https:// und ohne Pfad."
@@ -636,6 +757,19 @@ doctor:
   fonts_ok: "Jede in der Konfiguration genannte Schriftdatei liegt in assets/fonts/."
   fonts_missing: "In der Konfiguration genannt, aber nicht in assets/fonts/: %{files}."
   fonts_missing_fix: "Die Website rendert in der Ersatzschrift, was genau so aussieht, als würde die Konfiguration nicht wirken. Lege die Datei dorthin oder nimm sie aus fonts.faces heraus."
+
+  extra_css_ok: "%{count} zusätzliche(s) Stylesheet(s), jedes ein Pfad auf dieser Website und vorhanden."
+  nav_ok: "Menü: %{count} Eintrag/Einträge, jeder zeigt auf etwas Vorhandenes."
+  nav_tag_missing: "Der Menüeintrag \"%{label}\" zeigt auf das Schlagwort %{tag}, das kein Beitrag trägt."
+  nav_tag_missing_fix: "Dessen Liste wird nicht gebaut, der Eintrag ist also ein 404 im eigenen Menü. Meist wurde der letzte Beitrag damit zurückgezogen oder neu verschlagwortet. Korrigiere das Schlagwort oder entferne den Eintrag."
+  nav_url_missing: "Der Menüeintrag \"%{label}\" zeigt auf %{url}, wo diese Website nichts ausliefert."
+  nav_url_missing_fix: "Meist ein Beitrag, der nach dem Schreiben des Menüs umbenannt oder gelöscht wurde. Zeige auf etwas Vorhandenes oder entferne den Eintrag -- Adressen außerhalb dieser Website bleiben hier unberührt, dafür ist check --online da."
+  nav_url_relative: "Der Menüeintrag \"%{label}\" zeigt auf %{url} -- das ist keine Adresse, sondern ein Name, der gegen die jeweilige Seite gelesen wird."
+  nav_url_relative_fix: "Von der Startseite mag es sogar gehen, von einem Beitrag landet es neben dem Beitrag. Schreibe es mit Schrägstrichen: %{url}"
+  extra_css_remote: "site.extra_css nennt %{value}, das auf einem anderen Host liegt."
+  extra_css_remote_fix: "Jede Seite trägt style-src 'self', der Browser verwirft es also und die Website rendert ungestylt -- ohne Fehlermeldung an einer Stelle, an der du sie sehen würdest. Kopiere die Datei nach assets/ und nenne sie /assets/css/<name>.css."
+  extra_css_missing: "site.extra_css nennt %{value}, das nicht im Baum liegt."
+  extra_css_missing_fix: "Die Seite fordert es an, bekommt einen 404 und rendert ohne es -- das sieht genau nach einem Stylesheet aus, das nichts bewirkt. Lege die Datei dorthin oder streiche die Zeile."
 
   widgets_ok: "%{count} Seitenleisten-Widget(s), alle ausgefüllt."
   widget_shape: "Das Widget %{name} enthält keine Einstellungen."
@@ -691,6 +825,80 @@ doctor:
 # Platzhalter der Vorlage und zeigt keine Form. Ob jemand den Wert
 # wirklich gewählt hat, sagt die Zeile "Jetzt:" vs. "Vorschlag:"
 # (wizard.prompt_with_current / prompt_with_suggestion).
+check:
+  progress_online: "Frage das Web: %{done}/%{total}"
+  running_online: "Auch Links nach außen werden geprüft -- das dauert eine Weile."
+  online_ok: "Alle %{count} externen Link(s) antworten weiterhin."
+  link_gone: "%{slug}: %{url} ist weg (%{reason})."
+  link_gone_fix: "Gemeldet werden nur Hosts, die nicht mehr auflösen, und Seiten mit 404/410 -- ein Timeout oder ein 5xx heißt \"gerade nicht\" und bleibt unangetastet. Korrigiere den Link, entferne ihn oder zeige auf die Wayback Machine."
+  reason_no_host: "diesen Host gibt es nicht"
+  unknown_option: "Unbekannte Option: %{option}. check kennt nur --online."
+  heading: "Archiv wird geprüft"
+  progress: "Beiträge gelesen: %{done}/%{total}"
+  no_posts: "Es gibt noch keine Beiträge zu prüfen."
+  all_clear: "Im Archiv selbst ist alles in Ordnung: %{posts} Beitrag/Beiträge, Medien, Links und Weiterleitungen stimmen."
+  series_similar: "Die Serien „%{a}“ (%{count_a} Beitrag/Beiträge) und „%{b}“ (%{count_b} Beitrag/Beiträge) unterscheiden sich nur um wenige Zeichen -- ein Tippfehler?"
+  series_similar_fix: "Wenn es eine Serie ist, vereinheitliche die `series:`-Schreibweise in den Beiträgen -- verschiedene Schreibweisen gründen zwei Serien und teilen die Teile auf."
+  media_missing: "%{slug}: Die Datei %{file} fehlt im Medienverzeichnis."
+  media_missing_fix: "Der Beitrag fordert sie an, die Seite zeigt ein Loch. Meist ein Import mit fehlgeschlagenem Download -- lege die Datei dorthin oder nimm sie aus dem Beitrag heraus."
+  image_degenerate: "%{slug}: Das Bild %{file} ist %{width}x%{height} und wird gar nicht gerendert."
+  image_degenerate_fix: "Alles mit 1px oder weniger gilt als Zählpixel und wird MITSAMT Bildunterschrift verworfen, die Seite verliert also beides stillschweigend. Tausche das Bild aus oder entferne den Block."
+  link_dead: "%{slug}: verweist auf %{url}, wo diese Website nichts ausliefert."
+  link_dead_fix: "Meist ein Permalink aus einem Import oder ein Slug, der umbenannt wurde, bevor Umbenennungen eine Weiterleitung behielten. Korrigiere den Link oder gib dem Zielbeitrag einen redirect_from-Eintrag."
+  media_orphan: "Zum Medienverzeichnis %{dir} gehört kein Beitrag."
+  media_orphan_fix: "Rest eines gelöschten oder umbenannten Beitrags oder eines doppelt gelaufenen Imports. Nichts verweist darauf; lösche es selbst, nachdem du hineingesehen hast."
+  media_stray: "Beitrag %{slug} nennt die Datei %{file} in seinem Medienverzeichnis nicht mehr."
+  media_stray_fix: "Übrig von einem Bild, das die Quelle zwischen Importen entfernt oder umbenannt hat. Der Beitrag verweist nicht darauf; sieh nach und lösche sie selbst."
+  redirect_collision: "Auf %{origin} erheben mehrere Beiträge Anspruch: %{slugs}."
+  redirect_collision_fix: "Der zuletzt gerenderte gewinnt, die Leser der anderen landen bei ihm. Belasse den Eintrag bei nur einem Beitrag."
+  and_more: "...und %{count} weitere derselben Art, nicht aufgeführt."
+  summary: "%{errors} Problem(e), %{warnings} Sache(n) zum Nachsehen."
+  summary_clean: "Das Archiv ist in Ordnung."
+
+stats:
+  # Absagen, die lib/post_stats.rb auf dem Cron-Weg wirft. Sie erreichen
+  # einen Menschen zweimal -- als Zeile in der Cron-Mail und mitten im Satz,
+  # den doctor --online über das Token schreibt -- auf einer Website, die
+  # nicht englisch ist, war das ein halber Satz in der falschen Sprache.
+  no_mastodon_token: "comments.approval ist an, aber MASTODON_ACCESS_TOKEN ist nicht gesetzt -- ohne das sagt die API nie, welche Antworten du favorisiert hast."
+  no_bluesky_password: "comments.approval ist an, aber BLUESKY_APP_PASSWORD ist nicht gesetzt -- ohne das sagt die API nie, welche Antworten dir gefallen."
+  blind_answer: "comments.approval ist an, aber die Antwort von %{network} sagte nicht, welche Beiträge favorisiert sind -- die Anfrage war nicht authentifiziert, oder dem Token fehlt read:statuses. Wird abgelehnt, statt ein leeres Gespräch über die bereits freigegebenen Kommentare zu schreiben."
+  unknown_option: "Unbekannte Option: %{option}. stats kennt nur --json."
+  no_posts: "Es gibt noch nichts zu zählen."
+  heading_archive: "Das Archiv"
+  heading_years: "Nach Jahr"
+  heading_types: "Was sie sind"
+  heading_words: "Wörter"
+  heading_tags: "Schlagwörter"
+  heading_media: "Medien"
+  heading_sources: "Woher es stammt"
+  archive_line: "%{total} Beiträge: %{published} veröffentlicht, %{drafts} Entwürfe, %{scheduled} geplant, %{pages} Seiten"
+  span_line: "%{first} - %{last}, das sind %{days} Tage"
+  busiest_line: "am meisten kam %{year} dazu (%{count} Beitrag/Beiträge)"
+  words_line: "%{total} Wörter insgesamt, %{mean} pro Beitrag im Schnitt, %{median} in der Mitte"
+  longest_line: "am längsten: %{slug} (%{words} Wörter)"
+  reading_line: "das ganze Archiv zu lesen dauert %{hours} Stunden"
+  reading_line_minutes: "das ganze Archiv zu lesen dauert %{minutes} Minuten"
+  media_none: "keinerlei Medien"
+  tags_line: "%{unique} verschiedene, %{per_post} pro Beitrag"
+  media_line: "%{files} Datei(en), %{size}, bei %{posts} Beiträgen"
+  media_referenced_line: "%{referenced} Datei(en) verlangen die Beiträge, bei %{posts} Beiträgen -- media.nosync liegt nicht hier"
+
+export:
+  heading: "Das Archiv wird nach %{path} geschrieben"
+  progress: "Beiträge geschrieben: %{done}/%{total}"
+  unknown_option: "Unbekannte Option: %{option}. export kennt ein Verzeichnis, --no-drafts, --dry-run und --force."
+  target_not_empty: "%{path} ist nicht leer."
+  target_not_empty_fix: "Gib ein leeres Verzeichnis an oder wiederhole mit --force, dann wird neben dem Vorhandenen geschrieben. Gelöscht wird in keinem Fall etwas."
+  dry_run_notice: "Trockenlauf: Es wird alles gezählt und nichts geschrieben."
+  no_drafts_notice: "Entwürfe bleiben zu Hause -- nach draußen gehen nur veröffentlichte Beiträge und Seiten."
+  no_posts: "Es gibt noch nichts zu exportieren."
+  summary: "Nach %{path} geschrieben: %{posts} Beitrag/Beiträge, %{drafts} Entwurf/Entwürfe, %{pages} Seite(n) und %{media} Mediendatei(en) (%{size})."
+  summary_dry: "Nach %{path} geschrieben würde: %{posts} Beitrag/Beiträge, %{drafts} Entwurf/Entwürfe, %{pages} Seite(n) und %{media} Mediendatei(en) (%{size})."
+  fallback_note: "%{count} Block/Blöcke, für die Markdown keine Schreibweise hat, wurden als HTML geschrieben: %{kinds}. Jede Engine, die HTML durchreicht, stellt sie dar, und diese Engine liest sie vollständig zurück -- jeder trägt seine eigene Definition in einem Kommentar darüber, den alle anderen ignorieren."
+  collisions: "%{count} Datei(en) wurden umbenannt, damit sie sich nicht gegenseitig überschreiben -- zwei Beiträge wollten denselben Dateinamen."
+  next_steps: "Der Aufbau ist der von Jekyll: _posts/, _drafts/, Seiten im Wurzelverzeichnis, Medien unter assets/. Hugo, Eleventy und Astro lesen ihn mit einer Zeile Konfiguration; ./import.sh liest ihn, wie er ist."
+
 setup:
   intro: "Hier werden die Einstellungen abgefragt, die eine Website zum Laufen braucht. Die Antworten werden unterwegs geprüft und in config/site.yml und env.sh geschrieben."
   intro_skip: "Jede Frage lässt sich überspringen -- Enter übernimmt den darunter vorausgefüllten Wert. Nichts wird geschrieben, bevor du alle Änderungen zusammen gesehen und bestätigt hast."
@@ -714,7 +922,7 @@ setup:
   e_timezone: "Dieser Rechner kennt keine Zone namens \"%{zone}\". Zonen heißen Kontinent/Stadt, auf Englisch -- Europe/Berlin, nicht Berlin oder MEZ; die vollständige Liste steht in /usr/share/zoneinfo."
 
   q_base_url: "Adresse der Website"
-  h_base_url: "Die Adresse, unter der die Website zu sehen sein wird, z. B. https://meineseite.de -- ohne Schrägstrich am Ende. RSS, Sitemap und Vorschauen beim Teilen werden daraus gebaut. Wird in config/site.yml und env.sh zugleich geschrieben, damit die beiden Kopien nicht auseinanderlaufen."
+  h_base_url: "Die Adresse, unter der die Website zu sehen ist, z. B. https://meineseite.de -- ohne Schrägstrich am Ende. RSS, Sitemap und Vorschauen werden daraus gebaut; geht zugleich in config/site.yml und env.sh."
   e_base_url: "Das ist keine URL -- sie muss mit http:// oder https:// beginnen und einen Hostnamen enthalten."
   e_base_url_slash: "Entferne den Schrägstrich am Ende, sonst stehen in erzeugten Links zwei."
 
@@ -749,6 +957,12 @@ setup:
   password_skipped: "Kein App-Passwort. Die Website funktioniert, sie kündigt nur nie etwas an, bis du eines in env.sh einträgst."
 
   section_deploy_intro: "Die fertige Website ist ein gewöhnlicher Ordner voller Dateien; hier wird gewählt, wohin ./blog.sh rebuild ihn nach jeder Änderung hochlädt. Richte dich danach, wo die Website laufen wird -- und wenn du es noch nicht weißt, lass die erste Option stehen. Ändern geht jederzeit, ./setup.sh einfach noch einmal starten."
+  q_page_size: "Wie viele Beiträge auf einer Listenseite?"
+  h_page_size: "Nur bei der Ersteinrichtung gefragt. Die Seitenzahlen zählen ab dem ältesten Beitrag, gespeicherte Links bleiben gültig -- eine Änderung nach dem ersten Deploy verschiebt jede Grenze und schreibt jede Listenseite neu."
+  e_page_size: "Eine ganze Zahl größer als null."
+  section_scheduler: "Geplantes Veröffentlichen"
+  section_scheduler_intro: "Ein geplanter Beitrag veröffentlicht sich nicht selbst -- zur Zeit muss etwas laufen. Wer ./blog.sh schedule nutzen will, trägt diese Zeile in cron ein (sie deployt nichts von sich aus; der Job schaut nur, ob etwas fällig ist, und endet):"
+  scheduler_note: "Ohne diese Zeile wartet ein Beitrag in der Warteschlange und niemand schickt ihn je. Doctor merkt es, aber erst wenn etwas geplant ist. Die Seitenleiste hat einen eigenen Job, refresh-sidebar.sh -- siehe docs/operations.md."
   q_backend: "Wohin soll die gebaute Website?"
   backend_none: "Noch nirgendwo -- lokal schreiben und ansehen, später entscheiden"
   backend_surfer: "Cloudron Surfer -- du betreibst ein eigenes Cloudron mit der Surfer-App darauf"
@@ -819,9 +1033,11 @@ style:
   menu_banner: "Banner -- das Bild oben und seine Größe"
   menu_about: "Über mich -- Überschrift und Kurzbiografie"
   menu_footer: "Fußzeile -- Überschriften, Copyright, Hinweis, Links"
-  menu_social: "Soziale Netzwerke -- die Icon-Reihe in der Fußzeile und die Mastodon-Verifizierung"
+  menu_social: "Soziale Netzwerke -- Icons in der Fußzeile, Mastodon-Verifizierung"
   menu_widgets: "Seitenleiste -- Toots, Pixelfed, Commits, Bluesky, jeder RSS-Feed"
   menu_fonts: "Schriften -- Schrift und Größe von Name und Beschreibung auf dem Banner"
+  menu_layout: "Layout -- welche Bereiche der Seite es gibt, und dein eigenes Stylesheet"
+  menu_nav: "Menüleiste -- was im Streifen unter dem Banner steht"
   menu_analytics: "Statistik -- das Skript, falls du eines betreibst"
 
   palette_intro: "Eine Palette sind sieben Farben pro Modus. Alles Weitere -- Kartenhintergründe, Farben beim Darüberfahren, das Suchfeld -- wird beim Build von selbst daraus berechnet."
@@ -868,8 +1084,10 @@ style:
   e_hex: "Eine Farbe sieht aus wie #1da1f2 oder #fff."
 
   banner_current: "Das Bannerbild ist jetzt %{path}."
-  q_banner_file: "Pfad zu einem neuen Bannerbild (Enter behält das aktuelle)"
-  h_banner_file: "Jedes PNG, JPEG, GIF oder WebP. Es wird an seinen Platz kopiert und vermessen, damit Breite und Höhe in der Konfiguration zur Datei passen."
+  q_banner_file: "Bannerbild -- Dateiname in incoming/ (Enter behält das aktuelle)"
+  q_banner_src: "Unter welchem Namen speichern?"
+  h_banner_src: "Enter behält den aktuellen. Nach der gewählten Datei wäre es %{suggested} -- der Name ist eine Einstellung (banner.src), keine feste Regel."
+  h_banner_file: "Lege es in incoming/ und tippe nur den Namen. PNG, JPEG, GIF oder WebP. Etwa doppelt so breit wie dargestellt -- es geht über die volle Breite und wirkte auf einem dichten Display sonst weich; das mitgelieferte hat 1880x600."
   banner_not_found: "%{path} ist keine Datei, das Banner blieb unverändert."
   banner_copied: "✅ Nach %{path} kopiert."
   banner_pending: "✅ Wird als %{path} installiert, sobald du den Schreibvorgang bestätigst."
@@ -922,7 +1140,7 @@ style:
   widget_heading_rss: "Anderswo"
   q_widget_heading: "Überschrift über dem Widget"
   q_widget_account_id: "Numerische Konto-ID"
-  h_widget_account_id: "Die Nummer, nicht der @Name. Am einfachsten findet sie ./setup.sh mit eingetragenem Token -- das Widget wird dann gleich angeboten. Von Hand: öffne https://deine-instanz/api/v1/accounts/lookup?acct=deinname im Browser und übernimm den Wert \"id\"."
+  h_widget_account_id: "Die Nummer, nicht der @Name. ./setup.sh findet sie mit eingetragenem Token. Von Hand: öffne https://deine-instanz/api/v1/accounts/lookup?acct=deinname und übernimm \"id\"."
   q_widget_username: "GitHub-Benutzername"
   h_widget_username: "Nur der Name, so wie er in der URL deines Profils steht."
   q_widget_feed_url: "Feed-URL"
@@ -956,6 +1174,58 @@ style:
   list_remove: "Entfernen"
   list_keep: "So lassen"
   q_list_action: "Eines hinzufügen, eines entfernen, oder so lassen?"
+  nav_derived: "Das Menü wird gerade aus dem Inhalt abgeleitet: Alle, dazu ein Eintrag je Art von Beiträgen, die du schreibst."
+  nav_is_off: "Es gibt keine Menüleiste."
+  nav_current: "Das Menü jetzt:"
+  nav_turn_off: "Gar keine Menüleiste"
+  nav_off_note: "Die Leiste ist weg. Sonst ändert sich nichts -- die Schlagwort- und Typlisten werden weiter gebaut und bleiben erreichbar."
+  nav_replaces_derived: "Achtung: Der erste Eintrag kommt nicht zum abgeleiteten Menü dazu, er ersetzt es. Füge auch die hinzu, die bleiben sollen."
+  q_nav_action: "Eintrag hinzufügen, entfernen oder das Menü so lassen?"
+  q_nav_label: "Was soll im Eintrag stehen?"
+  q_nav_kind: "Wohin soll er führen?"
+  nav_kind_home: "Zur Startseite"
+  nav_kind_tag: "Zu einer Schlagwortliste"
+  nav_kind_page: "Zu einer Seite"
+  nav_kind_url: "Woandershin -- eine Adresse, die du eingibst"
+  q_nav_tag: "Zu welchem Schlagwort?"
+  h_nav_tag: "Der Name des Schlagworts, nicht die Adresse. Deine häufigsten: %{list}"
+  q_nav_page: "Zu welcher Seite?"
+  q_nav_url: "Zu welcher Adresse?"
+  h_nav_url: "Ein Pfad auf dieser Website (/about/) oder eine ganze Adresse woandershin."
+  nav_tag_unknown: "Kein Beitrag trägt das Schlagwort %{tag}, dessen Liste wird nicht gebaut und der Eintrag wäre ein 404."
+  nav_url_unknown: "Diese Website liefert unter %{url} nichts aus, der Eintrag wäre ein 404."
+  q_nav_anyway: "Trotzdem hinzufügen?"
+  q_layout_sidebar: "Die rechte Spalte (Bio, Widgets, Beitragszahlen)?"
+  q_layout_hero: "Das erste Bild eines Beitrags über den Titel heben?"
+  css_current: "Eigene Stylesheets, in Ladereihenfolge:"
+  q_css_action: "Stylesheet hinzufügen, entfernen oder so lassen?"
+  q_css_file: "Stylesheet -- Dateiname in incoming/"
+  h_css_file: "Lege es in incoming/ und tippe nur den Namen; es wird nach assets/css/ gespeichert und lädt nach dem eigenen des Motors, überschreibt es also. Der Name einer Datei, die schon in assets/css/ liegt, wird auch angenommen."
+  css_missing_mark: "⚠️  Datei fehlt"
+  css_not_found: "%{path} liegt nicht auf der Platte -- der Browser bekommt es schlicht nie und die Seite wird ohne gerendert."
+  q_css_anyway: "Trotzdem hinzufügen?"
+  file_will_go: "Wird gespeichert als %{path}."
+  file_copied: "Kopiert nach %{path}."
+  incoming_not_cleaned: "In incoming/ geblieben: %{files} -- die Kopie liegt am Platz, das Original ließ sich nicht löschen (keine Schreibrechte auf incoming/). Bitte von Hand entfernen."
+  q_banner_claim: "Eigener Claim-Text über dem Banner"
+  h_banner_claim: "Enter behält den aktuellen. Leer heißt: die Seitenbeschreibung wird verwendet. Dieser darf <br> tragen, die Beschreibung nicht -- sie geht auch in meta und RSS."
+  faces_current: "Eigene Schriften aus assets/fonts/:"
+  q_faces_action: "Schrift hinzufügen, entfernen oder so lassen?"
+  q_face_family: "Familienname, so wie du ihn im Stack schreibst"
+  h_face_family: "Zum Beispiel Playfair Display. Unter diesem Namen sprichst du die Schrift dann bei Titel oder Claim an."
+  q_face_file: "Schriftdatei -- Name in incoming/ oder in assets/fonts/"
+  h_face_file: "Lege sie in incoming/, tippe nur den Namen; sie landet in assets/fonts/. Am besten .woff2; .woff, .ttf und .otf gehen auch. Eine Datei je Familie und Schnitt, mit den Zeichen deiner Sprache."
+  q_face_weight: "Schnitt (optional)"
+  h_face_weight: "Enter überspringt. 400, oder ein Bereich wie 400 700 -- das ist auch die Vorgabe."
+  q_face_style: "Stil (optional)"
+  h_face_style: "Enter überspringt. Der Motor nimmt nur normal, italic oder oblique."
+  faces_missing_mark: "⚠️  Datei fehlt"
+  faces_not_found: "%{file} liegt nicht in assets/fonts/ -- der Build nennt sie und überspringt sie, die Seite käme also in der Ersatzschrift."
+  q_faces_anyway: "Trotzdem hinzufügen?"
+  css_remote: "Nur Pfade auf dieser Website. Jede Seite trägt style-src 'self', ein Stylesheet auf fremdem Host verwirft der Browser wortlos."
+  nav_url_relative: "%{url} ist keine Adresse -- ohne Schrägstriche liest der Browser das gegen die Seite, auf der das Menü steht."
+  q_nav_use_absolute: "Als %{url} schreiben?"
+  h_nav_tag_empty: "Der Name des Schlagworts, nicht die Adresse. Noch ist nichts verschlagwortet, es gibt nichts anzubieten."
   q_list_which: "Welches möchtest du entfernen?"
   q_list_title: "Titel des Links"
   q_list_url: "Adresse, auf die er zeigt"

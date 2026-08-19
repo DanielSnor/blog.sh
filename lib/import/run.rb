@@ -3,6 +3,8 @@
 require 'tmpdir'
 require_relative '../post_writer'
 require_relative 'media'
+require_relative 'media_index'
+require_relative 'html_blocks'
 
 module Import
   # The half of an import that has nothing to do with the platform: walk
@@ -34,13 +36,36 @@ module Import
     # a failure cost a WRITTEN post its file has to be able to leave these
     # out -- lumped together, the summary claimed media were lost from
     # posts that were never written at all.
-    Result = Struct.new(:written, :scanned, :skipped, :media, :media_failures, :skipped_media_failures,
-                        :samples, :interrupted, keyword_init: true)
+    #
+    # `media_reused` is the subset of `media` that was already in the
+    # archive and cost no download. Reported rather than merely enjoyed:
+    # the old summary said "420 media file(s)" for a run that fetched all
+    # 420 and for one that fetched none, which is the same sentence for two
+    # very different afternoons.
+    #
+    # `media_superseded` counts the fetches this run threw away because
+    # the archive already held DIFFERENT bytes under the entry's name --
+    # a source that re-encodes its pictures and keeps the addresses. The
+    # archive's copy wins by rule; the number is here so the summary can
+    # say the source has drifted, which is the operator's only signal.
+    Result = Struct.new(:written, :scanned, :skipped, :media, :media_reused,
+                        :media_failures, :skipped_media_failures, :samples, :interrupted,
+                        :dropped_elements, :media_superseded,
+                        keyword_init: true)
 
-    def initialize(adapter, dry_run: false, limit: nil, on_post: nil, on_scan: nil)
+    # `media_index` is what lets a re-import skip what it already has (see
+    # MediaIndex). Built once, lazily, and shared by every item.
+    #
+    # `refetch` (REFETCH_MEDIA=1) makes the run download even what the
+    # index already has. The index stays in place regardless: it is what
+    # the run falls back on when the source no longer answers.
+    def initialize(adapter, dry_run: false, limit: nil, on_post: nil, on_scan: nil,
+                   media_index: MediaIndex.shared, refetch: MediaIndex.refetch?)
       @adapter = adapter
       @dry_run = dry_run
       @limit = limit
+      @media_index = media_index
+      @refetch = refetch
       # Called with (written, post, scanned) after each written post, so a
       # wizard can show progress on a run that takes an hour without this
       # class knowing anything about terminals. Both counters are passed
@@ -56,10 +81,18 @@ module Import
     end
 
     def call
+      # A fresh ledger per run, or a second import in one process would
+      # report the first one's losses again.
+      HtmlBlocks.reset_dropped!
+      # PostWriter counts per process; the run owns only its own delta --
+      # same reason as the ledger above, without a reset that would zero
+      # another run's tally mid-flight.
+      superseded_before = PostWriter.superseded_downloads
       written = 0
       scanned = 0
       skipped = Hash.new(0)
       media_count = 0
+      media_reused = 0
       media_failures = []
       skipped_media_failures = []
       samples = []
@@ -89,7 +122,7 @@ module Import
           # the summary shows the loss instead of pretending completeness.
           begin
             Dir.mktmpdir do |tmpdir|
-              media = Media.new(tmpdir, dry_run: @dry_run)
+              media = Media.new(tmpdir, dry_run: @dry_run, index: @media_index, refetch: @refetch)
               post = @adapter.map(item, media)
 
               if post.is_a?(Symbol)
@@ -108,10 +141,15 @@ module Import
               end
 
               tag_with_platform(post)
+              record_media_sources(post, media)
               media_count += media.count
+              media_reused += media.reused
               media_failures.concat(media.failures)
 
-              PostWriter.write(post, media_files: media.files) unless @dry_run
+              unless @dry_run
+                path = PostWriter.write(post, media_files: media.files)
+                remember_media(post, path)
+              end
               written += 1
               samples << post['slug'] if samples.size < 5
               @on_post&.call(written, post, scanned)
@@ -126,11 +164,57 @@ module Import
       end
 
       Result.new(written: written, scanned: scanned, skipped: skipped, media: media_count,
-                 media_failures: media_failures, skipped_media_failures: skipped_media_failures,
-                 samples: samples, interrupted: interrupted)
+                 media_reused: media_reused, media_failures: media_failures,
+                 skipped_media_failures: skipped_media_failures,
+                 samples: samples, interrupted: interrupted,
+                 dropped_elements: HtmlBlocks.dropped.dup,
+                 media_superseded: PostWriter.superseded_downloads - superseded_before)
     end
 
     private
+
+    # Writes each media entry's original address into the post as `src`,
+    # beside the local filename.
+    #
+    # Here rather than in the adapters: twenty-two of them build media
+    # entries, in about thirty places, and a key that must be present for
+    # the archive to recognise its own files cannot depend on all of them
+    # remembering. Media already knows the mapping -- it allocated the name
+    # from the address -- so this is the one place both halves are in hand.
+    #
+    # Never overwrites: an entry that already carries a src has one that
+    # travelled further than this run (a block coming home from an export
+    # brings the address the file was fetched from years ago), and that is
+    # the address worth keeping.
+    def record_media_sources(post, media)
+      MediaIndex.each_media_entry(post) do |entry|
+        next unless entry['src'].to_s.empty?
+
+        src = media.source_of(entry['url'].to_s)
+        entry['src'] = src if src
+      end
+    end
+
+    # Adds what this post just wrote to the index, so the SAME address used
+    # by a later post in the same run is not fetched a second time. Old
+    # blogs reuse one picture across dozens of posts, and without this the
+    # index was a snapshot taken before the run began -- it could only ever
+    # answer for what a PREVIOUS run had put there.
+    #
+    # Read back off the post rather than out of Media, so what goes in is
+    # exactly what the next run's own pass would find there.
+    def remember_media(post, path)
+      return unless @media_index
+
+      dir = PostWriter.media_dir_for(path)
+      MediaIndex.each_media_entry(post) do |entry|
+        src = entry['src'].to_s
+        name = entry['url'].to_s
+        next if src.empty? || !MediaIndex.plain_name?(name)
+
+        @media_index.remember(src, File.join(dir, name), entry['width'], entry['height'])
+      end
+    end
 
     # Every imported post carries a tag naming where it came from, so an
     # archive assembled from several platforms stays sortable by origin --
@@ -146,8 +230,17 @@ module Import
       # one: "feed" says nothing about where a post came from, where
       # "medium.com" says all of it. source.platform stays what it is --
       # the kind of source, and half the re-import dedup key.
-      platform = if @adapter.respond_to?(:platform_tag) && @adapter.platform_tag
-                   @adapter.platform_tag.to_s
+      platform = if @adapter.respond_to?(:platform_tag)
+                   tag = @adapter.platform_tag
+                   # An adapter that HAS the method and still answers nil
+                   # is saying this post wants no platform tag at all --
+                   # not "fall back to source.platform". A tree written by
+                   # `./blog.sh export` carries its own source, so
+                   # importing it back would otherwise pin every post with
+                   # a pill for the platform it left years ago.
+                   return if tag.nil?
+
+                   tag.to_s
                  else
                    post.dig('source', 'platform').to_s
                  end

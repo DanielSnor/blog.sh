@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Regenerates the sidebar widget JSON files (pixelfed.json, toots.json,
-# commits.json, bluesky.json) and announced-post stats (stats.json), and
-# uploads only those to the deploy target -- without rebuilding the
-# whole site. Meant for cron.
+# commits.json, bluesky.json), announced-post stats (stats.json) and --
+# where comments.approval is on -- the approved comments themselves
+# (comments.json), then uploads only those to the deploy target, without
+# rebuilding the whole site. Meant for cron.
 #
 # Usage:
-#   ./scripts/refresh-sidebar.sh
+#   ./scripts/refresh-sidebar.sh [--full]
+#
+# --full does this run's fetch over every announced post rather than just
+# the recent ones. With moderation on, that is how a comment starred
+# under an old post reaches the site without waiting for the weekly pass.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -45,28 +50,42 @@ set +a
 # cron as SUCCESS. A monitored job then sees a clean run forever while
 # the sidebar has not refreshed for weeks.
 code=0
-ruby scripts/refresh_sidebar.rb || code=$?
+ruby scripts/refresh_sidebar.rb "$@" || code=$?
 [ "$code" -eq 3 ] && exit 0
 [ "$code" -ne 0 ] && exit "$code"
 
-# Upload whichever widget files this site actually has -- Sidebar.FEEDS
-# only writes JSONs for configured widgets, so a hardcoded list makes
-# deploy-web.sh abort on any site using a subset of them ("not found in
-# public.nosync/"). stats.json always exists; refresh_sidebar.rb just
-# wrote it.
+# Every file this refresh answers for, named whether or not it exists on
+# disk right now. The absent ones are the point: a name deploy-web.sh
+# cannot find locally but does find in its manifest is a request to take
+# that file OFF the target, and this is the only run that ever makes it.
+# refresh_sidebar.rb deletes comments.json when moderation is switched
+# off, precisely so a since-rejected comment stops being readable at a
+# public URL -- and while this list held only the files present on disk,
+# comments.json simply dropped out of it and stayed live on the site until
+# somebody happened to run a full deploy with --prune.
 #
-# Built with a loop rather than `ls <names>`: ls exits non-zero when ANY
-# name is missing, and under `set -euo pipefail` that killed the script
-# right here -- so every site configuring fewer than all five widgets
-# regenerated its JSONs and then silently never uploaded them.
-only=""
-for f in pixelfed.json toots.json commits.json bluesky.json rss.json stats.json; do
-  [ -f "public.nosync/$f" ] || continue
-  only="${only:+$only,}$f"
-done
+# Names that were never built and were never uploaded (the widgets a site
+# has not configured) cost nothing: deploy-web.sh passes over them without
+# a word. It used to abort on them, which is why this was a loop over
+# existing files -- and a loop rather than `ls <names>`, since ls exits
+# non-zero when any name is missing and `set -euo pipefail` then killed
+# the script here, leaving every site with fewer than all the widgets
+# regenerating its JSONs and silently never uploading them.
+only="pixelfed.json,toots.json,commits.json,bluesky.json,rss.json,stats.json,comments.json"
 
-if [ -z "$only" ]; then
-  echo "No sidebar files to upload (no widgets configured?) -- nothing to do."
+# Nothing has ever been built here, so there is nothing to send and nothing
+# on the target to take down either -- a site that has not been deployed has
+# no manifest for an absent name to be missing from. deploy-web.sh treats
+# that as an error, which is right when a person typed the command and
+# wrong on a cron tick: a non-zero exit here is a mail every half hour
+# saying the same thing about a site nobody has finished setting up yet.
+#
+# Named as its own case rather than restored as the old "no files to
+# upload" guard, which is what this replaced: that one skipped the upload
+# whenever public.nosync held none of these files, and skipping is exactly
+# what left a deleted comments.json live on the site.
+if [ ! -d public.nosync ]; then
+  echo "Nothing built yet (no public.nosync/) -- nothing to upload."
   exit 0
 fi
 

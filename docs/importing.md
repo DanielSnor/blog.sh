@@ -28,6 +28,36 @@ duplicated.
   the page just jumps once while it loads). Downloads follow redirects and
   retry transient failures; a file that still can't be fetched costs that
   image, not the post, and the summary says so.
+- **A file already here is not downloaded twice.** Each media entry records
+  the address it came from, so a re-import recognises what the archive
+  already holds and fetches only what is missing -- the summary says how
+  many it did not have to fetch, and over a complete archive that is no
+  requests at all. A picture that leaves a post and later returns finds
+  its old file again -- the post's kept versions remember the address,
+  and failing those the file's own bytes do -- so a drop-and-return
+  cycle does not grow the post's directory.
+- **An import only ever ADDS media.** A file already in
+  `media.nosync/<year>/<slug>/` is never replaced -- not by a re-import,
+  not by any flag -- because the bytes an import brings come from
+  somewhere it cannot vouch for. `REFETCH_MEDIA=1` only makes the run ask
+  the source about every address again instead of trusting the archive's
+  records; what lands on disk is still just the files that were missing.
+  When a download no longer matches the copy the archive keeps -- a
+  source that re-encoded a picture under its old address -- the
+  archive's copy wins and the summary counts the discarded download,
+  which is the one signal that the source has drifted away from this
+  archive. And nothing an import does repairs a damaged file:
+  `./blog.sh check` reports media a post names that the archive doesn't
+  have, and putting it right is a separate job with your own copy of the
+  original.
+- **The post describes the file that is really there.** Width and height
+  are re-read from the archive's own copy once the media is in place, so
+  a post cannot end up claiming dimensions over a file that never
+  arrived. A copy that cannot be measured -- zero bytes, truncated, a
+  format this engine cannot read -- leaves the post's previous record
+  standing; on a first import, where there is no previous record, a
+  video or an SVG keeps the dimensions its source stated. An entry whose
+  file is missing entirely is left saying exactly what it said.
 - **A re-import updates, never duplicates.** Posts are matched on their
   source identity -- platform, account and the item's own id -- not on the
   title, so fixing a typo at the source and importing again updates the
@@ -51,6 +81,10 @@ duplicated.
 - **One bad item costs one item.** A date that won't parse or markup nothing
   anticipated is counted under `error` and named on stderr; the run
   continues. A rejected API key still stops everything, as it should.
+- **What HTML conversion cannot keep is counted:** markup with no block
+  equivalent (an iframe, an embedded player, a form) is dropped and named
+  in the summary -- by every adapter that converts HTML, not just the
+  feed import.
 - **A dying source still leaves a summary.** If the platform stops answering
   mid-run (a 5xx on page twelve, a feed that goes away), the run stops,
   says so, and reports honest partial counts -- everything written up to
@@ -61,15 +95,14 @@ duplicated.
   running counter. A silent minute means something is wrong, not that it's
   working.
 - **Old addresses can survive the move.** When the new site answers on the
-  same domain the old blog did, sources that know their original URLs
-  (beehiiv, Blogger, Ghost, Jekyll/Hugo and Movable Type/TypePad with a
-  pattern, LiveJournal, Medium, Squarespace, Substack, the Wayback
-  Machine, Wix, WordPress/feed and Tumblr today) can record each
-  published post's old path as `redirect_from` -- the build then serves
-  a redirect at every one of them, so nothing anyone ever linked goes
-  dark. The wizard asks; the
-  scripts take `KEEP_PERMALINKS=1`. Say yes only on the same domain: on any
-  other, the old paths were never yours to answer. Posts with no usable
+  same domain the old blog did, a source that knows its original URLs --
+  most do -- can record each published post's old path as
+  `redirect_from`: the build then serves a redirect at every one of them,
+  so nothing anyone ever linked goes dark. The wizard asks wherever the
+  source can answer; the scripts take `KEEP_PERMALINKS=1`, and a source
+  that needs a URL pattern's help says so in its section below. Say yes
+  only on the same domain: on any other, the old paths were never yours
+  to answer. Posts with no usable
   path (WordPress "plain" `?p=123` permalinks live in the query string,
   which a static file can never see) are counted in the summary and
   imported without a redirect. For an archive imported before this
@@ -206,13 +239,16 @@ left to download from.
 Every post comes over, drafts included. Posts Ghost had scheduled arrive
 as drafts too, and the summary says how many: their publish times were a
 promise made to a different site, and this one's queue should not
-announce posts nobody here reviewed. Pages (about, contact, ...) are
-skipped and counted -- they are site furniture, not timeline entries. A
-custom excerpt becomes the post's first paragraph, the feature image its
-first image. YouTube embeds become the same video blocks a hand-written
-post gets; any other embedded player becomes a link to the embedded page,
-which outlives the player. Ghost's internal `#hashtag` tags are routing
-config, not labels, and are dropped.
+announce posts nobody here reviewed. Pages (about, contact, ...) arrive
+as pages, and the summary lists the addresses they landed on. A page is
+out of the listings, the archive and the feed, which is what a page is
+for and also means nothing links to it: add the ones that belong in the
+menu under `nav:` in `config/site.yml`. A custom excerpt becomes the
+post's first paragraph, the feature image its first image. YouTube
+embeds become the same video blocks a hand-written post gets; any other
+embedded player becomes a link to the embedded page, which outlives the
+player. Ghost's internal `#hashtag` tags are routing config, not
+labels, and are dropped.
 
 ### Instagram
 
@@ -265,21 +301,11 @@ index fold through NFKD anyway -- but it means a caption that looks
 identical to another one is also the same string, which is what a `grep`
 over `content.nosync/` expects.
 
-**The HTML export's timestamps are Pacific standard time, all year.** It
-prints them without a zone and in Meta's own, so they are read as -08:00
-and stored in `site.timezone`. Taken at face value instead, an archive
-comes out shifted by most of a day: the export this was built against
-showed a six-hour hole across every afternoon and 106 of 286 posts between
-midnight and 6am, which after conversion became peaks at 10am and 8pm --
-someone posting after the morning and the evening walk.
-
-Note *standard* time, not the `America/Los_Angeles` zone, which is the
-obvious reading and is wrong: the export does not shift for daylight
-saving, so treating a July post as PDT puts it an hour early. That one was
-only findable by importing the same account both ways -- 173 of 288 posts,
-exactly those falling in Pacific daylight-saving months, disagreed by
-exactly an hour, and the JSON export's epochs settled which side was
-right. The JSON path has none of this: an epoch means what it says.
+**Meta's HTML exports print their timestamps in fixed Pacific standard
+time** -- -08:00 all year, no daylight-saving shift, no zone named --
+and the import reads them as exactly that and stores them in
+`site.timezone`; the same convention, and the same conversion, covers
+Threads. The JSON path has none of this: an epoch means what it says.
 
 That clock also prints its month names in the language the export was
 requested in. Czech and English are understood -- the same tables the
@@ -303,14 +329,39 @@ nothing is lost to an HTML round-trip. `.html` bodies take the HTML
 path instead. Liquid `{% highlight %}` becomes a code block; other
 Liquid tags are dropped.
 
-**Images come from the tree itself** -- root-relative paths resolve
-against the site root, relative ones against the post -- so this works
-with no network, for a site that died years ago.
+**Images come from the tree where the tree has them.** A root-relative
+path resolves against the site root and a relative one against the post,
+and neither needs the network: that half works for a site that died years
+ago. An **absolute URL is downloaded** -- and a tree that came off a
+hosted platform is mostly absolute URLs pointing back at it. So import
+**while the old host still answers**, or pull the images down beside the
+posts first and point the markdown at them; once that host is gone, those
+images are gone with it. The run's summary is the only place that will say
+so, because an image that never arrived leaves no block behind: the post
+reads as though it never had one, and `./blog.sh check` afterwards finds
+nothing to report. Read that number before you rebuild.
 
 One thing a tree cannot tell you is its old URL shape: pass the
 pattern (`PERMALINK='/:year/:month/:day/:title/'`, the wizard asks) to
 keep permalinks; a post's explicit front matter `permalink` always
 wins, and without either, no redirect is guessed at.
+
+Pages count too: markdown in the root of the tree (`about.md`,
+`colophon.md` -- where Jekyll keeps its pages) is read alongside
+`_posts/` and `_drafts/`, minus the names that are never a page
+(`index`, `404`, `feed`, `sitemap` and friends).
+
+**A tree written by `./blog.sh export` comes back whole.** Its front
+matter carries a `blogsh:` block -- the post's identity and everything
+else no other engine has a word for -- and this importer reads it back,
+which makes export + import the supported way to move an installation
+between machines or hosts; such a post is coming home, so it collects no
+platform tag. The first round does normalise formatting spans markdown
+has no way to write -- two identical link spans over the same text, a
+span cut at a link's boundary, the order of spans covering the same run
+-- into one canonical shape; the visible text does not change. The
+mechanics, and the little that is deliberately lost,
+live in [architecture.md → Exporting](architecture.md#exporting-libexporterrb).
 
 The pattern understands `:year`, `:month`, `:day`, `:title` and
 `:slug`, and nothing else -- anything further is left in the address
@@ -454,7 +505,7 @@ ruby scripts/migrate_squarespace.rb <squarespace-export.xml>
 
 In Squarespace: **Settings → Import/Export → Export**, pick "WordPress
 format". It is almost a WordPress export, and everything a WXR import
-does applies -- pages and attachments counted as skips, drafts as
+does applies -- pages arrive as pages, attachments counted as skips, drafts as
 drafts. The differences are all in what a plain parse would silently
 lose, and the importer restores each: image URLs hidden in `data-src`,
 audio players that are just a `<div>` with data attributes (they become
@@ -488,7 +539,9 @@ Newsletters and podcasts come over, drafts included; a podcast episode's
 mp3 downloads and leads the post as an audio block. **Paid posts import
 in full** -- the export is the author's, so it carries the complete
 text, and the paywall marker is simply removed. The subtitle becomes the
-post's first paragraph. Threads and pages are skipped and counted.
+post's first paragraph. A page arrives as a page (it keeps its /p/
+address as a redirect, which is where Substack served it); threads are
+skipped and counted.
 
 Two honest gaps, both the export's: **tags don't exist in it** (Substack
 keeps them only on the live site -- posts arrive with just the platform
@@ -513,12 +566,11 @@ is repaired the same way as for Facebook and Instagram.
 JSON is the better ask if you have replies to keep out: only it marks
 them, so the HTML page imports every box it holds -- and an HTML run
 says so when it finishes, every time, since it cannot know whether
-there was anything to miss. HTML timestamps are
-printed to the minute in Meta's fixed Pacific clock (no daylight
-saving; the same convention, and the same conversion, as the Instagram
-HTML export) -- correct to the minute, but a re-import should stick to
-whichever format the first import used, since the lost seconds mean
-the two formats mint different identities for text-only posts.
+there was anything to miss. HTML timestamps are printed to the minute
+in Meta's fixed Pacific clock -- see [Instagram](#instagram) for the
+rule and the conversion -- and a re-import should stick to whichever
+format the first import used, since the lost seconds mean the two
+formats mint different identities for text-only posts.
 
 One flag the export carries deserves a word: `cross_post_source` is
 NOT treated as "this came from elsewhere" -- on real exports it sits
@@ -609,14 +661,11 @@ Archive never captured.
 WAYBACK_FROM=2013-01 WAYBACK_TO=2013-06 ruby scripts/migrate_wayback.rb <url>
 ```
 
-The window filters CAPTURES, not posts, and that distinction is worth
-holding on to: a late window is how you reach the end of a blog without
-replaying its whole history, but posts the feed had already dropped by
-then are missing from the run rather than from the blog -- so the
-summary says the run was windowed. Reading stays oldest-first inside
-the window, so overlapping captures still merge with the newest version
-of a post winning. The image survey ignores the window on purpose: it
-is the map you pick the window from.
+The window filters CAPTURES, not posts: what the feed had already
+dropped before the window opens is missing from the run, not from the
+blog, and the summary says the run was windowed. Reading stays
+oldest-first inside it; the image survey ignores the window on purpose
+-- it is the map you pick the window from.
 
 Honesty is the whole design here. The Archive only has what its
 crawler met: posts it never saw stay lost, images it never saved are
@@ -658,15 +707,25 @@ matters: **a public feed carries only its last few dozen items; a WXR file
 is the complete archive.** For WordPress, always export: **Tools → Export →
 All content**.
 
-From a WXR: only posts are imported (pages, attachments and menu items are
+From a WXR: posts and pages are imported (attachments and menu items are
 counted separately -- in a stock export they outnumber the posts), the slug
 the site already published under is kept, `publish` stays published and
 `draft`/`pending`/`private`/`future` become drafts, trashed items are
 skipped. Post bodies arrive as HTML and are converted to content blocks in
-the conservative subset the schema supports; anything with no representable
-shape (an iframe, an embedded player, a form) is dropped **and counted**,
-so the summary names what it couldn't keep. Images referenced in the markup
-are downloaded and measured.
+the conservative subset the schema supports; what the conversion cannot
+keep is dropped **and counted**, as everywhere. Images referenced in the
+markup are downloaded and measured.
+
+**A file that is very nearly XML is read anyway.** Exports are printed by
+templating engines, not by XML writers, so a raw query string left inside an
+element or a bare `&` in a title is ordinary -- and it makes a conforming
+parser refuse the entire archive over one character. Four of the twelve
+fixtures that Ghost's own migration tools ship are refused this way. Only
+characters that had to be escaped and were not are repaired, never structure
+and never inside a post body (where `&` is already an ordinary character),
+and the summary says how many. A file with a real defect -- a missing end
+tag, a download that stopped halfway -- still fails, and the refusal names
+*that* rather than the ampersand it just proved it can handle.
 
 **A file that is very nearly XML is read anyway.** Exports are printed by
 templating engines, not by XML writers, so a raw query string left inside an
@@ -687,6 +746,19 @@ posts keep their original dates, so they land in the archive rather than on
 the homepage, and dates a reader sees render in `site.timezone` -- set it
 before importing if the machine's clock isn't in your zone (see
 [install.md](install.md#2-configure-the-site----configsiteyml)).
+
+Then run **`./blog.sh check`** ([operations.md → Checking the
+archive](operations.md#checking-the-archive)), because a body's own links
+came across exactly as they were written. Where they point at your old
+posts that is right: with `KEEP_PERMALINKS` the import wrote a redirect at
+each of those addresses, so they answer here too and `check` accepts them.
+Where they point at the old platform's own furniture it is not -- a
+WordPress archive still carries `/wp-admin/...`, `/wp-content/...`,
+`/category/...` and `/feed/` inside its post bodies, and after the move
+those paths address the new site, which has nothing there. `check` names
+every one with its post ("links to X, which nothing on this site answers
+at"); on a blog that linked to itself a lot there will be dozens, and each
+is a decision -- rewrite it, drop it, or point it at the Wayback capture.
 
 Announcements are **not** sent for imported posts -- the auto-toot has a
 24-hour recency window, and imported dates are far outside it. That's the

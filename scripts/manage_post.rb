@@ -12,7 +12,9 @@ require 'tmpdir'
 require 'set'
 require 'securerandom'
 require 'shellwords'
+require 'stringio'
 require_relative '../lib/post_writer'
+require_relative '../lib/post_versions'
 require_relative '../lib/atomic_write'
 require_relative '../lib/mastodon_poster'
 require_relative '../lib/bluesky_poster'
@@ -81,7 +83,11 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc].freeze
+
+# What the site does with lead images when a post says nothing. Read here
+# so the header can show a post's effective answer rather than a blank.
+SITE_HERO = SiteConfig.get('layout', 'hero', default: false)
 
 # A key the parser doesn't know is silently dropped -- `pined: true` would
 # do nothing at all and never say so. Every key the author typed is checked
@@ -171,14 +177,31 @@ end
 # photo -- in converted form -- so the same "empty incoming/ means nothing
 # pending" rule applies to it.
 def cleanup_incoming(media_files, extra_sources = [])
+  left = []
   (media_files.keys + extra_sources).each do |src|
     next unless src
 
     expanded = File.expand_path(src)
     next unless expanded.start_with?("#{File.expand_path(INCOMING_DIR)}/")
+    next unless File.exist?(expanded)
 
-    File.delete(expanded) if File.exist?(expanded)
+    begin
+      File.delete(expanded)
+    rescue SystemCallError
+      # Deleting needs write permission on the DIRECTORY, not on the file,
+      # so an incoming/ owned by whoever uploads into it (a separate SFTP
+      # account is the usual arrangement) refuses this to the account that
+      # runs the CLI. The comment at the call site has always said this
+      # must not abort a save that already succeeded -- it now does not.
+      left << File.basename(expanded)
+    end
   end
+  return if left.empty?
+
+  # Said out loud rather than swallowed: "an empty incoming/ means nothing
+  # is pending" is the whole point of the tidying, and a file left behind
+  # quietly makes that untrue.
+  warn t('cli.incoming_not_cleaned', files: left.join(', '))
 end
 
 # Converts -- or refuses -- HEIC photos among the freshly attached media,
@@ -591,15 +614,60 @@ FRONTMATTER_HINT = t('cli.frontmatter_hint', cheat_sheet_url: CHEAT_SHEET_URL)
 # would just be a confusing extra path to the same decision. The parser
 # still honors a `date:` line if someone types one in by hand (backdating
 # an import, say); this only stops the template from suggesting it.
-def build_frontmatter(title:, tags:, type:, pinned: nil)
+# The value the `hero:` line should show, or nil for "don't offer the key".
+# A post that carries the field keeps it visible whatever the site does:
+# the header is what the save is rebuilt from, so a line left out is a
+# field deleted -- and this one arrived in a release where it was neither
+# in the header nor in the list of fields a save carries over, which meant
+# editing a post silently gave it back the site's answer.
+def hero_frontmatter_value(post)
+  own = post.key?('hero') ? truthy_frontmatter?(post['hero']) : nil
+  return own unless own.nil?
+
+  SITE_HERO ? true : nil
+end
+
+PAGE_TYPE = 'page'
+
+# `type: page` is how a page is written, because that is how it is thought
+# about: a page is a kind of post, not a flag on one. Inside it stays the
+# `page` field, and the content TYPE stays derived -- a page never appears
+# in a /type/ listing, so it has no use for one.
+#
+# `page: true` is still read, so pages written before this keep working
+# and an import that sets the field needs no translation.
+def frontmatter_type_and_page(meta)
+  type = meta['type'].to_s.strip
+  return [nil, true] if type.casecmp(PAGE_TYPE).zero?
+
+  [type.empty? ? nil : type, truthy_frontmatter?(meta['page'])]
+end
+
+def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
+                      unlisted: nil, series: nil, series_part: nil, toc: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
-  lines << "type: #{type}" if type
+  # A page says so on the type line, which is where somebody looks to find
+  # out what kind of thing they are editing -- and it is the only line it
+  # needs, since a page's content type is never used.
+  lines << "type: #{page ? PAGE_TYPE : type}" if page || type
   # Only shown when the post already carries it: a key that appears on
   # every new post would suggest pinning is part of writing one, when it
   # is a decision about an existing post.
   lines << "pinned: #{pinned}" unless pinned.nil?
+  # Same rule, one reason further: the site-wide layout.hero already
+  # decides this for every post, so the line is worth showing only where
+  # it can actually be acted on -- a site that uses heroes, or a post that
+  # has already said something of its own.
+  lines << "hero: #{hero}" unless hero.nil?
+  # Same rule as the pin: shown with its current value so the state can be
+  # read as well as changed, and left off a draft that has not claimed it
+  # -- a draft is unlisted already, by being a draft.
+  lines << "unlisted: #{unlisted}" unless unlisted.nil?
+  lines << "series: #{series}" unless series.nil?
+  lines << "series_part: #{series_part}" unless series_part.nil?
+  lines << "toc: #{toc}" unless toc.nil?
   lines << '---'
   "#{lines.join("\n")}\n\n"
 end
@@ -616,8 +684,37 @@ end
 TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old thread) don't get an auto announcement
 
 def announce_post(post, year:, date:, force: false)
+  # An unlisted post is not announced, and force does not open this door the
+  # way it opens the backdating one. The whole point of `unlisted` is a post
+  # that exists at its address for the handful of people you send the link
+  # to: it is out of the listings, the feeds, the sitemap and the search
+  # index, and putting its URL into a public timeline undoes all four in one
+  # go. There is no half-measure worth having here -- an announcement cannot
+  # be taken back once a server has it, so the rule is the same whether the
+  # post is published by hand or by cron, which has nobody to ask.
+  #
+  # To announce such a post, take the flag off first. That is one edit, and
+  # it makes the decision explicit rather than a side effect of publishing.
+  if truthy_frontmatter?(post['unlisted'])
+    warn t('cli.unlisted_no_toot')
+    return nil
+  end
+
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_toot')
+    return nil
+  end
+
+  # The one path that used to say nothing. Publishing.announce is a `case`
+  # over the configured network, so with neither section it matched no
+  # branch and returned nil -- and the callers, which cannot tell "did not
+  # try" from "tried and failed", printed "Failed to send the toot (see
+  # above)" over an empty screen. A reader who has just filled in an
+  # instance and a token believes the config and starts reading the
+  # engine's source instead, which is exactly what the first person to hit
+  # this did. The reason is knowable here, so it gets said here.
+  if SiteConfig.comment_network.nil?
+    warn t('cli.no_network_toot')
     return nil
   end
 
@@ -683,7 +780,7 @@ def cmd_add
   date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'])
   title = meta['title'].to_s.empty? ? nil : meta['title']
   tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
-  type = meta['type'].to_s.empty? ? nil : meta['type']
+  type, page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
@@ -745,7 +842,26 @@ def cmd_add
     'source' => { 'platform' => 'manual' }
   }
   post['type'] = type if type
+  # Was not read here at all before: a page could only be made by editing
+  # one into existence, never by writing one.
+  post['page'] = true if page
   post['pinned'] = true if truthy_frontmatter?(meta['pinned'])
+  post['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
+  # The same four keys edit_post persists, under the same rules -- the
+  # editor template offers them here too, and a key the editor offers must
+  # not vanish on the first save only to start working on the second. The
+  # series name is written as typed (its address slug is derived at build
+  # time), the part is an integer override for out-of-order publishing,
+  # and hero/toc are presence-based: only stored where they carry an
+  # opinion of their own.
+  post['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
+  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  post['series_part'] = part if part
+  if meta.key?('hero')
+    hero_wanted = truthy_frontmatter?(meta['hero'])
+    post['hero'] = hero_wanted unless hero_wanted == SITE_HERO
+  end
+  post['toc'] = truthy_frontmatter?(meta['toc']) if meta.key?('toc') && !meta['toc'].to_s.strip.empty?
 
   path = PostWriter.write(post, media_files: media_files)
   discard_editor_buffer
@@ -923,6 +1039,11 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
       # checked against.
       puts t('cli.schedule_slots_taken')
       passed.each { |time, slug| puts "     #{time.strftime(t('date_time_format'))} → '#{slug}'" }
+      # The road to an EARLIER slot, said exactly where the author is
+      # looking at a full queue and an offer a month out. The two-step is
+      # by design (the queue owns the ordering), but a design nobody
+      # mentions at this prompt reads as "the queue is full, tough luck".
+      puts Tui.paint("   #{t('cli.schedule_queue_hint')}", :dim)
       puts
     end
     puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
@@ -978,10 +1099,27 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
 end
 
 def announce_on_publish(post, year, date)
+  # Before the question, not after it: with no network there is nothing the
+  # answer could change, and being asked to confirm an announcement that
+  # cannot happen -- then being told it did not happen -- is two screens of
+  # ceremony over one missing section. announce_post keeps the same guard
+  # for any future caller that does not come through here.
+  if SiteConfig.comment_network.nil?
+    warn t('cli.no_network_toot')
+    return nil
+  end
+
   force = false
   if (date - Time.now).abs > TOOT_RECENCY_WINDOW
     answer = Tui.key_choice(t('cli.date_outside_window_prompt', date: date.strftime(t('date_format'))))
-    return nil unless answer.start_with?(t('cli.confirm_yes_char'))
+    # Saying no here is a decision, and it used to be reported as a
+    # failure: the question scrolled away, "Failed to send the toot (see
+    # above)" took its place, and above it was the question the author had
+    # just answered. It says what happened instead.
+    unless Tui.yes?(answer)
+      warn t('cli.toot_declined')
+      return nil
+    end
 
     force = true
   end
@@ -1075,14 +1213,19 @@ def pick_among_years(slug, paths)
 
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }
-  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+  question = t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
+    # The question goes INTO the frame. Printed above it, as it used to be,
+    # the frame would paint straight over it.
+    choice = Tui.menu(rows, header: [question, ''],
+                            hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
   end
+
+  puts question
 
   rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
   puts
@@ -1129,8 +1272,18 @@ def cmd_toot(slug)
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
   fields = announce_on_publish(post, year, date)
-  unless fields
+  # false means the network was asked and said no -- the poster has already
+  # printed what it heard, so "see above" has an above. nil means nobody
+  # was asked, and whichever guard declined to ask said why: unlisted, no
+  # base URL, no network configured, a date outside the window the author
+  # then refused. Printing "Failed" over those is a second, wrong answer to
+  # a question already answered -- and over the silent ones it was the only
+  # answer, pointing at nothing.
+  if fields == false
     warn t('cli.toot_failed')
+    warn ''
+    return
+  elsif fields.nil?
     warn ''
     return
   end
@@ -1182,8 +1335,13 @@ def cmd_bluesky(slug)
   end
 
   fields = announce_on_publish(post, year, date)
-  unless fields
+  # Same contract as `toot` above: false was refused by the network, nil was
+  # never attempted and said why.
+  if fields == false
     warn t('cli.bluesky_failed')
+    warn ''
+    return
+  elsif fields.nil?
     warn ''
     return
   end
@@ -1322,9 +1480,12 @@ end
 # Row selection, in both faces the pickers already have: the arrow-key
 # menu in a terminal, a numbered list plus a read line when piped -- so
 # the queue stays scriptable the same way everything else is.
-def queue_pick(entries)
+#
+# `initial:` is where the cursor opens. Piped input ignores it, the same
+# way it ignores every other cursor: there the row is named by number.
+def queue_pick(entries, initial: 0)
   rows = entries.each_with_index.map { |entry, i| queue_row(entry, i) }
-  return Tui.menu(rows, hint: t('cli.queue_menu_hint')) if Tui.interactive?
+  return Tui.menu(rows, hint: t('cli.queue_menu_hint'), initial: initial) if Tui.interactive?
 
   rows.each { |row| puts "  #{row}" }
   puts
@@ -1340,39 +1501,191 @@ end
 # rebuild happens once, on the way out, not after every move -- with a
 # multi-post reshuffle the intermediate states aren't worth a deploy
 # each.
+# PROTOTYPE (13 Aug 2026): the queue as a screen that stays put instead of
+# a dialog that reprints itself. Every keypress used to leave another full
+# copy of the queue in the scrollback -- twenty rows, a hint line and an
+# action row, again and again, so five moves buried the terminal in five
+# identical screens. Here the frame is repainted over itself and the
+# terminal never scrolls.
+#
+# Deliberately NOT the alternate screen: see Tui.frame. The last frame
+# stays on screen when the queue is left, and everything above it survives.
+#
+# What is prototype-grade and would need deciding before this spreads to
+# the other screens:
+#   * the size is re-read on every repaint, so a window resized WHILE the
+#     screen waits for a key straightens out on the next keypress rather
+#     than immediately -- no SIGWINCH handler yet
+#   * messages the actions print are captured and shown on the frame's own
+#     status line; anything printing more than one line ([p], [s], [n])
+#     leaves the screen instead, runs as it always did, and waits for a key
+#     before the frame comes back
+#   * piped input keeps the old line-based path untouched, below
 def cmd_queue
+  return cmd_queue_screen if Tui.interactive?
+
+  cmd_queue_lines
+end
+
+# The rows of one frame: heading, the window of the queue with the cursor,
+# a status line for whatever the last action said, and the keys. Built as
+# one array so Tui.frame can paint it in a single write -- a frame assembled
+# with several prints flickers on a slow connection, which SSH from a phone
+# certainly is.
+def queue_frame_lines(entries, selected, offset, window, mode, status)
+  lines = [Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold), '']
+  entries[offset, window].to_a.each_with_index do |entry, i|
+    row = queue_row(entry, offset + i)
+    lines << if (offset + i) == selected
+               Tui.paint("› #{Tui.truncate_to_width(Tui.strip_ansi(row), Tui.term_width - 2)}", :invert)
+             else
+               "  #{Tui.truncate_ansi(row, Tui.term_width - 2)}"
+             end
+  end
+  lines << ''
+  # The status line only exists when it has something to say. Reserving a
+  # row for it left three blank lines stacked under the list on every
+  # ordinary frame, which reads as a gap rather than as breathing room.
+  unless status.to_s.empty?
+    lines << Tui.truncate_to_width(status.to_s, Tui.term_width)
+    lines << ''
+  end
+  keys = mode == :list ? t('cli.queue_menu_hint') : with_carry_key(t('cli.queue_actions', slug: entries[selected][:slug]))
+  rows = Tui.fold_prompt(Tui.paint(keys, :dim), Tui.term_width).lines.map(&:chomp)
+  # The second value is how many rows at the end are the keys, so a window
+  # too short for the frame drops queue rows rather than the way out.
+  [lines + rows, rows.size + 1]
+end
+
+# Runs one of the actions that speak in a single line ([u], [d], [m]) and
+# hands back what it said, so the frame can show it on its status line
+# rather than letting it scroll the screen. $stdout is restored in an
+# ensure because these actions can abort the process outright.
+def queue_quiet_action(&block)
+  buffer = StringIO.new
+  original = $stdout
+  $stdout = buffer
+  result = block.call
+  [result, buffer.string.lines.map(&:chomp).reject(&:empty?).last.to_s]
+ensure
+  $stdout = original
+end
+
+def cmd_queue_screen
   dirty = false
+  selected = 0
+  offset = 0
+  mode = :list
+  status = ''
+
+  Tui.screen do |screen|
   loop do
     entries = queue_entries
     if entries.empty?
+      # No blank line of its own: the tail below writes the one blank line
+      # this command ends with, whichever way the loop was left. Reached
+      # only from a cleared screen (the first pass, or after screen.leave
+      # published the last post), so there is no open frame row to close.
       puts t('cli.queue_empty')
-      puts
       break
     end
 
-    puts Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold)
-    puts
-    index = queue_pick(entries)
-    if index.nil?
-      puts
-      break
+    selected = selected.clamp(0, entries.size - 1)
+    # Six rows go to the heading, its blank line, the blank line under the
+    # list and the keys block, which folds to two on a narrow terminal; the
+    # rest is queue. Recomputed every frame, so a resized window is simply
+    # the next frame with a different number of rows.
+    window = [entries.size, [Tui.term_height - 7, 3].max].min
+    offset = Tui.clamp_offset(selected, offset, window, entries.size)
+    lines, keep = queue_frame_lines(entries, selected, offset, window, mode, status)
+    screen.paint(lines, keep_last: keep)
+
+    key = screen.key
+    # A window resized while the screen waits repaints and changes nothing
+    # else -- including the status line, which the user has not read yet
+    # and did not ask to lose by dragging a corner.
+    next if key == :resize
+
+    status = ''
+
+    if mode == :list
+      case key
+      when :up then selected = (selected - 1) % entries.size
+      when :down then selected = (selected + 1) % entries.size
+      when :page_up then selected = [selected - window, 0].max
+      when :page_down then selected = [selected + window, entries.size - 1].min
+      when :home then selected = 0
+      when :end then selected = entries.size - 1
+      when :enter then mode = :actions
+      when :escape
+        # Tui.frame ends its last row WITHOUT a newline so the cursor can
+        # stand on it, and this is the one way out that leaves that frame
+        # standing -- so everything said afterwards was printed onto the
+        # keys line: "Esc zpětStiskni klávesu pro pokračování…". One
+        # newline closes the row; the blank line every wizard-reachable
+        # command ends with is written by the tail below.
+        puts
+        break
+      end
+      next
     end
 
-    puts
-    dirty = true if queue_act(entries, index)
+    case key
+    when 'u', 'd'
+      moved, status = queue_quiet_action { queue_swap(entries, selected, selected + (key == 'u' ? -1 : 1)) }
+      if moved
+        dirty = true
+        # The cursor travels with the post it just moved, the same rule the
+        # line-based screen follows through queue_focus_index.
+        selected += key == 'u' ? -1 : 1
+      end
+    when 'm'
+      # The carry SCREEN must not run inside queue_quiet_action: that
+      # redirects $stdout, and Tui.frame prints there -- so the screen was
+      # painted into the buffer instead of onto the terminal and [m] looked
+      # like a key that does nothing. Only the write afterwards is captured,
+      # because only the write has a line to say.
+      first_future = entries.index { |entry| entry[:time] > Time.now }
+      if first_future.nil? || selected < first_future
+        status = t('cli.queue_swap_overdue')
+      else
+        target = queue_carry_screen(entries, selected, first_future, screen)
+        if target && target != selected
+          carried, status = queue_quiet_action { queue_carry_apply(entries, selected, target) }
+          if carried
+            dirty = true
+            selected = target
+          end
+        end
+      end
+    when 'p', 's', 'n'
+      # These print more than a frame can hold -- a publish announces, a
+      # reschedule asks a question of its own. They get the terminal.
+      screen.leave(t('cli.wizard_continue_prompt')) do
+        dirty = true if queue_act_slow(entries, selected, key)
+      end
+      mode = :list
+    when :enter, :escape then mode = :list
+    end
+  end
   end
 
-  rebuild_and_deploy(t('cli.updating_preview')) if dirty
+  # The one blank line this command ends with. The rebuild opens with a
+  # blank line of its own and closes with another after "Done:", so it is
+  # only the silent way out that has to write one.
+  if dirty
+    rebuild_and_deploy(t('cli.updating_preview'))
+  else
+    puts
+  end
 end
 
-# Returns true when something changed that the closing rebuild must pick
-# up. "Publish now" rebuilds inside publish_draft as always; only the
-# compaction it may be followed by still needs the closing one.
-def queue_act(entries, index)
+# The three actions that leave the screen. Split out of queue_act so the
+# frame-based screen and the line-based one below run the same code for
+# them rather than two copies that can drift.
+def queue_act_slow(entries, index, key)
   entry = entries[index]
-  case Tui.key_choice(t('cli.queue_actions', slug: entry[:slug]))
-  when 'u' then queue_swap(entries, index, index - 1)
-  when 'd' then queue_swap(entries, index, index + 1)
+  case key
   when 'p'
     freed = entry[:time]
     publish_draft(entry[:slug], path: entry[:path])
@@ -1383,6 +1696,78 @@ def queue_act(entries, index)
   when 'n'
     unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
     queue_offer_compact(entry[:time], entries[(index + 1)..])
+  end
+end
+
+def cmd_queue_lines
+  dirty = false
+  focus = nil
+  loop do
+    entries = queue_entries
+    if entries.empty?
+      puts t('cli.queue_empty')
+      puts
+      break
+    end
+
+    puts Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold)
+    puts
+    index = queue_pick(entries, initial: queue_focus_index(entries, focus))
+    if index.nil?
+      puts
+      break
+    end
+
+    focus = { slug: entries[index][:slug], index: index }
+    puts
+    dirty = true if queue_act(entries, index)
+  end
+
+  rebuild_and_deploy(t('cli.updating_preview')) if dirty
+end
+
+# Where the cursor opens after an action, given the row it was on before.
+# By SLUG rather than by position: [u] and [d] move the picked post, so its
+# old row now holds the neighbour it traded with -- coming back by number
+# would leave the cursor behind, and a second [u] would carry off the wrong
+# post. Moving a post several slots is the ordinary case, and it used to
+# mean walking down from the top of the queue for every single slot.
+#
+# The remembered position is the fallback for a post that has LEFT the
+# queue ([p] publishes it, [n] returns it to drafts): there is no slug to
+# find any more, and its row now belongs to whoever moved up into it, which
+# is where the eye already is. Nearest-to-the-old-position among matches,
+# because the same slug in two different years is ordinary here (the rest
+# of this screen is careful about it too) and the first match may well be
+# the other one.
+def queue_focus_index(entries, focus)
+  return 0 if focus.nil? || entries.empty?
+
+  matches = entries.each_index.select { |i| entries[i][:slug] == focus[:slug] }
+  return matches.min_by { |i| (i - focus[:index]).abs } unless matches.empty?
+
+  focus[:index].clamp(0, entries.size - 1)
+end
+
+# Returns true when something changed that the closing rebuild must pick
+# up. "Publish now" rebuilds inside publish_draft as always; only the
+# compaction it may be followed by still needs the closing one.
+# [m] joins the row only in a terminal: carrying a post is a screen, and a
+# piped caller has [u] and [d], which need no screen at all. Inserted before
+# [Enter] the way the versions key is, which is literal in every locale.
+def with_carry_key(prompt)
+  return prompt unless Tui.interactive?
+
+  prompt.sub('[Enter]') { "#{t('cli.queue_action_carry')}[Enter]" }
+end
+
+def queue_act(entries, index)
+  entry = entries[index]
+  case (key = Tui.key_choice(with_carry_key(t('cli.queue_actions', slug: entry[:slug]))))
+  when 'u' then queue_swap(entries, index, index - 1)
+  when 'd' then queue_swap(entries, index, index + 1)
+  when 'm' then queue_carry(entries, index)
+  when 'p', 's', 'n' then queue_act_slow(entries, index, key)
   when '' then false
   else
     puts t('cli.queue_unknown')
@@ -1422,6 +1807,121 @@ rescue Exception
     warn ''
   end
   raise
+end
+
+# Picking the post up and carrying it, instead of trading places with one
+# neighbour at a time. The arrows move the post itself through the queue --
+# on screen and in memory -- and nothing is written until Enter puts it
+# down. Esc walks away and the queue is exactly as it was.
+#
+# The times do not travel with it. A queue of twenty slots stays those
+# twenty slots; carrying a post from the eighth to the second means the six
+# in between each step back one slot, which is the rule [u] already
+# follows, applied to a whole run at once. That is what lets this be a
+# single confirmed write instead of a write per slot: the set of occupied
+# times is identical before and after, only the posts sitting in them
+# differ.
+#
+# A post whose time has passed is off limits at both ends, for the reason
+# queue_swap gives -- the cron owns it now, and handing another post that
+# time would schedule it into the past.
+def queue_carry(entries, index)
+  first_future = entries.index { |entry| entry[:time] > Time.now }
+  if first_future.nil? || index < first_future
+    puts t('cli.queue_swap_overdue')
+    puts
+    return false
+  end
+
+  target = Tui.screen { |screen| queue_carry_screen(entries, index, first_future, screen) }
+  # The carry screen ends on a frame, whose last row Tui.frame leaves open
+  # for the cursor to stand on -- so the line the write reports below was
+  # printed onto the carry hint. cmd_queue_screen needs no such thing: it
+  # repaints over the frame instead of printing under it.
+  puts
+  return false if target.nil? || target == index
+
+  queue_carry_apply(entries, index, target)
+end
+
+# The write half, split from the screen half so a caller that has already
+# painted its own frame (cmd_queue_screen) can run the two apart -- the
+# screen has to reach the terminal, the write only has a line to report.
+def queue_carry_apply(entries, index, target)
+  order = entries.dup
+  order.insert(target, order.delete_at(index))
+  times = entries.map { |entry| entry[:time] }
+  moves = order.each_with_index.filter_map do |entry, i|
+    [entry, times[i]] unless entry[:time] == times[i]
+  end
+
+  # Every half checked before any of it is written -- the whole reason
+  # queue_swap does the same, only here the run is longer and a failure
+  # partway through would leave more of the queue half-moved.
+  moves.each do |entry, target_time|
+    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
+    target_path = File.join(CONTENT_DIR, target_time.year.to_s, "#{entry[:post]['slug']}.json")
+    next if File.expand_path(target_path) == File.expand_path(entry[:path])
+
+    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
+  end
+
+  apply_queue_moves(moves) do |entry, target_time|
+    write_scheduled_date(entry[:path], entry[:post], target_time, raw: entry[:raw])
+  end
+  puts Tui.paint(t('cli.queue_carried', slug: entries[index][:slug], position: target + 1,
+                                        date: times[target].getlocal.strftime(t('date_time_format'))), :green)
+  puts
+  true
+end
+
+# Draws the queue with one post held under the cursor and returns the
+# position it was put down at, or nil on Esc. Its own repaint loop rather
+# than Tui.menu, because the rows themselves reorder as the post travels --
+# a menu moves a cursor over a fixed list, and this moves the list.
+#
+# Piped callers never reach here: [m] is offered only in a terminal, and
+# scripted reordering has [u]/[d], which need no screen at all.
+def queue_carry_screen(entries, index, first_future, screen)
+  target = index
+  offset = 0
+
+  loop do
+    window = [entries.size, [Tui.term_height - 7, 3].max].min
+    order = entries.dup
+    order.insert(target, order.delete_at(index))
+    offset = Tui.clamp_offset(target, offset, window, entries.size)
+
+    # The same frame the queue screen paints, so picking a post up does not
+    # move anything on screen except the post itself -- the heading stays on
+    # its row, the list stays in its rows, only the hint at the bottom
+    # changes to say what the arrows now do.
+    lines = [Tui.paint(t('cli.props_queue_heading', count: entries.size), :bold), '']
+    order[offset, window].to_a.each_with_index do |entry, i|
+      row = queue_row(entry, offset + i)
+      lines << if (offset + i) == target
+                 Tui.paint("⇅ #{Tui.truncate_to_width(Tui.strip_ansi(row), Tui.term_width - 2)}", :invert)
+               else
+                 "  #{Tui.truncate_ansi(row, Tui.term_width - 2)}"
+               end
+    end
+    lines << ''
+    lines << Tui.paint(Tui.truncate_to_width(t('cli.queue_carry_hint'), Tui.term_width), :dim)
+    screen.paint(lines)
+
+    case screen.key
+    when :resize then next
+    # No wraparound: carrying a post off the top and having it appear at the
+    # bottom is a move nobody meant to make, and unlike a cursor this one
+    # writes to disk when it lands.
+    when :up then target = [target - 1, first_future].max
+    when :down then target = [target + 1, entries.size - 1].min
+    when :home then target = first_future
+    when :end then target = entries.size - 1
+    when :enter then return target
+    when :escape then return nil
+    end
+  end
 end
 
 # Moving a post earlier or later means exchanging times with its
@@ -1483,7 +1983,7 @@ def queue_offer_compact(freed_time, rest)
   return false if rest.empty? || freed_time <= Time.now
 
   answer = Tui.key_choice(t('cli.queue_compact_prompt', count: rest.size))
-  return false unless answer.start_with?(t('cli.confirm_yes_char'))
+  return false unless Tui.yes?(answer)
 
   times = [freed_time] + rest.map { |entry| entry[:time] }
   # The whole loop is checked before the first write, for the reason
@@ -1578,8 +2078,12 @@ end
 # operations that each used to be its own wizard menu item -- gathering
 # them under the post is what let the menu shrink to activities.
 
+# Returns the row rather than printing it, so the same builder serves both
+# faces: the frame collects the rows, the piped path prints them.
 def props_line(key, value)
-  puts format('  %-12s %s', t("cli.props_label_#{key}"), value) unless value.to_s.empty?
+  return nil if value.to_s.empty?
+
+  format('  %-12s %s', t("cli.props_label_#{key}"), value)
 end
 
 def props_title(post)
@@ -1597,7 +2101,106 @@ def abort_if_post_changed(path, original_raw, slug)
   abort t('cli.post_changed_while_editing', slug: slug)
 end
 
+# Everything above the keys, as rows. Built once and used by both faces:
+# the frame paints them, the piped path prints them.
+# No leading blank row: in the scrolling dialog one separated the title
+# from whatever was printed before it, and the piped path below still adds
+# it. At the top of a frame it is just a gap.
+def props_frame_lines(post, path, slug, year)
+  lines = ["  #{Tui.paint(props_title(post), :bold)}",
+           "  #{draft?(post) ? t('cli.props_draft_banner') : "posts/#{year}/#{post['slug']}/"}", '']
+  if draft?(post)
+    # No created/date line for a plain draft, on purpose: a draft has no
+    # time -- its date is set by publishing or scheduling, and showing
+    # anything earlier would suggest it means something.
+    lines << props_line('scheduled', post['scheduled'] ? Time.parse(post['date']).getlocal.strftime(t('date_time_format')) : nil)
+  else
+    lines << props_line('state', t('cli.props_state_published', date: Time.parse(post['date']).getlocal.strftime(t('date_time_format'))))
+  end
+  lines << props_line('type', ContentType.dominant(post))
+  lines << props_line('tags', (post['tags'] || []).join(', '))
+  lines << props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
+  lines << props_line('unlisted', truthy_frontmatter?(post['unlisted']) ? t('cli.props_unlisted_yes') : nil)
+  announced = post['mastodon_url'] || post['bluesky_url']
+  # An unlisted draft used to be told "goes out when the post publishes",
+  # which was both a false promise and the wrong way round: an unlisted post
+  # is never announced, so the line has to say that rather than leave the
+  # author expecting a toot that will not come -- or worse, believing one is
+  # owed and going to look for why it failed.
+  lines << props_line('announced', if announced then announced
+                                   elsif truthy_frontmatter?(post['unlisted'])
+                                     t('cli.props_announces_never_unlisted')
+                                   elsif draft?(post) then t('cli.props_announces_on_publish')
+                                   else t('cli.props_not_announced')
+                                   end)
+  # Old addresses are counted, not listed: a post renamed a few times
+  # would push everything else off the screen, and the list is one
+  # keypress away in [a].
+  addresses = Array(post['former_slugs']).size
+  lines << props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
+  lines.compact!
+  # The whole queue, after the property list rather than inside it: it is
+  # a block, not a field, and until now the only way to see what goes out
+  # when was opening every draft in turn -- which is also how an offered
+  # slot could look like the wrong one.
+  if post['scheduled'] && (queue = scheduled_entries.sort_by(&:first)).size > 1
+    lines << ''
+    lines << Tui.paint(t('cli.props_queue_heading', count: queue.size), :dim)
+    queue.each do |time, queued_slug|
+      mark = queued_slug == post['slug'] ? '→' : ' '
+      lines << "  #{mark} #{time.getlocal.strftime(t('date_time_format'))}  #{queued_slug}"
+    end
+  end
+  lines << ''
+  lines << Tui.paint(t('cli.props_attributes_hint'), :dim)
+  lines << ''
+  lines
+end
+
+# The keys row for the post as it stands: which three of the six shapes it
+# is (draft, scheduled, published, announced or not) decides the wording,
+# and [v] joins only when there is a version to restore.
+def props_prompt(post, path, slug, network_label)
+  key = if draft?(post)
+          post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'
+        elsif network_label
+          'cli.props_actions_published'
+        else
+          'cli.props_actions_published_plain'
+        end
+  with_versions_key(t(key, network: network_label), path, slug)
+end
+
 def cmd_props(slug)
+  return Tui.screen { |screen| props_loop(slug, screen) } if Tui.interactive?
+
+  props_loop(slug, nil)
+end
+
+# Runs an action that speaks for itself. On a frame it takes the terminal
+# and gives it back; piped it simply runs, which is what it always did.
+def props_run(screen, &block)
+  return block.call unless screen
+
+  screen.leave(t('cli.wizard_continue_prompt'), &block)
+end
+
+# Leaving the dialog. Tui.frame ends its last line without a newline
+# (deliberately -- see the comment there), so a frame left standing has its
+# keys row still open, and the wizard's "press a key" was printed onto it:
+# "[Enter] zpět: Stiskni klávesu pro pokračování…". That first newline
+# closes the row; the piped face has already closed its own. The second is
+# the blank line every wizard-reachable command ends with.
+def props_close(screen)
+  puts if screen
+  puts
+end
+
+# One loop for both faces. The actions are the point of this dialog and
+# there is no version of "keep them in step" that survives two copies of
+# this case statement, so the difference between a frame and a scroll is
+# confined to how the rows get on screen and how the key comes back.
+def props_loop(slug, screen)
   network = SiteConfig.comment_network
   network_label = { mastodon: 'Mastodon', bluesky: 'Bluesky' }[network]
 
@@ -1616,76 +2219,65 @@ def cmd_props(slug)
     post = JSON.parse(original_raw)
     year = File.basename(File.dirname(path))
 
-    puts
-    puts "  #{Tui.paint(props_title(post), :bold)}"
-    puts "  #{draft?(post) ? t('cli.props_draft_banner') : "posts/#{year}/#{post['slug']}/"}"
-    puts
-    if draft?(post)
-      # No created/date line for a plain draft, on purpose: a draft has no
-      # time -- its date is set by publishing or scheduling, and showing
-      # anything earlier would suggest it means something.
-      props_line('scheduled', post['scheduled'] ? Time.parse(post['date']).getlocal.strftime(t('date_time_format')) : nil)
+    lines = props_frame_lines(post, path, slug, year)
+    prompt = props_prompt(post, path, slug, network_label)
+
+    if screen
+      keys = Tui.fold_prompt(Tui.paint(prompt, :dim), Tui.term_width).lines.map(&:chomp)
+      screen.paint(lines + keys, keep_last: keys.size)
+      key = screen.key
+      next if key == :resize
+
+      # The frame's key comes back as a symbol for Enter and Esc, where the
+      # line-based dialog has always produced an empty string; the case
+      # statements below were written against that and stay untouched.
+      key = '' unless key.is_a?(String)
     else
-      props_line('state', t('cli.props_state_published', date: Time.parse(post['date']).getlocal.strftime(t('date_time_format'))))
-    end
-    props_line('type', ContentType.dominant(post))
-    props_line('tags', (post['tags'] || []).join(', '))
-    props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
-    announced = post['mastodon_url'] || post['bluesky_url']
-    props_line('announced', if announced then announced
-                            elsif draft?(post) then t('cli.props_announces_on_publish')
-                            else t('cli.props_not_announced')
-                            end)
-    # Old addresses are counted, not listed: a post renamed a few times
-    # would push everything else off the screen, and the list is one
-    # keypress away in [a].
-    addresses = Array(post['former_slugs']).size
-    props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
-    # The whole queue, after the property list rather than inside it: it is
-    # a block, not a field, and until now the only way to see what goes out
-    # when was opening every draft in turn -- which is also how an offered
-    # slot could look like the wrong one.
-    if post['scheduled'] && (queue = scheduled_entries.sort_by(&:first)).size > 1
       puts
-      puts Tui.paint(t('cli.props_queue_heading', count: queue.size), :dim)
-      queue.each do |time, queued_slug|
-        mark = queued_slug == post['slug'] ? '→' : ' '
-        puts "  #{mark} #{time.getlocal.strftime(t('date_time_format'))}  #{queued_slug}"
-      end
+      lines.each { |line| puts line }
+      key = Tui.key_choice(prompt)
+      # A pipe echoes nothing back, so the prompt's own row is still open --
+      # closed here, before an action prints under it. Without it every
+      # answer this dialog gives landed ON the keys: "[Enter] zpět: Datum
+      # publikace…". The frame's row is closed on the way out instead (see
+      # props_close), because there the frame is what stays on screen.
+      puts
     end
-
-    puts
-    puts Tui.paint(t('cli.props_attributes_hint'), :dim)
-    puts
 
     if draft?(post)
-      case Tui.key_choice(t(post['scheduled'] ? 'cli.props_actions_scheduled' : 'cli.props_actions_draft'))
-      when 'p' then return publish_draft(slug)
+      case key
+      when 'p' then return props_run(screen) { publish_draft(slug) }
       when 's'
-        puts
-        prompt_and_schedule(path, post, raw: original_raw)
+        props_run(screen) do
+          puts
+          prompt_and_schedule(path, post, raw: original_raw)
+        end
       when 'n'
         unless post['scheduled']
-          puts t('cli.props_unknown_draft')
+          props_run(screen) { puts t('cli.props_unknown_draft') }
           next
         end
-        unschedule_post(path, post, slug, raw: original_raw)
+        props_run(screen) { unschedule_post(path, post, slug, raw: original_raw) }
       when 'r'
-        slug = rename_post(path, post, raw: original_raw)
+        slug = props_run(screen) { rename_post(path, post, raw: original_raw) }
+      when 'v'
+        props_run(screen) { props_versions(path, slug) }
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.
-        next unless delete_post(slug)
+        gone = props_run(screen) do
+          delete_post(slug) && rebuild_and_deploy(t('cli.updating_preview'))
+        end
+        next unless gone
 
-        rebuild_and_deploy(t('cli.updating_preview'))
         return
-      when '' then return
-      else puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft')
+      when '' then return props_close(screen)
+      else props_run(screen) { puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft') }
       end
     else
-      case Tui.key_choice(network_label ? t('cli.props_actions_published', network: network_label) : t('cli.props_actions_published_plain'))
+      case key
       when 'u'
-        cmd_unpublish(slug)
+        props_run(screen) { cmd_unpublish(slug) }
         # A cancelled confirmation leaves the post published -- come back
         # to the dialog rather than ending it. After a real unpublish the
         # draft decision loop has already offered everything there is.
@@ -1693,23 +2285,27 @@ def cmd_props(slug)
         return if p2.nil? || draft?(JSON.parse(File.read(p2, encoding: 'utf-8')))
       when 't'
         unless network_label
-          puts t('cli.props_unknown_published_plain')
+          props_run(screen) { puts t('cli.props_unknown_published_plain') }
           next
         end
-        puts
-        network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
+        props_run(screen) do
+          puts
+          network == :bluesky ? cmd_bluesky(slug) : cmd_toot(slug)
+        end
       when 'c'
-        toggle_pin(path, post, slug, raw: original_raw)
+        props_run(screen) { toggle_pin(path, post, slug, raw: original_raw) }
       when 'r'
-        slug = rename_post(path, post, raw: original_raw)
+        slug = props_run(screen) { rename_post(path, post, raw: original_raw) }
       when 'a'
-        props_addresses(path, slug)
+        props_run(screen) { props_addresses(path, slug) }
+      when 'v'
+        props_run(screen) { props_versions(path, slug) }
       when 'x'
-        cmd_delete(slug)
+        props_run(screen) { cmd_delete(slug) }
         # Cancelled (the post still exists) -> stay in the dialog.
         return unless find_post_path(slug)
-      when '' then return
-      else puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain')
+      when '' then return props_close(screen)
+      else props_run(screen) { puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain') }
       end
     end
   end
@@ -1761,6 +2357,158 @@ end
 #
 # Taken addresses are marked as such, because that is the whole reason
 # someone would come here: the marked one is the entry to drop.
+# The [v] key joins the prompt only for a post that has something to show.
+# A row of actions is read every time the dialog opens, and one that is
+# there on every post from the day it is installed -- doing nothing on all
+# of them until somebody has edited one -- costs more attention than it
+# saves. Inserted before [Enter], which is literal in every locale.
+def with_versions_key(prompt, path, slug)
+  year = File.basename(File.dirname(path))
+  return prompt if PostVersions.list(slug, year, content_dir: CONTENT_DIR).empty?
+
+  prompt.sub('[Enter]') { "#{t('cli.props_action_versions')}[Enter]" }
+end
+
+def version_row(file, index)
+  format('%2d.  %s', index + 1, PostVersions.human_stamp(File.basename(file, '.json')))
+end
+
+# What the version SAYS, for the line under the cursor. A stamp answers
+# "when", and until now that was the whole of it -- restoring meant picking
+# by time and hoping, on the one screen where the point is to recognise a
+# text you wrote. Title first because that is what a post is filed under
+# here; failing that the opening words, which is what an untitled post is
+# recognised by.
+#
+# Read on demand, for the selected row only: ten versions of a long post
+# are ten files nobody needs opened to walk past them.
+def version_preview(file)
+  post = JSON.parse(File.read(file, encoding: 'utf-8'))
+  title = post['title'].to_s.strip
+  return title unless title.empty?
+
+  text = Array(post['content']).filter_map { |b| b['text'] if b['type'] == 'text' }.join(' ')
+  text.strip.gsub(/\s+/, ' ')
+rescue StandardError
+  # A version that will not parse is exactly the one somebody may be trying
+  # to restore FROM, so it stays in the list, just without a preview.
+  nil
+end
+
+# Same two faces as every other picker here: arrow keys in a terminal, a
+# numbered list and a read line when piped. This screen was the one place
+# that asked for a number even in a terminal, which made it the only list
+# in the wizard a cursor could not walk.
+#
+# Unlike the other pickers it still says so when the number is out of range
+# instead of quietly going back: a piped caller that typed 9 for three
+# versions has made a mistake worth hearing about, and the sentence for it
+# already exists in every locale.
+def version_pick(rows, header, versions)
+  if Tui.interactive?
+    return Tui.menu(rows, header: header, hint: t('cli.versions_menu_hint'),
+                          context: ->(i) { version_preview(versions[i]) })
+  end
+
+
+  header.each { |line| puts line }
+  rows.each { |row| puts "  #{row}" }
+  puts
+  print t('cli.versions_prompt', count: rows.size)
+  line = $stdin.gets.to_s.strip
+  # A pipe echoes nothing, so the prompt's own row is still open -- closed
+  # here, exactly as address_pick and queue_pick close theirs. Every caller
+  # then writes the blank line after the picker itself.
+  puts
+  return nil if line.empty?
+
+  index = line.to_i - 1
+  return index if line =~ /\A\d+\z/ && (0...rows.size).cover?(index)
+
+  puts t('cli.versions_unknown')
+  nil
+end
+
+# The undo for editing. Lists what this post said before its recent saves
+# and puts one of them back -- keeping the current text as a version of its
+# own first, so choosing wrong is itself undoable.
+#
+# Only the text comes back. Media is not versioned (see lib/post_versions.rb),
+# so a version old enough to name an image the post no longer has would
+# restore a broken reference -- which is what the cap on how many are kept
+# is for, and what the sentence under the list says out loud.
+def props_versions(path, slug)
+  year = File.basename(File.dirname(path))
+  versions = PostVersions.list(slug, year, content_dir: CONTENT_DIR)
+  if versions.empty?
+    puts t('cli.versions_none')
+    puts
+    return
+  end
+
+  # Both lines travel INTO the picker's frame. Printed here, as they were
+  # while the menu repainted in place, the frame would paint over them --
+  # and what it painted over was the heading naming the post and the
+  # warning that images are not versioned, which is the one thing a reader
+  # has to weigh before choosing. The warning sits above the list on
+  # purpose: it is about the whole operation, and a warning is worth more
+  # read before the choosing than after it.
+  header = [t('cli.versions_heading', slug: slug), t('cli.versions_media_note'), '']
+  index = version_pick(versions.map.with_index { |file, i| version_row(file, i) }, header, versions)
+  # The blank line after the picker, written here rather than in either of
+  # its two faces: Tui.menu only closes the row its frame left open. Without
+  # it the confirmation below stood on the row immediately under the keys.
+  puts
+  return if index.nil?
+
+  chosen = versions[index]
+  restored = JSON.parse(File.read(chosen, encoding: 'utf-8'))
+  # One key, not a typed word. This engine keeps typing for what DISAPPEARS
+  # -- deleting a post and unpublishing one both ask for the slug -- and
+  # restoring a version loses nothing: the current text is kept as a version
+  # of its own first, which is what the sentence above the prompt says. A
+  # confirmation that explains the move is reversible and then asks you to
+  # write something out argues with itself. It stays a confirmation rather
+  # than becoming none, because Enter in the list is a single keystroke and
+  # this overwrites the text being worked on.
+  unless Tui.yes?(Tui.key_choice(t('cli.versions_confirm')))
+    # No blank line of its own: cli.cancelled_nothing_saved ends in one
+    # already, which is how its other two callers (both aborts) get theirs.
+    # With this puts as well, cancelling a restore was the one place in the
+    # wizard that left two.
+    puts t('cli.cancelled_nothing_saved')
+    return
+  end
+
+  # The current text becomes a version too, so this is not the one move in
+  # the engine that cannot be walked back.
+  PostVersions.keep(path, content_dir: CONTENT_DIR)
+  current = JSON.parse(File.read(path, encoding: 'utf-8'))
+  # Held before the loop below replaces it: these blocks carry the only
+  # record of where each media file was downloaded from.
+  live_content = current['content']
+  # Only what the author writes comes back. Everything the engine owns --
+  # the announcement URLs, the draft token, the state, the redirects --
+  # belongs to the post as it is NOW, and restoring an old copy of it would
+  # sever a live thread or resurrect an address that has since been spent.
+  %w[title tags content type hero].each do |key|
+    restored.key?(key) ? current[key] = restored[key] : current.delete(key)
+  end
+  # `src` is engine-side too, and older than this dialog knows: every
+  # version written before media entries started carrying the address the
+  # file came from -- which is every version in every archive that predates
+  # it, i.e. the whole of any installation being upgraded -- restores a
+  # content array with the key simply missing. The post then cannot say
+  # which of the archive's files it already holds, and the next import
+  # fetches every one of them again. Taken from the copy being replaced,
+  # exactly as edit_post takes it from the stored post.
+  restore_media_src(current['content'], live_content)
+  AtomicWrite.write_json(path, current)
+  puts t('cli.versions_restored', path: path)
+  puts
+  rebuild_and_deploy(t('cli.updating_preview'))
+end
+
 def props_addresses(path, slug)
   loop do
     # Re-read at the top of every pass rather than trusting the copy the
@@ -1773,14 +2521,19 @@ def props_addresses(path, slug)
     entries = Array(post['former_slugs']).map(&:to_s)
     if entries.empty?
       puts t('cli.addresses_none')
+      puts
       return
     end
 
     current = "#{File.basename(File.dirname(path))}/#{slug}"
     rows = entries.each_with_index.map { |former, i| address_row(former, current, i) }
+    # Into the frame, not above it -- see version_pick.
+    index = address_pick(rows, [Tui.paint(t('cli.addresses_heading', count: entries.size), :dim), ''])
+    # The blank line after a picker is the caller's to write -- Tui.menu
+    # only closes the row its frame left open. Cancelling out of the list
+    # said nothing at all, so the wizard's "press a key" sat directly under
+    # the keys; the confirmation below had the same row to itself.
     puts
-    puts Tui.paint(t('cli.addresses_heading', count: entries.size), :dim)
-    index = address_pick(rows)
     return if index.nil?
 
     former = entries[index]
@@ -1806,11 +2559,12 @@ end
 # vacated is precisely the one another post can take.
 def address_row(former, current, index)
   parts = former.split('/').reject(&:empty?)
-  taken = parts.size == 2 && former != current &&
-          File.exist?(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"))
+  occupant = parts.size == 2 && former != current ? address_occupant(parts) : nil
   note = if parts.size != 2
            "  #{t('cli.addresses_unusable')}"
-         elsif taken
+         elsif occupant == :draft
+           "  #{t('cli.addresses_taken_draft')}"
+         elsif occupant
            "  #{t('cli.addresses_taken')}"
          else
            ''
@@ -1818,11 +2572,29 @@ def address_row(former, current, index)
   format('%2d.  %s%s', index + 1, former, note)
 end
 
+# Which kind of post owns year/slug today; nil when nobody does. The kind
+# matters: a draft emits no page, so the build still writes the redirect
+# stub there and the old link keeps working -- the takeover only happens
+# when that draft publishes. Told "this redirect never happens", the
+# owner's next move is dropping an address that is doing its job.
+def address_occupant(parts)
+  raw = File.read(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"), encoding: 'utf-8')
+  draft?(JSON.parse(raw)) ? :draft : :published
+rescue Errno::ENOENT
+  nil
+rescue StandardError
+  # An occupant that will not read or parse still owns the path --
+  # promising a live redirect on its account would be a guess.
+  :published
+end
+
 # Same two faces as every other picker here: arrow keys in a terminal, a
 # numbered list and a read line when piped.
-def address_pick(rows)
-  return Tui.menu(rows, hint: t('cli.addresses_menu_hint')) if Tui.interactive?
+def address_pick(rows, header)
+  return Tui.menu(rows, header: header, hint: t('cli.addresses_menu_hint')) if Tui.interactive?
 
+  puts
+  header.each { |line| puts line }
   rows.each { |row| puts "  #{row}" }
   puts
   print t('cli.addresses_pick_prompt')
@@ -1841,14 +2613,25 @@ def rename_post(path, post, raw: nil)
   puts
   print t('cli.rename_prompt')
   input = $stdin.gets&.strip.to_s
+  # A terminal echoes the Enter and closes the prompt's row; a pipe echoes
+  # nothing, so without this every answer below was printed onto the prompt
+  # itself -- "Přejmenovat na: Zrušeno." The same line Wizard.ask writes for
+  # the same reason.
+  puts unless Tui.interactive?
+  # Each of the five ways out below ends with one blank line, like every
+  # other command reachable from the wizard: this one is run from the
+  # properties dialog through screen.leave, and without it the "press a key"
+  # that follows sat flush against whatever was just refused.
   if input.empty?
     puts t('cli.cancelled')
+    puts
     return old_slug
   end
 
   new_slug = Slug.slugify(input)
   if new_slug.empty?
     puts t('cli.rename_unusable', input: input)
+    puts
     return old_slug
   end
   # A slug is a filename (<slug>.json) and a URL segment; slugify keeps it
@@ -1858,10 +2641,12 @@ def rename_post(path, post, raw: nil)
   # this caps by bytes for correctness, well under any filesystem's limit.
   if new_slug.bytesize > 200
     puts t('cli.rename_too_long')
+    puts
     return old_slug
   end
   if new_slug == old_slug
     puts t('cli.rename_same')
+    puts
     return old_slug
   end
 
@@ -1874,6 +2659,7 @@ def rename_post(path, post, raw: nil)
     # would overwrite it -- resolve manually", and a refused rename
     # neither continues nor needs resolving. Picking another slug does.
     puts t('cli.rename_taken', slug: new_slug)
+    puts
     return old_slug
   end
 
@@ -1884,6 +2670,7 @@ def rename_post(path, post, raw: nil)
   end
   unless Tui.key_choice(t('cli.rename_go')) == t('cli.confirm_yes_char')
     puts t('cli.cancelled')
+    puts
     return old_slug
   end
 
@@ -1906,6 +2693,13 @@ def rename_post(path, post, raw: nil)
   # edit_post uses, for the same reason: no step may remove the only copy
   # of anything before its replacement exists.
   PostWriter.move_media_dir(File.join(MEDIA_DIR, year, old_slug), new_media_dir)
+  # The edit history is keyed by year/slug like the media, so it renames
+  # with the post -- the trash has always taken it along (delete and
+  # restore both do). Left under the old slug, the [v] dialog went dark
+  # and the orphaned directory waited to be inherited by a future post
+  # born under that name.
+  PostVersions.move(old_slug, year, from_content_dir: CONTENT_DIR,
+                    to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, new_slug))
   AtomicWrite.write_json(new_path, updated)
   File.delete(path)
 
@@ -1956,7 +2750,24 @@ def edit_post(slug, path: nil)
     # otherwise pinning something nobody can see yet has nowhere to show.
     # Offering it when set matters: without the line in the header, saving
     # would drop a pin the post had (unpublish keeps it).
-    pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false')
+    pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false'),
+    unlisted: (draft?(post) && !truthy_frontmatter?(post['unlisted'])) ? nil : truthy_frontmatter?(post['unlisted'] || 'false'),
+    # Shown on a site that uses heroes, or on a post that has already said
+    # something of its own -- and it has to be shown in the second case
+    # even when the site doesn't, because a header without the line saves
+    # the post without it, which is exactly how this field went missing
+    # before it was here at all.
+    hero: hero_frontmatter_value(post),
+    # Offered only where it already is: turning a post into a page moves
+    # its address, so it is not something to hand somebody as a checkbox
+    # on every edit. Shown when set, so that saving cannot silently
+    # un-page a page.
+    page: truthy_frontmatter?(post['page']) ? true : nil,
+    # Both shown only when set, for the reason the pin is: a key on every
+    # new post suggests every post needs an answer, and almost none do.
+    series: post['series'].to_s.strip.empty? ? nil : post['series'].to_s.strip,
+    series_part: post['series_part'],
+    toc: post['toc'].nil? ? nil : truthy_frontmatter?(post['toc'])
   )
   body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
 
@@ -1986,7 +2797,7 @@ def edit_post(slug, path: nil)
   new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
   new_tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
-  new_type = meta['type'].to_s.empty? ? nil : meta['type']
+  new_type, new_page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
@@ -1995,6 +2806,7 @@ def edit_post(slug, path: nil)
   check_video_playback(media_files)
   fill_image_dimensions(blocks, media_files, media_dir)
   restore_posters(blocks, post['content'])
+  restore_media_src(blocks, post['content'])
   # Before the lookup, not after it: a player the post already has is not
   # worth a network call, and asking anyway is what made an edit depend on
   # a service answering.
@@ -2042,6 +2854,25 @@ def edit_post(slug, path: nil)
   }
   updated['type'] = new_type if new_type
   updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
+  updated['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
+  # Stored only when it disagrees with the site, so an ordinary post stays
+  # silent and follows layout.hero if that is ever flipped. Deleting the
+  # line is therefore a way to say "no opinion", not a way to lose one.
+  if meta.key?('hero')
+    hero_wanted = truthy_frontmatter?(meta['hero'])
+    updated['hero'] = hero_wanted unless hero_wanted == SITE_HERO
+  end
+  updated['page'] = true if new_page
+  # Written as typed: the series name is a display name (the slug for its
+  # address is derived at build time), and the part number is an override
+  # for the rare post published out of order.
+  updated['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
+  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  updated['series_part'] = part if part
+  # Only stored when it disagrees with the engine's own judgement, so the
+  # ordinary post carries no line about a table of contents it was never
+  # going to have.
+  updated['toc'] = truthy_frontmatter?(meta['toc']) if meta.key?('toc') && !meta['toc'].to_s.strip.empty?
   # Same survival rule as the announcement URLs below: former_slugs is not
   # representable in the frontmatter, so a save that forgot to carry it
   # over would silently break every redirect the post has accumulated --
@@ -2084,6 +2915,17 @@ def edit_post(slug, path: nil)
   if !File.exist?(path) || File.read(path, encoding: 'utf-8') != original_raw
     abort t('cli.post_changed_while_editing', slug: slug)
   end
+
+  # The one place a post's TEXT is replaced by a person, so the one place
+  # the previous text is worth keeping. Field-only writes elsewhere
+  # (pinning, announcing, scheduling) deliberately make no version: a
+  # history of pin toggles would bury the one entry anybody ever wants.
+  #
+  # Kept BEFORE the relocation below, and keyed on the old path on
+  # purpose: relocate_media moves the whole versions directory across a
+  # year change, so a copy kept there first travels with the rest --
+  # kept after the move, it would strand in the year the post just left.
+  PostVersions.keep(path, content_dir: CONTENT_DIR)
 
   # Media move first, replacement JSON second, old JSON last. The old
   # order deleted the post's only file and *then* moved its media -- so a
@@ -2205,6 +3047,11 @@ def delete_post(slug, path: nil)
   trash_dir = File.join(TRASH_DIR, year, slug)
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
+  # The post's earlier drafts go with it. Left behind they would be an
+  # orphan directory nothing points at, and a restore would bring the post
+  # back with amnesia -- the one thing `restore` exists to prevent.
+  PostVersions.move(slug, year, from_content_dir: CONTENT_DIR,
+                    to_dir: File.join(trash_dir, 'versions'))
   # Written rather than moved, because the copy that goes to trash must
   # not keep an address that no longer resolves: a restored post would
   # carry a dead announcement and `toot` would refuse to send a new one,
@@ -2251,14 +3098,19 @@ def pick_among_trashed(slug, paths)
 
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }
-  puts t('cli.ambiguous_slug', slug: slug, count: paths.size)
+  question = t('cli.ambiguous_slug', slug: slug, count: paths.size)
 
   if Tui.interactive?
-    choice = Tui.menu(rows, hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
+    # The question goes INTO the frame. Printed above it, as it used to be,
+    # the frame would paint straight over it.
+    choice = Tui.menu(rows, header: [question, ''],
+                            hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
     abort t('cli.cancelled_empty') if choice.nil?
     puts
     return paths[choice]
   end
+
+  puts question
 
   rows.each_with_index { |row, i| puts "#{i + 1}) #{row}" }
   puts
@@ -2295,6 +3147,17 @@ def cmd_restore(slug)
     # and every image in the restored post is a broken link. That is the
     # exact nesting move_media_dir exists to prevent.
     PostWriter.move_media_dir(trash_media, File.join(MEDIA_DIR, year, slug))
+  end
+  # ...and the history comes back with it, so a restored post can still be
+  # walked back to what it said before its last edit. The destination is
+  # cleared even when the trash carries no versions -- an orphaned history
+  # left there by an older deletion belongs to nobody, and a restored post
+  # must not inherit it as its own past.
+  trash_versions = File.join(trash_dir, 'versions')
+  FileUtils.rm_rf(File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
+  if Dir.exist?(trash_versions)
+    FileUtils.mkdir_p(File.join(PostVersions.versions_root(CONTENT_DIR), year))
+    FileUtils.mv(trash_versions, File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
   end
   FileUtils.rm_rf(trash_dir)
 
@@ -2697,7 +3560,14 @@ def cmd_browse(filters = {})
 
       # Everything below prints, so the frame this screen would repaint
       # over is gone -- the next pass starts a fresh one.
+      #
+      # Two newlines, not one. Tui.browse leaves its last row open on
+      # purpose (a newline per keypress would scroll the screen, which is
+      # the very thing the frame exists to stop), so the first one only
+      # closes the keys row -- the post's summary line was landing right
+      # against it. The second is the blank line the dialog stands on.
       state.delete(:lines)
+      puts
       puts
       post_crossroads(selected[:slug])
       Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
@@ -2748,6 +3618,12 @@ def cmd_browse(filters = {})
       print "\e[2J\e[H"
     end
   end
+  # Esc leaves the browser standing on its last frame, whose keys row
+  # Tui.browse deliberately left open. The first newline closes it, the
+  # second is the one blank line this command ends with -- without them
+  # the wizard's "press a key" was printed straight under the keys, with
+  # nothing between.
+  puts
   puts
 end
 
@@ -2790,8 +3666,12 @@ def pick_from_list(posts, empty_message)
   puts
   print t('cli.enter_number_or_slug')
   input = $stdin.gets&.strip.to_s
-  abort t('cli.cancelled_empty') if input.empty?
+  # Closing the prompt's row FIRST -- a pipe echoes nothing, so an abort
+  # taken before this printed its refusal onto the prompt itself. The other
+  # numbered pickers here (pick_among_years, address_pick) already close
+  # theirs on the line after the read, for the same reason.
   puts
+  abort t('cli.cancelled_empty') if input.empty?
 
   if input =~ /\A\d+\z/ && (1..posts.size).cover?(input.to_i)
     posts[input.to_i - 1][:slug]
@@ -2920,6 +3800,50 @@ def restore_embed_lookups(blocks, original_blocks)
   end
 end
 
+# The address a media file was downloaded from, carried over from the
+# stored post exactly as a poster and an embed's player are -- and for the
+# same reason: markdown has no way to say it, so MarkdownParser hands the
+# blocks back without it.
+#
+# What it costs to lose is the next import. `src` is the only record of
+# where a file came from -- nothing in a JPEG remembers -- and it is what
+# lets a re-import recognise the files this archive already holds instead
+# of fetching every one of them again. Editing one imported post used to
+# quietly hand that post's images back to the network.
+#
+# Keyed per media entry rather than per block, because a gallery is one
+# block with many files and each of them came from its own address.
+def restore_media_src(blocks, original_blocks)
+  stored = {}
+  each_media_entry(original_blocks) do |entry|
+    name = entry['url'].to_s
+    stored[name] ||= entry['src'] if !name.empty? && entry['src']
+  end
+  return if stored.empty?
+
+  each_media_entry(blocks) do |entry|
+    next if entry['src']
+
+    src = stored[entry['url'].to_s]
+    entry['src'] = src if src
+  end
+end
+
+# Every media entry in a list of blocks -- the files themselves and a
+# video's poster, which is a file with an address of its own.
+def each_media_entry(blocks)
+  Array(blocks).each do |block|
+    next unless block.is_a?(Hash)
+
+    %w[media poster].each do |key|
+      entries = block[key]
+      next unless entries.is_a?(Array)
+
+      entries.each { |entry| yield entry if entry.is_a?(Hash) }
+    end
+  end
+end
+
 def fill_image_dimensions(blocks, media_files, media_dir = nil)
   reverse = media_files.invert
   blocks.each do |b|
@@ -2967,7 +3891,16 @@ end
 # A manual build+deploy not tied to a specific post -- e.g. after a manual
 # template edit, when nothing else would otherwise trigger a rebuild.
 def cmd_rebuild
-  rebuild_and_deploy
+  return if rebuild_and_deploy
+
+  # The lock's own exit code, same as the build and deploy scripts leave
+  # with: somebody ran this by hand, and exit 0 reads as "a deploy
+  # happened" to whatever invoked it. A genuine failure keeps exit 0 --
+  # the .deploy-pending marker means the next scheduled run finishes the
+  # job, which is what the lines above have just promised. In the wizard
+  # the SystemExit is caught like every other cmd_* abort and only ends
+  # this menu entry, not the session.
+  exit RunLock::BUSY_EXIT if Publishing.stopped_on_busy_lock?
 end
 
 def print_usage
@@ -3050,35 +3983,86 @@ def wizard_header
   SiteHeader.render
 end
 
-def run_wizard
-  # In a terminal the wizard is an arrow-key menu (digits still work as
-  # quick select, Esc exits). Piped input keeps the numbered prompt.
-  if Tui.interactive?
-    loop do
-      # Reprinted every iteration, not just once at startup: each
-      # pause_and_clear wipes the screen, and without this the site
-      # identity (which blog am I even connected to?) would vanish
-      # from view after the very first action -- the whole point for
-      # anyone managing more than one site.
-      puts wizard_header
-      puts
-      puts t('cli.wizard_prompt_action')
-      puts
-      index = Tui.menu(WIZARD_MENU.map { |_, desc| desc },
-                       hint: t('cli.wizard_menu_hint', count: WIZARD_MENU.size))
-      # Esc leaves the cursor on the line right under the hint, so the shell
-      # prompt lands flush against the menu. One blank line to sit on the
-      # way out -- which is also what the piped branch below already does
-      # with its `puts` after reading the choice.
-      if index.nil?
-        puts
-        break
-      end
+# The identity block, the question, the choices and the keys, as one frame.
+# The identity is part of the frame rather than something printed once at
+# startup: it answers "which blog am I even connected to?", which is the
+# question of anyone who runs this against more than one site, and a frame
+# that is repainted cannot lose it the way a scrolling screen did.
+# Returns the rows and how many of them at the end are the keys, which the
+# frame must not drop on a short window. The menu scrolls like the queue
+# does rather than running off the bottom: six entries fit almost anywhere,
+# but "almost" is what a split terminal on a laptop breaks.
+def wizard_frame_lines(selected, offset, window)
+  lines = wizard_header.to_s.chomp.lines.map(&:chomp)
+  lines << ''
+  lines << t('cli.wizard_prompt_action')
+  lines << ''
+  WIZARD_MENU[offset, window].to_a.each_with_index do |(_, desc), i|
+    lines << if (offset + i) == selected
+               Tui.paint("› #{Tui.truncate_to_width(Tui.strip_ansi(desc), Tui.term_width - 2)}", :invert)
+             else
+               "  #{Tui.truncate_ansi(desc, Tui.term_width - 2)}"
+             end
+  end
+  lines << ''
+  hint = Tui.paint(t('cli.wizard_menu_hint', count: WIZARD_MENU.size), :dim)
+  keys = Tui.fold_prompt(hint, Tui.term_width).lines.map(&:chomp)
+  [lines + keys, keys.size + 1]
+end
 
-      puts
-      run_wizard_choice(WIZARD_MENU[index].first)
-      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
+def run_wizard_screen
+  selected = 0
+  offset = 0
+  Tui.screen do |screen|
+    loop do
+      # Three rows of identity, two blanks, the question, the blank above
+      # the keys and the keys themselves: what is left is the menu.
+      window = [WIZARD_MENU.size, [Tui.term_height - 9, 2].max].min
+      offset = Tui.clamp_offset(selected, offset, window, WIZARD_MENU.size)
+      lines, keep = wizard_frame_lines(selected, offset, window)
+      screen.paint(lines, keep_last: keep)
+      key = screen.key
+      chosen = nil
+
+      case key
+      when :resize then next
+      when :up then selected = (selected - 1) % WIZARD_MENU.size
+      when :down then selected = (selected + 1) % WIZARD_MENU.size
+      when :home then selected = 0
+      when :end then selected = WIZARD_MENU.size - 1
+      when :enter then chosen = selected
+      when :escape then break
+      when String
+        break if %w[q 0].include?(key)
+
+        # Quick select keeps working, and moves the cursor as it goes, so
+        # the frame under the action names the same row the digit chose.
+        if key =~ /\A[1-9]\z/ && key.to_i <= WIZARD_MENU.size
+          selected = key.to_i - 1
+          chosen = selected
+        end
+      end
+      next if chosen.nil?
+
+      # The chosen action gets the terminal: some of them are screens of
+      # their own (the queue), some print more than a frame can hold (a
+      # build). Either way the wizard's frame comes back afterwards.
+      screen.leave(t('cli.wizard_continue_prompt')) { run_wizard_choice(WIZARD_MENU[chosen].first) }
     end
+  end
+  # A blank line to sit on the way out, so the shell prompt does not land
+  # flush against the last frame. It takes two: Tui.frame ends its last row
+  # without a newline, so the first only closes that row -- one alone left
+  # the shell prompt on the line immediately under the keys.
+  puts
+  puts
+end
+
+def run_wizard
+  # In a terminal the wizard is a screen that stays put (digits still work
+  # as quick select, Esc exits). Piped input keeps the numbered prompt.
+  if Tui.interactive?
+    run_wizard_screen
     return
   end
 

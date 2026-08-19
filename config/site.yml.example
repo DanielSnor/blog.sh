@@ -8,13 +8,58 @@
 # it in for your own site. After every edit, rebuild: ./blog.sh rebuild, or
 # directly ruby build/build_blog.rb && ./scripts/deploy-web.sh.
 #
-# Sections in the order the page reads, top to bottom (the same order
-# ./style.sh's menu walks them): identity (site) -> the whole page's
-# palette (colors) -> the header (banner, fonts) -> the sidebar (about,
-# widgets) -> the footer (footer, social) -> analytics -> then the parts
-# with no place on the page: the comments network (mastodon OR bluesky),
-# publishing slots, media habits. A minimal config with just site,
-# banner, about and footer is a complete, working site.
+# A minimal config with just site, banner, about and footer is a complete,
+# working site. Everything else is optional, and a section left out means
+# the engine's own default -- never a broken page.
+#
+# HOW TO READ THE '#' LINES. This file uses them for two different jobs,
+# and telling them apart is the one thing worth knowing before you edit:
+#
+#   # like this sentence      documentation. Prose, never a setting.
+#   # layout:                 a SETTING that is switched off. Drop the
+#   #   sidebar: true         '# ' from every line of the block to use it.
+#   #   # instance: "..."     two '#': stays off even after you switch
+#                             its block on -- an optional key inside an
+#                             optional section.
+#
+# So one '#' in front of a key means "uncomment me", and two mean "still
+# optional". Where a switched-off section ENDS is marked with its own
+# '# --- end of ... ---' line, because once both are commented, a
+# paragraph of prose and a block of settings look exactly alike -- and
+# uncommenting half a section leaves the keys you did uncomment belonging
+# to whatever section came before it, with no error to tell you so.
+# ./blog.sh doctor reads the file you wrote and says what it found.
+#
+# EVERY SETTING THERE IS, in the order they appear below. A key shown in
+# (brackets) is optional and commented out where it lives; the rest of
+# this file explains each one where it stands.
+#
+#   site        title, short_name, description, author, lang, locale,
+#               timezone, base_url, (page_size), (extra_css)
+#   banner      src, alt, width, height, (show_title), (show_claim), (claim)
+#   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
+#               pill_bg, (banner_title), (banner_claim)
+#   fonts       (faces), (banner_title), (banner_title_size),
+#               (banner_claim), (banner_claim_size)
+#   layout      (sidebar), (hero)
+#   nav         (the menu bar: label with tag or url -- or [] for none)
+#   about       heading, html
+#   widgets     (toots, pixelfed, commits, bluesky, rss)
+#   footer      links_heading, links, note_heading, note_html, copyright,
+#               social_heading
+#   social      name, url, icon or icon_svg, (rel)
+#   mastodon    instance, (toot_length)          -- OR bluesky, never both
+#   bluesky     (handle), (pds)
+#   publishing  (slots)
+#   media       (convert_heic), (strip_location)
+#   seo         (block_ai_crawlers), (robots_extra)
+#   analytics   (src), (website_id)
+#
+# The order is the order the page reads, top to bottom -- identity, then
+# the header, the palette and the type, then the regions, the menu, the
+# sidebar, the footer -- and after that the parts with no place on the
+# page at all: the comments network, publishing, media, robots, analytics.
+# ./style.sh walks its own menu the same way.
 
 site:
   # The full title -- <title> on the homepage, and the basis for every other page's.
@@ -51,46 +96,18 @@ site:
   # the first deploy -- pagination is anchored so page contents never
   # change, and changing this later renumbers every existing page.
   # page_size: 10
-
-# Optional. Omit this whole section (or any key inside it) to fall back to
-# blog.sh's own blue palette (DEFAULT_COLORS in lib/colors_css.rb). Each
-# mode only takes these 7 keys -- everything else the CSS needs (card
-# background, nav text/border, link/badge hover, search input background)
-# is derived from them at build time (see color_properties in
-# lib/colors_css.rb), not separately configurable, since it's never
-# varied independently across any palette this engine has shipped.
-# Ready-made palettes live in config/palettes.yml -- `./style.sh` lists
-# them, shows a preview, and writes the chosen one in here, which beats
-# picking fourteen hex values by hand. Adding your own to that file makes
-# it appear in the list.
-# Rebuild after changing any value here: ./blog.sh rebuild.
-#
-# banner_title / banner_claim are the one exception: two more OPTIONAL
-# keys per mode, independent of each other and of the 7 above, for the
-# banner overlay text's color (see banner.show_title/show_claim below).
-# Default when omitted: nav_bg in light mode, white in dark mode -- the
-# same look the banner had before these keys existed.
-colors:
-  light:
-    bg: "#f5f8fa"
-    text: "#444a5a"
-    meta_text: "#657784"
-    accent: "#1da1f2"
-    nav_bg: "#eaf5fd"
-    border: "#e1e8ed"
-    pill_bg: "#d6ecfc"
-    # banner_title: "#ffffff"
-    # banner_claim: "#ffffff"
-  dark:
-    bg: "#111111"
-    text: "#ffffff"
-    meta_text: "#6a7f8c"
-    accent: "#4ab3f4"
-    nav_bg: "#192734"
-    border: "#263340"
-    pill_bg: "#16324a"
-    # banner_title: "#ffffff"
-    # banner_claim: "#ffffff"
+  # Optional: stylesheets loaded after the engine's own, in this order --
+  # where a skin belongs, so that dressing the site differently never
+  # means editing a template and losing the edit to the next git pull.
+  # Drop the file into assets/css/ and name it here.
+  #
+  # Paths on this site only. Every page carries style-src 'self', so a
+  # stylesheet on another host (a CDN, Google Fonts) is discarded by the
+  # browser with no error anywhere you would see one -- the site simply
+  # renders undressed. The build says which line it skipped, and
+  # ./blog.sh doctor reports both that and a local path that isn't there.
+  # extra_css:
+  #   - "/assets/css/skin.css"
 
 banner:
   # Ships with the engine, so a fresh install renders before you've drawn
@@ -118,6 +135,46 @@ banner:
   # as before -- same trust level as about.html/footer.note_html below
   # (site.yml is owner-edited config, not visitor input).
   # claim: "First line<br>Second line"
+
+# Optional. Omit this whole section (or any key inside it) to fall back to
+# blog.sh's own blue palette (DEFAULT_COLORS in lib/colors_css.rb). Each
+# mode only takes these 7 keys -- everything else the CSS needs (card
+# background, nav text/border, link/badge hover, search input background)
+# is derived from them at build time (see color_properties in
+# lib/colors_css.rb), not separately configurable, since it's never
+# varied independently across any palette this engine has shipped.
+# Ready-made palettes live in config/palettes.yml -- `./style.sh` lists
+# them, shows a preview, and writes the chosen one in here, which beats
+# picking fourteen hex values by hand. Adding your own to that file makes
+# it appear in the list.
+# Rebuild after changing any value here: ./blog.sh rebuild.
+#
+# banner_title / banner_claim are the one exception: two more OPTIONAL
+# keys per mode, independent of each other and of the 7 above, for the
+# banner overlay text's color (see banner.show_title/show_claim above).
+# Default when omitted: nav_bg in light mode, white in dark mode -- the
+# same look the banner had before these keys existed.
+colors:
+  light:
+    bg: "#f5f8fa"
+    text: "#444a5a"
+    meta_text: "#657784"
+    accent: "#1da1f2"
+    nav_bg: "#eaf5fd"
+    border: "#e1e8ed"
+    pill_bg: "#d6ecfc"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
+  dark:
+    bg: "#111111"
+    text: "#ffffff"
+    meta_text: "#6a7f8c"
+    accent: "#4ab3f4"
+    nav_bg: "#192734"
+    border: "#263340"
+    pill_bg: "#16324a"
+    # banner_title: "#ffffff"
+    # banner_claim: "#ffffff"
 
 # Optional, and the typographic half of the palette: the two lines painted
 # over the banner -- the site's name and its claim -- take their font AND
@@ -154,6 +211,50 @@ banner:
 #   banner_title_size: "52px"
 #   banner_claim: '"Open Sans", Arial, Helvetica, sans-serif'
 #   banner_claim_size: "20px"
+# --- end of fonts ---
+
+# Optional. Which structural regions of the page exist at all. Every key
+# defaults to the layout the engine has always had, so omitting the whole
+# section changes nothing.
+#
+# These are switches for whole regions, not for how a region looks: what
+# it looks like belongs in a stylesheet (site.extra_css above). A key per
+# visual property would turn this file into a stylesheet written in YAML.
+# layout:
+#   # The right-hand column: about, widgets, per-post stats. With it off
+#   # the content takes the full width instead of leaving a gap where the
+#   # sidebar was. Default: true.
+#   sidebar: true
+#   # Lift a post's first usable image out of the text and show it above
+#   # the title, with the byline under it. Off by default because it
+#   # reshapes every post page. A single post overrides the site either
+#   # way with a `hero:` line in its own file: `hero: false` keeps the
+#   # photo where it was written, `hero: true` asks for one on a site
+#   # that doesn't use them. A post with no usable image (or only a 1x1
+#   # tracking pixel out of an old import) keeps the ordinary layout.
+#   hero: false
+# --- end of layout ---
+
+# Optional. The menu across the top. Without this key the menu is what the
+# engine derives: All, then one entry per content type the site actually
+# has, growing as the archive does.
+#
+# With it, the site names its own entries instead -- `tag:` is a tag's
+# slug and becomes its listing, `url:` is taken as written, so an entry
+# can point at a post, at /markdown/, or off the site entirely. Useful
+# when the site's subjects are a better map of it than its media types.
+#
+# An empty list (nav: []) is an answer too: no menu bar and no toggle at
+# all. That is how a site turns the menu off -- there is no second key.
+#
+# `./style.sh` writes this for you and offers the tags and pages you
+# actually have; `./blog.sh doctor` says so when an entry stops pointing
+# at anything, which is what happens to a menu written a year ago.
+# nav:
+#   - { label: "Home", url: "/" }
+#   - { label: "Photography", tag: "photography" }
+#   - { label: "Syntax", url: "/markdown/" }
+# --- end of nav ---
 
 about:
   heading: "About"
@@ -204,6 +305,7 @@ about:
 #     # podcast -- or X through a self-hosted Nitter instance.
 #     feed_url: "https://example.com/feed.xml"
 #     limit: 3
+# --- end of widgets ---
 
 footer:
   links_heading: "Links"
@@ -230,13 +332,13 @@ footer:
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is
-# what earns the green check mark next to your site on a Mastodon
-# profile: Mastodon fetches the address you put in a profile metadata
-# field and verifies it only if that page links back with rel="me" to
-# the profile. Since the icons sit in the footer, every page carries the
-# link -- put your home page in the profile field and it just works. The
-# url: here has to be your profile as Mastodon shows it
-# (https://instance/@handle). More than one entry may carry rel: "me".
+# what earns the green check mark next to your site on a Mastodon profile:
+# Mastodon fetches the address you put in a profile metadata field and
+# verifies it only if that page links back with rel="me" to the profile.
+# Since the icons sit in the footer, every page carries the link -- put
+# your home page in the profile field and it just works. The url: here
+# has to be your profile as Mastodon shows it (https://instance/@handle).
+# More than one entry may carry rel: "me".
 social:
   - name: "Mastodon"
     url: "https://mastodon.social/@yourname"
@@ -251,13 +353,6 @@ social:
   - name: "E-mail"
     url: "mailto:you@example.com"
     icon: "email"
-
-# Optional. Omit this whole section for a site with no analytics script.
-# Commented out so a fresh build doesn't reference a script that isn't
-# yours -- uncomment with your own values.
-# analytics:
-#   src: "https://analytics.example.com/script.js"
-#   website_id: "00000000-0000-0000-0000-000000000000"
 
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's
@@ -274,10 +369,47 @@ mastodon:
   # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
   # toot_length: 500
 
-# The Bluesky alternative (uncomment this and remove mastodon: above):
+# The Bluesky alternative. Delete the mastodon: block above, then
+# uncomment the two lines below -- the header included, which is the half
+# that is easy to miss:
 # bluesky:
 #   handle: "you.bsky.social"
 #   # pds: "https://bsky.social"   # only for a self-hosted PDS
+# --- end of bluesky ---
+
+# Optional. Which replies are published under the article.
+#
+#   off   (default) all of them, read live from the network by the
+#         visitor's browser -- what every site did before this existed.
+#   fav   only the ones you favourite. You star a reply from whatever
+#         Mastodon or Bluesky client you already use, and it appears at
+#         the next cron run; everything else stays on the network and
+#         off the blog. Your own replies are published without starring.
+#
+# What "fav" costs, plainly:
+#   * It needs scripts/refresh-sidebar.sh in cron. "Did *I* favourite
+#     this" is a question only an authenticated request can ask, so the
+#     comments are prepared server-side and served from your own domain
+#     rather than fetched by the visitor. Without that cron nothing new
+#     ever appears. (The upside of the same change: the visitor's
+#     browser stops talking to the network entirely.)
+#   * On Mastodon the token in env.sh needs read:statuses as well as
+#     write:statuses. Reissue it if it predates this.
+#   * Approving is not instant -- up to one cron interval, and for a
+#     post older than ~90 days up to a week unless you run
+#     ./scripts/refresh-sidebar.sh --full.
+#   * A favourite is public on both networks. Anyone can see which
+#     replies you starred, and every reply you have ever starred out of
+#     politeness counts as approved.
+#   * Turning this on hides every existing comment until you go and star
+#     the ones you want kept.
+#   * It keeps replies off your blog. It cannot remove them from the
+#     network, where the thread stays public -- for that you still have
+#     block, mute and report.
+#
+# comments:
+#   approval: fav
+# --- end of comments ---
 
 # Optional. The times posts usually go out. With this set, [s] in the
 # draft dialog offers the next FREE slot instead of an empty prompt, so
@@ -291,6 +423,7 @@ mastodon:
 #     - "mon 09:30"
 #     - "wed 09:30"
 #     - "fri 09:30"
+# --- end of publishing ---
 
 # Optional. HEIC photos (the iPhone default) display only in Safari --
 # every other browser shows a broken image. Off (the default), attaching
@@ -316,3 +449,33 @@ mastodon:
 # media:
 #   convert_heic: true
 #   strip_location: false
+# --- end of media ---
+
+# Optional. What robots.txt says beyond "everything is allowed".
+#
+# block_ai_crawlers writes out a maintained list of the crawlers that
+# collect text to train on (GPTBot, ClaudeBot, CCBot, Google-Extended,
+# PerplexityBot and friends). Off by default: wanting to be findable in an
+# answer somebody gets from a machine is a legitimate position, and the
+# engine does not take it on your behalf either way.
+#
+# It is a REQUEST, not a fence. Some of these honour robots.txt and some
+# do not, and nothing here can make them -- if that matters to you, the
+# answer is at the web server, not in this file.
+#
+# robots_extra is appended verbatim, for the agents no list will ever be
+# current about.
+# seo:
+#   block_ai_crawlers: false
+#   robots_extra: |
+#     User-agent: SomeOtherBot
+#     Disallow: /
+# --- end of seo ---
+
+# Optional. Omit this whole section for a site with no analytics script.
+# Commented out so a fresh build doesn't reference a script that isn't
+# yours -- uncomment with your own values.
+# analytics:
+#   src: "https://analytics.example.com/script.js"
+#   website_id: "00000000-0000-0000-0000-000000000000"
+# --- end of analytics ---

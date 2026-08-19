@@ -44,6 +44,10 @@ require_relative '../lib/deploy_backend'
 require_relative '../lib/atomic_write'
 require_relative '../lib/file_size'
 
+# Runs at the end of the cron chain too, where stdout is a block-buffered
+# pipe and warn would otherwise overtake the progress lines around it.
+$stdout.sync = true
+
 DRY = ARGV.include?('--dry-run')
 FORCE = ARGV.include?('--force')
 PRUNE = ARGV.include?('--prune')
@@ -69,9 +73,13 @@ MANIFEST_PATH = File.join(ROOT, ".deploy_manifest#{BACKEND.manifest_suffix}.json
 # it was asked to send. Two things downstream need to know that, so it is
 # asked once here rather than re-derived and eventually diverging.
 SNAPSHOT = BACKEND.respond_to?(:always_prunes?) && BACKEND.always_prunes?
-# Orphans get deleted under --prune, or unconditionally on a snapshot
-# backend, whose every push mirrors the build exactly.
-PRUNES = PRUNE || SNAPSHOT
+# Orphans get deleted under --prune, unconditionally on a snapshot backend
+# (whose every push mirrors the build exactly), and under --only -- where
+# the orphan list holds nothing but the files this run was named and can no
+# longer find on disk (see the --only block below). Naming a file is as
+# deliberate as passing --prune, and it is the only way a deletion made
+# between two cron ticks ever reaches the target.
+PRUNES = PRUNE || SNAPSHOT || !ONLY.nil?
 # The manifest is saved in batches, not after every file: on a large deploy
 # that meant thousands of rewrites of a growing JSON file (hundreds of KB x
 # thousands = gigabytes of writes). Periodic saving still has to happen
@@ -230,16 +238,11 @@ all_files = files
 # sail through and (under --prune) take the live site with it.
 abort('❌ Stopped: public.nosync/ is empty -- run the build first (ruby build/build_blog.rb).') if all_files.empty?
 
-if ONLY
-  missing = ONLY - files
-  abort("❌ #{missing.join(', ')}: not found in public.nosync/.") unless missing.empty?
-
-  files = ONLY
-end
-
 # The manifest is always loaded, even with --force: --force only forces
 # re-uploading everything, but the list of previously uploaded files is
-# still needed to find orphans.
+# still needed to find orphans. It is loaded before --only is resolved
+# because what the target already has is the only thing that tells a name
+# no longer being built apart from a name that never existed.
 stored = load_manifest
 # --force means "upload everything again", not "forget what the target
 # has": starting from an empty manifest dropped every orphan still
@@ -247,6 +250,33 @@ stored = load_manifest
 # never be pruned -- it stays live on the target for good. The forcing
 # happens in the upload selection below instead.
 manifest = stored.dup
+
+# `--only` names the files this run answers for, and a name says something
+# about the file whether or not the build produced it. Three cases:
+#
+# * built now -- upload it.
+# * not built, but the manifest says the target has it -- take it OFF the
+#   target (the orphan block below). This used to abort, and that abort is
+#   why deleting a file between two cron ticks never reached the site:
+#   switching comment moderation off deletes comments.json locally, and
+#   the rejected words stayed readable at a public URL until somebody
+#   happened to run a full deploy with --prune. docs/operations.md
+#   promises the opposite in as many words.
+# * neither built nor on the target -- nothing to do, silently. Every tick
+#   of scripts/refresh-sidebar.sh names the widget JSONs a site has not
+#   configured; aborting on those stopped the cron dead, and remarking on
+#   them every half hour would be cron mail nobody reads. It is worth a
+#   word only when NOTHING named resolves to anything, which is what a
+#   mistyped name on the command line looks like -- so that case keeps the
+#   abort it always had.
+if ONLY
+  present = ONLY & all_files
+  gone = (ONLY & stored.keys) - all_files
+  unknown = ONLY - all_files - stored.keys
+  abort("❌ #{unknown.join(', ')}: not found in public.nosync/.") if present.empty? && gone.empty?
+
+  files = present
+end
 stats = {}
 # Every file in the build gets stat'd, not just the ones this run uploads:
 # the byte guards and the per-file size check both describe the BUILD, and
@@ -290,9 +320,16 @@ to_upload = ONLY || FORCE ? files : files.select { |name| manifest_hash(manifest
 skipped = files.size - to_upload.size
 
 # Orphans = uploaded at some point, but no longer in public.nosync/ (a
-# deleted post, renumbered pages). Not handled with --only -- there, only
-# the listed files are known about.
-orphans = ONLY ? [] : (stored.keys - all_files).sort
+# deleted post, renumbered pages). Under --only the scan is narrowed to
+# the named files, and that narrowing is the whole safety of it: a run
+# shipping three JSONs knows nothing about the rest of the build and must
+# not delete on the strength of it -- but it does know about the files it
+# was named for, and one of them being gone is a deletion it was asked to
+# carry out. A snapshot backend is the exception in the other direction:
+# it mirrors the entire build on every push whatever it was handed, so
+# there the list is the whole one even under --only.
+orphan_source = ONLY && !SNAPSHOT ? ONLY & stored.keys : stored.keys
+orphans = (orphan_source - all_files).sort
 
 # --- what the guards measure against ------------------------------------
 #
@@ -361,6 +398,19 @@ end
 # not be what was compared at all.
 ref_source = BASE ? "the last accepted build (#{BASE['at']})" : 'the manifest (no accepted build recorded yet)'
 notices = []
+
+# A batch backend can only express deletion as "mirror the whole tree"
+# (rsync --delete, rclone sync), which under --only would mirror a
+# two-file transfer over the entire target -- so those backends refuse the
+# combination, and the named file stays live. That has to be said: the
+# alternative is dropping it from the manifest as though it had been
+# deleted, after which nothing on this side knows the target still serves
+# it and no later --prune can find it.
+if ONLY && !SNAPSHOT && orphans.any? && BACKEND.respond_to?(:sync)
+  notices << "⚠️  #{orphans.join(', ')}: no longer in the build, but #{BACKEND.label} cannot delete " \
+             'single files -- run ./scripts/deploy-web.sh --prune to take them off the target.'
+  orphans = []
+end
 
 # --- per-file size, before the guards -----------------------------------
 #
@@ -506,7 +556,11 @@ end
 log("  #{files.size} file(s) selected, #{FileSize.human(build_bytes)} in the build, " \
     "#{to_upload.size} new/changed, #{skipped} unchanged (skipped)")
 if orphans.any?
-  log(PRUNES ? "  #{orphans.size} orphan(s) to delete#{PRUNE ? ' (--prune)' : ' (snapshot deploy)'}" \
+  why = if PRUNE then ' (--prune)'
+        elsif SNAPSHOT then ' (snapshot deploy)'
+        else ' (named in --only, no longer in the build)'
+        end
+  log(PRUNES ? "  #{orphans.size} orphan(s) to delete#{why}" \
              : "  ⚠️  #{orphans.size} orphaned file(s) on the target -- delete them with --prune")
 end
 
@@ -546,8 +600,11 @@ begin
     # Batch backend (rsync): one run covers everything, so the manifest is
     # updated wholesale on success -- and not at all on failure, since a
     # batch backend re-diffs against the target on the next run anyway.
+    # `files`, not ONLY: a name the build no longer produces has been taken
+    # out of it above, and handing it to --files-from would fail the whole
+    # transfer over a file that is meant to be gone.
     if BACKEND.sync(public_dir: PUBLIC_DIR, files: to_upload, orphans: orphans,
-                    only: ONLY, prune: PRUNES && orphans.any?,
+                    only: ONLY && files, prune: PRUNES && orphans.any?,
                     force: FORCE, logger: method(:log))
       to_upload.each do |name|
         manifest[name] = { 'hash' => hashes[name], 'size' => stats[name]['size'], 'mtime' => stats[name]['mtime'] }

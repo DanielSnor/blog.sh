@@ -13,6 +13,13 @@ require_relative 'i18n'
 require_relative 'media_dimensions'
 require_relative 'exif_location'
 require_relative 'deploy_backend'
+require_relative 'slug'
+# For the one thing doctor cannot answer from config alone: whether a
+# menu entry points at an address this archive produces. Sharing the
+# set with check rather than building a second one is the point --
+# two diagnostics disagreeing about what the build makes is worse than
+# one of them staying quiet.
+require_relative 'checker'
 # NOT require_relative 'publishing': it pulls in the posters, which read
 # SiteConfig at LOAD time -- and this is the one command that has to run
 # on a config nothing else can load. Requiring it put the raw Psych
@@ -139,6 +146,8 @@ module Doctor
     findings.concat(check_banner(data, root))
     findings.concat(check_colors(data))
     findings.concat(check_fonts(data, root))
+    findings.concat(check_extra_css(data, root))
+    findings.concat(check_nav(data, root))
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
@@ -275,19 +284,62 @@ module Doctor
 
   # --- network -------------------------------------------------------
 
+  # The value of comments.approval, read the way SiteConfig reads it, so
+  # the two cannot drift apart into disagreeing about the same file.
+  def approval_value(data)
+    dig(data, 'comments', 'approval').to_s.strip.downcase
+  end
+
+  # Is moderation actually switched on? Only the modes the engine accepts
+  # count: a value it will refuse is a config that publishes nothing at
+  # all, not one that moderates.
+  def moderated?(data)
+    %w[fav favourite favorite].include?(approval_value(data))
+  end
+
+  # Did the author MEAN to moderate? Anything other than absent/off, even
+  # a value the engine refuses. Used where a green line would contradict
+  # a finding check_comments is about to make.
+  def moderation_wanted?(data)
+    value = approval_value(data)
+    !(value.empty? || value == 'off' || value == 'false')
+  end
+
   def check_network(data)
     mastodon = dig(data, 'mastodon', 'instance')
     bluesky = dig(data, 'bluesky', 'handle')
-
-    if mastodon && bluesky
-      return [error(t('both_networks'), t('both_networks_fix'))]
-    end
+    # Whether the credentials that network needs are actually in env.sh.
+    # Under moderation this is not "announcements are on hold": without
+    # them PostStats cannot ask which replies were favourited, so no
+    # comment can ever be published -- which is why check_comments has to
+    # be told, and why the missing-credential line below is an error
+    # rather than advice when moderation is on.
+    credentials = if mastodon
+                    !ENV['MASTODON_ACCESS_TOKEN'].to_s.empty?
+                  elsif bluesky
+                    !ENV['BLUESKY_APP_PASSWORD'].to_s.empty?
+                  else
+                    false
+                  end
+    moderated = moderated?(data)
 
     findings = []
-    if mastodon
+    if mastodon && bluesky
+      # Two networks used to return early, which meant the one command
+      # whose whole purpose is to report everything at once reported this
+      # and stopped -- a broken comments.approval underneath waited for a
+      # second run. The per-network credential lines stay out of the way
+      # here (nobody can say which of the two they belong to while the
+      # config names both), but check_comments below runs either way.
+      findings << error(t('both_networks'), t('both_networks_fix'))
+    elsif mastodon
       findings << error(t('mastodon_instance_shape', value: mastodon)) if mastodon.to_s.include?('/')
       if ENV['MASTODON_ACCESS_TOKEN'].to_s.empty?
-        findings << warn(t('mastodon_token_missing'), t('mastodon_token_missing_fix'))
+        findings << if moderated
+                      error(t('mastodon_token_missing'), t('mastodon_token_missing_fix'))
+                    else
+                      warn(t('mastodon_token_missing'), t('mastodon_token_missing_fix'))
+                    end
       else
         findings << ok(t('mastodon_ok', instance: mastodon))
       end
@@ -295,14 +347,125 @@ module Doctor
       findings << error(t('toot_length', value: length.inspect)) if length && !(length.is_a?(Integer) && length.positive?)
     elsif bluesky
       if ENV['BLUESKY_APP_PASSWORD'].to_s.empty?
-        findings << warn(t('bluesky_password_missing'), t('bluesky_password_missing_fix'))
+        findings << if moderated
+                      error(t('bluesky_password_missing'), t('bluesky_password_missing_fix'))
+                    else
+                      warn(t('bluesky_password_missing'), t('bluesky_password_missing_fix'))
+                    end
       else
         findings << ok(t('bluesky_ok', handle: bluesky))
       end
-    else
-      findings << ok(t('no_network'))
+    # "No comments network configured" is a fine thing to say about a site
+    # that wanted none. On a site asking for moderation it is a tick
+    # printed next to the error saying moderation has nothing to moderate
+    # -- and sorted by severity the two land twenty lines apart, so the
+    # reader gets the diagnosis and then a green line denying it.
+    elsif !moderation_wanted?(data)
+      # "No network configured" is the truth about a site that wanted none,
+      # and a lie about a site whose owner filled in an instance and a token
+      # under a header they left commented out: the section is absent, so
+      # every check here agrees the site is fine, and the tick confirms the
+      # one belief that is wrong. A credential in env.sh is the evidence
+      # that somebody meant to have a network -- nobody issues an access
+      # token for a site that announces nothing -- so with one of those in
+      # hand, silence stops being an answer.
+      stranded = { 'MASTODON_ACCESS_TOKEN' => 'mastodon:', 'BLUESKY_APP_PASSWORD' => 'bluesky:' }
+                 .reject { |var, _| ENV[var].to_s.empty? }
+      findings << if stranded.empty?
+                    ok(t('no_network'))
+                  else
+                    warn(t('credentials_no_network', vars: stranded.keys.join(', ')),
+                         t('credentials_no_network_fix', sections: stranded.values.join(' / ')))
+                  end
     end
+    findings.concat(check_comments(data, mastodon || bluesky, credentials: credentials))
     findings
+  end
+
+  # Moderation has three ways to be configured into silence, and all three
+  # end the same way -- a site whose comments simply stop appearing, with
+  # nothing on the page to say why. Each gets named here instead.
+  #
+  # credentials defaults to true so a caller that only has the config in
+  # hand still gets every finding the config alone can support.
+  def check_comments(data, network, credentials: true)
+    approval = approval_value(data)
+
+    # A comments: section that exists and holds nothing moderation reads.
+    # `approval` is the only key anything in this engine looks for under
+    # it, so anything else there is a misspelling of it -- and a misspelled
+    # key does not fail: it reads as absent, moderation quietly does not
+    # happen, and every reply is published. That is the one wrong answer
+    # this whole feature exists to prevent, arrived at by a typo, and until
+    # now doctor handed such a site a clean bill of health. Reported before
+    # the empty check below, which would otherwise swallow it.
+    if approval.empty?
+      section = dig(data, 'comments')
+      if section.is_a?(Hash) && section.any?
+        return [error(t('approval_key_unknown', keys: section.keys.join(', ')),
+                      t('approval_key_unknown_fix'))]
+      end
+    end
+
+    return [] if approval.empty? || approval == 'off' || approval == 'false'
+
+    # `approval: on` reaches here as "true" -- YAML, not the author. The
+    # value in a plain "unknown value X" message would be one they never
+    # typed, so that case gets named for what it is.
+    return [error(t('approval_boolean'), t('approval_boolean_fix'))] if approval == 'true'
+
+    unless %w[fav favourite favorite].include?(approval)
+      # .inspect, not the bare value: "fav" copied out of a web page
+      # arrives with a non-breaking space on the end, and interpolated
+      # raw it was reported as an unknown `fav` -- a message naming as
+      # wrong something that looks exactly right. The quotes are what
+      # makes the invisible character visible, so SiteConfig's phrasing
+      # of the same complaint wins here too.
+      return [error(t('approval_unknown', value: approval.inspect), t('approval_unknown_fix'))]
+    end
+
+    # Nothing announces the posts, so no thread exists to approve out of.
+    return [error(t('approval_no_network'), t('approval_no_network_fix'))] unless network
+
+    findings = []
+    # Only claim the comments are moderated when they can be. With the
+    # token empty nothing is ever fetched, comments.json stays empty and
+    # the site shows no comments at all -- reported above as the error it
+    # is, so the one sentence that must not appear beside it is the green
+    # "comments are moderated".
+    findings << ok(t('approval_ok')) if credentials
+    # The comments now arrive by cron. Without it the site keeps whatever
+    # comments.json it last uploaded, forever -- but said unconditionally
+    # it was a standing yellow line no site could ever clear, on the sites
+    # running the cron exactly as documented as much as on the ones that
+    # never set it up. So it is asked the way check_scheduler asks its own
+    # question: by looking for evidence the thing has run.
+    findings << warn(t('approval_needs_cron'), t('approval_needs_cron_fix')) unless sidebar_ran_recently?
+    findings
+  end
+
+  # How long the sidebar refresh may be silent before its absence is worth
+  # mentioning. The documented cron is every half hour; a whole day is
+  # comfortably longer than any sane schedule and still short enough that
+  # a stopped cron is caught while an approved comment is still news.
+  SIDEBAR_STALE_AFTER = 24 * 3600
+
+  # scripts/refresh-sidebar.sh leaves no heartbeat of its own, but while
+  # moderation is on it rewrites public.nosync/comments.json on every
+  # single run (scripts/refresh_sidebar.rb) -- so that file's mtime is the
+  # heartbeat, and .stats_full_refresh_at backs it up for the runs that do
+  # the weekly full pass. Absent or stale, the site really is not getting
+  # its approved comments and the warning is earned.
+  def sidebar_ran_recently?
+    stamps = [File.join(ROOT, 'public.nosync', 'comments.json'),
+              File.join(ROOT, '.stats_full_refresh_at')].filter_map do |path|
+      File.mtime(path) if File.exist?(path)
+    rescue SystemCallError
+      nil
+    end
+    return false if stamps.empty?
+
+    (Time.now - stamps.max) <= SIDEBAR_STALE_AFTER
   end
 
   # --- appearance ----------------------------------------------------
@@ -373,6 +536,108 @@ module Doctor
     return [ok(t('fonts_ok'))] if missing.empty?
 
     [error(t('fonts_missing', files: missing.join(', ')), t('fonts_missing_fix'))]
+  end
+
+  # Both ways site.extra_css can fail are silent ones: style-src is 'self',
+  # so a stylesheet from another origin is dropped by the browser without a
+  # word, and a local path with a typo in it 404s just as quietly. Either
+  # way the page loads and merely looks undressed, which reads as "the
+  # skin doesn't work" rather than "this line is wrong".
+  def check_extra_css(data, root)
+    entries = dig(data, 'site', 'extra_css')
+    entries = [entries] if entries.is_a?(String)
+    return [] unless entries.is_a?(Array) && entries.any?
+
+    findings = []
+    entries.each do |raw|
+      href = raw.to_s.strip
+      next if href.empty?
+
+      if !href.start_with?('/') || href.start_with?('//')
+        findings << error(t('extra_css_remote', value: href), t('extra_css_remote_fix'))
+        next
+      end
+
+      # Only /assets/ can be checked against the tree -- anything else is
+      # generated by the build or dropped in by hand, and a missing-file
+      # claim about it would be a guess.
+      next unless href.start_with?('/assets/')
+
+      path = File.join(root, href.sub(%r{\A/}, ''))
+      findings << error(t('extra_css_missing', value: href), t('extra_css_missing_fix')) unless File.exist?(path)
+    end
+    findings << ok(t('extra_css_ok', count: entries.size)) if findings.empty?
+    findings
+  end
+
+  # A menu item pointing at nothing is as quiet as any other config
+  # mistake: the build renders the link, the deploy ships it, and the
+  # reader finds the 404. It happens most easily to the entries that were
+  # RIGHT once -- a post that got renamed, a tag whose last post was
+  # unpublished, a page deleted after the menu was written.
+  #
+  # Only for a site that has a `nav:` list at all, and the archive is read
+  # only then: a site using the derived menu pays nothing for this.
+  #
+  # The set of addresses is Checker's, not a second copy of it. A doctor
+  # that disagreed with check about what the build produces would be worse
+  # than one that said nothing -- and this is exactly the kind of list
+  # (tags, posts, pages, redirect stubs) that drifts if it is written
+  # twice. An `url:` off the site is left alone: pointing at somebody
+  # else's page is a legitimate menu item, and whether it answers is
+  # `check --online`'s question, not this one.
+  def check_nav(data, root)
+    entries = data['nav']
+    return [] unless entries.is_a?(Array) && entries.any?
+
+    posts = Checker.load_posts(root)
+    known = Checker.known_paths(posts)
+    tags = posts.flat_map { |p| Array(p['tags']).map { |t| Slug.slugify(t.to_s) } }.to_set
+
+    findings = []
+    entries.each do |entry|
+      next unless entry.is_a?(Hash)
+
+      label = entry['label'].to_s.strip
+      slug = entry['tag'].to_s.strip
+      if !slug.empty?
+        findings << error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix')) unless tags.include?(slug) || posts.empty?
+        next
+      end
+
+      url = entry['url'].to_s.strip
+      next if url.empty?
+
+      # `about` rather than `/about/`. The browser reads it against the
+      # page the menu is standing on, so the item points somewhere
+      # different from every page -- and from the front page it may even
+      # work, which is exactly why it survives being looked at.
+      if relative_nav_url?(url)
+        fixed = "/#{url.delete_prefix('/')}/"
+        findings << error(t('nav_url_relative', label: label, url: url), t('nav_url_relative_fix', url: fixed))
+        next
+      end
+
+      next unless url.start_with?('/')
+      next if url.start_with?('//', '/type/', '/assets/')
+      # Nothing to judge against on an archive with no posts in it yet.
+      next if posts.empty?
+      next if known.include?(url) || known.include?("#{url}/")
+
+      findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
+    end
+    findings << ok(t('nav_ok', count: entries.size)) if findings.empty? && !posts.empty?
+    findings
+  end
+
+  # An address that is neither on this site nor anywhere else -- it only
+  # means something relative to wherever it is written, which for a menu
+  # is every page at a different depth.
+  def relative_nav_url?(url)
+    return false if url.start_with?('/', '#')
+    return false if url.include?('://')
+
+    !url.start_with?('mailto:', 'tel:')
   end
 
   # Each widget needs the one value that identifies what it should show.
@@ -612,7 +877,27 @@ module Doctor
     end
 
     findings.concat(check_online_network(data))
+    findings.concat(check_online_approval(data))
     findings
+  end
+
+  # Whether the credentials can actually see which replies the author
+  # favourited -- the one moderation failure that looks like success from
+  # every other angle (see PostStats.approval_probe).
+  def check_online_approval(data)
+    approval = dig(data, 'comments', 'approval').to_s.strip.downcase
+    return [] unless %w[fav favourite favorite].include?(approval)
+
+    require_relative 'post_stats'
+    entry = PostStats.entries.max_by { |e| e[:date].to_s }
+    return [warn(t('approval_probe_nothing'))] unless entry
+
+    case PostStats.approval_probe(entry)
+    when :ok then [ok(t('approval_probe_ok'))]
+    else [error(t('approval_probe_blind'), t('approval_probe_blind_fix'))]
+    end
+  rescue StandardError => e
+    [warn(t('approval_probe_failed', message: e.message.to_s.lines.first.to_s.strip))]
   end
 
   def check_online_network(data)

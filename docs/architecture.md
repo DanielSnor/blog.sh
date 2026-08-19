@@ -46,18 +46,26 @@ dedup by `source`).
 | `slug` | string, required | URL segment; `Slug.slugify` output |
 | `date` | string, required | ISO 8601 with offset |
 | `content` | array, required | blocks, see below |
-| `title` | string | posts without one are titled by their slug |
+| `title` | string | optional. A post without one borrows the title of its first `link` block -- that is where a link post keeps what the reader takes for its title, and it becomes the heading (an `h1` on the post's page, an `h2` in a listing, both pointing where the link points), the `<title>`, the feed item and the structured data. With neither, the slug stands in |
 | `tags` | array of strings | rendered as pills, slugified for tag URLs |
 | `state` | `"published"` \| `"draft"` | absent = published |
 | `draft_token` | string | drafts only -- the hidden preview URL segment |
 | `created_at` | string | drafts only -- publish-time "was the date edited?" check |
-| `type` | string | explicit dominant content type; absent = derived from blocks |
+| `type` | string | explicit dominant content type; absent = derived from blocks. `type: page` is not a content type but the way a page is written -- see `page` below |
 | `source` | object | `platform` plus optionally `account`, `original_id` -- the re-import dedup key |
 | `mastodon_url` | string | the post's comment toot (Mastodon sites), set on publish/`toot` |
 | `bluesky_url` | string | the announcement's human link (Bluesky sites), set on publish/`bluesky` |
 | `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
 | `former_slugs` | array of strings | every address the post used to have, as `"year/slug"` frozen at rename time; the build emits a redirect stub for each (see `props` → rename). Engine-side history like the announcement URLs: edits and re-imports carry it over untouched |
 | `unpublished_from` | string | drafts only -- the `"year/slug"` address the post vacated when it was unpublished. Publishing consumes it: back under a different slug it becomes a `former_slugs` redirect, back under the same one it just disappears |
+| `series` | string | the series this post belongs to; with two or more published parts the build gives it a listing at `/series/<slug>/` and puts "part 2 of 5" navigation on the post |
+| `series_part` | integer | position within the series -- without it, parts are ordered by date, which is the usual case; the number is for the rare insert |
+| `pinned` | string/boolean | one post held at the top of the front page. Truth test is strict (`true`/`yes`/`1`), so a hand-edited `false` cannot pin by accident; more than one pinned post warns and the newest wins. Listings past page one, the archives and the feeds ignore it |
+| `toc` | string/boolean | table of contents on the post page. Absent = automatic (from 4 headings up); an explicit false suppresses it, an explicit true forces it below that threshold |
+| `hero` | string/boolean | whether the first non-degenerate image runs full width above the post. Absent = whatever `layout.hero` says for the whole site |
+| `scheduled` | boolean | set on a draft whose `date` is its future publish time; the `publish-scheduled` cron publishes it then and drops the key |
+| `unlisted` | string/boolean | a published post out of the listings, the archives, the feeds, the sitemap and the search index, `noindex` on its page -- but on its ordinary dated address, with its redirects intact. Not a password (see [decisions.md](decisions.md)); the truth test is loose, so a typo hides rather than exposes |
+| `page` | boolean | a page rather than a post: a permanent address (`/<slug>/`), out of the listings, the archives and the feed, but in the sitemap and the search index. Written as `type: page` in front matter; `page: true` is the older spelling and is still read |
 | `redirect_from` | array of strings | site-root paths the post answered at on its PREVIOUS platform (`"/old-post/"`, `"/2009/05/old-post.html"`), written by importers when the new site keeps the old domain. The build emits a redirect stub for each, after everything real -- a live page, listing or site file always wins over a stub, out loud. Deliberately separate from `former_slugs`: that is rename history inside this site, this is where the post lived before it arrived. Paths ending `.html`/`.htm` become literal files (Blogger-era URLs had no trailing slash); first segments the site itself owns (`posts`, `page`, `tag`, `type`, `assets`, `search`, `markdown`) are refused. Published posts only; edits and re-imports carry it over untouched |
 
 **Blocks** (`content` array entries), by `type`:
@@ -74,7 +82,7 @@ dedup by `source`).
 | `file` | `media` (`url`, `size` in bytes); `label` -- an attachment offered for download; the post's type becomes `document` when its text is caption-short |
 | `video` | one of four shapes: local file -- `media` (+ optional imported `poster`, same shape) and `caption` (the authoring CLI requires it); YouTube -- `provider: "youtube"`, `url`, `youtube_id`, `caption`; another platform the address alone identifies (Vimeo, PeerTube, archive.org) -- `provider`, `url`, `embed_id` (+ `embed_hash` for an unlisted Vimeo, `embed_origin` for the PeerTube instance), see `lib/embed.rb`; imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders as a polite "video unavailable" notice |
 | `audio` | local file -- `media` (first entry's `url`, no dimensions needed) and `caption`; a platform the address identifies (Spotify, SoundCloud, Mixcloud) -- `provider`, `url` and, where there is one, `embed_id`/`embed_kind`, see `lib/embed.rb`; a platform that had to be asked (Funkwhale, Bandcamp) -- `provider`, `url`, `embed_src` resolved once at save time by `lib/embed_lookup.rb` (+ `embed_origin` for the Funkwhale instance); imported embed -- `embed_html` (+ `provider`, `url`). A `url` alone renders a polite "audio unavailable" notice |
-| `link` | `url`; `title`; `description` -- rendered as a link card |
+| `link` | `url`; `title`; `description`. On a post with no title of its own the FIRST such block lends its title to the post (see `title` above) and then renders without it, leaving the description; anywhere else -- a titled post quoting a link mid-article, or a second link block -- it renders in full as a link card |
 
 An unrecognized `type` renders as its raw JSON in a `<pre>` -- loud,
 not silent.
@@ -119,6 +127,44 @@ see it:
 - The importers write the same schema through the shared
   `lib/post_writer.rb`, so an imported post and a hand-written one are
   indistinguishable downstream.
+
+## Undoing an edit (`lib/post_versions.rb`)
+
+Deleting a post was always reversible -- it goes to `trash/` and `restore`
+brings it back -- but editing one was not, and editing is what happens
+every day: a paragraph dropped and saved, a round-trip through markdown
+that could not express something, a paste into the wrong place. So the
+post as it stood is copied aside immediately before it is overwritten, by
+whoever is doing the overwriting: `PostWriter.write` for a re-import, the
+edit and restore paths in `scripts/manage_post.rb` for everything a person
+does by hand.
+
+The store is deliberately plain: `content.nosync/versions/<year>/<slug>/`,
+one whole post JSON per file, named for the second it was kept
+(`20260813-174204-118.json`) so that sorting the directory is sorting by
+time and no index has to be maintained. Ten per post; the eleventh drops
+the oldest, because the newest copy answers "what did this say before I
+broke it" in nine cases out of ten and an unbounded history of an archive
+this size is a second archive. `PostVersions.move` carries the directory
+into the trash with the post and back out on a restore, or a restored post
+would come back with amnesia and a deleted one would leave its history
+orphaned where nothing points at it.
+
+Three deliberate limits. It is **not configurable** -- a safety net with a
+switch is off exactly when it is needed, since nobody turns it on before
+the mistake, which is how this engine treats `trash/`, the slug-collision
+abort and the deploy guards too. Its **failures are swallowed**: a full
+disk or a read-only directory must not stop somebody saving their writing,
+and the point of this is to lose less. And it is **not git and not a
+backup** -- no branches, no diff between two arbitrary points, and it
+lives beside the content, so it dies with it. The backup list in
+[operations.md](operations.md#backup) still applies.
+
+Only the text is kept, never the media, which is the other half of why the
+cap is short: a version old enough to name a picture the post no longer
+has would restore a broken reference. The CLI side of this -- the `[v]`
+key, what the list shows and why restoring is itself undoable -- is in
+[operations.md](operations.md#properties-and-actions).
 
 ## Importing
 
@@ -207,6 +253,153 @@ included, so a photo taken sideways reserves the space it is shown at),
 `lib/video_probe.rb` (the video track's codec from the same box walk, two
 levels further down at `stsd`, so a save can say that a clip is HEVC).
 
+## Exporting (`lib/exporter.rb`)
+
+The mirror of the importers, and a much smaller thing: one source (this
+archive), one destination format, no adapters. `./blog.sh export` walks
+`content.nosync` and writes a Jekyll-shaped tree -- `_posts/<date>-<slug>.md`,
+`_drafts/<slug>.md`, pages at the root, media copied under
+`assets/<year>/<slug>/`. It only reads: nothing in the archive is
+touched, which is what lets it be the one command that still works on an
+installation somebody is leaving (hence its own entry point in
+`scripts/export.rb`, needing neither `env.sh` nor a config that parses).
+
+Three details carry the design:
+
+- **Its own front matter writer, deliberately not the CLI's.**
+  `build_frontmatter` in `scripts/manage_post.rb` is not YAML and does
+  not try to be: its reader (`MarkdownParser.parse_frontmatter`) splits
+  on the first colon and quotes nothing, which is right for a human
+  editing one post. Every reader downstream of an *export* -- Jekyll,
+  Hugo, `Import::Jekyll` -- uses a real YAML parser, where an unquoted
+  title containing a colon is a syntax error that takes the whole post
+  with it. The exporter therefore dumps through Psych with
+  `line_width: -1` (a folded long title is valid YAML and unreadable).
+- **Blocks markdown cannot write down become HTML, and get counted.**
+  `MarkdownWriter` drops what it has no syntax for -- the link card, an
+  imported embed with no recognisable address -- which is correct for
+  `edit`, where the CLI's loss guard stands behind it, and wrong for an
+  export. So the exporter renders block by block (the writer keeps no
+  state between blocks, so this is equivalent) and gives anything that
+  came back empty the same HTML the build renders. Counted per type and
+  said out loud, because the destination gets HTML where the rest of the
+  post is markdown. Above each one goes `<!-- blogsh:block {...} -->`,
+  the block's own JSON with its media paths rewritten to where they sit
+  in the export: every other engine ignores an HTML comment, and
+  `Import::Jekyll` turns it back into the block (`own_blocks_to_sentinels`
+  → `own_block`), so the round-trip loses nothing. `--` inside the JSON
+  is escaped as `\u002d`, or a caption containing `-->` would close the
+  comment early and spill markup into the page.
+  **Video and audio skip the markdown path even where the writer has a
+  form for them**: `!![caption](url)` is this engine's own syntax, and
+  CommonMark -- what every destination engine reads -- parses it as a
+  literal `!` followed by an *image*. Exported as markdown, a YouTube
+  video rendered on the destination as a broken image, and re-importing
+  the tree downloaded YouTube's HTML page and filed it in the archive as
+  `02.jpg` with no error reported, because the fetch had technically
+  succeeded. Found only by running the whole thing over a real 118-post
+  archive; a fixture could not have shown it, because both ends of a
+  fixture round-trip are ours.
+- **`blogsh:` is the round-trip.** Everything no other engine has a word
+  for goes under that one key -- `source` above all, which is half the
+  re-import dedup key. `Import::Jekyll` reads it back (whitelisted, never
+  merged), which turns export + import into a way to move an
+  installation. A post carrying it also gets no platform tag: a tree that
+  came from here and goes back must not collect a "jekyll" pill per
+  round.
+
+What is deliberately lost: `small`/`mention`/`color` spans keep their
+text and lose their styling, and a draft's preview URL is not exported
+(it is a private address, not a permalink).
+
+## Checking the archive (`lib/checker.rb`)
+
+`./blog.sh check` is doctor's counterpart and deliberately a separate
+command: doctor answers "is this installation sound", reads a handful of
+config values and takes a second, while this walks every post and every
+media file there is. Rolled into one command the fast half would stop
+being run, which is the half somebody runs before every deploy.
+
+It reads the **content**, not the built site. A finding has to name a post
+and a slug -- something to go and fix -- rather than a file under
+`public.nosync`, and it has to work before a build has ever run. Judging a
+link still needs to know which addresses a build would produce, so those
+are derived in the checker from the same rules `build_blog.rb` follows.
+Seven questions, in one pass: media a post asks for and hasn't got; images
+whose stored dimensions are 1px or smaller, which the build drops
+*together with their caption* and would otherwise lose silently; internal
+links pointing at an address nothing on this site answers at; media
+directories no post owns any more; files in a post's own directory the
+post no longer names; two series whose names sit an edit or two apart,
+which is usually one series and a typo; and one old address claimed by
+two posts, where whichever renders last wins and the others' readers land
+on it.
+
+Two rules shape the output. **It only ever reports** -- nothing here
+deletes an orphaned directory or rewrites a post, because the whole value
+of the tool is that its output can be trusted, and a checker that also
+acts has to be trusted twice. And each kind of finding is **capped**, the
+remainder counted (`more`), since a thousand identical lines is not more
+information than a screenful and buries every other kind -- the cap, with
+the rest of the command's day-to-day surface, is in
+[operations.md](operations.md#checking-the-archive). The exit code is
+non-zero on errors only: an orphan directory costs disk rather than
+correctness, so a cron job hanging off this would be crying wolf if
+warnings failed it. Like `export` and `stats` it has its own entry
+point (`scripts/check.rb`) rather than going through `manage_post.rb`,
+which applies the site timezone as it loads and aborts on a config it
+cannot read -- a run that exits explaining the config has checked nothing.
+
+`--online` is the only part that leaves the machine, and it is asked for
+by name because it takes minutes rather than a second and, over an archive
+going back twenty years, will find things nobody can do anything about.
+What counts as a finding is narrow on purpose: a host that no longer
+resolves, and a 404 or 410, are the web saying "this is gone"; a timeout,
+a refusal, a 5xx, a TLS error or a 403 are the web saying "not right now",
+and reporting those turns one flaky evening into forty findings that are
+all fine again tomorrow. A checker nobody believes is worse than no
+checker.
+
+Three details make it usable on a real archive rather than only correct:
+
+- **HEAD first, GET to confirm anything fatal.** A link checker has no use
+  for the body, and HEAD over a few thousand links is the difference
+  between minutes and an afternoon -- but HEAD is never believed when it
+  says a page is gone. Some servers answer it with 405 or 501 while
+  serving GET perfectly; worse, some answer 404 to HEAD and 200 to GET for
+  the very same address (bsky.app does this on profile pages, and the
+  first run over a real archive reported dozens of live links as dead
+  because of it). So `RETRY_WITH_GET` re-asks with a GET, one extra
+  request per apparently-dead link.
+- **Politeness rather than throughput.** One request at a time, and a
+  one-second pause between two requests to the same host: an archive with
+  two hundred links to one site should not read as an attack on it.
+- **Memory between runs.** `Checker::Cache` keeps every verdict in
+  `tmp/link-check.json` for a while (how long, see
+  [operations.md](operations.md#checking-the-archive)), so a second run
+  only asks about the links it has not seen lately -- without it nobody
+  runs this twice, since a few thousand requests is minutes and most of
+  the answers were the same yesterday. A cache it cannot read or write
+  is not an error: the check simply asks the network, which is what it
+  was going to do anyway.
+
+## Counting (`lib/stats.rb`)
+
+`./blog.sh stats` is the same shape as `check` and `export`: its own
+entry point, the archive on disk as its only input, no configuration it
+could die on. `lib/stats.rb` counts and returns a plain Hash -- it never
+prints, colours or translates -- and `scripts/stats.rb` renders that
+either as a screen for a person or, with `--json`, verbatim for whatever
+reads it next. That split is what keeps the two outputs from drifting:
+there is one set of numbers and two ways of showing it.
+
+It reuses what already answers each question rather than re-deriving it:
+`PostText.plain` for words (the same text the search index is built
+from), `ContentType.dominant` for what a post is, `FileSize.human` for
+sizes, and the build's own 200-words-per-minute constant for reading
+time -- two places telling a reader how long something takes must not
+disagree.
+
 ## Build pipeline (`build/build_blog.rb`)
 
 A single linear pass, no framework:
@@ -231,7 +424,12 @@ A single linear pass, no framework:
    instead of the whole archive.
 5. **Indexes & feeds.** Client-side search index split into recent
    (`search-index.json`, newest 500, loaded eagerly) and archive
-   (`search-index-archive.json`, loaded on first query);
+   (`search-index-archive.json`, loaded on first query). Each entry
+   carries one folded blob (title, text and tags together), which is what
+   `assets/js/search.js` matches on; it scores the hits afterwards -- a
+   word in the title above a word in the text, a whole word above the
+   same letters inside a longer one, date as the tiebreak -- and draws at
+   most `RESULT_LIMIT` of them while reporting the true count;
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
 6. **Assets, colors and the root favicon.** Before `assets/` is copied
@@ -268,24 +466,57 @@ don't depend on page content.
 
 ## The terminal UI
 
-`lib/tui.rb` is the whole UI layer: colors, single-keypress choices, an
-inline arrow-key menu and a spinner -- pure stdlib (`io/console`), plain
-VT100 sequences, no terminfo and no gems. Three deliberate constraints:
+`lib/tui.rb` is the whole UI layer: colors, single-keypress choices,
+arrow-key menus, the screens they live on and a spinner -- pure stdlib
+(`io/console`), plain VT100 sequences, no terminfo and no gems. Four
+deliberate constraints:
 
 - **Everything degrades.** `Tui.interactive?` gates every enhancement,
   so piped, scripted and cron runs keep the exact line-based behavior
   (and escape-code-free output) they always had. Colors additionally
   honor `NO_COLOR` and `TERM=dumb`.
-- **Raw mode per keystroke, never persistent.** `STDIN.getch` enters and
-  leaves raw mode around a single read, so no crash can leave the user's
-  shell broken -- the classic TUI failure mode.
-- **Inline, not fullscreen.** The menu repaints its lines in place with
-  cursor-up; no alternate screen, so the dialog stays in the scrollback.
-  A list longer than the terminal is tall scrolls inside a window sized
-  once per call (a wrapped or overflowing line would break the
-  fixed cursor-up arithmetic, which is also why items are truncated
-  rather than wrapped). A lone Esc is told apart from an arrow key by a
-  50 ms wait for the rest of the sequence.
+- **A screen that stays put.** `Tui.frame(rows, keep_last:)` paints from
+  the top of the viewport over whatever the previous frame left there,
+  writing the rows in one go and ending the last without a newline -- a
+  full-height frame that ends in one scrolls the view by exactly what this
+  exists to prevent. `keep_last` names the rows that survive a window too
+  short to hold the frame (the keys, normally); what gets dropped instead
+  is the end of the list, which the cursor can still scroll to. Everything
+  interactive is built on it: the wizard menu, the publishing queue,
+  `Tui.menu`, `Tui.browse`, the props dialog and the questions in
+  `./setup.sh`, `./style.sh` and `./import.sh`.
+- **Not the alternate screen.** `\e[?1049h` would discard its plane on
+  exit, and this CLI prints things worth keeping -- a draft's address,
+  what a deploy uploaded, what refused. The last frame stays where it was
+  drawn and the scrollback above it is never touched.
+- **Raw mode around a frame, never a session.** `Tui::Screen#key` holds
+  raw for one paint-and-read and gives it back, so no crash can leave the
+  user's shell broken -- the classic TUI failure mode. A lone Esc is told
+  apart from an arrow key by a 50 ms wait for the rest of the sequence.
+
+`Tui.screen` yields a `Screen`: `paint` puts a frame up, `key` waits for
+one keypress, and `leave` hands the terminal to something that prints more
+than a frame can hold (a build, a publish) and takes it back afterwards.
+Nothing in it knows what a post or a queue is. A window resized *while*
+`key` waits answers `:resize`, which every caller treats as "paint again":
+a trap alone would not do, because `getch` blocks in the kernel and the
+handler would run with the read still parked, so the handler writes a byte
+to a pipe that `key` waits on alongside the terminal.
+
+Two rules follow from painting at the top, and both are easy to get wrong.
+Anything a caller prints *just before* a picker is painted over, so the
+rows that belong above a list travel into it as `header:` rather than
+being printed first. And a list longer than the window scrolls inside it,
+on a window measured once when the picker opens: `Tui.menu` and
+`Tui.browse` read the terminal's height before their loop and keep it,
+because the arithmetic deciding which rows are visible has to stay valid
+for the life of the call. Answering a resize mid-wait is therefore the
+privilege of the screens that own a `Screen` -- the wizard menu, the
+publishing queue and the props dialog -- and everywhere else a resized
+window straightens itself on the next screen rather than on the spot.
+`context:` adds one line under the cursor saying what the selected row
+*is* -- what a version said, where the row itself can only say when it was
+kept -- and it is called for the selected row only.
 
 `lib/qr_code.rb` renders a draft's preview URL as a scannable QR code in
 half-block glyphs -- the smallest correct subset of the spec that the job
@@ -322,18 +553,11 @@ The deploy script owns the *what*; backends own the *how*:
   the build -- which is why it carries no per-backend suffix.
 - **Safeguards** run before any backend, and measure the build against
   that baseline rather than against the manifest: an upload failure must
-  not be able to move the yardstick. Four of them -- file count and total
-  bytes, each in both directions -- with percentages plus absolute floors,
-  since 20% of a small build is a couple of files. A drop stops the
-  deploy, as does a jump in file count; a jump in bytes only prints a
-  notice, because attaching media is authoring. A drop may also measure
-  against the manifest when that is larger (every entry in it is a file
-  that really uploaded, so it can only understate the site); growth never
-  does, because the manifest legitimately lags the build. Alongside them a
-  **per-file limit** (`lib/file_size.rb`) refuses a single file over
-  100 MB, both when a post is saved and before a deploy sends it.
-  `--prune` is the only deleting flag, `--force` the only override -- and
-  it does not override the per-file limit, which no target would accept.
+  not be able to move the yardstick. Which checks run, at which
+  thresholds, and what `--prune` and `--force` do and do not override is
+  in [operations.md](operations.md#deploying) -- so is the single
+  per-file size limit alongside them, enforced by `lib/file_size.rb`
+  when a post is saved as well as here.
 - **Backends** implement one of two shapes: per-file
   `session`/`upload`/`delete` (Surfer's HTTP API, local copies) or a
   single batch `sync` (rsync, rclone and git diff against the target
@@ -345,8 +569,31 @@ The deploy script owns the *what*; backends own the *how*:
 ## The client side
 
 Small single-purpose vanilla JS files, no framework, no third-party
-origins:
+origins. `util.js` loads first because everything else stands on it:
+`Blog.escapeHtml`, which every piece of foreign data goes through before
+it reaches `innerHTML`, and `Blog.formatDate`, which takes its locale from
+`window.BLOG_I18N` so a date the browser writes matches the ones the build
+wrote. Then, in load order:
 
+- **Theme** (`theme-toggle.js`): a button cycling three states -- follow
+  the system, light, dark -- with the reader's answer in `localStorage`
+  and nothing there while they are following the system. Anything else
+  found in storage is read as "no choice" rather than written onto the
+  root element, where it would match neither the light rules nor the dark
+  ones.
+- **The menu on a phone** (`nav-toggle.js`): opens and closes the bar, and
+  closes it on Escape or a tap on the page as well as on the button. The
+  open menu covers most of a phone's screen, and a reader who has decided
+  against it reaches for one of those two before hunting for the small
+  button again; Escape hands focus back to the button, which is where they
+  were before they opened it.
+- **Back to top** (`scroll-top.js`): the button appears past 300 px of
+  scrolling, on a listener declared `passive` so the browser never waits
+  to see whether it cancels the scroll. It asks
+  `prefers-reduced-motion` at the click rather than at load, because the
+  setting can change while the page is open -- and it has to ask at all,
+  since CSS can take the site's transitions out but not a scroll this code
+  asks for.
 - **Comments** (`comments.js`): a published post's announcement
   reference is baked into the page (`data-toot-url` or
   `data-bluesky-uri` -- exactly one network per site, see
@@ -366,6 +613,11 @@ origins:
 - **Search** (`search.js`) runs entirely client-side over the two
   index files, with the same diacritic folding the build used to create
   them.
+- **Lightbox** (`lightbox.js`) opens a post's figures and gallery images
+  over the page as a real dialog: `aria-modal`, the body held still, Tab
+  kept inside it, the arrows walking the group the image belongs to, and
+  focus handed back to the picture it was opened from. Its labels come
+  from `window.BLOG_I18N` like every other string the client draws.
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.

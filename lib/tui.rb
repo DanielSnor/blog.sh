@@ -121,6 +121,61 @@ module Tui
     "#{out}…"
   end
 
+  # Wraps where the comment above truncates, for the one kind of row that
+  # is not load-bearing for any repaint: a wizard's hint, which sits in a
+  # frame with empty rows under it. Truncating those was silently costing
+  # 7,391 characters across 42 of 54 hints -- and the part that went was
+  # the end, which is where a hint says what it will cost you. One hint
+  # explaining that the page size can never be changed again showed the
+  # words "asked now and only now" and hid every reason why.
+  #
+  # German is the reason this cannot be solved by writing shorter: it runs
+  # 15-20% longer than the same sentence in English, so a hint edited to
+  # fit in one language goes on being cut in another.
+  def wrap_to_width(text, width)
+    text = sanitize_row(text)
+    return [text] if width <= 1 || display_width(text) <= width
+
+    lines = []
+    current = +''
+    split_long_words(text.split(' '), width).each do |word|
+      if current.empty?
+        current = +word
+      elsif display_width("#{current} #{word}") <= width
+        current << ' ' << word
+      else
+        lines << current
+        current = +word
+      end
+    end
+    lines << current unless current.empty?
+    lines
+  end
+
+  # A word with no line it can fit on -- the lookup URL one hint tells you
+  # to open, a deploy path -- is cut into pieces that do, rather than left
+  # to overrun the row and be truncated away by the frame. Cutting a URL
+  # across two lines is ugly; losing its tail is worse, because what is
+  # left still looks like a whole address.
+  def split_long_words(words, width)
+    words.flat_map do |word|
+      next word if display_width(word) <= width
+
+      pieces = []
+      piece = +''
+      word.each_char do |ch|
+        if display_width(piece + ch) > width
+          pieces << piece
+          piece = +ch
+        else
+          piece << ch
+        end
+      end
+      pieces << piece unless piece.empty?
+      pieces
+    end
+  end
+
   # The same, for text that carries colour: an ANSI string's length is not
   # its visible width, so only the printable characters are counted and the
   # escape sequences pass through untouched. A cut inside a colour gets a
@@ -211,11 +266,82 @@ module Tui
   # by a line of input when piped -- the returned string matches what the
   # line-based dialogs always produced ('' for Enter/Esc, the downcased
   # answer otherwise), so callers' case statements stay unchanged.
-  def key_choice(prompt)
-    print prompt
-    unless interactive?
-      return $stdin.gets&.strip.to_s.downcase
+  # The keys line of a single-key prompt, folded to the terminal rather than
+  # left to wrap wherever the width happens to run out -- which lands inside
+  # an item, so "[r] rename slug" breaks after "rename" and the bracket
+  # naming the key sits on the line above its own words. Items stay whole
+  # and the trailing ": " stays with the last one, because that is where the
+  # cursor waits for the keypress.
+  #
+  # FOLDED, not trimmed the way `browse`'s keys line is. There the dropped
+  # items are ways to move around and a reader can guess them; here they are
+  # the actions themselves, and dropping "[x] delete" would mean the action
+  # does not exist on the one screen where the terminal is narrowest -- a
+  # phone over SSH. Nothing is hidden, it is only stacked.
+  #
+  # Two spaces is the separator every one of these strings uses, in all
+  # three locales. A prompt with no separator (or one that fits) comes back
+  # byte for byte, so piped output and the tests over it are untouched.
+  def fold_prompt(text, width)
+    return text if width < 20 || display_width(strip_ansi(text)) <= width
+
+    parts = text.split(/ {2,}/).reject(&:empty?)
+    return text if parts.size < 2
+
+    lines = []
+    current = +''
+    parts.each do |part|
+      candidate = current.empty? ? part : "#{current}  #{part}"
+      if !current.empty? && display_width(strip_ansi(candidate)) > width
+        lines << current
+        current = +'' << part
+      else
+        current = candidate
+      end
     end
+    lines << current
+    lines.join("\n")
+  end
+
+  # Whether an answer from key_choice means yes.
+  #
+  # On a terminal key_choice returns one keypress, so testing the first
+  # letter and testing the whole answer are the same thing. Down a pipe it
+  # returns the entire LINE -- and there the callers that asked
+  # `.start_with?(yes_char)` were accepting any word that happened to begin
+  # with it. On a Czech site that made "ahoj" and "abort" both mean yes:
+  # "abort" in particular reads as the exact opposite of what it did, and
+  # the three places it reached were restoring an old version over the text
+  # being worked on, compacting the publishing queue, and announcing a
+  # backdated post -- the last of which cannot be taken back at all.
+  #
+  # Exact matches only, and the same set Wizard.confirm accepts: the
+  # locale's own character, plus the three shipped ones so that habits
+  # carried between languages keep working. A word is not a keypress.
+  def yes?(answer)
+    answer = answer.to_s.strip.downcase
+    return false if answer.empty?
+
+    answer == I18n.lookup('cli.confirm_yes_char').to_s.downcase || %w[y j a].include?(answer)
+  end
+
+  def key_choice(prompt)
+    unless interactive?
+      print prompt
+      answer = $stdin.gets
+      # The terminal branch below closes the row in all three of its cases,
+      # by echoing the key that was pressed. Down a pipe there is nothing to
+      # echo -- the newline the answer arrived with is consumed by gets and
+      # never reaches the output -- so the row stayed open and whatever was
+      # said next landed on the question: "Zapsat tyhle změny? [a/N] Nic se
+      # nezapsalo." on one line. Three callers had grown their own
+      # `puts unless interactive?` to patch it from outside; the row belongs
+      # to whoever printed the prompt, which is here.
+      puts
+      return answer&.strip.to_s.downcase
+    end
+
+    print fold_prompt(prompt, term_width)
 
     key = read_key
     case key
@@ -228,6 +354,66 @@ module Tui
     else
       puts
       ''
+    end
+  end
+
+  # A line of input where Tab completes file names. The import wizard asks
+  # for the path to an export somebody has just downloaded, and without this
+  # the only way in is typing it from memory, correctly, the first time --
+  # for a name like `twitter-2026-08-13-a1b2c3.zip` sitting three
+  # directories down.
+  #
+  # readline is a DEFAULT gem: it ships with Ruby and installs nothing, so
+  # "no gems, no lockfile" still holds. It can nevertheless be absent (a Ruby
+  # built --without-readline), so a failed require degrades to the ordinary
+  # prompt rather than taking the wizard down on its first question. Piped
+  # input skips it too -- there is no terminal to complete against.
+  def path_line(prompt)
+    return plain_line(prompt) unless interactive? && readline?
+
+    # Word breaks off on purpose. Readline splits on spaces by default, and
+    # plenty of exports sit in a directory whose name has one -- completing
+    # only the fragment after the space finds nothing and reads as broken.
+    # With no break characters the whole line is the word, which is what a
+    # path is.
+    Readline.completion_append_character = nil
+    Readline.completer_word_break_characters = ''
+    Readline.completion_proc = ->(str) { complete_path(str) }
+    Readline.readline(prompt, false)
+  end
+
+  def plain_line(prompt)
+    print prompt
+    $stdin.gets
+  end
+
+  # Candidates are returned in the shape the line was typed in -- a "~" that
+  # was typed stays a "~". Handing back the expanded form instead would
+  # rewrite the visible line into an absolute path on the first Tab, which
+  # is disorienting when the answer is about to be echoed back in an error
+  # message. Directories get their trailing slash so a second Tab descends.
+  def complete_path(str)
+    typed = str.to_s
+    home = Dir.home
+    pattern = typed.empty? ? '*' : "#{typed.sub(/\A~/, home)}*"
+    Dir.glob(pattern).map do |hit|
+      shown = typed.start_with?('~') ? hit.sub(/\A#{Regexp.escape(home)}/, '~') : hit
+      File.directory?(hit) ? "#{shown}/" : shown
+    end
+  rescue StandardError
+    # A malformed glob (an unbalanced brace in a half-typed path) must not
+    # kill the prompt mid-question.
+    []
+  end
+
+  def readline?
+    return @readline unless @readline.nil?
+
+    @readline = begin
+      require 'readline'
+      true
+    rescue LoadError
+      false
     end
   end
 
@@ -283,49 +469,66 @@ module Tui
   # promise that Enter keeps the current value was false: Enter on the
   # language menu switched an English site to Czech, because cs sorts
   # first.
-  def menu(items, hint: nil, allow_text: false, text_prompt: nil, initial: 0, numeric_pick: true)
+  # `header:` are rows that belong ABOVE the list, inside the frame -- the
+  # question a picker is answering, most often. They used to be printed by
+  # the caller just before calling this, which worked while the menu
+  # repainted in place and stopped working the moment it started painting
+  # from the top of the viewport: the frame would land on top of them.
+  # `context:` is a lambda given the selected index, returning one line to
+  # show under the cursor -- what the row IS, when the row itself can only
+  # say what it is called. It is called for the selected row only, so the
+  # cost is one lookup per keypress rather than one per item. Same idea and
+  # same shape as `browse`'s, which had it first.
+  def menu(items, hint: nil, header: [], allow_text: false, text_prompt: nil, initial: 0,
+           numeric_pick: true, context: nil)
     selected = initial.to_i.clamp(0, [items.size - 1, 0].max)
-    offset = clamp_offset(selected, 0, [items.size, [term_height - 2 - (hint ? 2 : 0), 5].max].min, items.size)
-    # Leave a couple of rows above the menu for whatever's already on
-    # screen (the prompt that preceded it) plus the hint block, so the
-    # menu doesn't try to claim the entire terminal height for itself.
-    budget = term_height - 2 - (hint ? 2 : 0)
-    window = [items.size, [budget, 5].max].min
-    scrollable = items.size > window
-    # +2 for the hint, not +1: a blank separator line precedes it, and
-    # the cursor-up repaint math must count every physical line printed.
-    lines = window + (hint ? 2 : 0)
-    painted_once = false
+    header = Array(header)
+    # The rows the list cannot have: the header, the blank line under the
+    # list and the hint, plus one so the frame never quite fills the window
+    # (a full-height frame leaves the cursor with nowhere to stand, which
+    # matters for allow_text, where a line gets typed under it).
+    budget = term_height - header.size - (hint ? 2 : 0) - 1
+    window = [items.size, [budget, 3].max].min
+    offset = clamp_offset(selected, 0, window, items.size)
 
-    print "\e[?25l"
     loop do
       avail = term_width - 2 # "› " / "  " prefix
-      print "\e[#{lines}A" if painted_once
-      items[offset, window].each_with_index do |item, i|
-        line =
-          if (offset + i) == selected
-            # Stripped here, and only here: the whole row is painted
-            # :invert, and a colour's own reset inside it would end the
-            # inversion mid-line. Being the inverted row is the stronger
-            # signal anyway.
-            paint("› #{truncate_to_width(strip_ansi(item), avail)}", :invert)
-          else
-            # Colour kept, so the state markers read the same in a picker as
-            # they do in `list` -- the picker used to be the one place that
-            # showed them in plain grey.
-            "  #{truncate_ansi(item, avail)}"
-          end
-        print "\e[2K#{line}\n"
+      ctx = items.empty? || context.nil? ? nil : context.call(selected)
+      # The context line comes out of the WINDOW's budget, not out of the
+      # list: window is already the smaller of "what fits" and "how many
+      # there are", so taking one off it hid a row whenever the list was
+      # shorter than the screen -- two versions showed one.
+      row_window = ctx ? [items.size, [budget - 1, 2].max].min : window
+      offset = clamp_offset(selected, offset, row_window, items.size)
+      rows = header.dup
+      items[offset, row_window].to_a.each_with_index do |item, i|
+        rows << if (offset + i) == selected
+                  # Stripped here, and only here: the whole row is painted
+                  # :invert, and a colour's own reset inside it would end the
+                  # inversion mid-line. Being the inverted row is the stronger
+                  # signal anyway.
+                  paint("› #{truncate_to_width(strip_ansi(item), avail)}", :invert)
+                else
+                  # Colour kept, so the state markers read the same in a picker as
+                  # they do in `list` -- the picker used to be the one place that
+                  # showed them in plain grey.
+                  "  #{truncate_ansi(item, avail)}"
+                end
+        rows << paint("      #{truncate_to_width(ctx, avail - 4)}", :dim) if ctx && (offset + i) == selected
       end
       if hint
-        print "\e[2K\n"
+        rows << ''
         # Numeric rather than worded ("16-31 of 50") on purpose: this file
         # deliberately depends on nothing but io/console -- no config, no
         # locales -- and a bare range reads the same in every language.
-        text = scrollable ? "#{hint} · #{offset + 1}-#{offset + window}/#{items.size}" : hint
-        print "\e[2K#{paint(truncate_to_width(text, term_width), :dim)}\n"
+        # Counted from row_window, not window: with a context line under the
+        # cursor one fewer row is shown, and the counter has to say so.
+        shown = [row_window, items.size - offset].min
+        text = items.size > row_window ? "#{hint} · #{offset + 1}-#{offset + shown}/#{items.size}" : hint
+        rows << paint(truncate_to_width(text, term_width), :dim)
       end
-      painted_once = true
+      print "\e[?25l"
+      frame(rows, keep_last: hint ? 2 : 0)
 
       case (key = read_key)
       when :up
@@ -334,6 +537,24 @@ module Tui
       when :down
         selected = (selected + 1) % items.size
         offset = clamp_offset(selected, offset, window, items.size)
+      when :page_up, :page_down
+        # Paging moves the window, not just the cursor -- the rule `browse`
+        # already follows: leaving the offset to clamp_offset scrolls a
+        # single line and parks the cursor on the edge, which reads as a
+        # broken Page Down. And no wraparound, unlike the arrows: a page is
+        # a distance, and one that would land past the end stops at the end.
+        # read_key has named these keys since it learned to drain escape
+        # sequences; this menu was simply throwing them away, so a picker
+        # over a long archive could only be walked one row at a time.
+        delta = key == :page_up ? -window : window
+        selected = (selected + delta).clamp(0, [items.size - 1, 0].max)
+        offset = (offset + delta).clamp(0, [items.size - window, 0].max)
+      when :home
+        selected = 0
+        offset = 0
+      when :end
+        selected = [items.size - 1, 0].max
+        offset = [items.size - window, 0].max
       when :enter then return selected
       when :escape then return nil
       when String
@@ -353,7 +574,10 @@ module Tui
           index = offset + relative
           return index if relative < window && index < items.size
         elsif allow_text && key =~ /\A[[:alnum:]]\z/
-          print "\e[?25h#{text_prompt}#{key}"
+          # On its own line under the frame, which the frame leaves room
+          # for: typing onto the last painted row would put the answer
+          # inside the hint, and the frame would repaint over it.
+          print "\r\n\e[?25h#{text_prompt}#{key}"
           rest = $stdin.gets.to_s.strip
           line = "#{key}#{rest}"
           # numeric_pick: false for menus whose rows carry no numbers and
@@ -367,6 +591,17 @@ module Tui
     end
   ensure
     print "\e[?25h"
+    # Close the row the frame deliberately left open. frame ends its last
+    # line without a newline so the cursor can stand on it while the menu
+    # waits -- but the menu is done waiting now, and everything the caller
+    # says next was landing ON the keys line: "Esc zpětZrušeno." Every
+    # picker in the wizard did it, because every picker ends here.
+    #
+    # One newline, not two. It closes the line and no more; a caller that
+    # wants the blank line this CLI puts before a result already writes it,
+    # and with the row closed that `puts` finally produces the blank it was
+    # always meant to be instead of the line break nobody got.
+    puts
   end
 
   # Two strings on one line, the second flush right -- the status line of
@@ -394,11 +629,17 @@ module Tui
   #
   # Returns [:enter, index], [:key, character, index] or nil on Esc.
   # `state` is the caller's to keep between calls -- leaving the screen
-  # for a post and coming back lands on the same row instead of at the
-  # top -- and carries the height of the last frame, so a re-entry
-  # repaints over it. A caller that PRINTS anything in between (a submenu,
-  # an editor, a preview) must drop state[:lines] first, or the repaint
-  # would land in the middle of whatever it printed.
+  # for a post and coming back lands on the same row instead of at the top.
+  #
+  # It paints through `frame`, from the top of the viewport, like every
+  # other screen here. It used to repaint by counting its own lines and
+  # moving the cursor up over them, which was correct on its own and wrong
+  # as soon as it was entered FROM a screen: the wizard's frame was above
+  # it, the cursor-up landed in the middle of that frame, and walking into
+  # the archive and back out scrolled the view by fourteen lines. Painting
+  # from the top has no such arithmetic to get wrong, and it also retires
+  # the rule that a caller printing anything in between had to clear
+  # state[:lines] first.
   def browse(state, keys:, empty:, hot_keys: [], context: nil, search_hint: nil, cursor: true)
     query = state[:query].to_s
     searching = !state.delete(:searching).nil?
@@ -409,10 +650,6 @@ module Tui
     # Two of the lines are the status and the keys; one more is left for
     # whatever was on screen before, the same courtesy `menu` pays.
     window = [term_height - 4, 4].max
-    lines = window + 2
-    print "\e[#{state[:lines]}A" if state[:lines]
-    state[:lines] = lines
-    painted = false
 
     print "\e[?25l"
     # Raw for the WHOLE screen, not per keystroke: between two getch
@@ -429,7 +666,6 @@ module Tui
       row_window = ctx ? window - 1 : window
       state[:offset] = clamp_offset(state[:selected].to_i, state[:offset].to_i, row_window, rows.size)
 
-      print "\e[#{lines}A" if painted
       avail = term_width - 2
       shown = rows[state[:offset], row_window] || []
       out = []
@@ -448,23 +684,14 @@ module Tui
       left, right = Array(status)
       out << paint(pad_between(left.to_s, [right, position].compact.reject(&:empty?).join('  ·  '), term_width), :bold)
       out << paint(fit_keys(searching ? search_hint.to_s : keys, term_width), :dim)
-      # "\r\n", not "\n": this whole loop runs inside raw_screen, and raw
-      # mode clears OPOST, so the kernel no longer turns a newline into
-      # carriage-return + newline. With a bare LF every row starts where
-      # the previous one ended and the screen reads as a diagonal
-      # staircase. The carriage return has to be written by hand here.
-      # Control characters are stripped at the last moment, not at every
-      # call site that builds a row: a post title (or an imported feed
-      # title, which keeps newlines inside a wrapped <title>) carrying a
-      # newline or a tab painted its own line break inside the frame, so
-      # the screen ended up taller than the cursor-up count and drifted
-      # further with every keystroke. TAB is in the class too -- it is the
-      # character the note above names, and a tab expands to whatever
-      # stop width the terminal keeps, which no column arithmetic here
-      # can predict. ESC is the one exception: the rows carry the colour
-      # sequences this file wrote itself.
-      out.each { |line| print "\e[2K#{sanitize_row(line)}\r\n" }
-      painted = true
+      # frame writes the rows in one go, ends the last one without a
+      # newline (a full-height frame that ends in one scrolls the view by
+      # exactly the thing this avoids) and sanitizes control characters --
+      # a post title carrying a newline or a tab used to paint its own line
+      # break inside the frame and the screen drifted further with every
+      # keystroke. The keys are the two rows that must survive a window too
+      # short to hold everything.
+      frame(out, keep_last: 2)
 
       move = lambda do |delta|
         next if rows.empty?
@@ -535,6 +762,136 @@ module Tui
     end
   ensure
     print "\e[?25h"
+  end
+
+  # A screen that stays put. The frame is painted from the top of the
+  # viewport, over whatever the last frame left there, and the terminal
+  # never scrolls -- so a dialog that used to reprint its whole list after
+  # every keypress now lives on the same rows from beginning to end.
+  #
+  # NOT the alternate screen (\e[?1049h). That plane is discarded on exit,
+  # and this CLI prints things worth keeping: a draft's address, what was
+  # uploaded, what refused. Here the last frame stays exactly where it was
+  # drawn and the scrollback above it is never touched -- which is the same
+  # promise `pause_and_clear` has always made.
+  #
+  # The rows are joined rather than printed one by one, and the last one
+  # carries no line ending: printing term_height lines each with a newline
+  # scrolls the view by one, and a screen that scrolls by one per repaint
+  # is the very thing this exists to stop. \e[J clears whatever the
+  # previous, taller frame left below this one.
+  #
+  # \r\n, not \n -- callers paint inside raw_screen, where OPOST is off and
+  # the kernel no longer turns a newline into carriage-return plus newline.
+  # `keep_last` names the rows that must survive a window too short to hold
+  # the frame -- the keys, normally. Without it the frame is simply cut at
+  # the bottom, which is where the way out is written: a 14-row frame in a
+  # 12-row window lost "Esc back" and the screen became a trap. What gets
+  # dropped instead is the end of the middle, which is a list the cursor can
+  # still scroll through.
+  def frame(lines, keep_last: 0)
+    width = term_width
+    height = term_height
+    rows = if lines.size <= height || keep_last.zero?
+             lines.first(height)
+           else
+             tail = lines.last([keep_last, height].min)
+             lines.first(height - tail.size) + tail
+           end
+    body = rows.map { |line| "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}" }
+    print "\e[H#{body.join("\r\n")}\e[J"
+  end
+
+  # Everything below the frame, cleared. For leaving a screen behind before
+  # an operation that prints its own long output (a build, a deploy): the
+  # frame stays as the last thing on screen and the output starts under it,
+  # instead of the two overwriting each other row by row.
+  def frame_end(lines)
+    frame(lines)
+    print "\r\n"
+  end
+
+  # One screen's worth of terminal, held for as long as the caller needs it.
+  # The queue was the first of these; the rest of the CLI follows, so the
+  # loop that was written inside it lives here instead of being copied.
+  #
+  # The caller drives it: `paint` puts a frame up, `key` waits for a
+  # keypress, `leave` hands the terminal over to something that prints more
+  # than a frame can hold (a build, a publish) and takes it back afterwards.
+  # Nothing here knows what a queue or a post is -- it knows rows, keys and
+  # who owns the terminal right now.
+  #
+  # A window RESIZED WHILE THE SCREEN WAITS is the reason `key` is not just
+  # read_key. A trap alone would not do: $stdin.getch blocks in the kernel
+  # and the handler runs but the read stays parked, so the frame would only
+  # straighten on the next keypress. The handler therefore writes a byte to
+  # a pipe this waits on alongside the terminal -- the self-pipe every
+  # event loop ends up with -- and `key` answers :resize, which every caller
+  # treats as "paint again".
+  class Screen
+    def initialize
+      @lines = []
+      @resize_r, @resize_w = IO.pipe
+      @previous = Signal.trap('WINCH') do
+        begin
+          @resize_w.write_nonblock('.')
+        rescue StandardError
+          nil
+        end
+      end
+    end
+
+    def paint(lines, keep_last: 0)
+      @lines = lines
+      Tui.frame(lines, keep_last: keep_last)
+    end
+
+    def key
+      Tui.raw_screen do
+        print "\e[?25l"
+        ready, = IO.select([$stdin, @resize_r])
+        if ready.include?(@resize_r)
+          begin
+            @resize_r.read_nonblock(256)
+          rescue StandardError
+            nil
+          end
+          :resize
+        else
+          Tui.read_key
+        end
+      ensure
+        print "\e[?25h"
+      end
+    end
+
+    # The frame stays as the last thing on screen and the output starts
+    # under it, rather than the two overwriting each other row by row. The
+    # pause is what keeps the output readable: without it the next frame
+    # would wipe whatever was just said.
+    def leave(pause_message)
+      Tui.frame_end(@lines)
+      result = yield
+      Tui.pause_and_clear(pause_message)
+      result
+    end
+
+    def close
+      Signal.trap('WINCH', @previous || 'DEFAULT')
+      @resize_r.close
+      @resize_w.close
+    rescue StandardError
+      nil
+    end
+  end
+
+  # Runs a screen and always gives the signal handler and the pipe back,
+  # including when the block aborts the process or the user interrupts it.
+  def screen
+    scr = Screen.new
+    yield scr
+  ensure
+    scr&.close
   end
 
   # $stdin.raw with a floor: a stdin that cannot do raw (not a real

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'cgi'
+require 'json'
 require 'time'
 require 'yaml'
 # For the run's postscript below -- the other adapters that speak in the
@@ -8,7 +9,11 @@ require 'yaml'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative '../markdown_parser'
+# Only the postscript needs these, and only to say where a page actually
+# landed -- the same pair (and the same reason) as feed.rb.
+require_relative '../post_writer'
 require_relative 'html_blocks'
+require_relative 'pages_note'
 require_relative 'permalinks'
 
 module Import
@@ -19,9 +24,14 @@ module Import
   # it goes through the same MarkdownParser that authoring uses -- no
   # HTML round-trip -- and .html bodies take the HtmlBlocks path instead.
   #
-  # Unlike Ghost's Jekyll migrator, which downloads images from the live
-  # site, the images here come from the tree itself: the archive works
-  # for a site that died years ago.
+  # Images come from the tree where the tree has them -- a relative or
+  # root-relative path is read off disk, and that half really does work
+  # for a site that died years ago. An absolute URL goes to the network
+  # like anywhere else, and a tree exported from a hosted platform is
+  # mostly those: a real Hugo `content/` gave this 72 images to resolve
+  # and 70 were https:// links back to the WordPress it had been migrated
+  # from, of which 66 answered 404. The archive is only as complete as the
+  # old host is still willing to be, and the summary is where that is said.
   class Jekyll
     attr_accessor :keep_permalinks
 
@@ -35,6 +45,25 @@ module Import
       @keep_permalinks = keep_permalinks
       @rearranged = 0
       @liquid_links = 0
+      # Keyed by path rather than counted as they go: the wizard runs the
+      # same adapter over the tree twice (a preview pass, then the real
+      # one), and a counter would say everything twice.
+      @slugs = Hash.new { |h, k| h[k] = [] }
+      @authored = []
+      # Published pages, keyed by path for the same two-pass reason as
+      # @slugs; the value is what the postscript needs to name the page's
+      # address after the run has written it.
+      @page_notes = {}
+      # Per post, set by map before the blocks are built -- empty for any
+      # tree this engine did not write.
+      @own_media_src = {}
+      # Origin -> the file it belongs to, keyed by path for the same
+      # two-pass reason as @slugs. A redirect is one address pointing at
+      # one place, so the first claim wins and stays won across passes.
+      @origins = {}
+      # Files the tree names but does not hold, keyed by path for the
+      # two-pass reason again -- the postscript says how many.
+      @missing_media = {}
     end
 
     # Said out loud when the run rearranged anything -- see
@@ -43,6 +72,12 @@ module Import
       notes = []
       notes << I18n.t('import.note.ssg_images_freed', count: @rearranged) if @rearranged.positive?
       notes << I18n.t('import.note.ssg_liquid_links_dropped', count: @liquid_links) if @liquid_links.positive?
+      notes << I18n.t('import.note.ssg_media_missing', count: @missing_media.length) unless @missing_media.empty?
+      collisions = @slugs.count { |_, paths| paths.length > 1 }
+      notes << I18n.t('import.note.ssg_slug_collisions', count: collisions) if collisions.positive?
+      notes << I18n.t('import.note.ssg_author_dropped', count: @authored.length) unless @authored.empty?
+      notes << Import.pages_note(page_paths)
+      notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
     end
 
@@ -54,8 +89,11 @@ module Import
       @total
     end
 
+    # Nil for a post this engine wrote itself (see apply_own_keys): it
+    # already knows where it came from, and a round-trip through export
+    # and back must not leave a "jekyll" pill behind on every post.
     def platform_tag
-      'jekyll'
+      @own_post ? nil : 'jekyll'
     end
 
     def each_item(&block)
@@ -65,22 +103,57 @@ module Import
       # converter's output -- or a site built entirely on collections
       # (_docs, _tutorials), which Jekyll allows and jekyll/jekyll's own
       # docs/ is. Same shape, wider net, minus the machinery.
-      posts = wider_net if posts.empty? && drafts.empty?
-      files = (posts + drafts).sort
+      swept = posts.empty? && drafts.empty?
+
+      if swept
+        root, nested = wider_net.partition { |path| File.dirname(path) == @dir }
+        # Whether a file in the root of a swept tree is a page or a post is
+        # the one thing the tree does not say outright, and both answers
+        # are wrong somewhere: a Hugo export keeps its articles in posts/,
+        # navody/, zpravy/ and its standalone pages in the root, while a
+        # plain dump of markdown out of a converter is all posts and has no
+        # subdirectories at all. So the subdirectories are the answer: when
+        # the articles live somewhere else, what is left at the top is a
+        # page. When everything is at the top, it is all posts, exactly as
+        # before.
+        @furniture = nested.empty? ? [] : root.select { |path| not_a_page?(path) }
+        @pages = nested.empty? ? [] : root - @furniture
+        files = nested.empty? ? root : nested + @pages + @furniture
+      else
+        candidates = Dir.glob(File.join(@dir, '*.{md,markdown}'))
+        @furniture = candidates.select { |path| not_a_page?(path) }
+        @pages = candidates - @furniture
+        files = posts + drafts + @pages + @furniture
+      end
+
       @total = files.size
-      files.each(&block)
+      files.sort.each(&block)
     end
 
     def map(path, media)
+      # The furniture is refused, as ever -- but through the ledger, not
+      # by silence: left out of the walk entirely, a root _index.md
+      # holding real prose was missing from the totals, and the tree read
+      # as imported in full when it was not.
+      return :site_furniture if @furniture&.include?(path)
+
       raw = File.read(path, encoding: 'utf-8')
       meta, body = front_matter(raw)
       return :bad_frontmatter if meta.nil?
+
+      # Read before the blocks are built, because localize is where each
+      # file is registered and the address has to be in hand by then.
+      # A tree from anywhere else has no such key and this stays empty.
+      own = meta['blogsh']
+      src_map = own.is_a?(Hash) ? own['media_src'] : nil
+      @own_media_src = src_map.is_a?(Hash) ? src_map : {}
 
       blocks = if path.end_with?('.html')
                  HtmlBlocks.parse(body).blocks
                else
                  markdown_blocks(body)
                end
+      blocks = lead_image(meta, body) + blocks
       blocks = localize(blocks, media, path)
       return :empty if blocks.empty?
 
@@ -88,10 +161,13 @@ module Import
               meta['published'] == false || meta['draft'] == true
       date = item_date(meta, path)
       slug = slug_of(meta, path)
+      @slugs[slug] |= [path]
+      @authored |= [path] unless meta['author'].to_s.strip.empty?
+      title = clean_title(meta['title'])
 
       post = {
         'slug' => slug,
-        'title' => meta['title'].to_s.empty? ? slug : meta['title'].to_s,
+        'title' => title.empty? ? slug : title,
         'date' => date.iso8601,
         'state' => draft ? 'draft' : 'published',
         'tags' => tags_of(meta),
@@ -102,14 +178,104 @@ module Import
           'original_id' => path.delete_prefix("#{@dir}#{File::SEPARATOR}")
         }
       }
+      # A file the tree keeps at its root is a page, and saying so is the
+      # whole point of walking the root at all. It used to depend on the
+      # front matter carrying `type: page` -- which is a key this engine's
+      # own export writes and no other generator does, so the feature
+      # worked on a round trip and on nothing else. Measured on a real
+      # Hugo tree: 74 posts imported, none of them a page, and Kontakt,
+      # Komunita and Podpořte nás went into the archive, the tags and the
+      # feed as dated articles.
+      #
+      # The front matter still wins where it says something: `type:` is
+      # how a post declares its content type, and a root file that calls
+      # itself a quote is a quote. apply_own_keys reads that a few lines
+      # down, so this only sets the flag it does not touch.
+      post['page'] = true if @pages&.include?(path) && meta['type'].to_s.strip.empty?
+
       if @keep_permalinks && !draft
-        origin = origin_path(meta, slug, date)
-        post['redirect_from'] = [origin] if origin
+        # `type: page` is read by apply_own_keys a few lines down -- too
+        # late for the decisions here, where an exported page carrying it
+        # must already count as one.
+        page = post['page'] == true || meta['type'].to_s.strip == 'page'
+        origin = origin_path(meta, served_slug(meta, path, slug), date, page: page)
+        # A page already lands at the root, so an origin of /<slug>/ would
+        # redirect the address at itself -- which the build then complains
+        # about once per build, forever. The Ghost importer has guarded
+        # against this since pages arrived; this one had nothing to guard
+        # because it never made a page.
+        origin = nil if page && origin == "/#{slug}/"
+        post['redirect_from'] = [origin] if origin && claim_origin(origin, path)
       end
+      apply_own_keys(post, meta)
+      # After apply_own_keys on purpose: `type: page` in the front matter
+      # and a returning export's own `state` both land there, and either
+      # can change the answer. Only a published page goes on the list --
+      # a draft lives under /draft/<token>/, so its root address in `nav:`
+      # would be a menu item leading to 404 (the rule ghost.rb set).
+      @page_notes[path] = { source: post['source'], slug: post['slug'] } if post['page'] && post['state'] == 'published'
       post
     end
 
     private
+
+    # The addresses as WRITTEN, not as proposed: PostWriter suffixes a
+    # slug that is already taken, and this sentence is what somebody
+    # copies into `nav:` -- a predicted address that was never written
+    # points the menu at a 404. Nothing is written on a dry run, and then
+    # the proposed slug is the honest prediction; feed.rb reads its pages
+    # back the same way and for the same reason.
+    def page_paths
+      @page_notes.values.map do |entry|
+        written = PostWriter.find_by_source(entry[:source])
+        "/#{written ? File.basename(written, '.json') : entry[:slug]}/"
+      end
+    end
+
+    # Front matter this engine wrote itself. `./blog.sh export` writes
+    # everything markdown has no word for under a single `blogsh:` key,
+    # so a tree that came out of blog.sh can go back in whole -- the
+    # series, the redirects, the announcement URLs, a draft's token,
+    # and above all `source`, which is what makes a re-import land on
+    # the same posts instead of doubling the archive. A tree from
+    # anywhere else has no such key and nothing here fires.
+    #
+    # A whitelist rather than a merge: front matter is a file somebody
+    # handed us, and a post is not a place to let arbitrary keys in.
+    OWN_NESTED_KEYS = %w[source former_slugs redirect_from unpublished_from
+                         mastodon_url bluesky_url bluesky_uri draft_token
+                         created_at scheduled state page].freeze
+    # The ones that sit flat, because a destination engine plausibly
+    # understands them too -- Hugo has series, most engines have a pinned.
+    OWN_FLAT_KEYS = %w[series series_part pinned hero toc unlisted].freeze
+
+    def apply_own_keys(post, meta)
+      own = meta['blogsh']
+      # Read per post rather than per tree: a folder can hold both an
+      # export and something somebody wrote by hand, and only the posts
+      # that carry their own history should be treated as returning
+      # home. platform_tag asks this too.
+      @own_post = own.is_a?(Hash)
+
+      OWN_FLAT_KEYS.each do |key|
+        value = meta[key]
+        post[key] = value unless value.nil?
+      end
+      # `type: page` is how a page is written -- the same reading
+      # scripts/manage_post.rb gives it. Any other type is a content-type
+      # override and passes through as one.
+      type = meta['type'].to_s.strip
+      if type == 'page' then post['page'] = true
+      elsif !type.empty? then post['type'] = type
+      end
+
+      return unless own.is_a?(Hash)
+
+      OWN_NESTED_KEYS.each do |key|
+        value = own[key]
+        post[key] = value unless value.nil?
+      end
+    end
 
     # Not writing: _site/ is what Jekyll BUILT (every page a second
     # time), public/ and resources/ are Hugo's, the rest is machinery or
@@ -123,6 +289,32 @@ module Import
     # The files a repository keeps for people, not readers. Only in the
     # root: _docs/readme.md is a page about something.
     NOT_A_POST = %w[readme license licence contributing changelog code_of_conduct authors].freeze
+
+    # A Jekyll site keeps its pages as markdown in the ROOT -- about.md,
+    # colophon.md -- and `./blog.sh export` writes them there for the
+    # same reason. Without this they were the one thing a tree could
+    # hold that the importer walked straight past, so a site exported
+    # and imported back came home one page short.
+    #
+    # Only when _posts/ or _drafts/ turned something up: with neither,
+    # wider_net has already swept the whole tree and would hand the same
+    # files over twice. And only files, never directories -- a Hugo page
+    # bundle in the root is a post, and comes in through wider_net.
+    NOT_A_PAGE = %w[index home 404 feed rss atom sitemap search tags categories archive robots].freeze
+
+    # The names that are furniture rather than a page, wherever the tree
+    # was walked from. Hugo's _index.md and home.md are the section and
+    # home listings -- pages of the SITE, not pages in it -- and importing
+    # them yields a post whose body is the front page.
+    def not_a_page?(path)
+      # The leading underscore comes off first: Hugo names a section's own
+      # listing `_index.md`, and matched literally that is not the "index"
+      # this list already knows about -- so the front page of an imported
+      # site arrived as a page called "index", with the site's own
+      # introduction as its body.
+      base = File.basename(path, '.*').downcase.delete_prefix('_')
+      NOT_A_PAGE.include?(base) || NOT_A_POST.include?(base)
+    end
 
     # Markdown only, deliberately, even though a tree WITH _posts/ reads
     # .html as well. This net is cast over a directory nobody has
@@ -177,20 +369,44 @@ module Import
     # as authoring uploads), so they ride through the parse as sentinels
     # and become blocks in localize().
     def markdown_blocks(body)
+      # First, before any other rewriting: the comment carries a block's
+      # JSON verbatim, and a pass meant for prose (Liquid, lazy lists,
+      # inline images) has no business reaching inside it.
+      body = own_blocks_to_sentinels(body)
       body = resolve_references(body)
-      body = liquid_free(body)
+      # Everything from here down is a rewrite of PROSE, so all of it runs
+      # through outside_fences. A fence is the one place in a post where
+      # markdown, Liquid and shortcodes are the subject rather than the
+      # medium: an article explaining how Hugo writes an image showed the
+      # reader a code block, and the pass below planted its own sentinel
+      # inside it -- @@ssg-image:obrazek.jpg:...@@ went out on the article
+      # page, the front page, the tag pages and the feed. The same held
+      # for Liquid: a post about {% include %} lost the tag it was about.
+      body = outside_fences(body) { |prose| liquid_free(hugo_figures(prose)) }
       body = outside_fences(body) { |prose| join_lazy_list_lines(prose) }
-      body = free_inline_images(body)
+      body = outside_fences(body) { |prose| free_inline_images(prose) }
+      body = outside_fences(body) { |prose| images_to_sentinels(prose) }
+      blocks, = MarkdownParser.parse_body(body, nil)
+      blocks
+    end
+
+    # Three parts, and the third is why: markdown puts a picture's
+    # caption in the title position -- ![alt](path "caption") -- which
+    # is where `./blog.sh export` writes it and where CommonMark says
+    # it goes. Carrying only the path and the alt meant an export read
+    # back lost the caption outright AND filed the alt text as one, so
+    # a photograph came home described by words written for somebody
+    # who cannot see it. Every part is CGI-escaped, so a colon inside
+    # any of them arrives as %3A and the split stays unambiguous.
+    def images_to_sentinels(body)
       body = body.gsub(MarkdownParser::IMAGE_RE) do
-        "@@ssg-image:#{CGI.escape(Regexp.last_match(2).strip)}:#{CGI.escape(Regexp.last_match(1).to_s)}@@"
+        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
       end
       # Line-anchored form ([ \t], NOT \s -- \s eats the newlines and
       # with them the paragraph break after the image).
-      body = body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"[^"]*")?\)[ \t]*$/) do
-        "@@ssg-image:#{CGI.escape(Regexp.last_match(2).strip)}:#{CGI.escape(Regexp.last_match(1).to_s)}@@"
+      body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"([^"]*)")?\)[ \t]*$/) do
+        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
       end
-      blocks, = MarkdownParser.parse_body(body, nil)
-      blocks
     end
 
     # Hands BODY to the block a piece at a time, skipping fenced code: a
@@ -198,7 +414,7 @@ module Import
     # line inside one is somebody's EXAMPLE of markdown and must arrive
     # exactly as written. An unterminated fence runs to the end, the same
     # reading MarkdownParser gives it.
-    def outside_fences(body)
+    def outside_fences(body, &block)
       out = +''
       prose = +''
       fence = nil
@@ -208,14 +424,30 @@ module Import
           out << line
           fence = nil if marker && marker.length >= fence.length && line.strip == marker
         elsif marker
-          out << yield(prose) << line
+          out << rewritten(prose, &block) << line
           prose = +''
           fence = marker
         else
           prose << line
         end
       end
-      out << yield(prose)
+      out << rewritten(prose, &block)
+    end
+
+    # A fence marker only opens a fence when it stands at the start of its
+    # own line, and free_inline_images strips the paragraphs it rebuilds --
+    # so a chunk of prose that ENDED in a picture came back without its
+    # last newline and the ``` below it was glued onto the text. Every
+    # fence after that point in the post read as its own opposite: code
+    # became prose, prose became code, and the passes that skip fences
+    # skipped the wrong half of the article. Harmless while the whole body
+    # was rewritten in one piece; not once the rewriting happens chunk by
+    # chunk.
+    def rewritten(prose)
+      text = yield(prose)
+      return text if text.empty? || text.end_with?("\n") || !prose.end_with?("\n")
+
+      "#{text}\n"
     end
 
     # --- reference links -------------------------------------------------
@@ -302,6 +534,41 @@ module Import
     # still an address that resolves. Every other variable pointed
     # somewhere else entirely.
     SITE_ROOT = /\A\{\{\s*site\.(?:baseurl|url)\s*\}\}/
+
+    # --- Hugo shortcodes -------------------------------------------------
+
+    # {{< figure src="x.jpg" alt="..." >}} is how Hugo writes a picture --
+    # its one built-in shortcode that every theme's documentation leads
+    # with. To the blanket strip below it is just another {{ }}, so the
+    # line vanished and with it the photograph, which in a page bundle
+    # was lying on disk right next to the article. Nothing said so
+    # either: no file was named, so nothing could be reported missing.
+    #
+    # Read before the strip and turned straight into a sentinel rather
+    # than back into markdown: the caption is somebody else's sentence
+    # and may hold the quotes that markdown's title position cannot.
+    # Every other shortcode still falls through to the strip.
+    FIGURE = /\{\{[<%]\s*figure\s+(.*?)\s*\/?[>%]\}\}/m
+    FIGURE_ATTR = /([a-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/
+
+    def hugo_figures(text)
+      text.gsub(FIGURE) do
+        whole = Regexp.last_match(0)
+        attrs = {}
+        Regexp.last_match(1).scan(FIGURE_ATTR) { |key, dq, sq| attrs[key] = dq || sq }
+        src = attrs['src'].to_s.strip
+        # A figure with no src names no picture; let the strip have it.
+        next whole if src.empty?
+
+        # Hugo's caption is the line under the picture, its title a
+        # heading above -- either is a caption here, and the alt stays
+        # the alt. Blank lines around it because a figure is a block, and
+        # a shortcode may sit at the end of a paragraph.
+        caption = attrs['caption'].to_s.strip
+        caption = attrs['title'].to_s.strip if caption.empty?
+        "\n\n#{image_sentinel(src, attrs['alt'], caption)}\n\n"
+      end
+    end
 
     def liquid_free(body)
       out = +''
@@ -443,8 +710,8 @@ module Import
       while (m = INLINE_IMAGE.match(rest))
         before = m.pre_match
         pieces << before unless before.strip.empty?
-        pieces << m[0]
-        rest = m.post_match
+        image, rest = fold_caption(m[0], m.post_match)
+        pieces << image
         @rearranged += 1
       end
       pieces << rest unless rest.strip.empty?
@@ -454,25 +721,137 @@ module Import
       pieces.map(&:strip).join("\n\n")
     end
 
-    SENTINEL = /@@ssg-image:([^:@]*):([^@]*)@@/
+    # "![](photo.png)*co je na obrázku*" -- WordPress's caption, and what
+    # every conversion out of it writes. Moving the picture onto its own
+    # line left the italics behind as a paragraph, which reads as a
+    # sentence fragment even when the photograph arrives; when it does
+    # not (an archive whose images are on a domain that no longer
+    # answers) the picture is dropped and the fragment is all that is
+    # left -- an install guide down to three paragraphs reading "výběr
+    # jazyka", "výběr časového pásma", "rozložení klávesnice". It is a
+    # caption, so it goes where a caption goes, and it lives or dies with
+    # the picture it belongs to.
+    #
+    # Only italics that finish the line, and only onto a picture that has
+    # no caption of its own already.
+    TRAILING_CAPTION = /\A[ \t]*(?:\*([^*\n]+)\*|_([^_\n]+)_)[ \t]*(?=\n|\z)/
+
+    def fold_caption(image, rest)
+      return [image, rest] if image.match?(/\s"[^"]*"\)\z/)
+      return [image, rest] unless (m = TRAILING_CAPTION.match(rest))
+
+      caption = (m[1] || m[2]).strip
+      # The title position is quote-delimited, so a caption holding one
+      # would rewrite the picture's address. Rare enough to leave alone.
+      return [image, rest] if caption.empty? || caption.include?('"')
+
+      # Block form: a caption is prose, and sub's replacement string reads
+      # a backslash in it as a back-reference.
+      [image.sub(/\)\z/) { " \"#{caption}\")" }, m.post_match]
+    end
+
+    SENTINEL = /@@ssg-image:([^:@]*):([^:@]*):([^@]*)@@/
+
+    def image_sentinel(src, alt, title)
+      "@@ssg-image:#{CGI.escape(src.to_s.strip)}:#{CGI.escape(alt.to_s)}:#{CGI.escape(title.to_s)}@@"
+    end
+
+    # What `./blog.sh export` writes above the HTML it had to fall back
+    # to for a block markdown cannot express -- video, audio, a link
+    # card. Reading it back is what turns an export into a round-trip
+    # instead of a one-way door: the block comes home as a block rather
+    # than as a paragraph of markup. The comment ends at the first
+    # " -->", which the exporter guarantees by escaping "--" inside the
+    # JSON; the HTML under it runs to the blank line and is dropped with
+    # it, since the block itself says everything that markup did.
+    #
+    # Anybody else's HTML comments are untouched: the marker is specific,
+    # and a tree that never came from here simply has none.
+    OWN_BLOCK_RE = /^<!-- blogsh:block (\{.*?\}) -->\n.*?(?=\n\n|\z)/m
+    OWN_BLOCK_SENTINEL = %r{\A@@blogsh-block:([A-Za-z0-9+/=]+)@@\z}
+
+    def own_blocks_to_sentinels(body)
+      body.gsub(OWN_BLOCK_RE) { "@@blogsh-block:#{[Regexp.last_match(1)].pack('m0')}@@" }
+    end
+
+    # The block as it was written, with its media re-registered: the JSON
+    # names each file where it sits in the export
+    # (/assets/<year>/<slug>/01.mp4), and from_file copies it into this
+    # archive under the number it gets here -- the same path an image
+    # takes through image_block.
+    def own_block(packed, media)
+      block = JSON.parse(packed.unpack1('m'))
+      return nil unless block.is_a?(Hash)
+
+      %w[media poster].each do |key|
+        entries = block[key]
+        next unless entries.is_a?(Array)
+
+        block[key] = entries.filter_map do |entry|
+          next entry unless entry.is_a?(Hash) && entry['url']
+
+          src = entry['url'].to_s
+          local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, @dir)
+          name = media.from_file(local, src: entry['src'] || own_media_src(local))
+          name ? entry.merge('url' => name) : nil
+        end
+      end
+      block
+    rescue JSON::ParserError
+      nil
+    end
+
+    # `image:` in the front matter is how Hugo's themes -- Blowfish,
+    # Congo, PaperMod -- name the picture an article leads with. This
+    # engine has no such field, and the key was read by nobody: three
+    # articles in a real Hugo tree named one, and all three lost it.
+    # What it does have is a first image block, which is what a lead
+    # picture is; Ghost's feature image and Wix's cover come home the
+    # same way, and localize turns the name into a file in this archive.
+    #
+    # Not when the body already shows the same file: a theme's `image:`
+    # doubles as the social-card picture and is usually the very
+    # photograph the post opens with, so importing both shows it twice.
+    def lead_image(meta, body)
+      src = meta['image']
+      return [] unless src.is_a?(String)
+
+      src = src.strip
+      return [] if src.empty? || body.include?(src)
+
+      [{ 'type' => 'image', 'media' => [{ 'url' => src }] }]
+    end
 
     def localize(blocks, media, post_path)
       blocks.filter_map do |block|
-        if block['type'] == 'text' && (m = block['text'].to_s.strip.match(/\A#{SENTINEL}\z/))
-          image_block(CGI.unescape(m[1]), CGI.unescape(m[2]), media, post_path)
+        if block['type'] == 'text' && (m = block['text'].to_s.strip.match(OWN_BLOCK_SENTINEL))
+          own_block(m[1], media)
+        elsif block['type'] == 'text' && (m = block['text'].to_s.strip.match(/\A#{SENTINEL}\z/))
+          image_block(CGI.unescape(m[1]), CGI.unescape(m[2]), CGI.unescape(m[3]), media, post_path)
         elsif block['type'] == 'image'
           # From the HtmlBlocks path: the URL is still the tree's own.
-          image_block(block.dig('media', 0, 'url').to_s, nil, media, post_path)
+          image_block(block.dig('media', 0, 'url').to_s, nil, nil, media, post_path)
         else
           block
         end
       end
     end
 
+    # Where the file in the tree was originally fetched from, if the tree
+    # says. `./blog.sh export` writes that under `blogsh: media_src:`,
+    # keyed by the file's own name -- the width and the height an importer
+    # can measure back out of the bytes, but nothing in a JPEG remembers
+    # the address it was downloaded from. Without it coming home, an
+    # archive exported and imported back would fetch every one of its
+    # images again on the next run.
+    def own_media_src(local_path)
+      @own_media_src[File.basename(local_path)]
+    end
+
     # A root-relative path is looked up in the tree, a relative one next
     # to the post, an absolute URL downloaded -- in that order of
     # likelihood for a static site's own images.
-    def image_block(src, alt, media, post_path)
+    def image_block(src, alt, title, media, post_path)
       # A data: URI is the image itself, inline -- nothing to fetch,
       # nothing on disk, and no block form for inline bytes here. Dropped
       # quietly and without a number: handed to from_file it showed up in
@@ -487,6 +866,7 @@ module Import
       # in this tree, and joining it onto @dir named a local file the
       # archive never had. from_url's failure line tells the real story
       # -- a remote resource that could not be fetched.
+      local = nil
       filename = if src.match?(/\A[A-Za-z][A-Za-z0-9+.-]*:/)
                    media.from_url(src)
                  else
@@ -494,16 +874,44 @@ module Import
                    # Unconditionally: from_file spends the number and records
                    # the miss itself. Stat-ing here instead made numbering
                    # depend on which files happened to be present.
-                   media.from_file(local)
+                   media.from_file(local, src: own_media_src(local))
                  end
-      return nil unless filename
-
-      entry = { 'url' => filename }
-      width, height = media.dimensions(filename)
-      entry['width'] = width if width
-      entry['height'] = height if height
+      if filename
+        entry = { 'url' => filename }
+        width, height = media.dimensions(filename)
+        entry['width'] = width if width
+        entry['height'] = height if height
+      elsif local
+        # A file the tree names but does not hold. Dropping the block
+        # dropped more than the picture -- its alt text and caption went
+        # with it, and a post whose ONLY block it was vanished from the
+        # import whole. The build already lives with a named file that is
+        # not there (it says MISSING and renders the alt), so the block
+        # stays, under the name the tree used: put the file into the
+        # post's media folder and the next build picks it up. from_file
+        # above has recorded the miss; the postscript counts these.
+        @missing_media[local] = true
+        entry = { 'url' => File.basename(local) }
+        known = own_media_src(local)
+        entry['src'] = known if known
+      else
+        return nil
+      end
       block = { 'type' => 'image', 'media' => [entry] }
-      block['caption'] = alt unless alt.to_s.empty?
+      # Each word where it belongs. The alt text is what a picture is for
+      # somebody who cannot see it; the caption is what it says to
+      # everybody. They are different sentences and the markdown keeps
+      # them apart, so this does too -- it used to file the alt as the
+      # caption and drop the caption, which printed the description under
+      # the photograph and left the screen reader with nothing.
+      #
+      # And never one from the other: markdown renders no alt text, so a
+      # picture that has only an alt shows no caption on the site it came
+      # from. Copying the alt in printed a sentence under the photograph
+      # that the original page never showed -- and an export read back
+      # stopped matching itself on exactly the alt-only images.
+      block['alt_text'] = alt unless alt.to_s.empty?
+      block['caption'] = title unless title.to_s.empty?
       block
     end
 
@@ -515,15 +923,60 @@ module Import
     # under this year.
     DATED_NAME = /\A(\d{4})-(\d{1,2})-(\d{1,2})-/
 
-    def slug_of(meta, path)
-      explicit = meta['slug'] || meta['basename']
-      return Slug.slugify(explicit.to_s) if explicit && !explicit.to_s.empty?
+    # A filename that has been through a URL keeps its escapes on disk --
+    # a WordPress export writes %ef%bf%bcawesomewm-basics.md, which is the
+    # object-replacement character U+FFFC and then the title. Slugified as
+    # written, the escaping itself became the address: ef-bf-bcawesomewm-
+    # basics. Decoded by hand rather than with CGI.unescape, which also
+    # reads "+" as a space and would take the plus out of c++-tutorial.md.
+    PERCENT_ESCAPE = /%[0-9A-Fa-f]{2}/
 
+    def percent_decode(name)
+      return name unless name.match?(PERCENT_ESCAPE)
+
+      name.gsub(PERCENT_ESCAPE) { |hex| hex[1, 2].hex.chr }
+          .force_encoding(Encoding::UTF_8).scrub('')
+    end
+
+    def base_name(path)
       base = File.basename(path).sub(/\.(md|markdown|html)\z/, '').sub(DATED_NAME, '')
       # A Hugo page bundle is a directory with an index.md -- the
       # directory is the name.
-      base = File.basename(File.dirname(path)) if base == 'index'
-      Slug.slugify(base)
+      base == 'index' ? File.basename(File.dirname(path)) : base
+    end
+
+    def explicit_slug(meta)
+      value = (meta['slug'] || meta['basename']).to_s
+      value.empty? ? nil : value
+    end
+
+    def slug_of(meta, path)
+      explicit = explicit_slug(meta)
+      return Slug.slugify(explicit) if explicit
+
+      Slug.slugify(percent_decode(base_name(path)))
+    end
+
+    # What the old site actually served, which is the only thing a
+    # redirect is worth writing about. Normally that is the slug -- but an
+    # escaped filename IS a URL path segment already, and the generator
+    # handed it out letter for letter. Redirecting from the decoded name
+    # would send visitors from an address nobody ever had.
+    def served_slug(meta, path, slug)
+      return slug if explicit_slug(meta)
+
+      raw = base_name(path)
+      raw.match?(PERCENT_ESCAPE) ? raw : slug
+    end
+
+    # Characters that occupy no space and say nothing. U+FFFC is what a
+    # WordPress export leaves where an embed used to be, and it rode into
+    # the title untouched: an archive entry, a heading and a <title> tag
+    # that all opened with a gap nobody could see, let alone delete.
+    INVISIBLE = /[\u00AD\u200B-\u200F\u202A-\u202E\u2060\uFEFF\uFFFC]/
+
+    def clean_title(value)
+      value.to_s.gsub(INVISIBLE, '').strip
     end
 
     def item_date(meta, path)
@@ -553,16 +1006,34 @@ module Import
     # The front matter's own permalink wins, then the pattern given at
     # the door. No pattern, no redirect -- a guessed address would 404
     # with a straight face.
-    def origin_path(meta, slug, date)
+    #
+    # The pattern never applies to a page: it says where the old site
+    # kept its POSTS, and a root page never lived on a dated address --
+    # a /:year/:month/:day/:title/ pattern gave kontakt a redirect from
+    # /2021/12/11/kontakt/, an address the old site never served, and
+    # the build wrote a stub on it.
+    def origin_path(meta, slug, date, page: false)
       explicit = meta['permalink'] || meta['url']
       return explicit.to_s if explicit && !explicit.to_s.empty?
-      return nil unless @permalink
+      return nil if page || !@permalink
 
       @permalink.gsub(':year', format('%04d', date.year))
                 .gsub(':month', format('%02d', date.month))
                 .gsub(':day', format('%02d', date.day))
                 .gsub(':title', slug)
                 .gsub(':slug', slug)
+    end
+
+    # One old address redirects to one place. A tree that holds two files
+    # for one slug -- the flat post and the page bundle it grew into --
+    # derives the same origin for both, and handing it to both makes the
+    # build choose. The first file in walk order gets it, which is also
+    # the file PostWriter writes first, i.e. the one that keeps the
+    # unsuffixed slug the origin used to serve; the later copy arrives
+    # with no redirect, exactly like a post that never had an address.
+    def claim_origin(origin, path)
+      @origins[origin] ||= path
+      @origins[origin] == path
     end
   end
 end

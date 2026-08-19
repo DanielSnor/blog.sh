@@ -98,6 +98,76 @@ SITE_TITLE = SiteConfig.fetch('site', 'title')
 SITE_SHORT_NAME = SiteConfig.fetch('site', 'short_name')
 SITE_DESCRIPTION = SiteConfig.fetch('site', 'description')
 SITE_AUTHOR = SiteConfig.fetch('site', 'author')
+# Stylesheets loaded after the site's own, so a skin can live in a file of
+# the site's own rather than in an edited template. Local paths only, and
+# the refusal is loud: every page carries style-src 'self', so a
+# stylesheet on another host is discarded by the browser without an error
+# the author will ever see -- the page just renders undressed. Same trade
+# the HEIC refusal makes, stop where the person can still act rather than
+# hand them a silent half-result.
+def extra_css_hrefs
+  entries = SiteConfig.get('site', 'extra_css', default: nil)
+  entries = [entries] if entries.is_a?(String)
+  return [] unless entries.is_a?(Array)
+
+  entries.filter_map do |raw|
+    href = raw.to_s.strip
+    next if href.empty?
+    # A protocol-relative "//host/x.css" is another origin too, and it is
+    # the one shape that looks local at a glance.
+    next href if href.start_with?('/') && !href.start_with?('//')
+
+    warn "⚠️  site.extra_css: #{raw.inspect} is not a path on this site, so the page's " \
+         'Content-Security-Policy would discard it -- skipped. Copy the file into assets/ ' \
+         'and name it as /assets/css/<name>.css.'
+    nil
+  end
+end
+EXTRA_CSS = extra_css_hrefs.freeze
+
+# Assembled here rather than looped in the template, and the reason is the
+# same one nav.html.erb documents: layout.html.erb compiles without a trim
+# mode, so a block tag sitting on its own line leaves its newlines on every
+# page whether or not the loop ever runs. A site with no extra stylesheet
+# has to come out byte-for-byte as it did before this existed -- otherwise
+# adding the feature would rewrite every page of every existing archive to
+# say exactly what it said yesterday.
+def extra_css_links
+  EXTRA_CSS.map { |href| %(\n  <link rel="stylesheet" href="#{h(href)}">) }.join
+end
+
+# Mastodon reads this off a shared link and puts the author's account on
+# the preview card, so somebody who sees the site passed around has a way
+# to follow it. No new config key: the account is whichever `social:` entry
+# points at a profile on the instance the site already announces to --
+# which is the same entry that carries rel="me" for the verified link back.
+#
+# A site whose comments live on Bluesky has no Mastodon account to name and
+# simply gets no tag; inventing one from a handle that is not on the
+# instance would put a wrong address on every page.
+def fediverse_creator
+  return nil if MASTODON_INSTANCE.to_s.empty?
+
+  entry = SOCIAL.find do |e|
+    url = e['url'].to_s
+    host = begin
+      URI.parse(url).host
+    rescue URI::InvalidURIError
+      nil
+    end
+    host == MASTODON_INSTANCE && url[%r{/@[^/]+/?\z}]
+  end
+  return nil unless entry
+
+  handle = entry['url'].to_s[%r{/@([^/]+)/?\z}, 1]
+  handle && "@#{handle}@#{MASTODON_INSTANCE}"
+end
+
+def fediverse_creator_meta
+  creator = FEDIVERSE_CREATOR
+  creator ? %(\n  <meta name="fediverse:creator" content="#{h(creator)}">) : ''
+end
+
 SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
 SITE_LOCALE = SiteConfig.get('site', 'locale', default: 'en_US')
 BANNER = SiteConfig.fetch('banner')
@@ -105,6 +175,21 @@ BANNER = SiteConfig.fetch('banner')
 # site that just doesn't want the overlay) can drop either line without
 # losing the other. Both default to true, so an existing site's banner
 # renders exactly as it did before these keys existed.
+# Which structural regions of the page exist at all. Both default to true,
+# so a site that says nothing renders exactly what it rendered before.
+# These are switches for whole regions, not for how they look: what a
+# region looks like belongs in a stylesheet (site.extra_css), and a key
+# per visual property would turn config/site.yml into a stylesheet written
+# in YAML.
+LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
+# The lead image lifted out of the text and shown above the title. Off
+# unless a site asks for it, because it reshapes every post page it
+# touches -- and a site is entitled to have had the shape it has.
+LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
+# The menu repeated under the content. It carries no search field, so with
+# an empty `nav:` there would be nothing left in it to show -- but a site
+# with a menu may still not want it twice.
+
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
 ANALYTICS = SiteConfig.get('analytics')
@@ -124,8 +209,14 @@ SOCIAL = SiteConfig.get('social', default: [])
 # just gets an empty hash instead of an aborted build.
 WIDGETS = SiteConfig.get('widgets', default: {})
 MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
+# Computed once, here, because both halves it needs (the instance and the
+# social links) exist by this line and not before it.
+FEDIVERSE_CREATOR = fediverse_creator
 # Also enforces the mastodon/bluesky exclusivity right at build time.
 COMMENT_NETWORK = SiteConfig.comment_network
+# :fav means cron prepares the comments and the page reads them from this
+# origin, so the markup, the policy and the client all change together.
+COMMENTS_APPROVAL = SiteConfig.comments_approval
 
 # The color palette and the generated stylesheet live in
 # lib/colors_css.rb, shared with ./style.sh -- its palette preview must
@@ -148,21 +239,26 @@ def client_i18n_json
     stats_comments: t('js.stats_comments'),
     reply_on_mastodon: t('js.reply_on_mastodon'),
     reply_on_bluesky: t('js.reply_on_bluesky'),
+    comments_moderated: t('js.comments_moderated'),
     results_one: t('js.results_one'),
     results_few: t('js.results_few'),
     results_many: t('js.results_many'),
+    results_capped: t('js.results_capped'),
     no_results_pending: t('js.no_results_pending'),
     no_results_final: t('js.no_results_final'),
     try_other_words: t('js.try_other_words'),
     searching_archive: t('js.searching_archive'),
-    search_prefix: t('js.search_prefix'),
-    search_heading: t('search.heading'),
     search_prompt: t('search.prompt'),
     loading_index: t('js.loading_index'),
     index_unavailable: t('js.index_unavailable'),
     lightbox_close: t('js.lightbox_close'),
     lightbox_prev: t('js.lightbox_prev'),
-    lightbox_next: t('js.lightbox_next')
+    lightbox_next: t('js.lightbox_next'),
+    lightbox_label: t('js.lightbox_label'),
+    lightbox_open: t('js.lightbox_open'),
+    theme_auto: t('ui.theme_auto'),
+    theme_light: t('ui.theme_light'),
+    theme_dark: t('ui.theme_dark')
   }.to_json
 end
 
@@ -191,12 +287,19 @@ CLIENT_I18N_SCRIPT_HASH = "'sha256-#{Digest::SHA256.base64digest(CLIENT_I18N_SCR
 # refused by the browser: comments silently gone, with nothing in the build
 # to say so. The comment at post_stats_html claims posts survive a switch;
 # this is what makes that true.
+#
+# With comments.approval on, none of the comment origins are granted at
+# all: cron has already read the thread and the page fetches its comments
+# from here. That is the last third-party *data* request a visitor's
+# browser made, so moderation quietly tightens the policy for the whole
+# site. (Avatars are still loaded from wherever their instance hosts
+# them, under img-src -- see docs/decisions.md.)
 def csp_content(frame_origins = [], comment_origins = [])
   analytics_origin = ANALYTICS && ANALYTICS['src'] ? URI.parse(ANALYTICS['src']) : nil
   analytics_origin &&= "#{analytics_origin.scheme}://#{analytics_origin.host}"
-  mastodon_origin = MASTODON_INSTANCE ? "https://#{MASTODON_INSTANCE}" : nil
+  mastodon_origin = MASTODON_INSTANCE && COMMENTS_APPROVAL.nil? ? "https://#{MASTODON_INSTANCE}" : nil
   # Bluesky threads are read from the public AppView, no auth involved.
-  bluesky_origin = COMMENT_NETWORK == :bluesky ? 'https://public.api.bsky.app' : nil
+  bluesky_origin = COMMENT_NETWORK == :bluesky && COMMENTS_APPROVAL.nil? ? 'https://public.api.bsky.app' : nil
 
   script_src = ["'self'", CLIENT_I18N_SCRIPT_HASH, analytics_origin].compact.join(' ')
   connect_src = (["'self'", analytics_origin, mastodon_origin, bluesky_origin].compact +
@@ -584,7 +687,7 @@ def heading_id(text, seen)
   seen[base] > 1 ? "#{base}-#{seen[base]}" : base
 end
 
-def render_block(block, media_prefix, seen = {})
+def render_block(block, media_prefix, seen = {}, title_lifted: false)
   case block['type']
   when 'text'
     heading = block['subtype'].to_s[/\Aheading([1-6])\z/, 1]
@@ -668,7 +771,14 @@ def render_block(block, media_prefix, seen = {})
   when 'link'
     title = CGI.escapeHTML((block['title'] || block['url']).to_s)
     description = CGI.escapeHTML(block['description'].to_s)
-    %(<p class="link-block"><a href="#{CGI.escapeHTML(block['url'].to_s)}"><strong>#{title}</strong></a><br>#{description}</p>)
+    if title_lifted
+      # The title is the post's heading now, and the heading is the link.
+      # What is left here is the description -- and a link block that had
+      # none has nothing left to draw at all.
+      description.empty? ? '' : %(<p class="link-block">#{description}</p>)
+    else
+      %(<p class="link-block"><a href="#{CGI.escapeHTML(block['url'].to_s)}"><strong>#{title}</strong></a><br>#{description}</p>)
+    end
   else
     "<pre>#{block.to_json}</pre>"
   end
@@ -745,7 +855,10 @@ def degenerate_image?(block)
   w <= 1 || h <= 1
 end
 
-def render_content(blocks, media_prefix)
+# `lifted` is the one block whose title has been promoted to the post's
+# heading (see link_title_block); it is compared by identity, so a second
+# link block with the same title still renders in full.
+def render_content(blocks, media_prefix, lifted: nil)
   blocks = blocks.reject { |b| degenerate_image?(b) }
   seen = {}
   html = []
@@ -759,11 +872,11 @@ def render_content(blocks, media_prefix)
       end
       html << (group.length > 1 ? render_photo_grid(group, media_prefix, seen) : render_block(group.first, media_prefix, seen))
     else
-      html << render_block(blocks[i], media_prefix, seen)
+      html << render_block(blocks[i], media_prefix, seen, title_lifted: blocks[i].equal?(lifted))
       i += 1
     end
   end
-  html.join("\n")
+  html.reject(&:empty?).join("\n")
 end
 
 CONTENT_ICONS = {
@@ -810,6 +923,58 @@ def dominant_content_type(post)
   TYPE_CACHE[post] ||= ContentType.dominant(post)
 end
 
+# Words a minute. Not a measurement of anybody in particular -- it is the
+# figure the whole web settled on, and its only job is to tell a long piece
+# from a short one before the reader commits.
+READING_WORDS_PER_MINUTE = 200
+
+# Shown only above the length at which the engine already stops calling a
+# post a photo with a caption: below ContentType::CAPTION_LIMIT, "1 min
+# read" over twelve words is noise pretending to be information. Reusing
+# that boundary rather than inventing a second number keeps the two from
+# drifting apart -- there is one idea here ("is this a piece of writing?")
+# and it should have one answer.
+def reading_minutes(post)
+  text = PostText.plain(post)
+  return nil if text.length <= ContentType::CAPTION_LIMIT
+
+  [(text.split(/\s+/).size.to_f / READING_WORDS_PER_MINUTE).round, 1].max
+end
+
+# The headings of a post, with the ids the rendered page will give them.
+# Generated by walking the blocks exactly as render_content does, with its
+# own `seen` counter, because a table of contents whose anchors disagree
+# with the page is worse than none at all.
+def toc_entries(post)
+  seen = {}
+  (post['content'] || []).filter_map do |block|
+    next unless block.is_a?(Hash)
+
+    level = block['subtype'].to_s[/\Aheading([1-6])\z/, 1]
+    next unless level
+
+    text = block['text'].to_s
+    next if text.strip.empty?
+
+    { 'level' => level.to_i, 'text' => text, 'id' => heading_id(text, seen) }
+  end
+end
+
+# Enough headings that a reader would scan for one, or an explicit `toc:`
+# on the post. Four is where a list stops being a restatement of the page
+# and starts being a way around it.
+TOC_MIN_HEADINGS = 4
+
+def toc_for(post)
+  wanted = post['toc']
+  return [] if !wanted.nil? && !truthy?(wanted)
+
+  entries = toc_entries(post)
+  return [] if entries.size < TOC_MIN_HEADINGS && wanted.nil?
+
+  entries
+end
+
 PIN_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' \
             'stroke-linejoin="round" stroke-linecap="round"><path d="M12 17v5"/>' \
             '<path d="M9 4h6v3l2 4H7l2-4z"/></svg>'
@@ -820,13 +985,41 @@ PIN_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 # explains why this copy is first; on page 3 it would read as a sorting
 # bug. Its colour comes from the palette's text colour, so it keeps its
 # contrast on any accent without per-palette tuning.
-def date_badge(post, link: nil, pinned: false)
+# The date a reader sees -- the site's timezone, the locale's format. The
+# same string date_badge puts in its tile, for the places that want the
+# date without the tile.
+def post_display_date(post)
+  post_display_time(post).strftime(t('date_format'))
+end
+
+# `heading:` turns the tile into the page's h1 instead of a div.
+#
+# Most of this archive has no title -- 2,754 of sean.cz's 4,418 posts are
+# imported tweets and photographs, and a photograph with a caption has
+# nothing to call itself. Their pages had no h1 at all: post_heading_html
+# returns an empty string when there is neither a title nor a borrowed one
+# from a link, so a reader moving through the page by its headings found
+# nothing to land on, on the majority of the site.
+#
+# The date is what those pages are called -- it is already the first thing
+# on them and the thing every listing identifies them by. So the tile that
+# was already saying it becomes the heading, rather than a second heading
+# being added above it: a clipped h1 carrying the same date (the trick the
+# front page uses for the site title) would have every screen reader
+# announce the date twice in a row. Nothing moves, nothing new is drawn,
+# and the outline starts where the page does.
+#
+# Only on the post's own page, and only when there is no title: in a
+# listing the heading is the post title at h2 and the badge beside it is a
+# link to the post, which is a different job.
+def date_badge(post, link: nil, pinned: false, heading: false)
   icon = CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
   pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
   inner = "#{icon}<span>#{date}</span>"
   inner = %(<a href="#{link}">#{inner}</a>) if link
-  %(<div class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</div>)
+  tag = heading ? 'h1' : 'div'
+  %(<#{tag} class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</#{tag}>)
 end
 
 # Folding/slugification lives in lib/slug.rb, shared with the CLI and both
@@ -863,8 +1056,82 @@ def draft?(post)
   post['state'] == 'draft'
 end
 
+# Which series a post belongs to, the posts in it, and where this one sits
+# -- filled in after the archive is read (SERIES_MAP below), so a post
+# rendered before that knows nothing and simply has no series.
+#
+# Ordered by date unless a post says otherwise with series_part. Publishing
+# out of order is rare enough that the date is the right default and wrong
+# often enough that there has to be a way to say so.
+def series_context(post)
+  slug = series_slug_of(post)
+  return [nil, [], nil] if slug.nil? || !defined?(SERIES_MAP)
+
+  in_series = SERIES_MAP[slug] || []
+  index = in_series.index { |p| p.equal?(post) }
+  index ? [slug, in_series, index] : [nil, [], nil]
+end
+
+def series_slug_of(post)
+  name = post['series'].to_s.strip
+  return nil if name.empty?
+
+  slug = Slug.slugify(name)
+  slug.empty? ? nil : slug
+end
+
+def series_order_key(post)
+  part = Integer(post['series_part'], exception: false)
+  # Posts with an explicit number come first, in that order; the rest keep
+  # their chronology after them. Mixing the two by pretending an absent
+  # number is zero would put every undated part at the front.
+  [part ? 0 : 1, part || 0, post_time(post)]
+end
+
+# A page is a post that does not belong in the stream: About, Contact, the
+# colophon. It keeps a permanent address and stays findable -- it is in the
+# sitemap and in the search index -- but it is out of the listings, the tag
+# and type archives and the feed, because a reader working through the
+# archive is not looking for it and a subscriber did not ask to be told it
+# changed.
+def page?(post)
+  truthy?(post['page'])
+end
+
+# A published post that is not in the stream: it keeps its ordinary
+# address and its date, but stays out of the listings, the archives, the
+# feeds, the sitemap and the search index. The only way to it is a link
+# somebody was given -- the draft's hidden address generalised to a post
+# that is finished.
+#
+# NOT a password. A static site cannot keep a secret from anyone holding
+# the URL, and pretending otherwise would be a promise the engine cannot
+# keep; what it can honestly offer is "not listed anywhere".
+#
+# The loose truth test, unlike `pinned`'s strict one, is deliberate and
+# the asymmetry is the point: a typo in `pinned` costs a post its place
+# at the top, while a typo here would put a post somebody meant to keep
+# out of the listings into all of them. The two failures are not worth
+# the same, so this one errs towards hiding.
+def unlisted?(post)
+  truthy?(post['unlisted'])
+end
+
+# "true"/"yes"/"1" as written by hand, and the real booleans YAML and JSON
+# produce. Same spellings `pinned` has always taken.
+def truthy?(value)
+  return false if value.nil? || value == false
+
+  !%w[false no 0].include?(value.to_s.strip.downcase)
+end
+
 def post_path(post)
   return "/draft/#{post['draft_token']}/#{post['slug']}/" if draft?(post)
+  # At the root, because that is what a page is -- and because every
+  # redirect_from a migration carries for one (Ghost, WordPress,
+  # Squarespace) is a root path. A dated address for something with no
+  # date would be the odd one out on every site that has ever had pages.
+  return "/#{post['slug']}/" if page?(post)
 
   "/posts/#{post_time(post).year}/#{post['slug']}/"
 end
@@ -890,7 +1157,7 @@ end
 # The media prefix is post_path either way, so the rendered content is
 # identical on the post's own page and in every listing it appears in.
 def post_content_html(post)
-  CONTENT_CACHE[post] ||= render_content(post['content'], post_path(post))
+  CONTENT_CACHE[post] ||= render_content(post['content'], post_path(post), lifted: link_title_block(post))
 end
 
 def plain_text_length(post)
@@ -941,10 +1208,13 @@ def post_stats_html(post)
 end
 
 def comments_attrs(post)
+  # data-moderated switches the client from reading the live thread to
+  # reading /comments.json -- see the header of assets/js/comments.js.
+  moderated = COMMENTS_APPROVAL ? ' data-moderated' : ''
   if post['mastodon_url']
-    %( data-toot-url="#{h(post['mastodon_url'])}")
+    %( data-toot-url="#{h(post['mastodon_url'])}"#{moderated})
   elsif post['bluesky_uri']
-    %( data-bluesky-uri="#{h(post['bluesky_uri'])}" data-bluesky-url="#{h(post['bluesky_url'])}")
+    %( data-bluesky-uri="#{h(post['bluesky_uri'])}" data-bluesky-url="#{h(post['bluesky_url'])}"#{moderated})
   end
 end
 
@@ -964,8 +1234,8 @@ def build_list_item(post, pinned: false)
   excerpt = excerpt?(post)
   content_class = excerpt ? 'content excerpt' : 'content'
   read_more = excerpt ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
-  title = post['title'] ? %(<h2><a href="#{prefix}">#{h(post['title'])}</a></h2>) : ''
-  stats = post_stats_html(post)
+  title = post_heading_html(post, 'h2', prefix)
+  stats = post_meta_html(post, reading_labels(post))
   <<~HTML
     <div class="card post-list-item">
       <div class="post-header">
@@ -1023,7 +1293,7 @@ def post_structured_head(post)
   data = {
     '@context' => 'https://schema.org',
     '@type' => 'BlogPosting',
-    'headline' => post['title'].to_s.empty? ? post['slug'] : post['title'],
+    'headline' => post_title_for(post),
     'datePublished' => published,
     'url' => "#{SITE_BASE_URL}#{post_path(post)}",
     'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_path(post)}",
@@ -1042,24 +1312,265 @@ def post_structured_head(post)
   lines.map { |line| "\n  #{line}" }.join
 end
 
+# The post's lead image, when the site shows one: the first image whose
+# size is known and sane, together with the media entry the markup needs.
+# A post's own `hero:` overrides the site's answer in both directions --
+# the same two doors `pinned` has, and it reads the same spellings, so a
+# post that wants to keep its photo in the text says `hero: false` and one
+# on a site without heroes can still ask for one.
+#
+# Degenerate images are skipped rather than lifted: a 1x1 tracking pixel
+# from some imported archive would otherwise become the page's lead
+# picture. A post with nothing suitable simply keeps the ordinary layout,
+# so there is no second template to keep in step with this one.
+# The date in the hero's byline, or nothing at all on a page.
+#
+# The rule is the same one the date badge follows -- "Contact, 1 July 2022"
+# says nothing except that somebody had to type a date into a field -- but
+# it was written into only one of the two places a date reaches the top of
+# the page. A page with no usable image looked right, so the hole stayed
+# shut until Ivan's About page turned out to have a portrait.
+#
+# A helper returning '' rather than a conditional in the template, for the
+# reason reading_time_html gives: post.html.erb renders for every post on
+# the site, and a block tag on its own line leaves its newlines on all of
+# them.
+# The same question the badge answers, in the layout that has no badge: with
+# a hero the date lives in the byline under the picture, so on a titled post
+# it is a <time> and on an untitled one it is the heading -- a <time> inside
+# an h1, which keeps the machine-readable date and gives the page the
+# outline entry it had none of. See date_badge for why the date rather than
+# a clipped copy of it.
+def hero_time_html(post, heading: false)
+  return '' if page?(post)
+
+  stamp = %(<time datetime="#{h(post_time(post).iso8601)}">#{h(post_display_date(post))}</time>)
+  heading ? %(<h1 class="post-hero__date">#{stamp}</h1>) : stamp
+end
+
+# Whether the post says what it is called. Untitled posts -- an imported
+# tweet, a photograph with a caption -- borrow a title from a link block if
+# they carry one, and otherwise have none at all; on those the date does the
+# job, and this is what asks.
+def post_names_itself?(post)
+  !post['title'].nil? || !link_title_block(post).nil?
+end
+
+def hero_for(post)
+  return nil unless post.is_a?(Hash)
+
+  setting = post['hero']
+  wanted = setting.nil? ? LAYOUT_HERO : !%w[false no 0].include?(setting.to_s.strip.downcase)
+  return nil unless wanted
+
+  block = (post['content'] || []).find do |b|
+    b.is_a?(Hash) && b['type'] == 'image' && !degenerate_image?(b)
+  end
+  return nil unless block
+
+  media = (block['media'] || []).first
+  media && media['url'] ? [block, media] : nil
+end
+
+# Empty string rather than a conditional in the template: post.html.erb
+# renders for every post on the site, and a block tag on its own line
+# leaves its newlines on all of them whether or not the block runs -- so a
+# post with none of these has to come out exactly as it did before.
+# The clock sits in the same row as the favourites, boosts and replies,
+# because it is the same kind of fact: something to know about the post
+# before deciding to read it. On its own line above the text it read as an
+# announcement.
+#
+# The row is a block of its own, and that is not tidiness: the contents
+# list floats, and a float takes the top of the line box it lands in. With
+# the counts and the clock as loose inline boxes, that line WAS the
+# metadata -- so the contents began level with the star rather than level
+# with the article. Wrapped, the float starts after the row, which is
+# where the text starts too.
+#
+# The number is bare ("6 min") since the icon already says what it counts;
+# the full sentence stays as the accessible name, which is where a screen
+# reader needs it and where an icon says nothing at all.
+# 16px and a radius of 9, to match the star, the boost and the comment
+# bubble it stands in a row with (assets/js/comments.js). It was 18 with a
+# radius of 9.5, and the two compounded: a bigger box AND a shape filling
+# more of it, so the clock read about a fifth larger than its neighbours.
+# The other three are centred by the flex row; this one is `display: inline`
+# for the hero byline's baseline (see .post-stat.reading-time), so its
+# vertical-align carries the size change with it.
+READING_TIME_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" ' \
+                    'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+                    'stroke-linejoin="round" aria-hidden="true">' \
+                    '<circle cx="12" cy="12" r="9"/><path d="M12 7V12l3.5 2"/></svg>'
+
+# What a post's reading time SAYS, short one included. Kept apart from the
+# markup because two callers need the same words and one of them (the hero
+# byline) draws them somewhere else entirely.
+#
+# A post under the length at which the engine stops calling it a photo with
+# a caption has no minutes to report, and used to report nothing at all.
+# It says "under a minute" now, and that is a layout decision more than an
+# informational one: on an archive like sean.cz, eleven posts out of 4,394
+# carry an announcement, so from the second page of the archive onwards NO
+# card had a meta row -- and the few that did stood out as a break in the
+# rhythm rather than as a card with more to say. With this every card
+# carries exactly one row. See docs/decisions.md.
+def reading_labels(post)
+  minutes = reading_minutes(post)
+  return [t('post.reading_time_under'), t('post.reading_minutes_under')] unless minutes
+
+  [t('post.reading_time', minutes: minutes), t('post.reading_minutes', minutes: minutes)]
+end
+
+# nil means "not here" -- the one caller that passes it is the post page
+# with a lead image, where the byline under the picture carries the reading
+# time and a second copy above the text would be the same fact twice. It no
+# longer doubles as "this post is too short to time": that case has words of
+# its own now, and conflating the two is what would have printed the reading
+# time in both places on a short post with a hero.
+def reading_time_html(labels)
+  return '' unless labels
+
+  title, short = labels
+  %(<span class="post-stat reading-time" title="#{h(title)}" ) +
+    %(aria-label="#{h(title)}">#{READING_TIME_ICON}) +
+    %(<span>#{h(short)}</span></span>)
+end
+
+# '' when there is nothing to put in it: a site with no comments network and
+# a post whose reading time is drawn elsewhere has to come out exactly as it
+# did before this row existed.
+def post_meta_html(post, labels)
+  stats = post_stats_html(post)
+  reading = reading_time_html(labels)
+  return '' if stats.empty? && reading.empty?
+
+  %(<div class="post-meta">#{stats}#{reading}</div>)
+end
+
+def toc_html(entries)
+  return '' if entries.empty?
+
+  items = entries.map do |e|
+    %(<li class="toc-l#{e['level']}"><a href="##{h(e['id'])}">#{h(e['text'])}</a></li>)
+  end.join
+  %(<nav class="toc" aria-label="#{h(t('post.toc_label'))}"><p class="toc-heading">#{h(t('post.toc_heading'))}</p><ol>#{items}</ol></nav>\n                )
+end
+
+# Where a post sits in its series, and the way on. Only ever within the
+# series: chronological neighbours across a whole archive are usually
+# unrelated -- on an archive assembled from twenty-two sources, "next" is
+# a tweet from 2011 beside an essay from 2026, which is noise wearing the
+# clothes of navigation.
+def series_nav_html(slug, in_series, index, position, post = nil)
+  # A draft is not in SERIES_MAP -- "part 3 of 7" is a fact about the
+  # published set and the draft is not in it. But saying NOTHING made a
+  # typo in the series name invisible until the address was live and the
+  # toot sent: a misspelling quietly founds a one-post series, and with
+  # fewer than two members it does not even get a page to notice it on.
+  # So a draft's preview answers the question that actually matters while
+  # previewing -- does this join something, or start something new?
+  if post && draft?(post) && position == :top
+    name = post['series'].to_s.strip
+    return '' if name.empty?
+
+    draft_slug = series_slug_of(post)
+    published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || 0) : 0
+    label = if published.positive?
+              spelled = (defined?(SERIES_NAMES) && SERIES_NAMES[draft_slug]) || name
+              t('post.series_draft_joins', name: spelled, count: published, number: published + 1)
+            else
+              t('post.series_draft_new', name: name)
+            end
+    return %(<p class="series-note series-note--draft">#{h(label)}</p>\n                )
+  end
+
+  return '' if slug.nil? || in_series.size < 2
+
+  if position == :top
+    label = t('post.series_part', name: h(SERIES_NAMES[slug].to_s), number: index + 1, total: in_series.size)
+    return %(<p class="series-note"><a href="/series/#{h(slug)}/">#{label}</a></p>\n                )
+  end
+
+  prev_post = index.positive? ? in_series[index - 1] : nil
+  next_post = in_series[index + 1]
+  return '' if prev_post.nil? && next_post.nil?
+
+  links = []
+  links << %(<a class="series-prev" href="#{h(post_path(prev_post))}">#{h(t('post.series_previous', title: post_title_for(prev_post)))}</a>) if prev_post
+  links << %(<a class="series-next" href="#{h(post_path(next_post))}">#{h(t('post.series_next', title: post_title_for(next_post)))}</a>) if next_post
+  %(<nav class="series-nav">#{links.join}</nav>\n                )
+end
+
+# A link post carries no title of its own -- what the reader takes for its
+# title lives inside its link block. The engine therefore had nothing to put
+# in a heading, in <title>, or in a feed item: listings and post pages
+# printed no heading at all and the title came out as bold body text inside
+# the article, while the tab and the feed printed the slug.
+#
+# The first link block that has a title lends it to the post. The block then
+# renders without it (see render_block), or the page would say it twice.
+def link_title_block(post)
+  return nil if post['title']
+
+  (post['content'] || []).find { |b| b['type'] == 'link' && !b['title'].to_s.empty? }
+end
+
+def post_title_for(post)
+  return post['title'].to_s if post['title']
+
+  block = link_title_block(post)
+  (block ? block['title'] : post['slug']).to_s
+end
+
+# The heading itself. A post's own title links to the post in a listing and
+# is plain text on the post's own page -- `self_href` nil says which. A link
+# post's borrowed title goes where the link goes in both places: on a blog
+# of links that is the thing the reader is reaching for, and the date badge
+# beside it is still the way to the post's own page.
+def post_heading_html(post, level, self_href)
+  if post['title']
+    inner = self_href ? %(<a href="#{self_href}">#{h(post['title'])}</a>) : h(post['title'])
+    return %(<#{level}>#{inner}</#{level}>)
+  end
+
+  block = link_title_block(post)
+  return '' unless block
+
+  %(<#{level}><a href="#{h(block['url'])}">#{h(block['title'])}</a></#{level}>)
+end
+
 def render_post_html(post, template)
-  content_html = post_content_html(post)
+  toc = toc_for(post)
+  series_slug, series_posts, series_index = series_context(post)
+  hero_block, hero_media = hero_for(post)
+  # Rendered without the lifted block, or the same photo appears twice --
+  # once as the lead and once where it was written. Only the hero path
+  # pays for the extra render; every other post keeps the memoized one.
+  content_html = hero_block ? render_content(post['content'] - [hero_block], post_path(post)) : post_content_html(post)
   draft_banner = draft?(post) ? draft_banner(post) : ''
   layout(template.result(binding),
-         title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post['title'] || post['slug']}" : (post['title'] || post['slug']),
+         title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),
          description: post_description(post),
          path: post_path(post),
          image: post_og_image(post),
          og_type: 'article',
-         # Drafts must never end up in search engines or link previews.
-         extra_head: draft?(post) ? %(\n  <meta name="robots" content="noindex, nofollow">) : post_structured_head(post),
+         # Drafts and unlisted posts must never end up in search engines
+         # or link previews -- for an unlisted post that is the whole
+         # point, since being out of the sitemap only stops the crawler
+         # being told, not the crawler arriving from a link.
+         extra_head: if draft?(post) || unlisted?(post)
+                       %(\n  <meta name="robots" content="noindex, nofollow">)
+                     else
+                       post_structured_head(post)
+                     end,
          frame_origins: Embed.frame_origins_for(post['content']),
          comment_origins: comment_origins_for([post]))
 end
 
 def rss_item(post)
   url = "#{SITE_BASE_URL}#{post_path(post)}"
-  title = CGI.escapeHTML((post['title'] || post['slug']).to_s)
+  title = CGI.escapeHTML(post_title_for(post))
   pub_date = post_time(post).rfc2822
   description = render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}")
   # A post's rendered HTML goes into the feed inside CDATA, and CDATA has
@@ -1082,7 +1593,8 @@ def rss_item(post)
   ITEM
 end
 
-def render_rss(posts)
+def render_rss(posts, path: '/rss.xml', title: SITE_TITLE, description: SITE_DESCRIPTION,
+               link: "#{SITE_BASE_URL}/")
   items = posts.first(RSS_ITEM_LIMIT).map { |post| rss_item(post) }.join
   # The newest post's date, not Time.now -- otherwise rss.xml differs on
   # every build and gets re-uploaded even when nothing changed.
@@ -1091,10 +1603,10 @@ def render_rss(posts)
     <?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
       <channel>
-        <title>#{h(SITE_TITLE)}</title>
-        <link>#{SITE_BASE_URL}/</link>
-        <atom:link href="#{SITE_BASE_URL}/rss.xml" rel="self" type="application/rss+xml" />
-        <description>#{h(SITE_DESCRIPTION)}</description>
+        <title>#{h(title)}</title>
+        <link>#{link}</link>
+        <atom:link href="#{SITE_BASE_URL}#{path}" rel="self" type="application/rss+xml" />
+        <description>#{h(description)}</description>
         <language>#{SITE_LANG}</language>
         <lastBuildDate>#{last_build}</lastBuildDate>
         #{items}
@@ -1212,7 +1724,18 @@ def nav_active_for(path)
   # Pagination lives under the type ('/type/video/page/2/'), so the item is
   # the first two segments rather than the whole path.
   type = path[%r{\A/type/([^/]+)/}, 1]
-  type ? "/type/#{type}/" : nil
+  return "/type/#{type}/" if type
+
+  # A tag listing (and its pagination) belongs under the tag's own item,
+  # for the menus that are made of tags rather than types; anything else --
+  # a post, a generated page -- lights up only when an item points straight
+  # at it. Both are matched against the menu the site actually has rather
+  # than returned unconditionally, because the answer becomes a
+  # PARTIAL_RESULTS key: returning every path would give each of thousands
+  # of tag and post pages its own cache entry for an identical menu.
+  tag = path[%r{\A/tag/([^/]+)/}, 1]
+  candidate = tag ? "/tag/#{tag}/" : path
+  NAV_ITEM_HREFS.include?(candidate) ? candidate : nil
 end
 
 # The entire attribute, or an empty string -- see the comment in
@@ -1227,6 +1750,11 @@ end
 # Embed.frame_origins_for -- a property of the posts on the page, not of
 # the engine's current configuration.
 def comment_origins_for(posts)
+  # Moderated comments come from this origin whatever instance a post was
+  # announced on, so the per-post grant that exists to survive a network
+  # switch has nothing left to allow.
+  return [] unless COMMENTS_APPROVAL.nil?
+
   Array(posts).filter_map do |post|
     next unless post.is_a?(Hash)
 
@@ -1275,7 +1803,89 @@ end
 # One compiled ERB per template, reused for every page it renders (recompiling
 # the same source for every one of what can be thousands of listing pages is
 # pure waste).
+# A listing's own heading: what kind of listing it is, then what it is a
+# listing OF. The kind stays in the markup and is hidden visually rather
+# than dropped, because the alternative loses it entirely -- a screen
+# reader on a tag page would announce "Bitwarden" and nothing else, and a
+# pill's background colour is not read aloud. Which listings show the kind
+# at all is a CSS decision (see .listing-heading__kind in site.css), so a
+# site can put the word back with one rule.
+#
+# Only listings whose value is an arbitrary string get a kind: a tag name
+# and a search query can be anything, so "Bitwarden" alone reads like a
+# post title, while the eight content-type labels are a closed set that
+# cannot be mistaken for one. That is why type listings pass no kind and
+# always did without one.
+def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil)
+  value = value.to_s
+  kind = kind.to_s
+  return '' if value.empty? && kind.empty?
+
+  classes = ['listing-heading']
+  classes << "listing-heading--#{variant}" if variant
+  parts = []
+  parts << %(<span class="listing-heading__kind">#{h(kind)}</span>) unless kind.empty?
+  parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
+  id_attr = value_id ? %( id="#{h(value_id)}") : ''
+  parts << %(<span class="listing-heading__value"#{id_attr}>#{h(value)}</span>)
+  # h1, not h2. This is what the page is about -- the tag being listed, the
+  # search being run -- and the posts under it are h2 already, so at h2 it
+  # was a sibling of the things it introduces rather than their heading. A
+  # listing had no h1 at all, which left every page in the archive except a
+  # post and the cheat sheet with an outline that started at level two.
+  %(<h1 class="#{classes.join(' ')}">#{parts.join}</h1>)
+end
+
+# The landing page is the one listing with nothing to announce: it is the
+# site itself, and the banner has said so already. Giving it a visible
+# heading would put a word on every front page built with this engine that
+# nobody asked for -- so it gets the site's own title, clipped out of sight
+# by the stylesheet the way the "Tag"/"Search" labels are. Clipped rather
+# than display:none for the same reason as those: hidden is not the same as
+# gone, and the point of this heading is to be there for a reader who
+# navigates by headings and cannot see the banner at all.
+def home_heading_html
+  %(<h1 class="listing-heading listing-heading--home">#{h(SITE_TITLE)}</h1>)
+end
+
+# Decorative by definition -- the accessible name is the kind span next to
+# it, so the glyph is hidden from assistive technology rather than given a
+# label that would then be read twice. Same magnifier the nav's search
+# button uses.
+LISTING_HEADING_ICONS = {
+  search: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+          'fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' \
+          '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  # A stack of sheets: several parts that are one thing, which is what a
+  # series is and what the word it replaces was saying. It replaces the
+  # word rather than joining it -- the heading is the series' NAME, and
+  # "Série" in front of it was a label competing with the name for the
+  # start of the line. The word stays in the markup for a screen reader,
+  # the same arrangement a tag listing has used since it got its pill.
+  #
+  # The two sheets behind are an edge each rather than whole outlines:
+  # three complete pages at 20px close up into a grey block, and the
+  # folded corner is what says "page" once the rest has gone small.
+  series: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+          'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+          'stroke-linejoin="round" aria-hidden="true">' \
+          '<path d="M17 3h-6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7z"/>' \
+          '<path d="M17 3v3a1 1 0 0 0 1 1h3"/>' \
+          '<path d="M6 7v12a2 2 0 0 0 2 2h9"/>' \
+          '<path d="M3 11v8a2 2 0 0 0 2 2h8"/></svg>',
+  # The hole in the label is a circle rather than the zero-length line the
+  # shape is usually drawn with: that trick renders only under a round
+  # linecap, and one stylesheet override away it disappears without
+  # anything else looking wrong.
+  tag: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+       'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+       'stroke-linejoin="round" aria-hidden="true">' \
+       '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/>' \
+       '<circle cx="7" cy="7" r="1.2"/></svg>'
+}.freeze
+
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
+                  heading_kind: nil, heading_variant: nil, heading_icon: nil, feed_path: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
   pages, fixed = anchored_pages(posts)
   pages.each do |number, page_posts|
@@ -1295,7 +1905,14 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
-    main_html = template.result_with_hash(list_html: list_html, pagination: pagination, heading: heading)
+    heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
+                                        icon: heading_icon)
+    # Tags, series and content types all name themselves; the landing page is
+    # the only listing that arrives here with nothing, and it is the only one
+    # that would otherwise have no h1 (see home_heading_html).
+    heading_html = home_heading_html if heading_html.empty?
+    main_html = template.result_with_hash(list_html: list_html, pagination: pagination,
+                                          heading_html: heading_html)
     # A listing renders the same blocks the post page does, players
     # included, so it needs the same frame permissions. The pinned post
     # counts as one of them wherever it is lifted onto the landing page:
@@ -1312,6 +1929,9 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
+                           # So a reader who wants only this subject can be handed it by
+                           # their feed reader, which looks for exactly this link.
+                           extra_head: feed_path ? %(\n  <link rel="alternate" type="application/rss+xml" title="#{h(page_title)}" href="#{h(feed_path)}">) : '',
                            frame_origins: Embed.frame_origins_for(shown.flat_map { |p| p['content'] })))
   end
   pages.size
@@ -1499,6 +2119,44 @@ posts.reverse!
 # RSS, the sitemap and the search index all draw from it unchanged. Drafts
 # only get their own page at a hidden address.
 drafts, posts = posts.partition { |p| draft?(p) }
+# Pages come out of `posts` here, once, so that everything downstream --
+# listings, tags, types, RSS, pagination -- keeps drawing from a list that
+# means "the stream" and needs no exception of its own. The two consumers
+# that DO want them (the sitemap and the search index) ask for them by
+# name, which is the right way round: being findable is the point of a
+# page, and being in the stream is not.
+#
+# A page at the root cannot be allowed to shadow an address the engine
+# already owns. The rest of the site lives under /posts/, /tag/, /type/,
+# /draft/ and the two generated pages, so those are the names to refuse.
+RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
+                            robots.txt 404 favicon.ico].freeze
+pages, posts = posts.partition { |p| page?(p) }
+# Out of the stream on the same principle as pages, one step further:
+# a page is taken out of the listings but stays findable (sitemap,
+# search), while an unlisted post is out of those too. So it is
+# partitioned here and then added back BY NAME to the two things it is
+# still entitled to -- its own page, and the redirect stubs for
+# addresses it used to have.
+unlisted_posts, posts = posts.partition { |p| unlisted?(p) }
+pages.reject! do |page|
+  next false unless RESERVED_ROOT_SEGMENTS.include?(page['slug'].to_s.downcase)
+
+  warn "⚠️  Page '#{page['slug']}' would sit on an address the engine already uses (/#{page['slug']}/) -- not built. Rename it."
+  true
+end
+# `unlisted` on a PAGE means the same as it does on a post, and pages are
+# the likeliest thing to be marked with it: a migration leaves behind a
+# "Sample Page" and a "Privacy Policy" nobody wrote, and unlisted is what
+# somebody reaches for instead of deleting them. Taken out of `pages`
+# here, they join the same list, so the sitemap and the search index --
+# the only two things `pages` still feeds -- stop contradicting the
+# noindex the page's own <head> already carried.
+#
+# After the reserved-name refusal above, not before it: a page called
+# "posts" must be refused whether or not it is also unlisted.
+unlisted_pages, pages = pages.partition { |p| unlisted?(p) }
+unlisted_posts.concat(unlisted_pages)
 # A draft without its token would build at the GUESSABLE /draft//slug/ --
 # every writer in the engine guarantees the token, so a missing one means
 # a hand-copied or hand-edited JSON, and the unguessable-URL design must
@@ -1529,6 +2187,40 @@ CONTENT_TYPE_LABELS = {
 # simply stop being generated, and the deploy prunes them like any other
 # no-longer-generated file. Defined here, before the first page renders,
 # because the nav partial reads NAV_TYPE_ITEMS.
+# Built once, before any post renders, because every post in a series needs
+# to know about all the others -- "part 3 of 7" and the link onwards are
+# facts about the set, not about the post.
+SERIES_MAP = posts.group_by { |p| series_slug_of(p) }
+                  .reject { |slug, group| slug.nil? || group.size < 2 }
+                  .transform_values { |group| group.sort_by { |p| series_order_key(p) } }
+                  .freeze
+# Published parts per series slug, singletons included -- SERIES_MAP
+# deliberately drops groups under two (a "series" of one is a post), and
+# that is exactly why a draft's preview cannot ask it whether the name it
+# carries joins anything: the one-post series a typo founds is the case
+# it needs to see.
+SERIES_PUBLISHED = posts.group_by { |p| series_slug_of(p) }
+                        .reject { |slug, _| slug.nil? }
+                        .transform_values(&:size)
+                        .freeze
+# The name as it was written, for the heading -- the slug is only an
+# address. The first spelling wins if a series is spelled two ways, with
+# one exception: a spelling that IS its own slug loses to one that is not.
+# Slugify is idempotent, so `series: novy-sean-cz` has always grouped with
+# `series: Nový Sean.cz` -- writing the address was allowed, it just put
+# the address in the heading of the series page if that post happened to
+# be read first. Now the address only names the series when nobody
+# anywhere spelled it out.
+SERIES_NAMES = posts.each_with_object({}) do |post, acc|
+  slug = series_slug_of(post)
+  next unless slug && SERIES_MAP.key?(slug)
+
+  name = post['series'].to_s.strip
+  if !acc.key?(slug) || (acc[slug] == slug && name != slug)
+    acc[slug] = name
+  end
+end.freeze
+
 PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
 NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
@@ -1536,6 +2228,42 @@ NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
           'document' => 'documents' }.fetch(type)
   ["/type/#{type}/", t("nav.#{key}")]
 end.freeze
+
+# The menu a site actually shows. Without a `nav:` key it is what it has
+# always been -- All, then one item per content type the site has -- so no
+# existing installation renders a byte differently. With one, the site
+# names its own items instead:
+#
+#   nav:
+#     - { label: "Home", url: "/" }
+#     - { label: "Life in the UK", tag: "life-in-uk" }
+#
+# `tag:` is a tag's slug and becomes /tag/<slug>/; `url:` is taken as
+# written, so an item can point at a post, at a generated page or off the
+# site entirely. An entry missing either a label or a destination is
+# skipped rather than rendered as an empty link.
+#
+# An empty list is a decision, not a mistake: the menu then renders
+# nothing at all -- no bar, no toggle -- rather than an empty bar. That is
+# also how a site turns the menu off, so there is no second key for it.
+def configured_nav_items
+  entries = SiteConfig.get('nav', default: nil)
+  return nil unless entries.is_a?(Array)
+
+  entries.filter_map do |entry|
+    next unless entry.is_a?(Hash)
+
+    label = entry['label'].to_s.strip
+    slug = entry['tag'].to_s.strip
+    href = slug.empty? ? entry['url'].to_s.strip : "/tag/#{slug}/"
+    next if label.empty? || href.empty?
+
+    [href, label]
+  end
+end
+
+NAV_ITEMS = (configured_nav_items || ([['/', t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
+NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
@@ -1567,7 +2295,7 @@ def referenced_media_filenames(post)
   end.compact
 end
 
-(posts + drafts).each do |post|
+(posts + pages + unlisted_posts + drafts).each do |post|
   year = post_time(post).year
   dir = output_dir(post)
 
@@ -1615,7 +2343,7 @@ def redirect_stub_html(post)
     <meta http-equiv="refresh" content="0; url=#{url}">
     <link rel="canonical" href="#{url}">
     <meta name="robots" content="noindex">
-    <title>#{h(post['title'] || post['slug'])}</title>
+    <title>#{h(post_title_for(post))}</title>
     </head>
     <body>
     <p>#{h(t('redirect.moved'))} <a href="#{url}">#{h(url)}</a></p>
@@ -1633,7 +2361,11 @@ end
 # unpublished post is off the site, old addresses included, and the stubs
 # come back when it does. Stubs stay out of listings, feeds, the sitemap
 # and the search index by construction -- they are not posts.
-posts.each do |post|
+#
+# Pages are in here as well as posts: a renamed page owes its old
+# address exactly what a renamed post does. They are out of the
+# LISTINGS, not out of the engine's promises.
+(posts + pages + unlisted_posts).each do |post|
   Array(post['former_slugs']).each do |former|
     parts = former.to_s.split('/').reject(&:empty?)
     # "." and ".." can only arrive via a hand-edited JSON (slugify never
@@ -1678,18 +2410,53 @@ posts.each do |post|
   end
 end
 
+# A feed per tag, but only for the tags the site's own menu points at.
+#
+# The alternative is a feed for every tag, and on a real archive that is
+# 1761 files nobody will ever fetch, rebuilt and re-diffed on every build
+# -- the exact inverse of "nothing renders that wasn't asked for". A tag
+# in the menu is the site saying this is a subject it publishes on, which
+# is the same thing as saying somebody might want to follow just that.
+#
+# A site with the default type menu gets none, and that is the intended
+# answer rather than an oversight: it has not named any subject yet.
+FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _| href[%r{\A/tag/([^/]+)/\z}, 1] }.freeze
+
 tags_map.each do |slug, data|
+  if FEED_TAG_SLUGS.include?(slug)
+    emit(File.join(PUBLIC_DIR, 'tag', slug, 'rss.xml'),
+         render_rss(data[:posts], path: "/tag/#{slug}/rss.xml",
+                    title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
+                    description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
+                    link: "#{SITE_BASE_URL}/tag/#{slug}/"))
+  end
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
-                base_path: "/tag/#{slug}", heading: t('tag.heading', name: data[:name]),
+                base_path: "/tag/#{slug}", heading: data[:name],
+                heading_kind: t('tag.kind'), heading_variant: 'tag', heading_icon: :tag,
+                feed_path: FEED_TAG_SLUGS.include?(slug) ? "/tag/#{slug}/rss.xml" : nil,
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
+end
+
+# A series gets a listing of its own, in series order rather than newest
+# first: the whole point of one is that it is meant to be read from the
+# start. Only for a series with more than one post, which SERIES_MAP
+# already guarantees -- a "series" of one is a post.
+SERIES_MAP.each do |slug, in_series|
+  name = SERIES_NAMES[slug].to_s
+  write_listing(in_series, index_template, File.join(PUBLIC_DIR, 'series', slug),
+                base_path: "/series/#{slug}", heading: name,
+                heading_kind: t('series.kind'), heading_variant: 'series',
+                heading_icon: :series,
+                title: t('series.title', name: name, short_name: SITE_SHORT_NAME),
+                description: t('series.description', name: name, author: SITE_AUTHOR))
 end
 
 PRESENT_TYPES.each do |type|
   type_posts = posts.select { |post| dominant_content_type(post) == type }
   label = CONTENT_TYPE_LABELS[type]
   write_listing(type_posts, index_template, File.join(PUBLIC_DIR, 'type', type),
-                base_path: "/type/#{type}", heading: label,
+                base_path: "/type/#{type}", heading: label, heading_variant: 'type',
                 title: t('type.title', label: label, short_name: SITE_SHORT_NAME),
                 description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
 end
@@ -1707,8 +2474,14 @@ end
 
 # posts is sorted newest-first, so splitting into "first N" / "the rest" is
 # also the split into recent / archive -- no further sorting needed.
-recent_search_index = posts.first(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
-archive_search_index = posts.drop(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
+# Pages are searchable for the same reason they are in the sitemap:
+# somebody typing "contact" expects to be handed the contact page, and
+# it is in no listing they could have browsed to instead. They go in the
+# eagerly-loaded half regardless of age -- there are a handful of them,
+# and burying them in the lazy archive would defeat the point.
+searchable = pages + posts
+recent_search_index = searchable.first(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
+archive_search_index = searchable.drop(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
 emit(File.join(PUBLIC_DIR, 'search-index.json'), recent_search_index.to_json)
 emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), archive_search_index.to_json)
 
@@ -1718,6 +2491,49 @@ emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
             title: t('search.page_title', site_title: SITE_TITLE),
             description: t('search.page_description'),
             path: '/search/'))
+
+# The page a mistyped or long-dead address lands on. Every supported host
+# serves /404.html for a path it has nothing at -- until now that was the
+# host's own default, which says nothing about this site and offers no way
+# on. This one carries the site's chrome, so the menu and the search field
+# turn a dead end into somewhere to go next.
+#
+# Nothing that already exists is rewritten by adding it: it is a new file
+# at an address nothing else claims. noindex because a 404 that gets
+# indexed is worse than no 404 at all.
+#
+# Through listing_heading_html rather than a hand-written copy of what it
+# emits. The two had drifted by exactly one level: every listing became an h1
+# in this cycle and this page, written out by hand, stayed an h2 -- so the
+# one page 1.3 added was the one page the promise "every page has an h1" did
+# not hold for. Nothing is drawn differently; the markup is what the helper
+# was already producing everywhere else.
+# The signpost under the heading, centred: blank boards, one accent arrow
+# pointing on -- the page's own sentence ("the way on is the menu and the
+# search") drawn once. Inline, in the page's own colors (currentColor and
+# the accent variable), so every palette and both themes paint it
+# themselves and no request leaves for a picture. Size lives in the
+# stylesheet, not here -- the phone and the desktop want it differently.
+# aria-hidden: it decorates the heading, it does not say anything the
+# heading doesn't.
+NOT_FOUND_SIGN =
+  %(<svg class="not-found-sign" viewBox="0 0 120 104") +
+  %( fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round") +
+  %( stroke-linejoin="round" aria-hidden="true">) +
+  %(<line x1="60" y1="14" x2="60" y2="98"/>) +
+  %(<path d="M60 22 h34 l12 8 -12 8 h-34 z" stroke="var(--accent)"/>) +
+  %(<path d="M60 48 h-30 l-12 8 12 8 h30 z"/>) +
+  %(<line x1="46" y1="98" x2="74" y2="98"/>) +
+  %(</svg>)
+
+emit(File.join(PUBLIC_DIR, '404.html'),
+     layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
+            %(        #{NOT_FOUND_SIGN}\n) +
+            %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
+            title: t('not_found.page_title', site_title: SITE_TITLE),
+            description: t('not_found.page_description'),
+            path: '/404.html',
+            extra_head: %(\n  <meta name="robots" content="noindex">)))
 
 if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))
@@ -1748,9 +2564,64 @@ STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
 File.write(STATS_PATH, '{}') unless File.exist?(STATS_PATH)
 WRITTEN[STATS_PATH] = true
 
+# The approved comments, written by the same cron and needing the same
+# protection -- which it did not have. Every build swept the file away as
+# something no longer generated, and since a publish is a build followed by
+# a deploy with --prune, publishing a post took every approved comment off
+# the whole site until the next cron tick put them back. On a moderated
+# site that is the feature deleting its own output as a side effect of
+# ordinary use.
+#
+# Registered only while moderation is on, and that condition is doing work
+# rather than tidiness: with it off the file must NOT be protected. It is
+# deleted when moderation is switched off precisely so a rejected comment
+# stops being readable at a public address, and a build that kept it alive
+# would hold the door open for exactly what the deletion is there to close.
+# Nothing is created here, unlike stats.json -- a comments.json that does
+# not exist yet means the cron has not run, and inventing an empty one
+# would tell the page there is nothing to show rather than nothing to
+# read.
+COMMENTS_PATH = File.join(PUBLIC_DIR, 'comments.json')
+WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
+
 emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
-emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts, tags_map, PRESENT_TYPES))
-emit(File.join(PUBLIC_DIR, 'robots.txt'), "User-agent: *\nAllow: /\nSitemap: #{SITE_BASE_URL}/sitemap.xml\n")
+# Pages ride along in the sitemap: being findable is the whole point of
+# one, and the sitemap is how a search engine is told they exist at all
+# -- nothing links to them from the archive.
+emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES))
+# The crawlers that collect text to train on, as of this release. A list in
+# the engine goes stale, which is why the free-text key below exists beside
+# it -- but a list nobody has to research is the difference between a site
+# that makes this choice and one that meant to.
+#
+# Off by default. Wanting to be findable in an answer somebody gets from a
+# machine is a legitimate position, and it is not the engine's to take on
+# a site's behalf.
+#
+# And it is a request, not a fence: some of these honour robots.txt and
+# some do not. Anything here that said "blocks" would be a lie -- see
+# docs/decisions.md.
+AI_CRAWLERS = %w[GPTBot ChatGPT-User OAI-SearchBot ClaudeBot Claude-Web anthropic-ai
+                 CCBot Google-Extended PerplexityBot Bytespider Amazonbot
+                 Applebot-Extended meta-externalagent Diffbot Omgilibot].freeze
+
+def robots_txt
+  lines = ['User-agent: *', 'Allow: /']
+  if SiteConfig.get('seo', 'block_ai_crawlers', default: false)
+    AI_CRAWLERS.each { |agent| lines << '' << "User-agent: #{agent}" << 'Disallow: /' }
+  end
+  extra = SiteConfig.get('seo', 'robots_extra').to_s.strip
+  lines << '' << extra unless extra.empty?
+  # The blank line only when something was actually put between: a site
+  # that configures neither has to get back the exact three lines it got
+  # before this existed, or every install re-uploads a robots.txt to say
+  # what it already said.
+  lines << '' if lines.size > 2
+  lines << "Sitemap: #{SITE_BASE_URL}/sitemap.xml"
+  "#{lines.join("\n")}\n"
+end
+
+emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
 
 # An imported post keeps answering at the addresses its previous platform
 # gave it: redirect_from is a list of site-root paths ("/bitwarden/",
@@ -1762,7 +2633,10 @@ emit(File.join(PUBLIC_DIR, 'robots.txt'), "User-agent: *\nAllow: /\nSitemap: #{S
 # EVERYTHING real -- posts, listings, search, feeds, root files -- and a
 # stub yields to whatever the build already produced, out loud.
 REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
-posts.each do |post|
+# Pages too, for the reason above -- and because a source like Substack
+# serves its pages under /p/<slug>, so the old address is a real one the
+# importer records and this loop is the only thing that answers it.
+(posts + pages + unlisted_posts).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
     if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }

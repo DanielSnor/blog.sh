@@ -57,8 +57,17 @@ module SiteConfig
     # read the file first -- an unreadable answer to the single most
     # common way this file breaks. The line number is what fixes it, and
     # Psych knew it all along.
+    # The line is where the parser gave up, which is not always where the
+    # mistake is: an indented block whose header got commented out, or a
+    # quote left open, breaks at the first thing that no longer fits --
+    # often further down the file, and sometimes further up, inside the
+    # section before it. Said out loud, because the first person to report
+    # this had read the named line, found it blameless, and gone looking
+    # through the engine's source instead.
     abort("❌ #{path} is not valid YAML: #{e.problem} at line #{e.line}, column #{e.column}. " \
           "Usually indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. " \
+          "If that line looks fine, the cause is elsewhere -- most often a commented-out section header " \
+          "with its keys left behind, or an unclosed quote earlier. " \
           "Run ./blog.sh doctor for the full picture.")
   end
 
@@ -139,5 +148,36 @@ module SiteConfig
     return :bluesky if bluesky
 
     nil
+  end
+
+  # How a reply earns its place under the article: :fav means the author
+  # favourited it on the network, nil means every reply shows (what every
+  # install did before this existed, and still the default).
+  #
+  # Off is not merely the safe default, it is a different data path: with
+  # moderation off the visitor's browser reads the live thread from the
+  # network, as always. With it on, the thread cannot be judged in the
+  # browser at all -- "did *I* favourite this" is an authenticated
+  # question and the token can never leave the server -- so the comments
+  # are prepared by cron and served from this origin instead. Turning it
+  # on therefore also makes the comments depend on that cron running (see
+  # scripts/refresh-sidebar.sh and Doctor.check_comments).
+  # YAML reads an unquoted off/no as the boolean false, which means the
+  # documented `approval: off` arrives here as "false" -- it has to be
+  # understood, not rejected. Its opposite (`on`/`yes` -> true) is not
+  # accepted in return: there is one mode today and guessing which one
+  # somebody meant would be a decision the config never made. The
+  # message says what YAML did, since the value it names is not the
+  # value that was typed.
+  def comments_approval
+    value = get('comments', 'approval').to_s.strip.downcase
+    return nil if value.empty? || value == 'off' || value == 'false'
+    return :fav if %w[fav favourite favorite].include?(value)
+
+    if value == 'true'
+      abort("❌ comments.approval is on/yes in #{PATH}, which YAML reads as true -- write the mode by name: \"fav\".")
+    end
+
+    abort("❌ Unknown comments.approval #{value.inspect} in #{PATH} -- expected \"fav\" or \"off\".")
   end
 end

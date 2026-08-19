@@ -5,6 +5,8 @@
 # strftime formáty pro všechna data renderovaná na serveru (datumové odznaky,
 # search index, JSON sidebar widgetů, hlášky CLI). Klientský protějšek je
 # js.date_locale níže — drž je konzistentní.
+thousands_separator: "\u00a0"
+decimal_point: ","
 date_format: "%-d. %-m. %Y"
 date_time_format: "%-d. %-m. %Y %H:%M"
 
@@ -23,6 +25,20 @@ nav:
   search_placeholder: "Hledat…"
 
 post:
+  reading_time: "Na čtení %{minutes} min"
+  reading_minutes: "%{minutes} min"
+  # Cokoli pod hranicí, od které engine přestává postu říkat fotka
+  # s popiskem. Říká se to, místo aby se to vynechalo, aby každá karta
+  # ve výpisu nesla stejný řádek — viz docs/decisions.md.
+  reading_time_under: "Na čtení míň než minuta"
+  reading_minutes_under: "< 1 min"
+  toc_heading: "Na téhle stránce"
+  toc_label: "Obsah"
+  series_part: "Díl %{number} ze %{total} — %{name}"
+  series_draft_joins: "Série %{name} — publikovaných dílů: %{count}, po publikaci díl %{number}."
+  series_draft_new: "Žádný publikovaný post zatím sérii „%{name}“ nenese — překlep, nebo první díl?"
+  series_previous: "← %{title}"
+  series_next: "%{title} →"
   comments_heading: "Komentáře"
   back_to_list: "← zpět na výpis"
   read_more: "Číst dál"
@@ -39,9 +55,18 @@ pagination:
   page: "strana %{number}"
 
 tag:
-  heading: "Štítek: %{name}"
+  feed_title: "%{name} – %{site_title}"
+  # V nadpisu výpisu je vidět samotný štítek; tohle je slovo, které říká,
+  # o jaký výpis jde -- zůstává pro odečítače obrazovky a ve výchozím
+  # vzhledu se skrývá (viz .listing-heading__kind v site.css).
+  kind: "Štítek"
   title: "Štítek: %{name} – %{short_name}"
   description: "Příspěvky se štítkem %{name} na osobním webu %{author}."
+
+series:
+  kind: "Série"
+  title: "%{name} – %{short_name}"
+  description: "Série %{name} na osobním webu, kde %{author} píše — v pořadí ke čtení."
 
 type:
   text: "Text"
@@ -59,12 +84,19 @@ index:
   empty: "Zatím žádné příspěvky tohoto typu."
 
 search:
-  heading: "Vyhledávání"
+  # Zároveň slouží jako nadpis stránky, dokud není zadaný žádný dotaz.
+  kind: "Vyhledávání"
   tagline: "Prohledá všechny typy příspěvků — bez ohledu na diakritiku."
   tip: "Tip: víc slov = musí být všechna;<br>přesnou frázi dej do uvozovek („…“);<br>slovo vyloučíš mínusem (-slovo)."
   prompt: "Zadej dotaz."
   page_title: "Vyhledávání – %{site_title}"
   page_description: "Fulltextové vyhledávání v příspěvcích, bez ohledu na diakritiku."
+
+not_found:
+  heading: "Tady nic není"
+  body: "Tahle adresa na tomhle webu na nic nemíří — buď je v ní překlep, nebo mířila na něco, co se mezitím přestěhovalo. Cesta dál je menu nahoře a vyhledávací pole."
+  page_title: "Tady nic není – %{site_title}"
+  page_description: "Stránka, na kterou tahle adresa míří, neexistuje."
 
 markdown_page:
   default_title: "Markdown"
@@ -72,6 +104,12 @@ markdown_page:
 
 ui:
   scroll_top: "Nahoru"
+  # Popisek přepínače vzhledu. Čte se dvakrát: šablona ho vloží do stránky a
+  # assets/js/theme-toggle.js ho přepisuje při každém kliknutí, takže se sem
+  # dostává i přes window.BLOG_I18N (client_i18n_json v build/build_blog.rb).
+  theme_auto: "Vzhled: podle systému"
+  theme_light: "Vzhled: světlý"
+  theme_dark: "Vzhled: tmavý"
 
 js:
   date_locale: "cs-CZ"
@@ -80,19 +118,22 @@ js:
   stats_comments: "Komentářů"
   reply_on_mastodon: "Reagovat na Mastodonu"
   reply_on_bluesky: "Reagovat na Bluesky"
+  comments_moderated: "Komentáře, které autor vybral. Celá diskuse je na síti."
   results_one: "výsledek"
   results_few: "výsledky"
   results_many: "výsledků"
+  results_capped: " — zobrazeno nejlepších %{count}"
   no_results_pending: "Nic nenalezeno,"
   no_results_final: "Nic nenalezeno."
   try_other_words: " Zkus jiná / obecnější slova."
   searching_archive: " (hledám i ve starším archivu…)"
-  search_prefix: "Vyhledávání: "
   loading_index: "Načítám index…"
   index_unavailable: "Vyhledávací index není k dispozici."
   lightbox_close: "Zavřít"
   lightbox_prev: "Předchozí"
   lightbox_next: "Další"
+  lightbox_label: "Prohlížeč obrázků"
+  lightbox_open: "Zvětšit obrázek"
 
 cli:
   cancel_word: "zrušit"
@@ -145,11 +186,19 @@ cli:
     (Poznámku si tedy piš přes //, ne přes # — mřížky jsou vyhrazené pro nadpisy.)
 
     FRONTMATTER (mezi --- a ---):
-      title  nadpis (volitelný)
-      tags   tagy oddělené čárkou, např: příroda, procházka, praha
-      type   typ postu — text / quote / chat / image / video / audio / link
-             (volitelné — necháš-li prázdné, typ se odvodí sám podle
-             obsahu postu)
+      title   nadpis (volitelný)
+      tags    tagy oddělené čárkou, např: příroda, procházka, praha
+      type    typ postu — text / quote / chat / image / video / audio / link
+              (volitelné — necháš-li prázdné, typ se odvodí sám podle
+              obsahu postu)
+              page → stránka mimo výpisy, archiv i RSS, na vlastní adrese
+              (About, Kontakt)
+      pinned  true → post se drží na začátku první stránky výpisu
+      unlisted true → post zůstane na své adrese, ale zmizí z výpisů,
+              feedů, sitemapy i hledání (odkaz pro pár lidí, ne heslo)
+      series  jméno série; posty se stejným jménem tvoří sérii
+      hero    true/false → úvodní obrázek nad titulkem u tohohle postu
+      toc     true/false → seznam kapitol (sám naskočí od čtyř nadpisů)
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
@@ -163,6 +212,7 @@ cli:
   template_unchanged: "Šablona zůstala beze změny (neuloženo?), post nevznikl."
   empty_content: "Prázdný obsah, nic se nezapsalo."
   wrote_draft: "Zapsáno jako draft: %{path}"
+  incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je v postu, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně, ať dál platí, že prázdné incoming = nic nečeká."
   generating_preview: "Generuji náhled"
   draft_saved_preview_pending: "Draft je uložený. Náhled se ukáže po úspěšném nasazení — pak spusť ./blog.sh edit %{slug}"
 
@@ -177,6 +227,7 @@ cli:
   schedule_slot_keys: "  [Enter] přijmout  ·  vlastní datum (YYYY-MM-DD HH:MM)  ·  „%{cancel_word}“ = zpět"
   schedule_queue_position: "  %{count}. post ve frontě (předchozí: '%{slug}', %{date})."
   schedule_slots_taken: "  Dřívější sloty jsou obsazené:"
+  schedule_queue_hint: "Chceš ho dřív — třeba v dnešním slotu? Přijmi nabídnutý čas a ve frontě (./blog.sh queue) ho přenes na začátek: časy zůstanou slotům a zbytek ustoupí o jeden."
   props_queue_heading: "Fronta (naplánovaných: %{count}):"
   queue_empty: "Fronta je prázdná — draft naplánuješ přes [s] v jeho náhledu, nebo ./blog.sh schedule."
   queue_overdue: "(čeká na cron)"
@@ -188,6 +239,9 @@ cli:
   queue_already_last: "Post už je poslední ve frontě."
   queue_swap_overdue: "S postem, jehož čas už prošel, nejde měnit pořadí — počkej, až ho cron publikuje."
   queue_swapped: "Přesunuto: '%{slug}' se publikuje %{date}."
+  queue_action_carry: "[m] přenést jinam  "
+  queue_carry_hint: "↑↓ nést post · Enter položit · Esc zrušit"
+  queue_carried: "Přeneseno: '%{slug}' je ve frontě %{position}. a publikuje se %{date}."
   queue_compact_prompt: "Posunout zbytek fronty (%{count}) o slot dopředu? [a/N] "
   queue_compacted: "Fronta posunuta: každý následující post převzal dřívější slot."
   menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
@@ -212,6 +266,7 @@ cli:
   bluesky_recovered: "Ten post už oznámený byl — našel jsem oznámení na účtu a zapsal jeho adresu místo toho, abych poslal druhé: %{url}"
   deleting_bluesky: "Mažu oznámení na Bluesky: %{url}"
   delete_bluesky_failed: "Smazání oznámení na Bluesky selhalo — smaž ho ručně."
+  unlisted_no_toot: "Post je nezalistovaný, oznámení se neposlalo. Aby odešlo, sundej mu nejdřív příznak."
   backdated_no_toot: "Datum postu není aktuální (zpětně datovaný post), oznámení se neposlalo."
   schedule_only_drafts: "Post '%{slug}' už je publikovaný — plánovat jde jen drafty."
   scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
@@ -230,6 +285,8 @@ cli:
   still_draft_toot: "Post '%{slug}' je pořád draft — nejdřív publikuj (./blog.sh publish %{slug}), teprve pak má toot na co odkazovat."
   already_has_toot: "Post už toot má, neposílám druhý: %{url}"
   toot_failed: "Toot se nepodařilo poslat (viz výš)."
+  no_network_toot: "Nic se neoznámilo: config/site.yml nemá sekci mastodon: ani bluesky:, takže tenhle web nikam neoznamuje. Jestli jsi ji chtěl nastavit, zkontroluj, že hlavička sekce je živý řádek, a ne komentář — klíče pod zakomentovanou hlavičkou patří tomu, co bylo před ní. Samotný token patří do env.sh."
+  toot_declined: "Neoznámeno, jak jsi chtěl."
   tooted: "Otootováno: %{url}"
 
   already_draft: "Post '%{slug}' je už draft: %{url}"
@@ -298,6 +355,10 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře post
       ./blog.sh doctor [--online] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
+      ./blog.sh check                projde archiv a řekne, co je v něm rozbité
+      ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
+                                     zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
+      ./blog.sh stats [--json]       spočítá archiv — posty, roky, slova, štítky, média, odkud to je
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -346,18 +407,30 @@ cli:
   props_label_type: "typ"
   props_label_tags: "štítky"
   props_label_pinned: "připnutí"
+  props_label_unlisted: "nezalistován"
   props_label_announced: "oznámení"
   props_label_addresses: "staré odkazy"
   props_draft_banner: "draft — není na webu, jen náhled"
   props_state_published: "publikováno, %{date}"
   props_pinned_yes: "ano — drží se nahoře na úvodní stránce"
+  props_unlisted_yes: "ano — dostupný na své adrese, ale v žádném výpisu, feedu, sitemapě ani hledání"
   props_announces_on_publish: "zatím ne — odejde s publikací"
+  props_announces_never_unlisted: "neodejde — nezalistovaný post se neoznamuje"
   props_not_announced: "bez oznámení"
   props_attributes_hint: "Typ a štítky se upravují v hlavičce při editaci textu."
   props_actions_draft: "[p] publikovat  [s] naplánovat  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
   props_actions_scheduled: "[p] publikovat hned  [s] přeplánovat  [n] zrušit plán  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
   props_actions_published: "[u] stáhnout z webu  [t] oznámit (%{network})  [c] připnout/odepnout  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
   props_actions_published_plain: "[u] stáhnout z webu  [c] připnout/odepnout  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
+  props_action_versions: "[v] starší verze  "
+  versions_none: "Tenhle post zatím žádnou starší verzi nemá — odkládá se při každé editaci."
+  versions_heading: "Co příspěvek %{slug} říkal před posledními uloženími:"
+  versions_media_note: "Vrací se jen text; obrázky se neverzují, takže stará kopie příspěvku může zmiňovat ten, který post už nemá."
+  versions_menu_hint: "↑↓ pohyb · Enter obnovit verzi · Esc zpět"
+  versions_prompt: "Kterou verzi vrátit? [1-%{count}, Enter zruší]: "
+  versions_unknown: "Verze s tímhle číslem není."
+  versions_confirm: "Současný text se taky odloží jako verze, takže je to vratné. Obnovit? [a/N] "
+  versions_restored: "Obnoveno: %{path}"
   props_unknown_draft: "Nerozumím, zkus p / s / r / x."
   props_unknown_scheduled: "Nerozumím, zkus p / s / n / r / x."
   props_unknown_published: "Nerozumím, zkus u / t / c / r / a / x."
@@ -367,6 +440,7 @@ cli:
   addresses_menu_hint: "↑↓ pohyb · Enter zrušit adresu · Esc zpět"
   addresses_pick_prompt: "Číslo adresy ke zrušení (cokoliv jiného = zpět): "
   addresses_taken: "— adresu převzal jiný post, tohle přesměrování nikdy nenastane"
+  addresses_taken_draft: "— adresu zabral draft, přesměrování zatím funguje; převezme ji až jeho publikace"
   addresses_unusable: "— nepoužitelné, čekám \"rok/slug\""
   addresses_drop_confirm: "Zrušit %{address}? Ten odkaz tím přestane fungovat natrvalo. [a/N] "
   addresses_dropped: "🔗 %{address} zrušeno — už nikam nepřesměrovává."
@@ -384,12 +458,25 @@ cli:
   rename_go: "Přejmenovat? [a/N] "
   renamed_label: "Přejmenováno: %{slug}"
 
+poster:
+  # Co se autor dozví, když oznámení neodešlo. Je to výsledek něčeho, co
+  # právě udělal — stisku [t] nebo publikace — takže to čte člověk, v CLI,
+  # ve svém jazyce. Diagnostika pod tím (HTTP kódy, text výjimky) zůstává
+  # anglicky: ta je pro toho, kdo se na to má podívat, a přeložený stavový
+  # řádek se nikomu nehledá.
+  no_mastodon_token_post: "MASTODON_ACCESS_TOKEN není nastavený, toot se neodeslal."
+  no_mastodon_token_delete: "MASTODON_ACCESS_TOKEN není nastavený, toot se nesmazal."
+  no_bluesky_password_post: "BLUESKY_APP_PASSWORD není nastavené, oznámení na Bluesky se neodeslalo."
+  no_bluesky_password_delete: "BLUESKY_APP_PASSWORD není nastavené, oznámení na Bluesky se nesmazalo."
+  stats_fetch_failed: "Načtení statistik selhalo (%{key}): %{message}"
+
 redirect:
   moved: "Tenhle příspěvek se přestěhoval:"
 
 cron:
   no_scheduled_due: "Žádný naplánovaný post není na řadě."
   published_scheduled: "Publikován naplánovaný post '%{slug}' (datum %{date})."
+  unlisted_not_announced: "Post '%{slug}' je nezalistovaný, oznámení se neposílalo."
   publishing_scheduled: "Publikuji naplánované posty (%{count})"
   publish_failed: "❌ '%{slug}' se nepodařilo publikovat: %{error}. Ostatních postů na řadě se to nedotklo; po opravě se publikuje v dalším běhu."
   announce_failed: "⚠️  '%{slug}' je publikovaný, ale oznámení selhalo — post je venku a nic na něj neodkazuje, a samo se to znovu nepokusí. Zkontroluj token a oznam ho ručně: ./blog.sh toot (nebo ./blog.sh bluesky)."
@@ -449,8 +536,10 @@ import:
   scanned: "přečteno položek: %{count}…"
   dry_run_running: "Čtu %{label} — zatím se nic nezapisuje…"
   keep_permalinks_prompt: "Poběží tenhle web na STEJNÉ doméně jako starý blog? Pokud ano, každý post si podrží starou adresu jako přesměrování. [a/N] "
-  would_write: "Zapsalo by se postů: %{count}; médií ke stažení: %{media}."
+  would_write: "Zapsalo by se postů: %{count}; médií v nich: %{media}."
   media_not_verified: "Náhled nestahuje — kolik médií doopravdy dorazí, řekne až ostrý běh."
+  media_reused: "Z toho %{count} archiv už má a bere si je z něj, ne ze zdroje."
+  media_superseded: "Stažených souborů, které už neodpovídají kopii v archivu: %{count} — zahodily se, archiv si nechává vlastní bajty."
   written: "Zapsáno postů: %{count}, souborů médií: %{media}."
   sample_slugs: "Prvních několik slugů:"
   skipped: "  přeskočeno (%{reason}): %{count}"
@@ -496,7 +585,6 @@ import:
     quote: "citace"
     empty: "žádný použitelný obsah"
     attachment: "příloha, ne post"
-    page: "stránka, ne post"
     not_a_post: "není post"
     trashed: "v koši"
     boost: "boost"
@@ -517,16 +605,27 @@ import:
     bad_date: "nepodařilo se přečíst řádek DATE — Movable Type píše MM/DD/RRRR HH:MM:SS, AM/PM volitelně"
     misaligned_row: "řádek nesedí na hlavičku — dřív na řádku zůstala otevřená uvozovka"
     unparsed: "archivovanou stránku nešlo přečíst jako post"
+    site_furniture: "vlastní vybavení webu — výpis (_index, home), feed, 404 — ne stránka s obsahem"
   # Postscripty adapterů — poznámky pod náhledem a souhrnem. Skriptová cesta
   # (migrate_*.rb) je vypisuje schválně anglicky, viz lib/import/cli.rb.
   note:
+    pages_imported: "Stránek se přeneslo %{count} a leží na %{paths}. Zatím na ně nic na webu neodkazuje — menu se odvozuje z typů obsahu, dokud neřekneš jinak, takže je přidej pod `nav:` v config/site.yml, jestli tam patří."
+    pages_and_more: " a dalších %{count}"
     ssg_images_freed: "Obrázků uvnitř řádku textu, kde je post neumí ukázat: %{count} — každý dostal vlastní řádek, a obrázek, který byl jen ozdobou odkazu, se stal jeho textem."
     ssg_liquid_links_dropped: "Odkazů adresovaných přes Liquid ({{ site.repository }}, {% link %}, {% post_url %}): %{count} — taková adresa mimo Jekyll nic neznamená. Slova zůstala, adresa šla pryč; lepší než odkaz mířící na stránku tohohle blogu, která tu nikdy nebyla."
+    ssg_media_missing: "Obrázků, které jmenují soubor, jenž ve stromu není: %{count} — každý si v postu podržel místo, alt text i popisek a míří na chybějící jméno. Chybí jen samotný soubor; build to bude hlásit, dokud ho do složky médií postu nedodáš."
+    ssg_slug_collisions: "Adres, o které se hlásí víc než jeden soubor: %{count} — strom z Huga, který si nechal plochý post i page bundle, co z něj vyrostl, nebo tentýž článek podaný dvakrát. Naimportovaly se všechny a ty pozdější dostaly na konec „-2“, takže nic nechybí; ty dvojice si projdi a nechtěnou smaž."
+    ssg_author_dropped: "Postů, které ve frontmatteru uvádějí autora: %{count} — tenhle engine je záměrně jednoautorský a pole pro autora nemá, jméno se tedy nepřeneslo. Jestli v archivu leží texty někoho jiného, uveď ho před publikací v textu."
     substack_paid: "Postů jen pro předplatitele Substacku: %{count} — naimportovány celé (export je tvůj) a označené štítkem „substack-paid“, ať je před publikací najdeš."
     facebook_crossposts: "Crosspostů z jiných platforem (Twitter, Posterous, …): %{count} — přeskočeny, ať nezdvojují importy těch platforem. FACEBOOK_CROSSPOSTS=1 je vezme."
     feed_ampersands_escaped: "Samostatných znaků „&“, kvůli kterým soubor nebyl platné XML: %{count} — doplněny na &amp;, aby šel vůbec přečíst. Text uvnitř CDATA, kde jsou těla postů, zůstal přesně tak, jak byl vyexportovaný."
     feed_controls_dropped: "Řídicích znaků, které XML nepřipouští: %{count} — vypuštěny, aby šel soubor přečíst."
     feed_unmapped: "Postů bez použitelné původní adresy: %{count} (holé permalinky „?p=123“ mají identitu v query stringu) — naimportovány bez přesměrování."
+    feed_unmapped_pages: "Stránek bez použitelné původní adresy: %{count} (holé permalinky „?page_id=12“ mají identitu v query stringu) — naimportovány bez přesměrování."
+    feed_pages_home: "Stránek, které už leží na adrese, kterou měly na starém webu: %{count} — přesměrování nepotřebují, při stěhování na stejnou doménu jim odkazy fungují dál tak, jak jsou."
+    feed_pages_reserved: "Stránek, které dorazily na adresy, které si engine drží pro sebe: %{count} (%{paths}) — dokud je nepřejmenuješ, build je nepostaví, takže je takhle nedávej do `nav:`."
+    feed_dropped: "Z těl postů vypadl obsah, pro který schéma bloků nemá tvar: %{listed}. Obvykle jde o embedy a formuláře — jestli post to video potřebuje, vrať odkaz ručně."
+    feed_linked_images: "Obrázků obalených odkazem, který obrázkový blok neunese: %{count} — obrázky dorazily, adresy, kam mířily, ne."
     ghost_scheduled: "Postů naplánovaných v Ghostu: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
     livejournal_nonpublic: "Zápisků jen pro přátele nebo soukromých: %{count} — dorazily jako drafty, veřejné nikdy nebyly."
     medium_responses: "Postů vypadajících jako reakce pod cizími články: %{count} — dorazily jako drafty k revizi."
@@ -578,7 +677,7 @@ doctor:
   site_yml_syntax: "config/site.yml není platné YAML: %{message}."
   site_yml_unreadable: "config/site.yml existuje, ale nejde přečíst: %{message}."
   site_yml_unreadable_fix: "Zkontroluj vlastníka a práva souboru (ls -l config/site.yml). Obvykle pomůže: chmod 644 config/site.yml — a pokud soubor vlastní root po průvodci spuštěném přes sudo, taky chown."
-  site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek."
+  site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek. Když ten řádek vypadá v pořádku, příčina je jinde — nejčastěji zakomentovaná hlavička sekce, pod kterou zůstaly její klíče, nebo dřív neuzavřená uvozovka."
 
   identity_ok: "Identita webu je vyplněná."
   key_missing: "V config/site.yml chybí %{key}."
@@ -602,7 +701,25 @@ doctor:
   timezone_unknown: "site.timezone \"%{zone}\" není zóna, kterou tenhle stroj zná."
   timezone_unknown_fix: "Použij název podle IANA, třeba Europe/Prague nebo America/New_York (viz /usr/share/zoneinfo), nebo UTC. Překlep by tiše posunul datum u každého postu."
 
+  approval_ok: "Komentáře se moderují — zveřejní se jen odpovědi, kterým dáš hvězdu."
+  approval_boolean: "comments.approval je on (nebo yes), což YAML čte jako booleovskou hodnotu, ne jako režim."
+  approval_boolean_fix: "Napiš režim jménem: comments.approval: fav. (off a no se rozumí, protože můžou znamenat jen jedno.)"
+  approval_unknown: "Neznámá hodnota comments.approval %{value} — sestavení ji odmítne."
+  approval_unknown_fix: "Možnosti jsou jen dvě: \"fav\" (zveřejnit odpovědi, kterým jsi dal hvězdu) a \"off\" (zveřejnit všechny)."
+  approval_key_unknown: "V config/site.yml je sekce comments:, ale nic v ní, co by moderace četla (je tam: %{keys}) — takže se zveřejňuje každá odpověď, bez moderace."
+  approval_key_unknown_fix: "Ten klíč se jmenuje comments.approval a hodnota \"fav\" zveřejní jen odpovědi, kterým jsi dal hvězdu. Jestli jsi moderovat nechtěl, tu sekci radši smaž: klíč, který nikdo nečte, není totéž co vypnutá moderace, a poznáš to až podle odpovědi na webu, kterou jsi neschválil."
+  approval_no_network: "comments.approval je zapnuté, ale není nastavená síť, kam se posty oznamují."
+  approval_no_network_fix: "Moderace vybírá z odpovědí na oznamovací post. Nastav mastodon: nebo bluesky:, nebo dej comments.approval: off."
+  approval_needs_cron: "Moderované komentáře se na web dostanou jedině přes scripts/refresh-sidebar.sh."
+  approval_needs_cron_fix: "Přidej ho do cronu (*/30 * * * * /cesta/k/blog.sh/scripts/refresh-sidebar.sh). Bez něj web drží naposledy nahrané komentáře a nově schválený se nikdy neobjeví."
+  approval_probe_ok: "Token vidí, kterým odpovědím jsi dal hvězdu."
+  approval_probe_nothing: "Zatím není nic oznámené, takže nebylo na čem token vyzkoušet."
+  approval_probe_blind: "Síť odpovídá, aniž by řekla, kterým odpovědím jsi dal hvězdu — všechna vlákna na webu by vyšla prázdná."
+  approval_probe_blind_fix: "Mastodonní token potřebuje kromě write:statuses i rozsah read:statuses — vytvoř ho znovu v Nastavení -> Pro vývojáře. U Bluesky zkontroluj, že BLUESKY_APP_PASSWORD je app password pro handle z config/site.yml."
+  approval_probe_failed: "Nepodařilo se ověřit, jestli token vidí tvoje hvězdy: %{message}"
   no_network: "Není nastavená žádná síť pro komentáře — posty se nikam neoznamují."
+  credentials_no_network: "%{vars} je v env.sh nastavený, ale žádná sekce sítě nakonfigurovaná není — takže se nic neoznamuje a nečtou se žádné komentáře."
+  credentials_no_network_fix: "Token, který nemá sekci, kde by se použil, obvykle znamená, že sama hlavička je pořád zakomentovaná: zkontroluj, že %{sections} v config/site.yml je živý řádek, ne komentář, a že pod ní sedí její klíče. Když web opravdu nikam neoznamuje, smaž ten údaj z env.sh."
   both_networks: "Jsou nastavené obě sekce, mastodon: i bluesky:, a sestavení to odmítá."
   both_networks_fix: "Komentáře i oznamovací post žijí přesně na jedné síti. Tu, kterou nechceš, zakomentuj."
   mastodon_instance_shape: "mastodon.instance je \"%{value}\" — patří tam jen jméno serveru, bez https:// a bez cesty."
@@ -630,6 +747,19 @@ doctor:
   fonts_ok: "Každý soubor s písmem, který config jmenuje, je v assets/fonts/."
   fonts_missing: "Config je jmenuje, ale v assets/fonts/ nejsou: %{files}."
   fonts_missing_fix: "Web se vykreslí náhradním písmem, což vypadá přesně jako nefunkční config. Buď soubor dodej, nebo ho vyhoď z fonts.faces."
+
+  extra_css_ok: "Dalších stylopisů: %{count}, každý je cesta na tomhle webu a existuje."
+  nav_ok: "Menu: položek %{count}, každá míří na něco existujícího."
+  nav_tag_missing: "Položka menu „%{label}“ míří na štítek %{tag}, který nemá žádný post."
+  nav_tag_missing_fix: "Jeho výpis se nestaví, takže je to 404 ve vlastním menu. Obvykle byl poslední post s tím štítkem stažen z webu nebo přeštítkován. Oprav štítek, nebo položku vyhoď."
+  nav_url_missing: "Položka menu „%{label}“ míří na %{url}, kde tenhle web nic nevydává."
+  nav_url_missing_fix: "Obvykle post, který se po napsání menu přejmenoval nebo smazal. Nasměruj ji tam, kde něco je, nebo ji vyhoď — adresy mimo tenhle web se tu neřeší, na ty je check --online."
+  nav_url_relative: "Položka menu „%{label}“ míří na %{url}, což není adresa, ale jméno, které se čte proti stránce, na které zrovna stojí."
+  nav_url_relative_fix: "Z titulní strany to možná i funguje, z postu to skončí vedle postu. Napiš to s lomítky: %{url}"
+  extra_css_remote: "site.extra_css jmenuje %{value}, což je na cizím serveru."
+  extra_css_remote_fix: "Každá stránka nese style-src 'self', takže to prohlížeč zahodí a web se vykreslí neoblečený — bez chyby kdekoli, kde bys ji viděl. Zkopíruj soubor do assets/ a napiš ho jako /assets/css/<jméno>.css."
+  extra_css_missing: "site.extra_css jmenuje %{value}, což ve stromu není."
+  extra_css_missing_fix: "Stránka si o něj řekne, dostane 404 a vykreslí se bez něj — vypadá to přesně jako stylopis, který nic nedělá. Buď soubor dodej, nebo ten řádek vyhoď."
 
   widgets_ok: "Widgetů v postranním panelu: %{count}, všechny vyplněné."
   widget_shape: "Widget %{name} není sada nastavení."
@@ -683,6 +813,80 @@ doctor:
 # čerstvé instalaci je „současná hodnota" jen výplň ze šablony, takže tvar
 # ukázat neumí. Jestli hodnotu někdo doopravdy nastavil, říká řádek „Teď:"
 # vs. „Návrh:" (wizard.prompt_with_current / prompt_with_suggestion).
+check:
+  progress_online: "Ptám se webu: %{done}/%{total}"
+  running_online: "Kontroluju i odkazy mimo tenhle web — chvíli to potrvá."
+  online_ok: "Všechny odkazy ven pořád odpovídají. Zkontrolováno: %{count}."
+  link_gone: "%{slug}: %{url} je pryč (%{reason})."
+  link_gone_fix: "Hlásí se jen hostitelé, kteří už neexistují, a stránky s 404/410 — timeout nebo 5xx znamená „teď ne“ a nechává se být. Oprav odkaz, vyhoď ho, nebo ho namiř do archivu Wayback Machine."
+  reason_no_host: "takový hostitel neexistuje"
+  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, nic jiného."
+  heading: "Kontrola archivu"
+  progress: "Čtu posty: %{done}/%{total}"
+  no_posts: "Zatím tu není co kontrolovat, archiv je prázdný."
+  all_clear: "Uvnitř archivu je vše v pořádku — postů: %{posts}, média, odkazy i přesměrování sedí."
+  series_similar: "Série „%{a}“ (postů: %{count_a}) a „%{b}“ (postů: %{count_b}) se liší jen o pár znaků — překlep?"
+  series_similar_fix: "Jestli jde o tutéž sérii, sjednoť zápis `series:` v postech — rozdílný zápis zakládá dvě série a dělí díly mezi ně."
+  media_missing: "%{slug}: soubor %{file} v adresáři médií chybí."
+  media_missing_fix: "Post si o něj říká a na stránce zůstane díra. Obvykle import, kterému selhalo stahování — buď soubor dodej, nebo ho z postu vyhoď."
+  image_degenerate: "%{slug}: obrázek %{file} má %{width}x%{height} a vůbec se nevykreslí."
+  image_degenerate_fix: "Cokoli 1px a menší se bere jako sledovací pixel a zahodí se I S POPISKEM, takže stránka tiše přijde o obojí. Vyměň obrázek, nebo blok smaž."
+  link_dead: "%{slug}: odkazuje na %{url}, kde na tomhle webu nic není."
+  link_dead_fix: "Obvykle permalink zbylý po importu, nebo slug přejmenovaný dřív, než si přejmenování začalo držet přesměrování. Oprav odkaz, nebo cílovému postu přidej redirect_from."
+  media_orphan: "K adresáři médií %{dir} nepatří žádný post."
+  media_orphan_fix: "Zbytek po smazaném nebo přejmenovaném postu, případně po importu, který běžel dvakrát. Nic na něj neodkazuje; smaž si ho sám, až se na něj podíváš."
+  media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
+  media_stray_fix: "Zbylo po obrázku, který zdroj mezi importy odebral nebo přejmenoval. Post na něj neodkazuje; až se podíváš, smaž ho sám."
+  redirect_collision: "Na adresu %{origin} si dělá nárok víc postů: %{slugs}."
+  redirect_collision_fix: "Vyhraje ten, který se vysází později, a čtenáři ostatních skončí u něj. Nech ten záznam jen u jednoho postu."
+  and_more: "...a dalších %{count} téhož druhu, nevypsaných."
+  summary: "Problémů: %{errors}, věcí ke kouknutí: %{warnings}."
+  summary_clean: "Archiv je v pořádku."
+
+stats:
+  # Odmítnutí, která vyhazuje lib/post_stats.rb na cronové cestě. K člověku
+  # se dostanou dvakrát — jako řádek v cronovém mailu a vložená doprostřed
+  # věty, kterou o tokenu píše doctor --online. Na webu, který není
+  # anglicky, z toho byla půlka věty v cizím jazyce.
+  no_mastodon_token: "comments.approval je zapnuté, ale MASTODON_ACCESS_TOKEN není nastavený — bez něj API nikdy neřekne, kterým odpovědím jsi dal hvězdu."
+  no_bluesky_password: "comments.approval je zapnuté, ale BLUESKY_APP_PASSWORD není nastavené — bez něj API nikdy neřekne, které odpovědi se ti líbí."
+  blind_answer: "comments.approval je zapnuté, ale odpověď ze sítě %{network} neřekla, které posty jsou označené hvězdou — požadavek nebyl přihlášený, nebo tokenu chybí read:statuses. Odmítám to místo toho, abych přes už schválené komentáře zapsal prázdné vlákno."
+  unknown_option: "Neznámý přepínač: %{option}. stats bere jen --json, nic jiného."
+  no_posts: "Zatím není co počítat."
+  heading_archive: "Archiv"
+  heading_years: "Po letech"
+  heading_types: "Čím jsou"
+  heading_words: "Slova"
+  heading_tags: "Štítky"
+  heading_media: "Média"
+  heading_sources: "Odkud to je"
+  archive_line: "postů: %{total} — z toho publikovaných %{published}, rozepsaných %{drafts}, naplánovaných %{scheduled}, stránek %{pages}"
+  span_line: "%{first} – %{last}, dnů: %{days}"
+  busiest_line: "nejvíc toho přibylo v roce %{year} (postů: %{count})"
+  words_line: "slov celkem: %{total}, průměrně na post: %{mean}, uprostřed: %{median}"
+  longest_line: "nejdelší: %{slug} (slov: %{words})"
+  reading_line: "přečíst celý archiv trvá %{hours} hodiny"
+  reading_line_minutes: "přečíst celý archiv trvá minut: %{minutes}"
+  media_none: "žádná média"
+  tags_line: "různých: %{unique}, na post %{per_post}"
+  media_line: "souborů: %{files}, %{size}, postů s médii: %{posts}"
+  media_referenced_line: "souborů, o které si posty říkají: %{referenced}, postů s médii: %{posts} — media.nosync tu není"
+
+export:
+  heading: "Zapisuju archiv do %{path}"
+  progress: "Zapisuju posty: %{done}/%{total}"
+  unknown_option: "Neznámý přepínač: %{option}. export bere adresář, --no-drafts, --dry-run a --force."
+  target_not_empty: "%{path} není prázdný."
+  target_not_empty_fix: "Zadej prázdný adresář, nebo zopakuj s --force a zapíše se vedle toho, co tam už je. Nic se v žádném případě nemaže."
+  dry_run_notice: "Nanečisto: všechno se spočítá, nic se nezapíše."
+  no_drafts_notice: "Rozepsané zůstávají doma — ven jdou jen publikované posty a stránky."
+  no_posts: "Zatím není co exportovat."
+  summary: "Zapsáno do %{path} — postů: %{posts}, rozepsaných: %{drafts}, stránek: %{pages}, souborů médií: %{media} (%{size})."
+  summary_dry: "Zapsalo by se do %{path} — postů: %{posts}, rozepsaných: %{drafts}, stránek: %{pages}, souborů médií: %{media} (%{size})."
+  fallback_note: "Bloků, pro které markdown nemá zápis: %{count} — zapsaly se jako HTML (%{kinds}). Každý engine, který HTML propouští, je vykreslí, a tenhle engine je přečte zpátky celé — každý si nad sebou nese vlastní zápis v komentáři, kterého si nikdo jiný nevšimne."
+  collisions: "Přejmenovaných souborů: %{count} — aby se nepřepsaly navzájem; dva posty chtěly stejné jméno."
+  next_steps: "Rozvržení je jekyllovské: _posts/, _drafts/, stránky v kořeni, média pod assets/. Hugo, Eleventy i Astro ho přečtou po jednom řádku konfigurace; ./import.sh ho přečte tak, jak je."
+
 setup:
   intro: "Zeptám se na nastavení, která web potřebuje k provozu, odpovědi cestou ověřím a zapíšu je do config/site.yml a env.sh."
   intro_skip: "Každou otázku jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."
@@ -706,7 +910,7 @@ setup:
   e_timezone: "Tenhle stroj zónu „%{zone}“ nezná. Zóny se jmenují Světadíl/Město, anglicky — Europe/Prague, ne Praha ani CEST; úplný seznam je v /usr/share/zoneinfo."
 
   q_base_url: "Adresa webu"
-  h_base_url: "Adresa, na které bude web k vidění, třeba https://mujweb.cz — bez lomítka na konci. Staví se z ní RSS, sitemapa i náhledy při sdílení. Zapíše se do config/site.yml i env.sh naráz, ať se ty dvě kopie nerozejdou."
+  h_base_url: "Adresa, na které bude web k vidění, třeba https://mujweb.cz — bez lomítka na konci. Staví se z ní RSS, sitemapa i náhledy při sdílení; zapíše se do config/site.yml i env.sh naráz."
   e_base_url: "Tohle není URL — musí začínat na http:// nebo https:// a obsahovat jméno serveru."
   e_base_url_slash: "Smaž koncové lomítko, jinak budou v generovaných odkazech dvě."
 
@@ -741,6 +945,12 @@ setup:
   password_skipped: "Bez hesla aplikace. Web funguje, jen nikdy nic neoznámí, dokud ho nedoplníš do env.sh."
 
   section_deploy_intro: "Hotový web je obyčejná složka souborů; tady se vybírá, kam ji ./blog.sh rebuild po každé změně nahraje. Řiď se tím, kde ti web poběží — a jestli to ještě nevíš, nech první možnost. Změnit to jde kdykoli, stačí ./setup.sh spustit znovu."
+  q_page_size: "Kolik postů na jednu stránku výpisu?"
+  h_page_size: "Ptám se jen teď, při prvním nastavení. Stránkování je ukotvené od nejstaršího postu, takže uložený odkaz na starou stránku platí napořád — změna po nasazení ale přečísluje všechny hranice a přepíše každou stránku archivu."
+  e_page_size: "Celé číslo větší než nula."
+  section_scheduler: "Plánované publikování"
+  section_scheduler_intro: "Naplánovaný post nevydá ./blog.sh sám od sebe — musí ho někdo v ten čas spustit. Když chceš ./blog.sh schedule používat, přidej si do cronu tenhle řádek (nic se tím nenasazuje, úloha jen kouká, jestli něco dozrálo, a hned končí):"
+  scheduler_note: "Bez toho řádku post počká ve frontě a nikdo ho nevydá. Doctor to pozná, ale až budeš mít něco naplánovaného. Postranní panel má vlastní úlohu, refresh-sidebar.sh — podrobnosti v docs/operations.md."
   q_backend: "Kam má hotový web putovat?"
   backend_none: "Zatím nikam — psát a prohlížet lokálně, rozhodnout se později"
   backend_surfer: "Cloudron Surfer — máš vlastní Cloudron a v něm appku Surfer"
@@ -814,6 +1024,8 @@ style:
   menu_social: "Sociální sítě — řádek ikon v patičce a ověření na Mastodonu"
   menu_widgets: "Postranní panel — tooty, Pixelfed, commity, Bluesky, jakýkoli RSS feed"
   menu_fonts: "Písma — písmo a velikost názvu a popisu na hlavičce"
+  menu_layout: "Rozvržení — které části stránky vůbec jsou, a vlastní stylopis"
+  menu_nav: "Menu — co stojí v pruhu pod bannerem"
   menu_analytics: "Měření návštěvnosti — skript, jestli nějaký máš"
 
   palette_intro: "Paleta je sedm barev na režim. Všechno ostatní — pozadí karet, barvy při najetí myší, vyhledávací pole — se z nich při sestavení dopočítá samo."
@@ -860,8 +1072,10 @@ style:
   e_hex: "Barva vypadá jako #1da1f2 nebo #fff."
 
   banner_current: "Obrázek hlavičky je teď %{path}."
-  q_banner_file: "Cesta k novému obrázku hlavičky (Enter nechá stávající)"
-  h_banner_file: "Jakékoli PNG, JPEG, GIF nebo WebP. Zkopíruje se na místo a změří, takže rozměry v configu budou sedět se souborem."
+  q_banner_file: "Obrázek hlavičky — jméno souboru v incoming/ (Enter nechá stávající)"
+  q_banner_src: "Pod jakým jménem ho uložit?"
+  h_banner_src: "Enter nechá současné. Podle vybraného souboru by to bylo %{suggested} — jméno je volba (banner.src), ne dané pravidlo."
+  h_banner_file: "Dej ho do incoming/ a napiš jen jméno. PNG, JPEG, GIF nebo WebP. Dělej ho zhruba dvakrát širší, než se zobrazuje — jde přes celou šířku a na hustém displeji by byl jinak měkký; dodávaný má 1880x600."
   banner_not_found: "%{path} není soubor, hlavička zůstala beze změny."
   banner_copied: "✅ Zkopírováno do %{path}."
   banner_pending: "✅ Nainstaluje se jako %{path}, až zápis potvrdíš."
@@ -914,7 +1128,7 @@ style:
   widget_heading_rss: "Jinde"
   q_widget_heading: "Nadpis nad widgetem"
   q_widget_account_id: "Číselné ID účtu"
-  h_widget_account_id: "Číslo, ne @jméno. Nejsnáz ho najde ./setup.sh s vyplněným tokenem — widget pak nabídne sám. Ručně: otevři v prohlížeči https://tvoje-instance/api/v1/accounts/lookup?acct=tvojejmeno a opiš hodnotu „id“."
+  h_widget_account_id: "Číslo, ne @jméno. Nejsnáz: ./setup.sh s vyplněným tokenem ho najde sám. Ručně: otevři https://tvoje-instance/api/v1/accounts/lookup?acct=tvojejmeno a opiš hodnotu „id“."
   q_widget_username: "Uživatelské jméno na GitHubu"
   h_widget_username: "Jen jméno, tak jak je v adrese tvého profilu."
   q_widget_feed_url: "Adresa feedu"
@@ -948,6 +1162,58 @@ style:
   list_remove: "Odebrat"
   list_keep: "Nechat, jak je"
   q_list_action: "Přidat, odebrat, nebo nechat být?"
+  nav_derived: "Menu se teď odvozuje z obsahu: Vše a k tomu položka za každý druh postů, které píšeš."
+  nav_is_off: "Žádný pruh s menu tu není."
+  nav_current: "Menu teď:"
+  nav_turn_off: "Žádné menu"
+  nav_off_note: "Pruh je pryč. Nic jiného se nehnulo — výpisy štítků a typů se pořád staví a pořád se na ně dá dostat."
+  nav_replaces_derived: "Pozor: první přidaná položka se k odvozenému menu nepřidá, nahradí ho. Přidej i ty, které chceš zachovat."
+  q_nav_action: "Přidat položku, odebrat, nebo menu nechat být?"
+  q_nav_label: "Co má být v položce napsáno?"
+  q_nav_kind: "Kam má vést?"
+  nav_kind_home: "Na titulní stranu"
+  nav_kind_tag: "Na výpis štítku"
+  nav_kind_page: "Na stránku"
+  nav_kind_url: "Jinam — na adresu, kterou napíšeš"
+  q_nav_tag: "Na který štítek?"
+  h_nav_tag: "Jméno štítku, ne adresa. Tvoje nejvytíženější: %{list}"
+  q_nav_page: "Na kterou stránku?"
+  q_nav_url: "Na jakou adresu?"
+  h_nav_url: "Cesta na tomhle webu (/about/), nebo celá adresa někam jinam."
+  nav_tag_unknown: "Štítek %{tag} nemá žádný post, jeho výpis se nestaví a položka by byla 404."
+  nav_url_unknown: "Na %{url} tenhle web nic nevydává, položka by byla 404."
+  q_nav_anyway: "Přidat ji přesto?"
+  q_layout_sidebar: "Postranní panel vpravo (bio, widgety, statistiky u postu)?"
+  q_layout_hero: "Vytáhnout první obrázek postu nad titulek?"
+  css_current: "Vlastní stylopisy, v pořadí načítání:"
+  q_css_action: "Přidat stylopis, odebrat, nebo nechat být?"
+  q_css_file: "Stylopis — jméno souboru v incoming/"
+  h_css_file: "Dej ho do incoming/ a napiš jen jméno; uloží se do assets/css/ a načte se až za stylopisem enginu, takže ho přebíjí. Jméno souboru, který už v assets/css/ je, se taky přijme."
+  css_missing_mark: "⚠️  soubor tam není"
+  css_not_found: "Soubor %{path} na disku není — prohlížeč ho prostě nedostane a web se vykreslí bez něj."
+  q_css_anyway: "Přidat ho přesto?"
+  file_will_go: "Uloží se jako %{path}."
+  file_copied: "Zkopírováno do %{path}."
+  incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je na místě, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně."
+  q_banner_claim: "Vlastní text přetisku pod bannerem"
+  h_banner_claim: "Enter nechá současný. Prázdné = použije se popis webu. Tady smí být <br> pro zalomení, což popis webu nesmí (jde i do meta a RSS)."
+  faces_current: "Vlastní fonty z assets/fonts/:"
+  q_faces_action: "Přidat font, odebrat, nebo nechat být?"
+  q_face_family: "Jméno rodiny, jak ho pak napíšeš do stacku"
+  h_face_family: "Například Playfair Display. Tímhle jménem se na font odkážeš v písmu názvu nebo popisu."
+  q_face_file: "Soubor fontu — jméno v incoming/ nebo v assets/fonts/"
+  h_face_file: "Dej ho do incoming/ a napiš jen jméno; uloží se do assets/fonts/. Nejlíp .woff2, projdou i .woff, .ttf a .otf. Jeden soubor na rodinu a řez, a musí nést znaky pro češtinu — latin-ext nebo plnou verzi."
+  q_face_weight: "Řez (nepovinné)"
+  h_face_weight: "Enter přeskočí. Třeba 400, nebo rozsah 400 700 — to je i výchozí, když nic nenapíšeš."
+  q_face_style: "Styl (nepovinné)"
+  h_face_style: "Enter přeskočí. Engine vezme jen normal, italic nebo oblique."
+  faces_missing_mark: "⚠️  soubor tam není"
+  faces_not_found: "Soubor %{file} v assets/fonts/ není — build ho pojmenuje a přeskočí, takže by se web vykreslil náhradním písmem."
+  q_faces_anyway: "Přidat ho přesto?"
+  css_remote: "Jen cesty na tomhle webu. Stránky nesou style-src 'self', takže stylopis z cizího serveru prohlížeč zahodí bez jediné hlášky."
+  nav_url_relative: "%{url} není adresa — bez lomítek to prohlížeč čte proti stránce, na které menu zrovna stojí."
+  q_nav_use_absolute: "Zapsat jako %{url}?"
+  h_nav_tag_empty: "Jméno štítku, ne adresa. Zatím není nic oštítkované, takže není co nabídnout."
   q_list_which: "Který chceš odebrat?"
   q_list_title: "Název odkazu"
   q_list_url: "Adresa, kam míří"

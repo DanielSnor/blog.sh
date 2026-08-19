@@ -177,8 +177,17 @@ comments and all -- and fills in the answers you give it, which is the
 same file you would have written by hand, minus the chance of a tab
 where a space belongs. It covers the `site` block, the comments network
 and the deploy target; `./style.sh` covers `banner`, `about`, `footer`,
-`social`, `colors`, `fonts` and `widgets`. Both are re-runnable and
+`social`, `colors`, `fonts`, `widgets` and `nav`. Both are re-runnable and
 neither takes anything away from editing the file directly.
+
+If you do edit it directly -- which is a first-class way to use this
+engine, not a fallback -- run **`./blog.sh doctor`** when you are done. It
+reads the file you just wrote and reports every problem in it at once,
+which is the half a hand edit does not get for free: an unclosed quote, a
+tab, a value in the wrong section, a token in `env.sh` with no section to
+use it. It is also the answer when a YAML error names a line that looks
+perfectly fine -- the parser stops where things stop fitting, which can be
+a long way from the mistake.
 
 The example is fully commented. The short version:
 
@@ -189,13 +198,26 @@ The example is fully commented. The short version:
   `widgets` (toots / pixelfed / commits / bluesky / rss, each
   independently), `mastodon` **or** `bluesky` (comments + auto-announce
   -- exactly one, see [step 8](#8-comments-network-optional-mastodon-or-bluesky)),
+  `comments` (which replies get published -- same step),
   `colors` (7 keys per light/dark mode -- omitted keys fall back to the
   built-in blue palette; whole palettes ship in `config/palettes.yml`, and
   `./style.sh` shows you a preview -- light and dark side by side -- and
   writes the one you pick into this section, so you never have to choose
   fourteen hex values by hand or blind), `fonts` (the banner title's and claim's font
   stack and size, plus any `.woff2` you put in `assets/fonts/` -- omitted
-  keys fall back to the built-in JetBrains Mono at 45px/20px).
+  keys fall back to the built-in JetBrains Mono at 45px/20px),
+  `nav` and `layout` (what the pages are made of --
+  [below](#the-menu-the-regions-and-a-stylesheet-of-your-own)),
+  `publishing.slots` (the times posts usually go out, so scheduling stops
+  asking for a date --
+  [operations.md](operations.md#publishing-slots)),
+  `media` (`convert_heic` and `strip_location`, both discussed under
+  [Writing from a phone](operations.md#writing-from-a-phone)), and `seo`
+  (`block_ai_crawlers` writes a maintained list of the crawlers that
+  collect text to train on into `robots.txt`, `robots_extra` is appended
+  verbatim -- off by default, because wanting to be findable in an answer
+  somebody gets from a machine is a legitimate position and the engine
+  does not take it on your behalf either way).
 
 `social` is the row of icons in the footer. Each entry takes `name`,
 `url` and either `icon` (a name from the built-in set) or `icon_svg`
@@ -254,6 +276,54 @@ into `assets/fonts/`, declare it under `fonts.faces`, and the header is
 in your own type; say nothing and it stays self-hosted JetBrains Mono at
 45px/20px. Narrow screens scale from whatever size is configured, so
 there is no second pair of keys to keep in sync.
+
+### The menu, the regions and a stylesheet of your own
+
+Four more settings decide what the pages are *made of* rather than what
+they look like. Each has a default that leaves a site saying nothing
+exactly as it was, so none of them has to be touched.
+
+`nav:` replaces the menu bar the build otherwise derives from the content
+types that actually have posts. An entry takes a `label` plus either a
+`tag` (a tag's slug, which becomes `/tag/<slug>/`) or a `url` taken as
+written -- so an item can point at a post, at a generated page, or off the
+site entirely:
+
+```yaml
+nav:
+  - { label: "Home", url: "/" }
+  - { label: "Photographs", tag: "photo" }
+```
+
+An entry missing either half is skipped rather than rendered as an empty
+link. An empty list is a decision rather than a mistake: the menu then
+renders nothing at all -- no bar, no toggle -- which is also how a site
+turns the menu off, so there is no second key for that.
+
+`layout.sidebar` and `layout.hero` switch whole regions on and off. The
+sidebar is on unless you say otherwise; the hero -- the post's first
+usable image lifted out of the text and run full width above the title --
+is off unless you ask, because it reshapes every post page it touches and
+a site is entitled to keep the shape it has. A single post can still ask
+for one either way with `hero:` in its own header (see
+[operations.md](operations.md#writing-and-publishing)). They are switches
+for regions, not for how a region looks: what things look like belongs in
+a stylesheet, and a key per visual property would turn this file into a
+stylesheet written in YAML.
+
+`site.extra_css` is that stylesheet -- one path, or a list of them, loaded
+after the site's own, so a skin can live in a file of yours instead of in
+an edited engine file with the pull conflicts that implies
+([step 9](#9-updating-the-engine)). Local paths only
+(`/assets/css/mine.css`): every page carries `style-src 'self'`, so a
+stylesheet on another host would be discarded by the browser without an
+error you would ever see -- the page would simply render undressed -- and
+the build refuses it out loud instead.
+
+`site.page_size` is how many posts a listing page holds; 10 without it.
+Worth setting once, before the first deploy: pagination is anchored to the
+oldest post precisely so page contents never change as new posts arrive,
+and changing the size later renumbers every page in the archive.
 
 ## 3. Configure the environment -- `env.sh`
 
@@ -464,7 +534,11 @@ variant:
 ## 8. Comments network (optional): Mastodon or Bluesky
 
 Every published post is announced on the configured network, and
-replies to that announcement are the post's comments. Configure
+replies to that announcement are the post's comments. A reply's
+pictures appear under its words -- thumbnails linking out to the full
+image, loaded from the commenter's own network the same way their
+avatar already is; a reply marked sensitive keeps its pictures to
+itself. Configure
 **exactly one** of the two -- the build refuses a config with both,
 since a discussion split across two networks serves nobody. Without
 either section, everything else still works; publishing just skips the
@@ -496,6 +570,59 @@ announcement (logged, not an error).
    excerpt shrinks; title, link and hashtags never do), with the link
    and hashtags clickable. Comments are read from Bluesky's public
    AppView by the visitor's browser -- no token involved on the page.
+
+**Optional: publish only the replies you star.**
+
+By default every reply to the announcement appears under the article.
+`comments.approval: fav` in `config/site.yml` changes that to: a reply
+appears once *you* favourite it, from whatever Mastodon or Bluesky
+client you already use. Your own replies need no star. Everything else
+stays on the network and off the blog.
+
+```yaml
+comments:
+  approval: fav      # or "off" (the default)
+```
+
+**The moment you switch this on, every comment already on the site
+disappears.** Moderation publishes only what you have starred, and at
+that moment that is nothing -- a site with years of replies goes quiet
+in one rebuild. They come back one star at a time, so plan the switch
+for a moment when you can go and star the keepers right away, and run
+`./scripts/refresh-sidebar.sh --full` once afterwards to settle old
+posts on the spot instead of within the week.
+
+Three things have to be true for it to work, and `./blog.sh doctor`
+(add `--online` for the token check) says so when they aren't:
+
+1. **`scripts/refresh-sidebar.sh` has to be in cron** (see
+   [operations.md](operations.md#cron-sidebar-widgets-and-post-stats)).
+   "Did *I* favourite this?" is a question only an authenticated request
+   can ask, and the token can't be shipped to a browser -- so cron reads
+   the thread and writes `public/comments.json`, and the page renders
+   from that. Without that cron job nothing new ever appears.
+2. **On Mastodon the token needs `read:statuses`** alongside
+   `write:statuses`. Reissue it under Preferences → Development if yours
+   predates this: a token without it gets a perfectly good answer with
+   the `favourited` field left out of it, which reads as "approved
+   nothing". On Bluesky the existing app password is enough.
+3. **You have to go and star the comments worth keeping** -- see the
+   warning above the list.
+
+Worth knowing before switching it on:
+
+- Approval is not instant -- up to one cron interval, and for a post
+  older than ~90 days up to a week, since old posts are only refreshed
+  occasionally. `./scripts/refresh-sidebar.sh --full` does it now.
+- A favourite is public on both networks. Anyone can see which replies
+  you starred, and replies starred in the past count as approved.
+- The side effect nobody asks for and everybody gets: with the thread
+  already read server-side, the visitor's browser stops contacting the
+  network at all, and the page's CSP drops its `connect-src` grant to
+  it. Avatars are still loaded from the instance hosting them.
+- It keeps replies off the blog. It cannot remove them from the network,
+  where the thread stays public and this site still links to it. Block,
+  mute and report remain the tools for that.
 
 ## 9. Updating the engine
 

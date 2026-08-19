@@ -26,7 +26,7 @@ caption-deep.** The `/type/` listings need every post filed exactly
 once, and asking the author to pick a type on every post would be one
 more prompt that's usually inferable -- so the type is derived, with an
 explicit `type:` in the frontmatter as the override for the post that
-disagrees. The rules, measured against a 3281-post archive before
+disagrees. The rules, measured against a real archive before
 choosing: media (video > audio > image) win only while the post's text
 stays under 500 characters -- past that it's an article and the media
 are illustrations; a quote post is one that *opens* with a quote, so a
@@ -47,14 +47,13 @@ seven items was the budget.
 **The bar sizes itself instead of being sized for a label set.** That
 "budget" was a count, and a count is the wrong unit: the `document` type
 made it nine items, and a site that uses all of them ran its longest
-label under the search field -- measured at 906px (en), 927 (cs) and 899
-(de) against the 908 available, so one locale overflowed and the other
-two had single-digit slack. Anywhere between the mobile breakpoint and
-the full width, every locale did. Three rules replace the budget: the
-menu may wrap to a second row, the search box never shrinks or is
-overlapped, and the gap between items is 1.25rem rather than 1.875rem
-(eight gaps at nine items -- 80px, more than the whole overflow, without
-shortening a single label). A tenth type, a longer translation or a
+label under the search field -- measured, one locale overflowed at the
+full width and the other two had almost no slack, and anywhere between
+the mobile breakpoint and the full width every locale did. Three rules
+replace the budget: the menu may wrap to a second row, the search box
+never shrinks or is overlapped, and the gap between items is tighter --
+across eight gaps that recovers more than the whole overflow without
+shortening a single label. A tenth type, a longer translation or a
 different font now costs a taller bar rather than a hidden item.
 *Cost:* a denser menu, and a two-row bar in the narrow band where the
 longest locale still doesn't fit on one.
@@ -89,6 +88,16 @@ posts survive their source platform dying (the Twitter/Tumblr archives
 this engine was born from are full of dead CDN links). *Cost:* disk
 space, and migrations must download everything up front.
 
+**Every card in a listing says how long its post takes to read, including
+the ones that take under a minute.** Stars, boosts and comments come from
+an announcement, which on a real archive almost no post has -- so a meta
+row fed by those appeared on a handful of cards and read as a break in the
+listing, while a reading time is the one thing every post can report,
+which is what keeps the row (and the column of cards) constant. *Cost:* on
+an archive of short posts most cards carry the same three words -- a
+column that keeps its shape was judged worth more than a field that earns
+its place on every row.
+
 ## Publishing and comments
 
 **Comments are replies to an announcement post -- on exactly one
@@ -102,12 +111,69 @@ presence on the chosen network, and deleting the announcement deletes
 the discussion (which `unpublish` does deliberately, to never leave an
 announcement pointing at a dead URL).
 
+**Moderation, where there is any, is a star on the reply -- and it is
+off by default.** The engine had no answer to a reply written to wound:
+the thread was published whole, and the only recourse was on the
+network. `comments.approval: fav` inverts it -- a reply appears under
+the article once the author favourites it, from whatever client they
+already have on their phone. No queue, no dashboard, no second identity
+system: the moderation interface is the social app the comments already
+live in, and the approval is one tap in the place you were reading
+anyway. Two rules keep the result readable rather than merely filtered:
+the author's own replies need no star (nobody stars themselves, and
+without it half of every exchange would vanish), and a reply is only
+shown if everything between it and the announcement is shown too (an
+approved answer to a rejected comment answers nothing).
+
+*Costs, and they are real:*
+- **A favourite is public**, on both networks. Approving is also
+  endorsing in the eyes of anyone who looks, and every star handed out
+  over the years is retroactively an approval. A private signal
+  (Mastodon bookmarks, Bluesky's saved posts) would not carry that, and
+  is the obvious second mode if this one chafes.
+- **Comments stop being live.** The live thread was the justification
+  for the one client-side exception to *no third-party requests from
+  the visitor's browser* (below), and a moderated thread is no longer
+  live -- the page shows a curated subset either way -- so the exception
+  lapses with it: cron writes `comments.json` and the page reads it
+  from its own origin. What that changes, and what avatars still do, is
+  said once, there.
+- **The engine now stores other people's words.** Modestly: only what
+  was approved, rewritten from the source on every cron run, with no
+  interface that can edit it -- a cache, not a database. But the claim
+  above, that there is nothing to moderate or migrate, holds only while
+  this is off, and a deletion at the source follows at the refresh
+  cron's cadence rather than immediately -- under an old post, somebody's
+  deleted reply can outlive its deletion here by up to a week. That lag
+  is part of this decision's price, not a tunable; the cadences behind
+  it, and how to settle a deletion on the spot, are in
+  [operations.md](operations.md#cron-sidebar-widgets-and-post-stats).
+- **Turning it on hides every existing comment** until the author goes
+  and stars the ones worth keeping. Which is why the default is off and
+  why it stays a per-site decision.
+- **It is not a defence, it is a filter.** The reply still stands on the
+  network, under an announcement this site links to. Block, mute and
+  report are still the only things that touch it there.
+
 **Everything starts as a draft, and drafts live on the public site
 behind a `SecureRandom` token with `noindex`.** The whole point is
 previewing from a phone or sending the link to a reviewer before
 publishing -- a localhost-only preview can't do either. *Cost:* the
 draft text physically exists on the host; the token (and staying out of
 every listing and index) is the fence.
+
+**A published post can be unlisted, and unlisted is as far as it goes.**
+`unlisted: true` is the draft's hidden-address idea generalised to a
+post that is finished -- what it reaches is in
+[operations.md](operations.md#properties-and-actions). It stops short of
+being a password deliberately: a static host serves whatever it is asked
+for, so the only honest way to gate a page would be encrypting it in the
+browser, and that is a promise this engine will not make (the key would
+sit in the same page). *Cost:* anyone holding the link can read it and
+pass it on. The truth test is the loose one, unlike `pinned`'s strict
+one, because the two typos are not worth the same: a mistyped pin costs
+a post its place at the top, a mistyped `unlisted` would put something
+into every listing its author meant to keep out of them.
 
 **The publish date comes from publishing, not from a field.** Publishing
 means "now", scheduling asks for a date -- so the frontmatter template
@@ -136,8 +202,8 @@ published near midnight on December 31 into another year, changing a live
 URL. Feeds and the sitemap stay on it for the same reason in reverse --
 they carry absolute instants for machines, where the offset is noise.
 *Cost:* stored dates aren't rewritten, so a site adopting this re-renders
-only the posts whose local day actually differs (73 of sean.cz's 3281,
-none of them changing year).
+only the posts whose local day actually differs -- a handful on a real
+archive, none of them changing year.
 
 **Importing gets its own wizard, and always previews before it writes.**
 `./import.sh` is separate from `./blog.sh` because the two have opposite
@@ -215,7 +281,9 @@ backs up and restores with the post and can never orphan.
 bytes aborts (a broken build must never be mirrored), deletion is opt-in
 (`--prune`), manifests are per-backend so switching targets can't inherit
 foreign state, and every manifest is disposable -- deleting one costs one
-full re-upload, never correctness.
+full re-upload, never correctness. The guards themselves -- what trips
+them and how to prove them by hand -- are in
+[operations.md](operations.md#deploying).
 
 **The guards measure the build against the build.** They used to compare
 it against the manifest, which is the state of the *target* -- so any
@@ -233,15 +301,17 @@ transferred bytes that the next `--prune` reclaims, a missed drop deletes
 live pages.
 
 **One file-size limit for every backend, and no key to loosen it.** The
-hosts differ wildly -- GitHub Pages refuses a single file over 100 MiB, a
+hosts differ wildly -- a git pages host refuses large files outright, a
 plain rsync target refuses nothing -- but a per-backend limit would mean a
 post that saves today becomes undeployable the day the site moves. The
-strictest supported target therefore sets the rule for all of them, and
-the number is decimal (100 MB, ~4.7% under GitHub's limit) so the engine
-refuses before the host does. Refusal happens at save time, where the
-author can still act, as well as at deploy time; a config key would only
-restate the question every installation would then answer differently,
-the same reasoning as the fixed JPEG quality in the HEIC converter.
+strictest supported target therefore sets the rule for all of them, with
+the engine's line drawn just under that host's so it refuses before the
+host does (the limit itself is in
+[operations.md](operations.md#deploying)). Refusal happens at save time,
+where the author can still act, as well as at deploy time; a config key
+would only restate the question every installation would then answer
+differently, the same reasoning as the fixed JPEG quality in the HEIC
+converter.
 
 **Six deploy backends behind one small contract.** The manifest logic
 is target-independent; backends only move bytes. Self-diffing targets
@@ -335,8 +405,8 @@ for a measurable reason.** A HEIC photo displays in Safari and nowhere
 else; HEVC video plays in the large majority of browsers, so refusing it
 would take away a video most readers could watch. The genuinely
 undeployable files are already stopped by the per-file size limit, and on
-real footage the two almost coincide: of twelve clips straight off a
-phone, exactly one was HEVC -- and it was also the only one over 100 MB.
+real footage the two almost coincide -- the clip that is HEVC tends to be
+the one over the limit anyway.
 What was missing was a sentence at the moment the author can still act,
 so `lib/video_probe.rb` reads the video track's codec out of the file's
 own boxes (no ffprobe, the same box walk `MediaDimensions` already does)
@@ -364,9 +434,17 @@ every other file's load-time-requires convention.
 **No third-party requests from the visitor's browser.** Widgets are
 fetched server-side on cron into same-origin JSON: visitors' IPs leak
 nowhere, GitHub's rate limit can't kill the sidebar, and a slow third
-party can't slow the page. The one exception is deliberate: the
-Mastodon comments thread, fetched client-side because it's the actual
-live discussion. Fonts are self-hosted for the same reason.
+party can't slow the page. Two exceptions are deliberate, and naming
+both matters -- an unlisted one reads later like an oversight somebody
+should "fix". The first is the comments thread, fetched client-side
+because it is the actual live discussion -- and that one lapses the
+moment `comments.approval` is on, since a moderated thread is no longer
+live and cron has read it already (see *Publishing and comments*).
+Avatars in comments remain hotlinked either way. The second is an
+analytics script, for a site that asks for one: `analytics:` is absent
+by default, nothing is added to any page without it, and the policy
+names that origin only while the section exists. Fonts are self-hosted
+for the same reason as the rest.
 
 **CSP without `unsafe-inline`, delivered as a meta tag.** The single
 inline script (client i18n strings) is allowlisted by its SHA-256
@@ -389,16 +467,46 @@ escape code may ever reach a log. *Cost:* two code paths in the
 dialogs -- worth it, since cron and scripts drive the same commands
 humans do.
 
-**No curses, no fullscreen, no dependencies.** `io/console` plus VT100
-sequences cover what a conversational CLI needs, and staying inline
-keeps the whole session in the scrollback where a user can scroll back
-through it. *Cost:* no complex layouts -- deliberately not the goal.
+**No curses, no dependencies.** `io/console` plus VT100 sequences cover
+what this needs. *Cost:* no complex layouts -- deliberately not the goal.
+
+**A screen that repaints, but not the alternate screen.** Every keypress
+in a dialog used to leave another full copy of it behind: walking three
+rows down the queue, opening the actions and moving a post three slots
+scrolled the view by dozens of lines and buried the terminal in identical
+screens. Frames are painted from the top of the viewport instead, so the
+same sequence scrolls it by none. The alternate screen (`\e[?1049h`) would
+have been the obvious way and is deliberately not used: it discards its
+plane on exit, and this CLI prints things worth keeping -- a draft's
+address, what a deploy uploaded, what refused. Painting in place keeps
+both properties, the screen holding still *and* the scrollback intact.
+*Cost:* a full frame per keypress is about a third more bytes over the
+wire than the old partial repaint; repainting only changed rows is the
+obvious answer if that ever matters.
+
+**Action rows fold; navigation keys are trimmed.** The keys under a post
+run to 137 characters in German, so on 80 columns -- or a phone over SSH
+-- something has to give. `browse`'s navigation line drops items from the
+middle, which is right for ways to move around: a reader can guess them.
+The rows under a post are the actions themselves, so they break between
+items instead and keep every one. Hiding `[x] delete` would hide it from
+exactly the reader least able to guess it is there. *Cost:* on a narrow
+terminal the keys take four lines instead of one.
+
+**Confirmations are graded by what disappears.** Deleting a post and
+unpublishing one ask for the slug to be typed out. Restoring an earlier
+version asks for one key, because it loses nothing -- the current text is
+kept as a version of its own first, which is what the sentence above the
+prompt says. A prompt explaining that a move is reversible and then
+demanding a word be written out argues with itself. It stays a
+confirmation rather than becoming none: Enter in the list is a single
+keystroke and a restore overwrites the text being worked on.
 
 **The menu scrolls; the lists aren't capped to fit a screen.** Pickers
-used to offer only the 10 most recent posts because the menu printed
-every item it was handed, so anything longer than the terminal broke its
-cursor-up repaint. Scrolling a window moves that limit into the UI where
-it belongs -- on a blog with thousands of posts, a cap that small is a
+used to offer only the 10 most recent posts, because back when the menu
+printed every item it was handed, anything longer than the terminal broke
+the repaint. Scrolling a window moves that limit into the UI where it
+belongs -- on a blog with thousands of posts, a cap that small is a
 functional restriction, not tidiness. *Cost:* window arithmetic (and
 digits selecting within the visible window, not the whole list).
 
@@ -442,7 +550,8 @@ render identically; tokens are meant to exist only where they're used.
 **Config written by the engine is edited as text, never dumped from a
 parsed hash.** Loading `config/site.yml`, changing a key and writing it
 back is one line of Ruby and would have destroyed the thing that makes
-the file usable: of its 277 example lines, only about 60 are keys. The
+the file usable: most of its lines are comments and commented-out
+blocks, only a fraction are keys. The
 rest is the documentation for every setting the engine has, plus the
 commented-out blocks you uncomment when you want a widget or a custom
 font -- and real sites hand-edit around it (sean.cz keeps an `<img>`
@@ -467,6 +576,97 @@ diff it shows back, written into a file created mode 600, and verified
 against the instance before it is kept. *Cost:* one dialog in this
 engine handles a secret, so that is one place to be careful about
 rather than none.
+
+**A site is customized by its configuration, not by editing the
+engine.** There is one release, and it either runs as shipped or runs
+the way a site asked for in `config/site.yml` -- so switching off the
+sidebar, naming your own menu, loading your own stylesheet or turning on
+the hero are all settings, and none of them is a reason to hold a
+modified copy of a template. That matters because a modified template
+is not a private matter: `git pull` either refuses it or silently
+reverts it, and the site's own look is what gets lost.
+
+Two layers carry it. Configuration switches whole structural regions on
+and off (`layout.sidebar`, `layout.hero`, `nav:`),
+and a stylesheet of the site's own (`site.extra_css`) does everything
+about how those regions look. Neither can rot: the engine knows about
+the first, and a CSS rule that stops matching simply stops applying.
+
+*Cost, and it is a real one:* the engine has to anticipate. Every future
+"I want it different" is either a new key or an answer of no, and the
+line between them has to hold -- keys name **regions and modes**, never
+individual visual properties, or this file becomes a stylesheet written
+in YAML. The palette made the same trade first (7 keys, everything else
+derived, promote one only when reality demands it).
+
+*The rejected alternative:* letting a site override whole templates from
+a directory of its own. It would answer every wish at once, which is
+exactly why it is the wrong shape here -- it is not "a setting", it is a
+fork with better manners, and a forked template is frozen in time. The
+site quietly stops receiving whatever the engine adds to that template
+later, and nothing says so.
+
+**Editing a post is undoable, and not because a setting says so.**
+Deleting a post has always gone to `trash/`; editing one was final, and
+editing is what happens every day. The previous text is now kept before
+an overwrite -- by an edit, and by a re-import, which is the more
+dangerous of the two because it replaces the whole archive at once and
+nobody reads a few thousand posts afterwards. There is no key to turn it
+off: a safety net with a switch is off exactly when it is needed, since
+nobody turns it on before the mistake, and none of the engine's other
+guards (the trash, the slug-collision abort, the deploy guards) are
+optional either -- only the destructive direction ever is. Field-only
+writes make no version, or a history of pin toggles would bury the one
+entry anybody wants. *Cost:* ten copies of the text per edited post, and
+media is not versioned -- so a version old enough can name an image the
+post no longer has, which is what the cap is for.
+
+**A series is not a tag.** Tags are many per post and unordered; a series
+is one and has an order, which is the whole of the difference and enough
+of it. Ordering is by date with `series_part:` as the override, the same
+shape `type:` uses -- publishing out of order is rare enough that the
+date is the right default and common enough that there has to be a way to
+say otherwise. Previous and next are offered only *within* a series and
+never across the archive: on a site assembled from many imported
+platforms the chronological neighbour of an essay is a tweet from
+fifteen years earlier, and calling that "next" is noise wearing the
+clothes of navigation. *Cost:* one more field, and a series of one is
+silently not a series (it is a post).
+
+**A feed per tag, only for the tags the menu names.** Generating one for
+every tag means thousands of files on a real archive, rebuilt and re-diffed on
+every build, that nobody will ever fetch -- the exact inverse of "nothing
+renders that wasn't asked for". A tag in `nav:` is the site saying this
+is a subject it publishes on, which is the same statement as "somebody
+might want to follow just this". *Cost:* a site with the derived type
+menu gets no tag feeds at all, which is the intended answer rather than
+an oversight -- it has not named a subject yet.
+
+**robots.txt can say no to AI crawlers, and the engine does not decide
+which way.** `seo.block_ai_crawlers` writes out a maintained list;
+`seo.robots_extra` is appended verbatim for the ones no list will be
+current about. Off by default, because wanting to be findable in a
+machine-generated answer is a legitimate position and not the engine's to
+take for a site. And it is documented as a *request*: some of these
+crawlers honour robots.txt and some do not, so anything here that said
+"blocks" would be a lie. *Cost:* a list in the engine goes stale, and
+updating it is a release note.
+
+**A listing's heading marks what it is; it doesn't say it twice.** Tag
+and search headings used to be sentences with a colon ("Tag: archive").
+The word is now its own element beside the value, hidden from sight by
+the stylesheet -- clipped rather than `display: none`, since that would
+take it out of the accessibility tree as well, and a screen reader on a
+tag page would then announce a bare name with no hint of where it is.
+The value carries the marker instead: a tag wears the pill shape tags
+wear everywhere else, a query sits behind the magnifier from the nav.
+Content-type listings get no marker at all, and never had one --
+**a marker belongs where the value is arbitrary text**, which a tag name
+and a search query are and a closed set of eight labels is not. The
+window title keeps the word: a browser tab and a search result have
+neither stylesheet nor pill, so there it is the only thing telling two
+pages apart. *Cost:* one more element in the markup, and a site that
+wants the word back has to undo one rule rather than translate a string.
 
 **Colors are 7 keys per mode; everything else is derived.** Across
 every palette this engine actually shipped, the other custom properties
@@ -509,3 +709,129 @@ which resolve against a post's media directory or need more width than
 a 260px sidebar has), so a table pasted into a bio renders as a
 paragraph of pipes rather than a table. And the passthrough means a
 typo in hand-written HTML still reaches the page, exactly as before.
+
+**Keyboard focus is one ring for the whole site, not a design per
+control.** The alternative was to give each control its own indicator,
+matched to the ground it sits on. One ring is easier to recognise -- a
+reader learns what "you are here" looks like once -- and it is one rule
+to keep in step instead of a dozen. Where the ring has to move inside
+the control it is because the ground outside it is not something the
+stylesheet can vouch for (a banner photograph, the lightbox's black) or
+is the accent the ring is drawn in (the active menu item, the date
+badge), not because those controls wanted a look of their own. *Cost:*
+the ring is the accent, and it is not derived from what is behind it --
+a palette whose accent sits close to its card background gets a quiet
+ring on the page body, and a skin that repaints a control's ground has
+to look at the ring itself rather than getting a new one for free.
+
+**The phone's search field is ordered ahead of the menu it is written
+after.** In the markup the bar reads button, menu, search -- which is the
+order a desktop wants. On a phone the menu is 100% wide and wraps to its
+own line, so left alone the field would land on a third line and move
+down the screen every time the menu opened; `order` puts it back beside
+the button. *Cost:* the usual price of ordering, that Tab follows the
+markup and not the eye -- with the menu open, Tab goes from the button
+down to the menu items and only then back up to the field. Closed, the
+items are `display: none` and there is nothing to disagree about, which
+is the state the bar is in almost always.
+
+**The images a lightbox can open are made into buttons by the script, not
+by the build.** `tabindex` and `role="button"` are added at runtime rather
+than written into the HTML, so a page served without its JavaScript --
+blocked, failed, still loading -- shows pictures rather than things that
+announce themselves as pressable and then do nothing when pressed. *Cost:*
+the tab order of a photo-heavy post is only correct once the script has
+run, and a reader tabbing in the first few hundred milliseconds walks past
+images that are about to become buttons.
+
+**Once the top bar became sticky, the menu repeated under the content
+went.** The bar answers the question the bottom menu existed for -- how a
+reader who has just finished an article gets anywhere -- for the whole
+page, search field included, and keeping both put two identical menus on
+one phone screen. There is no key to bring it back: a repeat of a bar
+that is always on screen is not a preference somebody might hold, and a
+key nobody would ever set is a key that rots. The line the bottom menu
+drew between content and footer is drawn by the stylesheet now. *Cost:*
+an appearance change that arrives unasked and has no way back short of a
+site carrying its own template.
+
+**The sticky rule is scoped to the page's own bar, not to `nav`.** A post
+carries a second `<nav>` inside `<main>` for its pagination, and there is
+nothing sticky about "older posts". `.wrap > nav` says which one is the
+menu bar. *Cost:* a structural selector rather than a class -- move the
+bar out of `.wrap` and the stickiness follows the markup instead of the
+intent.
+
+**Search ranks with four numbers, and draws fifty.** A post whose title
+is the query is a better answer than one that mentioned the word once,
+whatever their dates -- so the hits are scored (title above text, whole
+word above part of a word) and date decides only the ties, which is
+where the archive-is-a-diary argument for chronological results was
+right. The scale is four constants rather than a term-frequency
+model, because the whole of it has to be explainable in one sentence to
+be maintainable in a 150-line script. *Cost:* no BM25, no term
+frequency -- forty mentions do not beat one, and the index's single
+folded blob cannot tell a tag from a paragraph, so a post *tagged* with
+the query ranks no higher than one that says it in passing. Both are
+fixable by putting more fields in the index, and both would cost every
+visitor the bytes.
+
+**The search address is replaced, not pushed.** Typing rewrites `?q=` on
+the current history entry rather than adding one. Pushing would give
+every keystroke its own entry, and Back would then walk the query
+backwards a letter at a time without ever leaving the page -- the
+behaviour people mean when they complain a site "traps" the back button.
+*Cost:* Back does not undo a search; it leaves /search/ altogether, and
+there is no way to return to the query you had two words ago. Which is
+the trade: the address is worth having so a search can be sent to
+somebody and come back to, and it is not worth having at the price of the
+back button.
+
+**A result list has a ceiling, and the count above it does not.** Fifty
+cards, with the true total still printed above them. Showing everything
+cost a real archive visible time and tens of thousands of page elements;
+showing fifty and lying about the total would be worse than either.
+There is no "show more" and
+no pagination: a reader who has not found it in fifty ranked answers is
+better served by narrowing the query, and every extra control here is one
+more thing to translate and maintain. *Cost:* the 51st answer is
+unreachable except by asking a better question -- which is only fair
+because the list is ranked, and would have been indefensible while it was
+in date order.
+
+**The front page's h1 is there and not visible.** Every listing heading
+became an h1 (it was an h2, a sibling of the post titles it introduces),
+which left the front page as the only listing with no heading to promote
+-- it announces nothing, being the site itself. A visible one would put a
+word on every front page built with this engine that nobody asked for, so
+it carries the site's title clipped out of sight, the same way the
+"Tag"/"Search" labels are. *Cost:* text in the page that nobody sees --
+which means it can go stale without anyone noticing, and a tool reading
+the page as text rather than rendering it will find a title where there
+used to be none.
+
+**The banner's overlay lines are a column, not two pinned corners.** The
+site name and the claim used to be positioned absolutely against opposite
+corners of the picture, which reads well and holds only as long as there
+is picture between them -- and the height of that picture is the one
+thing the engine does not decide. On a phone it runs out. Rather than
+buying a little room (smaller type, thinner insets) and hoping, the two
+went into one box laid out as a column, where overlapping is not a state
+the layout can reach. *Cost:* one more element in the markup of every
+page, and the insets moved out of the two lines into the box around them
+-- so a stylesheet that positioned `.banner-title` or `.banner-claim`
+itself has to be looked at. In return, the corners are described in one
+place instead of four, and a banner short enough to run out of room
+crowds its lines instead of printing one through the other.
+
+**Reduced motion is answered with one blanket rule, not a list of the
+things that move.** `prefers-reduced-motion` switches off transitions
+and animations for everything, rather than naming the declarations that
+actually carry movement -- and most of the engine's do not, they fade a
+colour. A list would be more precise on the day it was written and
+wrong on the first day somebody added a rule and did not think of it,
+which is exactly the kind of upkeep a preference like this cannot
+depend on. *Cost:* a skin's own transitions go off with the engine's,
+whether or not they move anything, and an animation a site genuinely
+needs under that preference (a loading indicator that means something)
+has to ask for itself back in its own media query.

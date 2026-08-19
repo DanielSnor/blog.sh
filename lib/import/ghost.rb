@@ -6,6 +6,7 @@ require 'uri'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative 'html_blocks'
+require_relative 'pages_note'
 require_relative 'permalinks'
 
 module Import
@@ -31,6 +32,7 @@ module Import
       @site_url = site_url.to_s.sub(%r{/+\z}, '')
       @keep_permalinks = keep_permalinks
       @scheduled = 0
+      @page_paths = []
     end
 
     def label
@@ -56,10 +58,14 @@ module Import
     end
 
     def map(item, media)
-      # Pages are deliberately not posts: an about page or a contact page
-      # in the middle of the archive would be timeline noise. The summary
-      # counts them so nobody wonders where they went.
-      return :page if item['type'] != 'post'
+      # A page is imported AS a page rather than skipped. It was skipped
+      # while the engine had nowhere to put one: an about or a contact page
+      # dropped into the middle of the archive would have been timeline
+      # noise. Now it keeps its address and stays out of the stream, which
+      # is what it was on the old site too -- and a migration that silently
+      # left the About page behind was the worst kind of loss, because the
+      # site looked complete.
+      is_page = item['type'] != 'post'
 
       html = item['html'].to_s.gsub('__GHOST_URL__', @site_url)
       blocks = leading_blocks(item, media) + body_blocks(html, media, item)
@@ -80,17 +86,32 @@ module Import
           'original_id' => item['id']
         }
       }
+      if is_page
+        post['page'] = true
+        # Only a page that is actually published answers at that address.
+        # A Ghost draft arrives as a draft here too, so it lives under
+        # /draft/<token>/ -- and the note this list feeds tells the reader
+        # to put these addresses in `nav:`, where a draft's root path would
+        # be a menu item leading to 404.
+        @page_paths << "/#{post['slug']}/" if state == 'published'
+      end
       if @keep_permalinks && state == 'published'
         path = Permalinks.local_path(post_url(item))
-        post['redirect_from'] = [path] if path
+        # A page already lands at the root, so on Ghost -- where a page
+        # lived at /about/ too -- the redirect would point the new address
+        # at itself. The build warns about exactly that, once per build,
+        # forever.
+        post['redirect_from'] = [path] if path && !(is_page && path == "/#{post['slug']}/")
       end
       post
     end
 
     def postscript
-      return nil if @scheduled.zero?
-
-      I18n.t('import.note.ghost_scheduled', count: @scheduled)
+      notes = []
+      notes << I18n.t('import.note.ghost_scheduled', count: @scheduled) if @scheduled.positive?
+      notes << Import.pages_note(@page_paths)
+      notes.compact!
+      notes.empty? ? nil : notes.join("\n  ")
     end
 
     private
@@ -170,6 +191,7 @@ module Import
       segments(html).flat_map do |kind, payload|
         case kind
         when :embed then [payload]
+        when :video then video_blocks(payload, media)
         else localize_images(HtmlBlocks.parse(payload).blocks, media, item)
         end
       end
@@ -183,17 +205,29 @@ module Import
     # hand-written post gets (the build makes the iframe, no foreign HTML
     # in the data), anything else becomes a link to the embedded page --
     # honest, visible, and it survives the platform dying.
-    EMBED_CARD = %r{<figure[^>]*class="[^"]*kg-embed-card[^"]*"[^>]*>.*?</figure>}m
+    #
+    # A video card is lifted for the opposite reason: HtmlBlocks understands
+    # its markup all too well. Ghost writes the whole player into the export
+    # -- two buttons, a seek slider and the spans holding the clock -- around
+    # a <video> that HtmlBlocks drops, so an uploaded film left three
+    # paragraphs of control panel behind ("0:00", "/0:15") and nothing said
+    # the film was gone. The mp4 is a file like any picture in the post, so
+    # it is downloaded and handed to the video block build_blog.rb already
+    # draws a player for. The same promise the embed cards get: what was
+    # uploaded outlives the platform it was uploaded to.
+    CARD = %r{<figure[^>]*class="[^"]*kg-(embed|video)-card[^"]*"[^>]*>.*?</figure>}m
     IFRAME_SRC = /<iframe[^>]*\ssrc="([^"]+)"/m
     YOUTUBE_ID = %r{youtube(?:-nocookie)?\.com/embed/([A-Za-z0-9_-]{6,})}
+    VIDEO_TAG = /<video[^>]*>/
+    FIGCAPTION = %r{<figcaption[^>]*>(.*?)</figcaption>}m
 
     def segments(html)
       parts = []
       last = 0
-      html.scan(EMBED_CARD) do
+      html.scan(CARD) do
         match = Regexp.last_match
         parts << [:html, html[last...match.begin(0)]]
-        parts << embed_segment(match[0])
+        parts << (match[1] == 'video' ? [:video, match[0]] : embed_segment(match[0]))
         last = match.end(0)
       end
       parts << [:html, html[last..]]
@@ -215,6 +249,43 @@ module Import
                    'formatting' => [{ 'type' => 'link', 'url' => src,
                                       'start' => 0, 'end' => src.length }] }]
       end
+    end
+
+    # Nothing of the player survives except the file it was playing and the
+    # caption underneath it. The dimensions come from the <video> element
+    # rather than from the downloaded bytes: MediaDimensions reads image
+    # headers, and an mp4 is not one.
+    #
+    # A file that could not be fetched costs the block, not the post --
+    # Media has already recorded the address, so the summary names the loss
+    # instead of the post quietly arriving without it.
+    def video_blocks(figure, media)
+      tag = figure[VIDEO_TAG].to_s
+      src = tag[/\ssrc="([^"]*)"/, 1].to_s
+      filename = src.empty? ? nil : media.from_url(absolute(src))
+      return [] unless filename
+
+      entry = { 'url' => filename }
+      %w[width height].each do |dimension|
+        value = tag[/\s#{dimension}="(\d+)"/, 1]
+        entry[dimension] = value.to_i if value
+      end
+      block = { 'type' => 'video', 'media' => [entry] }
+      caption = card_caption(figure)
+      block['caption'] = caption unless caption.empty?
+      [block]
+    end
+
+    # The caption is the one part of a card a person wrote, so it is read
+    # the way prose is read -- entities and all -- rather than by stripping
+    # angle brackets.
+    def card_caption(figure)
+      inner = figure[FIGCAPTION, 1]
+      return '' unless inner
+
+      HtmlBlocks.parse(inner).blocks
+                .select { |block| block['type'] == 'text' }
+                .map { |block| block['text'] }.join(' ').strip
     end
 
     # Same contract as Feed#localize_images: download, measure, or lose

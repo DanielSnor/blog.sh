@@ -6,6 +6,8 @@
 # search index, sidebar widget JSON, CLI messages). The client-side
 # counterpart is js.date_locale below -- keep the two consistent so
 # build-time and runtime dates read the same.
+thousands_separator: ","
+decimal_point: "."
 date_format: "%b %-d, %Y"
 date_time_format: "%b %-d, %Y %H:%M"
 
@@ -24,6 +26,20 @@ nav:
   search_placeholder: "Search…"
 
 post:
+  reading_time: "%{minutes} min read"
+  reading_minutes: "%{minutes} min"
+  # Anything under the length at which the engine stops calling a post a
+  # photo with a caption. Said rather than left out, so every card in a
+  # listing carries the same row -- see docs/decisions.md.
+  reading_time_under: "under a minute's read"
+  reading_minutes_under: "< 1 min"
+  toc_heading: "On this page"
+  toc_label: "Table of contents"
+  series_part: "Part %{number} of %{total} of %{name}"
+  series_draft_joins: "Series %{name} -- published parts: %{count}; published, this would be part %{number}."
+  series_draft_new: "No published post carries the series \"%{name}\" yet -- a typo, or the first part?"
+  series_previous: "← %{title}"
+  series_next: "%{title} →"
   comments_heading: "Comments"
   back_to_list: "← back to list"
   read_more: "Read more"
@@ -40,9 +56,18 @@ pagination:
   page: "page %{number}"
 
 tag:
-  heading: "Tag: %{name}"
+  feed_title: "%{name} – %{site_title}"
+  # The listing heading shows the tag itself; this is the word that says
+  # what kind of listing it is, kept for screen readers and hidden from
+  # sight by default (see .listing-heading__kind in site.css).
+  kind: "Tag"
   title: "Tag: %{name} – %{short_name}"
   description: "Posts tagged %{name} on %{author}'s personal site."
+
+series:
+  kind: "Series"
+  title: "%{name} – %{short_name}"
+  description: "The series %{name} on the personal site of %{author}, in reading order."
 
 type:
   text: "Text"
@@ -60,12 +85,19 @@ index:
   empty: "No posts of this type yet."
 
 search:
-  heading: "Search"
+  # Doubles as the page's own heading when no query has been typed yet.
+  kind: "Search"
   tagline: "Searches across all post types — accent-insensitive."
   tip: "Tip: more than one word means all must match;<br>put an exact phrase in quotes (“…”);<br>exclude a word with a minus (-word)."
   prompt: "Type a query."
   page_title: "Search – %{site_title}"
   page_description: "Full-text search across posts, accent-insensitive."
+
+not_found:
+  heading: "Nothing here"
+  body: "This address does not point at anything on this site -- it may have been mistyped, or it may have been something that has since moved. The menu above and the search box are the way on."
+  page_title: "Nothing here – %{site_title}"
+  page_description: "The page this address points at does not exist."
 
 markdown_page:
   default_title: "Markdown"
@@ -73,6 +105,13 @@ markdown_page:
 
 ui:
   scroll_top: "Up"
+  # Label for the appearance toggle. Read twice: the layout puts it on the
+  # page, and assets/js/theme-toggle.js rewrites it on every click -- which is
+  # why it also travels through window.BLOG_I18N (client_i18n_json in
+  # build/build_blog.rb).
+  theme_auto: "Appearance: follow system"
+  theme_light: "Appearance: light"
+  theme_dark: "Appearance: dark"
 
 # Consumed client-side via window.BLOG_I18N (see client_i18n_json in
 # build/build_blog.rb and templates/layout.html.erb) -- assets/js/*.js can't
@@ -84,19 +123,28 @@ js:
   stats_comments: "Comments"
   reply_on_mastodon: "Reply on Mastodon"
   reply_on_bluesky: "Reply on Bluesky"
+  comments_moderated: "Comments the author picked out. The whole discussion is on the network."
   results_one: "result"
   results_few: "results"
   results_many: "results"
+  # Appended to the count when more was found than is drawn. The number is
+  # the cap itself (RESULT_LIMIT in assets/js/search.js), not the count, so
+  # it needs no plural forms.
+  results_capped: " — showing the best %{count}"
   no_results_pending: "No results yet,"
   no_results_final: "No results."
   try_other_words: " Try different or more general words."
   searching_archive: " (also searching the older archive…)"
-  search_prefix: "Search: "
   loading_index: "Loading index…"
   index_unavailable: "Search index unavailable."
   lightbox_close: "Close"
   lightbox_prev: "Previous"
   lightbox_next: "Next"
+  # The name of the overlay itself, for a screen reader announcing what just
+  # opened; and the name of the image-as-button where the image has no alt
+  # text to be named by.
+  lightbox_label: "Image viewer"
+  lightbox_open: "Open image"
 
 # scripts/manage_post.rb (the ./blog.sh authoring CLI/wizard) and its
 # frontmatter-editor hint text. cancel_word is compared against user input
@@ -159,6 +207,15 @@ cli:
       type   post type -- text / quote / chat / image / video / audio / link
              (optional -- leave it blank and the type is inferred from the
              post's content)
+             page -> a page: its own address, out of the listings, the
+             archives and the feed (About, Contact)
+      pinned true -> the post is held at the top of the first listing page
+      unlisted true -> the post keeps its address but leaves the listings,
+             the feeds, the sitemap and the search (a link for a few
+             people, not a password)
+      series name of a series; posts sharing a name form one
+      hero   true/false -> lead image above the title for this post
+      toc    true/false -> chapter list (appears by itself from four headings)
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
     [s]chedule asks for a future date/time when you pick it. To backdate,
@@ -172,6 +229,7 @@ cli:
   template_unchanged: "Template left unchanged (not saved?), no post was created."
   empty_content: "Empty content, nothing was written."
   wrote_draft: "Written as draft: %{path}"
+  incoming_not_cleaned: "Left in incoming/: %{files} — the copy is in the post, but the staged original could not be deleted (no write permission on incoming/). Remove it by hand, so an empty incoming/ still means nothing is pending."
   generating_preview: "Generating preview"
   draft_saved_preview_pending: "Draft is saved. The preview will show up after a successful deploy -- then run ./blog.sh edit %{slug}"
 
@@ -186,6 +244,7 @@ cli:
   schedule_slot_keys: "  [Enter] accept  ·  your own date (YYYY-MM-DD HH:MM)  ·  \"%{cancel_word}\" = back"
   schedule_queue_position: "  Post %{count} in the queue (previous: '%{slug}', %{date})."
   schedule_slots_taken: "  Earlier slots are taken:"
+  schedule_queue_hint: "Want it sooner -- today's slot, say? Accept the offered time, then carry the post to the front of the queue (./blog.sh queue): the times stay with the slots and the rest step back one."
   props_queue_heading: "The queue (%{count} scheduled):"
   queue_empty: "The queue is empty -- a draft is scheduled via [s] in its preview, or ./blog.sh schedule."
   queue_overdue: "(waiting for the cron)"
@@ -197,6 +256,9 @@ cli:
   queue_already_last: "The post is already last in the queue."
   queue_swap_overdue: "A post whose time has passed can't be reordered -- wait for the cron to publish it."
   queue_swapped: "Moved: '%{slug}' publishes %{date}."
+  queue_action_carry: "[m] carry it elsewhere  "
+  queue_carry_hint: "↑↓ carry the post · Enter put it down · Esc cancel"
+  queue_carried: "Carried: '%{slug}' is now %{position}. in the queue and publishes %{date}."
   queue_compact_prompt: "Shift the rest of the queue (%{count}) a slot earlier? [y/N] "
   queue_compacted: "Queue shifted: every following post took over the earlier slot."
   menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
@@ -221,6 +283,7 @@ cli:
   bluesky_recovered: "That post was already announced -- found it on the account and recorded the address, instead of sending a second one: %{url}"
   deleting_bluesky: "Deleting the Bluesky announcement: %{url}"
   delete_bluesky_failed: "Deleting the Bluesky announcement failed -- delete it by hand."
+  unlisted_no_toot: "The post is unlisted, so no announcement was sent. Take the flag off first if you want one."
   backdated_no_toot: "Post date isn't current (a backdated post), the announcement was not sent."
   schedule_only_drafts: "Post '%{slug}' is already published -- only drafts can be scheduled."
   scheduled_label: "Scheduled: '%{slug}' publishes automatically at %{date}."
@@ -239,6 +302,8 @@ cli:
   still_draft_toot: "Post '%{slug}' is still a draft -- publish it first (./blog.sh publish %{slug}); only then does a toot have something to link to."
   already_has_toot: "Post already has a toot, not sending a second one: %{url}"
   toot_failed: "Failed to send the toot (see above)."
+  no_network_toot: "Nothing was announced: config/site.yml has no mastodon: or bluesky: section, so this site announces nowhere. If you meant to set one up, check that the section header is a live line rather than a comment -- keys under a commented-out header belong to whatever came before it. The token itself goes in env.sh."
+  toot_declined: "Left unannounced, as asked."
   tooted: "Tooted: %{url}"
 
   already_draft: "Post '%{slug}' is already a draft: %{url}"
@@ -307,6 +372,10 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--strip-location]
                                      reads the configuration and says what is wrong with it
+      ./blog.sh check                walks the archive and says what is broken in it
+      ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
+                                     writes the whole archive out as a tree of markdown files (default tmp/export)
+      ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
@@ -355,18 +424,30 @@ cli:
   props_label_type: "type"
   props_label_tags: "tags"
   props_label_pinned: "pinned"
+  props_label_unlisted: "unlisted"
   props_label_announced: "announced"
   props_label_addresses: "old links"
   props_draft_banner: "draft -- not on the site, preview only"
   props_state_published: "published, %{date}"
   props_pinned_yes: "yes -- held at the top of the front page"
+  props_unlisted_yes: "yes -- reachable by its address, in no listing, feed, sitemap or search"
   props_announces_on_publish: "not yet -- goes out when the post publishes"
+  props_announces_never_unlisted: "never -- an unlisted post is not announced"
   props_not_announced: "not announced"
   props_attributes_hint: "Type and tags are edited in the header when you edit the text."
   props_actions_draft: "[p] publish  [s] schedule  [r] rename slug  [x] delete  [Enter] back: "
   props_actions_scheduled: "[p] publish now  [s] reschedule  [n] cancel the schedule  [r] rename slug  [x] delete  [Enter] back: "
   props_actions_published: "[u] unpublish  [t] announce (%{network})  [c] pin/unpin  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
   props_actions_published_plain: "[u] unpublish  [c] pin/unpin  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
+  props_action_versions: "[v] earlier versions  "
+  versions_none: "This post has no earlier versions yet -- one is kept each time it is edited."
+  versions_heading: "What the post %{slug} said before its recent saves:"
+  versions_media_note: "Only the text comes back; images are not versioned, so an old copy of the post may mention one it no longer has."
+  versions_menu_hint: "↑↓ move · Enter restore the version · Esc back"
+  versions_prompt: "Restore which version? [1-%{count}, Enter cancels]: "
+  versions_unknown: "No version with that number."
+  versions_confirm: "The current text is kept as a version too, so this is undoable. Restore it? [y/N] "
+  versions_restored: "Restored: %{path}"
   props_unknown_draft: "Not understood, try p / s / r / x."
   props_unknown_scheduled: "Not understood, try p / s / n / r / x."
   props_unknown_published: "Not understood, try u / t / c / r / a / x."
@@ -376,6 +457,7 @@ cli:
   addresses_menu_hint: "↑↓ move · Enter drop the address · Esc back"
   addresses_pick_prompt: "Number of the address to drop (anything else goes back): "
   addresses_taken: "-- taken by another post, this redirect never happens"
+  addresses_taken_draft: "-- taken by a draft, the redirect still works; publishing that draft takes it over"
   addresses_unusable: "-- unusable, expected \"year/slug\""
   addresses_drop_confirm: "Drop %{address}? That link stops working for good. [y/N] "
   addresses_dropped: "🔗 %{address} dropped -- it no longer redirects anywhere."
@@ -393,6 +475,19 @@ cli:
   rename_go: "Rename? [y/N] "
   renamed_label: "Renamed: %{slug}"
 
+poster:
+  # What the author is told when an announcement did not go out. These are
+  # the outcome of something they just did -- pressing [t], or publishing --
+  # so a person reads them, in the CLI, in their own language. The
+  # diagnostics underneath (HTTP codes, exception text) stay English: those
+  # are for whoever is asked to look at it, and a translated status line
+  # helps nobody search for it.
+  no_mastodon_token_post: "MASTODON_ACCESS_TOKEN is not set, the toot was not created."
+  no_mastodon_token_delete: "MASTODON_ACCESS_TOKEN is not set, the toot was not deleted."
+  no_bluesky_password_post: "BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not posted."
+  no_bluesky_password_delete: "BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not deleted."
+  stats_fetch_failed: "Fetching the stats failed (%{key}): %{message}"
+
 # The one line on a renamed post's redirect stub -- the page a reader sees
 # for a fraction of a second (or with meta-refresh disabled) at an old
 # address.
@@ -402,6 +497,7 @@ redirect:
 cron:
   no_scheduled_due: "No scheduled post is due."
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
+  unlisted_not_announced: "Post '%{slug}' is unlisted, so nothing was announced."
   publishing_scheduled: "Publishing %{count} scheduled post(s)"
   publish_failed: "❌ '%{slug}' could not be published: %{error}. The other due posts were not affected; fix this one and it will publish on the next run."
   announce_failed: "⚠️  '%{slug}' is published, but announcing it failed -- the post is public with nothing pointing at it, and nothing will try again. Check the token, then announce it by hand with ./blog.sh toot (or ./blog.sh bluesky)."
@@ -461,8 +557,10 @@ import:
   scanned: "read %{count} item(s)…"
   dry_run_running: "Reading %{label} -- nothing is written yet…"
   keep_permalinks_prompt: "Will this site answer on the SAME domain the old blog did? If so, every post keeps its old address as a redirect. [y/N] "
-  would_write: "Would write %{count} post(s); media files to fetch: %{media}."
+  would_write: "Would write %{count} post(s); media in them: %{media}."
   media_not_verified: "A preview downloads nothing -- the real run reports how many of those actually arrive."
+  media_reused: "%{count} of them are already in this archive and come from there, not from the source."
+  media_superseded: "%{count} downloaded file(s) no longer match the archive's copy and were discarded -- the archive keeps its own bytes."
   written: "Wrote %{count} post(s) and %{media} media file(s)."
   sample_slugs: "First few slugs:"
   skipped: "  %{count} skipped (%{reason})"
@@ -508,7 +606,6 @@ import:
     quote: "quote post"
     empty: "no usable content"
     attachment: "attachment, not a post"
-    page: "page, not a post"
     not_a_post: "not a post"
     trashed: "in the trash"
     boost: "boost"
@@ -529,16 +626,27 @@ import:
     bad_date: "the DATE line could not be read -- Movable Type writes MM/DD/YYYY HH:MM:SS, with AM/PM optional"
     misaligned_row: "the row does not line up with the header -- a quote left open earlier in the line"
     unparsed: "the archived page could not be read as a post"
+    site_furniture: "the site's own furniture -- a listing (_index, home), a feed, a 404 -- not a page of content"
   # Adapter postscripts -- the notes under the preview and the summary. The
   # scripted path (migrate_*.rb) prints these in English, see lib/import/cli.rb.
   note:
+    pages_imported: "%{count} page(s) came across and are at %{paths}. Nothing on the site links to them yet -- the menu is derived from your content types until you say otherwise, so add them under `nav:` in config/site.yml if they belong there."
+    pages_and_more: " and %{count} more"
     ssg_images_freed: "%{count} image(s) sat inside a line of text, where a post cannot show them -- each was moved onto a line of its own, and a picture that was only a link's decoration became the link's text."
     ssg_liquid_links_dropped: "%{count} link(s) were addressed through Liquid ({{ site.repository }}, {% link %}, {% post_url %}) -- an address that means nothing outside Jekyll. The words were kept and the address dropped, rather than left pointing at a page of this blog that was never there."
+    ssg_media_missing: "%{count} image(s) named a file the tree does not have. Each kept its place in its post, with its alt text and caption, pointing at the missing name -- only the file itself is absent, and the build will say so until it arrives in the post's media folder."
+    ssg_slug_collisions: "%{count} address(es) were claimed by more than one file -- a Hugo tree that kept both the flat post and the page bundle it grew into, or the same article filed twice. All of them were imported and the later ones got \"-2\" on the end, so nothing was lost; go through those pairs and delete the one you don't want."
+    ssg_author_dropped: "%{count} post(s) named an author in their front matter. This engine is single-author by design and has no field for one, so the name did not come across -- if the archive holds somebody else's writing, credit them in the text before you publish."
     substack_paid: "%{count} post(s) were subscribers-only on Substack -- imported in full (the export is yours) and tagged \"substack-paid\", so you can find them before you publish."
     facebook_crossposts: "%{count} post(s) were crossposts from other platforms (Twitter, Posterous, ...) -- skipped so they don't duplicate those platforms' own imports. FACEBOOK_CROSSPOSTS=1 includes them."
     feed_ampersands_escaped: "%{count} stray \"&\" character(s) made this file invalid XML -- escaped, so it could be read at all. Text inside CDATA, where the post bodies live, was left exactly as exported."
     feed_controls_dropped: "%{count} control character(s) XML does not allow were dropped so the file could be read."
     feed_unmapped: "%{count} post(s) had no usable original address (plain \"?p=123\" permalinks have their identity in the query string) -- imported without a redirect."
+    feed_unmapped_pages: "%{count} page(s) had no usable original address (plain \"?page_id=12\" permalinks have their identity in the query string) -- imported without a redirect."
+    feed_pages_home: "%{count} page(s) already sit at the address they had on the old site, so they need no redirect -- moving to the same domain, their links keep working as they are."
+    feed_pages_reserved: "%{count} page(s) came across on addresses this engine uses for itself (%{paths}) -- the build will not put them up until they are renamed, so do not list them under `nav:` as they stand."
+    feed_dropped: "Content the block schema has no shape for was dropped from post bodies: %{listed}. Embeds and forms are the usual ones -- if a post needs its video, put the link back by hand."
+    feed_linked_images: "%{count} picture(s) were wrapped in a link, which an image block cannot carry -- the pictures arrived, the addresses they pointed at did not."
     ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
     livejournal_nonpublic: "%{count} entr(y/ies) were friends-only or private -- imported as drafts, they were never public."
     medium_responses: "%{count} post(s) looked like responses to other people's articles -- imported as drafts for review."
@@ -590,7 +698,7 @@ doctor:
   site_yml_syntax: "config/site.yml is not valid YAML: %{message}."
   site_yml_unreadable: "config/site.yml exists but cannot be read: %{message}."
   site_yml_unreadable_fix: "Check the file's owner and permissions (ls -l config/site.yml). Usually: chmod 644 config/site.yml — and if the file is owned by root after a wizard ran under sudo, chown it too."
-  site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value."
+  site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. If that line looks fine, the cause is elsewhere -- most often a section header commented out with its keys left behind, or a quote left open earlier."
 
   identity_ok: "The site's identity is filled in."
   key_missing: "%{key} is missing from config/site.yml."
@@ -614,7 +722,25 @@ doctor:
   timezone_unknown: "site.timezone \"%{zone}\" is not a timezone this machine knows."
   timezone_unknown_fix: "Use an IANA name like Europe/Prague or America/New_York (see /usr/share/zoneinfo), or UTC. A typo here would silently date every post wrong."
 
+  approval_ok: "Comments are moderated -- only replies you favourite are published."
+  approval_boolean: "comments.approval is on (or yes), which YAML reads as a boolean, not a mode."
+  approval_boolean_fix: "Write the mode by name: comments.approval: fav. (off and no are understood, since they can only mean one thing.)"
+  approval_unknown: "Unknown comments.approval %{value} -- the build will refuse it."
+  approval_unknown_fix: "The only values are \"fav\" (publish the replies you favourite) and \"off\" (publish all of them)."
+  approval_key_unknown: "config/site.yml has a comments: section, but nothing in it that moderation reads (found: %{keys}) -- so every reply is published, unmoderated."
+  approval_key_unknown_fix: "The key is comments.approval, and \"fav\" is the mode that publishes only the replies you favourite. If you meant not to moderate, delete the section instead: a key nobody reads is not the same as switching moderation off, and the two look identical until a reply you never approved is on the site."
+  approval_no_network: "comments.approval is on, but no network is configured to announce posts on."
+  approval_no_network_fix: "Moderation picks from the replies to an announcement. Configure mastodon: or bluesky:, or set comments.approval: off."
+  approval_needs_cron: "Moderated comments reach the site only through scripts/refresh-sidebar.sh."
+  approval_needs_cron_fix: "Put it in cron (*/30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh). Without it the site keeps the comments it last uploaded, and a newly approved one never appears."
+  approval_probe_ok: "The token can see which replies you favourited."
+  approval_probe_nothing: "Nothing is announced yet, so there was no thread to test the token against."
+  approval_probe_blind: "The network answers without saying which replies you favourited -- every thread on the site would come out empty."
+  approval_probe_blind_fix: "The Mastodon token needs the read:statuses scope as well as write:statuses -- reissue it under Preferences -> Development. On Bluesky, check BLUESKY_APP_PASSWORD is an app password for the handle in config/site.yml."
+  approval_probe_failed: "Could not check whether the token sees your favourites: %{message}"
   no_network: "No comments network configured -- posts are not announced anywhere."
+  credentials_no_network: "%{vars} is set in env.sh, but no network section is configured -- so nothing is announced and no comments are read."
+  credentials_no_network_fix: "A token with no section to use it usually means the header itself is still commented out: check that %{sections} in config/site.yml is a live line, not a comment, and that its keys sit under it. Delete the credential from env.sh if the site really announces nowhere."
   both_networks: "Both mastodon: and bluesky: are configured, and the build refuses that."
   both_networks_fix: "Comments and the announcement post live on exactly one network. Comment out the section you do not want."
   mastodon_instance_shape: "mastodon.instance is \"%{value}\" -- it takes a host name only, with no https:// and no path."
@@ -642,6 +768,19 @@ doctor:
   fonts_ok: "Every font file named in the config is in assets/fonts/."
   fonts_missing: "Named in the config but not in assets/fonts/: %{files}."
   fonts_missing_fix: "The site renders in the fallback font, which looks exactly like the config not working. Put the file there, or drop it from fonts.faces."
+
+  extra_css_ok: "Extra stylesheet(s): %{count}, every one a path on this site and present."
+  nav_ok: "Menu: %{count} item(s), every one of them pointing at something."
+  nav_tag_missing: "The menu item \"%{label}\" points at the tag %{tag}, which no post carries."
+  nav_tag_missing_fix: "Its listing is not built, so the item is a 404 in your own menu. Usually the last post with that tag was unpublished or retagged. Fix the tag or drop the item."
+  nav_url_missing: "The menu item \"%{label}\" points at %{url}, which this site does not answer at."
+  nav_url_missing_fix: "Usually a post that was renamed or deleted after the menu was written. Point it somewhere that exists, or drop it -- an address off this site is left alone here, that is check --online's question."
+  nav_url_relative: "The menu item \"%{label}\" points at %{url}, which is not an address but a name read against whatever page it is on."
+  nav_url_relative_fix: "From the front page it may even work; from a post it lands beside the post. Write it with the slashes: %{url}"
+  extra_css_remote: "site.extra_css names %{value}, which lives on another host."
+  extra_css_remote_fix: "Every page carries style-src 'self', so the browser discards it and the site renders undressed -- with no error anywhere you would see one. Copy the file into assets/ and name it /assets/css/<name>.css."
+  extra_css_missing: "site.extra_css names %{value}, which is not in the tree."
+  extra_css_missing_fix: "The page asks for it, gets a 404 and renders without it, which looks exactly like a stylesheet that does nothing. Put the file there, or drop the line."
 
   widgets_ok: "%{count} sidebar widget(s), all filled in."
   widget_shape: "The %{name} widget is not a set of settings."
@@ -696,6 +835,80 @@ doctor:
 # template's filler, so it cannot show the shape. Whether anybody
 # actually chose the value is what the "Now:" vs. "Suggested:" line says
 # (wizard.prompt_with_current / prompt_with_suggestion).
+check:
+  progress_online: "Asking the web: %{done}/%{total}"
+  running_online: "Also checking links that leave this site -- this takes a while."
+  online_ok: "All %{count} outside link(s) still answer."
+  link_gone: "%{slug}: %{url} is gone (%{reason})."
+  link_gone_fix: "Only hosts that no longer resolve and pages answering 404/410 are reported -- a timeout or a 5xx is \"not right now\" and is left alone. Fix the link, drop it, or point it at the Wayback Machine."
+  reason_no_host: "the host does not exist"
+  unknown_option: "Unknown option: %{option}. check takes --online, nothing else."
+  heading: "Checking this archive"
+  progress: "Reading posts: %{done}/%{total}"
+  no_posts: "There are no posts to check yet."
+  all_clear: "Nothing wrong inside the archive: %{posts} post(s), with media, links and redirects all checking out."
+  series_similar: "The series \"%{a}\" (%{count_a} post(s)) and \"%{b}\" (%{count_b} post(s)) differ by only a few characters -- a typo?"
+  series_similar_fix: "If they are one series, unify the `series:` spelling across the posts -- different spellings found two series and split the parts between them."
+  media_missing: "%{slug}: the file %{file} is missing from its media directory."
+  media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
+  image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."
+  image_degenerate_fix: "Anything 1px or smaller is treated as a tracking pixel and dropped WITH its caption, so the page silently loses both. Replace the image or remove the block."
+  link_dead: "%{slug}: links to %{url}, which nothing on this site answers at."
+  link_dead_fix: "Usually a permalink left over from an import, or a slug renamed before renames kept a redirect. Fix the link, or give the target post a redirect_from entry."
+  media_orphan: "No post owns the media directory %{dir}."
+  media_orphan_fix: "Left over from a deleted or renamed post, or an import that ran twice. Nothing links to it; delete it yourself once you have looked."
+  media_stray: "Post %{slug} no longer names the file %{file} in its media directory."
+  media_stray_fix: "Left behind by a picture the source dropped or renamed between imports. The post does not reference it; delete it yourself once you have looked."
+  redirect_collision: "%{origin} is claimed by more than one post: %{slugs}."
+  redirect_collision_fix: "Whichever renders last wins and the others' readers land on it. Leave the entry on one post only."
+  and_more: "...and %{count} more of the same kind, not listed."
+  summary: "%{errors} problem(s), %{warnings} thing(s) worth a look."
+  summary_clean: "The archive is sound."
+
+stats:
+  # Refusals raised by lib/post_stats.rb on the cron path. They reach a
+  # person twice -- as a line in the cron mail, and interpolated into what
+  # doctor --online says about the token -- so on a site that is not English
+  # they were half of a sentence in the wrong language.
+  no_mastodon_token: "comments.approval is on but MASTODON_ACCESS_TOKEN is not set -- without it the API never says which replies you favourited."
+  no_bluesky_password: "comments.approval is on but BLUESKY_APP_PASSWORD is not set -- without it the API never says which replies you liked."
+  blind_answer: "comments.approval is on but the %{network} answer did not say which posts are favourited -- the request was not authenticated, or the token is missing read:statuses. Refusing rather than publishing an empty thread over the comments already approved."
+  unknown_option: "Unknown option: %{option}. stats takes --json, nothing else."
+  no_posts: "There is nothing to count yet."
+  heading_archive: "The archive"
+  heading_years: "By year"
+  heading_types: "What they are"
+  heading_words: "Words"
+  heading_tags: "Tags"
+  heading_media: "Media"
+  heading_sources: "Where it came from"
+  archive_line: "%{total} post(s): %{published} published, %{drafts} draft(s), %{scheduled} scheduled, %{pages} page(s)"
+  span_line: "%{first} - %{last}, which is %{days} days"
+  busiest_line: "the busiest year was %{year} (%{count} post(s))"
+  words_line: "%{total} words in all, %{mean} per post on average, %{median} in the middle"
+  longest_line: "longest: %{slug} (%{words} words)"
+  reading_line: "reading the whole archive takes %{hours} hours"
+  reading_line_minutes: "reading the whole archive takes %{minutes} minutes"
+  media_none: "no media at all"
+  tags_line: "%{unique} different, %{per_post} per post"
+  media_line: "%{files} file(s), %{size}, across %{posts} post(s)"
+  media_referenced_line: "%{referenced} file(s) the posts ask for, across %{posts} post(s) -- media.nosync is not here"
+
+export:
+  heading: "Writing this archive out to %{path}"
+  progress: "Writing posts: %{done}/%{total}"
+  unknown_option: "Unknown option: %{option}. export takes a directory, --no-drafts, --dry-run and --force."
+  target_not_empty: "%{path} is not empty."
+  target_not_empty_fix: "Give an empty directory, or repeat with --force to write alongside what is already there. Nothing is deleted either way."
+  dry_run_notice: "Dry run: everything is counted, nothing is written."
+  no_drafts_notice: "Drafts are staying home -- only published posts and pages are going out."
+  no_posts: "There is nothing to export yet."
+  summary: "Written to %{path}: %{posts} post(s), %{drafts} draft(s), %{pages} page(s), and %{media} media file(s) (%{size})."
+  summary_dry: "Would write to %{path}: %{posts} post(s), %{drafts} draft(s), %{pages} page(s), and %{media} media file(s) (%{size})."
+  fallback_note: "%{count} block(s) markdown has no syntax for were written as HTML: %{kinds}. Any engine that passes HTML through renders them, and this engine reads them back whole -- each one carries its own definition in a comment above it, which everybody else ignores."
+  collisions: "%{count} file(s) were renamed so they would not overwrite each other -- two posts asked for the same filename."
+  next_steps: "The layout is Jekyll's: _posts/, _drafts/, pages at the root, media under assets/. Hugo, Eleventy and Astro read it with a line of config; ./import.sh reads it as it stands."
+
 setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
   intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."
@@ -719,7 +932,7 @@ setup:
   e_timezone: "This machine does not know a zone called \"%{zone}\". Zones are named Continent/City, in English -- Europe/Prague, not Praha or CEST; the full list is in /usr/share/zoneinfo."
 
   q_base_url: "Site address"
-  h_base_url: "The address the site will be seen at, e.g. https://mysite.com -- no trailing slash. RSS, the sitemap and share previews are built from it. Written to config/site.yml and env.sh at once, so the two copies cannot drift apart."
+  h_base_url: "The address the site will be seen at, e.g. https://mysite.com -- no trailing slash. RSS, the sitemap and share previews are built from it; written to config/site.yml and env.sh at once."
   e_base_url: "That is not a URL -- it has to start with http:// or https:// and carry a host name."
   e_base_url_slash: "Drop the trailing slash, or generated links end up with two."
 
@@ -754,6 +967,12 @@ setup:
   password_skipped: "No app password. The site works; it just never announces anything until you add one to env.sh."
 
   section_deploy_intro: "The built site is an ordinary folder of files; this picks where ./blog.sh rebuild uploads it after every change. Go by where the site will run -- and if you don't know yet, keep the first option. It can be changed any time by running ./setup.sh again."
+  q_page_size: "How many posts on one listing page?"
+  h_page_size: "Asked now and only now, on the first setup. Pagination is anchored to the oldest post, so a saved link to an old page stays true -- but changing it after the first deploy moves every boundary and rewrites every listing page."
+  e_page_size: "A whole number greater than zero."
+  section_scheduler: "Scheduled publishing"
+  section_scheduler_intro: "A scheduled post does not publish itself -- something has to run at the time. If you mean to use ./blog.sh schedule, add this line to cron (it deploys nothing on its own; the job looks whether anything is due and exits):"
+  scheduler_note: "Without that line a post waits in the queue and nobody ever sends it. Doctor notices, but only once something is scheduled. The sidebar has a job of its own, refresh-sidebar.sh -- see docs/operations.md."
   q_backend: "Where should the built site go?"
   backend_none: "Nowhere yet -- write and preview locally, decide later"
   backend_surfer: "Cloudron Surfer -- you run your own Cloudron with the Surfer app on it"
@@ -827,6 +1046,8 @@ style:
   menu_social: "Social -- the row of icons in the footer, and Mastodon verification"
   menu_widgets: "Sidebar -- recent toots, Pixelfed, commits, Bluesky, any RSS feed"
   menu_fonts: "Fonts -- the typeface and size of the name and description on the banner"
+  menu_layout: "Layout -- which regions of the page exist, and your own stylesheet"
+  menu_nav: "Menu bar -- what stands in the strip under the banner"
   menu_analytics: "Analytics -- the script, if you run one"
 
   palette_intro: "A palette is seven colours per mode. Everything else -- card backgrounds, hover colours, the search field -- is worked out from them at build time on its own."
@@ -873,8 +1094,10 @@ style:
   e_hex: "A colour looks like #1da1f2 or #fff."
 
   banner_current: "The banner image is now %{path}."
-  q_banner_file: "Path to a new banner image (Enter to keep the current one)"
-  h_banner_file: "Any PNG, JPEG, GIF or WebP. It is copied into place and measured, so the config's width and height match the file."
+  q_banner_file: "Banner image -- file name in incoming/ (Enter keeps the current one)"
+  q_banner_src: "What should it be saved as?"
+  h_banner_src: "Enter keeps the current one. After the file you picked it would be %{suggested} -- the name is a setting (banner.src), not a fixed rule."
+  h_banner_file: "Drop it in incoming/ and type just the name. PNG, JPEG, GIF or WebP. Make it about twice as wide as it is displayed -- it spans the full width and would look soft on a dense screen; the one shipped is 1880x600."
   banner_not_found: "%{path} is not a file, so the banner was left alone."
   banner_copied: "✅ Copied into %{path}."
   banner_pending: "✅ Will be installed as %{path} once you confirm the write."
@@ -927,7 +1150,7 @@ style:
   widget_heading_rss: "Elsewhere"
   q_widget_heading: "Heading over the widget"
   q_widget_account_id: "Numeric account id"
-  h_widget_account_id: "The number, not the @handle. Easiest: ./setup.sh with the token filled in finds it and offers this widget itself. By hand: open https://your-instance/api/v1/accounts/lookup?acct=yourname in a browser and copy the \"id\" value."
+  h_widget_account_id: "The number, not the @handle. ./setup.sh finds it when the token is filled in. By hand: open https://your-instance/api/v1/accounts/lookup?acct=yourname and copy \"id\"."
   q_widget_username: "GitHub username"
   h_widget_username: "Just the name, as it appears in your profile URL."
   q_widget_feed_url: "Feed URL"
@@ -961,6 +1184,58 @@ style:
   list_remove: "Remove one"
   list_keep: "Leave it as it is"
   q_list_action: "Add one, remove one, or leave them?"
+  nav_derived: "The menu is derived from your content right now: All, plus one item per kind of post you write."
+  nav_is_off: "There is no menu bar."
+  nav_current: "The menu now:"
+  nav_turn_off: "No menu bar at all"
+  nav_off_note: "The bar is gone. Nothing else moves -- the tag and type listings are still built and still reachable."
+  nav_replaces_derived: "Careful: the first item you add does not join the derived menu, it replaces it. Add the ones you want to keep too."
+  q_nav_action: "Add an item, remove one, or leave the menu alone?"
+  q_nav_label: "What should the item say?"
+  q_nav_kind: "Where should it lead?"
+  nav_kind_home: "The front page"
+  nav_kind_tag: "A tag listing"
+  nav_kind_page: "A page"
+  nav_kind_url: "Somewhere else -- an address you type"
+  q_nav_tag: "Which tag?"
+  h_nav_tag: "The name of the tag, not the address. Your busiest ones: %{list}"
+  q_nav_page: "Which page?"
+  q_nav_url: "What address?"
+  h_nav_url: "A path on this site (/about/) or a whole address somewhere else."
+  nav_tag_unknown: "No post carries the tag %{tag}, so its listing is not built and the item would be a 404."
+  nav_url_unknown: "This site does not answer at %{url}, so the item would be a 404."
+  q_nav_anyway: "Add it anyway?"
+  q_layout_sidebar: "The right-hand column (bio, widgets, per-post stats)?"
+  q_layout_hero: "Lift a post's first image above its title?"
+  css_current: "Your own stylesheets, in load order:"
+  q_css_action: "Add a stylesheet, remove one, or leave them?"
+  q_css_file: "Stylesheet -- file name in incoming/"
+  h_css_file: "Drop it in incoming/ and type just the name; it is saved into assets/css/ and loads after the engine own, so it overrides it. The name of a file already in assets/css/ is accepted too."
+  css_missing_mark: "⚠️  file is not there"
+  css_not_found: "%{path} is not on disk -- the browser simply never gets it and the site renders without it."
+  q_css_anyway: "Add it anyway?"
+  file_will_go: "It will be saved as %{path}."
+  file_copied: "Copied to %{path}."
+  incoming_not_cleaned: "Left in incoming/: %{files} -- the copy is in place, but the original could not be deleted (no write permission on incoming/). Remove it by hand."
+  q_banner_claim: "Your own claim text over the banner"
+  h_banner_claim: "Enter keeps the current one. Empty means the site description is used. This one may carry <br>; the description may not, since it also goes into meta and RSS."
+  faces_current: "Your own fonts from assets/fonts/:"
+  q_faces_action: "Add a font, remove one, or leave them?"
+  q_face_family: "Family name, as you will write it in a stack"
+  h_face_family: "For example Playfair Display. This is the name you then use in the title or claim font."
+  q_face_file: "Font file -- name in incoming/ or in assets/fonts/"
+  h_face_file: "Drop it in incoming/ and type just the name; it is saved into assets/fonts/. Prefer .woff2; .woff, .ttf and .otf work too. One file per family and weight, carrying the characters your language needs."
+  q_face_weight: "Weight (optional)"
+  h_face_weight: "Enter skips it. 400, or a range like 400 700 -- which is also what you get if you say nothing."
+  q_face_style: "Style (optional)"
+  h_face_style: "Enter skips it. The engine takes normal, italic or oblique, nothing else."
+  faces_missing_mark: "⚠️  file is not there"
+  faces_not_found: "%{file} is not in assets/fonts/ -- the build names it and skips it, so the site would render in the fallback face."
+  q_faces_anyway: "Add it anyway?"
+  css_remote: "Paths on this site only. Every page carries style-src 'self', so a stylesheet on another host is discarded by the browser without a word."
+  nav_url_relative: "%{url} is not an address -- without the slashes the browser reads it against whatever page the menu is on."
+  q_nav_use_absolute: "Write it as %{url}?"
+  h_nav_tag_empty: "The name of the tag, not the address. Nothing is tagged yet, so there is nothing to offer."
   q_list_which: "Which one do you want to remove?"
   q_list_title: "Title of the link"
   q_list_url: "Address it points at"

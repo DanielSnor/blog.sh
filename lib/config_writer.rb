@@ -342,17 +342,30 @@ module ConfigWriter
       item_indent = indent + ConfigWriter::INDENT
 
       body = items.flat_map do |item|
+        # A plain sequence of scalars -- site.extra_css is one -- as well as
+        # the sequence of mappings this was written for (social, footer
+        # links, nav). Told apart by the item, not by a second method: the
+        # caller knows what it is holding and should not have to say so.
+        next ["#{' ' * item_indent}- #{ConfigWriter.scalar(item)}\n"] unless item.is_a?(Hash)
+
         pairs = item.reject { |_, v| v.nil? }
         pairs.each_with_index.map do |(k, v), i|
           marker = i.zero? ? '- ' : '  '
           "#{' ' * item_indent}#{marker}#{k}: #{ConfigWriter.scalar(v)}\n"
         end
       end
-      body = ["#{' ' * item_indent}[]\n"] if items.empty?
-
       extent = value_extent(line_no)
-      @lines[line_no..extent] = ["#{' ' * indent}#{key}:\n", *body]
-      @intended[key_path] = items.map { |i| i.reject { |_, v| v.nil? } }
+      # An empty list is written inline. `key:` followed by an indented
+      # `[]` parses the same, but it reads as a key someone forgot to
+      # finish -- and for `nav:` the difference between 'no items' and
+      # 'nothing written yet' is the difference between no menu bar and
+      # the derived one.
+      @lines[line_no..extent] = if items.empty?
+                                  ["#{' ' * indent}#{key}: []\n"]
+                                else
+                                  ["#{' ' * indent}#{key}:\n", *body]
+                                end
+      @intended[key_path] = items.map { |i| i.is_a?(Hash) ? i.reject { |_, v| v.nil? } : i }
       self
     end
 
@@ -645,8 +658,12 @@ module ConfigWriter
       data = YamlCompat.load_file(@path) || {}
       @intended.each do |key_path, expected|
         actual = key_path.reduce(data) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
-        actual = actual.map { |h| h.transform_keys(&:to_s) } if actual.is_a?(Array)
-        want = expected.is_a?(Array) ? expected.map { |h| h.transform_keys(&:to_s) } : expected
+        # Sequences of mappings get their keys stringified before the
+        # comparison; a sequence of scalars (site.extra_css) has nothing to
+        # stringify and must be left as it is.
+        stringify = ->(list) { list.map { |i| i.is_a?(Hash) ? i.transform_keys(&:to_s) : i } }
+        actual = stringify.call(actual) if actual.is_a?(Array)
+        want = expected.is_a?(Array) ? stringify.call(expected) : expected
         next if actual == want
 
         raise "#{key_path.join('.')} reads back as #{actual.inspect}, expected #{want.inspect}"
