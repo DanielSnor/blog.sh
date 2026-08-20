@@ -201,8 +201,16 @@ SITE_COLORS = SiteConfig.get('colors', default: {})
 # moves both in one rebuild.
 THEME_COLOR_LIGHT = ColorsCss.color_for(SITE_COLORS, 'light', 'bg')
 THEME_COLOR_DARK = ColorsCss.color_for(SITE_COLORS, 'dark', 'bg')
-ABOUT = SiteConfig.fetch('about')
-FOOTER = SiteConfig.fetch('footer')
+# `get` with an empty default, for the same reason WIDGETS below has one:
+# every key in these two sections is optional and every template that reads
+# them guards for emptiness, so a site that deleted its whole `about:` block
+# has answered the question rather than broken the config. With `fetch` it
+# aborted the build -- while `doctor`, which no longer requires about.html
+# or footer.copyright either, called the same file healthy. A build that
+# stops on a file the checker vouches for is the one shape of failure this
+# release is about.
+ABOUT = SiteConfig.get('about', default: {})
+FOOTER = SiteConfig.get('footer', default: {})
 SOCIAL = SiteConfig.get('social', default: [])
 # Both the Mastodon comments/toot integration and every sidebar widget are
 # optional -- `get` (not `fetch`) so a site with none of this configured
@@ -342,8 +350,32 @@ def social_links_html
   end.join("\n")
 end
 
+# A chrome heading rides with its content -- the footer partial guards the
+# CONTENT since 1.2, but the heading's own emptiness was never asked about,
+# so links_heading: "" over a filled list rendered <h3></h3>, and a note
+# could not be published without a title at all (sh.cynicky.blog wanted
+# exactly that and had no way to say it). Emits the complete line, newline
+# included, or nothing: the template joins this to the next markup line, so
+# a site WITH a heading renders byte for byte what it always has -- the
+# partials compile without a trim mode, and a guard written as its own
+# template line would have added a blank line to every page of every
+# installation (same trap as the about card's guard).
+def chrome_heading_line(text)
+  return '' if text.to_s.strip.empty?
+
+  "        <h3>#{h(text)}</h3>\n"
+end
+
 def footer_links_html
-  FOOTER.fetch('links', []).map do |link|
+  # `|| []`, not fetch's default: Hash#fetch answers the default only for a
+  # MISSING key, and `links:` left standing without a list under it is a
+  # key that is present and nil. That typo -- or an editor that removed the
+  # last entry and left the key -- used to reach .map and end the build in a
+  # NoMethodError, with no page regenerated and `doctor` calling the same
+  # file healthy. Its sibling `social:` has always read the empty answer
+  # correctly (SiteConfig.get returns the default for nil), and the two
+  # describe the same shape of data.
+  (FOOTER['links'] || []).map do |link|
     %(          <li><a href="#{h(link['url'])}">#{h(link['title'])}</a></li>)
   end.join("\n")
 end
@@ -2243,9 +2275,12 @@ end.freeze
 # site entirely. An entry missing either a label or a destination is
 # skipped rather than rendered as an empty link.
 #
-# An empty list is a decision, not a mistake: the menu then renders
-# nothing at all -- no bar, no toggle -- rather than an empty bar. That is
-# also how a site turns the menu off, so there is no second key for it.
+# An empty list is a decision, not a mistake: the entries and the toggle
+# that opens them go away rather than leaving an empty menu behind. That
+# is also how a site turns the menu off, so there is no second key for it.
+# The <nav> bar itself outlives them, because the search field lives in
+# it and templates/layout.html.erb asks for search on every page it
+# renders (redirect stubs, which skip layout() on purpose, carry no bar).
 def configured_nav_items
   entries = SiteConfig.get('nav', default: nil)
   return nil unless entries.is_a?(Array)

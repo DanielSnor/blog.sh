@@ -31,6 +31,7 @@ require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
 require_relative '../lib/publishing'
+require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
 require_relative '../lib/tui'
 require_relative '../lib/site_header'
@@ -69,11 +70,49 @@ end
 # iPad, which is the whole reason this exists), but it can't be guessed or
 # reached from anywhere else. The build also adds noindex to it.
 def draft_url(post)
-  "#{SITE_BASE_URL.to_s.chomp('/')}/draft/#{post['draft_token']}/#{post['slug']}/"
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{draft_path(post)}"
 end
 
 def published_url(slug, year)
-  "#{SITE_BASE_URL.to_s.chomp('/')}/posts/#{year}/#{slug}/"
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{published_path(slug, year)}"
+end
+
+# The site-relative halves, split off so the local-preview hint below can
+# put the SAME page under a different origin. Split rather than derived by
+# string surgery on the finished URL: a base_url that itself contained
+# "/posts/" would make that surgery cut in the wrong place.
+def draft_path(post)
+  "/draft/#{post['draft_token']}/#{post['slug']}/"
+end
+
+def published_path(slug, year)
+  "/posts/#{year}/#{slug}/"
+end
+
+# An install that never answered "where does this go?" still carries the
+# template's address, so every URL printed above says example.com -- a
+# domain the author does not own and cannot open. doctor already names
+# this state (base_url_placeholder) and the two have to agree on what
+# counts as it, hence the same literal comparison.
+PLACEHOLDER_BASE_URL = 'https://example.com'
+
+def placeholder_base_url?
+  SITE_BASE_URL.to_s.chomp('/') == PLACEHOLDER_BASE_URL
+end
+
+# `./blog.sh preview` serves the build on 8000 unless told otherwise. The
+# number is repeated here rather than shared with that command on purpose:
+# what this prints is the address of the DEFAULT invocation, which is the
+# one the hint is telling somebody to run.
+LOCAL_PREVIEW_PORT = 8000
+
+# Printed under a preview or a publish line, and only where the canonical
+# address is still the template's: on a real site that address IS the
+# answer, and a second one under every post would be noise.
+def puts_local_preview_hint(site_path)
+  return unless placeholder_base_url?
+
+  puts Tui.paint(t('cli.local_preview_hint', url: "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}"), :dim)
 end
 
 # --- frontmatter ------------------------------------------------------
@@ -681,8 +720,6 @@ end
 # raises: a failed announcement must not block publishing the post
 # itself. Composition and dispatch live in lib/publishing.rb, shared
 # with the scheduled-publish cron.
-TOOT_RECENCY_WINDOW = 24 * 60 * 60 # seconds; posts dated further from "now" than this (e.g. backfilled from an old thread) don't get an auto announcement
-
 def announce_post(post, year:, date:, force: false)
   # An unlisted post is not announced, and force does not open this door the
   # way it opens the backdating one. The whole point of `unlisted` is a post
@@ -695,7 +732,7 @@ def announce_post(post, year:, date:, force: false)
   #
   # To announce such a post, take the flag off first. That is one edit, and
   # it makes the decision explicit rather than a side effect of publishing.
-  if truthy_frontmatter?(post['unlisted'])
+  if Publishing.unlisted?(post)
     warn t('cli.unlisted_no_toot')
     return nil
   end
@@ -718,7 +755,7 @@ def announce_post(post, year:, date:, force: false)
     return nil
   end
 
-  if !force && (date - Time.now).abs > TOOT_RECENCY_WINDOW
+  if !force && !Publishing.within_recency_window?(date)
     warn t('cli.backdated_no_toot')
     return nil
   end
@@ -743,7 +780,7 @@ def cmd_add
   # Offered before the template is built, because restoring means opening
   # the editor on the recovered text INSTEAD of the template.
   restored = offer_editor_buffer('add')
-  template = restored || build_frontmatter(title: '', tags: '', type: '') + "First paragraph's text.\n"
+  template = restored || build_frontmatter(title: '', tags: '', type: '') + "#{t('cli.template_body_placeholder')}\n"
   raw = edit_in_editor(template, FRONTMATTER_HINT, { 'kind' => 'add' })
 
   # Editor closed without saving (or saved untouched) leaves the template
@@ -913,7 +950,12 @@ def draft_decision_loop(slug, path: nil)
     # before this, whether from cmd_add or the 'e' branch below) already
     # ended with a blank line after "Done:", so another one would double up.
     puts Tui.paint(t('cli.preview_label', url: draft_url(post)), :cyan)
-    if Tui.interactive? && (qr = QrCode.render(draft_url(post)))
+    puts_local_preview_hint(draft_path(post))
+    # No QR under a placeholder address: the code is there to carry the
+    # draft to a phone, and a phone that scans example.com lands on a
+    # domain this author does not own. A localhost code is no better --
+    # it resolves to the phone itself.
+    if Tui.interactive? && !placeholder_base_url? && (qr = QrCode.render(draft_url(post)))
       puts
       puts qr
       puts Tui.paint(t('cli.qr_hint'), :dim)
@@ -930,7 +972,9 @@ def draft_decision_loop(slug, path: nil)
     when 'e' then edit_post(slug, path: path)
     when 's'
       puts
-      return if prompt_and_schedule(path, post, raw: raw)
+      # == true: :busy already said why nothing happened, and the dialog
+      # coming back around is the retry.
+      return if prompt_and_schedule(path, post, raw: raw) == true
     when 'd', ''
       puts
       puts t('cli.left_as_draft', slug: slug)
@@ -950,10 +994,12 @@ end
 # [s] dialog choice and the standalone `schedule` command -- both ask the
 # same question, and since the frontmatter no longer offers a date field,
 # asking is the only way either of them can get one. Returns true when
-# scheduled, false on cancel/invalid input: the dialog uses that to come
-# around again, the standalone command just ends. The preview is rebuilt
-# because the entered date becomes the post's date and shows on the draft
-# page.
+# scheduled, false on cancel (an unreadable date re-asks in place rather
+# than answering false -- both callers used to treat a typo differently,
+# and only one of them by design), and :busy when a running publish holds
+# the queue. No preview rebuild on the way out: the entered date shows on
+# pages the publication regenerates anyway, and the middle of three builds
+# on the road to "post tonight" was the one a beginner paid for nothing.
 #
 # No leading blank line here: the two callers arrive with different things
 # above them. pick_from_list already ends with one, while the dialog's
@@ -1017,7 +1063,7 @@ def queue_position(time, entries)
   { count: earlier.size + 1, slug: earlier.last[1], date: earlier.last[0] }
 end
 
-def prompt_and_schedule(path, post, rebuild: true, raw: nil)
+def prompt_and_schedule(path, post, raw: nil)
   # Read once when slots are configured (the offer needs it); a site
   # without slots pays nothing here and reads the archive only after it
   # has actually scheduled something, for the queue line.
@@ -1046,10 +1092,6 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
       puts Tui.paint("   #{t('cli.schedule_queue_hint')}", :dim)
       puts
     end
-    puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
-    print '> '
-  else
-    print t('cli.schedule_date_prompt')
   end
   # NOT `raw = ...`: this method's raw: keyword is the file's bytes as
   # they looked before the dialog opened -- the staleness guard's whole
@@ -1057,36 +1099,73 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
   # typed date line, and the guard then compared the post file against
   # the answer "2026-12-24 08:00", failed by construction, and every
   # scheduling path in the CLI aborted with "changed on disk".
-  answer = $stdin.gets
-  # EOF is not Enter. With an offer on screen an empty line accepts, and
-  # Ctrl-D (or a piped run whose input ran out) would otherwise schedule,
-  # rebuild and deploy a post nobody confirmed.
-  return false if answer.nil?
+  # A loop, not one attempt: a typo in the date used to END the standalone
+  # command (exit 0, post untouched) while the draft dialog's [s] asked
+  # again -- but only because its menu happens to loop. Two behaviours for
+  # the same question; now the question itself re-asks until it gets a
+  # date, a cancel, or the end of input.
+  date = nil
+  loop do
+    if slot
+      puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
+      print '> '
+    else
+      print t('cli.schedule_date_prompt')
+    end
+    answer = $stdin.gets
+    # EOF is not Enter. With an offer on screen an empty line accepts, and
+    # Ctrl-D (or a piped run whose input ran out) would otherwise schedule
+    # and announce a post nobody confirmed -- and inside a loop it would
+    # re-ask forever.
+    return false if answer.nil?
 
-  input = answer.strip
-  return false if input.empty? && slot.nil?
-  return false if input.downcase == t('cli.cancel_word')
+    input = answer.strip
+    return false if input.empty? && slot.nil?
+    return false if input.downcase == t('cli.cancel_word')
 
-  date = if input.empty?
-           slot
-         else
-           begin
-             Time.parse(input)
-           rescue ArgumentError
-             nil
+    date = if input.empty?
+             slot
+           else
+             begin
+               Time.parse(input)
+             rescue ArgumentError
+               nil
+             end
            end
-         end
-  if date.nil?
-    puts t('cli.schedule_date_invalid')
-    return false
-  end
-  if date <= Time.now
-    puts t('cli.schedule_date_not_future')
-    return false
+    if date.nil?
+      puts t('cli.schedule_date_invalid')
+      next
+    end
+    if date <= Time.now
+      puts t('cli.schedule_date_not_future')
+      # An offer can expire mid-dialog: the slot is computed before the
+      # loop, and a long hesitation (or a slot minutes away) leaves
+      # [Enter] advertising a time this guard now refuses -- every press
+      # of it, forever. Recomputed from the same entries: their times
+      # only aged, and a queue changed underneath is caught at the write.
+      if input.empty? && slot
+        slot = next_publish_slot(post['slug'], entries)
+        puts t('cli.schedule_slot_offer', slot: slot.strftime(t('date_time_format'))) if slot
+      end
+      date = nil
+      next
+    end
+
+    break
   end
 
-  write_scheduled_date(path, post, date, raw: raw)
-  rebuild_and_deploy(t('cli.updating_preview')) if rebuild
+  # :busy, distinct from false: false means the author declined or the
+  # input did not parse, and the standalone command answers that with
+  # exit 0. A publish holding the lock is neither -- the caller whose
+  # exit code somebody scripts against answers it with BUSY_EXIT, like
+  # cmd_rebuild has since the lock existed.
+  return :busy if write_scheduled_date(path, post, date, raw: raw).nil?
+
+  # No preview rebuild here any more: scheduling a post written this
+  # session used to build and deploy the site a SECOND time only to
+  # stamp a new date on a draft preview the publication throws away --
+  # the add-time build already shows the content, and the cron's build
+  # ships the real page. The queue screen never rebuilt here either.
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   position = queue_position(date, entries || scheduled_entries(except_slug: post['slug']))
   if position
@@ -1099,6 +1178,21 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
 end
 
 def announce_on_publish(post, year, date)
+  # Before everything else, the record on the post itself: an announcement
+  # that already exists is never repeated from here -- not by publish, not
+  # by the standalone toot/bluesky commands, which all arrive through this
+  # method. A second one does not replace the first, it strands the
+  # replies under it; unpublish keeps the address on the post for exactly
+  # this check to find (its own message promises that publishing again
+  # will not add a second one -- this is where that promise is kept, and
+  # it used not to be kept anywhere). Wanting a fresh announcement anyway
+  # is expressed by deleting the address fields from the post's JSON: an
+  # edit deliberate enough to mean it.
+  if Publishing.announced?(post)
+    warn t('cli.announcement_exists', url: Publishing.announcement_url(post))
+    return nil
+  end
+
   # Before the question, not after it: with no network there is nothing the
   # answer could change, and being asked to confirm an announcement that
   # cannot happen -- then being told it did not happen -- is two screens of
@@ -1110,7 +1204,7 @@ def announce_on_publish(post, year, date)
   end
 
   force = false
-  if (date - Time.now).abs > TOOT_RECENCY_WINDOW
+  unless Publishing.within_recency_window?(date)
     answer = Tui.key_choice(t('cli.date_outside_window_prompt', date: date.strftime(t('date_format'))))
     # Saying no here is a decision, and it used to be reported as a
     # failure: the question scrolled away, "Failed to send the toot (see
@@ -1176,6 +1270,7 @@ def publish_draft(slug, path: nil)
   # line after its own "Done: uploaded...", same doubling as
   # draft_decision_loop above.
   puts Tui.paint(t('cli.done_label', url: published_url(slug, new_year)), :green)
+  puts_local_preview_hint(published_path(slug, new_year))
   puts t('cli.backdated_note') unless untouched
   puts
 end
@@ -1263,12 +1358,10 @@ def cmd_toot(slug)
     return
   end
 
-  if post['mastodon_url']
-    puts t('cli.already_has_toot', url: post['mastodon_url'])
-    puts
-    return
-  end
-
+  # No own already-announced check: announce_on_publish below carries it,
+  # for every caller alike -- and unlike the truthy test that used to sit
+  # here, it is not fooled by an empty string into refusing a first toot,
+  # and not blind to an announcement living on the other network.
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
   fields = announce_on_publish(post, year, date)
@@ -1313,8 +1406,14 @@ def cmd_bluesky(slug)
     return
   end
 
-  if post['bluesky_url']
-    puts t('cli.already_has_bluesky', url: post['bluesky_url'])
+  # announced?, not a bare bluesky_url test: a post whose announcement
+  # lives on Mastodon must refuse here too (a second thread on a second
+  # network strands the first all the same), and the recovery lookup
+  # below is for posts with NO announcement on record -- running it over
+  # one that has an address would be a network call asking a question the
+  # post already answers.
+  if Publishing.announced?(post)
+    puts t('cli.announcement_exists', url: Publishing.announcement_url(post))
     puts
     return
   end
@@ -1366,6 +1465,21 @@ def cmd_publish(slug)
     return
   end
 
+  # The one path into the draft dialog that never built: add, edit and
+  # unpublish all rebuild before it, so the Preview line the dialog prints
+  # points at a page that exists. A draft that arrived by import or by a
+  # hand-written JSON had a dead preview here -- and since scheduling
+  # stopped rebuilding, nothing later covered for it. Built only when the
+  # page is actually missing: a build is the expensive step on a large
+  # archive, and the ordinary publish-after-edit walk has already paid it.
+  # A draft without a token has no preview address to be dead; the build
+  # would not conjure one.
+  token = post['draft_token'].to_s
+  unless token.empty? ||
+         File.exist?(File.join(ROOT, 'public.nosync', 'draft', token, slug, 'index.html'))
+    rebuild_and_deploy(t('cli.generating_preview'))
+  end
+
   draft_decision_loop(slug, path: path)
 end
 
@@ -1388,14 +1502,18 @@ def cmd_schedule(slug)
   end
 
   if post['scheduled']
-    unschedule_post(path, post, slug, raw: raw)
+    # The same exit code cmd_rebuild answers a held lock with: somebody
+    # scripting `blog.sh schedule` must not read "a publish was in the
+    # way" as "unscheduled". In the wizard the SystemExit is caught like
+    # every other cmd_* abort.
+    exit RunLock::BUSY_EXIT unless unschedule_post(path, post, slug, raw: raw)
     return
   end
 
   # The bytes from before the prompt ride along, so the cron publishing
   # this exact post mid-dialog is caught -- the same guard every other
   # path into scheduling already carries.
-  prompt_and_schedule(path, post, raw: raw)
+  exit RunLock::BUSY_EXIT if prompt_and_schedule(path, post, raw: raw) == :busy
 end
 
 # Shared by the CLI toggle above and the [n] action in the properties
@@ -1405,12 +1523,28 @@ end
 # captured post back after a prompt, and the cron may have published it in
 # the meantime.
 def unschedule_post(path, post, slug, raw: nil)
-  abort_if_post_changed(path, raw, slug) if raw
-  updated = post.dup
-  updated.delete('scheduled')
-  AtomicWrite.write_json(path, updated)
+  # Same lock as write_scheduled_date above, same reason: the capture this
+  # writes back must not overwrite what a mid-dialog tick just published.
+  held = RunLock.hold(ROOT, label: 'queue') do
+    abort_if_post_changed(path, raw, slug) if raw
+    updated = post.dup
+    updated.delete('scheduled')
+    AtomicWrite.write_json(path, updated)
+  end
+  # false, not a bare return: the queue screen decides whether to offer
+  # compacting the slots behind this post by this answer, and a decline
+  # that returned the same nil as success once shifted the queue onto a
+  # slot the refused unschedule never freed -- two posts on one time,
+  # published (and announced) by a single tick.
+  if held == RunLock::BUSY
+    warn t('cli.queue_busy')
+    warn ''
+    return false
+  end
+
   puts t('cli.unscheduled_label', slug: slug)
   puts
+  true
 end
 
 # Writes `date` into a draft as its scheduled publish time. A date in
@@ -1431,22 +1565,38 @@ end
 # it a second time. The check therefore belongs HERE, at the last
 # instruction before the write, not at the top of a dialog that then waits
 # for a keypress.
+# The byte compare above is only half the guard: the compare and the write
+# have to sit under the same lock the cron takes, or a tick landing between
+# them writes the capture back over a post the tick just published -- the
+# queue screen has held it since the lock existed, and this is the [s]
+# dialog's and the standalone schedule's turn. Reentrant under
+# apply_queue_moves (RunLock.hold yields straight through for a holder), so
+# the queue screen pays nothing for it. Returns nil without writing when a
+# publish is running; callers treat that like any other declined prompt.
 def write_scheduled_date(path, post, date, raw: nil, slug: nil)
-  abort_if_post_changed(path, raw, slug || post['slug']) if raw
-  updated = post.merge('date' => date.iso8601, 'scheduled' => true)
-  new_year = date.year.to_s
-  new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
-  if File.expand_path(new_path) != File.expand_path(path)
-    abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
+  held = RunLock.hold(ROOT, label: 'queue') do
+    abort_if_post_changed(path, raw, slug || post['slug']) if raw
+    updated = post.merge('date' => date.iso8601, 'scheduled' => true)
+    new_year = date.year.to_s
+    new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
+    if File.expand_path(new_path) != File.expand_path(path)
+      abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
 
-    FileUtils.mkdir_p(File.dirname(new_path))
-    Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
-    AtomicWrite.write_json(new_path, updated)
-    File.delete(path)
-  else
-    AtomicWrite.write_json(new_path, updated)
+      FileUtils.mkdir_p(File.dirname(new_path))
+      Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
+      AtomicWrite.write_json(new_path, updated)
+      File.delete(path)
+    else
+      AtomicWrite.write_json(new_path, updated)
+    end
+    new_path
   end
-  new_path
+  if held == RunLock::BUSY
+    warn t('cli.queue_busy')
+    return nil
+  end
+
+  held
 end
 
 # --- the queue screen -------------------------------------------------
@@ -1692,10 +1842,13 @@ def queue_act_slow(entries, index, key)
     queue_offer_compact(freed, entries[(index + 1)..])
   when 's'
     puts
-    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw])
+    prompt_and_schedule(entry[:path], entry[:post], raw: entry[:raw]) == true
   when 'n'
-    unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
-    queue_offer_compact(entry[:time], entries[(index + 1)..])
+    # Only a write that happened frees the slot: a declined unschedule
+    # falling through to this offer stacked two posts on one time.
+    if unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
+      queue_offer_compact(entry[:time], entries[(index + 1)..])
+    end
   end
 end
 
@@ -1776,13 +1929,15 @@ def queue_act(entries, index)
   end
 end
 
-# Runs a queue's writes in order and, when one dies partway, names what
-# did and did not move before the failure travels on. The pre-flights in
-# queue_swap and queue_offer_compact catch what they can SEE -- a stale
-# file, a taken path -- but a full disk, a permission error or a Ctrl-C
-# BETWEEN the writes is invisible to them, and the half-moved queue it
-# leaves behind was only ever discovered by the cron publishing the
-# wrong post. Nothing is rolled back: the disk that just refused one
+# Runs a queue's writes in order -- under the lock, after checking every
+# one of them -- and, when one dies partway, names what did and did not
+# move before the failure travels on. The pre-flight below catches what it
+# can SEE -- a stale file, a taken path -- and the lock keeps the one run
+# that could invalidate an answer out of the gap between the checking and
+# the writing. Neither reaches the rest: a full disk, a permission error
+# or a Ctrl-C BETWEEN the writes is invisible to both, and the half-moved
+# queue it leaves behind was only ever discovered by the cron publishing
+# the wrong post. Nothing is rolled back: the disk that just refused one
 # write is not owed a second chance with another, and a wrong guess
 # here doubles the damage. rescue Exception, not StandardError, because
 # the deaths this must outlive long enough to speak are exactly the
@@ -1792,21 +1947,57 @@ end
 # times are the ISO form the JSON carries, since repairing that file by
 # hand is what the report is for.
 def apply_queue_moves(moves)
-  done = 0
-  moves.each do |entry, target|
-    yield entry, target
-    done += 1
-  end
-rescue Exception
-  if done.positive?
-    warn ''
-    warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
-    moves.each_with_index do |(entry, target), i|
-      warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+  held = RunLock.hold(ROOT, label: 'queue') do
+    # Checked here rather than in the three callers that used to each keep
+    # a copy of this loop: above the lock these answers could stop being
+    # true between the asking and the writing, and the thing that makes
+    # them stop being true is not a person -- it is the publishing cron,
+    # which runs every fifteen minutes and does not wait for anyone to
+    # finish reading a screen. A tick landing in that gap publishes a due
+    # post and then has a draft's schedule written back over it: state
+    # reverted, announcement URL dropped, the same post queued to go out
+    # (and be announced) a second time.
+    #
+    # The byte compare stays what it always was, and still earns its keep
+    # inside the lock: it catches the tick that finished a moment BEFORE
+    # the lock was taken, which no lock can do anything about.
+    moves.each do |entry, target|
+      abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
+      target_path = File.join(CONTENT_DIR, target.year.to_s, "#{entry[:post]['slug']}.json")
+      next if File.expand_path(target_path) == File.expand_path(entry[:path])
+
+      abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
     end
-    warn ''
+
+    done = 0
+    begin
+      moves.each do |entry, target|
+        yield entry, target
+        done += 1
+      end
+    rescue Exception
+      if done.positive?
+        warn ''
+        warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
+        moves.each_with_index do |(entry, target), i|
+          warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+        end
+        warn ''
+      end
+      raise
+    end
+    true
   end
-  raise
+  return true unless held == RunLock::BUSY
+
+  # Nothing was written and nothing is broken -- the run in the way is
+  # almost always the publishing cron, which is gone within a minute. The
+  # queue is re-read on the next frame anyway, so trying again costs a
+  # keypress. (RunLock says the same thing on stderr, naming the holder;
+  # this line is the one the queue screen can put on its status row.)
+  puts t('cli.queue_busy')
+  puts
+  false
 end
 
 # Picking the post up and carrying it, instead of trading places with one
@@ -1855,20 +2046,14 @@ def queue_carry_apply(entries, index, target)
     [entry, times[i]] unless entry[:time] == times[i]
   end
 
-  # Every half checked before any of it is written -- the whole reason
-  # queue_swap does the same, only here the run is longer and a failure
+  # Every half is checked before any of it is written, and both halves of
+  # that happen under the lock -- see apply_queue_moves, which holds it and
+  # does the checking. Here the run is longer than a swap's, so a failure
   # partway through would leave more of the queue half-moved.
-  moves.each do |entry, target_time|
-    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
-    target_path = File.join(CONTENT_DIR, target_time.year.to_s, "#{entry[:post]['slug']}.json")
-    next if File.expand_path(target_path) == File.expand_path(entry[:path])
-
-    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
-  end
-
-  apply_queue_moves(moves) do |entry, target_time|
+  applied = apply_queue_moves(moves) do |entry, target_time|
     write_scheduled_date(entry[:path], entry[:post], target_time, raw: entry[:raw])
   end
+  return false unless applied
   puts Tui.paint(t('cli.queue_carried', slug: entries[index][:slug], position: target + 1,
                                         date: times[target].getlocal.strftime(t('date_time_format'))), :green)
   puts
@@ -1944,27 +2129,21 @@ def queue_swap(entries, index, other_index)
     return false
   end
 
-  # Both halves are checked BEFORE either is written. write_scheduled_date
-  # aborts the process on a stale file or a target path that is taken, and
-  # a swap is two independent writes -- so an abort on the second left the
-  # first applied: the moved post sat on a slot the un-moved post still
-  # held, and the cron published both. In the [u] direction the surviving
-  # half moved the picked post EARLIER, publishing it months before the
-  # date that had just been confirmed, with nothing on screen but the
-  # abort. A same-slug-in-two-years collision makes that deterministic,
-  # and the engine treats those as ordinary.
+  # Both halves are checked BEFORE either is written (in apply_queue_moves,
+  # under the lock). write_scheduled_date aborts the process on a stale
+  # file or a target path that is taken, and a swap is two independent
+  # writes -- so an abort on the second left the first applied: the moved
+  # post sat on a slot the un-moved post still held, and the cron published
+  # both. In the [u] direction the surviving half moved the picked post
+  # EARLIER, publishing it months before the date that had just been
+  # confirmed, with nothing on screen but the abort. A same-slug-in-two-
+  # years collision makes that deterministic, and the engine treats those
+  # as ordinary.
   moves = [[entry, other[:time]], [other, entry[:time]]]
-  moves.each do |e, target|
-    abort_if_post_changed(e[:path], e[:raw], e[:post]['slug']) if e[:raw]
-    target_path = File.join(CONTENT_DIR, target.year.to_s, "#{e[:post]['slug']}.json")
-    next if File.expand_path(target_path) == File.expand_path(e[:path])
-
-    abort t('cli.post_already_exists', slug: e[:post]['slug'], path: target_path) if File.exist?(target_path)
-  end
-
-  apply_queue_moves(moves) do |e, target|
+  applied = apply_queue_moves(moves) do |e, target|
     write_scheduled_date(e[:path], e[:post], target, raw: e[:raw])
   end
+  return false unless applied
   puts Tui.paint(t('cli.queue_swapped', slug: entry[:slug],
                                         date: other[:time].getlocal.strftime(t('date_time_format'))), :green)
   puts
@@ -1990,17 +2169,12 @@ def queue_offer_compact(freed_time, rest)
   # queue_swap is: write_scheduled_date ABORTS the process, and an abort
   # partway through N writes left the queue half-shifted -- some posts
   # moved forward, some not -- while the message on the way out says
-  # nothing was saved.
-  rest.each_with_index do |entry, i|
-    abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
-    target = File.join(CONTENT_DIR, times[i].year.to_s, "#{entry[:post]['slug']}.json")
-    next if File.expand_path(target) == File.expand_path(entry[:path])
-
-    abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target) if File.exist?(target)
-  end
-  apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
+  # nothing was saved. (Both the checking and the writing are in
+  # apply_queue_moves now, which does them holding the cron's lock.)
+  applied = apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
     entry[:path] = write_scheduled_date(entry[:path], entry[:post], target, raw: entry[:raw])
   end
+  return false unless applied
   puts Tui.paint(t('cli.queue_compacted'), :green)
   puts
   true
@@ -2120,15 +2294,19 @@ def props_frame_lines(post, path, slug, year)
   lines << props_line('type', ContentType.dominant(post))
   lines << props_line('tags', (post['tags'] || []).join(', '))
   lines << props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
-  lines << props_line('unlisted', truthy_frontmatter?(post['unlisted']) ? t('cli.props_unlisted_yes') : nil)
-  announced = post['mastodon_url'] || post['bluesky_url']
+  # The same two predicates the announcer uses, so this screen predicts
+  # what publish will DO rather than re-deriving it: announcement_url is
+  # not fooled by an empty string and sees all three fields, unlisted?
+  # reads the flag as broadly as the builder that hides the post.
+  lines << props_line('unlisted', Publishing.unlisted?(post) ? t('cli.props_unlisted_yes') : nil)
+  announced = Publishing.announcement_url(post)
   # An unlisted draft used to be told "goes out when the post publishes",
   # which was both a false promise and the wrong way round: an unlisted post
   # is never announced, so the line has to say that rather than leave the
   # author expecting a toot that will not come -- or worse, believing one is
   # owed and going to look for why it failed.
   lines << props_line('announced', if announced then announced
-                                   elsif truthy_frontmatter?(post['unlisted'])
+                                   elsif Publishing.unlisted?(post)
                                      t('cli.props_announces_never_unlisted')
                                    elsif draft?(post) then t('cli.props_announces_on_publish')
                                    else t('cli.props_not_announced')

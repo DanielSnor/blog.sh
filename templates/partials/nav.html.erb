@@ -3,9 +3,11 @@
     `nav:` list or, with no such key, All plus the content types the site
     has. Rendering them through one loop means the default menu comes out
     byte for byte as it did when it was hardcoded here.
-    An empty list renders no bar and no toggle at all, which is how a site
-    turns the menu off; a bar that only carries the search field is what
-    is left when the top nav has items switched off but search on.
+    An empty list takes the items and the toggle with it, which is how a
+    site turns the menu off. What is left is a bar carrying nothing but
+    the search field -- and since layout.html.erb passes search: true on
+    every page, that is what an emptied menu actually looks like today.
+    The `|| search` half of the condition is what keeps it standing.
     The odd tag layout is not style: partials compile without an ERB trim
     mode, so a tag's own line breaks would leak into every page as blank
     lines. Same reason nav_current emits the whole aria-current attribute

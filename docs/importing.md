@@ -277,8 +277,10 @@ avatar history; and stories, likes and comments, which aren't posts. A
 carousel becomes one image block per photo, which the build then renders as
 a photo grid.
 
-Captions lose their trailing hashtags -- the tail is already the post's
-tags, and as prose it would be a wall of one-word links under every photo.
+Captions lose their trailing hashtag lines -- lines at the caption's end
+made of nothing but hashtags. That tail is already the post's tags, and
+as prose it would be a wall of one-word links under every photo; a
+hashtag inside a sentence is prose and stays where it was written.
 Two things neither export contains, so neither does the import: **post
 URLs** (`source.post_url` stays unset; a guessed one would 404 while
 looking authoritative) and **alt text**. Neither states pixel sizes
@@ -715,17 +717,6 @@ skipped. Post bodies arrive as HTML and are converted to content blocks in
 the conservative subset the schema supports; what the conversion cannot
 keep is dropped **and counted**, as everywhere. Images referenced in the
 markup are downloaded and measured.
-
-**A file that is very nearly XML is read anyway.** Exports are printed by
-templating engines, not by XML writers, so a raw query string left inside an
-element or a bare `&` in a title is ordinary -- and it makes a conforming
-parser refuse the entire archive over one character. Four of the twelve
-fixtures that Ghost's own migration tools ship are refused this way. Only
-characters that had to be escaped and were not are repaired, never structure
-and never inside a post body (where `&` is already an ordinary character),
-and the summary says how many. A file with a real defect -- a missing end
-tag, a download that stopped halfway -- still fails, and the refusal names
-*that* rather than the ampersand it just proved it can handle.
 
 **A file that is very nearly XML is read anyway.** Exports are printed by
 templating engines, not by XML writers, so a raw query string left inside an

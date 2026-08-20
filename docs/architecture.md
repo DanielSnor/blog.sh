@@ -24,7 +24,7 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
 - `content` is an array of **typed blocks**: `text` (with `subtype`
   heading1-6/quote), `list`, `table`, `code`, `image`, `video`, `audio`,
   `file`,
-  `link`, `hr`.
+  `link`, `chat`, `hr`.
 - Inline formatting (bold/italic/strikethrough/code/link) is stored as
   **codepoint offset ranges into plain text**, not nested HTML -- the
   same NPF-style shape Tumblr's API uses, which is what the importers
@@ -325,11 +325,14 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Seven questions, in one pass: media a post asks for and hasn't got; images
+Eight questions, in one pass: media a post asks for and hasn't got; images
 whose stored dimensions are 1px or smaller, which the build drops
 *together with their caption* and would otherwise lose silently; internal
-links pointing at an address nothing on this site answers at; media
-directories no post owns any more; files in a post's own directory the
+links pointing at an address nothing on this site answers at; links
+written relative to the post rather than to the site, which a static host
+answers 200 with the page the reader is already on -- the one kind here
+that fails at nothing and is therefore invisible from everywhere else;
+media directories no post owns any more; files in a post's own directory the
 post no longer names; two series whose names sit an edit or two apart,
 which is usually one series and a typo; and one old address claimed by
 two posts, where whichever renders last wins and the others' readers land

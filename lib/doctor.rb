@@ -87,6 +87,7 @@ module Doctor
     %w[site description] => 'Personal web/log of Your Name',
     %w[site author] => 'Your Name',
     %w[banner alt] => 'Your Site',
+    %w[footer note_heading] => 'Found something here?',
     %w[footer copyright] => 'All rights reserved &copy; 2026'
   }.freeze
 
@@ -211,9 +212,23 @@ module Doctor
 
   # --- identity ------------------------------------------------------
 
+  # What the site cannot render without. Deliberately NOT the whole chrome:
+  # the templates guard everything whose emptiness is a legitimate answer,
+  # and a check that calls a supported state an error is worse than no check
+  # -- it teaches its reader to ignore the red.
+  #
+  # about.html and footer.copyright used to sit here and were exactly that:
+  # templates/partials/footer.html.erb drops the copyright line when the
+  # value is empty and aside.html.erb does the same with the about card, yet
+  # a site that had chosen either was answered with "footer.copyright is
+  # missing from config/site.yml" and exit 1. Neither goes unwatched: both
+  # are still flagged by check_placeholders -- the copyright through the
+  # PLACEHOLDERS hash, about.html through the substring check beside it --
+  # so an install that merely has not filled them in yet is still told,
+  # as something worth a look rather than as a fault.
   REQUIRED = [
     %w[site title], %w[site short_name], %w[site description], %w[site author],
-    %w[banner src], %w[about html], %w[footer copyright]
+    %w[banner src]
   ].freeze
 
   def check_identity(data)

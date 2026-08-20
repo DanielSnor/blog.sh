@@ -192,8 +192,12 @@ a long way from the mistake.
 The example is fully commented. The short version:
 
 - **Required:** `site` (title, short_name, description, author, lang,
-  locale, base_url), `banner`, `about`, `footer`. That alone is a
-  complete, working site.
+  locale, base_url) and `banner`. That alone is a complete, working
+  site.
+- **`about` and `footer`** introduce the site and close every page; the
+  example ships both filled in. Neither is required: an emptied value
+  takes its section with it -- heading and all -- rather than rendering
+  empty, and a deleted block reads the same as an emptied one.
 - **Optional, each activates only when present:** `analytics`, `social`,
   `widgets` (toots / pixelfed / commits / bluesky / rss, each
   independently), `mastodon` **or** `bluesky` (comments + auto-announce
@@ -296,9 +300,10 @@ nav:
 ```
 
 An entry missing either half is skipped rather than rendered as an empty
-link. An empty list is a decision rather than a mistake: the menu then
-renders nothing at all -- no bar, no toggle -- which is also how a site
-turns the menu off, so there is no second key for that.
+link. An empty list is a decision rather than a mistake: the entries and
+the button that opens them are gone, which is also how a site turns the
+menu off, so there is no second key for that. The bar itself stays, since
+the search field is rendered inside it.
 
 `layout.sidebar` and `layout.hero` switch whole regions on and off. The
 sidebar is on unless you say otherwise; the hero -- the post's first
@@ -546,8 +551,10 @@ announcement (logged, not an error).
 
 **Mastodon:**
 
-1. In `config/site.yml`, set `mastodon.instance` -- this switches on
-   comments, per-post stats and the auto-toot on publish.
+1. In `config/site.yml`, uncomment the `mastodon:` block -- the header
+   line included, which is the half that is easy to miss -- and set
+   `mastodon.instance`. This switches on comments, per-post stats and
+   the auto-toot on publish.
 2. On that instance: Preferences → Development → New application, scope
    `write:statuses`. Put the token into env.sh as
    `MASTODON_ACCESS_TOKEN`.

@@ -26,6 +26,15 @@ require 'time'
 module RunLock
   ENV_MARKER = 'BLOG_SH_LOCK_HELD'
   BUSY = :busy
+  # When a LIVE holder has been going longer than this, the busy message
+  # stops promising "in a minute" and says since when it has held the
+  # lock. flock has no timeout, so a hung publish holds every queue
+  # write hostage while the message keeps sounding routine. Thirty
+  # minutes is two cron intervals and far above a full build-plus-deploy
+  # on a large archive -- a false alarm takes deliberate effort. A DEAD
+  # holder needs none of this: the kernel released its flock the moment
+  # it ended, whatever the lock file still says.
+  STUCK_AFTER = 30 * 60
 
   # The exit code build_blog.rb and deploy_web.rb use for "another run
   # holds the lock". Distinct from 1, because "come back in a minute" and
@@ -179,6 +188,7 @@ module RunLock
     # held either way; that part of the message was never in doubt.
     holder = '' unless holder_alive?(holder)
     detail = holder.empty? ? '' : " (#{holder})"
+    stuck = stuck_hint(holder)
     # Dropping the holder detail is right, but it takes the only actionable
     # fact with it: that the run in the way is almost always the scheduled
     # one, and will be gone shortly. Without that, the message describes a
@@ -187,7 +197,26 @@ module RunLock
     # Cron comes back on its own in fifteen minutes; a person who just
     # confirmed a palette does not.
     "ℹ️  Another #{label ? "#{label} " : ''}run is still going#{detail} -- " \
-      'skipping this one. Nothing is broken; try again in a minute.'
+      "skipping this one. Nothing is broken; try again in a minute.#{stuck}"
+  end
+
+  # The holder line is "pid label iso8601-start". Empty when the holder is
+  # dead or unknown (see busy_message), so a hint here always describes a
+  # process that is alive right now and has been holding the lock for
+  # longer than any legitimate run takes.
+  def stuck_hint(holder)
+    started = holder.split(' ')[2]
+    return '' unless started
+
+    begin
+      age = Time.now - Time.parse(started)
+    rescue ArgumentError
+      return ''
+    end
+    return '' unless age > STUCK_AFTER
+
+    " It has been holding it since #{started}, which is longer than these runs take -- " \
+      'if that process is stuck, ending it releases the lock (a dead one releases it by itself).'
   end
 
   # The holder line starts with the pid that wrote it. Signal 0 asks the

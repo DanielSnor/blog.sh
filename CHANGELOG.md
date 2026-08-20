@@ -10,6 +10,222 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.3.1 -- 2026-08-20
+
+A bug-fix release about three things. The publishing queue: what the cron
+may announce, what order it publishes in, and who may write the queue while
+somebody else is reading it. The first hour of an install: what a site with
+no deploy target yet is told about where it is, and in which language. And
+what emptiness means: a config section emptied on purpose stops crashing
+the build, failing `doctor` and leaving headings over nothing -- and `check`
+now sees the links that resolve against the post instead of the site.
+Nothing to migrate -- `git pull`, rebuild, deploy.
+
+### Fixed
+
+- **The scheduled-publish cron announced backdated posts as if they were
+  news.** The recency window that keeps a post dated far from today from
+  being announced automatically was a constant inside the interactive CLI,
+  so only the path with somebody at a terminal ever honoured it. Putting an
+  old post through the queue -- an archived thread given a page of its own,
+  a release written up after the fact -- therefore dropped years-old pages
+  into a live timeline, and an announcement cannot be recalled. The cron
+  declines on the author's behalf now: the post is published, the skip is
+  said out loud per post, and the line names `./blog.sh toot <slug>` for
+  sending it by hand. A cron that has been down longer than a day is the
+  deliberate cost of that -- those posts publish without announcements, and
+  say so.
+- **A post that had already been announced could be announced a second
+  time.** The second toot does not replace the first: it stands beside it,
+  live, while the URL stored on the post points at the new one and the
+  original thread's replies stop being reachable from the page they belong
+  to. A post reaches the cron in that state after being unpublished and
+  re-scheduled, or re-dated by hand. Any post carrying an announcement of
+  its own (`mastodon_url`, `bluesky_url`, `bluesky_uri`) is now published
+  and left alone. This is the half the window above cannot cover: a
+  backfilled post given today's date sits inside it.
+- **Posts that came due in the same tick were published in alphabetical
+  order.** The queue was read with `Dir.glob` and never sorted, so the
+  order was the order of the file names. On an ordinary tick that is
+  invisible -- one post is due. It shows after the cron has been down: a
+  morning's worth of posts comes back at once and is published, and
+  announced, backwards. They go out oldest first now, in the order the
+  queue was arranged in.
+- **The guard against a second announcement only covered the cron.**
+  `unpublish` keeps a post's announcement address precisely so a later
+  publish can see one exists -- and prints a promise to that effect --
+  but the publish path never looked: a draft carrying its old URL was
+  re-announced on publish without a question, the address overwritten,
+  the original thread's replies stranded. Every manual path -- publish,
+  `toot`, `bluesky` -- now asks the one question the cron asks, in the
+  one shared place, and refuses while the post carries an address on
+  either network. Wanting a second announcement is expressed by deleting
+  the address field from the post's JSON: an edit deliberate enough to
+  mean it. (The cron's skip message used to recommend `./blog.sh toot`
+  here -- a command that would have refused; it now names the true way.
+  And the old per-command checks had their own faults the shared one does
+  not: an empty string in `mastodon_url` refused a first toot, and an
+  announcement living on the other network was invisible.)
+- **The cron read `unlisted` more narrowly than the site does.** The
+  builder hides a post whose flag says anything but no; the cron kept
+  its own list of yeses, so a flag written by a script as `"1"` or
+  `"Yes"` hid the post from every listing and put its address on a
+  public timeline anyway. One predicate now, shared by the cron, the
+  manual announce and the properties screen, exactly as broad as the
+  builder's.
+- **Two queue writes still ran outside the lock.** The queue lock (below)
+  covered the queue screen's moves; the [s] scheduling dialog and the
+  [n]/`schedule` unscheduling kept relying on the byte compare alone,
+  with the same microsecond window between the compare and the write.
+  They take the same lock now and decline the same way when a publish is
+  running -- a decline that is a real answer: the queue screen does not
+  offer to compact slots behind an unschedule that never happened, and
+  the standalone `schedule` answers a held lock with the same busy exit
+  code `rebuild` has always used, instead of exit 0 pretending it wrote.
+  And a lock held by a live but stuck process is named: once a
+  holder has been going longer than any legitimate run takes, the busy
+  message says since when, instead of promising "in a minute" forever.
+- **`check` could not see a link written relative to the post.** It kept
+  what starts with a slash as internal and what carries a scheme as
+  external, so `./?item=another-post` or `photo/index.php?gallery=3` was
+  neither, and no run looked at it -- `--online` included. These are not
+  dead links, which is why they outlive audits: a static host ignores the
+  query string, so the address answers 200 with the very post the reader
+  is standing on. Nothing fails and nobody arrives. They are reported as
+  errors now, with the rooted form to rewrite them to; a bare `#fragment`
+  stays quiet, since resolving against its own page is what it is for.
+  (Found on an archive that had just been declared sound: 73 of them, in
+  61 posts.)
+- **The example config had chosen Mastodon for you.** `mastodon:
+  instance: "mastodon.social"` shipped as a live section while every other
+  optional one ships commented out -- so the documented manual path (copy
+  both templates, touch nothing) was a site that announces to Mastodon
+  with no token to do it. The first scheduled post's cron tick then
+  printed "MASTODON_ACCESS_TOKEN is not set... Check the token" to
+  somebody with no token to check, and exited 1 -- cron failure mail on a
+  healthy install, on every tick with a post due. Both networks now ship
+  commented out like the rest: a network is a choice, and the loud exit
+  is reserved for a choice somebody actually made. Sites that configured
+  a network on purpose are untouched.
+- **A `links:` key left standing without a list under it ended the build in
+  a stack trace.** `Hash#fetch` answers its default for a key that is
+  missing, not for one that is present and nil, so a footer written by
+  hand -- or one whose last entry was deleted and the key left behind --
+  reached `.map` on nil: `NoMethodError`, no page regenerated, and
+  `./blog.sh doctor` calling the very same file healthy. An empty answer is
+  an answer, and it is now read as one, the way `social:` always has been.
+  The same held one level up: a deleted (or emptied) `about:` or `footer:`
+  block aborted the build outright, over sections whose every key the
+  templates guard individually. Both now read as empty, like `widgets:`
+  always has.
+- **`doctor` failed an install over states the templates support on
+  purpose.** An emptied `footer.copyright` drops the copyright line and an
+  emptied `about` drops its card -- both deliberate, both guarded in the
+  templates -- and doctor answered them with "is missing from
+  config/site.yml" and exit 1. A check that calls a supported state a fault
+  teaches its reader to ignore the red. Neither goes unwatched: both are
+  still flagged while they hold the template's own text, as something worth
+  a look rather than as a fault.
+- **An emptied `about` drew an empty card on every page.** The footer drops
+  a heading whose content is gone and the five sidebar widgets appear only
+  when configured -- but the about card was unconditional, so a site that
+  had not written a bio (or had removed one) carried `<h3></h3>` over an
+  empty box, site-wide. A site that HAS an about text renders byte for
+  byte what it did before.
+- **Four places promised that an empty menu leaves no bar.** `nav: []`
+  removes the entries and the button that opens them, but the bar itself
+  stays, because the search field is rendered inside it and there is no key
+  to turn search off. `config/site.yml.example`, `docs/install.md` and the
+  engine's comments in the build and in the nav template all said "no bar,
+  no toggle"; they now say what happens.
+- **A fresh install was told its site is at `example.com`.** Before a deploy
+  target is chosen, the address in the config is still the template's, and
+  both the draft preview line and the `Done:` line after a publish printed
+  it -- a domain the author does not own, so the one thing a first post
+  wants to do could not be done. The build is right there in
+  `public.nosync/`, and `./blog.sh preview` serves it; both lines now say so
+  underneath, with the address that actually opens. Only while the config
+  carries the template's address: a site with a real one is not told twice
+  where it is. The QR code under a draft preview is dropped in that state
+  for the same reason -- it exists to carry the draft to a phone, and a
+  phone that scans it would land on `example.com`.
+- **The deploy said "the site goes nowhere" in English on a site that is
+  not English.** `scripts/deploy_web.rb` was the one entry point that never
+  loaded the translations, so the line printed after every single save on
+  an install with no deploy target -- the state every install starts in --
+  came out in English while the rest of the flow spoke the site's language.
+  It is translated now, in the same words `doctor` uses for the same state.
+  The language is read the way `doctor` reads it, tolerantly: a config too
+  broken to parse still deploys the build that is already built.
+- **The editor template's body was English on every site.** The header
+  above it had been translated for releases; the one line under it,
+  "First paragraph's text.", was written into the code. It is the first
+  thing an author sees inside the editor.
+- **The Instagram import's "no posts found" hint stopped one level too
+  high.** It said to point at the directory holding
+  `your_instagram_activity/` -- which is where the reader already was;
+  the actual difference sits one level deeper, where the JSON export
+  keeps `posts_*.json` under `media/` and the HTML one under `content/`.
+  The message names the subfolders now, and importing.md says "trailing
+  hashtag lines" where it said "trailing hashtags": only lines made of
+  nothing but hashtags are cut, a hashtag inside a sentence stays.
+- **The scheduling question worked against the person answering it.** The
+  prompt never said that a bare "18:00" means today -- the fastest route
+  to tonight was the one route nobody could see; a typo in the date ended
+  the standalone `schedule` with exit 0 and the post untouched, while the
+  draft dialog's [s] asked again, but only because its menu happens to
+  loop -- one question, two behaviours; and scheduling rebuilt and
+  deployed the whole site just to stamp a new date on a draft preview the
+  publication throws away hours later -- the middle of three builds on
+  the road to "post tonight". The prompt now advertises the bare time,
+  the question re-asks until it gets a date or a cancel, and scheduling
+  writes the queue without rebuilding anything.
+- **`publishing.slots` existed only for whoever found it in the
+  documentation.** The setup wizard explains the scheduler cron and then
+  never mentioned the one key that makes the scheduler offer times by
+  itself; the word "slots" did not appear in it. It asks now, right under
+  the cron line, and empty still means what it always has -- no slots,
+  the scheduler asks for a date.
+- **A heading could not be turned off.** Emptying a footer section's
+  content has taken its heading with it since 1.2 -- but emptying the
+  HEADING over content that stays rendered a bare `<h3></h3>`, so a note
+  without a title was not a thing a site could say. It is now: an empty
+  heading over live content renders no heading at all, for the links, the
+  note and the social column alike, and a site with headings renders byte
+  for byte what it did. And `doctor` watches `footer.note_heading` with
+  the other template texts -- the shipped English "Found something here?"
+  sat over a Czech note on a live site for twelve days with every check
+  green, because this one key was never on the placeholder list.
+- **A Surfer nobody can reach arrived as a backtrace too.** The two
+  likeliest beginner states -- the app is stopped, or SURFER_URL points at
+  a machine where nothing listens -- landed in a raw `Errno::ECONNREFUSED`
+  out of net/http, the only stack trace left on the deploy path. It is a
+  sentence now, naming the address and the way forward, and the deploy
+  bookkeeping still records the run as interrupted, so the next one says
+  so in its header. Mid-batch drops were already handled per file; this
+  was the connection that never opened at all.
+- **A config the filesystem refused to write arrived as a backtrace.**
+  `./style.sh` and `./setup.sh` copy the file to a `.bak` before they write
+  it, so a backup left behind by a run made as another user -- root, most
+  often -- blocks the write although the config itself is perfectly
+  writable. The refusal was a raw `Errno`, and neither the wizard (which
+  handles only a failed verification) nor its guard (only Ctrl-C) expected
+  one: the run died mid-write with a Ruby stack trace and no hint of what
+  to do. It says which file refused and that the backup is written first,
+  and nothing is left half-written -- the refusal happens before any file
+  is replaced.
+- **Reordering the queue wrote without the lock the cron holds.** Every
+  write the queue screen makes is guarded by a byte compare against what
+  was read before the prompt, but the compare and the write were separate
+  instructions, and the run that changes these files with nobody at the
+  keyboard arrives every fifteen minutes. A tick landing in between
+  published a due post and then had a draft's schedule written back over
+  it: the state reverted to draft, the announcement URL dropped (so
+  `unpublish` could no longer delete the toot), and the post queued to go
+  out -- and be announced -- a second time. Moving a post now takes the
+  same lock for the checks and the writes together, and a reshuffle that
+  meets a running publish moves nothing and says why.
+
 ## 1.3 -- 2026-08-19
 
 Dressing a site differently no longer means editing the engine -- your

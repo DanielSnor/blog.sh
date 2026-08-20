@@ -341,8 +341,9 @@ below assume Ruby 2.7+ is already on the machine:
 Every integration beyond the core (analytics, each sidebar widget,
 comments and the auto-announcement on Mastodon or Bluesky) is optional
 and activates only when its
-config section is present -- a minimal `site.yml` with just `site`,
-`banner`, `about` and `footer` is a complete, working site.
+config section is present -- a minimal `site.yml` with just `site` and
+`banner` is a complete, working site; `about` and `footer` are worth
+filling in, but an emptied section simply leaves the page.
 
 That's the short path. The complete one -- server install, every deploy
 backend step by step, the phone workflow, the comments-network setup -- is
@@ -542,7 +543,10 @@ rebuild. Run it from cron wherever the site is built:
 
 Every 30 minutes is plenty -- the data it refreshes (recent toots,
 Pixelfed posts, commits, like/boost counts) doesn't move faster than
-that. Skip the cron entirely if no widgets are configured.
+that. Skip the cron entirely if no widgets are configured -- unless
+comments are moderated (`comments.approval: fav`): approved replies
+reach the site through this same job (it writes `comments.json` too),
+so a moderated site needs it with or without widgets.
 
 A second, optional job powers `./blog.sh schedule` -- it publishes
 scheduled drafts whose date has arrived (and does nothing otherwise):
@@ -555,12 +559,6 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 
 What isn't built yet, and what building it would take:
 
-- **Next, as a patch release** -- small, already-decided corrections:
-  the scheduled-publish cron learns the restraint the interactive
-  publish already has (a backdated post publishes without announcing;
-  a post that carries an announcement URL is never announced again --
-  its comment thread is the thing being protected), plus a handful of
-  edge fixes the release audit chose to defer rather than rush.
 - **Further out** -- importing sport activities is the working theme
   for a future release: GPX/TCX/FIT from whatever tracker you use, a
   post with the map and the numbers, no account on anybody's platform

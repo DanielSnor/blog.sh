@@ -55,6 +55,21 @@ module ConfigWriter
   # put in it. The file is restored before this is raised -- see save!.
   class VerificationFailed < StandardError; end
 
+  # Raised when the filesystem refuses the write itself: the file (or the
+  # backup written beside it) belongs to somebody else, the disk is full,
+  # the mount is read-only. Its own class because it is not a fault in the
+  # config and nothing about it is fixable by editing one -- and because
+  # the alternative was what actually happened on a live installation: the
+  # raw Errno travelled through the wizard, which rescues only
+  # VerificationFailed, and out through Wizard.guard, which rescues only
+  # Interrupt, so somebody trying to change one line of their footer got a
+  # Ruby backtrace three times in a row and no idea what to do about it.
+  #
+  # The backup is the first thing save! writes, which is the part nobody
+  # expects: a config the user CAN write is still unwritable when the .bak
+  # beside it is not theirs -- the usual leftover of one run made as root.
+  class NotWritable < StandardError; end
+
   INDENT = 2
 
   # A minimal diff of two line arrays, as ["-old\n", "+new\n", ...].
@@ -401,9 +416,16 @@ module ConfigWriter
 
       backup_path = "#{@path}.bak"
       had_file = File.exist?(@path)
-      FileUtils.cp(@path, backup_path) if backup && had_file
-
-      AtomicWrite.write(@path, current)
+      begin
+        FileUtils.cp(@path, backup_path) if backup && had_file
+        AtomicWrite.write(@path, current)
+      rescue SystemCallError => e
+        # The Errno's own message already names the file it could not open,
+        # which is the one fact the reader needs and the one the wizard
+        # cannot work out for itself -- the backup and the config fail
+        # differently and only one of them is the file being edited.
+        raise NotWritable, e.message
+      end
 
       begin
         verify!
@@ -761,10 +783,11 @@ module ConfigWriter
       return false unless changed?
 
       backup_path = "#{@path}.bak"
-      if backup && File.exist?(@path)
-        FileUtils.cp(@path, backup_path)
-        File.chmod(0o600, backup_path)
-      end
+      begin
+        if backup && File.exist?(@path)
+          FileUtils.cp(@path, backup_path)
+          File.chmod(0o600, backup_path)
+        end
       # Read BEFORE the write: AtomicWrite replaces the file with a new
       # inode, so afterwards the mode is the new file's and the old one is
       # gone. Skipping the chmod when the file existed -- which is what this
@@ -772,12 +795,15 @@ module ConfigWriter
       # whatever the umask says (0644 by default) on every single save,
       # while the wizard printed "readable only by you (mode 600)" a few
       # lines earlier.
-      previous = File.stat(@path).mode & 0o7777 if File.exist?(@path)
-      AtomicWrite.write(@path, current)
-      # A mode that already lets nobody but the owner in is kept exactly --
-      # somebody who chose 0400 meant it. Anything wider is not a choice
-      # this file can honour.
-      File.chmod(previous && (previous & 0o077).zero? ? previous : 0o600, @path)
+        previous = File.stat(@path).mode & 0o7777 if File.exist?(@path)
+        AtomicWrite.write(@path, current)
+        # A mode that already lets nobody but the owner in is kept exactly --
+        # somebody who chose 0400 meant it. Anything wider is not a choice
+        # this file can honour.
+        File.chmod(previous && (previous & 0o077).zero? ? previous : 0o600, @path)
+      rescue SystemCallError => e
+        raise NotWritable, e.message
+      end
       true
     end
 
