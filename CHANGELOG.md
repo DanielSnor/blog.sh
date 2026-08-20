@@ -78,7 +78,11 @@ Nothing to migrate -- `git pull`, rebuild, deploy.
   [n]/`schedule` unscheduling kept relying on the byte compare alone,
   with the same microsecond window between the compare and the write.
   They take the same lock now and decline the same way when a publish is
-  running. And a lock held by a live but stuck process is named: once a
+  running -- a decline that is a real answer: the queue screen does not
+  offer to compact slots behind an unschedule that never happened, and
+  the standalone `schedule` answers a held lock with the same busy exit
+  code `rebuild` has always used, instead of exit 0 pretending it wrote.
+  And a lock held by a live but stuck process is named: once a
   holder has been going longer than any legitimate run takes, the busy
   message says since when, instead of promising "in a minute" forever.
 - **`check` could not see a link written relative to the post.** It kept

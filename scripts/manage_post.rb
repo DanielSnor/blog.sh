@@ -972,7 +972,9 @@ def draft_decision_loop(slug, path: nil)
     when 'e' then edit_post(slug, path: path)
     when 's'
       puts
-      return if prompt_and_schedule(path, post, raw: raw)
+      # == true: :busy already said why nothing happened, and the dialog
+      # coming back around is the retry.
+      return if prompt_and_schedule(path, post, raw: raw) == true
     when 'd', ''
       puts
       puts t('cli.left_as_draft', slug: slug)
@@ -1127,7 +1129,12 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
     return false
   end
 
-  return false unless write_scheduled_date(path, post, date, raw: raw)
+  # :busy, distinct from false: false means the author declined or the
+  # input did not parse, and the standalone command answers that with
+  # exit 0. A publish holding the lock is neither -- the caller whose
+  # exit code somebody scripts against answers it with BUSY_EXIT, like
+  # cmd_rebuild has since the lock existed.
+  return :busy if write_scheduled_date(path, post, date, raw: raw).nil?
 
   rebuild_and_deploy(t('cli.updating_preview')) if rebuild
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
@@ -1451,14 +1458,18 @@ def cmd_schedule(slug)
   end
 
   if post['scheduled']
-    unschedule_post(path, post, slug, raw: raw)
+    # The same exit code cmd_rebuild answers a held lock with: somebody
+    # scripting `blog.sh schedule` must not read "a publish was in the
+    # way" as "unscheduled". In the wizard the SystemExit is caught like
+    # every other cmd_* abort.
+    exit RunLock::BUSY_EXIT unless unschedule_post(path, post, slug, raw: raw)
     return
   end
 
   # The bytes from before the prompt ride along, so the cron publishing
   # this exact post mid-dialog is caught -- the same guard every other
   # path into scheduling already carries.
-  prompt_and_schedule(path, post, raw: raw)
+  exit RunLock::BUSY_EXIT if prompt_and_schedule(path, post, raw: raw) == :busy
 end
 
 # Shared by the CLI toggle above and the [n] action in the properties
@@ -1476,14 +1487,20 @@ def unschedule_post(path, post, slug, raw: nil)
     updated.delete('scheduled')
     AtomicWrite.write_json(path, updated)
   end
+  # false, not a bare return: the queue screen decides whether to offer
+  # compacting the slots behind this post by this answer, and a decline
+  # that returned the same nil as success once shifted the queue onto a
+  # slot the refused unschedule never freed -- two posts on one time,
+  # published (and announced) by a single tick.
   if held == RunLock::BUSY
     warn t('cli.queue_busy')
     warn ''
-    return
+    return false
   end
 
   puts t('cli.unscheduled_label', slug: slug)
   puts
+  true
 end
 
 # Writes `date` into a draft as its scheduled publish time. A date in
@@ -1781,10 +1798,13 @@ def queue_act_slow(entries, index, key)
     queue_offer_compact(freed, entries[(index + 1)..])
   when 's'
     puts
-    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw])
+    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw]) == true
   when 'n'
-    unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
-    queue_offer_compact(entry[:time], entries[(index + 1)..])
+    # Only a write that happened frees the slot: a declined unschedule
+    # falling through to this offer stacked two posts on one time.
+    if unschedule_post(entry[:path], entry[:post], entry[:slug], raw: entry[:raw])
+      queue_offer_compact(entry[:time], entries[(index + 1)..])
+    end
   end
 end
 
