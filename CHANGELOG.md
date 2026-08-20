@@ -165,6 +165,14 @@ Nothing to migrate -- `git pull`, rebuild, deploy.
   The message names the subfolders now, and importing.md says "trailing
   hashtag lines" where it said "trailing hashtags": only lines made of
   nothing but hashtags are cut, a hashtag inside a sentence stays.
+- **A Surfer nobody can reach arrived as a backtrace too.** The two
+  likeliest beginner states -- the app is stopped, or SURFER_URL points at
+  a machine where nothing listens -- landed in a raw `Errno::ECONNREFUSED`
+  out of net/http, the only stack trace left on the deploy path. It is a
+  sentence now, naming the address and the way forward, and the deploy
+  bookkeeping still records the run as interrupted, so the next one says
+  so in its header. Mid-batch drops were already handled per file; this
+  was the connection that never opened at all.
 - **A config the filesystem refused to write arrived as a backtrace.**
   `./style.sh` and `./setup.sh` copy the file to a `.bak` before they write
   it, so a backup left behind by a run made as another user -- root, most

@@ -669,6 +669,14 @@ begin
     end
   end
   completed = true
+rescue Surfer::Unreachable => e
+  # The one failure that means NOTHING happened on the target: the
+  # connection never opened. The ensure below still runs, so the state
+  # file records this run as 'interrupted' and the next one says so in
+  # its header -- what must not happen is the raw backtrace this used
+  # to be, on the likeliest beginner mistakes there are: the app is
+  # stopped, or SURFER_URL points at a machine where nothing listens.
+  abort(I18n.t('cli.surfer_unreachable', url: ENV['SURFER_URL'].to_s, reason: e.message))
 ensure
   save_manifest(manifest)
   # `completed` no longer decides whether a marker survives -- it is how a

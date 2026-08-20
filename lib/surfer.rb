@@ -18,7 +18,24 @@ require_relative 'version'
 module Surfer
   USER_AGENT = BlogSh.user_agent('upload')
 
-  module_function
+# Raised when the connection to the Surfer app cannot be opened at all:
+# nothing was uploaded, nothing was deleted, and retrying would dial the
+# same dead address again. deploy_web turns this into a sentence naming
+# SURFER_URL -- it used to escape as a raw Errno backtrace, the only
+# stack trace an otherwise fully spoken setup could still show a
+# beginner (a stopped app and a mistyped URL both land here).
+class Unreachable < StandardError; end
+
+# Everything TCPSocket/TLS can throw before the first request goes out.
+# Distinct from Session::RETRIABLE on purpose: those happen mid-batch on
+# a connection that already worked, and reconnecting once is the right
+# answer there. Here nothing ever worked.
+CONNECT_ERRORS = [
+  Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH,
+  Errno::ETIMEDOUT, Net::OpenTimeout, SocketError, OpenSSL::SSL::SSLError
+].freeze
+
+module_function
 
   def configured?
     !ENV['SURFER_URL'].to_s.empty? && !ENV['SURFER_TOKEN'].to_s.empty?
@@ -32,7 +49,11 @@ module Surfer
     http.use_ssl = (base.scheme == 'https')
     http.open_timeout = 15
     http.read_timeout = 60
-    http.start
+    begin
+      http.start
+    rescue *CONNECT_ERRORS => e
+      raise Unreachable, "#{e.class}: #{e.message.lines.first.to_s.strip}"
+    end
     yield Session.new(http)
   ensure
     http.finish if http&.started?

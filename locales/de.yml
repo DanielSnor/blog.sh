@@ -231,6 +231,7 @@ cli:
   local_preview_hint: "Die Website geht noch nirgendwohin -- starte ./blog.sh preview und öffne %{url} (Standardport 8000)."
   template_body_placeholder: "Text des ersten Absatzes."
   deploy_backend_incomplete: "Das Deploy-Backend %{name} ist nicht konfiguriert -- der Upload wird übersprungen. Der Build in public.nosync/ ist vollständig; ./blog.sh preview zeigt ihn. Setze DEPLOY_BACKEND und seine Werte in env.sh (siehe env.sh.example), um wirklich zu deployen."
+  surfer_unreachable: "❌ Der Surfer unter %{url} antwortet nicht (%{reason}) -- die App ist wohl gestoppt, oder SURFER_URL in env.sh zeigt woandershin. Der fertige Build wartet in public.nosync/; sobald der Server läuft (oder die Adresse stimmt), lädt ./blog.sh rebuild ihn hoch."
   what_next_prompt: "Wie weiter? [d] Entwurf lassen  [e] bearbeiten  [p] veröffentlichen  [s] planen  [x] löschen: "
   left_as_draft: "Bleibt Entwurf. Später veröffentlichen: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nicht verstanden, versuch d / e / p / s / x."
