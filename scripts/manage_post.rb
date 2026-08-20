@@ -732,7 +732,7 @@ def announce_post(post, year:, date:, force: false)
   #
   # To announce such a post, take the flag off first. That is one edit, and
   # it makes the decision explicit rather than a side effect of publishing.
-  if truthy_frontmatter?(post['unlisted'])
+  if Publishing.unlisted?(post)
     warn t('cli.unlisted_no_toot')
     return nil
   end
@@ -1127,7 +1127,8 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
     return false
   end
 
-  write_scheduled_date(path, post, date, raw: raw)
+  return false unless write_scheduled_date(path, post, date, raw: raw)
+
   rebuild_and_deploy(t('cli.updating_preview')) if rebuild
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   position = queue_position(date, entries || scheduled_entries(except_slug: post['slug']))
@@ -1141,6 +1142,21 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
 end
 
 def announce_on_publish(post, year, date)
+  # Before everything else, the record on the post itself: an announcement
+  # that already exists is never repeated from here -- not by publish, not
+  # by the standalone toot/bluesky commands, which all arrive through this
+  # method. A second one does not replace the first, it strands the
+  # replies under it; unpublish keeps the address on the post for exactly
+  # this check to find (its own message promises that publishing again
+  # will not add a second one -- this is where that promise is kept, and
+  # it used not to be kept anywhere). Wanting a fresh announcement anyway
+  # is expressed by deleting the address fields from the post's JSON: an
+  # edit deliberate enough to mean it.
+  if Publishing.announced?(post)
+    warn t('cli.announcement_exists', url: Publishing.announcement_url(post))
+    return nil
+  end
+
   # Before the question, not after it: with no network there is nothing the
   # answer could change, and being asked to confirm an announcement that
   # cannot happen -- then being told it did not happen -- is two screens of
@@ -1306,12 +1322,10 @@ def cmd_toot(slug)
     return
   end
 
-  if post['mastodon_url']
-    puts t('cli.already_has_toot', url: post['mastodon_url'])
-    puts
-    return
-  end
-
+  # No own already-announced check: announce_on_publish below carries it,
+  # for every caller alike -- and unlike the truthy test that used to sit
+  # here, it is not fooled by an empty string into refusing a first toot,
+  # and not blind to an announcement living on the other network.
   year = File.basename(File.dirname(path))
   date = Time.parse(post['date'])
   fields = announce_on_publish(post, year, date)
@@ -1356,8 +1370,14 @@ def cmd_bluesky(slug)
     return
   end
 
-  if post['bluesky_url']
-    puts t('cli.already_has_bluesky', url: post['bluesky_url'])
+  # announced?, not a bare bluesky_url test: a post whose announcement
+  # lives on Mastodon must refuse here too (a second thread on a second
+  # network strands the first all the same), and the recovery lookup
+  # below is for posts with NO announcement on record -- running it over
+  # one that has an address would be a network call asking a question the
+  # post already answers.
+  if Publishing.announced?(post)
+    puts t('cli.announcement_exists', url: Publishing.announcement_url(post))
     puts
     return
   end
@@ -1448,10 +1468,20 @@ end
 # captured post back after a prompt, and the cron may have published it in
 # the meantime.
 def unschedule_post(path, post, slug, raw: nil)
-  abort_if_post_changed(path, raw, slug) if raw
-  updated = post.dup
-  updated.delete('scheduled')
-  AtomicWrite.write_json(path, updated)
+  # Same lock as write_scheduled_date above, same reason: the capture this
+  # writes back must not overwrite what a mid-dialog tick just published.
+  held = RunLock.hold(ROOT, label: 'queue') do
+    abort_if_post_changed(path, raw, slug) if raw
+    updated = post.dup
+    updated.delete('scheduled')
+    AtomicWrite.write_json(path, updated)
+  end
+  if held == RunLock::BUSY
+    warn t('cli.queue_busy')
+    warn ''
+    return
+  end
+
   puts t('cli.unscheduled_label', slug: slug)
   puts
 end
@@ -1474,22 +1504,38 @@ end
 # it a second time. The check therefore belongs HERE, at the last
 # instruction before the write, not at the top of a dialog that then waits
 # for a keypress.
+# The byte compare above is only half the guard: the compare and the write
+# have to sit under the same lock the cron takes, or a tick landing between
+# them writes the capture back over a post the tick just published -- the
+# queue screen has held it since the lock existed, and this is the [s]
+# dialog's and the standalone schedule's turn. Reentrant under
+# apply_queue_moves (RunLock.hold yields straight through for a holder), so
+# the queue screen pays nothing for it. Returns nil without writing when a
+# publish is running; callers treat that like any other declined prompt.
 def write_scheduled_date(path, post, date, raw: nil, slug: nil)
-  abort_if_post_changed(path, raw, slug || post['slug']) if raw
-  updated = post.merge('date' => date.iso8601, 'scheduled' => true)
-  new_year = date.year.to_s
-  new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
-  if File.expand_path(new_path) != File.expand_path(path)
-    abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
+  held = RunLock.hold(ROOT, label: 'queue') do
+    abort_if_post_changed(path, raw, slug || post['slug']) if raw
+    updated = post.merge('date' => date.iso8601, 'scheduled' => true)
+    new_year = date.year.to_s
+    new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
+    if File.expand_path(new_path) != File.expand_path(path)
+      abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
 
-    FileUtils.mkdir_p(File.dirname(new_path))
-    Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
-    AtomicWrite.write_json(new_path, updated)
-    File.delete(path)
-  else
-    AtomicWrite.write_json(new_path, updated)
+      FileUtils.mkdir_p(File.dirname(new_path))
+      Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
+      AtomicWrite.write_json(new_path, updated)
+      File.delete(path)
+    else
+      AtomicWrite.write_json(new_path, updated)
+    end
+    new_path
   end
-  new_path
+  if held == RunLock::BUSY
+    warn t('cli.queue_busy')
+    return nil
+  end
+
+  held
 end
 
 # --- the queue screen -------------------------------------------------
@@ -2184,15 +2230,19 @@ def props_frame_lines(post, path, slug, year)
   lines << props_line('type', ContentType.dominant(post))
   lines << props_line('tags', (post['tags'] || []).join(', '))
   lines << props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
-  lines << props_line('unlisted', truthy_frontmatter?(post['unlisted']) ? t('cli.props_unlisted_yes') : nil)
-  announced = post['mastodon_url'] || post['bluesky_url']
+  # The same two predicates the announcer uses, so this screen predicts
+  # what publish will DO rather than re-deriving it: announcement_url is
+  # not fooled by an empty string and sees all three fields, unlisted?
+  # reads the flag as broadly as the builder that hides the post.
+  lines << props_line('unlisted', Publishing.unlisted?(post) ? t('cli.props_unlisted_yes') : nil)
+  announced = Publishing.announcement_url(post)
   # An unlisted draft used to be told "goes out when the post publishes",
   # which was both a false promise and the wrong way round: an unlisted post
   # is never announced, so the line has to say that rather than leave the
   # author expecting a toot that will not come -- or worse, believing one is
   # owed and going to look for why it failed.
   lines << props_line('announced', if announced then announced
-                                   elsif truthy_frontmatter?(post['unlisted'])
+                                   elsif Publishing.unlisted?(post)
                                      t('cli.props_announces_never_unlisted')
                                    elsif draft?(post) then t('cli.props_announces_on_publish')
                                    else t('cli.props_not_announced')

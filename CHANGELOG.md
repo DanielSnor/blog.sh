@@ -51,6 +51,36 @@ Nothing to migrate -- `git pull`, rebuild, deploy.
   morning's worth of posts comes back at once and is published, and
   announced, backwards. They go out oldest first now, in the order the
   queue was arranged in.
+- **The guard against a second announcement only covered the cron.**
+  `unpublish` keeps a post's announcement address precisely so a later
+  publish can see one exists -- and prints a promise to that effect --
+  but the publish path never looked: a draft carrying its old URL was
+  re-announced on publish without a question, the address overwritten,
+  the original thread's replies stranded. Every manual path -- publish,
+  `toot`, `bluesky` -- now asks the one question the cron asks, in the
+  one shared place, and refuses while the post carries an address on
+  either network. Wanting a second announcement is expressed by deleting
+  the address field from the post's JSON: an edit deliberate enough to
+  mean it. (The cron's skip message used to recommend `./blog.sh toot`
+  here -- a command that would have refused; it now names the true way.
+  And the old per-command checks had their own faults the shared one does
+  not: an empty string in `mastodon_url` refused a first toot, and an
+  announcement living on the other network was invisible.)
+- **The cron read `unlisted` more narrowly than the site does.** The
+  builder hides a post whose flag says anything but no; the cron kept
+  its own list of yeses, so a flag written by a script as `"1"` or
+  `"Yes"` hid the post from every listing and put its address on a
+  public timeline anyway. One predicate now, shared by the cron, the
+  manual announce and the properties screen, exactly as broad as the
+  builder's.
+- **Two queue writes still ran outside the lock.** The queue lock (below)
+  covered the queue screen's moves; the [s] scheduling dialog and the
+  [n]/`schedule` unscheduling kept relying on the byte compare alone,
+  with the same microsecond window between the compare and the write.
+  They take the same lock now and decline the same way when a publish is
+  running. And a lock held by a live but stuck process is named: once a
+  holder has been going longer than any legitimate run takes, the busy
+  message says since when, instead of promising "in a minute" forever.
 - **`check` could not see a link written relative to the post.** It kept
   what starts with a slash as internal and what carries a scheme as
   external, so `./?item=another-post` or `photo/index.php?gallery=3` was

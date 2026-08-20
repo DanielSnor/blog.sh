@@ -105,7 +105,7 @@ due.each do |path, post, date|
   # announcement has it. Skipped rather than failed: nothing went wrong and
   # the exit code must not say it did, or the one mail that matters gets
   # lost among the ones that do not.
-  unlisted = [true, 'true', 'yes', 1].include?(updated['unlisted'])
+  unlisted = Publishing.unlisted?(updated)
   # An announcement that has already happened is not repeated. The post's
   # own fields are the record of it, and a second toot does not replace
   # the first -- it stands beside it, live, while the URL that gets stored

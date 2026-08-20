@@ -257,6 +257,30 @@ module Publishing
     %w[mastodon_url bluesky_url bluesky_uri].any? { |field| !post[field].to_s.strip.empty? }
   end
 
+  # The address behind announced?, for the messages that name what already
+  # exists: first non-empty of the three fields, in the order a reader
+  # would recognize.
+  def announcement_url(post)
+    %w[mastodon_url bluesky_url bluesky_uri].map { |field| post[field].to_s.strip }.find { |v| !v.empty? }
+  end
+
+  # Mirrors build_blog.rb's truthy? on purpose, and deliberately NOT the
+  # CLI's stricter frontmatter reading: the builder decides which posts
+  # the site hides, and every announcer must skip at least everything the
+  # builder hides. The cron once kept its own, narrower list of yeses --
+  # [true, 'true', 'yes', 1] -- so a flag written by a script as "1" or
+  # "Yes" hid the post from every listing and put its address on a public
+  # timeline anyway. CLI-authored posts never feel the difference (the
+  # frontmatter normalizes the flag to a boolean on save); a JSON written
+  # by hand or by a script -- the 17 Aug incident's own vector -- is
+  # exactly who this is for.
+  def unlisted?(post)
+    value = post['unlisted']
+    return false if value.nil? || value == false
+
+    !%w[false no 0].include?(value.to_s.strip.downcase)
+  end
+
   # Sends the announcement to whichever network the site configured and
   # returns the post fields to store ('mastodon_url', or 'bluesky_url' +
   # 'bluesky_uri'). The caller decides WHETHER to announce (recency
