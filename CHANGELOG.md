@@ -59,6 +59,17 @@ to migrate -- `git pull`, rebuild, deploy.
   stays quiet, since resolving against its own page is what it is for.
   (Found on an archive that had just been declared sound: 73 of them, in
   61 posts.)
+- **The example config had chosen Mastodon for you.** `mastodon:
+  instance: "mastodon.social"` shipped as a live section while every other
+  optional one ships commented out -- so the documented manual path (copy
+  both templates, touch nothing) was a site that announces to Mastodon
+  with no token to do it. The first scheduled post's cron tick then
+  printed "MASTODON_ACCESS_TOKEN is not set... Check the token" to
+  somebody with no token to check, and exited 1 -- cron failure mail on a
+  healthy install, on every tick with a post due. Both networks now ship
+  commented out like the rest: a network is a choice, and the loud exit
+  is reserved for a choice somebody actually made. Sites that configured
+  a network on purpose are untouched.
 - **A `links:` key left standing without a list under it ended the build in
   a stack trace.** `Hash#fetch` answers its default for a key that is
   missing, not for one that is present and nil, so a footer written by
