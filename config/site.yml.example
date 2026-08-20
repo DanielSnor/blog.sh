@@ -258,6 +258,9 @@ colors:
 #   - { label: "Syntax", url: "/markdown/" }
 # --- end of nav ---
 
+# The sidebar's introduction card. Nothing here is load-bearing: an
+# emptied html takes the card with it, heading and all, and deleting
+# the whole block reads the same as emptying it.
 about:
   heading: "About"
   # Markdown, the same as in a post: **bold**, [links](https://example.com),
@@ -309,6 +312,11 @@ about:
 #     limit: 3
 # --- end of widgets ---
 
+# Three columns: links, a note with the copyright line, social icons.
+# Each heading rides with its content -- empty the links (links: [] is
+# an answer, like nav) and the Links column renders nothing, heading
+# included, rather than a title over an empty list. Same for the note,
+# the copyright and the icons; a deleted block reads as all-empty.
 footer:
   links_heading: "Links"
   links:

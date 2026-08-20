@@ -192,8 +192,12 @@ a long way from the mistake.
 The example is fully commented. The short version:
 
 - **Required:** `site` (title, short_name, description, author, lang,
-  locale, base_url), `banner`, `about`, `footer`. That alone is a
-  complete, working site.
+  locale, base_url) and `banner`. That alone is a complete, working
+  site.
+- **`about` and `footer`** introduce the site and close every page; the
+  example ships both filled in. Neither is required: an emptied value
+  takes its section with it -- heading and all -- rather than rendering
+  empty, and a deleted block reads the same as an emptied one.
 - **Optional, each activates only when present:** `analytics`, `social`,
   `widgets` (toots / pixelfed / commits / bluesky / rss, each
   independently), `mastodon` **or** `bluesky` (comments + auto-announce

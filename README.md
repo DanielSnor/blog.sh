@@ -341,8 +341,9 @@ below assume Ruby 2.7+ is already on the machine:
 Every integration beyond the core (analytics, each sidebar widget,
 comments and the auto-announcement on Mastodon or Bluesky) is optional
 and activates only when its
-config section is present -- a minimal `site.yml` with just `site`,
-`banner`, `about` and `footer` is a complete, working site.
+config section is present -- a minimal `site.yml` with just `site` and
+`banner` is a complete, working site; `about` and `footer` are worth
+filling in, but an emptied section simply leaves the page.
 
 That's the short path. The complete one -- server install, every deploy
 backend step by step, the phone workflow, the comments-network setup -- is
