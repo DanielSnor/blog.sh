@@ -994,10 +994,12 @@ end
 # [s] dialog choice and the standalone `schedule` command -- both ask the
 # same question, and since the frontmatter no longer offers a date field,
 # asking is the only way either of them can get one. Returns true when
-# scheduled, false on cancel/invalid input: the dialog uses that to come
-# around again, the standalone command just ends. The preview is rebuilt
-# because the entered date becomes the post's date and shows on the draft
-# page.
+# scheduled, false on cancel (an unreadable date re-asks in place rather
+# than answering false -- both callers used to treat a typo differently,
+# and only one of them by design), and :busy when a running publish holds
+# the queue. No preview rebuild on the way out: the entered date shows on
+# pages the publication regenerates anyway, and the middle of three builds
+# on the road to "post tonight" was the one a beginner paid for nothing.
 #
 # No leading blank line here: the two callers arrive with different things
 # above them. pick_from_list already ends with one, while the dialog's
@@ -1136,6 +1138,15 @@ def prompt_and_schedule(path, post, raw: nil)
     end
     if date <= Time.now
       puts t('cli.schedule_date_not_future')
+      # An offer can expire mid-dialog: the slot is computed before the
+      # loop, and a long hesitation (or a slot minutes away) leaves
+      # [Enter] advertising a time this guard now refuses -- every press
+      # of it, forever. Recomputed from the same entries: their times
+      # only aged, and a queue changed underneath is caught at the write.
+      if input.empty? && slot
+        slot = next_publish_slot(post['slug'], entries)
+        puts t('cli.schedule_slot_offer', slot: slot.strftime(t('date_time_format'))) if slot
+      end
       date = nil
       next
     end
@@ -1452,6 +1463,21 @@ def cmd_publish(slug)
     puts t('cli.already_published', slug: slug, url: published_url(slug, Time.parse(post['date']).year))
     puts
     return
+  end
+
+  # The one path into the draft dialog that never built: add, edit and
+  # unpublish all rebuild before it, so the Preview line the dialog prints
+  # points at a page that exists. A draft that arrived by import or by a
+  # hand-written JSON had a dead preview here -- and since scheduling
+  # stopped rebuilding, nothing later covered for it. Built only when the
+  # page is actually missing: a build is the expensive step on a large
+  # archive, and the ordinary publish-after-edit walk has already paid it.
+  # A draft without a token has no preview address to be dead; the build
+  # would not conjure one.
+  token = post['draft_token'].to_s
+  unless token.empty? ||
+         File.exist?(File.join(ROOT, 'public.nosync', 'draft', token, slug, 'index.html'))
+    rebuild_and_deploy(t('cli.generating_preview'))
   end
 
   draft_decision_loop(slug, path: path)
