@@ -87,6 +87,7 @@ module Doctor
     %w[site description] => 'Personal web/log of Your Name',
     %w[site author] => 'Your Name',
     %w[banner alt] => 'Your Site',
+    %w[footer note_heading] => 'Found something here?',
     %w[footer copyright] => 'All rights reserved &copy; 2026'
   }.freeze
 

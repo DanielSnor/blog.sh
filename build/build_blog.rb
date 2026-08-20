@@ -350,6 +350,22 @@ def social_links_html
   end.join("\n")
 end
 
+# A chrome heading rides with its content -- the footer partial guards the
+# CONTENT since 1.2, but the heading's own emptiness was never asked about,
+# so links_heading: "" over a filled list rendered <h3></h3>, and a note
+# could not be published without a title at all (sh.cynicky.blog wanted
+# exactly that and had no way to say it). Emits the complete line, newline
+# included, or nothing: the template joins this to the next markup line, so
+# a site WITH a heading renders byte for byte what it always has -- the
+# partials compile without a trim mode, and a guard written as its own
+# template line would have added a blank line to every page of every
+# installation (same trap as the about card's guard).
+def chrome_heading_line(text)
+  return '' if text.to_s.strip.empty?
+
+  "        <h3>#{h(text)}</h3>\n"
+end
+
 def footer_links_html
   # `|| []`, not fetch's default: Hash#fetch answers the default only for a
   # MISSING key, and `links:` left standing without a list under it is a

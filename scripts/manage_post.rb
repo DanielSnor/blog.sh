@@ -1061,7 +1061,7 @@ def queue_position(time, entries)
   { count: earlier.size + 1, slug: earlier.last[1], date: earlier.last[0] }
 end
 
-def prompt_and_schedule(path, post, rebuild: true, raw: nil)
+def prompt_and_schedule(path, post, raw: nil)
   # Read once when slots are configured (the offer needs it); a site
   # without slots pays nothing here and reads the archive only after it
   # has actually scheduled something, for the queue line.
@@ -1090,10 +1090,6 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
       puts Tui.paint("   #{t('cli.schedule_queue_hint')}", :dim)
       puts
     end
-    puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
-    print '> '
-  else
-    print t('cli.schedule_date_prompt')
   end
   # NOT `raw = ...`: this method's raw: keyword is the file's bytes as
   # they looked before the dialog opened -- the staleness guard's whole
@@ -1101,32 +1097,50 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
   # typed date line, and the guard then compared the post file against
   # the answer "2026-12-24 08:00", failed by construction, and every
   # scheduling path in the CLI aborted with "changed on disk".
-  answer = $stdin.gets
-  # EOF is not Enter. With an offer on screen an empty line accepts, and
-  # Ctrl-D (or a piped run whose input ran out) would otherwise schedule,
-  # rebuild and deploy a post nobody confirmed.
-  return false if answer.nil?
+  # A loop, not one attempt: a typo in the date used to END the standalone
+  # command (exit 0, post untouched) while the draft dialog's [s] asked
+  # again -- but only because its menu happens to loop. Two behaviours for
+  # the same question; now the question itself re-asks until it gets a
+  # date, a cancel, or the end of input.
+  date = nil
+  loop do
+    if slot
+      puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
+      print '> '
+    else
+      print t('cli.schedule_date_prompt')
+    end
+    answer = $stdin.gets
+    # EOF is not Enter. With an offer on screen an empty line accepts, and
+    # Ctrl-D (or a piped run whose input ran out) would otherwise schedule
+    # and announce a post nobody confirmed -- and inside a loop it would
+    # re-ask forever.
+    return false if answer.nil?
 
-  input = answer.strip
-  return false if input.empty? && slot.nil?
-  return false if input.downcase == t('cli.cancel_word')
+    input = answer.strip
+    return false if input.empty? && slot.nil?
+    return false if input.downcase == t('cli.cancel_word')
 
-  date = if input.empty?
-           slot
-         else
-           begin
-             Time.parse(input)
-           rescue ArgumentError
-             nil
+    date = if input.empty?
+             slot
+           else
+             begin
+               Time.parse(input)
+             rescue ArgumentError
+               nil
+             end
            end
-         end
-  if date.nil?
-    puts t('cli.schedule_date_invalid')
-    return false
-  end
-  if date <= Time.now
-    puts t('cli.schedule_date_not_future')
-    return false
+    if date.nil?
+      puts t('cli.schedule_date_invalid')
+      next
+    end
+    if date <= Time.now
+      puts t('cli.schedule_date_not_future')
+      date = nil
+      next
+    end
+
+    break
   end
 
   # :busy, distinct from false: false means the author declined or the
@@ -1136,7 +1150,11 @@ def prompt_and_schedule(path, post, rebuild: true, raw: nil)
   # cmd_rebuild has since the lock existed.
   return :busy if write_scheduled_date(path, post, date, raw: raw).nil?
 
-  rebuild_and_deploy(t('cli.updating_preview')) if rebuild
+  # No preview rebuild here any more: scheduling a post written this
+  # session used to build and deploy the site a SECOND time only to
+  # stamp a new date on a draft preview the publication throws away --
+  # the add-time build already shows the content, and the cron's build
+  # ships the real page. The queue screen never rebuilt here either.
   puts Tui.paint(t('cli.scheduled_label', slug: post['slug'], date: date.strftime(t('date_time_format'))), :green)
   position = queue_position(date, entries || scheduled_entries(except_slug: post['slug']))
   if position
@@ -1798,7 +1816,7 @@ def queue_act_slow(entries, index, key)
     queue_offer_compact(freed, entries[(index + 1)..])
   when 's'
     puts
-    prompt_and_schedule(entry[:path], entry[:post], rebuild: false, raw: entry[:raw]) == true
+    prompt_and_schedule(entry[:path], entry[:post], raw: entry[:raw]) == true
   when 'n'
     # Only a write that happened frees the slot: a declined unschedule
     # falling through to this offer stacked two posts on one time.

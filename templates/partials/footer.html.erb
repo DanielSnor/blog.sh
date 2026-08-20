@@ -6,16 +6,14 @@
 <footer>
       <div>
 <% unless footer_links_html.empty? %>
-        <h3><%= h(FOOTER['links_heading']) %></h3>
-        <ul>
+<%= chrome_heading_line(FOOTER['links_heading']) %>        <ul>
 <%= footer_links_html %>
         </ul>
 <% end %>
       </div>
       <div>
 <% unless FOOTER['note_html'].to_s.strip.empty? %>
-        <h3><%= h(FOOTER['note_heading']) %></h3>
-        <div class="chrome-text"><%= config_html(FOOTER['note_html']) %></div>
+<%= chrome_heading_line(FOOTER['note_heading']) %>        <div class="chrome-text"><%= config_html(FOOTER['note_html']) %></div>
 <% end %>
 <% unless FOOTER['copyright'].to_s.strip.empty? %>
         <p class="copyright"><%= config_line_html(FOOTER['copyright']) %></p>
@@ -23,8 +21,7 @@
       </div>
       <div>
 <% unless social_links_html.empty? %>
-        <h3><%= h(FOOTER['social_heading']) %></h3>
-        <div class="social-icons">
+<%= chrome_heading_line(FOOTER['social_heading']) %>        <div class="social-icons">
 <%= social_links_html %>
         </div>
 <% end %>

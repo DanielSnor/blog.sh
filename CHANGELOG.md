@@ -169,6 +169,33 @@ Nothing to migrate -- `git pull`, rebuild, deploy.
   The message names the subfolders now, and importing.md says "trailing
   hashtag lines" where it said "trailing hashtags": only lines made of
   nothing but hashtags are cut, a hashtag inside a sentence stays.
+- **The scheduling question worked against the person answering it.** The
+  prompt never said that a bare "18:00" means today -- the fastest route
+  to tonight was the one route nobody could see; a typo in the date ended
+  the standalone `schedule` with exit 0 and the post untouched, while the
+  draft dialog's [s] asked again, but only because its menu happens to
+  loop -- one question, two behaviours; and scheduling rebuilt and
+  deployed the whole site just to stamp a new date on a draft preview the
+  publication throws away hours later -- the middle of three builds on
+  the road to "post tonight". The prompt now advertises the bare time,
+  the question re-asks until it gets a date or a cancel, and scheduling
+  writes the queue without rebuilding anything.
+- **`publishing.slots` existed only for whoever found it in the
+  documentation.** The setup wizard explains the scheduler cron and then
+  never mentioned the one key that makes the scheduler offer times by
+  itself; the word "slots" did not appear in it. It asks now, right under
+  the cron line, and empty still means what it always has -- no slots,
+  the scheduler asks for a date.
+- **A heading could not be turned off.** Emptying a footer section's
+  content has taken its heading with it since 1.2 -- but emptying the
+  HEADING over content that stays rendered a bare `<h3></h3>`, so a note
+  without a title was not a thing a site could say. It is now: an empty
+  heading over live content renders no heading at all, for the links, the
+  note and the social column alike, and a site with headings renders byte
+  for byte what it did. And `doctor` watches `footer.note_heading` with
+  the other template texts -- the shipped English "Found something here?"
+  sat over a Czech note on a live site for twelve days with every check
+  green, because this one key was never on the placeholder list.
 - **A Surfer nobody can reach arrived as a backtrace too.** The two
   likeliest beginner states -- the app is stopped, or SURFER_URL points at
   a machine where nothing listens -- landed in a raw `Errno::ECONNREFUSED`

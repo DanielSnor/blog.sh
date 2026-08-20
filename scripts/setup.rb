@@ -65,6 +65,7 @@ require_relative '../lib/config_writer'
 require_relative '../lib/wizard'
 require_relative '../lib/version'
 require_relative '../lib/site_header'
+require_relative '../lib/publish_slots'
 
 def t(key, **vars)
   I18n.t("setup.#{key}", **vars)
@@ -200,7 +201,7 @@ def run
   ask_page_size(site, current)
   ask_address(site, env, current)
   ask_deploy(env, current)
-  tell_about_scheduler
+  tell_about_scheduler(site, current)
   ask_network(site, env, current)
 
   review_and_write(site, env)
@@ -333,7 +334,7 @@ end
 # nothing ever publishes it. Doctor cannot warn about it on a fresh
 # install either -- it stays quiet while the queue is empty, so the first
 # hint would otherwise be a post that did not go out.
-def tell_about_scheduler
+def tell_about_scheduler(site, current)
   # Said into the frame context (Wizard.say), not printed: the comments
   # menu paints right after this and repaints from the top of the window,
   # so a printed cron line was erased in the same instant it appeared --
@@ -348,6 +349,18 @@ def tell_about_scheduler
   say('')
   say(t('scheduler_note'), :dim)
   say('')
+
+  # The slots existed only for whoever found them in the documentation --
+  # scripts/setup.rb did not contain the word until the queue walkthroughs
+  # flagged it. Empty skips: a site without slots is the documented
+  # default, and the scheduler then asks for a date instead of offering.
+  current_slots = Array(current.dig('publishing', 'slots')).join(', ')
+  value = ask_valid(t('q_slots'), current_slots.empty? ? nil : current_slots, hint: t('h_slots')) do |answer|
+    specs = answer.split(',').map(&:strip).reject(&:empty?)
+    t('e_slots') if specs.empty? || specs.any? { |spec| PublishSlots.parse(spec).nil? }
+  end
+  specs = value.to_s.split(',').map(&:strip).reject(&:empty?)
+  site.set_list(%w[publishing slots], specs) unless specs.empty? || value == current_slots
 end
 
 def ask_address(site, env, current)
