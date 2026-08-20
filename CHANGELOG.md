@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.3.1 -- unreleased
+## 1.3.1 -- 2026-08-20
 
 A bug-fix release about three things. The publishing queue: what the cron
 may announce, what order it publishes in, and who may write the queue while
