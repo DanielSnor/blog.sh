@@ -12,11 +12,14 @@ prints what an installation is running.
 
 ## 1.3.1 -- unreleased
 
-A bug-fix release about the publishing queue -- what the cron may announce,
-what order it publishes in, and who may write the queue while somebody else
-is reading it -- and about the first hour of an install: what a site with no
-deploy target yet is told about where it is, and in which language. Nothing
-to migrate -- `git pull`, rebuild, deploy.
+A bug-fix release about three things. The publishing queue: what the cron
+may announce, what order it publishes in, and who may write the queue while
+somebody else is reading it. The first hour of an install: what a site with
+no deploy target yet is told about where it is, and in which language. And
+what emptiness means: a config section emptied on purpose stops crashing
+the build, failing `doctor` and leaving headings over nothing -- and `check`
+now sees the links that resolve against the post instead of the site.
+Nothing to migrate -- `git pull`, rebuild, deploy.
 
 ### Fixed
 
@@ -124,6 +127,14 @@ to migrate -- `git pull`, rebuild, deploy.
   above it had been translated for releases; the one line under it,
   "First paragraph's text.", was written into the code. It is the first
   thing an author sees inside the editor.
+- **The Instagram import's "no posts found" hint stopped one level too
+  high.** It said to point at the directory holding
+  `your_instagram_activity/` -- which is where the reader already was;
+  the actual difference sits one level deeper, where the JSON export
+  keeps `posts_*.json` under `media/` and the HTML one under `content/`.
+  The message names the subfolders now, and importing.md says "trailing
+  hashtag lines" where it said "trailing hashtags": only lines made of
+  nothing but hashtags are cut, a hashtag inside a sentence stays.
 - **A config the filesystem refused to write arrived as a backtrace.**
   `./style.sh` and `./setup.sh` copy the file to a `.bak` before they write
   it, so a backup left behind by a run made as another user -- root, most

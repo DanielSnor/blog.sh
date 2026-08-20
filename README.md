@@ -543,7 +543,10 @@ rebuild. Run it from cron wherever the site is built:
 
 Every 30 minutes is plenty -- the data it refreshes (recent toots,
 Pixelfed posts, commits, like/boost counts) doesn't move faster than
-that. Skip the cron entirely if no widgets are configured.
+that. Skip the cron entirely if no widgets are configured -- unless
+comments are moderated (`comments.approval: fav`): approved replies
+reach the site through this same job (it writes `comments.json` too),
+so a moderated site needs it with or without widgets.
 
 A second, optional job powers `./blog.sh schedule` -- it publishes
 scheduled drafts whose date has arrived (and does nothing otherwise):
@@ -556,12 +559,6 @@ scheduled drafts whose date has arrived (and does nothing otherwise):
 
 What isn't built yet, and what building it would take:
 
-- **Next, as a patch release** -- small, already-decided corrections:
-  the scheduled-publish cron learns the restraint the interactive
-  publish already has (a backdated post publishes without announcing;
-  a post that carries an announcement URL is never announced again --
-  its comment thread is the thing being protected), plus a handful of
-  edge fixes the release audit chose to defer rather than rush.
 - **Further out** -- importing sport activities is the working theme
   for a future release: GPX/TCX/FIT from whatever tracker you use, a
   post with the map and the numbers, no account on anybody's platform

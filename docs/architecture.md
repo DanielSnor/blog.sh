@@ -24,7 +24,7 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
 - `content` is an array of **typed blocks**: `text` (with `subtype`
   heading1-6/quote), `list`, `table`, `code`, `image`, `video`, `audio`,
   `file`,
-  `link`, `hr`.
+  `link`, `chat`, `hr`.
 - Inline formatting (bold/italic/strikethrough/code/link) is stored as
   **codepoint offset ranges into plain text**, not nested HTML -- the
   same NPF-style shape Tumblr's API uses, which is what the importers

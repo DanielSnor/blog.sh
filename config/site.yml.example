@@ -8,9 +8,9 @@
 # it in for your own site. After every edit, rebuild: ./blog.sh rebuild, or
 # directly ruby build/build_blog.rb && ./scripts/deploy-web.sh.
 #
-# A minimal config with just site, banner, about and footer is a complete,
-# working site. Everything else is optional, and a section left out means
-# the engine's own default -- never a broken page.
+# A minimal config with just site and banner is a complete, working site.
+# Everything else is optional, and a section left out -- or emptied --
+# means the engine's own default -- never a broken page.
 #
 # HOW TO READ THE '#' LINES. This file uses them for two different jobs,
 # and telling them apart is the one thing worth knowing before you edit:

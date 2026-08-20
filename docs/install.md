@@ -551,8 +551,10 @@ announcement (logged, not an error).
 
 **Mastodon:**
 
-1. In `config/site.yml`, set `mastodon.instance` -- this switches on
-   comments, per-post stats and the auto-toot on publish.
+1. In `config/site.yml`, uncomment the `mastodon:` block -- the header
+   line included, which is the half that is easy to miss -- and set
+   `mastodon.instance`. This switches on comments, per-post stats and
+   the auto-toot on publish.
 2. On that instance: Preferences → Development → New application, scope
    `write:statuses`. Put the token into env.sh as
    `MASTODON_ACCESS_TOKEN`.
