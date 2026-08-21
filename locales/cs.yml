@@ -1140,7 +1140,7 @@ style:
   widget_heading_rss: "Jinde"
   q_widget_heading: "Nadpis nad widgetem"
   q_widget_account_id: "ID účtu"
-  h_widget_account_id: "ID, ne @jméno — na Mastodonu číslo, na GoToSocial ULID. Nejsnáz: ./setup.sh s vyplněným tokenem ho najde sám. Ručně: otevři https://tvoje-instance/api/v1/accounts/lookup?acct=tvojejmeno a opiš hodnotu „id“."
+  h_widget_account_id: "ID, ne @jméno — číslo na Mastodonu, ULID na GoToSocial. Najde ho ./setup.sh s tokenem, nebo otevři https://tvoje-instance/api/v1/accounts/lookup?acct=tvojejmeno a opiš „id“."
   q_widget_username: "Uživatelské jméno na GitHubu"
   h_widget_username: "Jen jméno, tak jak je v adrese tvého profilu."
   q_widget_feed_url: "Adresa feedu"
