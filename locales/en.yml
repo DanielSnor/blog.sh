@@ -499,6 +499,7 @@ redirect:
   moved: "This post has moved:"
 
 cron:
+  commits_instance_bad: "The commits widget's `instance` is not a server address (%{value}), so no commits were fetched."
   no_scheduled_due: "No scheduled post is due."
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
   unlisted_not_announced: "Post '%{slug}' is unlisted, so nothing was announced."
@@ -795,6 +796,8 @@ doctor:
   widget_incomplete: "The %{name} widget has no %{key}, so it can never show anything."
   widget_account_id: "The toots widget wants the account's API id and has %{value}."
   widget_account_id_fix: "Not the @handle -- the id: a number on Mastodon, a 26-character ULID on GoToSocial. Open https://instance/api/v1/accounts/lookup?acct=you and copy \"id\"; ./setup.sh looks it up for you."
+  widget_instance: "The commits widget's `instance` is not a server address: %{value}."
+  widget_instance_fix: "Write the server itself, scheme and host only -- \"https://codeberg.org\", \"https://git.example.org\" -- not a handle, a repository or a bare host name. Leave the key out entirely for GitHub."
   widget_heading: "The %{name} widget has no heading, so it appears without a title."
   widget_limit: "The %{name} widget's limit is %{value}; it has to be a whole number greater than zero."
 

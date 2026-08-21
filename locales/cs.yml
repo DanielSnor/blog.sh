@@ -478,6 +478,7 @@ redirect:
   moved: "Tenhle příspěvek se přestěhoval:"
 
 cron:
+  commits_instance_bad: "`instance` u widgetu commits není adresa serveru (%{value}), takže se žádné commity nestáhly."
   no_scheduled_due: "Žádný naplánovaný post není na řadě."
   published_scheduled: "Publikován naplánovaný post '%{slug}' (datum %{date})."
   unlisted_not_announced: "Post '%{slug}' je nezalistovaný, oznámení se neposílalo."
@@ -774,6 +775,8 @@ doctor:
   widget_incomplete: "Widget %{name} nemá %{key}, takže nikdy nic nezobrazí."
   widget_account_id: "Widget s tooty chce API ID účtu a má %{value}."
   widget_account_id_fix: "Ne @jméno — ID: na Mastodonu číslo, na GoToSocial 26znakové ULID. Otevři https://instance/api/v1/accounts/lookup?acct=ty a opiš hodnotu „id“; ./setup.sh si ho dohledá sám."
+  widget_instance: "`instance` u widgetu commits není adresa serveru: %{value}."
+  widget_instance_fix: "Napiš samotný server, jen schéma a host — „https://codeberg.org\", „https://git.example.org\" — ne handle, ne repozitář a ne holé jméno hostu. Pro GitHub klíč vůbec neuváděj."
   widget_heading: "Widget %{name} nemá nadpis, takže se zobrazí bez titulku."
   widget_limit: "Limit widgetu %{name} je %{value}; musí to být celé číslo větší než nula."
 

@@ -3,7 +3,7 @@
 require 'json'
 require_relative 'pixelfed_fetcher'
 require_relative 'mastodon_fetcher'
-require_relative 'github_fetcher'
+require_relative 'commits_fetcher'
 require_relative 'bluesky_fetcher'
 require_relative 'rss_fetcher'
 
@@ -24,7 +24,7 @@ module Sidebar
   ALL_FEEDS = {
     'pixelfed.json' => PixelfedFetcher,
     'toots.json' => MastodonFetcher,
-    'commits.json' => GithubFetcher,
+    'commits.json' => CommitsFetcher,
     'bluesky.json' => BlueskyFetcher,
     'rss.json' => RssFetcher
   }.freeze

@@ -705,6 +705,16 @@ module Doctor
         findings << error(t('widget_account_id', value: conf['account_id'].inspect), t('widget_account_id_fix'))
       end
 
+      # A Gitea/Forgejo address, when the widget points at one. The likely
+      # mistakes are a handle, a link to one repository, or a bare host --
+      # each of them ends as an empty card nobody notices, because a widget
+      # that fetches nothing looks exactly like a widget whose author has
+      # not pushed lately.
+      if name == 'commits' && !conf['instance'].to_s.strip.empty? &&
+         !conf['instance'].to_s.strip.match?(%r{\Ahttps?://[^/\s]+/?\z})
+        findings << error(t('widget_instance', value: conf['instance'].inspect), t('widget_instance_fix'))
+      end
+
       findings << warn(t('widget_heading', name: name)) if conf['heading'].to_s.empty?
       limit = conf['limit']
       findings << error(t('widget_limit', name: name, value: limit.inspect)) if limit && !(limit.is_a?(Integer) && limit.positive?)

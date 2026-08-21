@@ -12,6 +12,25 @@ prints what an installation is running.
 
 ## 1.4 -- unreleased
 
+### Added
+
+- **The commits widget reads Gitea and Forgejo, not just GitHub.** Asked for
+  by the first person outside this project to run the engine: most of the
+  Fediverse hosts its code on Codeberg or its own Forgejo, and the
+  workaround was to mirror to GitHub for the sake of one sidebar card.
+  `widgets.commits.instance` takes the server's address and that is the
+  whole configuration -- an address already answers which kind of host it
+  is, so there is no second key to keep in agreement with it. Without the
+  key nothing changes. The forge path costs **one** request where GitHub
+  costs one per commit, because a Gitea activity item carries the commits
+  it is about, message and timestamp included; `doctor` refuses a handle, a
+  link to one repository or a bare host name, each of which would otherwise
+  end as an empty card indistinguishable from "has not pushed lately".
+  Verified against two live servers before it was written.
+- **Icons for Gitea, Forgejo, Codeberg and GitLab** in the footer's set, so
+  a site that hosts its code outside GitHub can say so with the same row of
+  icons everything else uses.
+
 ### Changed
 
 - **A key that is written down speaks for itself.** `nav:` left standing

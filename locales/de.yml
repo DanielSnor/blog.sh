@@ -488,6 +488,7 @@ redirect:
   moved: "Dieser Beitrag ist umgezogen:"
 
 cron:
+  commits_instance_bad: "`instance` des Commits-Widgets ist keine Serveradresse (%{value}); es wurden keine Commits geholt."
   no_scheduled_due: "Kein geplanter Beitrag ist fällig."
   published_scheduled: "Geplanten Beitrag '%{slug}' veröffentlicht (Datum %{date})."
   unlisted_not_announced: "Beitrag '%{slug}' ist ungelistet, es wurde nichts angekündigt."
@@ -784,6 +785,8 @@ doctor:
   widget_incomplete: "Dem Widget %{name} fehlt %{key}, also kann es nie etwas anzeigen."
   widget_account_id: "Das Toots-Widget will die API-ID des Kontos und hat %{value}."
   widget_account_id_fix: "Nicht den @Namen -- die ID: auf Mastodon eine Nummer, auf GoToSocial eine 26-stellige ULID. Öffne https://instanz/api/v1/accounts/lookup?acct=du und übernimm \"id\"; ./setup.sh sucht sie selbst heraus."
+  widget_instance: "`instance` des Commits-Widgets ist keine Serveradresse: %{value}."
+  widget_instance_fix: "Gib den Server selbst an, nur Schema und Host -- \"https://codeberg.org\", \"https://git.example.org\" -- keinen Handle, kein Repository und keinen bloßen Hostnamen. Für GitHub den Schlüssel ganz weglassen."
   widget_heading: "Das Widget %{name} hat keine Überschrift und erscheint deshalb ohne Titel."
   widget_limit: "Das Limit des Widgets %{name} ist %{value}; es muss eine ganze Zahl größer als null sein."
 

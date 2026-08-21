@@ -298,6 +298,10 @@ about:
 #     heading: "Recent commits"
 #     username: "yourname"
 #     limit: 3
+#     # GitHub unless you say otherwise. For a Gitea or Forgejo server --
+#     # Codeberg, your own git -- give its address here and the widget
+#     # reads that instead; the address is the whole configuration.
+#     # instance: "https://codeberg.org"
 #   bluesky:
 #     heading: "Recent Bluesky posts"
 #     # handle is optional -- it falls back to bluesky.handle below, so set
@@ -338,7 +342,8 @@ footer:
   social_heading: "Find me on"
 
 # icon = a name from the built-in set: mastodon, pixelfed, linkedin,
-# github, bluesky, instagram, threads, facebook, x, youtube, rss, email.
+# github, gitea, forgejo, codeberg, gitlab, bluesky, instagram, threads,
+# facebook, x, youtube, rss, email.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is

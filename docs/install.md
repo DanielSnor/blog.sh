@@ -223,8 +223,17 @@ The example is fully commented. The short version:
   somebody gets from a machine is a legitimate position and the engine
   does not take it on your behalf either way).
 
+The `commits` widget reads GitHub unless you give it `instance` -- the
+address of a Gitea or Forgejo server (Codeberg, your own git). The address
+is the whole configuration: nothing else has to be said, because it already
+answers which kind of host this is. That path costs one request where
+GitHub costs one per commit, since a Gitea activity item carries the
+commits it is about.
+
 `social` is the row of icons in the footer. Each entry takes `name`,
-`url` and either `icon` (a name from the built-in set) or `icon_svg`
+`url` and either `icon` (a name from the built-in set: mastodon, pixelfed,
+linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky, instagram,
+threads, facebook, x, youtube, rss, email) or `icon_svg`
 (your own markup), plus an optional `rel` that is passed through to the
 rendered link. `rel: "me"` on the Mastodon entry is what gets your site
 verified -- the green check mark next to it on your profile: Mastodon
