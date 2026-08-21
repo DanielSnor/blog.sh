@@ -11,6 +11,7 @@ guides that go deeper:
 | [architecture.md](architecture.md) | How does it work inside -- content model, build pipeline, deploy, client side, security? |
 | [decisions.md](decisions.md) | Why is it built this way -- the trade-offs, each with its admitted cost? |
 | [importing.md](importing.md) | How do I bring an old blog in -- per-source guides, what gets kept, how to undo? |
+| [skinning.md](skinning.md) | How do I make it look like something else -- without forking the engine? |
 | [localization.md](localization.md) | How do I translate the engine into my language? |
 
 ## Where to start, by situation
@@ -20,6 +21,7 @@ guides that go deeper:
 | Evaluating the engine | main README → the screenshots → *Why this exists* → *What it does* |
 | Setting up a site | [install.md](install.md), top to bottom |
 | Writing and publishing posts | [operations.md → Writing and publishing](operations.md#writing-and-publishing) |
+| Dressing the site differently | [skinning.md](skinning.md) -- try `./style.sh` first; a skin is the expensive answer |
 | Moving content in from elsewhere | [importing.md](importing.md), then `./import.sh` |
 | Taking content out, or moving the whole site | [operations.md → Taking your content elsewhere](operations.md#taking-your-content-elsewhere), then `./blog.sh export` |
 | Checking that the archive itself is sound | [operations.md → Checking the archive](operations.md#checking-the-archive), then `./blog.sh check` |
