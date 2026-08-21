@@ -25,6 +25,7 @@ require 'rbconfig'
 require 'English'
 require_relative '../lib/run_lock'
 require_relative '../lib/site_config'
+require_relative '../lib/account_id'
 
 ROOT = File.expand_path('..', __dir__)
 SITE_YML = File.join(ROOT, 'config', 'site.yml')
@@ -897,8 +898,10 @@ def configure_widget(name)
         t('e_limit') unless answer.to_s.match?(/\A[1-9]\d*\z/)
       elsif key == 'account_id'
         # The mistake this whole prompt exists to catch: the @handle goes
-        # in, nothing comes out, and nothing anywhere says why.
-        t('e_account_id') unless answer.to_s.match?(/\A\d+\z/)
+        # in, nothing comes out, and nothing anywhere says why. What an
+        # id may look like (Mastodon numbers, GoToSocial ULIDs) lives in
+        # lib/account_id.rb, shared with doctor.
+        t('e_account_id') unless AccountId.plausible?(answer)
       elsif key == 'feed_url'
         t('e_feed_url') unless answer.to_s.match?(%r{\Ahttps?://})
       end

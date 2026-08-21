@@ -10,6 +10,31 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.3.2 -- unreleased
+
+A GoToSocial release, both fixes reported from the first blog.sh site
+paired with one (arch-linux.cz). GTS speaks Mastodon's API but answers
+with its own accents -- ULID account ids, and content negotiation on
+Accept -- and two places in the engine assumed the Mastodon dialect was
+the only one. Nothing to migrate -- `git pull`, rebuild, deploy.
+
+### Fixed
+
+- The feed widget (and the Pixelfed widget, and the feed importer) asked
+  every host for `application/json` first, and a server that negotiates
+  content by Accept -- GoToSocial's profile feed for one -- answered
+  exactly as asked: with a JSON Feed the XML parser then reported as
+  "Malformed XML". Feed readers now ask for RSS/Atom first, and keep
+  asking for it across redirects; API callers keep JSON. The same GTS
+  feed URL that failed now renders as a sidebar widget.
+- `doctor` and `./style.sh` refused every GoToSocial account id: the
+  check demanded digits only (Mastodon's shape), while GTS answers the
+  same lookup endpoint with a 26-character ULID -- so the id the setup
+  points you at was rejected by the very tool that asked for it, on a
+  value the fetcher handles fine. Both gates now accept numbers and
+  letter-and-digit ids (ULIDs, Pleroma flakes) while still catching the
+  mistake they exist for: a pasted @handle or profile URL.
+
 ## 1.3.1 -- 2026-08-20
 
 A bug-fix release about three things. The publishing queue: what the cron

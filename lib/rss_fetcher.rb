@@ -40,7 +40,10 @@ module RssFetcher
       return []
     end
 
-    parse(FeedHttp.get(FEED_URL))
+    # XML_ACCEPT, or a content-negotiating host (GoToSocial's profile
+    # feed) answers the default JSON-first Accept with a JSON Feed and
+    # this parser calls the feed malformed.
+    parse(FeedHttp.get(FEED_URL, accept: FeedHttp::XML_ACCEPT))
   rescue StandardError => e
     warn "RSS feed fetch failed: #{e.message}"
     []

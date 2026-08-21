@@ -288,7 +288,7 @@ about:
 #     # instance is optional -- it falls back to mastodon.instance below,
 #     # so set it only when the widget shows an account living elsewhere.
 #     # instance: "mastodon.social"
-#     account_id: "000000000000000000" # numeric Mastodon account id, not the @handle
+#     account_id: "000000000000000000" # the account's API id, not the @handle -- a number on Mastodon, a ULID on GoToSocial
 #     limit: 3
 #   pixelfed:
 #     heading: "Recent Pixelfed posts"

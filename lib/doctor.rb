@@ -14,6 +14,7 @@ require_relative 'media_dimensions'
 require_relative 'exif_location'
 require_relative 'deploy_backend'
 require_relative 'slug'
+require_relative 'account_id'
 # For the one thing doctor cannot answer from config alone: whether a
 # menu entry points at an address this archive produces. Sharing the
 # set with check rather than building a second one is the point --
@@ -679,9 +680,11 @@ module Doctor
       required = WIDGET_REQUIRED[name]
       if required && conf[required].to_s.empty?
         findings << error(t('widget_incomplete', name: name, key: required))
-      elsif name == 'toots' && !conf['account_id'].to_s.match?(/\A\d+\z/)
-        # The numeric id, not the @handle -- the single most common way
-        # this widget is filled in wrong, and it fails silently.
+      elsif name == 'toots' && !AccountId.plausible?(conf['account_id'])
+        # The id, not the @handle -- the single most common way this
+        # widget is filled in wrong, and it fails silently. What counts
+        # as an id (Mastodon numbers, GoToSocial ULIDs, Pleroma flakes)
+        # lives in lib/account_id.rb, shared with the style wizard.
         findings << error(t('widget_account_id', value: conf['account_id'].inspect), t('widget_account_id_fix'))
       end
 
