@@ -51,7 +51,7 @@
   <script defer src="<%= h(ANALYTICS['src']) %>" data-website-id="<%= h(ANALYTICS['website_id']) %>"></script>
 <% end %>
 </head>
-<body>
+<body<%= body_attr %>>
   <div class="wrap">
     <div class="banner-wrap">
       <a href="/" class="banner-link"><img class="banner" src="<%= h(BANNER['src']) %>" alt="<%= h(BANNER['alt']) %>" width="<%= BANNER['width'] %>" height="<%= BANNER['height'] %>"></a>

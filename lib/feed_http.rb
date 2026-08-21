@@ -34,6 +34,16 @@ module FeedHttp
   # controls.
   MAX_BODY = 8 * 1024 * 1024
 
+  # What a fetch says it accepts. Most callers read JSON APIs, so JSON
+  # first stays the default -- but a caller after a FEED must not say
+  # that: servers that content-negotiate on Accept (GoToSocial for one)
+  # answer `application/json` with a JSON Feed document, and the XML
+  # parsers behind rss_fetcher, pixelfed_fetcher and the feed importer
+  # then report the whole feed as malformed. Those callers pass
+  # XML_ACCEPT instead, and the same URL yields RSS/Atom again.
+  DEFAULT_ACCEPT = 'application/json, application/atom+xml, */*'
+  XML_ACCEPT = 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.1'
+
   module_function
 
   def now
@@ -56,14 +66,14 @@ module FeedHttp
   # a Location is chosen by the remote, and following one with the
   # credentials still attached would hand them to whatever host it names.
   def get(url, redirects_left = MAX_REDIRECTS, deadline = now + TOTAL_TIMEOUT, max_body: MAX_BODY,
-          bearer: nil, headers: {})
+          accept: DEFAULT_ACCEPT, bearer: nil, headers: {})
     remaining = deadline - now
     raise "timed out after #{TOTAL_TIMEOUT}s (#{url})" if remaining <= 0
 
     uri = URI(url)
     req = Net::HTTP::Get.new(uri)
     req['User-Agent'] = USER_AGENT
-    req['Accept'] = 'application/json, application/atom+xml, */*'
+    req['Accept'] = accept
     req['Authorization'] = "Bearer #{bearer}" unless bearer.to_s.empty?
     headers.each { |name, value| req[name.to_s] = value.to_s }
 
@@ -102,7 +112,10 @@ module FeedHttp
       raise "refusing a #{target.scheme.inspect} redirect (#{url})" unless %w[http https].include?(target.scheme)
 
       same_host = target.host == uri.host && target.scheme == uri.scheme && target.port == uri.port
-      get(target.to_s, redirects_left - 1, deadline, max_body: max_body,
+      # accept survives every redirect: it is a media-type preference,
+      # not a credential, and a feed moved to a new host still has to be
+      # asked for XML or GoToSocial-style negotiation answers with JSON.
+      get(target.to_s, redirects_left - 1, deadline, max_body: max_body, accept: accept,
                        bearer: same_host ? bearer : nil, headers: same_host ? headers : {})
     else
       raise "HTTP #{res.code} (#{url})"

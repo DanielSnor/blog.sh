@@ -42,7 +42,7 @@ module PixelfedFetcher
       return []
     end
 
-    doc = REXML::Document.new(FeedHttp.get(FEED_URL))
+    doc = REXML::Document.new(FeedHttp.get(FEED_URL, accept: FeedHttp::XML_ACCEPT))
 
     doc.elements.to_a('feed/entry').first(LIMIT).map do |entry|
       full_title = entry.elements['title'].text.to_s

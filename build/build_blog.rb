@@ -1814,9 +1814,21 @@ def comment_origins_for(posts)
   end.uniq
 end
 
+# `body_class` is how a stylesheet tells one listing page from another. CSS
+# cannot read an address, so the first page of a listing and its /page/N/
+# continuations were indistinguishable: a skin that wanted a lead card, or a
+# profile block, on the first page only had nothing to hang the rule on, and
+# both skins written against this engine hit it independently. The class is
+# emitted on both sides -- page-first and page-cont -- rather than marking
+# only the continuations, so a skin can scope its additions positively
+# instead of writing them unconditionally and then undoing each property
+# again further down.
 def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website',
-           extra_head: '', frame_origins: [], comment_origins: [])
+           extra_head: '', frame_origins: [], comment_origins: [], body_class: nil)
   LAYOUT.result_with_hash(
+    # Pre-rendered as the whole attribute, so a page without one keeps a bare
+    # <body> rather than an empty class="" on every page of every site.
+    body_attr: body_class ? %( class="#{body_class}") : '',
     main_html: main_html,
     page_title: title,
     page_description: description,
@@ -1961,6 +1973,10 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     emit(File.join(out_dir, 'index.html'),
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
+                           # The landing page of a listing is the highest number and
+                           # lives at the base path; everything below it is a
+                           # continuation. See layout for why both are named.
+                           body_class: number > fixed ? 'page-first' : 'page-cont',
                            # So a reader who wants only this subject can be handed it by
                            # their feed reader, which looks for exactly this link.
                            extra_head: feed_path ? %(\n  <link rel="alternate" type="application/rss+xml" title="#{h(page_title)}" href="#{h(feed_path)}">) : '',

@@ -398,7 +398,7 @@ module Import
         # file is big enough for it to matter. Reading items as they
         # stream would remove the ceiling, and would be a different
         # adapter.
-        FeedHttp.get(@source, max_body: nil)
+        FeedHttp.get(@source, max_body: nil, accept: FeedHttp::XML_ACCEPT)
       rescue StandardError => e
         # A feed URL that 404s, times out or resolves nowhere raised through
         # to the wizard as a raw backtrace: the same defect the malformed-XML
