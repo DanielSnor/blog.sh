@@ -27,6 +27,17 @@ prints what an installation is running.
   link to one repository or a bare host name, each of which would otherwise
   end as an empty card indistinguishable from "has not pushed lately".
   Verified against two live servers before it was written.
+- **`./blog.sh check --json`: the findings themselves, all of them.** A
+  finding used to be a finished sentence and nothing else, and the lists
+  were capped at twenty of a kind by the time anyone saw them -- so the
+  rest was not merely unprinted but never built. Findings now carry the
+  kind they are (`link_dead`, `media_stray`, `series_similar`...) and the
+  data they are about (the post's slug, the address, the file), the cap
+  belongs to the screen, and `--json` prints the whole list. This is what
+  makes acting on a check possible at all: the archive cleanup that took a
+  hand-written script over sean.cz in August could have read this instead.
+  The screen is unchanged, built from the same objects, and the exit code
+  is the same in both modes.
 - **Icons for Gitea, Forgejo, Codeberg and GitLab** in the footer's set, so
   a site that hosts its code outside GitHub can say so with the same row of
   icons everything else uses.

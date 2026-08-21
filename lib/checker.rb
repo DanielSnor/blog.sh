@@ -28,7 +28,14 @@ module Checker
   # `count` is how many findings the line stands for: 1 for an ordinary
   # finding, and for a "...and N more" line the N that was not printed --
   # which is what lets the summary total the archive instead of the screen.
-  Finding = Struct.new(:level, :text, :fix, :count, keyword_init: true) do
+  # `kind` and `data` are the finding itself; `text` and `fix` are one way
+  # of saying it. Until 1.4 there was only the sentence, which meant nothing
+  # downstream could act on a finding without parsing prose -- and the lists
+  # were already capped at twenty by the time anyone saw them, so the rest
+  # was not merely unsaid but gone. `./blog.sh check --json` prints the
+  # whole list, and it costs nothing to keep: the screen is still built from
+  # the same objects.
+  Finding = Struct.new(:level, :text, :fix, :count, :kind, :data, keyword_init: true) do
     def error?
       level == :error
     end
@@ -65,38 +72,52 @@ module Checker
     I18n.t("check.#{key}", **vars)
   end
 
-  def ok(text)
-    Finding.new(level: :ok, text: text, count: 1)
+  def ok(text, kind: nil, data: nil)
+    Finding.new(level: :ok, text: text, count: 1, kind: kind, data: data)
   end
 
-  def warn(text, fix = nil)
-    Finding.new(level: :warn, text: text, fix: fix, count: 1)
+  def warn(text, fix = nil, kind: nil, data: nil)
+    Finding.new(level: :warn, text: text, fix: fix, count: 1, kind: kind, data: data)
   end
 
-  def error(text, fix = nil)
-    Finding.new(level: :error, text: text, fix: fix, count: 1)
+  def error(text, fix = nil, kind: nil, data: nil)
+    Finding.new(level: :error, text: text, fix: fix, count: 1, kind: kind, data: data)
   end
 
-  def run(root:, progress: nil, online: false, online_progress: nil)
+  # How many findings of one kind a screen is willing to show. The rest ride
+  # along as a single "...and N more", whose count is what lets the summary
+  # total the archive rather than the screen.
+  CAP = 20
+
+  # Capping happens here, in one place, and only when a cap is asked for:
+  # the checks build every finding they have and hand the whole list over.
+  # `--json` passes nil and gets all of them.
+  def capped(findings, cap)
+    return findings if cap.nil? || findings.size <= cap
+
+    findings.first(cap) + more(findings.size - cap, findings.first.level)
+  end
+
+  def run(root:, progress: nil, online: false, online_progress: nil, cap: CAP)
     posts = load_posts(root)
-    return [warn(t('no_posts'))] if posts.empty?
+    return [warn(t('no_posts'), kind: :no_posts)] if posts.empty?
 
     known = known_paths(posts)
     findings = []
-    findings.concat(check_media(root, posts, progress))
-    findings.concat(check_degenerate_images(posts))
-    findings.concat(check_internal_links(posts, known))
-    findings.concat(check_relative_links(posts))
-    findings.concat(check_orphan_media(root, posts))
-    findings.concat(check_stray_media(root, posts))
+    findings.concat(check_media(root, posts, progress, cap))
+    findings.concat(check_degenerate_images(posts, cap))
+    findings.concat(check_internal_links(posts, known, cap))
+    findings.concat(check_relative_links(posts, cap))
+    findings.concat(check_orphan_media(root, posts, cap))
+    findings.concat(check_stray_media(root, posts, cap))
     findings.concat(check_redirects(posts))
     findings.concat(check_series_names(posts))
     local_clean = findings.none? { |f| f.error? || f.warn? }
-    findings << ok(t('all_clear', posts: posts.size)) if local_clean
+    findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
 
     if online
       cache = Cache.new(File.join(root, 'tmp', 'link-check.json'))
-      findings.concat(check_external_links(posts, cache: cache, online_progress: online_progress))
+      findings.concat(check_external_links(posts, cache: cache, online_progress: online_progress, cap: cap))
       cache.save
     end
     findings
@@ -186,7 +207,7 @@ module Checker
   # A post whose media never arrived. The import summary said so at the
   # time and nothing has said so since, which is why a whole archive can
   # carry these for years without anyone knowing.
-  def check_media(root, posts, progress)
+  def check_media(root, posts, progress, cap = CAP)
     missing = []
     posts.each_with_index do |post, index|
       progress&.call(index + 1, posts.size)
@@ -199,15 +220,16 @@ module Checker
     end
     return [] if missing.empty?
 
-    missing.first(20).map do |slug, url|
-      error(t('media_missing', slug: slug, file: url), t('media_missing_fix'))
-    end + more(missing.size - 20, :error)
+    capped(missing.map do |slug, url|
+      error(t('media_missing', slug: slug, file: url), t('media_missing_fix'),
+            kind: :media_missing, data: { 'slug' => slug, 'file' => url })
+    end, cap)
   end
 
   # Images the build will drop on the floor: a size of 1px or less is the
   # tracking pixel rule, and the block goes with its caption. Nothing on
   # the rendered page shows that anything used to be there.
-  def check_degenerate_images(posts)
+  def check_degenerate_images(posts, cap = CAP)
     found = posts.flat_map do |post|
       (post['content'] || []).filter_map do |block|
         next unless block.is_a?(Hash) && block['type'] == 'image'
@@ -222,15 +244,16 @@ module Checker
     end
     return [] if found.empty?
 
-    found.first(20).map do |slug, url, w, h|
-      warn(t('image_degenerate', slug: slug, file: url, width: w, height: h), t('image_degenerate_fix'))
-    end + more(found.size - 20, :warn)
+    capped(found.map do |slug, url, w, h|
+      warn(t('image_degenerate', slug: slug, file: url, width: w, height: h), t('image_degenerate_fix'),
+           kind: :image_degenerate, data: { 'slug' => slug, 'file' => url, 'width' => w, 'height' => h })
+    end, cap)
   end
 
   # Links from one post to another address on this site that nothing will
   # ever answer at -- the residue of an import that rewrote permalinks, or
   # of a slug that was renamed before renaming kept a redirect.
-  def check_internal_links(posts, known)
+  def check_internal_links(posts, known, cap = CAP)
     dead = []
     posts.each do |post|
       internal_links(post).each do |url|
@@ -247,8 +270,10 @@ module Checker
     end
     return [] if dead.empty?
 
-    dead.first(20).map { |slug, url| error(t('link_dead', slug: slug, url: url), t('link_dead_fix')) } +
-      more(dead.size - 20, :error)
+    capped(dead.map do |slug, url|
+      error(t('link_dead', slug: slug, url: url), t('link_dead_fix'),
+            kind: :link_dead, data: { 'slug' => slug, 'url' => url })
+    end, cap)
   end
 
   # Links that are written relative to wherever they happen to be read
@@ -265,19 +290,21 @@ module Checker
   # answers 200 with the post the reader is already on. Nothing fails,
   # nothing is logged, and the reader simply never arrives -- which is why
   # 73 of them sat in one archive through every audit it ever had.
-  def check_relative_links(posts)
+  def check_relative_links(posts, cap = CAP)
     found = posts.flat_map do |post|
       all_links(post).select { |url| relative_link?(url) }.map { |url| [post['slug'], url] }
     end
     return [] if found.empty?
 
-    found.first(20).map { |slug, url| error(t('link_relative', slug: slug, url: url), t('link_relative_fix')) } +
-      more(found.size - 20, :error)
+    capped(found.map do |slug, url|
+      error(t('link_relative', slug: slug, url: url), t('link_relative_fix'),
+            kind: :link_relative, data: { 'slug' => slug, 'url' => url })
+    end, cap)
   end
 
   # Media directories no post claims. Pure disk, invisible from anywhere --
   # left behind by a delete, a rename, or an import that ran twice.
-  def check_orphan_media(root, posts)
+  def check_orphan_media(root, posts, cap = CAP)
     media_root = File.join(root, 'media.nosync')
     return [] unless Dir.exist?(media_root)
 
@@ -288,8 +315,10 @@ module Checker
     end
     return [] if orphans.empty?
 
-    orphans.first(20).map { |rel| warn(t('media_orphan', dir: rel), t('media_orphan_fix')) } +
-      more(orphans.size - 20, :warn)
+    capped(orphans.map do |rel|
+      warn(t('media_orphan', dir: rel), t('media_orphan_fix'),
+           kind: :media_orphan, data: { 'dir' => rel })
+    end, cap)
   end
 
   # The same leftovers one level down: files inside a directory a post
@@ -299,7 +328,7 @@ module Checker
   # referenced files exist, never whether existing files are referenced.
   # After the renumbering fix these strays are the one shape of orphan
   # left standing, and they were invisible from every side.
-  def check_stray_media(root, posts)
+  def check_stray_media(root, posts, cap = CAP)
     strays = posts.flat_map do |post|
       dir = File.join(root, 'media.nosync', post['__year'], post['slug'].to_s)
       next [] unless Dir.exist?(dir)
@@ -311,9 +340,10 @@ module Checker
     end
     return [] if strays.empty?
 
-    strays.first(20).map do |slug, file|
-      warn(t('media_stray', slug: slug, file: file), t('media_stray_fix'))
-    end + more(strays.size - 20, :warn)
+    capped(strays.map do |slug, file|
+      warn(t('media_stray', slug: slug, file: file), t('media_stray_fix'),
+           kind: :media_stray, data: { 'slug' => slug, 'file' => file })
+    end, cap)
   end
 
   # Two posts claiming one old address. The build answers with whichever it
@@ -345,7 +375,10 @@ module Checker
       names = [a, b].map { |slug| groups[slug].map { |p| p['series'].to_s.strip }.uniq.first }
       findings << warn(t('series_similar', a: names[0], count_a: groups[a].size,
                                            b: names[1], count_b: groups[b].size),
-                       t('series_similar_fix'))
+                       t('series_similar_fix'),
+                       kind: :series_similar,
+                       data: { 'a' => names[0], 'posts_a' => groups[a].size,
+                               'b' => names[1], 'posts_b' => groups[b].size })
     end
     findings
   end
@@ -390,7 +423,8 @@ module Checker
     claims.filter_map do |origin, slugs|
       next if slugs.uniq.size < 2
 
-      error(t('redirect_collision', origin: origin, slugs: slugs.uniq.join(', ')), t('redirect_collision_fix'))
+      error(t('redirect_collision', origin: origin, slugs: slugs.uniq.join(', ')), t('redirect_collision_fix'),
+            kind: :redirect_collision, data: { 'origin' => origin, 'slugs' => slugs.uniq })
     end
   end
 
@@ -413,7 +447,7 @@ module Checker
   # links to one site should not read as an attack on it.
   ONLINE_HOST_PAUSE = 1.0
 
-  def check_external_links(posts, cache: nil, online_progress: nil)
+  def check_external_links(posts, cache: nil, online_progress: nil, cap: CAP)
     urls = external_urls(posts)
     return [] if urls.empty?
 
@@ -443,13 +477,15 @@ module Checker
     end
 
     gone = results.select { |_, verdict| verdict[:gone] }
-    return [ok(t('online_ok', count: urls.size))] if gone.empty?
+    return [ok(t('online_ok', count: urls.size), kind: :online_ok, data: { 'checked' => urls.size })] if gone.empty?
 
     owners = url_owners(posts)
-    gone.keys.first(20).map do |url|
+    capped(gone.keys.map do |url|
       error(t('link_gone', slug: owners[url].to_s, url: url, reason: gone[url][:reason]),
-            t('link_gone_fix'))
-    end + more(gone.size - 20, :error)
+            t('link_gone_fix'),
+            kind: :link_gone,
+            data: { 'slug' => owners[url].to_s, 'url' => url, 'reason' => gone[url][:reason] })
+    end, cap)
   end
 
   # HEAD first: a link checker has no use for the body, and a HEAD over a
@@ -540,7 +576,8 @@ module Checker
   def more(remaining, level)
     return [] unless remaining.positive?
 
-    [Finding.new(level: level, text: t('and_more', count: remaining), count: remaining)]
+    [Finding.new(level: level, text: t('and_more', count: remaining), count: remaining,
+                 kind: :and_more, data: { 'count' => remaining })]
   end
 
   # Both places a block keeps a file: the media themselves and a video's

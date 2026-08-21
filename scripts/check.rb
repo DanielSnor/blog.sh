@@ -37,9 +37,11 @@ require_relative '../lib/checker'
 # user that external links had been checked when nothing had left the
 # machine -- worse than not offering the switch at all.
 online = false
+as_json = false
 ARGV.each do |arg|
   case arg
   when '--online' then online = true
+  when '--json' then as_json = true
   else
     warn(I18n.t('check.unknown_option', option: arg))
     exit 2
@@ -52,6 +54,29 @@ def paint_level(level)
   when :warn then Tui.paint('⚠️ ', :yellow)
   else Tui.paint('✅', :green)
   end
+end
+
+# --json prints the findings themselves rather than a screenful of them:
+# every finding, uncapped, each with the kind it is and the data it is
+# about. The screen shows twenty of a kind and totals the rest, which is
+# right for reading and useless for anything that wants to act -- a script
+# that adds redirect_from for dead links cannot work from "...and 23 more".
+# Progress goes to stderr here, so stdout stays a document.
+if as_json
+  require 'json'
+  progress = nil
+  findings = Checker.run(root: ROOT, online: online, cap: nil)
+  errors = findings.select(&:error?).sum(&:count)
+  warnings = findings.select(&:warn?).sum(&:count)
+  puts JSON.pretty_generate(
+    'errors' => errors,
+    'warnings' => warnings,
+    'findings' => findings.map do |f|
+      { 'level' => f.level.to_s, 'kind' => f.kind&.to_s, 'data' => f.data,
+        'text' => f.text, 'fix' => f.fix }.compact
+    end
+  )
+  exit(errors.zero? ? 0 : 1)
 end
 
 puts SiteHeader.render

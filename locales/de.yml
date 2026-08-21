@@ -843,7 +843,7 @@ check:
   link_gone: "%{slug}: %{url} ist weg (%{reason})."
   link_gone_fix: "Gemeldet werden nur Hosts, die nicht mehr auflösen, und Seiten mit 404/410 -- ein Timeout oder ein 5xx heißt \"gerade nicht\" und bleibt unangetastet. Korrigiere den Link, entferne ihn oder zeige auf die Wayback Machine."
   reason_no_host: "diesen Host gibt es nicht"
-  unknown_option: "Unbekannte Option: %{option}. check kennt nur --online."
+  unknown_option: "Unbekannte Option: %{option}. check kennt nur --online und --json."
   heading: "Archiv wird geprüft"
   progress: "Beiträge gelesen: %{done}/%{total}"
   no_posts: "Es gibt noch keine Beiträge zu prüfen."

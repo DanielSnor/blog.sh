@@ -853,7 +853,7 @@ check:
   link_gone: "%{slug}: %{url} is gone (%{reason})."
   link_gone_fix: "Only hosts that no longer resolve and pages answering 404/410 are reported -- a timeout or a 5xx is \"not right now\" and is left alone. Fix the link, drop it, or point it at the Wayback Machine."
   reason_no_host: "the host does not exist"
-  unknown_option: "Unknown option: %{option}. check takes --online, nothing else."
+  unknown_option: "Unknown option: %{option}. check takes --online and --json, nothing else."
   heading: "Checking this archive"
   progress: "Reading posts: %{done}/%{total}"
   no_posts: "There are no posts to check yet."

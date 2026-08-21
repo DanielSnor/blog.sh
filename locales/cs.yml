@@ -831,7 +831,7 @@ check:
   link_gone: "%{slug}: %{url} je pryč (%{reason})."
   link_gone_fix: "Hlásí se jen hostitelé, kteří už neexistují, a stránky s 404/410 — timeout nebo 5xx znamená „teď ne“ a nechává se být. Oprav odkaz, vyhoď ho, nebo ho namiř do archivu Wayback Machine."
   reason_no_host: "takový hostitel neexistuje"
-  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, nic jiného."
+  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online a --json, nic jiného."
   heading: "Kontrola archivu"
   progress: "Čtu posty: %{done}/%{total}"
   no_posts: "Zatím tu není co kontrolovat, archiv je prázdný."

@@ -487,6 +487,7 @@ Three things are worth knowing before you rely on the result:
 ```bash
 ./blog.sh check            # walks every post and every media file
 ./blog.sh check --online   # also asks whether the links that leave the site still answer
+./blog.sh check --json     # the findings as data: every one of them, no screen
 ```
 
 `doctor` asks whether the installation is sound and takes a second;
@@ -548,6 +549,16 @@ and a GET with 200 for the same address. Verdicts are remembered in
 `tmp/link-check.json` for two weeks, so running it again next week only
 asks about the links it hasn't seen lately; deleting that file just means
 the next run asks about everything.
+
+The screen shows at most twenty findings of a kind and totals the rest in
+a "...and N more" line, which is right for reading and useless for acting
+on: a script that wants to add `redirect_from` for every dead link cannot
+work from a summary. `--json` prints all of them instead, each with the
+kind it is (`link_dead`, `media_stray`, `series_similar`...) and the data
+it is about -- the post's slug, the address, the file. The exit code is
+the same in both modes: 0 when the archive is sound, 1 when something in
+it is not.
+
 
 ## Counting the archive
 
