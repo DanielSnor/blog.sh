@@ -175,6 +175,15 @@ Three traps in browser tooling, all of which have cost an afternoon here:
 
 ## Two skins that exist
 
+| One engine, two skins |  |
+| --- | --- |
+| ![A blog.sh site dressed as a Hugo theme](skin-hugo.png) | ![A blog.sh site dressed as Ghost](skin-ghost.png) |
+| Hugo/Blowfish: compact bar, profile block, card list | Ghost: full-width lead card, dotted frame, tiles |
+
+Neither picture has anything of the engine's own layout left on screen,
+and neither site edited a template to get there. For comparison, the
+engine's own look is in the [main README](../README.md).
+
 Both are complete sites, and both deliberately differ from the thing they
 imitate.
 
