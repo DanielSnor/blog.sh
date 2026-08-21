@@ -16,7 +16,23 @@ A GoToSocial release, both fixes reported from the first blog.sh site
 paired with one (arch-linux.cz). GTS speaks Mastodon's API but answers
 with its own accents -- ULID account ids, and content negotiation on
 Accept -- and two places in the engine assumed the Mastodon dialect was
-the only one. Nothing to migrate -- `git pull`, rebuild, deploy.
+the only one. It also carries one small thing for skins, from the same
+site: a listing page now says whether it is the first one. Nothing to
+migrate -- `git pull`, rebuild, deploy.
+
+### Added
+
+- **A listing page now says whether it is the first one.** `<body>` on a
+  listing carries `page-first` or `page-cont`, so a stylesheet can tell the
+  front page of a listing from its `/page/N/` continuations -- something CSS
+  cannot work out on its own, since it cannot read an address. Both skins
+  written against this engine wanted the same thing (a lead card on one, a
+  profile block on the other) and neither could have it. Both sides are
+  named rather than only the continuations, so a skin scopes its additions
+  positively instead of writing them unconditionally and undoing each
+  property further down. Post pages keep a bare `<body>`. Every listing page
+  changes by those bytes, so the next deploy after this upgrade will carry
+  them; nothing else moves.
 
 ### Fixed
 

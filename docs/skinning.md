@@ -87,6 +87,35 @@ where the layout stops being decoration and starts being whether the text
 fits. The cost of this rule is that a skin ends up with more media queries
 than it feels like it should need. Pay it.
 
+## Styling one page of a listing
+
+CSS cannot read an address, so for a stylesheet the front page and
+`/page/2/` used to be the same document -- which is why the two skins here
+both wanted a lead card or a profile block on the first page and neither
+could have one.
+
+Since 1.3.2 a listing's `<body>` says which it is:
+
+```css
+.page-first .post-list-item:first-child { /* the lead card */ }
+.page-cont  .archive-note { /* only on the continuations */ }
+```
+
+`page-first` is the page that lives at the listing's own address, `page-cont`
+is everything under `/page/N/`, and both are emitted for every listing --
+the front page, a tag, a series, a content type. A post page carries a bare
+`<body>`, so a rule scoped to either class cannot leak onto one.
+
+Two of them exist rather than one on purpose: a single mark on the
+continuations would force you to write the first page's look
+unconditionally and then take it back property by property, and a rule that
+undoes another is the kind a later change quietly stops undoing. Scope
+positively instead.
+
+The pair says nothing about *which* listing you are on. That is already in
+the markup: the front page's heading carries its own modifier, and a tag
+listing names itself.
+
 ## Structures the engine leans on
 
 Three rules in `site.css` are not decoration -- other things are built on
