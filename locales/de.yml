@@ -369,9 +369,10 @@ cli:
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
       ./blog.sh doctor [--online] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
-      ./blog.sh check [--online] [--json]
+      ./blog.sh check [--online] [--json] [--repair]
                                      geht das Archiv durch und nennt, was darin kaputt ist;
-                                     --json gibt jeden Fund als Daten aus, ungekürzt
+                                     --json gibt jeden Fund als Daten aus, ungekürzt;
+                                     --repair bietet je Fund die eine erlaubte Reparatur an
       ./blog.sh export [<Verzeichnis>] [--no-drafts] [--dry-run] [--force]
                                      schreibt das ganze Archiv als Baum von Markdown-Dateien (Standard tmp/export)
       ./blog.sh stats [--json]       zählt das Archiv -- Beiträge, Jahre, Wörter, Schlagwörter, Medien, Herkunft
@@ -845,7 +846,17 @@ check:
   link_gone: "%{slug}: %{url} ist weg (%{reason})."
   link_gone_fix: "Gemeldet werden nur Hosts, die nicht mehr auflösen, und Seiten mit 404/410 -- ein Timeout oder ein 5xx heißt \"gerade nicht\" und bleibt unangetastet. Korrigiere den Link, entferne ihn oder zeige auf die Wayback Machine."
   reason_no_host: "diesen Host gibt es nicht"
-  unknown_option: "Unbekannte Option: %{option}. check kennt nur --online und --json."
+  repair_nothing: "Nichts zu reparieren -- das Archiv ist in Ordnung."
+  repair_no_offer: "Hier gibt es nichts anzubieten: das entscheidest du."
+  repair_add_redirect: "%{origin} in redirect_from von %{slug} (%{to}) eintragen -- eine hinzugefügte Zeile, und jeder Link auf die alte Adresse wird beantwortet, auch die von außen."
+  repair_rewrite_link: "Den Link in %{slug} umschreiben: %{from} -> %{to}"
+  repair_trash: "%{path} in den Papierkorb verschieben (wiederherstellbar, nie gelöscht)."
+  repair_prompt: "Ausführen? [a] ja  [s] überspringen  [q] Ende"
+  repair_applied: "Erledigt."
+  repair_failed: "Nicht möglich -- es wurde nichts geändert."
+  repair_summary: "Ausgeführt: %{applied}, übersprungen: %{skipped}, ohne Angebot: %{no_offer}."
+  repair_rebuild: "Führe ./blog.sh rebuild aus, damit die Änderungen auf die Website kommen."
+  unknown_option: "Unbekannte Option: %{option}. check kennt nur --online, --json und --repair."
   heading: "Archiv wird geprüft"
   progress: "Beiträge gelesen: %{done}/%{total}"
   no_posts: "Es gibt noch keine Beiträge zu prüfen."

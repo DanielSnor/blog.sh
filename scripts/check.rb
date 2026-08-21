@@ -38,10 +38,12 @@ require_relative '../lib/checker'
 # machine -- worse than not offering the switch at all.
 online = false
 as_json = false
+repair = false
 ARGV.each do |arg|
   case arg
   when '--online' then online = true
   when '--json' then as_json = true
+  when '--repair' then repair = true
   else
     warn(I18n.t('check.unknown_option', option: arg))
     exit 2
@@ -77,6 +79,61 @@ if as_json
     end
   )
   exit(errors.zero? ? 0 : 1)
+end
+
+# --repair walks the findings and offers, for each one, the single repair
+# that finding allows: the old address written into the target post's
+# redirect_from, a relative link rewritten to the address it means, a file
+# nobody references moved to the trash. Nothing is applied without a key
+# press, nothing is deleted, and a kind with no obvious answer -- a
+# collision between two posts, an image the author has to look at -- is
+# shown and passed over rather than guessed at.
+if repair
+  require_relative '../lib/repair'
+  require_relative '../lib/run_lock'
+
+  RunLock.acquire!(ROOT, label: 'check --repair')
+  findings = Checker.run(root: ROOT, online: online, cap: nil)
+  actionable = findings.reject { |f| f.level == :ok }
+  if actionable.empty?
+    puts Tui.paint(I18n.t('check.repair_nothing'), :green)
+    exit 0
+  end
+
+  idx = Repair.index(Checker.load_posts(ROOT))
+  applied = 0
+  skipped = 0
+  no_offer = 0
+  actionable.each do |finding|
+    proposal = Repair.propose(finding, idx)
+    puts
+    puts "#{paint_level(finding.level)} #{finding.text}"
+    if proposal.nil?
+      no_offer += 1
+      puts Tui.paint("   #{I18n.t('check.repair_no_offer')}", :dim)
+      next
+    end
+
+    puts Tui.paint("   #{I18n.t("check.repair_#{proposal.action}", **proposal.data.transform_keys(&:to_sym))}", :bold)
+    answer = Tui.key_choice("   #{I18n.t('check.repair_prompt')} ")
+    case answer
+    when 'q' then break
+    when 'a', 'y', 'j' then
+      if Repair.apply!(proposal, ROOT)
+        applied += 1
+        puts Tui.paint("   #{I18n.t('check.repair_applied')}", :green)
+      else
+        puts Tui.paint("   #{I18n.t('check.repair_failed')}", :red)
+      end
+    else
+      skipped += 1
+    end
+  end
+
+  puts
+  puts I18n.t('check.repair_summary', applied: applied, skipped: skipped, no_offer: no_offer)
+  puts Tui.paint(I18n.t('check.repair_rebuild'), :bold) if applied.positive?
+  exit 0
 end
 
 puts SiteHeader.render

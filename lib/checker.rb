@@ -215,14 +215,14 @@ module Checker
       media_urls(post).each do |url|
         next if url.empty? || url.include?('://')
 
-        missing << [post['slug'], url] unless File.exist?(File.join(dir, url))
+        missing << [post['slug'], url, post['__year']] unless File.exist?(File.join(dir, url))
       end
     end
     return [] if missing.empty?
 
-    capped(missing.map do |slug, url|
+    capped(missing.map do |slug, url, year|
       error(t('media_missing', slug: slug, file: url), t('media_missing_fix'),
-            kind: :media_missing, data: { 'slug' => slug, 'file' => url })
+            kind: :media_missing, data: { 'slug' => slug, 'file' => url, 'year' => year })
     end, cap)
   end
 
@@ -336,13 +336,13 @@ module Checker
       referenced = media_urls(post).to_set
       Dir.children(dir).reject { |f| f.start_with?('.') }
          .reject { |f| referenced.include?(f) }
-         .map { |f| [post['slug'], f] }
+         .map { |f| [post['slug'], f, post['__year']] }
     end
     return [] if strays.empty?
 
-    capped(strays.map do |slug, file|
+    capped(strays.map do |slug, file, year|
       warn(t('media_stray', slug: slug, file: file), t('media_stray_fix'),
-           kind: :media_stray, data: { 'slug' => slug, 'file' => file })
+           kind: :media_stray, data: { 'slug' => slug, 'file' => file, 'year' => year })
     end, cap)
   end
 

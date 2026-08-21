@@ -550,6 +550,22 @@ and a GET with 200 for the same address. Verdicts are remembered in
 asks about the links it hasn't seen lately; deleting that file just means
 the next run asks about everything.
 
+`--repair` walks the findings and offers, for each one, the single repair
+that finding allows -- nothing is applied without a key press. A dead link
+to an old address is repaired on the **target** post, by writing that
+address into its `redirect_from`: one added line, your own text untouched,
+and every link to the old address answered at once, including the ones
+from outside the site that no check can see. A link written relative to the
+post is rewritten to the address it means. A media directory or file no
+post references is moved to the trash, where `restore` can reach it -- the
+repair pass never deletes anything.
+
+Where the right answer is a matter of judgement -- two posts claiming one
+old address, an image the author has to look at, a link to something this
+archive never had -- it says so and passes over. A second run proposes
+nothing, because the findings it repaired are gone; run `./blog.sh rebuild`
+afterwards to put the changes on the site.
+
 The screen shows at most twenty findings of a kind and totals the rest in
 a "...and N more" line, which is right for reading and useless for acting
 on: a script that wants to add `redirect_from` for every dead link cannot

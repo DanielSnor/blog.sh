@@ -376,9 +376,10 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--strip-location]
                                      reads the configuration and says what is wrong with it
-      ./blog.sh check [--online] [--json]
+      ./blog.sh check [--online] [--json] [--repair]
                                      walks the archive and says what is broken in it;
-                                     --json prints every finding as data, uncapped
+                                     --json prints every finding as data, uncapped;
+                                     --repair offers, per finding, the one repair it allows
       ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                      writes the whole archive out as a tree of markdown files (default tmp/export)
       ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from
@@ -855,7 +856,17 @@ check:
   link_gone: "%{slug}: %{url} is gone (%{reason})."
   link_gone_fix: "Only hosts that no longer resolve and pages answering 404/410 are reported -- a timeout or a 5xx is \"not right now\" and is left alone. Fix the link, drop it, or point it at the Wayback Machine."
   reason_no_host: "the host does not exist"
-  unknown_option: "Unknown option: %{option}. check takes --online and --json, nothing else."
+  repair_nothing: "Nothing to repair -- the archive is sound."
+  repair_no_offer: "No repair to offer here: this one is yours to decide."
+  repair_add_redirect: "Write %{origin} into the redirect_from of %{slug} (%{to}) -- one added line, every link to the old address answered, including the ones from outside."
+  repair_rewrite_link: "Rewrite the link in %{slug}: %{from} -> %{to}"
+  repair_trash: "Move %{path} to the trash (restorable, never deleted)."
+  repair_prompt: "Apply? [a] apply  [s] skip  [q] stop"
+  repair_applied: "Done."
+  repair_failed: "Could not be applied -- nothing was changed."
+  repair_summary: "Applied: %{applied}, skipped: %{skipped}, nothing offered: %{no_offer}."
+  repair_rebuild: "Run ./blog.sh rebuild to put the changes on the site."
+  unknown_option: "Unknown option: %{option}. check takes --online, --json and --repair, nothing else."
   heading: "Checking this archive"
   progress: "Reading posts: %{done}/%{total}"
   no_posts: "There are no posts to check yet."

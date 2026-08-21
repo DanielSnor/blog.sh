@@ -359,9 +359,10 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře post
       ./blog.sh doctor [--online] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
-      ./blog.sh check [--online] [--json]
+      ./blog.sh check [--online] [--json] [--repair]
                                      projde archiv a řekne, co je v něm rozbité;
-                                     --json vypíše všechny nálezy jako data, bez stropu
+                                     --json vypíše všechny nálezy jako data, bez stropu;
+                                     --repair u každého nálezu nabídne tu jedinou opravu, kterou dovoluje
       ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
                                      zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
       ./blog.sh stats [--json]       spočítá archiv — posty, roky, slova, štítky, média, odkud to je
@@ -833,7 +834,17 @@ check:
   link_gone: "%{slug}: %{url} je pryč (%{reason})."
   link_gone_fix: "Hlásí se jen hostitelé, kteří už neexistují, a stránky s 404/410 — timeout nebo 5xx znamená „teď ne“ a nechává se být. Oprav odkaz, vyhoď ho, nebo ho namiř do archivu Wayback Machine."
   reason_no_host: "takový hostitel neexistuje"
-  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online a --json, nic jiného."
+  repair_nothing: "Není co spravovat — archiv je v pořádku."
+  repair_no_offer: "Tady nemám co nabídnout: tohle je rozhodnutí na tobě."
+  repair_add_redirect: "Zapsat %{origin} do redirect_from postu %{slug} (%{to}) — jeden přidaný řádek, a odpoví se na všechny odkazy na starou adresu včetně těch zvenčí."
+  repair_rewrite_link: "Přepsat odkaz v postu %{slug}: %{from} -> %{to}"
+  repair_trash: "Přesunout %{path} do koše (dá se vrátit, nemaže se)."
+  repair_prompt: "Provést? [a] ano  [s] přeskočit  [q] konec"
+  repair_applied: "Hotovo."
+  repair_failed: "Nepovedlo se — nic se nezměnilo."
+  repair_summary: "Provedeno: %{applied}, přeskočeno: %{skipped}, bez nabídky: %{no_offer}."
+  repair_rebuild: "Spusť ./blog.sh rebuild, ať se změny dostanou na web."
+  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, --json a --repair, nic jiného."
   heading: "Kontrola archivu"
   progress: "Čtu posty: %{done}/%{total}"
   no_posts: "Zatím tu není co kontrolovat, archiv je prázdný."

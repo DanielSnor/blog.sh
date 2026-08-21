@@ -27,6 +27,24 @@ prints what an installation is running.
   link to one repository or a bare host name, each of which would otherwise
   end as an empty card indistinguishable from "has not pushed lately".
   Verified against two live servers before it was written.
+- **`./blog.sh check --repair`: the checker's other half.** Until now
+  `check` could say what was wrong with an archive and nothing more, so
+  acting on it meant a hand-written script that re-derived what the checker
+  already knew -- which is exactly what the sean.cz cleanup in August was.
+  `--repair` walks the findings and offers, one at a time, the single
+  repair each one allows; nothing is applied without a key press. Three
+  rules hold throughout: **add rather than rewrite** (a dead link is
+  repaired on the target post's `redirect_from`, one added line, the
+  author's own text untouched, and every link to that address answered at
+  once -- including the ones from outside that no check can see);
+  **never delete** (an unreferenced file goes to the trash `restore` reads);
+  and **nothing twice** (a repaired archive proposes nothing on the next
+  run). Where the answer is a matter of judgement -- a collision between two
+  posts, an image somebody has to look at, a link to something the archive
+  never had -- it says so and passes over rather than guessing. Behind it,
+  the same lookup that made the August cleanup possible: an exact slug, or
+  a prefix when an import truncated one, and no proposal at all when two
+  posts could both be meant.
 - **`./blog.sh check --json`: the findings themselves, all of them.** A
   finding used to be a finished sentence and nothing else, and the lists
   were capped at twenty of a kind by the time anyone saw them -- so the
