@@ -376,7 +376,9 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--strip-location]
                                      reads the configuration and says what is wrong with it
-      ./blog.sh check                walks the archive and says what is broken in it
+      ./blog.sh check [--online] [--json]
+                                     walks the archive and says what is broken in it;
+                                     --json prints every finding as data, uncapped
       ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                      writes the whole archive out as a tree of markdown files (default tmp/export)
       ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from

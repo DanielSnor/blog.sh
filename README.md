@@ -376,7 +376,9 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
-./blog.sh check                # walks the archive and says what is broken in it
+./blog.sh check [--online] [--json]
+                               # walks the archive and says what is broken in it;
+                               # --json prints every finding as data instead of a screenful
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                # writes the whole archive out as a tree of markdown files
 ./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources

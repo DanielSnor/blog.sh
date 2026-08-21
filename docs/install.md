@@ -230,6 +230,12 @@ answers which kind of host this is. That path costs one request where
 GitHub costs one per commit, since a Gitea activity item carries the
 commits it is about.
 
+`social`, `footer.links` and `nav` are lists, and a list key holds a list
+or nothing at all: emptiness is a legitimate answer everywhere. Anything
+else under one of them -- a single URL pasted where a list belongs -- is a
+mistake `doctor` names and the build reads as empty, rather than a
+traceback out of an engine file.
+
 `social` is the row of icons in the footer. Each entry takes `name`,
 `url` and either `icon` (a name from the built-in set: mastodon, pixelfed,
 linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky, instagram,
@@ -312,10 +318,15 @@ An entry missing either half is skipped rather than rendered as an empty
 link. An empty list is a decision rather than a mistake: the entries and
 the button that opens them are gone, which is also how a site turns the
 menu off, so there is no second key for that. The bar itself stays, since
-the search field is rendered inside it.
+the search field is rendered inside it. `nav:` with nothing under it at all
+-- the key left standing after its entries were deleted -- reads the same
+way, because a key that is written down is an answer; leave the key out
+entirely to ask the engine for its own menu again.
 
 `layout.sidebar` and `layout.hero` switch whole regions on and off. The
-sidebar is on unless you say otherwise; the hero -- the post's first
+sidebar is on unless you say otherwise -- though it is only drawn when
+something would stand in it, so a site with no about text and no widgets
+gets its full width back without having to say so; the hero -- the post's first
 usable image lifted out of the text and run full width above the title --
 is off unless you ask, because it reshapes every post page it touches and
 a site is entitled to keep the shape it has. A single post can still ask

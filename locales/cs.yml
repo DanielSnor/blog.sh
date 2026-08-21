@@ -359,7 +359,9 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře post
       ./blog.sh doctor [--online] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
-      ./blog.sh check                projde archiv a řekne, co je v něm rozbité
+      ./blog.sh check [--online] [--json]
+                                     projde archiv a řekne, co je v něm rozbité;
+                                     --json vypíše všechny nálezy jako data, bez stropu
       ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
                                      zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
       ./blog.sh stats [--json]       spočítá archiv — posty, roky, slova, štítky, média, odkud to je

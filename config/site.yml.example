@@ -247,7 +247,8 @@ colors:
 # An empty list (nav: []) is an answer too: the entries and the button
 # that opens them are gone. That is how a site turns the menu off -- there
 # is no second key for it. The bar itself stays, because the search field
-# is rendered inside it.
+# is rendered inside it. A bare `nav:` with nothing under it means the same
+# thing; delete the key itself to get the engine's own menu back.
 #
 # `./style.sh` writes this for you and offers the tags and pages you
 # actually have; `./blog.sh doctor` says so when an entry stops pointing

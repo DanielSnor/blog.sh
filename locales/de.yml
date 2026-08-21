@@ -369,7 +369,9 @@ cli:
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
       ./blog.sh doctor [--online] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
-      ./blog.sh check                geht das Archiv durch und nennt, was darin kaputt ist
+      ./blog.sh check [--online] [--json]
+                                     geht das Archiv durch und nennt, was darin kaputt ist;
+                                     --json gibt jeden Fund als Daten aus, ungekürzt
       ./blog.sh export [<Verzeichnis>] [--no-drafts] [--dry-run] [--force]
                                      schreibt das ganze Archiv als Baum von Markdown-Dateien (Standard tmp/export)
       ./blog.sh stats [--json]       zählt das Archiv -- Beiträge, Jahre, Wörter, Schlagwörter, Medien, Herkunft
