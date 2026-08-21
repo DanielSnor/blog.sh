@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.3.2 -- unreleased
+## 1.3.2 -- 2026-08-21
 
 A GoToSocial release, both fixes reported from the first blog.sh site
 paired with one (arch-linux.cz). GTS speaks Mastodon's API but answers
