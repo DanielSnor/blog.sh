@@ -789,6 +789,8 @@ doctor:
   extra_css_missing_fix: "The page asks for it, gets a 404 and renders without it, which looks exactly like a stylesheet that does nothing. Put the file there, or drop the line."
 
   widgets_ok: "%{count} sidebar widget(s), all filled in."
+  list_shape: "`%{key}` is not a list."
+  list_shape_fix: "A list is written as lines starting with \"- \" under the key. A key with nothing under it means none of them, which is allowed."
   widget_shape: "The %{name} widget is not a set of settings."
   widget_incomplete: "The %{name} widget has no %{key}, so it can never show anything."
   widget_account_id: "The toots widget wants the account's API id and has %{value}."

@@ -182,6 +182,11 @@ BANNER = SiteConfig.fetch('banner')
 # per visual property would turn config/site.yml into a stylesheet written
 # in YAML.
 LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
+# The column is only worth reserving when something would stand in it. A site
+# with no about text and no widgets kept an empty <aside> and the grid kept
+# its 260px beside it, so the content sat in a narrowed column with a blank
+# strip alongside -- held space for furniture that was never coming.
+ASIDE_CARDS = %w[toots pixelfed commits bluesky rss].freeze
 # The lead image lifted out of the text and shown above the title. Off
 # unless a site asks for it, because it reshapes every post page it
 # touches -- and a site is entitled to have had the shape it has.
@@ -211,11 +216,26 @@ THEME_COLOR_DARK = ColorsCss.color_for(SITE_COLORS, 'dark', 'bg')
 # release is about.
 ABOUT = SiteConfig.get('about', default: {})
 FOOTER = SiteConfig.get('footer', default: {})
-SOCIAL = SiteConfig.get('social', default: [])
+# A list key holds a list or nothing. Anything else -- a string where a list
+# was meant, a key that swallowed its own indentation and became a hash --
+# used to reach .map and end the build in a NoMethodError, with no page
+# regenerated and the traceback naming a line in the engine rather than the
+# line in the config that caused it. Read as empty here and reported by
+# `doctor`, which is where a config mistake belongs.
+def config_list(value)
+  value.is_a?(Array) ? value : []
+end
+
+SOCIAL = config_list(SiteConfig.get('social', default: []))
 # Both the Mastodon comments/toot integration and every sidebar widget are
 # optional -- `get` (not `fetch`) so a site with none of this configured
 # just gets an empty hash instead of an aborted build.
 WIDGETS = SiteConfig.get('widgets', default: {})
+# ...so the switch that decides the column asks both questions: does the
+# author want a sidebar, and is there anything to put in it.
+SIDEBAR_SHOWN = LAYOUT_SIDEBAR &&
+                (!ABOUT.is_a?(Hash) || !ABOUT['html'].to_s.strip.empty? ||
+                 (WIDGETS.is_a?(Hash) && ASIDE_CARDS.any? { |name| WIDGETS[name] }))
 MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 # Computed once, here, because both halves it needs (the instance and the
 # social links) exist by this line and not before it.
@@ -375,7 +395,7 @@ def footer_links_html
   # file healthy. Its sibling `social:` has always read the empty answer
   # correctly (SiteConfig.get returns the default for nil), and the two
   # describe the same shape of data.
-  (FOOTER['links'] || []).map do |link|
+  config_list(FOOTER['links']).map do |link|
     %(          <li><a href="#{h(link['url'])}">#{h(link['title'])}</a></li>)
   end.join("\n")
 end
@@ -2297,9 +2317,19 @@ end.freeze
 # The <nav> bar itself outlives them, because the search field lives in
 # it and templates/layout.html.erb asks for search on every page it
 # renders (redirect stubs, which skip layout() on purpose, carry no bar).
+# nil means "nothing configured, pick the default menu"; [] means "a menu of
+# nothing", and the difference is whether `nav:` is written down at all.
+# Until 1.4 a `nav:` key with nothing under it fell back to the default
+# menu, while the same emptiness under `links:` meant no links -- one
+# editing accident, two opposite answers. A key that is written down now
+# speaks for itself everywhere.
 def configured_nav_items
+  return nil unless SiteConfig.key?('nav')
+
   entries = SiteConfig.get('nav', default: nil)
-  return nil unless entries.is_a?(Array)
+  # Written down but not a list: doctor names it, and the build takes the
+  # key at its word rather than quietly restoring a menu nobody asked for.
+  return [] unless entries.is_a?(Array)
 
   entries.filter_map do |entry|
     next unless entry.is_a?(Hash)

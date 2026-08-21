@@ -132,6 +132,18 @@ module SiteConfig
     value.nil? ? default : value
   end
 
+  # Whether a key is WRITTEN DOWN, as opposed to what it holds. `get` cannot
+  # answer this: a key with nothing under it and no key at all both read as
+  # nil, and for a list they mean opposite things -- "I want none of these"
+  # against "decide for me". Only the file itself knows which was typed.
+  def key?(*keys)
+    return false unless File.exist?(PATH)
+
+    parent = keys[0..-2].reduce(data) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
+    parent = data if keys.length == 1
+    parent.is_a?(Hash) && parent.key?(keys.last)
+  end
+
   # The comments/announcement network: :mastodon, :bluesky, or nil when
   # neither is configured. Deliberately exclusive -- a post's comments
   # live on exactly one network, so configuring both sections at once is

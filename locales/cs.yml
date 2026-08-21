@@ -768,6 +768,8 @@ doctor:
   extra_css_missing_fix: "Stránka si o něj řekne, dostane 404 a vykreslí se bez něj — vypadá to přesně jako stylopis, který nic nedělá. Buď soubor dodej, nebo ten řádek vyhoď."
 
   widgets_ok: "Widgetů v postranním panelu: %{count}, všechny vyplněné."
+  list_shape: "`%{key}` není seznam."
+  list_shape_fix: "Seznam se píše jako řádky začínající „- \" pod klíčem. Klíč, pod kterým nic není, znamená žádné položky, a to je v pořádku."
   widget_shape: "Widget %{name} není sada nastavení."
   widget_incomplete: "Widget %{name} nemá %{key}, takže nikdy nic nezobrazí."
   widget_account_id: "Widget s tooty chce API ID účtu a má %{value}."

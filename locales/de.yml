@@ -778,6 +778,8 @@ doctor:
   extra_css_missing_fix: "Die Seite fordert es an, bekommt einen 404 und rendert ohne es -- das sieht genau nach einem Stylesheet aus, das nichts bewirkt. Lege die Datei dorthin oder streiche die Zeile."
 
   widgets_ok: "%{count} Seitenleisten-Widget(s), alle ausgefüllt."
+  list_shape: "`%{key}` ist keine Liste."
+  list_shape_fix: "Eine Liste besteht aus Zeilen, die unter dem Schlüssel mit \"- \" beginnen. Ein Schlüssel ohne Inhalt bedeutet keine Einträge, und das ist erlaubt."
   widget_shape: "Das Widget %{name} enthält keine Einstellungen."
   widget_incomplete: "Dem Widget %{name} fehlt %{key}, also kann es nie etwas anzeigen."
   widget_account_id: "Das Toots-Widget will die API-ID des Kontos und hat %{value}."

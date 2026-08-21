@@ -10,6 +10,39 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.4 -- unreleased
+
+### Changed
+
+- **A key that is written down speaks for itself.** `nav:` left standing
+  with nothing under it used to fall back to the menu the engine picks,
+  while the same emptiness under `links:` meant no links -- one editing
+  accident, two opposite answers, and the one that looked unchanged was the
+  menu. An empty `nav:` now means no menu, the way an empty `links:` has
+  always meant no links. **Upgrading:** a site that deleted its menu entries
+  but kept the key gets no menu now; write the entries back, or delete the
+  key to ask the engine for its own menu again. A site without a `nav:` key
+  is unaffected, which is every site that never set one.
+- **The sidebar column goes with its last card.** A site with no about text
+  and no widgets kept an empty `<aside>`, and the grid kept the 260px beside
+  it: the article sat in a narrowed column with a blank strip alongside,
+  space held for furniture that was never coming. The column is now drawn
+  when there is something to put in it -- `layout.sidebar: false` still
+  turns it off outright, and a site with an about text or a single widget
+  renders exactly as before.
+
+### Fixed
+
+- **A list key that held something else ended the build in a traceback.**
+  A string under `social:` (a URL pasted where a list of them belongs), or
+  anything but a list under `footer.links` or `nav:`, reached `.map` and
+  stopped the build with a `NoMethodError` naming a line in the engine --
+  while `doctor` called the same config healthy and exited 0. The build now
+  reads a wrong shape as empty and carries on, and `doctor` names the key
+  and fails the install, which is where a config mistake belongs. A key
+  with nothing under it stays what it has always been: none of them, and
+  no complaint.
+
 ## 1.3.2 -- 2026-08-21
 
 A GoToSocial release, both fixes reported from the first blog.sh site

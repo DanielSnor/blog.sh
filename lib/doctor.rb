@@ -150,6 +150,7 @@ module Doctor
     findings.concat(check_fonts(data, root))
     findings.concat(check_extra_css(data, root))
     findings.concat(check_nav(data, root))
+    findings.concat(check_list_shapes(data))
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
@@ -665,6 +666,22 @@ module Doctor
     'commits' => 'username',
     'rss' => 'feed_url'
   }.freeze
+
+  # The three keys that hold a list. A list key holds a list or nothing:
+  # `social:` with nothing under it is a site with no icons, which is a
+  # legitimate thing to want. A STRING under it is a mistake -- and until
+  # 1.4 it was a mistake the build reported as a NoMethodError in an engine
+  # file, while doctor called the same config healthy.
+  LIST_KEYS = [%w[social], %w[footer links], %w[nav]].freeze
+
+  def check_list_shapes(data)
+    LIST_KEYS.filter_map do |path|
+      value = dig(data, *path)
+      next if value.nil? || value.is_a?(Array)
+
+      error(t('list_shape', key: path.join('.')), t('list_shape_fix'))
+    end
+  end
 
   def check_widgets(data)
     widgets = data['widgets']
