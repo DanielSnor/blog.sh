@@ -327,7 +327,15 @@ module Repair
     # failure -- and the first one is every archive that was ever imported
     # twice, which is most of the ones this pass exists for.
     kept = PostVersions.list(slug, year, content_dir: content).any? do |file|
-      File.read(file, encoding: 'utf-8') == before
+      # Per file: one unreadable version in the history (a write cut short
+      # by a full disk, a permission left behind by a restore) must not
+      # stop every repair on that post -- which is what a single raise
+      # inside this loop did.
+      begin
+        File.read(file, encoding: 'utf-8') == before
+      rescue SystemCallError, IOError
+        false
+      end
     end
     unless kept
       warn "version not kept for #{File.basename(path)} -- nothing was changed"

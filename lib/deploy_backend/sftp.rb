@@ -44,7 +44,11 @@ module DeployBackend
     # `target` because one is an identity and the other is an address.
     def identity
       dir = ENV['SFTP_REMOTE_DIR'].to_s.gsub(%r{/+\z}, '')
-      dir.empty? ? target : "#{target}:#{dir}"
+      # SFTP_ARGS too: a different port, key or ssh-config host is a
+      # different server behind the same user@host, and a manifest that
+      # describes the other one says everything is already uploaded.
+      args = ENV['SFTP_ARGS'].to_s.strip
+      [dir.empty? ? target : "#{target}:#{dir}", args.empty? ? nil : args].compact.join(' ')
     end
 
     def manifest_suffix

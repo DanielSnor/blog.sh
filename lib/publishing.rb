@@ -6,6 +6,7 @@ require 'time'
 # For $CHILD_STATUS -- the exit status of the build and the deploy is what
 # tells "the lock was busy" from "it broke", and $? does not read as either.
 require 'English'
+require_relative 'post_address'
 require_relative 'site_config'
 require_relative 'atomic_write'
 require_relative 'post_writer'
@@ -94,9 +95,11 @@ module Publishing
     # former_slugs, so a rename back to an earlier slug can never leave
     # an address redirecting to itself (or a build warning that never
     # goes away).
-    vacated = updated.delete('unpublished_from')
-    former = (Array(updated['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
-    former.empty? ? updated.delete('former_slugs') : updated['former_slugs'] = former
+    # A page's debt is written as "/old-slug/" and belongs in redirect_from;
+    # a post's is "<year>/<slug>" and belongs in former_slugs. One function
+    # knows which (lib/post_address.rb), because this was decided in five
+    # places and each got it wrong at a different time.
+    PostAddress.spend_vacated(updated, updated.delete('unpublished_from'), slug: slug, year: new_year)
 
     new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
     if new_year != old_year

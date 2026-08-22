@@ -4,6 +4,7 @@ require 'securerandom'
 require 'digest'
 require 'time'
 require_relative 'atomic_write'
+require_relative 'post_address'
 require_relative 'post_versions'
 require_relative 'exif_location'
 require_relative 'media_dimensions'
@@ -656,9 +657,7 @@ module PostWriter
     # the old address 404'd while a marker for it sat in the JSON. Spent
     # here for the same reason and in the same way.
     if post['state'] != 'draft' && post['unpublished_from']
-      vacated = post.delete('unpublished_from')
-      former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{year}/#{slug}"]
-      former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
+      PostAddress.spend_vacated(post, post.delete('unpublished_from'), slug: slug, year: year)
     end
 
     new_dir = File.join(CONTENT_DIR, year)

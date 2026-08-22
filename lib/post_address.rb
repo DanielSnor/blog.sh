@@ -25,6 +25,39 @@ module PostAddress
     "/posts/#{year || date_year(post)}/#{post['slug']}/"
   end
 
+
+  # The address a post is being moved AWAY from, in the shape the archive
+  # records such debts. Two shapes, because a page's address has no year in
+  # it and former_slugs (which is "<year>/<slug>") cannot say so:
+  #   a post -> "2026/old-slug", spent into former_slugs
+  #   a page -> "/old-slug/",    spent into redirect_from
+  # Written down in ONE place because it was worked out separately in five
+  # (edit, rename, unpublish, publish, re-import) and each of them got it
+  # wrong at a different time: the year came off the FOLDER, which parts
+  # company with the address the moment a date is corrected across a year.
+  def vacated_marker(post, slug: nil)
+    name = slug || post['slug']
+    return "/#{name}/" if page?(post)
+
+    "#{date_year(post)}/#{name}"
+  end
+
+  # Spends such a marker into whichever list can express it, and never lets
+  # a post redirect to itself.
+  def spend_vacated(post, marker, slug: nil, year: nil)
+    return post if marker.to_s.empty?
+
+    name = slug || post['slug']
+    if marker.to_s.start_with?('/')
+      olds = (Array(post['redirect_from']).map(&:to_s) + [marker.to_s]).uniq - ["/#{name}/"]
+      olds.empty? ? post.delete('redirect_from') : post['redirect_from'] = olds
+    else
+      former = (Array(post['former_slugs']).map(&:to_s) + [marker.to_s]).uniq - ["#{year || date_year(post)}/#{name}"]
+      former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
+    end
+    post
+  end
+
   def draft?(post)
     post['state'].to_s == 'draft'
   end

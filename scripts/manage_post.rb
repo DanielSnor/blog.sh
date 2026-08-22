@@ -2219,7 +2219,7 @@ def cmd_unpublish(slug)
                        # this into a former_slugs redirect -- otherwise the old public URL
                        # would 404 with no trace, exactly what renames promise not to do.
                        # Publishing back under the same address just consumes the marker.
-                       'unpublished_from' => "#{File.basename(File.dirname(path))}/#{slug}")
+                       'unpublished_from' => PostAddress.vacated_marker(post, slug: slug))
   # Kept when the delete failed, so the address survives to be retried --
   # and so a re-publish can see there is already an announcement out there.
   if toot_gone
@@ -2832,11 +2832,21 @@ def rename_post(path, post, raw: nil)
     return old_slug
   end
 
-  # Same guard as edit and publish: the address and the media directory
-  # are both keyed by year/slug, and neither may land on another post's.
+  # Same guard as edit and publish, with the two questions kept apart: the
+  # FILE and its media live under the folder's year, while the ADDRESS
+  # follows the date (and a page has no year in it at all). Asking only the
+  # folder let a rename land on an address another post was already being
+  # served at -- and the build refuses to run on two posts at one address,
+  # so the whole site would stop building.
   new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
   new_media_dir = File.join(MEDIA_DIR, year, new_slug)
-  if File.exist?(new_path) || Dir.exist?(new_media_dir)
+  taken_address = Dir.glob(File.join(CONTENT_DIR, '*', "#{new_slug}.json")).any? do |other|
+    candidate = JSON.parse(File.read(other, encoding: 'utf-8')) rescue nil
+    next false unless candidate.is_a?(Hash) && candidate['state'].to_s != 'draft'
+
+    PostAddress.path(candidate) == PostAddress.path(post.merge('slug' => new_slug))
+  end
+  if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
     # Not the shared post_already_exists text: that one says "continuing
     # would overwrite it -- resolve manually", and a refused rename
     # neither continues nor needs resolving. Picking another slug does.
@@ -2877,20 +2887,11 @@ def rename_post(path, post, raw: nil)
     # Those two part company after a date is corrected across a year, and
     # recording the folder's year left the live address dying without a
     # redirect while a stub appeared at an address nobody ever linked to.
-    address_year = post['date'].to_s[0, 4]
-    if PostAddress.page?(post)
-      # A page is served at the root, and former_slugs cannot express that
-      # (every entry of it is <year>/<slug>). Its old address is recorded
-      # the way every imported one is: as a redirect_from on the post that
-      # took its place.
-      olds = Array(post['redirect_from']).map(&:to_s) + ["/#{old_slug}/"]
-      updated['redirect_from'] = (olds.uniq - ["/#{new_slug}/"])
-    else
-      former = Array(post['former_slugs']).map(&:to_s) + ["#{address_year}/#{old_slug}"]
-      # A rename back to an earlier slug must not leave that address
-      # redirecting to itself.
-      updated['former_slugs'] = (former.uniq - ["#{address_year}/#{new_slug}"])
-    end
+    # One rule for the address being vacated, and one for where the debt is
+    # written down -- see lib/post_address.rb. A rename back to an earlier
+    # slug must not leave that address redirecting to itself, which is what
+    # spend_vacated takes care of.
+    PostAddress.spend_vacated(updated, PostAddress.vacated_marker(post, slug: old_slug), slug: new_slug)
   end
 
   # Media first, replacement JSON second, old JSON last -- the same order
