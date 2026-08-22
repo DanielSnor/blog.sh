@@ -1459,9 +1459,13 @@ def cmd_bluesky(slug)
   # second case used to end with two announcements of the same post.
   # The address the announcement carries is the one it is found by later,
   # so this has to ask the same question the announcement asked.
-  if (found = BlueskyPoster.find_announcement(
-    Publishing.post_url(post['slug'], year, page: PostAddress.page?(post))
-  ))
+  # BOTH shapes for a page: until 1.4 an announcement carried
+  # /posts/<year>/<slug>/ even for a page, so looking only for the address
+  # a page has today would miss the announcement that is actually out
+  # there -- and the post would be announced a second time.
+  candidates = [Publishing.post_url(post['slug'], year, page: PostAddress.page?(post))]
+  candidates << Publishing.post_url(post['slug'], year, page: false) if PostAddress.page?(post)
+  if (found = candidates.uniq.filter_map { |url| BlueskyPoster.find_announcement(url) }.first)
     updated = post.merge('bluesky_url' => found[:url], 'bluesky_uri' => found[:uri])
     AtomicWrite.write_json(path, updated)
     puts t('cli.bluesky_recovered', url: found[:url])
@@ -2689,7 +2693,19 @@ def props_versions(path, slug)
   return if index.nil?
 
   chosen = versions[index]
-  restored = JSON.parse(File.read(chosen, encoding: 'utf-8'))
+  restored = begin
+    JSON.parse(File.read(chosen, encoding: 'utf-8'))
+  rescue JSON::ParserError, SystemCallError => e
+    # A version is a file like any other -- a half-written save, a copy the
+    # cloud is still bringing down. Ending the whole CLI in a parser error
+    # was the one thing this screen must not do: it is where somebody goes
+    # precisely BECAUSE something is wrong.
+    puts Tui.paint("⚠️  #{File.basename(chosen)}: #{e.class} -- #{e.message.lines.first.to_s.strip[0, 80]}", :yellow)
+    puts
+    next_round = true
+    nil
+  end
+  return props_versions(path, slug) if restored.nil? && next_round
   # One key, not a typed word. This engine keeps typing for what DISAPPEARS
   # -- deleting a post and unpublishing one both ask for the slug -- and
   # restoring a version loses nothing: the current text is kept as a version
@@ -4607,7 +4623,13 @@ else
     unless Dir.exist?(File.join(ROOT, 'public.nosync'))
       abort t('cli.preview_missing_public')
     end
-    port = (ARGV.shift || '8000').to_i
+    # "preview draft" is a thing somebody types, and to_i turned it into
+    # port 0 -- the system then handed out a random port and the line on
+    # screen said http://localhost:0/, which is not where it is listening.
+    asked = ARGV.shift || '8000'
+    abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
+
+    port = asked.to_i
     puts t('cli.preview_serving', url: "http://localhost:#{port}/")
     # The serve loop below blocks forever -- with stdout piped (not a TTY)
     # the URL line would sit in the buffer the whole time, so push it out.

@@ -432,7 +432,14 @@ orphans = (orphan_source - all_files).sort
 # the old key too, or the same orphan is re-derived on every future run.
 built_folded = all_files.to_h { |name| [fold_deploy_name(name), true] }
 folded_away, orphans = orphans.partition { |name| built_folded[fold_deploy_name(name)] }
-folded_away.each { |name| stored.delete(name) }
+# Out of BOTH: `manifest` is a copy taken before this line, so deleting
+# from `stored` alone left the old spelling in the file that gets written
+# -- for good, since the next run compares against a name the build no
+# longer produces and nothing ever takes it out.
+folded_away.each do |name|
+  stored.delete(name)
+  manifest.delete(name)
+end
 
 # --- what the guards measure against ------------------------------------
 #
@@ -736,6 +743,11 @@ begin
                            'mtime' => stats[name]['mtime'] }
       end
       ok = landed.size
+      # What did NOT land, so uploaded + failed + unchanged adds up to the
+      # number of files the run set out with. "failed 1" for a batch of
+      # twenty-nine was a count of failed BATCHES, printed in a line that
+      # says files.
+      failed = to_upload.size - landed.size
       log("  #{landed.size} file(s) did land and are written down; the next run resumes from there") if landed.any?
     end
   else

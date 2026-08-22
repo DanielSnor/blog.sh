@@ -79,8 +79,20 @@ module BlueskyPoster
                        { repo: session['did'], collection: 'app.bsky.feed.post', record: record },
                        jwt: session['accessJwt'])
 
-    rkey = result['uri'].to_s.split('/').last
-    { url: "https://bsky.app/profile/#{HANDLE}/post/#{rkey}", uri: result['uri'] }
+    # The shape is checked, not assumed. A PDS that answers 200 with
+    # something else -- a proxy in front of it, a version that changed its
+    # mind, an error body with a 200 -- used to be written into the post as
+    # a perfectly good announcement whose address is at:///app.bsky.feed.post/
+    # and leads nowhere, for ever: the post then carries an announcement it
+    # does not have, so nothing offers to send one again.
+    uri = result['uri'].to_s
+    rkey = uri.split('/').last.to_s
+    unless uri.start_with?('at://') && uri.include?('/app.bsky.feed.post/') && !rkey.empty?
+      warn "Posting to Bluesky failed: the server answered without a usable record address (#{result.inspect[0, 120]})"
+      return nil
+    end
+
+    { url: "https://bsky.app/profile/#{HANDLE}/post/#{rkey}", uri: uri }
   rescue StandardError => e
     warn "Posting to Bluesky failed: #{e.message}"
     nil

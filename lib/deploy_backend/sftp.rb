@@ -281,8 +281,15 @@ module DeployBackend
       (1..parts.length).map { |i| parts.first(i).join('/') }
     end
 
+    # Backslash first, quote second -- the other order escapes the quote and
+    # then escapes its own escape, so a name with a backslash in it walked
+    # out of its quotes and took the rest of the batch with it. A newline
+    # is refused outright: the batch file is one command per line, so a
+    # name containing one would BE a second command.
     def quote(path)
-      %("#{path.gsub('"', '\"')}")
+      raise "sftp cannot address a name with a newline in it: #{path.inspect}" if path.to_s.include?("\n")
+
+      %("#{path.to_s.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}")
     end
   end
 end

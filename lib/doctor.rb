@@ -642,7 +642,16 @@ module Doctor
       end
 
       next unless url.start_with?('/')
-      next if url.start_with?('//', '/type/', '/assets/')
+      next if url.start_with?('//', '/type/')
+      # /assets/ is not automatically sound: it is a real file on disk, and
+      # a menu item naming one that is not there 404s on every page of the
+      # site while doctor called the menu fine.
+      if url.start_with?('/assets/')
+        next if File.exist?(File.join(root, url.delete_prefix('/')))
+
+        findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
+        next
+      end
       # Nothing to judge against on an archive with no posts in it yet.
       next if posts.empty?
       next if known.include?(url) || known.include?("#{url}/")

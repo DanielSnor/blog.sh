@@ -260,8 +260,14 @@ module Checker
       # pages the build never writes.
       series = Slug.slugify(post['series'].to_s)
       paths << "/series/#{series}/" if series_sizes[series] >= 2
-      Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
-      Array(post['redirect_from']).each { |origin| paths << origin.to_s }
+      # Only for a post the site actually serves: the build writes a
+      # redirect stub for a post's old addresses, and a draft has no page
+      # to redirect TO -- so counting its former addresses as known let a
+      # link to one pass as sound while the reader gets a 404.
+      if in_stream || !draft?(post)
+        Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
+        Array(post['redirect_from']).each { |origin| paths << origin.to_s }
+      end
     end
     paths
   end
@@ -388,7 +394,7 @@ module Checker
   # the rendered page shows that anything used to be there.
   def check_degenerate_images(posts, cap = CAP)
     found = posts.flat_map do |post|
-      (post['content'] || []).filter_map do |block|
+      (Array(post['content']) || []).filter_map do |block|
         next unless block.is_a?(Hash) && block['type'] == 'image'
 
         media = (block['media'] || []).first || {}
@@ -829,7 +835,7 @@ module Checker
   # was never reported missing, and the stray check below would have
   # reported every poster that exists as a leftover.
   def media_urls(post)
-    (post['content'] || []).flat_map do |block|
+    (Array(post['content']) || []).flat_map do |block|
       next [] unless block.is_a?(Hash)
 
       %w[media poster].flat_map do |key|
@@ -862,7 +868,7 @@ module Checker
   # Both places a link can live: a block that is a link card, and a
   # formatting span inside any text the post carries.
   def all_links(post)
-    (post['content'] || []).flat_map do |block|
+    (Array(post['content']) || []).flat_map do |block|
       next [] unless block.is_a?(Hash)
 
       urls = []

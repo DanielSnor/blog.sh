@@ -85,7 +85,7 @@ module DeployBackend
         email = IO.popen(['git', '-C', work, 'config', 'user.email'], &:read).to_s.strip
         identity = email.empty? ? ['-c', 'user.name=deploy', '-c', 'user.email=deploy@localhost'] : []
 
-        ok = git.call('add', '-A') &&
+        ok = git.call('-c', 'core.excludesFile=/dev/null', 'add', '-A', '-f') &&
              system('git', '-C', work, *identity, 'commit', '-q', '-m',
                     "Deploy #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}") &&
              git.call('push', '-q', '--force', remote, "HEAD:refs/heads/#{branch}")

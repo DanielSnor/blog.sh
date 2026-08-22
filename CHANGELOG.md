@@ -23,9 +23,12 @@ prints what an installation is running.
   is, so there is no second key to keep in agreement with it. Without the
   key nothing changes. The forge path costs **one** request where GitHub
   costs one per commit, because a Gitea activity item carries the commits
-  it is about, message and timestamp included; `doctor` refuses a handle, a
-  link to one repository or a bare host name, each of which would otherwise
-  end as an empty card indistinguishable from "has not pushed lately".
+  it is about, message and timestamp included; `doctor` refuses a handle and a bare
+  host name outright, and flags an address with a path after it (a profile,
+  a repository -- but also a forge that genuinely lives under one) as worth
+  checking rather than wrong, pointing at `<instance>/api/v1/version` to
+  settle it. Either way the answer arrives before the card turns out empty
+  and indistinguishable from "has not pushed lately".
   Verified against two live servers before it was written.
 - **Media are read from the year the post's FILE lives in.** A post whose
   date was corrected across a year boundary keeps its file (and its media)

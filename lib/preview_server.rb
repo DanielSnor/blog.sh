@@ -26,6 +26,13 @@ module PreviewServer
   # lists mirror MarkdownParser's VIDEO/AUDIO/FILE_EXTENSIONS; when one
   # of those grows, this grows with it.
   MIME_TYPES = {
+    # Formats the importers bring home: an .avif from a modern export and
+    # an .heic straight off a phone (kept under its own name when
+    # media.convert_heic is off). Without a type the browser downloaded
+    # the picture instead of showing it, in the one place whose whole job
+    # is showing the site.
+    '.avif' => 'image/avif',
+    '.heic' => 'image/heic',
     '.html' => 'text/html; charset=utf-8', '.css' => 'text/css; charset=utf-8',
     '.js' => 'text/javascript; charset=utf-8', '.json' => 'application/json; charset=utf-8',
     '.xml' => 'application/xml; charset=utf-8', '.txt' => 'text/plain; charset=utf-8',
@@ -85,7 +92,14 @@ module PreviewServer
     if path.nil?
       respond(client, 403, 'Forbidden', 'text/plain', 'Forbidden')
     elsif !File.file?(path)
-      respond(client, 404, 'Not Found', 'text/plain', '404 Not Found')
+      # The build makes a 404 page; the preview is where its own site is
+      # looked at, so it should be the one the reader would get.
+      own = File.join(root, '404.html')
+      if File.file?(own)
+        respond(client, 404, 'Not Found', 'text/html; charset=utf-8', File.read(own, encoding: 'utf-8'))
+      else
+        respond(client, 404, 'Not Found', 'text/plain', '404 Not Found')
+      end
     else
       send_file(client, path, verb, headers['range'])
     end
@@ -135,6 +149,10 @@ module PreviewServer
     else
       from = first.to_i
       return :unsatisfiable if from >= size
+      # "bytes=5-2" is not a range, it is a typo -- and answering it as one
+      # produced a 206 with a negative Content-Length and the whole file
+      # behind it. Treated as no range at all: send the file.
+      return nil if !last.empty? && last.to_i < from
 
       [from, last.empty? ? size - 1 : [last.to_i, size - 1].min]
     end
@@ -182,6 +200,18 @@ module PreviewServer
     clean = percent_decode(raw_path.split('?').first.to_s)
     full = File.expand_path(File.join(root, clean))
     return nil unless full == root || full.start_with?("#{root}/")
+
+    # ...and where it REALLY is, not just what its name says. A symlink
+    # inside public.nosync pointing out of the tree passed the name test
+    # and was then served -- the preview would hand out anything on the
+    # machine the link happened to name.
+    begin
+      real = File.realpath(File.directory?(full) ? full : File.dirname(full))
+      root_real = File.realpath(root)
+      return nil unless real == root_real || real.start_with?("#{root_real}/")
+    rescue SystemCallError
+      return nil
+    end
 
     File.directory?(full) ? File.join(full, 'index.html') : full
   end

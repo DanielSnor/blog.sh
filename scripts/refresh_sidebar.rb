@@ -125,7 +125,18 @@ end
 
 stats = previous_stats.merge(fetched.transform_values { |result| result['stats'] })
 File.write(STATS_PATH, stats.to_json)
-File.write(FULL_REFRESH_PATH, Time.now.to_f.to_s) if full_refresh
+# The stamp says "the weekly pass was done", and the next six days are
+# decided by it. A pass in which every single fetch failed -- an instance
+# down, a token that lost its scope -- used to write it anyway, so the
+# thing that would have retried tomorrow went quiet for a week instead.
+if full_refresh
+  if fetched.any? || PostStats.entries.empty?
+    File.write(FULL_REFRESH_PATH, Time.now.to_f.to_s)
+  else
+    warn '⚠️  The full pass fetched nothing at all, so it is not recorded as done -- ' \
+         'the next run will try again instead of waiting a week.'
+  end
+end
 
 puts "stats.json: #{fetched.size} post(s) updated (#{stats.size} total)" \
      "#{full_refresh ? ' [full refresh]' : ' [last ~90 days only]'}"

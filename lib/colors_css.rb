@@ -68,7 +68,11 @@ module ColorsCss
   # A value from config lands inside a CSS declaration, so it must not be
   # able to end one. Everything here would either break the stylesheet or
   # smuggle in rules of its own -- a font stack needs none of it.
-  CSS_VALUE_FORBIDDEN = /[;{}<>@\\\n\r]/.freeze
+  # Comment markers belong here too: a font name carrying "/*" opens a
+  # comment that swallows everything after it -- in the generated file
+  # that was the entire light palette, silently, and the site came out in
+  # the browser's own default colours with nothing said anywhere.
+  CSS_VALUE_FORBIDDEN = %r{[;{}<>@\\\n\r]|/\*|\*/}
 
   module_function
 
@@ -173,6 +177,14 @@ module ColorsCss
   # not working and gives nothing to go on.
   def font_face_css(fonts, fonts_dir)
     faces = fonts['faces']
+    # A mapping instead of a list is the shape somebody writes when they
+    # have one face: `faces:` then `family:` under it. Skipping it without
+    # a word left them with a config that looks right and a site with no
+    # custom font, and nothing to go on.
+    if faces && !faces.is_a?(Array)
+      warn_face("fonts.faces has to be a list of entries (each with family and file), not #{faces.class.to_s.downcase}")
+      return ''
+    end
     return '' unless faces.is_a?(Array) && faces.any?
 
     blocks = faces.filter_map { |face| font_face_block(face, fonts_dir) }

@@ -75,6 +75,19 @@ HEX = /\A#(\h{3}|\h{6})\z/.freeze
 ICONS = %w[mastodon pixelfed linkedin github gitea forgejo codeberg gitlab
            bluesky instagram threads facebook x youtube rss email].freeze
 
+# current.dig blows up the moment a key holds something other than a
+# mapping -- a hand-edited config with `widgets:` as a list, say -- and
+# this is a tool people open BECAUSE their config is wrong.
+def at(*keys)
+  node = current
+  keys.each do |key|
+    return nil unless node.is_a?(Hash)
+
+    node = node[key]
+  end
+  node
+end
+
 def current
   @current ||= begin
     path = File.exist?(SITE_YML) ? SITE_YML : SITE_YML_EXAMPLE
@@ -103,7 +116,7 @@ def template_values
 end
 
 def template?(*keys)
-  value = current.dig(*keys)
+  value = at(*keys)
   !value.nil? && value == template_values.dig(*keys)
 end
 
@@ -152,7 +165,7 @@ end
 def current_palette
   palettes.find do |_, data|
     %w[light dark].all? do |mode|
-      COLOR_KEYS.all? { |k| current.dig('colors', mode, k) == data.dig(mode, k) }
+      COLOR_KEYS.all? { |k| at('colors', mode, k) == data.dig(mode, k) }
     end
   end&.first
 end
@@ -208,12 +221,12 @@ def section_colors_by_hand
     Wizard.say(t("colors_#{mode}"), :bold)
     Wizard.say('')
     COLOR_KEYS.each do |key|
-      value = Wizard.ask_valid("colors.#{mode}.#{key}", current.dig('colors', mode, key),
+      value = Wizard.ask_valid("colors.#{mode}.#{key}", at('colors', mode, key),
                                hint: t("color_#{key}")) do |answer|
         t('e_hex') unless answer.match?(HEX)
       end
       site.set(['colors', mode, key], value) if value
-      candidate[mode][key] = value || current.dig('colors', mode, key)
+      candidate[mode][key] = value || at('colors', mode, key)
     end
   end
   offer_palette_preview(candidate, t('pv_custom_name'))
@@ -269,7 +282,7 @@ def preview_site_url
   require_relative '../lib/deploy_backend'
   return nil unless DeployBackend.pick.configured?
 
-  base = (ENV['SITE_BASE_URL'] || current.dig('site', 'base_url')).to_s.chomp('/')
+  base = (ENV['SITE_BASE_URL'] || at('site', 'base_url')).to_s.chomp('/')
   # The template's own placeholder is not this site's address: printing
   # (and QR-encoding) https://example.com/... pointed the user at a
   # domain they do not own while the upload went to the real target.
@@ -336,7 +349,7 @@ end
 # today, and a wrong pair makes every page jump. Nobody should have to
 # read the dimensions off their own file.
 def section_banner
-  src = current.dig('banner', 'src') || '/assets/images/header.png'
+  src = at('banner', 'src') || '/assets/images/header.png'
   # Into the frame, not onto the screen. Wizard.ask repaints from the top
   # of the viewport, so a `puts` here was erased by the very question it
   # was there to inform -- and this line names the file currently in place,
@@ -379,7 +392,7 @@ def section_banner
   # the copy would have recorded the OLD image's dimensions for the new one.
   measure_banner(src, @pending_banner)
 
-  alt = Wizard.ask(t('q_banner_alt'), current.dig('banner', 'alt'), hint: t('h_banner_alt'),
+  alt = Wizard.ask(t('q_banner_alt'), at('banner', 'alt'), hint: t('h_banner_alt'),
                    suggested: template?('banner', 'alt'))
   site.set(%w[banner alt], alt) if alt
 
@@ -387,9 +400,9 @@ def section_banner
   # ON, the engine's own default (BANNER_SHOW_TITLE/_CLAIM in
   # build_blog.rb). Asking with a bare [y/N] meant a run through the banner
   # section turned both overlays off for anyone who pressed Enter.
-  show_title = Wizard.confirm(t('q_show_title'), default: current.dig('banner', 'show_title') != false)
+  show_title = Wizard.confirm(t('q_show_title'), default: at('banner', 'show_title') != false)
   site.set(%w[banner show_title], show_title)
-  show_claim = Wizard.confirm(t('q_show_claim'), default: current.dig('banner', 'show_claim') != false)
+  show_claim = Wizard.confirm(t('q_show_claim'), default: at('banner', 'show_claim') != false)
   site.set(%w[banner show_claim], show_claim)
 
   # Only where it can be seen. The claim's text is site.description unless
@@ -403,7 +416,7 @@ def section_banner
 end
 
 def ask_banner_claim
-  now = current.dig('banner', 'claim')
+  now = at('banner', 'claim')
   answer = Wizard.ask(t('q_banner_claim'), now, hint: t('h_banner_claim')).to_s
   return if answer.strip.empty? || answer == now.to_s
 
@@ -466,7 +479,7 @@ end
 def install_pending_files
   require 'fileutils'
   if @pending_banner
-    src = site.intended[%w[banner src]] || current.dig('banner', 'src') || '/assets/images/header.png'
+    src = site.intended[%w[banner src]] || at('banner', 'src') || '/assets/images/header.png'
     queue_file(@pending_banner, src)
   end
   return if @pending_files.nil? || @pending_files.empty?
@@ -542,10 +555,10 @@ end
 # changes nothing, which is the rule the menu section had to learn the
 # hard way.
 def section_layout
-  sidebar = Wizard.confirm(t('q_layout_sidebar'), default: current.dig('layout', 'sidebar') != false)
+  sidebar = Wizard.confirm(t('q_layout_sidebar'), default: at('layout', 'sidebar') != false)
   site.set(%w[layout sidebar], sidebar)
 
-  hero = Wizard.confirm(t('q_layout_hero'), default: current.dig('layout', 'hero') == true)
+  hero = Wizard.confirm(t('q_layout_hero'), default: at('layout', 'hero') == true)
   site.set(%w[layout hero], hero)
 
   puts
@@ -556,7 +569,7 @@ end
 # the engine's own -- which is what lets a site look like something else
 # without editing a template and losing the edit to the next git pull.
 def section_extra_css
-  entries = current.dig('site', 'extra_css')
+  entries = at('site', 'extra_css')
   entries = [] unless entries.is_a?(Array)
   entries = entries.map(&:to_s)
   touched = false
@@ -580,7 +593,7 @@ def section_extra_css
       entry = ask_css_entry
       next unless entry
 
-      entries << entry
+      entries << entry if entry
       touched = true
     when 'remove'
       entries = remove_from(entries) { |e| e }
@@ -640,28 +653,28 @@ def ask_css_entry
 end
 
 def section_about
-  heading = Wizard.ask(t('q_about_heading'), current.dig('about', 'heading'), hint: t('h_about_heading'),
+  heading = Wizard.ask(t('q_about_heading'), at('about', 'heading'), hint: t('h_about_heading'),
                        suggested: template?('about', 'heading'))
   site.set(%w[about heading], heading) if heading
 
-  html = Wizard.ask_text(t('q_about_html'), current.dig('about', 'html'),
+  html = Wizard.ask_text(t('q_about_html'), at('about', 'html'),
                          hint: t('h_about_html'), comment: t('c_about_html'))
-  site.set_text(%w[about html], html) if html && html != current.dig('about', 'html')
+  site.set_text(%w[about html], html) if html && html != at('about', 'html')
   puts
 end
 
 def section_footer
   %w[links_heading note_heading social_heading copyright].each do |key|
-    value = Wizard.ask(t("q_footer_#{key}"), current.dig('footer', key), hint: t("h_footer_#{key}"),
+    value = Wizard.ask(t("q_footer_#{key}"), at('footer', key), hint: t("h_footer_#{key}"),
                        suggested: template?('footer', key))
     site.set(['footer', key], value) if value
   end
 
-  note = Wizard.ask_text(t('q_footer_note'), current.dig('footer', 'note_html'),
+  note = Wizard.ask_text(t('q_footer_note'), at('footer', 'note_html'),
                          hint: t('h_footer_note'), comment: t('c_footer_note'))
-  site.set_text(%w[footer note_html], note) if note && note != current.dig('footer', 'note_html')
+  site.set_text(%w[footer note_html], note) if note && note != at('footer', 'note_html')
 
-  links = edit_list(current.dig('footer', 'links'), %w[title url]) do |item|
+  links = edit_list(at('footer', 'links'), %w[title url]) do |item|
     "#{item['title']} -> #{item['url']}"
   end
   site.set_list(%w[footer links], links) if links
@@ -884,6 +897,11 @@ end
 def ask_social_entry
   name = Wizard.ask(t('q_social_name'), '')
   url = Wizard.ask(t('q_social_url'), '', hint: t('h_social_url'))
+  # Answering nothing means "never mind", not "add an icon with no name
+  # that links nowhere" -- which is what it used to write into the footer
+  # of every page on the site.
+  return nil if name.to_s.strip.empty? || url.to_s.strip.empty?
+
   icon = Wizard.choose(t('q_social_icon'), ICONS.map { |i| [i, i] }, current_index: 0)
   entry = { 'name' => name, 'url' => url, 'icon' => icon }
   # rel="me" is what earns the verification tick on a Mastodon profile,
@@ -925,11 +943,11 @@ def section_widgets
 end
 
 def configure_widget(name)
-  heading = Wizard.ask(t('q_widget_heading'), current.dig('widgets', name, 'heading') || t("widget_heading_#{name}"))
+  heading = Wizard.ask(t('q_widget_heading'), at('widgets', name, 'heading') || t("widget_heading_#{name}"))
   site.set(['widgets', name, 'heading'], heading) if heading
 
   WIDGETS[name].each do |key|
-    value = Wizard.ask_valid(t("q_widget_#{key}"), current.dig('widgets', name, key) || default_for(key),
+    value = Wizard.ask_valid(t("q_widget_#{key}"), at('widgets', name, key) || default_for(key),
                              hint: t("h_widget_#{key}")) do |answer|
       if key == 'limit'
         t('e_limit') unless answer.to_s.match?(/\A[1-9]\d*\z/)
@@ -983,7 +1001,7 @@ def section_fonts
     'banner_title' => t('q_font_title'), 'banner_title_size' => t('q_font_title_size'),
     'banner_claim' => t('q_font_claim'), 'banner_claim_size' => t('q_font_claim_size')
   }.each do |key, label|
-    value = Wizard.ask(label, current.dig('fonts', key), hint: t("h_font_#{key}"))
+    value = Wizard.ask(label, at('fonts', key), hint: t("h_font_#{key}"))
     site.set(['fonts', key], value) if value
   end
   puts
@@ -995,7 +1013,7 @@ end
 # silently falls back, and the banner then looks like the setting simply
 # did not work.
 def section_font_faces
-  entries = current.dig('fonts', 'faces')
+  entries = at('fonts', 'faces')
   entries = [] unless entries.is_a?(Array)
   entries = entries.select { |e| e.is_a?(Hash) }
   touched = false
@@ -1074,7 +1092,7 @@ def ask_font_face
 end
 
 def section_analytics
-  src = Wizard.ask(t('q_analytics_src'), current.dig('analytics', 'src'), hint: t('h_analytics_src'))
+  src = Wizard.ask(t('q_analytics_src'), at('analytics', 'src'), hint: t('h_analytics_src'))
   if src.to_s.empty?
     Wizard.say(t('analytics_skipped'), :dim)
     Wizard.say('')
@@ -1082,7 +1100,7 @@ def section_analytics
   end
 
   site.set(%w[analytics src], src)
-  id = Wizard.ask(t('q_analytics_id'), current.dig('analytics', 'website_id'), hint: t('h_analytics_id'))
+  id = Wizard.ask(t('q_analytics_id'), at('analytics', 'website_id'), hint: t('h_analytics_id'))
   site.set(%w[analytics website_id], id) if id
   puts
 end

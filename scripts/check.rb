@@ -64,6 +64,15 @@ end
 # right for reading and useless for anything that wants to act -- a script
 # that adds redirect_from for dead links cannot work from "...and 23 more".
 # Progress goes to stderr here, so stdout stays a document.
+# Two modes, one run: --json is a document about the archive as it stands,
+# --repair changes the archive. Asked for together, the repair used to be
+# swallowed without a word and the person walked away believing the
+# archive had been fixed.
+if as_json && repair
+  warn I18n.t('check.json_and_repair')
+  exit 2
+end
+
 if as_json
   require 'json'
   progress = nil
