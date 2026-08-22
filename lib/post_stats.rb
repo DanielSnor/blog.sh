@@ -98,11 +98,40 @@ module PostStats
   # which address is unreadable in both places: fetch_one turns it into a
   # warning naming the post, and doctor into approval_probe_failed, which
   # quotes the message instead of accusing the credentials.
+  # A host the site does NOT say it announces on. Only ever true when the
+  # site names an instance and the post names a different one: with no
+  # instance configured there is nothing to compare against, and the
+  # archive's own URLs are then the only thing that knows where the
+  # announcements live. Compared without scheme or path, because both
+  # spellings turn up in configs written by hand.
+  def foreign_host?(host)
+    configured = SiteConfig.get('mastodon', 'instance').to_s
+                           .sub(%r{\Ahttps?://}, '').sub(%r{/.*\z}, '').downcase
+    return false if configured.empty?
+
+    configured != host.to_s.downcase
+  end
+
   def parse_toot_url!(url)
     parse_toot_url(url) ||
       raise("mastodon_url #{url.to_s.inspect} is not an address this engine can read -- expected " \
             'https://instance/@user/123 or https://instance/users/user/statuses/123, so no ' \
             'engagement or comments can be fetched for that post.')
+  end
+
+  # The same list, plus how many post files could not be read at all. A
+  # caller that NARROWS something by this list has to know that: a file
+  # that will not parse is not a post that went away, and treating the two
+  # alike deletes a published post's approved discussion from a file the
+  # public reads.
+  def entries_with_gaps
+    before = unreadable_count
+    list = entries.map { |entry| entry[:key] }
+    [list, unreadable_count - before]
+  end
+
+  def unreadable_count
+    @unreadable_count ||= 0
   end
 
   def entries
@@ -132,6 +161,7 @@ module PostStats
       # AFTER the widgets had been written locally: the local build looked
       # current while the live site stayed frozen.
       warn "Skipping unreadable post file #{file}: #{e.class}: #{e.message.lines.first.to_s.strip[0, 80]}"
+      @unreadable_count = unreadable_count + 1
       nil
     end
   end
@@ -148,7 +178,20 @@ module PostStats
   def fetch_mastodon(url)
     parsed = parse_toot_url!(url)
 
-    token = approval ? mastodon_token! : nil
+    # The token goes to the CONFIGURED instance and nowhere else. Which
+    # host is asked comes from the post's own mastodon_url -- an imported
+    # archive, a hand edit, an account that moved -- and sending the site's
+    # bearer token to whatever hostname a post file happens to name hands
+    # somebody else's server a credential that can read and write as the
+    # author. Without the token the public parts of the thread still
+    # answer; the private ones are not this engine's to fetch from a
+    # stranger.
+    stranger = foreign_host?(parsed[:instance])
+    token = approval && !stranger ? mastodon_token! : nil
+    if stranger
+      warn "⚠️  #{parsed[:instance]} is not the instance in config/site.yml -- asked without the " \
+           'token, so anything that needs one (a favourite, a follower-only reply) will be missing.'
+    end
     base = "https://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}"
     status = JSON.parse(FeedHttp.get(base, bearer: token))
     context = JSON.parse(FeedHttp.get("#{base}/context", bearer: token))

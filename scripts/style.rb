@@ -307,9 +307,14 @@ def show_preview_online(url, local_fallback)
   # photographed the QR one evening and found it dead the next morning.
   Wizard.say(t('pv_temporary'), :dim)
   if Tui.interactive? && (qr = QrCode.render(url))
-    puts
-    puts qr
-    puts Tui.paint(I18n.t('cli.qr_hint'), :dim)
+    # Into the frame, one row at a time, and NOT through Wizard.say: say
+    # wraps to the terminal width, and a wrapped QR code is a picture of
+    # nothing. Printed straight to the screen the code lasted until the
+    # menu repainted over it -- which is immediately -- so what the person
+    # was meant to photograph was gone before they reached for the phone.
+    Wizard.remember('')
+    qr.to_s.lines.each { |line| Wizard.remember(line.chomp) }
+    Wizard.remember(Tui.paint(I18n.t('cli.qr_hint'), :dim))
   end
   open_in_browser(url)
 end
@@ -1117,6 +1122,13 @@ def remove_from(entries)
 
   options = entries.each_with_index.map { |e, i| [i, yield(e)] }
   index = Wizard.choose(t('q_list_which'), options, current_index: 0)
+  # Esc gives nil, and nil is not an index: rejecting "the entry whose
+  # position equals nil" matched nothing, so the list came back one item
+  # shorter -- the FIRST one, which on a default site is the Mastodon link
+  # carrying rel="me". Backing out of a question must leave the answer
+  # exactly as it was.
+  return entries if index.nil?
+
   entries.reject.with_index { |_, i| i == index }
 end
 

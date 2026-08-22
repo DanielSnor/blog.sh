@@ -164,6 +164,13 @@ module DeployBackend
       '.sftp'
     end
 
+    # Deletion here is by NAME, one orphan at a time, so it composes with
+    # --only: asking for two files and taking one down is a coherent run.
+    # Backends that could only mirror had to refuse that combination.
+    def deletes_by_name?
+      true
+    end
+
     # What the last sync got onto the target, whether or not the whole run
     # succeeded. deploy_web.rb records these even after a failure, so an
     # interrupted transfer resumes instead of starting over.

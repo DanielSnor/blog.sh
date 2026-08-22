@@ -136,9 +136,33 @@ def manifest_target
   # `identity` where a backend has one (sftp: the same server with two
   # directories is two targets), `target` otherwise. Never the connection
   # string itself -- that one has to stay exactly what the tool expects.
-  return BACKEND.identity.to_s if BACKEND.respond_to?(:identity)
+  raw = if BACKEND.respond_to?(:identity)
+          BACKEND.identity.to_s
+        elsif BACKEND.respond_to?(:target)
+          BACKEND.target.to_s
+        else
+          ''
+        end
+  settle_target(raw)
+end
 
-  BACKEND.respond_to?(:target) ? BACKEND.target.to_s : ''
+# Two spellings of one place are one target. A trailing slash, a doubled
+# one, `./` in front, `..` in the middle, a relative path where an
+# absolute one stood -- none of them moves the site anywhere, and all of
+# them used to throw the manifest away and re-upload everything (losing
+# the orphan list with it, which is the expensive half). A remote address
+# keeps its shape: only the path part after the colon is tidied, because
+# `user@host:` is the tool's syntax, not ours.
+def settle_target(raw)
+  return raw if raw.empty?
+
+  head, sep, tail = raw.rpartition(':')
+  path = sep.empty? ? raw : tail
+  return raw if path.empty? || path.start_with?('#')
+
+  settled = path.start_with?('/') ? File.expand_path(path) : path.squeeze('/').chomp('/')
+  settled = settled.sub(%r{\A\./}, '')
+  sep.empty? ? settled : "#{head}#{sep}#{settled}"
 end
 
 def load_manifest
@@ -478,14 +502,18 @@ end
 ref_source = BASE ? "the last accepted build (#{BASE['at']})" : 'the manifest (no accepted build recorded yet)'
 notices = []
 
-# A batch backend can only express deletion as "mirror the whole tree"
-# (rsync --delete, rclone sync), which under --only would mirror a
-# two-file transfer over the entire target -- so those backends refuse the
-# combination, and the named file stays live. That has to be said: the
-# alternative is dropping it from the manifest as though it had been
-# deleted, after which nothing on this side knows the target still serves
-# it and no later --prune can find it.
-if ONLY && !SNAPSHOT && orphans.any? && BACKEND.respond_to?(:sync)
+# This refusal was written when deletion on a batch backend meant "mirror
+# the whole tree" (rsync --delete, rclone sync), which under --only would
+# have mirrored a two-file transfer over the entire target. Since those
+# backends delete the orphans BY NAME, the reason is gone -- and the cost
+# of keeping the refusal was not theoretical: refresh-sidebar.sh runs
+# --only=comments.json every half hour, so a comments.json full of
+# rejected comments stayed publicly readable while the cron announced the
+# fact twice an hour and nothing ever took it down.
+#
+# --prune still has to be asked for; --only alone changes nothing. What is
+# fixed here is that asking for both now works instead of being refused.
+if ONLY && !SNAPSHOT && orphans.any? && BACKEND.respond_to?(:sync) && !BACKEND.respond_to?(:deletes_by_name?)
   notices << "⚠️  #{orphans.join(', ')}: no longer in the build, but #{BACKEND.label} cannot delete " \
              'single files -- run ./scripts/deploy-web.sh --prune to take them off the target.'
   orphans = []

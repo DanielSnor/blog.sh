@@ -1387,8 +1387,13 @@ def cmd_toot(slug)
   # for every caller alike -- and unlike the truthy test that used to sit
   # here, it is not fooled by an empty string into refusing a first toot,
   # and not blind to an announcement living on the other network.
-  year = File.basename(File.dirname(path))
+  # The year of the ADDRESS, not of the folder. A post whose date was
+  # corrected across a year keeps its file where it was -- the engine says
+  # so in half a dozen comments -- and the announcement is public and
+  # cannot be edited afterwards, so getting it from the folder meant a
+  # permanent link into nothing.
   date = Time.parse(post['date'])
+  year = PostAddress.date_year(post)
   fields = announce_on_publish(post, year, date)
   # false means the network was asked and said no -- the poster has already
   # printed what it heard, so "see above" has an above. nil means nobody
@@ -1443,8 +1448,10 @@ def cmd_bluesky(slug)
     return
   end
 
-  year = File.basename(File.dirname(path))
+  # The address year again, not the folder's: what goes out in a toot is
+  # public and cannot be corrected afterwards.
   date = Time.parse(post['date'])
+  year = PostAddress.date_year(post)
 
   # Before sending: is one already out there? This command runs precisely
   # when the post carries no announcement address -- which means either
@@ -2351,7 +2358,7 @@ def props_frame_lines(post, path, slug, year)
   # Old addresses are counted, not listed: a post renamed a few times
   # would push everything else off the screen, and the list is one
   # keypress away in [a].
-  addresses = Array(post['former_slugs']).size
+  addresses = address_entries(post).size
   lines << props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
   lines.compact!
   # The whole queue, after the property list rather than inside it: it is
@@ -2733,15 +2740,19 @@ def props_addresses(path, slug)
     # minutes. The write below refuses if anything moved in between.
     raw = File.read(path, encoding: 'utf-8')
     post = JSON.parse(raw)
-    entries = Array(post['former_slugs']).map(&:to_s)
+    entries = address_entries(post)
     if entries.empty?
       puts t('cli.addresses_none')
       puts
       return
     end
 
-    current = "#{File.basename(File.dirname(path))}/#{slug}"
-    rows = entries.each_with_index.map { |former, i| address_row(former, current, i) }
+    # The post's own address today, in the shape its kind of address is
+    # written in -- a page's has no year in it. Compared against, so the
+    # row for "the address I am at right now" is not marked as taken by
+    # somebody else.
+    current = PostAddress.vacated_marker(post, slug: slug)
+    rows = entries.each_with_index.map { |(_, value), i| address_row(value, current, i) }
     # Into the frame, not above it -- see version_pick.
     index = address_pick(rows, [Tui.paint(t('cli.addresses_heading', count: entries.size), :dim), ''])
     # The blank line after a picker is the caller's to write -- Tui.menu
@@ -2751,14 +2762,14 @@ def props_addresses(path, slug)
     puts
     return if index.nil?
 
-    former = entries[index]
+    key, former = entries[index]
     print t('cli.addresses_drop_confirm', address: former)
     next unless Tui.key_choice('') == t('cli.confirm_yes_char')
 
     abort_if_post_changed(path, raw, slug)
-    remaining = entries - [former]
     updated = post.dup
-    remaining.empty? ? updated.delete('former_slugs') : updated['former_slugs'] = remaining
+    remaining = Array(updated[key]).map(&:to_s) - [former]
+    remaining.empty? ? updated.delete(key) : updated[key] = remaining
     AtomicWrite.write_json(path, updated)
     puts Tui.paint(t('cli.addresses_dropped', address: former), :green)
     maybe_rebuild
@@ -2772,10 +2783,45 @@ end
 # The comparison is against the post's whole current address, not its
 # slug: a post that moved between years keeps its slug, and the address it
 # vacated is precisely the one another post can take.
+# Both lists, in one list. A post records the addresses it has left in
+# former_slugs ("year/slug"); a PAGE records them in redirect_from
+# ("/slug/"), because a page's address has no year to write down. The
+# dialog read only the first, so a renamed page was told it had no old
+# addresses at all -- while the build warned about the one it could not
+# place, on every single run, with nothing anywhere able to clear it.
+def address_entries(post)
+  Array(post['former_slugs']).map { |value| ['former_slugs', value.to_s] } +
+    Array(post['redirect_from']).map { |value| ['redirect_from', value.to_s] }
+end
+
+# Who is standing at a root address today: a page of that slug, whatever
+# year its file sits in. Same question address_occupant answers for a
+# post's address, asked the way a page is served.
+def root_occupant(name)
+  Dir.glob(File.join(CONTENT_DIR, '*', "#{name}.json")).sort.each do |file|
+    candidate = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue StandardError
+      next
+    end
+    next unless candidate.is_a?(Hash) && PostAddress.page?(candidate)
+
+    return draft?(candidate) ? :draft : :published
+  end
+  nil
+end
+
 def address_row(former, current, index)
   parts = former.split('/').reject(&:empty?)
-  occupant = parts.size == 2 && former != current ? address_occupant(parts) : nil
-  note = if parts.size != 2
+  page_address = former.start_with?('/')
+  occupant = if former == current
+               nil
+             elsif page_address && parts.size == 1
+               root_occupant(parts.first)
+             elsif parts.size == 2
+               address_occupant(parts)
+             end
+  note = if !page_address && parts.size != 2
            "  #{t('cli.addresses_unusable')}"
          elsif occupant == :draft
            "  #{t('cli.addresses_taken_draft')}"
@@ -3615,7 +3661,11 @@ def cmd_list(filters)
 
     true
   end
-  posts.sort_by! { |p| p[:date] }
+  # A post whose date is missing or unreadable sorts last instead of
+  # ending the command: `list` is one of the ways somebody goes LOOKING for
+  # the post that is broken, and a raw comparison error out of sort_by
+  # named neither the file nor the problem.
+  posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
   posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
@@ -4009,7 +4059,11 @@ RECENT_LIST_COUNT = 50
 
 def recent_posts(limit)
   posts = load_posts_summary
-  posts.sort_by! { |p| p[:date] }
+  # A post whose date is missing or unreadable sorts last instead of
+  # ending the command: `list` is one of the ways somebody goes LOOKING for
+  # the post that is broken, and a raw comparison error out of sort_by
+  # named neither the file nor the problem.
+  posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
   posts.first(limit)
 end

@@ -6,6 +6,7 @@ require 'fileutils'
 require 'net/http'
 require 'uri'
 require 'timeout'
+require 'time'
 require_relative 'post_address'
 require_relative 'slug'
 require_relative 'i18n'
@@ -105,6 +106,7 @@ module Checker
 
     known = known_paths(posts)
     findings = []
+    findings.concat(check_unbuildable(posts, cap))
     findings.concat(check_media(root, posts, progress, cap))
     findings.concat(check_degenerate_images(posts, cap))
     findings.concat(check_internal_links(posts, known, cap))
@@ -128,17 +130,63 @@ module Checker
   # --- reading the archive ------------------------------------------------
 
   def load_posts(root)
+    @unreadable = []
     dir = File.join(root, 'content.nosync', 'posts')
     Dir.glob(File.join(dir, '*', '*.json')).sort.filter_map do |path|
       post = JSON.parse(File.read(path, encoding: 'utf-8'))
-      next unless post.is_a?(Hash)
+      # Not a post object either -- the build stops on both, and "not a
+      # Hash" used to leave here as quietly as a syntax error.
+      raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)
 
       post['__path'] = path
       post['__year'] = File.basename(File.dirname(path))
       post
-    rescue JSON::ParserError
+    rescue StandardError => e
+      # Remembered, not discarded. A file the checker cannot read is a file
+      # the BUILD refuses to run on -- and dropping it silently meant check
+      # counted the archive minus that post and called the whole thing
+      # sound, while the next build stopped dead on it.
+      @unreadable << [path, "#{e.class}: #{e.message.lines.first.to_s.strip[0, 90]}"]
       nil
     end
+  end
+
+  def unreadable_files
+    @unreadable ||= []
+  end
+
+  # Files the checker could not read, and posts whose date it could not
+  # parse: both are states the build refuses to run on, so a check that
+  # calls the archive sound while either is present is telling the author
+  # the opposite of what they are about to find out.
+  def check_unbuildable(posts, cap = CAP)
+    findings = unreadable_files.map do |path, reason|
+      error(t('post_unreadable', file: short_path(path), reason: reason),
+            t('post_unreadable_fix'), kind: :post_unreadable,
+            data: { 'file' => path, 'reason' => reason })
+    end
+    posts.each do |post|
+      next if parseable_date?(post['date'])
+
+      findings << error(t('post_date_unreadable', file: short_path(post['__path'].to_s),
+                                                  value: post['date'].inspect),
+                        t('post_date_unreadable_fix'), kind: :post_date_unreadable,
+                        data: { 'file' => post['__path'].to_s })
+    end
+    capped(findings, cap)
+  end
+
+  def parseable_date?(value)
+    return false if value.to_s.strip.empty?
+
+    Time.parse(value.to_s)
+    true
+  rescue StandardError
+    false
+  end
+
+  def short_path(path)
+    File.join(File.basename(File.dirname(path)), File.basename(path))
   end
 
   def draft?(post)
@@ -265,7 +313,12 @@ module Checker
   end
 
   def claim_one(dir, url, children, by_fold)
-    return [url, :exact] if children.include?(url)
+    # The name being in the directory is not the same as the file being
+    # there: a dangling symlink is listed by Dir.children and opens to
+    # nothing. The build copies by reading, so it reported the picture as
+    # MISSING while check -- trusting the name alone -- called the archive
+    # sound and left the page pointing at an address with no file behind it.
+    return [url, :exact] if children.include?(url) && File.exist?(File.join(dir, url))
 
     referenced = File.join(dir, url)
     if File.exist?(referenced)
@@ -427,7 +480,16 @@ module Checker
     media_root = File.join(root, 'media.nosync')
     return [] unless Dir.exist?(media_root)
 
-    owned = posts.map { |post| File.join(post['__year'], post['slug'].to_s) }.to_set
+    # BOTH years a post can own media under: the folder its file sits in,
+    # and the year in its date. The two differ whenever a date was
+    # corrected across a New Year -- which the engine treats as ordinary
+    # and the build reads media from either -- so counting only the folder
+    # called a directory the site is serving from "orphaned", and
+    # --repair then offered to put a live photograph in the trash.
+    owned = posts.flat_map do |post|
+      slug = post['slug'].to_s
+      [File.join(post['__year'].to_s, slug), File.join(PostAddress.date_year(post), slug)]
+    end.to_set
     orphans = Dir.glob(File.join(media_root, '*', '*')).select { |p| File.directory?(p) }.filter_map do |dir|
       rel = dir.sub("#{media_root}/", '')
       rel unless owned.include?(rel)

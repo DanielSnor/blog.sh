@@ -107,9 +107,21 @@ fetched = PostStats.fetch_all(recent_only: !full_refresh)
 # PostStats.entries already leaves out drafts, and a withdrawn post is a
 # draft again -- so "still published" and "still exists" are one question
 # with one answer here.
-live = PostStats.entries.map { |entry| entry[:key] }
-previous_stats = previous_stats.slice(*live)
-previous_comments = previous_comments.slice(*live)
+# ...but only when the archive could be read in full. entries silently
+# skips a post file that will not parse -- a half-written save, a cloud
+# copy still arriving -- and narrowing against that list would read the
+# gap as "this post is gone" and delete its approved discussion. A run
+# without --full does not refetch it either, so the thread would not come
+# back until the weekly pass. Not being able to tell is a reason to keep
+# everything, not to forget.
+live, unreadable = PostStats.entries_with_gaps
+if unreadable.positive?
+  warn "⚠️  #{unreadable} post file(s) could not be read -- comments.json and stats.json keep " \
+       'every entry this run, since there is no telling which of them are still published.'
+else
+  previous_stats = previous_stats.slice(*live)
+  previous_comments = previous_comments.slice(*live)
+end
 
 stats = previous_stats.merge(fetched.transform_values { |result| result['stats'] })
 File.write(STATS_PATH, stats.to_json)

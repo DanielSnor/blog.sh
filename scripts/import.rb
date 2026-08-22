@@ -46,6 +46,7 @@ require_relative '../lib/import/jekyll'
 require_relative '../lib/import/livejournal'
 require_relative '../lib/import/squarespace'
 require_relative '../lib/import/substack'
+require_relative '../lib/import/pages_note'
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -582,6 +583,22 @@ def report(result, dry_run:)
 
   result.skipped.each do |reason, count|
     puts t('import.skipped', count: count, reason: reason_label(reason))
+  end
+
+  # Pages arrive out of the listings, out of the archive and out of the
+  # feed -- which is what they are for, and also means nothing on the site
+  # links to them. This sentence is the only thing that says so, and the
+  # wizard lost it when the note moved out of the adapters: Cli.report got
+  # it, and the wizard has a report of its own.
+  pages_note = Import.pages_note(Array(result.respond_to?(:pages) ? result.pages : nil))
+  puts Tui.paint(pages_note, :cyan) if pages_note
+
+  # An item that failed is a loss, not a category of skip -- and the count
+  # alone leaves the reader to guess which of five thousand it was.
+  errors = Array(result.respond_to?(:errors) ? result.errors : nil)
+  unless errors.empty?
+    puts Tui.paint(t('import.items_failed', count: errors.size), :yellow)
+    errors.first(3).each { |line| puts "  #{line}" }
   end
 
   return if result.media_failures.empty?

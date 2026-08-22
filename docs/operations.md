@@ -499,6 +499,9 @@ rather than a file under `public.nosync`: something to go and fix.
 
 What it looks for, each with a line saying what to do about it:
 
+- **A post file that will not read, or a date nothing can parse.** The
+  build refuses to run on either, so check says so first: without this it
+  counted the archive minus the broken file and called the rest sound.
 - **Media a post asks for and hasn't got** -- a video's poster image
   included -- usually an import whose download failed. The page renders
   a hole.
@@ -771,7 +774,7 @@ A second, optional job publishes scheduled drafts
 when nothing is due, so a tight interval costs nothing:
 
 ```
-*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh >/dev/null
 ```
 
 Every run of that job touches `.last-scheduled-run` in the project root,

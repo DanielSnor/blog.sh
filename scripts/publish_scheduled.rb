@@ -87,13 +87,15 @@ due.sort_by! { |_path, _post, date| date }
 Publishing.mark_scheduler_alive
 
 if due.empty? && !File.exist?(DEPLOY_PENDING)
-  # To stderr, not stdout. The documented crontab runs this every fifteen
-  # minutes and the overwhelming majority of those ticks have nothing to
-  # do; cron mails whatever reaches stdout, so this one sentence became
-  # ninety-six mails a day and buried the ones that matter. It is still
-  # said, because a hand-run tick has to answer "did it look?" -- stderr
-  # is where cron's own 2>&1 redirection puts it when somebody asks.
-  warn I18n.t('cron.no_scheduled_due')
+  # Said to a PERSON, and to nobody else. The documented crontab runs this
+  # every fifteen minutes and the overwhelming majority of those ticks
+  # have nothing to do; cron mails whatever the job writes, so one
+  # sentence per tick is ninety-six mails a day and the ones that matter
+  # drown in them. Moving it to stderr was not enough -- the documented
+  # line pipes both streams together, which is how the mails kept coming.
+  # A hand-run tick still answers "did it look?", because then there is a
+  # terminal on the other end.
+  warn I18n.t('cron.no_scheduled_due') if $stdout.tty?
   exit 0
 end
 

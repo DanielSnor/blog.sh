@@ -44,6 +44,13 @@ module DeployBackend
       '.rclone'
     end
 
+    # Deletion here is by NAME, one orphan at a time, so it composes with
+    # --only: asking for two files and taking one down is a coherent run.
+    # Backends that could only mirror had to refuse that combination.
+    def deletes_by_name?
+      true
+    end
+
     # Named deletions rather than a mirror: `rclone delete --files-from`
     # removes these paths and looks at nothing else on the target.
     def prune_orphans(orphans, logger)
@@ -84,16 +91,20 @@ module DeployBackend
         system(*full)
       end
 
-      ok = if only
-             Tempfile.create('blog-sh-rclone') do |f|
-               f.puts(only)
-               f.flush
-               run.call(['--files-from', f.path])
-             end
+      # Same reason as rsync: deploy_web decided by content hash, and
+      # rclone deciding again by size and modtime made the manifest
+      # describe bytes that never left this machine.
+      wanted = only || Array(files)
+      ok = if wanted.empty?
+             true
            else
-             run.call([])
+             Tempfile.create('blog-sh-rclone') do |f|
+               f.puts(wanted)
+               f.flush
+               run.call(['--ignore-times', '--files-from', f.path])
+             end
            end
-      ok = prune_orphans(orphans, logger) if ok && prune && !only
+      ok = prune_orphans(orphans, logger) if ok && prune
       logger&.call(ok ? '  ✅ rclone finished' : '  ❌ rclone failed')
       !!ok
     end

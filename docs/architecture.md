@@ -325,7 +325,10 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Nine questions, in one pass: media a post asks for and hasn't got; images
+Ten questions, in one pass: files the checker cannot read at all and posts
+whose date nothing can parse -- both of them states the BUILD refuses to run
+on, so a check that stayed quiet about them was calling an archive sound
+that was about to stop the site; media a post asks for and hasn't got; images
 whose stored dimensions are 1px or smaller, which the build drops
 *together with their caption* and would otherwise lose silently; internal
 links pointing at an address nothing on this site answers at; links

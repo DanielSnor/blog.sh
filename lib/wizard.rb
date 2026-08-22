@@ -266,7 +266,14 @@ module Wizard
     # left alone: a caller that painted a row measured it as it meant it,
     # and an ANSI string's length is not its width.
     rows = Array(note).flat_map do |row|
-      row.to_s.include?("\e") ? [row] : Tui.wrap_to_width(row.to_s, Tui.term_width)
+      # A row painted in one colour from end to end can still be wrapped:
+      # take the paint off, wrap the words, put the same paint back on each
+      # line. Leaving every coloured row alone meant the explanations --
+      # which are dim, all of them -- were cut at the frame instead, and
+      # half the sentence about the derived menu (or the palette) was
+      # simply not there. Rows with colour CHANGING inside them are still
+      # left as their author measured them.
+      row.to_s.include?("\e") ? wrap_painted(row.to_s) : Tui.wrap_to_width(row.to_s, Tui.term_width)
     end
     unless Tui.interactive?
       rows.each { |row| puts row }
@@ -311,6 +318,17 @@ module Wizard
 
   # A menu that can be left, for wizards built as a set of sections
   # rather than one pass. Returns nil when the user is done.
+  # One colour around the whole row, or nothing to do. The pattern is
+  # deliberately narrow: an escape anywhere in the middle means the caller
+  # is doing something this cannot measure, and guessing there would break
+  # a row that is correct today.
+  def wrap_painted(row)
+    match = row.match(/\A(\e\[[0-9;]*m)([^\e]*)(\e\[0m)\z/)
+    return [row] unless match
+
+    Tui.wrap_to_width(match[2], Tui.term_width).map { |line| "#{match[1]}#{line}#{match[3]}" }
+  end
+
   def choose_or_exit(label, options)
     rows = options.map { |(_, desc)| desc } + [t('done')]
     unless Tui.interactive?

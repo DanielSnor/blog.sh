@@ -555,7 +555,7 @@ A second, optional job powers `./blog.sh schedule` -- it publishes
 scheduled drafts whose date has arrived (and does nothing otherwise):
 
 ```
-*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh >/dev/null
 ```
 
 ## Roadmap

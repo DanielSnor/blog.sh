@@ -31,6 +31,13 @@ module DeployBackend
       '.rsync'
     end
 
+    # Deletion here is by NAME, one orphan at a time, so it composes with
+    # --only: asking for two files and taking one down is a coherent run.
+    # Backends that could only mirror had to refuse that combination.
+    def deletes_by_name?
+      true
+    end
+
     # only:  restricts the transfer to the listed files (--files-from) --
     #        how deploy-web.sh --only=... maps onto a batch backend.
     # prune: deletes exactly the orphans deploy_web.rb named, and nothing
@@ -58,16 +65,26 @@ module DeployBackend
         system(*full)
       end
 
-      ok = if only
-             Tempfile.create('blog-sh-rsync') do |f|
-               f.puts(only)
-               f.flush
-               run.call(['--files-from', f.path])
-             end
+      # The list of names is OURS, not rsync's. deploy_web has already
+      # decided what changed -- by content hash -- and then wrote those
+      # decisions into the manifest; letting rsync decide again by size
+      # and timestamp meant a file rewritten within the same second, at
+      # the same length, was skipped while the manifest recorded the new
+      # bytes as delivered. The target then served the old text forever
+      # and every later run agreed there was nothing to do. Handing rsync
+      # the names with -I makes what arrives and what is written down the
+      # same list.
+      wanted = only || Array(files)
+      ok = if wanted.empty?
+             true
            else
-             run.call([])
+             Tempfile.create('blog-sh-rsync') do |f|
+               f.puts(wanted)
+               f.flush
+               run.call(['-I', '--files-from', f.path])
+             end
            end
-      ok = prune_orphans(run, orphans, logger) if ok && prune && !only
+      ok = prune_orphans(run, orphans, logger) if ok && prune
       logger&.call(ok ? '  ✅ rsync finished' : '  ❌ rsync failed')
       !!ok
     end
