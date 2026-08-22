@@ -7,6 +7,7 @@ require 'yaml'
 require_relative 'markdown_writer'
 require_relative 'embed'
 require_relative 'file_size'
+require_relative 'post_address'
 
 # lib/exporter.rb -- the archive as a tree of markdown files: what
 # `./blog.sh export` writes, and the mirror of lib/import/. The engine
@@ -87,7 +88,7 @@ module Exporter
   # written before, and both are still read -- the same pair
   # scripts/manage_post.rb accepts.
   def page?(post)
-    post['type'].to_s == 'page' || truthy?(post['page'])
+    PostAddress.page?(post)
   end
 
   def truthy?(value)

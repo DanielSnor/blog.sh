@@ -4,6 +4,7 @@ require 'json'
 require 'time'
 require_relative 'post_text'
 require_relative 'content_type'
+require_relative 'post_address'
 
 # lib/stats.rb -- what `./blog.sh stats` counts. Numbers only: this
 # module never prints, never colours and never translates, so the same
@@ -163,7 +164,7 @@ module Stats
   end
 
   def page?(post)
-    post['type'].to_s == 'page' || truthy?(post['page'])
+    PostAddress.page?(post)
   end
 
   def truthy?(value)

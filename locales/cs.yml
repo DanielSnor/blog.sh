@@ -896,7 +896,7 @@ check:
   address_duplicate: "Na adrese /posts/%{year}/%{slug}/ by se servíroval víc než jeden post (%{count})."
   address_duplicate_fix: "Build v tomhle stavu vůbec neproběhne — jeden post by přepsal druhý a jejich média by se smíchala. Dej jednomu z nich jiný slug (`./blog.sh props` → adresa), nebo datum v jiném roce."
   address_duplicate_page: "Na adrese /%{slug}/ by se servírovala víc než jedna stránka (%{count})."
-  address_duplicate_page_fix: "Stránka nemá v adrese rok, takže je nerozdělí ani jiné datum — build v tomhle stavu neproběhne a jedna stránka by přepsala druhou. Dej jedné z nich jiný slug (`./blog.sh props` → adresa)."
+  address_duplicate_page_fix: "Stránka nemá v adrese rok, takže je nerozdělí ani jiné datum. Web se postaví, ale servírovat se bude jen jedna z nich — ta druhá zůstane v mapě webu i ve vyhledávání a povede na cizí obsah. Dej jedné z nich jiný slug (`./blog.sh props` → adresa)."
   redirect_collision: "Na adresu %{origin} si dělá nárok víc postů: %{slugs}."
   redirect_collision_fix: "Vyhraje ten, který se vysází později, a čtenáři ostatních skončí u něj. Nech ten záznam jen u jednoho postu."
   and_more: "...a dalších %{count} téhož druhu, nevypsaných."

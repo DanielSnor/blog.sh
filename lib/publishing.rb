@@ -109,7 +109,8 @@ module Publishing
     # than only when the year changes: a draft published onto a page's
     # slug never moved years at all, and the scheduler's cron reaches
     # this line with nobody at the keyboard to read what went wrong.
-    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug, except: path)
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug,
+                                  except: path, path: new_path)
     abort(I18n.t('cli.post_already_exists', slug: slug, path: taken)) if taken
 
     if new_year != old_year

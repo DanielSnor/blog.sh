@@ -912,6 +912,19 @@ def cmd_add
   end
   post['toc'] = truthy_frontmatter?(meta['toc']) if meta.key?('toc') && !meta['toc'].to_s.strip.empty?
 
+  # The slug was settled before the editor opened, when nobody yet knew
+  # whether this would be a page -- and a page is served at the root, where
+  # the year in the file name buys it nothing. Walk on to the next serial
+  # now that the answer is in, so that the write below never has to refuse.
+  if PostAddress.page?(post)
+    base = post['slug']
+    serial = 2
+    while AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: post['slug'])
+      post['slug'] = "#{base}-#{serial}"
+      serial += 1
+    end
+  end
+
   path = PostWriter.write(post, media_files: media_files)
   discard_editor_buffer
   cleanup_incoming(media_files, heic_consumed)
@@ -1595,7 +1608,7 @@ def write_scheduled_date(path, post, date, raw: nil, slug: nil)
     # year can still land the post on an address another post is served
     # at, and the old guard only looked when the folder changed.
     taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
-                                  slug: post['slug'], except: path)
+                                  slug: post['slug'], except: path, path: new_path)
     abort t('cli.post_already_exists', slug: post['slug'], path: taken) if taken
 
     if File.expand_path(new_path) != File.expand_path(path)
@@ -1982,8 +1995,10 @@ def apply_queue_moves(moves)
     moves.each do |entry, target|
       abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
       moved = entry[:post].merge('date' => target.iso8601)
+      target_path = File.join(CONTENT_DIR, target.year.to_s, "#{entry[:post]['slug']}.json")
       taken = AddressGuard.occupant(moved, content_dir: CONTENT_DIR,
-                                    slug: entry[:post]['slug'], except: entry[:path])
+                                    slug: entry[:post]['slug'], except: entry[:path],
+                                    path: target_path)
       abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: taken) if taken
     end
 
@@ -2871,7 +2886,8 @@ def rename_post(path, post, raw: nil)
   # site that would not build.
   new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
   new_media_dir = File.join(MEDIA_DIR, year, new_slug)
-  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug)
+  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug,
+                                        path: new_path)
   if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
     # Not the shared post_already_exists text: that one says "continuing
     # would overwrite it -- resolve manually", and a refused rename
@@ -2899,7 +2915,7 @@ def rename_post(path, post, raw: nil)
     # under the DATE's year, not the folder's. The banner two rows above
     # this dialog had it right while the promise below did not.
     page = PostAddress.page?(post)
-    address_year = post['date'].to_s[0, 4]
+    address_year = PostAddress.date_year(post)
     puts t('cli.rename_confirm',
            old_url: published_url(old_slug, address_year, page: page),
            new_url: published_url(new_slug, address_year, page: page))
@@ -3153,7 +3169,8 @@ def edit_post(slug, path: nil)
            PostAddress.collision_keys(post, slug: slug) ||
            File.expand_path(new_path) != File.expand_path(path)
   if moving
-    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug, except: path)
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug,
+                                  except: path, path: new_path)
     abort t('cli.post_already_exists', slug: slug, path: taken) if taken
   end
 
@@ -3482,7 +3499,7 @@ def cmd_restore(slug)
   year = Time.parse(post['date']).year.to_s
   new_dir = File.join(CONTENT_DIR, year)
   new_path = File.join(new_dir, "#{slug}.json")
-  taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug)
+  taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug, path: new_path)
   abort t('cli.post_already_exists', slug: slug, path: taken) if taken
 
   FileUtils.mkdir_p(new_dir)

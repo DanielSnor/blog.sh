@@ -51,7 +51,7 @@ dedup by `source`).
 | `state` | `"published"` \| `"draft"` | absent = published |
 | `draft_token` | string | drafts only -- the hidden preview URL segment |
 | `created_at` | string | drafts only -- publish-time "was the date edited?" check |
-| `type` | string | explicit dominant content type; absent = derived from blocks. `type: page` is not a content type but the way a page is written -- see `page` below |
+| `type` | string | explicit dominant content type; absent = derived from blocks. `type: page` belongs in FRONT MATTER only: what a stored post carries is `page: true`, and nothing reads `type` when deciding where a post is served |
 | `source` | object | `platform` plus optionally `account`, `original_id` -- the re-import dedup key |
 | `mastodon_url` | string | the post's comment toot (Mastodon sites), set on publish/`toot` |
 | `bluesky_url` | string | the announcement's human link (Bluesky sites), set on publish/`bluesky` |

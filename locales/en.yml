@@ -918,7 +918,7 @@ check:
   address_duplicate: "%{count} posts would be served at /posts/%{year}/%{slug}/."
   address_duplicate_fix: "The build refuses to run in this state -- one post would be written over the other and their media mixed. Give one of them another slug (`./blog.sh props` -> address), or a date in another year."
   address_duplicate_page: "%{count} pages would be served at /%{slug}/."
-  address_duplicate_page_fix: "A page has no year in its address, so another date will not separate them -- the build refuses to run in this state and one page would be written over the other. Give one of them another slug (`./blog.sh props` -> address)."
+  address_duplicate_page_fix: "A page has no year in its address, so another date will not separate them. The site still builds, but only one of the two is served -- the other stays in the sitemap and in search, leading to somebody else's text. Give one of them another slug (`./blog.sh props` -> address)."
   redirect_collision: "%{origin} is claimed by more than one post: %{slugs}."
   redirect_collision_fix: "Whichever renders last wins and the others' readers land on it. Leave the entry on one post only."
   and_more: "...and %{count} more of the same kind, not listed."

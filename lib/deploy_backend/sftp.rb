@@ -99,33 +99,34 @@ module DeployBackend
     def normalised_args
       tokens = split_args(ENV['SFTP_ARGS'].to_s.strip)
       pairs = []
-      loose = false
       until tokens.empty?
         token = tokens.shift
         next if token.match?(CHATTER)
 
         key, glued = unglue(token)
+        # A bare word is the value of a switch this code does not know
+        # takes one. It rides along with its key rather than becoming an
+        # entry of its own, so that sorting can never part the two and seat
+        # two different servers on one fingerprint. The previous attempt
+        # answered this by switching sorting OFF for the whole line, which
+        # made tidying up an unrelated switch into a new target -- the very
+        # thing the sorting is there to prevent.
+        if !key.start_with?('-') && !pairs.empty?
+          pairs.last[1] = "#{pairs.last[1]} #{key}"
+          next
+        end
+
         value = glued || (TAKES_VALUE.include?(key) && !tokens.empty? ? tokens.shift : nil)
         next if value && TUNING.include?(key)
 
-        # A bare word means a switch this code does not know takes a value,
-        # so its value is walking around loose. Sorting would part the two,
-        # and two different servers could then land on one fingerprint --
-        # the mistake that leaves a target empty and calls it success.
-        loose = true if value.nil? && !key.start_with?('-')
         pairs << [key, value ? "#{key} #{value}" : key]
       end
-      return pairs.map(&:last) if loose
 
       # Sorted by KEY, with the original position as the tiebreaker. Two
       # lines that differ only in the order of their switches come out the
       # same, while a repeated -o keeps the order it was written in --
       # openssh takes the first value of those, so swapping them really is
-      # a second configuration. Asking instead whether ANY key repeats
-      # turned one repeated switch into "this whole line is order
-      # sensitive", and two -o (StrictHostKeyChecking with its hosts file)
-      # is the commonest SFTP_ARGS there is: tidying such a line up threw
-      # the manifest away, orphans and all.
+      # a second configuration.
       pairs.each_with_index.sort_by { |(key, _), index| [key, index] }.map { |(_, text), _| text }
     end
 

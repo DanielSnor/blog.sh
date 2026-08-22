@@ -2271,8 +2271,16 @@ end
 # error and the guards refuse to create it; a site that already has one
 # keeps being served, one page short and saying so on every build.
 at_the_root.each do |(_, slug), dupes|
-  warn("⚠️  #{dupes.size} posts are served at /#{slug}/ -- only the last one built stays:\n" \
+  # Which one survives is worth saying out loud: posts are written newest
+  # first, so the page that stays is the OLDER of the two -- the opposite
+  # of what somebody who just wrote the second one expects. And the loser
+  # does not disappear quietly: it keeps its entry in the sitemap and in
+  # the search index, both of which then point a reader at the winner's
+  # text under the loser's title.
+  warn("⚠️  #{dupes.size} posts are served at /#{slug}/ -- only one of them is:\n" \
        "#{dupes.map { |p| "      #{p['__path']}" }.join("\n")}\n" \
+       "   The site still builds and the OLDER one keeps the address; the other stays\n" \
+       "   in the sitemap and in search, pointing readers at text that is not its own.\n" \
        '   Give one of them another slug (./blog.sh props -> address).')
 end
 

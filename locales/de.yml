@@ -908,7 +908,7 @@ check:
   address_duplicate: "%{count} Beiträge würden unter /posts/%{year}/%{slug}/ ausgeliefert."
   address_duplicate_fix: "Der Build läuft in diesem Zustand gar nicht -- ein Beitrag würde den anderen überschreiben und ihre Medien vermischen. Gib einem von beiden einen anderen Slug (`./blog.sh props` -> Adresse) oder ein Datum in einem anderen Jahr."
   address_duplicate_page: "%{count} Seiten würden unter /%{slug}/ ausgeliefert."
-  address_duplicate_page_fix: "Eine Seite hat kein Jahr in ihrer Adresse, ein anderes Datum trennt sie also nicht -- der Build läuft in diesem Zustand nicht und eine Seite würde die andere überschreiben. Gib einer von beiden einen anderen Slug (`./blog.sh props` -> Adresse)."
+  address_duplicate_page_fix: "Eine Seite hat kein Jahr in ihrer Adresse, ein anderes Datum trennt sie also nicht. Die Site wird weiterhin gebaut, ausgeliefert wird aber nur eine der beiden -- die andere bleibt in der Sitemap und in der Suche und führt zu fremdem Text. Gib einer von beiden einen anderen Slug (`./blog.sh props` -> Adresse)."
   redirect_collision: "Auf %{origin} erheben mehrere Beiträge Anspruch: %{slugs}."
   redirect_collision_fix: "Der zuletzt gerenderte gewinnt, die Leser der anderen landen bei ihm. Belasse den Eintrag bei nur einem Beitrag."
   and_more: "...und %{count} weitere derselben Art, nicht aufgeführt."

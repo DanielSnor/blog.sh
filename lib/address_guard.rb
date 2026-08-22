@@ -21,16 +21,36 @@ require_relative 'post_address'
 module AddressGuard
   module_function
 
-  # The file already occupying one of the addresses this post would take,
-  # or nil. `except` is the post's own file, which is never in its own way.
-  def occupant(post, content_dir:, slug: nil, except: nil)
+  # The file standing in the way of this write, or nil. Two questions, and
+  # both of them have to be asked here, because five callers asked only one
+  # of them each and each one asked the other's.
+  #
+  #   `path`  -- the FILE about to be written. A different post already
+  #              there is overwritten with no trash, no version and no
+  #              warning, and that is not hypothetical: a post whose file
+  #              sits in one year's folder while its date puts its address
+  #              in another (which the engine documents as ordinary) has a
+  #              free address and an occupied path at the same time.
+  #   the address -- which no path check can see, because a page is served
+  #              at the root and a post follows its date, not its folder.
+  #
+  # Replacing the old File.exist? with the address check, rather than
+  # adding to it, is how publish, edit, scheduling, restore and re-import
+  # came to silently eat a live published post.
+  #
+  # `except` is the post's own file, which is never in its own way.
+  def occupant(post, content_dir:, slug: nil, except: nil, path: nil)
     name = (slug || post['slug']).to_s
     return nil if name.empty?
 
+    mine_now = except && File.expand_path(except)
+    if path && File.exist?(path) && File.expand_path(path) != mine_now
+      return path
+    end
+
     wanted = PostAddress.collision_keys(post, slug: name)
-    mine = except && File.expand_path(except)
     Dir.glob(File.join(content_dir, '*', "#{name}.json")).sort.each do |other|
-      next if mine && File.expand_path(other) == mine
+      next if mine_now && File.expand_path(other) == mine_now
 
       # A file that will not read or parse still owns its address. Guessing
       # "empty" from an unreadable file is how a restore left behind by a

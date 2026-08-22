@@ -61,9 +61,6 @@ module PostWriter
     rescue StandardError
       nil
     end
-    media_files = reconcile_media_names(post, previous, year, slug, media_files)
-    copy_media(media_files, year, slug)
-    sync_media_dimensions(post, year, slug, previous: previous)
     path = File.join(dir, "#{slug}.json")
     # unique_slug settles the FILE name; it says nothing about the address.
     # An imported page is served at the root, where a page already standing
@@ -71,11 +68,22 @@ module PostWriter
     # reported success, and left an archive whose two pages share one
     # address. Raised, not aborted: the per-item rescue counts it, names it,
     # and the rest of the import goes on.
-    taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug, except: path)
+    #
+    # Asked BEFORE a single file is copied. Refusing after the media were
+    # already on disk left an orphaned directory behind, which unique_slug
+    # then counted as an occupied name -- so running the very same import
+    # again put the post somewhere else. An import that is refused has to
+    # leave the archive exactly as it found it, or it is not repeatable.
+    taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug,
+                                  except: path, path: path)
     if taken
       raise "cannot write '#{slug}': a different post is already served at that address " \
             "(#{taken}) -- resolve the slug clash by hand"
     end
+
+    media_files = reconcile_media_names(post, previous, year, slug, media_files)
+    copy_media(media_files, year, slug)
+    sync_media_dimensions(post, year, slug, previous: previous)
 
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
@@ -634,7 +642,7 @@ module PostWriter
     # that already have one import behind them. Only the post's own current
     # address: a former slug redirecting to the page is exactly what
     # former_slugs is for.
-    merged -= ["/#{slug}/"] if post['page']
+    merged -= ["/#{slug}/"] if PostAddress.page?(post)
     merged.empty? ? post.delete('redirect_from') : post['redirect_from'] = merged
     # hero, toc and unlisted need presence rather than truth, and that
     # distinction is the whole point of them: `hero: false` is a post saying
@@ -699,7 +707,7 @@ module PostWriter
     # a re-import about to be refused must refuse with no side effects,
     # and it used to leave one spare version behind on its way out.
     taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug,
-                                  except: existing_path)
+                                  except: existing_path, path: new_path)
     if taken
       raise "cannot write '#{slug}' into #{year}: a different post is already served " \
             "at that address (#{taken}) -- resolve the slug clash by hand"
