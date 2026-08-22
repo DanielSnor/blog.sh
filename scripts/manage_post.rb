@@ -861,8 +861,15 @@ def cmd_add
   # new photo ended up nowhere and the post showed the old one.
   base_slug = slug
   serial = 2
+  # The address as well as the file: a new post is a draft, served under
+  # its token, but the day it publishes it takes /posts/<year>/<slug>/ --
+  # and a post whose FILE sits in another year can already be served
+  # there. Walking on to the next serial is the whole fix; nobody has to
+  # be told, because the name was never promised to anyone yet.
   while File.exist?(File.join(CONTENT_DIR, date.year.to_s, "#{slug}.json")) ||
-        Dir.exist?(File.join(MEDIA_DIR, date.year.to_s, slug))
+        Dir.exist?(File.join(MEDIA_DIR, date.year.to_s, slug)) ||
+        AddressGuard.occupant({ 'slug' => slug, 'date' => date.iso8601 },
+                              content_dir: CONTENT_DIR, slug: slug)
     slug = "#{base_slug}-#{serial}"
     serial += 1
   end
