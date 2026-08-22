@@ -59,6 +59,7 @@ require_relative '../lib/slug'
 # at.
 require_relative '../lib/checker'
 require_relative '../lib/post_address'
+require_relative '../lib/forge_address'
 
 def t(key, **vars)
   I18n.t("style.#{key}", **vars)
@@ -172,7 +173,19 @@ def section_palette
   return unless data
 
   %w[light dark].each do |mode|
-    COLOR_KEYS.each { |key| site.set(['colors', mode, key], data[mode][key]) }
+    # Only the colours the palette actually names. A palette may leave keys
+    # out -- docs/install.md says so in as many words, and the engine falls
+    # back to its own blue for whatever is missing -- but writing them out
+    # as empty values does not leave them out, it sets them to nothing:
+    # `text:` with no value after it, twelve times, and then doctor
+    # refusing the config it was just handed. What is absent has to stay
+    # absent.
+    COLOR_KEYS.each do |key|
+      value = data[mode][key]
+      next if value.to_s.strip.empty?
+
+      site.set(['colors', mode, key], value)
+    end
   end
   # Into the frame (Wizard.say): the preview question follows immediately
   # and repaints the screen, and what it asks about is exactly these rows.
@@ -346,7 +359,13 @@ def section_banner
       # reliably erased.
       Wizard.remember(Tui.paint(t('banner_pending', path: src), :green))
     else
-      Wizard.remember(Tui.paint("⚠️  #{t('banner_not_found', path: path)}", :yellow))
+      # Said, not remembered. `remember` puts a row in the frame, which a
+      # piped run never paints at all and a terminal cuts at its width --
+      # so the one sentence that answers "why did nothing happen?" was
+      # invisible in a script and half-visible on screen, with a green
+      # "✅ Measured: 1880x600" (the OLD banner, still installed) directly
+      # underneath it, reading like success.
+      Wizard.say(Tui.paint("⚠️  #{t('banner_not_found', path: path)}", :yellow))
     end
   end
 
@@ -878,7 +897,11 @@ end
 WIDGETS = {
   'toots' => %w[account_id limit],
   'pixelfed' => %w[feed_url limit],
-  'commits' => %w[username limit],
+  # `instance` is what 1.4 added: the same card reads Gitea and Forgejo,
+  # and without a question here the only way to set it was editing
+  # site.yml by hand -- while the wizard went on asking for a "GitHub
+  # username" on a site pointed at Codeberg.
+  'commits' => %w[username instance limit],
   'bluesky' => %w[limit],
   'rss' => %w[feed_url limit]
 }.freeze
@@ -913,9 +936,26 @@ def configure_widget(name)
         t('e_account_id') unless AccountId.plausible?(answer)
       elsif key == 'feed_url'
         t('e_feed_url') unless answer.to_s.match?(%r{\Ahttps?://})
+      elsif key == 'instance'
+        # Empty means GitHub, which is the answer most people want and the
+        # behaviour without the key. Anything else is checked the way
+        # doctor checks it, so a typo is caught here rather than becoming
+        # an empty card nobody can tell from "has not pushed lately".
+        next if answer.to_s.strip.empty?
+
+        if ForgeAddress.base(answer).nil?
+          t('e_widget_instance')
+        elsif ForgeAddress.path_under_host?(answer)
+          t('e_widget_instance_repo')
+        end
       end
     end
     next unless value
+
+    # An empty instance is not a value, it is the default: writing
+    # `instance: ""` would leave doctor complaining about a key the person
+    # deliberately left blank.
+    next if key == 'instance' && value.to_s.strip.empty?
 
     site.set(['widgets', name, key], key == 'limit' ? value.to_i : value)
   end

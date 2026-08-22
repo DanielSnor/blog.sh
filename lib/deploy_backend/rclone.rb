@@ -44,13 +44,37 @@ module DeployBackend
       '.rclone'
     end
 
+    # Named deletions rather than a mirror: `rclone delete --files-from`
+    # removes these paths and looks at nothing else on the target.
+    def prune_orphans(orphans, logger)
+      names = Array(orphans)
+      return true if names.empty?
+
+      Tempfile.create('blog-sh-rclone-prune') do |f|
+        f.puts(names)
+        f.flush
+        full = ['rclone', 'delete', target, '--files-from', f.path]
+        full += Shellwords.split(ENV['RCLONE_ARGS'].to_s) unless ENV['RCLONE_ARGS'].to_s.empty?
+        logger&.call("  #{full.join(' ')} (#{names.size} orphan(s))")
+        system(*full)
+      end
+    end
+
     # only:  restricts the transfer to the listed files (--files-from).
-    # prune: switches copy -> sync; never combined with only:, matching
-    #        deploy_web.rb, which skips orphans under --only.
+    # prune: deletes exactly the orphans deploy_web.rb named; never
+    #        combined with only:, matching deploy_web.rb, which skips
+    #        orphans under --only.
     # force: retransfers regardless of size/modtime (--ignore-times).
-    # files:/orphans: unused -- rclone delta-diffs against the target itself.
+    # files: unused -- rclone delta-diffs against the target itself.
+    #
+    # `sync` used to do the pruning, and `sync` does not prune, it MIRRORS:
+    # anything on the far end this build did not produce is deleted, the
+    # engine's or not. On a real bucket that is somebody else's prefix, a
+    # hand-written robots.txt, a certificate challenge -- gone, while the
+    # run reports the two deletions the manifest knew about. The engine is
+    # a guest on that target, not its owner.
     def sync(public_dir:, files: nil, orphans: nil, only: nil, prune: false, force: false, logger: nil)
-      args = ['rclone', prune && !only ? 'sync' : 'copy', "#{public_dir}/", target]
+      args = ['rclone', 'copy', "#{public_dir}/", target]
       args << '--ignore-times' if force
       args += Shellwords.split(ENV['RCLONE_ARGS'].to_s) unless ENV['RCLONE_ARGS'].to_s.empty?
 
@@ -69,6 +93,7 @@ module DeployBackend
            else
              run.call([])
            end
+      ok = prune_orphans(orphans, logger) if ok && prune && !only
       logger&.call(ok ? '  ✅ rclone finished' : '  ❌ rclone failed')
       !!ok
     end

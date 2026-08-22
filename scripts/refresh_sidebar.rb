@@ -96,6 +96,21 @@ previous_stats = previous_json(STATS_PATH)
 previous_comments = previous_json(COMMENTS_PATH)
 fetched = PostStats.fetch_all(recent_only: !full_refresh)
 
+# Both files are served from the public site, and merging alone never
+# forgets: a post taken back down -- or deleted outright -- kept its whole
+# approved discussion readable at a public URL for as long as the file
+# lived, which is exactly what taking a post down is meant to prevent.
+#
+# Narrowed against ALL entries, not against what this run fetched: a run
+# without --full only refetches the last ninety days, and intersecting
+# with that would delete every older post's thread on every tick.
+# PostStats.entries already leaves out drafts, and a withdrawn post is a
+# draft again -- so "still published" and "still exists" are one question
+# with one answer here.
+live = PostStats.entries.map { |entry| entry[:key] }
+previous_stats = previous_stats.slice(*live)
+previous_comments = previous_comments.slice(*live)
+
 stats = previous_stats.merge(fetched.transform_values { |result| result['stats'] })
 File.write(STATS_PATH, stats.to_json)
 File.write(FULL_REFRESH_PATH, Time.now.to_f.to_s) if full_refresh

@@ -563,9 +563,25 @@ module ConfigWriter
       line_no = range.find do |i|
         ConfigWriter.comment?(@lines[i]) && ConfigWriter.declares?(@lines[i], key, indent)
       end
-      raise MissingKey, "#{key_path.join('.')} is not in #{@path}, active or commented" unless line_no
+      if line_no
+        @lines[line_no] = ConfigWriter.uncomment(@lines[line_no])
+        return
+      end
 
-      @lines[line_no] = ConfigWriter.uncomment(@lines[line_no])
+      # A key the template deliberately keeps switched OFF -- written with
+      # two '#' so that uncommenting its section wholesale leaves it alone
+      # -- is still a key somebody can ask for by name. widgets.commits.
+      # instance is the case that found this: the wizard asked the question,
+      # the person answered it, and the write died on a key the template
+      # was hiding on their behalf. Asking for it by name IS the switch.
+      double = range.find do |i|
+        ConfigWriter.comment?(@lines[i]) &&
+          ConfigWriter.comment?(ConfigWriter.uncomment(@lines[i])) &&
+          ConfigWriter.declares?(ConfigWriter.uncomment(@lines[i]), key, indent)
+      end
+      raise MissingKey, "#{key_path.join('.')} is not in #{@path}, active or commented" unless double
+
+      @lines[double] = ConfigWriter.uncomment(ConfigWriter.uncomment(@lines[double]))
     end
 
     # Where a key may legitimately be found: inside its parent's body, or

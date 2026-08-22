@@ -2,6 +2,7 @@
 
 require_relative 'run'
 require_relative '../i18n'
+require_relative 'pages_note'
 
 # Operator tools speak English on purpose: a migrate script is reached by
 # typing a path, not the authoring UI, and its output lands in cron logs.
@@ -21,6 +22,11 @@ module Import
   # and summary formatting. The wizard (scripts/import.rb) does its own
   # thing, since it also has a preview pass and prompts to run.
   module Cli
+    # How many failed items the summary names before it stops. Enough to
+    # see a pattern, few enough that a broken export does not bury the
+    # counts above them.
+    SHOWN_ERRORS = 5
+
     module_function
 
     # Reads LIMIT from the environment. Validated rather than .to_i'd,
@@ -74,7 +80,10 @@ module Import
       # A cron or a script must see a partial run as a failure, or nobody
       # ever finds out the source died -- the summary above already said
       # everything a human needs.
-      exit 1 if result.interrupted
+      # An item that failed is a loss the exit code has to carry: a cron
+      # or a CI step that only looks at the status saw a clean 0 while a
+      # page was quietly missing from the archive.
+      exit 1 if result.interrupted || Array(result.respond_to?(:errors) ? result.errors : nil).any?
       result
     end
 
@@ -117,6 +126,16 @@ module Import
       result.skipped.sort_by { |reason, _| reason.to_s }.each do |reason, count|
         puts "  #{count} skipped (#{reason})"
       end
+      # An error is not a category of skip like "reply" or "boost": those
+      # are decisions, this is something that went wrong, and the count
+      # alone leaves the reader to guess which of five thousand items it
+      # was. Named here, with the reason, the way media failures are.
+      errors = result.respond_to?(:errors) ? Array(result.errors) : []
+      errors.first(SHOWN_ERRORS).each { |line| puts "    #{line}" }
+      puts "    ... #{errors.size - SHOWN_ERRORS} more" if errors.size > SHOWN_ERRORS
+      # Built from what the run WROTE, not from what the source contained.
+      pages_note = Import.pages_note(Array(result.respond_to?(:pages) ? result.pages : nil))
+      puts "  #{pages_note}" if pages_note
       # One line for all eleven adapters that parse HTML bodies: what the
       # block schema could not hold. It used to be counted by exactly one
       # of them (feed.rb) and thrown away by the rest, while the header of

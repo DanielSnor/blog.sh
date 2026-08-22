@@ -87,9 +87,24 @@ due.sort_by! { |_path, _post, date| date }
 Publishing.mark_scheduler_alive
 
 if due.empty? && !File.exist?(DEPLOY_PENDING)
-  puts I18n.t('cron.no_scheduled_due')
+  # To stderr, not stdout. The documented crontab runs this every fifteen
+  # minutes and the overwhelming majority of those ticks have nothing to
+  # do; cron mails whatever reaches stdout, so this one sentence became
+  # ninety-six mails a day and buried the ones that matter. It is still
+  # said, because a hand-run tick has to answer "did it look?" -- stderr
+  # is where cron's own 2>&1 redirection puts it when somebody asks.
+  warn I18n.t('cron.no_scheduled_due')
   exit 0
 end
+
+# Written BEFORE anything is published, not after the deploy fails. A run
+# killed between publishing and deploying -- docker stop, a Cloudron
+# restart, systemctl -- left the post published and announced, the site
+# not rebuilt, and nothing anywhere saying a deploy was owed: the next
+# tick found nothing due and went back to sleep, and the page never
+# appeared. The marker means "this run owes the site a deploy", which is
+# true from the moment there is something to publish.
+Publishing.mark_deploy_pending unless due.empty?
 
 failures = 0
 due.each do |path, post, date|

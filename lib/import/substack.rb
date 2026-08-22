@@ -142,7 +142,7 @@ module Import
     end
 
     def postscript
-      notes = [Import.pages_note(@page_paths)]
+      notes = []
       return notes.compact.first if @paid.zero?
 
       # lookup rather than t: a missing key aborts, and no summary line is

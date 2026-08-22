@@ -76,7 +76,6 @@ module Import
       collisions = @slugs.count { |_, paths| paths.length > 1 }
       notes << I18n.t('import.note.ssg_slug_collisions', count: collisions) if collisions.positive?
       notes << I18n.t('import.note.ssg_author_dropped', count: @authored.length) unless @authored.empty?
-      notes << Import.pages_note(page_paths)
       notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
     end

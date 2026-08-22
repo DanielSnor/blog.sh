@@ -50,7 +50,14 @@ module Publishing
     (ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')).to_s.chomp('/')
   end
 
-  def post_url(slug, year)
+  # `page:` because a page is served at the root: the announcement for one
+  # carried /posts/<year>/<slug>/, an address the site never answers at, so
+  # the toot that told the world about a new page linked to a 404 -- and
+  # the URL is also what finds the announcement again later, to update or
+  # withdraw it.
+  def post_url(slug, year, page: false)
+    return "#{base_url}/#{slug}/" if page
+
     "#{base_url}/posts/#{year}/#{slug}/"
   end
 
@@ -153,8 +160,8 @@ module Publishing
   # title/url/hashtags must never be truncated (a cut-off URL is a dead
   # link, a cut-off hashtag is a broken one) -- only the perex shrinks to
   # make the whole toot fit under Mastodon's TOOT_LENGTH limit.
-  def compose_toot(title:, slug:, year:, blocks:, tags:)
-    url = post_url(slug, year)
+  def compose_toot(title:, slug:, year:, blocks:, tags:, page: false)
+    url = post_url(slug, year, page: page)
     hashtags = hashtags_for(tags)
     fixed_length = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length
     budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
@@ -201,8 +208,8 @@ module Publishing
   # The Bluesky counterpart of compose_toot: same never-truncate rule for
   # title/url/hashtags, 300-grapheme budget. Links and hashtags become
   # clickable via facets, which BlueskyPoster builds from this text.
-  def compose_bluesky_post(title:, slug:, year:, blocks:, tags:)
-    url = post_url(slug, year)
+  def compose_bluesky_post(title:, slug:, year:, blocks:, tags:, page: false)
+    url = post_url(slug, year, page: page)
     hashtags = hashtags_for(tags)
     fixed = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
     budget = BLUESKY_LENGTH - grapheme_length(fixed) - 2
@@ -312,12 +319,14 @@ module Publishing
     case SiteConfig.comment_network
     when :mastodon
       url = MastodonPoster.publish(compose_toot(title: title, slug: slug, year: year,
-                                                blocks: blocks, tags: tags),
+                                                blocks: blocks, tags: tags,
+                                                page: PostAddress.page?(post)),
                                    idempotency_key: "#{year}/#{slug}")
       url ? { 'mastodon_url' => url } : false
     when :bluesky
       result = BlueskyPoster.publish(compose_bluesky_post(title: title, slug: slug, year: year,
-                                                          blocks: blocks, tags: tags))
+                                                          blocks: blocks, tags: tags,
+                                                          page: PostAddress.page?(post)))
       result ? { 'bluesky_url' => result[:url], 'bluesky_uri' => result[:uri] } : false
     end
   end

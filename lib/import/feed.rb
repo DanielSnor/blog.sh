@@ -59,8 +59,7 @@ module Import
     # `nav:` has earned a menu of 404s. A name added there and forgotten
     # here only makes this note optimistic; the build still refuses and
     # still says so.
-    RESERVED_PAGE_SLUGS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
-                             robots.txt 404 favicon.ico].freeze
+    RESERVED_PAGE_SLUGS = Import::RESERVED_PAGE_SLUGS
 
     # keep_permalinks is a writer, not just an option, because the wizard
     # only learns the answer after the adapter exists: the question is
@@ -233,7 +232,6 @@ module Import
       home = live.count { |page| page[:already_home] }
       notes << I18n.t('import.note.feed_pages_home', count: home) if home.positive?
       notes << I18n.t('import.note.feed_linked_images', count: @linked_images) if @linked_images.positive?
-      notes << Import.pages_note(live.map { |page| "/#{page[:slug]}/" })
       notes << reserved_pages_note(reserved)
       notes.compact!
       notes.empty? ? nil : notes.join("\n  ")

@@ -221,7 +221,13 @@ module MarkdownParser
 
   # --- block-level regexes -------------------------------------------------
 
-  IMAGE_RE = /\A!\[([^\]]*)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
+  # The alt text is read up to the FIRST "](", not up to the first "]".
+  # Titles carry brackets -- "[es] W-ZERO3" is a real post's picture -- and
+  # a line the parser cannot read comes back as a paragraph of literal
+  # markdown: the image block is gone, its file is pruned as unreferenced
+  # a moment later, and the page then shows the author's absolute disk path
+  # as text. VIDEO_RE has always been written this way; this one was not.
+  IMAGE_RE = /\A!\[(.*?)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
   # Two exclamation marks = video, whether a local file or YouTube.
   # Deliberately explicit: a bare address on its own line stays a plain
   # paragraph, so a video can also just be linked to instead of every link

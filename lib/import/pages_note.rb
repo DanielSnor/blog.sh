@@ -22,6 +22,14 @@ module Import
   # be able to say one sentence.
   PAGE_NOTE_SAMPLE = 5
 
+  # Addresses the engine answers at itself. A page that lands on one of
+  # them is not announced as "came across and is at /tag/" -- it is not
+  # there, the site's own listing is -- and feed.rb names such pages
+  # separately, as needing a rename. Kept here rather than inside one
+  # adapter because the run now writes that sentence for all of them.
+  RESERVED_PAGE_SLUGS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
+                           robots.txt 404 favicon.ico].freeze
+
   def self.pages_note(paths)
     return nil if paths.nil? || paths.empty?
 

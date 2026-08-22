@@ -1450,7 +1450,11 @@ def cmd_bluesky(slug)
   # when the post carries no announcement address -- which means either
   # none was ever sent, or one was sent and the reply never came back. The
   # second case used to end with two announcements of the same post.
-  if (found = BlueskyPoster.find_announcement(Publishing.post_url(post['slug'], year)))
+  # The address the announcement carries is the one it is found by later,
+  # so this has to ask the same question the announcement asked.
+  if (found = BlueskyPoster.find_announcement(
+    Publishing.post_url(post['slug'], year, page: PostAddress.page?(post))
+  ))
     updated = post.merge('bluesky_url' => found[:url], 'bluesky_uri' => found[:uri])
     AtomicWrite.write_json(path, updated)
     puts t('cli.bluesky_recovered', url: found[:url])

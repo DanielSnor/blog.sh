@@ -217,6 +217,15 @@ end
 # be indistinguishable from a deliberate one, and the guards would trust it.
 def save_state(state)
   AtomicWrite.write_json(BASELINE_PATH, state)
+rescue SystemCallError => e
+  # A full disk is the ordinary way this fails, and it used to end the run
+  # in a raw backtrace out of File#initialize -- no sentence, nothing said
+  # about what had or had not been uploaded. The state file is bookkeeping:
+  # losing it costs one full re-upload next time, which is worth saying and
+  # not worth dying over.
+  warn "⚠️  #{BASELINE_PATH}: #{e.message.lines.first.to_s.strip}"
+  warn "   #{I18n.t('cli.deploy_state_unwritable')}"
+  false
 end
 
 # Older manifests (before this extension) have a bare hash string as the
@@ -692,6 +701,20 @@ begin
       end
     else
       failed = 1
+      # A batch backend that can say WHICH files landed before it stopped
+      # (sftp) has them written down, exactly as failed_orphans are: an
+      # upload interrupted at file 48 of 159 used to record nothing, so the
+      # next run began again from the first one -- and on a slow line a
+      # deploy that always restarts is a deploy that never finishes.
+      landed = BACKEND.respond_to?(:uploaded) ? BACKEND.uploaded : []
+      landed.each do |name|
+        next unless hashes[name]
+
+        manifest[name] = { 'hash' => hashes[name], 'size' => stats[name]['size'],
+                           'mtime' => stats[name]['mtime'] }
+      end
+      ok = landed.size
+      log("  #{landed.size} file(s) did land and are written down; the next run resumes from there") if landed.any?
     end
   else
     BACKEND.session do |session|

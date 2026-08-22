@@ -109,7 +109,6 @@ module Import
     def postscript
       notes = []
       notes << I18n.t('import.note.ghost_scheduled', count: @scheduled) if @scheduled.positive?
-      notes << Import.pages_note(@page_paths)
       notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
     end

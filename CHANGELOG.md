@@ -146,6 +146,71 @@ prints what an installation is running.
 
 ### Fixed
 
+- **A bracket in an alt text no longer destroys the picture.** `![[es]
+  W-ZERO3](...)` -- a real caption on a real photograph -- was a line the
+  markdown reader could not parse, so the next `edit` turned the image
+  block into a paragraph of literal markdown, the file was pruned as
+  unreferenced a moment later, and the page then printed the author's
+  absolute disk path as text. `check` said nothing about any of it, and the
+  post could not be edited back into shape either.
+- **`--prune` deletes what the deploy named, and nothing else.** On the
+  `rsync` and `rclone` backends it did not prune, it MIRRORED: everything
+  on the far end this build had not produced went with it -- the ACME
+  challenge a certificate renewal was standing in, an old blog kept in a
+  subdirectory, a hand-written robots.txt -- while the run reported
+  "deleted 2", because two is what the manifest knew about. A static site
+  generator is a guest on that directory, not its owner.
+- **An interrupted sftp transfer resumes.** A run killed at file 48 of 159
+  recorded nothing, so the next one started again from the first -- and on
+  a slow line a deploy that always restarts is a deploy that never
+  finishes. What landed is written down now, whether or not the run
+  finished, and the summary says so.
+- **A full disk ends a deploy with a sentence.** It used to be a raw
+  traceback out of the state file's write, with nothing said about what had
+  or had not been uploaded.
+- **Announcing a page linked to an address the site does not answer at.**
+  The toot (or Bluesky post) for a new page carried `/posts/<year>/<slug>/`
+  -- and that same URL is what finds the announcement again later, to
+  update or withdraw it.
+- **A post taken back down keeps its discussion off the site.** `comments.json`
+  and `stats.json` were merged and never narrowed, so a withdrawn -- or
+  deleted -- post kept its whole approved discussion readable at a public
+  URL, which is exactly what taking a post down is meant to prevent.
+- **An import that loses an item says which one, and exits 1.** "1 skipped
+  (error)" in a run that scrolled past a hundred lines of progress named
+  neither the item nor the reason, and the exit code was 0, so a cron or a
+  CI step saw a clean run. The sentence about pages that came across is
+  also built from what was WRITTEN now: it used to announce a page the
+  write had refused, and point the reader at somebody else's.
+- **The Twitter import stopped leaving `&lt;` and `&amp;` in the text** --
+  and, worse, in twelve permanent addresses, as `-gt-` and `-amp-`. The
+  entities are decoded after the offsets that need them, so every link
+  still lands on its own words.
+- **The Facebook import says what it does not take.** Albums, uncategorised
+  photos and videos sit beside the timeline in the export and this adapter
+  reads none of them -- which is a decision, not an oversight, and one the
+  summary now states instead of leaving somebody to discover it months
+  later by missing a picture.
+- **`doctor` stopped ticking three things that were not fine**: a queue
+  whose posts are days past their date while the runner is alive and
+  failing on every tick, a site that owes a deploy nothing else was
+  reading, and a menu whose items lead to tag pages the build does not
+  make. `check` no longer counts a tag page into existence from a draft.
+- **The scheduler's quiet tick is quiet.** The documented crontab runs it
+  every fifteen minutes and almost every one of those has nothing to do;
+  saying so on stdout is ninety-six mails a day, which is how the ticks
+  that matter get ignored. It also writes down that a deploy is owed
+  BEFORE it publishes, so a run killed between the two -- a restart, a
+  `docker stop` -- no longer leaves a post published, announced and never
+  uploaded, with nothing anywhere saying so.
+- **`./style.sh` can point the commits widget at a forge.** The card reads
+  Gitea and Forgejo since this release, and the wizard went on asking for a
+  "GitHub username" with no way to say anything else. A palette that leaves
+  colours out no longer writes them as empty values (which took `doctor`
+  down with twelve complaints); and a banner file that is not there says so
+  out loud, instead of into a frame a piped run never paints and a terminal
+  cuts in half -- with a green "Measured: 1880x600", the OLD banner, right
+  underneath.
 - **Turning a post into a page (or back) no longer loses its address.**
   `type: page` typed into the frontmatter -- or deleted from it -- moves a
   post between `/posts/2026/slug/` and `/slug/` without touching the date,

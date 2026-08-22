@@ -133,9 +133,46 @@ module Import
     end
 
     def postscript
-      return nil if @crossposts.zero?
+      notes = []
+      notes << I18n.t('import.note.facebook_crossposts', count: @crossposts) if @crossposts.positive?
+      notes << untouched_note
+      notes.compact!
+      notes.empty? ? nil : notes.join("\n  ")
+    end
 
-      I18n.t('import.note.facebook_crossposts', count: @crossposts)
+    # An export carries more than the timeline: albums, the photos that
+    # never made it into one, and videos. This adapter reads your_posts*
+    # and nothing else -- which is a decision, not an oversight (an album
+    # is not a post, and inventing one per photo would bury a timeline).
+    # Saying so is not optional though: the export lists these files at the
+    # top level, the archive plainly does not contain them afterwards, and
+    # a summary that never mentions them leaves the person to discover the
+    # gap themselves, months later, by missing a picture.
+    def untouched_note
+      photos = countable(File.join(@posts_dir, 'your_uncategorized_photos.*'))
+      albums = Dir.glob(File.join(@posts_dir, 'album', '*.json')).size
+      videos = countable(File.join(@posts_dir, 'your_videos.*'))
+      return nil if photos.zero? && albums.zero? && videos.zero?
+
+      I18n.t('import.note.facebook_untouched', photos: photos, albums: albums, videos: videos)
+    end
+
+    # How many entries a side file holds, without pretending to parse the
+    # HTML variant: there the count is the number of media entries, and one
+    # unreadable file must not take the sentence down with it.
+    def countable(pattern)
+      Dir.glob(pattern).sum do |path|
+        body = File.read(path, encoding: 'utf-8')
+        if path.end_with?('.json')
+          data = JSON.parse(body)
+          list = data.is_a?(Hash) ? (data['photos'] || data['videos_v2'] || data.values.find { |v| v.is_a?(Array) }) : data
+          Array(list).size
+        else
+          body.scan(/<img|<video/i).size
+        end
+      rescue StandardError
+        0
+      end
     end
 
     private

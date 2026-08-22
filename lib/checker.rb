@@ -162,6 +162,17 @@ module Checker
   # -- a checker that reports links as dead because it disagrees with the
   # build is worse than one that says nothing about them. /type/ links are
   # therefore accepted without inspection.
+  # The tags that will actually have a page: carried by a post in the
+  # stream. A tag only a draft, a page or an unlisted post wears never gets
+  # one, so a menu item pointing at it is dead on every page of the site.
+  # Shared with doctor rather than worked out twice -- this is exactly the
+  # kind of list that drifts.
+  def stream_tags(posts)
+    posts.reject { |post| draft?(post) || PostAddress.page?(post) || post['unlisted'] }
+         .flat_map { |post| Array(post['tags']).map { |tag| Slug.slugify(tag.to_s) } }
+         .reject(&:empty?).to_set
+  end
+
   def known_paths(posts)
     paths = Set.new(FIXED_PATHS)
     # How many posts in the STREAM carry each series -- the same set the
@@ -176,7 +187,13 @@ module Checker
     end
     posts.each do |post|
       paths << post_path(post)
-      (post['tags'] || []).each do |tag|
+      # A tag page is built from the STREAM, exactly like a series page:
+      # a tag carried only by a draft, a page or an unlisted post never
+      # gets one. Counting those tags as known made every link to such a
+      # tag look sound -- including the ones the site puts in its own menu,
+      # on every page, where doctor then called the menu fine.
+      in_stream = !(draft?(post) || PostAddress.page?(post) || post['unlisted'])
+      (in_stream ? Array(post['tags']) : []).each do |tag|
         slug = Slug.slugify(tag.to_s)
         next if slug.empty?
 

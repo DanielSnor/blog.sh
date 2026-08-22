@@ -164,11 +164,19 @@ module DeployBackend
       '.sftp'
     end
 
+    # What the last sync got onto the target, whether or not the whole run
+    # succeeded. deploy_web.rb records these even after a failure, so an
+    # interrupted transfer resumes instead of starting over.
+    def uploaded
+      @uploaded ||= []
+    end
+
     # only: and force: are unused on purpose -- files: already reflects
     # them (deploy_web.rb narrows to --only and a --force run arrives
     # with every file listed), so the batch just executes the list.
     def sync(public_dir:, files:, orphans:, only: nil, prune: false, force: false, logger: nil)
       @failed_orphans = []
+      @uploaded = []
       return true if files.empty? && !(prune && orphans.any?)
 
       Tempfile.create('blog-sh-sftp') do |f|
@@ -179,6 +187,7 @@ module DeployBackend
         output, status = Open3.capture2e(*full)
         print output
         ok = status.success?
+        @uploaded = landed(output, files, ok)
         @failed_orphans = failed_deletes(output, orphans) if prune
         logger&.call(ok ? '  ✅ sftp finished' : '  ❌ sftp failed')
         ok
@@ -209,6 +218,29 @@ module DeployBackend
 
     def failed_orphans
       Array(@failed_orphans)
+    end
+
+    # Which files actually landed. `sftp -b` echoes every command it runs
+    # and stops at the first one that fails, so the puts it echoed are the
+    # puts it did -- minus the last one when the run ended badly, which is
+    # the one that broke.
+    #
+    # Without this a transfer interrupted at file 48 of 159 recorded
+    # nothing at all: the next run uploaded all 159 again, and on a slow
+    # line that is the difference between a deploy that finishes and one
+    # that never does. The list is used the way failed_orphans already is
+    # -- deploy_web.rb writes down what is genuinely on the far end.
+    def landed(output, files, ok)
+      wanted = Array(files)
+      remote = wanted.to_h { |name| [name, true] }
+      done = output.lines.filter_map do |line|
+        next unless line =~ /(?:^|sftp> )put\s+(?:"[^"]*"|\S+)\s+(?:"([^"]*)"|(\S+))/
+
+        name = Regexp.last_match(1) || Regexp.last_match(2)
+        name if remote[name]
+      end
+      done.pop unless ok || done.empty?
+      done
     end
 
     def batch_commands(public_dir, files, orphans, prune)

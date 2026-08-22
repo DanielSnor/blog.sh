@@ -78,7 +78,8 @@ module PostWriter
                                   except: path, path: path)
     if taken
       raise "cannot write '#{slug}': a different post is already served at that address " \
-            "(#{taken}) -- resolve the slug clash by hand"
+            "(#{File.join(File.basename(File.dirname(taken)), File.basename(taken))}) -- " \
+            'resolve the slug clash by hand'
     end
 
     media_files = reconcile_media_names(post, previous, year, slug, media_files)

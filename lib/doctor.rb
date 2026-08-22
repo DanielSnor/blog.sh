@@ -156,6 +156,7 @@ module Doctor
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
+    findings.concat(check_deploy_pending)
     findings.concat(check_media_location(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
@@ -611,7 +612,10 @@ module Doctor
 
     posts = Checker.load_posts(root)
     known = Checker.known_paths(posts)
-    tags = posts.flat_map { |p| Array(p['tags']).map { |t| Slug.slugify(t.to_s) } }.to_set
+    # Asked of Checker, because the build only writes a tag page for a tag
+    # some post in the STREAM carries: counting a draft's tag as known let
+    # doctor tick a menu whose items 404 on every page of the site.
+    tags = Checker.stream_tags(posts)
 
     findings = []
     entries.each do |entry|
@@ -782,6 +786,25 @@ module Doctor
   # single run.
   SCHEDULER_STALE_AFTER = 2 * 3600
 
+  # The site owes a deploy: something published and the upload that should
+  # have followed did not happen. The marker is written by every path that
+  # can leave that debt -- the manual publish and the cron alike -- but the
+  # only thing that ever READ it was the scheduled run, which is optional.
+  # On an install without that cron the message said "the next scheduled
+  # run will retry it" about a run that does not exist, and nothing else
+  # mentioned the debt again.
+  def check_deploy_pending
+    marker = File.join(ROOT, '.deploy-pending')
+    return [] unless File.exist?(marker)
+
+    since = begin
+      Time.parse(File.read(marker).strip)
+    rescue StandardError
+      File.mtime(marker)
+    end
+    [error(t('deploy_pending', ago: humanize_age(Time.now - since)), t('deploy_pending_fix'))]
+  end
+
   def check_scheduler
     queue = scheduled_posts
     return [] if queue.empty?
@@ -798,7 +821,18 @@ module Doctor
     end
 
     age = Time.now - last
-    return [ok(t('scheduler_ok', count: queue.size, ago: humanize_age(age)))] if age <= SCHEDULER_STALE_AFTER
+    if age <= SCHEDULER_STALE_AFTER
+      # A live runner and a post still sitting past its date is the worst
+      # of the three states, and it used to be the only one that read as
+      # ✅: something IS running the queue, so the heartbeat is fresh --
+      # and the post is not going out, tick after tick, because every
+      # attempt fails. "The queue has 1 post waiting and something ran it
+      # 0 minutes ago" was true and told nobody anything.
+      return [error(t('scheduler_overdue', count: overdue, ago: humanize_age(age)),
+                    t('scheduler_overdue_fix'))] if overdue.positive?
+
+      return [ok(t('scheduler_ok', count: queue.size, ago: humanize_age(age)))]
+    end
 
     stale = t('scheduler_stale', ago: humanize_age(age), count: queue.size)
     [overdue.positive? ? error(stale, t('scheduler_fix')) : warn(stale, t('scheduler_fix'))]

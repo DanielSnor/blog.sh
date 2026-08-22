@@ -5,6 +5,8 @@ require_relative '../post_writer'
 require_relative 'media'
 require_relative 'media_index'
 require_relative 'html_blocks'
+require_relative '../post_address'
+require_relative 'pages_note'
 
 module Import
   # The half of an import that has nothing to do with the platform: walk
@@ -50,7 +52,7 @@ module Import
     # say the source has drifted, which is the operator's only signal.
     Result = Struct.new(:written, :scanned, :skipped, :media, :media_reused,
                         :media_failures, :skipped_media_failures, :samples, :interrupted,
-                        :dropped_elements, :media_superseded,
+                        :dropped_elements, :media_superseded, :pages, :errors,
                         keyword_init: true)
 
     # `media_index` is what lets a re-import skip what it already has (see
@@ -96,6 +98,8 @@ module Import
       media_failures = []
       skipped_media_failures = []
       samples = []
+      pages = []
+      errors = []
 
       interrupted = nil
 
@@ -120,10 +124,12 @@ module Import
           # 2000 of 6000 leaves a third of an archive imported and no report
           # of what happened. Counted under :error and named on stderr, so
           # the summary shows the loss instead of pretending completeness.
+          failed_slug = nil
           begin
             Dir.mktmpdir do |tmpdir|
               media = Media.new(tmpdir, dry_run: @dry_run, index: @media_index, refetch: @refetch)
               post = @adapter.map(item, media)
+              failed_slug = post['slug'] if post.is_a?(Hash)
 
               if post.is_a?(Symbol)
                 skipped[post] += 1
@@ -146,16 +152,40 @@ module Import
               media_reused += media.reused
               media_failures.concat(media.failures)
 
+              written_slug = post['slug']
               unless @dry_run
                 path = PostWriter.write(post, media_files: media.files)
                 remember_media(post, path)
+                # unique_slug may have handed the post another name on the
+                # way in, and the sentence about pages has to say the
+                # address the reader will actually find -- not the one the
+                # source asked for.
+                written_slug = File.basename(path, '.json')
               end
               written += 1
+              # The addresses of pages that actually landed. The sentence
+              # about them used to be built where the source was PARSED, so
+              # a page the write refused was still announced as "came across
+              # and is at /about/" -- pointing at somebody else's page.
+              # A page whose slug is one the engine owns (/tag/, /search/,
+              # /posts/) is NOT announced as "came across and is at" -- the
+              # site answers that address itself, and feed.rb names such
+              # pages separately as needing a rename. Saying both would be
+              # sending the reader somewhere the page is not.
+              if PostAddress.page?(post) && post['state'] != 'draft' &&
+                 !Import::RESERVED_PAGE_SLUGS.include?(written_slug.to_s.downcase)
+                pages << PostAddress.path(post.merge('slug' => written_slug))
+              end
               samples << post['slug'] if samples.size < 5
               @on_post&.call(written, post, scanned)
             end
           rescue StandardError => e
             skipped[:error] += 1
+            # Kept, not just counted. "1 skipped (error)" in a run that
+            # scrolled past a hundred lines of progress tells nobody which
+            # item was lost or why, and the reason is usually the one thing
+            # that can be acted on.
+            errors << "#{failed_slug || "item #{scanned}"}: #{e.message.lines.first.to_s.strip[0, 160]}"
             warn "  item #{scanned} failed: #{e.class}: #{e.message}"
           end
         end
@@ -164,6 +194,7 @@ module Import
       end
 
       Result.new(written: written, scanned: scanned, skipped: skipped, media: media_count,
+                 pages: pages, errors: errors,
                  media_reused: media_reused, media_failures: media_failures,
                  skipped_media_failures: skipped_media_failures,
                  samples: samples, interrupted: interrupted,
