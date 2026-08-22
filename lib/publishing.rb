@@ -99,7 +99,7 @@ module Publishing
     # a post's is "<year>/<slug>" and belongs in former_slugs. One function
     # knows which (lib/post_address.rb), because this was decided in five
     # places and each got it wrong at a different time.
-    PostAddress.spend_vacated(updated, updated.delete('unpublished_from'), slug: slug, year: new_year)
+    PostAddress.spend_vacated(updated, updated.delete('unpublished_from'), slug: slug)
 
     new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
     if new_year != old_year

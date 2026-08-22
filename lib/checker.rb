@@ -456,33 +456,51 @@ module Checker
   # media), so a check that calls the archive sound is telling the author
   # the opposite of what they are about to find out.
   def check_duplicate_addresses(posts, cap = CAP)
-    # Grouped by the ADDRESS, and drafts included -- both of them mirroring
-    # what the build actually refuses to run on. Grouping by year and slug
-    # missed pages, which are served at the root and so collide across
-    # years; excluding drafts made check call an archive sound that the
-    # build would then decline to build at all.
-    groups = posts.group_by { |post| duplicate_key(post) }
-                  .select { |_, group| group.size > 1 }
-    return [] if groups.empty?
+    # Grouped by EVERY key a post can collide on, and drafts included --
+    # both of them mirroring what the build actually refuses to run on.
+    # One key per post was the hole: a page went into the page group and
+    # out of the year group, so a page and a post sharing a slug in one
+    # year never met here -- while the build, which keys both of them by
+    # year and slug, stopped dead on exactly that pair. check handed out a
+    # clean bill for an archive that could not be built at all.
+    ordered = {}
+    posts.each do |post|
+      PostAddress.collision_keys(post).each { |key| (ordered[key] ||= []) << post }
+    end
+    colliding = ordered.select { |_, group| group.size > 1 }
+    return [] if colliding.empty?
 
-    capped(groups.map do |_, group|
-      first = group.first
-      error(t('address_duplicate', year: PostAddress.date_year(first),
-                                   slug: first['slug'].to_s, count: group.size),
-            t('address_duplicate_fix'),
-            kind: :address_duplicate,
-            data: { 'year' => PostAddress.date_year(first), 'slug' => first['slug'].to_s,
-                    'address' => PostAddress.page?(first) ? "/#{first['slug']}/" : nil,
-                    'files' => group.map { |post| post['__path'].to_s } }.compact)
-    end, cap)
+    # Two pages of one slug dated in one year collide on both of their
+    # keys. Report the pair once, under the key that names the address a
+    # reader would actually type.
+    by_files = {}
+    colliding.each do |key, group|
+      files = group.map { |post| post['__path'].to_s }.sort
+      by_files[files] = [key, group] if by_files[files].nil? || key.first == 'page'
+    end
+
+    capped(by_files.values.map { |key, group| duplicate_finding(key, group) }, cap)
   end
 
-  # A page has no year in its address, so two pages of one slug collide
-  # however far apart their dates are.
-  def duplicate_key(post)
-    return ['page', post['slug'].to_s] if PostAddress.page?(post)
-
-    [PostAddress.date_year(post), post['slug'].to_s]
+  # A page has no year in its address, so a message built from one sends
+  # the reader to a URL the site does not answer at -- and "give it a date
+  # in another year", the advice that ends the other message, changes
+  # nothing at all for two pages.
+  def duplicate_finding(key, group)
+    slug = group.first['slug'].to_s
+    files = group.map { |post| post['__path'].to_s }
+    if key.first == 'page'
+      error(t('address_duplicate_page', slug: slug, count: group.size),
+            t('address_duplicate_page_fix'),
+            kind: :address_duplicate,
+            data: { 'slug' => slug, 'address' => "/#{slug}/", 'files' => files })
+    else
+      error(t('address_duplicate', year: key.first, slug: slug, count: group.size),
+            t('address_duplicate_fix'),
+            kind: :address_duplicate,
+            data: { 'year' => key.first, 'slug' => slug,
+                    'address' => "/posts/#{key.first}/#{slug}/", 'files' => files })
+    end
   end
 
   # Two posts claiming one old address. The build answers with whichever it

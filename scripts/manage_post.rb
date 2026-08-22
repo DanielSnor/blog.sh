@@ -2832,19 +2832,32 @@ def rename_post(path, post, raw: nil)
     return old_slug
   end
 
-  # Same guard as edit and publish, with the two questions kept apart: the
-  # FILE and its media live under the folder's year, while the ADDRESS
-  # follows the date (and a page has no year in it at all). Asking only the
-  # folder let a rename land on an address another post was already being
-  # served at -- and the build refuses to run on two posts at one address,
-  # so the whole site would stop building.
+  # Same guard as edit and publish, and it has to refuse EXACTLY what the
+  # build refuses -- so it asks PostAddress the same question the build
+  # asks, instead of working out its own answer. Comparing served
+  # addresses was its own answer, and it let through both pairs the build
+  # stops on: a draft (served under its token, but its file and media sit
+  # under year/slug like everyone else's) and a page (served at the root,
+  # so its year never seemed to matter). Either one turned a rename into a
+  # site that would not build.
   new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
   new_media_dir = File.join(MEDIA_DIR, year, new_slug)
+  wanted = PostAddress.collision_keys(post, slug: new_slug)
   taken_address = Dir.glob(File.join(CONTENT_DIR, '*', "#{new_slug}.json")).any? do |other|
-    candidate = JSON.parse(File.read(other, encoding: 'utf-8')) rescue nil
-    next false unless candidate.is_a?(Hash) && candidate['state'].to_s != 'draft'
+    # An occupant that will not read or parse still owns the place -- the
+    # same answer address_occupant gives eighty lines above this one. A
+    # file left unreadable by a restore, or evicted by the cloud sync this
+    # working copy lives in, read as "nobody lives here", and the rename
+    # walked straight into it. A false alarm costs one more slug to think
+    # of; a missed collision costs every build from then on.
+    candidate = begin
+      JSON.parse(File.read(other, encoding: 'utf-8'))
+    rescue StandardError
+      next true
+    end
+    next false unless candidate.is_a?(Hash)
 
-    PostAddress.path(candidate) == PostAddress.path(post.merge('slug' => new_slug))
+    (PostAddress.collision_keys(candidate) & wanted).any?
   end
   if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
     # Not the shared post_already_exists text: that one says "continuing
@@ -3096,24 +3109,25 @@ def edit_post(slug, path: nil)
   # rename creates, and the stub mechanism has always been able to pay it;
   # nothing was writing the entry, so the old link just died. A draft
   # vacates nothing, exactly as in rename_post.
-  # The year the post was SERVED under, which is the one in its date -- not
-# the folder it happens to sit in. For a post whose date was corrected
-# across a year boundary the two differ, and recording the folder's year
-# wrote a redirect from an address the site never answered at, which the
-# build then refused with a warning nobody could act on.
-old_address_year = post['date'].to_s[0, 4]
-# A page has no year in its address at all, so moving one between years
-# vacates nothing: recording it wrote a redirect from an address the site
-# never had, which the build then refused with a warning nobody could act on.
-vacated = if draft?(post) || PostAddress.page?(post) || new_year == old_address_year
-            nil
-          else
-            "#{old_address_year}/#{slug}"
-          end
-  former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
-  updated['former_slugs'] = former unless former.empty?
+  # Both lists come across first, because what the save owes is decided
+  # against what the post already carries -- and then the debt is asked of
+  # PostAddress in both directions: the address the post HAD, and the one
+  # the save gives it.
+  #
+  # Asking only about the year was the hole. `type: page` typed into the
+  # frontmatter -- or deleted from it, which the editor shows precisely so
+  # that saving cannot silently un-page a page -- moves a post between
+  # /posts/2026/slug/ and /slug/ without touching the date. Every link to
+  # the address it left then died with no stub behind it, and this is the
+  # one path of the five that was still working it out on its own.
+  carried = Array(post['former_slugs']).map(&:to_s)
+  updated['former_slugs'] = carried unless carried.empty?
+  inherited = Array(post['redirect_from']).map(&:to_s)
+  updated['redirect_from'] = inherited unless inherited.empty?
+  was = draft?(post) ? nil : PostAddress.vacated_marker(post, slug: slug)
+  now = draft?(updated) ? nil : PostAddress.vacated_marker(updated, slug: slug)
+  PostAddress.spend_vacated(updated, was == now ? nil : was, slug: slug)
   updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
-  updated['redirect_from'] = post['redirect_from'] if post['redirect_from']
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
   updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']

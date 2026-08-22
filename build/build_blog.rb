@@ -2228,10 +2228,23 @@ end
 # mixed up. This used to be a silent risk on any conflicting file copy
 # (cloud sync, a manual cp/SFTP on the server) -- better to fail loudly here
 # than publish a broken archive.
-duplicates = posts.group_by { |p| [post_time(p).year, p['slug']] }.select { |_, v| v.size > 1 }
+# Asked of PostAddress, not worked out here, because the checker and the
+# rename guard have to refuse exactly what this refuses -- and when the
+# three of them each had their own version, a rename could hand the archive
+# a state this abort then stopped the whole site on. The second key is new
+# here: two PAGES of one slug are served at one address however far apart
+# their dates are, and this used to build both and keep whichever it wrote
+# last, silently.
+collisions = {}
+posts.each do |p|
+  PostAddress.collision_keys(p, year: post_time(p).year).each { |key| (collisions[key] ||= []) << p }
+end
+duplicates = collisions.select { |_, v| v.size > 1 }
 unless duplicates.empty?
-  list = duplicates.map { |(year, slug), dupes| "  #{year}/#{slug} (#{dupes.size}x)" }.join("\n")
-  abort("❌ Duplicate year/slug in content.nosync/posts/ -- build stopped:\n#{list}")
+  list = duplicates.map do |(year, slug), dupes|
+    "  #{year == 'page' ? "/#{slug}/" : "#{year}/#{slug}"} (#{dupes.size}x)"
+  end.join("\n")
+  abort("❌ Two posts at one address in content.nosync/posts/ -- build stopped:\n#{list}")
 end
 
 # Slug is a tiebreaker, not decoration: sort_by isn't stable, and posts

@@ -657,7 +657,7 @@ module PostWriter
     # the old address 404'd while a marker for it sat in the JSON. Spent
     # here for the same reason and in the same way.
     if post['state'] != 'draft' && post['unpublished_from']
-      PostAddress.spend_vacated(post, post.delete('unpublished_from'), slug: slug, year: year)
+      PostAddress.spend_vacated(post, post.delete('unpublished_from'), slug: slug)
     end
 
     new_dir = File.join(CONTENT_DIR, year)
@@ -687,23 +687,30 @@ module PostWriter
 
     PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
 
+    # A re-import that moves where a post is served vacates the address it
+    # had, and the redirect has to be recorded here exactly as edit_post
+    # records it: a source that starts reporting its dates in another
+    # timezone is enough to move a post across a New Year, and every link
+    # to it died with no stub behind it.
+    #
+    # Asked of PostAddress on both sides, and asked OUTSIDE the "did the
+    # file move" branch, because the file is not what decides this. The old
+    # three lines took the year off the FOLDER -- which parts company with
+    # the address the moment a date is corrected -- and never asked whether
+    # either side was a page, so a source that started marking a post as a
+    # page moved it from /posts/2019/slug/ to /slug/ with the file sitting
+    # exactly where it was, and nothing was recorded at all.
+    #
+    # Read from the OLD file: `post` is what the import built, and the
+    # state that decides whether there is a public address to keep is the
+    # state the post is in now.
+    if old.is_a?(Hash) && old['state'] != 'draft'
+      was = PostAddress.vacated_marker(old, slug: old['slug'] || slug)
+      now = post['state'] == 'draft' ? nil : PostAddress.vacated_marker(post, slug: slug)
+      PostAddress.spend_vacated(post, was == now ? nil : was, slug: slug)
+    end
+
     if File.expand_path(new_path) != File.expand_path(existing_path)
-
-      # A published post that moves years vacates its public address, and
-      # the redirect for it has to be recorded here exactly as edit_post
-      # records it -- a re-import from a source that started reporting its
-      # dates in another timezone is enough to move a post across a New
-      # Year, and every link to it died with no stub behind it.
-      #
-      # Read from the OLD file: `post` is what the import built, and the
-      # state that decides whether there is a public address to keep is the
-      # state the post is in now.
-      if old && old['state'] != 'draft'
-        vacated = "#{old_year}/#{slug}"
-        former = (Array(post['former_slugs']).map(&:to_s) + [vacated]).uniq - ["#{year}/#{slug}"]
-        post['former_slugs'] = former unless former.empty?
-      end
-
       FileUtils.mkdir_p(new_dir)
       move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
       # The edit history is keyed by year/slug exactly like the media, and

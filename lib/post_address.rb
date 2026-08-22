@@ -44,18 +44,55 @@ module PostAddress
 
   # Spends such a marker into whichever list can express it, and never lets
   # a post redirect to itself.
+  #
+  # "Itself" is asked of the post's CURRENT state, not guessed from the
+  # shape of the debt. Unpublish a post, turn it into a page, publish it:
+  # the debt reads "2026/aaa" because a post wrote it, while the thing
+  # paying it is now a page served at /aaa/. Matching shape against shape
+  # read that as a redirect to self and threw a real debt away.
+  #
+  # A marker that is nil or empty still runs the self-reference sweep --
+  # publish did that unconditionally before this became one function, and
+  # an archive that arrived carrying a redirect to itself (an import, a
+  # hand edit, an older engine) was quietly healed by the next publish
+  # instead of warning on every build with nothing able to clear it.
   def spend_vacated(post, marker, slug: nil, year: nil)
-    return post if marker.to_s.empty?
+    name = (slug || post['slug']).to_s
+    mine = page?(post) ? "/#{name}/" : "#{year || date_year(post)}/#{name}"
+    debts = Array(marker).map(&:to_s).reject(&:empty?)
 
-    name = slug || post['slug']
-    if marker.to_s.start_with?('/')
-      olds = (Array(post['redirect_from']).map(&:to_s) + [marker.to_s]).uniq - ["/#{name}/"]
-      olds.empty? ? post.delete('redirect_from') : post['redirect_from'] = olds
-    else
-      former = (Array(post['former_slugs']).map(&:to_s) + [marker.to_s]).uniq - ["#{year || date_year(post)}/#{name}"]
-      former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
-    end
+    olds = (Array(post['redirect_from']).map(&:to_s) + debts.grep(%r{\A/})).uniq - [mine]
+    former = (Array(post['former_slugs']).map(&:to_s) + debts.grep_v(%r{\A/})).uniq - [mine]
+
+    olds.empty? ? post.delete('redirect_from') : post['redirect_from'] = olds
+    former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
     post
+  end
+
+  # Every way two posts can end up on top of each other.
+  #
+  # The build refuses to run on two posts sharing a year and a slug: they
+  # would write one output directory and one media/<year>/<slug>/ between
+  # them, so one of them would silently disappear. Pages add a second way,
+  # because a page is served at the root: two of them with one slug collide
+  # however far apart their dates are, and that one the build did not catch
+  # at all -- it built both and served whichever it wrote last.
+  #
+  # Three places were answering this and no two of them agreed -- the build
+  # by year and slug, the checker by "page" OR year, the rename guard by
+  # the served address -- so each let through what the others refused. A
+  # rename could hand the archive a state the build then declined to build:
+  # the whole site stopped by an answer to a question nobody had written
+  # down once.
+  #
+  # A draft gets the year/slug key (its file and its media live there like
+  # everyone else's) but never the page key: it is served under its token,
+  # not at the root.
+  def collision_keys(post, slug: nil, year: nil)
+    name = (slug || post['slug']).to_s
+    keys = [[(year || date_year(post)).to_s, name]]
+    keys << ['page', name] if page?(post) && !draft?(post)
+    keys
   end
 
   def draft?(post)

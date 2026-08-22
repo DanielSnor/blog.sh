@@ -271,6 +271,15 @@ unless DRY || BACKEND.configured?
   exit 0
 end
 
+# Asked before anything is written. A typo in the backend's extra switches
+# used to surface as a raw Shellwords backtrace from the middle of the run:
+# past every guard, with the baseline already on disk and the run recorded
+# as started and never finished, which is what feeds the "unfinished" streak
+# the header reports.
+if BACKEND.respond_to?(:problem) && (args_problem = BACKEND.problem)
+  abort "❌ #{args_problem}\n   #{I18n.t('cli.deploy_args_fix')}"
+end
+
 # Read before anything writes it, because the write below happens mid-run
 # and the header would otherwise report this run back to itself.
 STATE = load_state

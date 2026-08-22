@@ -29,6 +29,17 @@ module DeployBackend
       ENV['RCLONE_TARGET'].to_s
     end
 
+    # Same question sftp answers, for the same reason: an unmatched quote
+    # in RCLONE_ARGS is a typo in a hand-edited env.sh, and it belongs in a
+    # sentence before the run starts, not in a backtrace from the middle
+    # of one.
+    def problem
+      Shellwords.split(ENV['RCLONE_ARGS'].to_s)
+      nil
+    rescue ArgumentError => e
+      "RCLONE_ARGS: #{e.message}"
+    end
+
     def manifest_suffix
       '.rclone'
     end
