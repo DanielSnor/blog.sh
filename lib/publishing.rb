@@ -7,6 +7,7 @@ require 'time'
 # tells "the lock was busy" from "it broke", and $? does not read as either.
 require 'English'
 require_relative 'post_address'
+require_relative 'address_guard'
 require_relative 'site_config'
 require_relative 'atomic_write'
 require_relative 'post_writer'
@@ -102,12 +103,16 @@ module Publishing
     PostAddress.spend_vacated(updated, updated.delete('unpublished_from'), slug: slug)
 
     new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
-    if new_year != old_year
-      # A different post can already own <new_year>/<slug> -- writing
-      # there would replace it wholesale, and the build's duplicate
-      # check never fires because only one file remains.
-      abort(I18n.t('cli.post_already_exists', slug: slug, path: new_path)) if File.exist?(new_path)
+    # A different post can already own the address this one is about to
+    # take -- and writing there leaves an archive the build refuses to
+    # run on. Asked of AddressGuard, and asked on EVERY publish rather
+    # than only when the year changes: a draft published onto a page's
+    # slug never moved years at all, and the scheduler's cron reaches
+    # this line with nobody at the keyboard to read what went wrong.
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug, except: path)
+    abort(I18n.t('cli.post_already_exists', slug: slug, path: taken)) if taken
 
+    if new_year != old_year
       FileUtils.mkdir_p(File.dirname(new_path))
       relocate_media(slug, old_year, new_year)
     end

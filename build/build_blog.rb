@@ -1160,7 +1160,7 @@ end
 # archive is not looking for it and a subscriber did not ask to be told it
 # changed.
 def page?(post)
-  truthy?(post['page'])
+  PostAddress.page?(post)
 end
 
 # A published post that is not in the stream: it keeps its ordinary
@@ -2241,8 +2241,13 @@ posts.each do |p|
 end
 duplicates = collisions.select { |_, v| v.size > 1 }
 unless duplicates.empty?
+  # The address alone does not find the files: a page collides on its slug
+  # however far apart the two dates are, so "/about/ (2x)" leaves the
+  # reader grepping a whole archive for the pair they have to choose
+  # between. The files ARE the fix, so they are what the message hands over.
   list = duplicates.map do |(year, slug), dupes|
-    "  #{year == 'page' ? "/#{slug}/" : "#{year}/#{slug}"} (#{dupes.size}x)"
+    where = dupes.map { |p| "      #{p['__path'] || "#{p['date'].to_s[0, 4]}/#{p['slug']}.json"}" }
+    "  #{year == 'page' ? "/#{slug}/" : "#{year}/#{slug}"} (#{dupes.size}x)\n#{where.join("\n")}"
   end.join("\n")
   abort("❌ Two posts at one address in content.nosync/posts/ -- build stopped:\n#{list}")
 end

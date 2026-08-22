@@ -5,6 +5,7 @@ require 'digest'
 require 'time'
 require_relative 'atomic_write'
 require_relative 'post_address'
+require_relative 'address_guard'
 require_relative 'post_versions'
 require_relative 'exif_location'
 require_relative 'media_dimensions'
@@ -680,9 +681,11 @@ module PostWriter
     # here has been moved or deleted yet. Hoisted ABOVE the version keep:
     # a re-import about to be refused must refuse with no side effects,
     # and it used to leave one spare version behind on its way out.
-    if File.expand_path(new_path) != File.expand_path(existing_path) && File.exist?(new_path)
-      raise "cannot move '#{slug}' into #{year}: a different post already owns " \
-            "#{new_path} -- resolve the slug clash by hand"
+    taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug,
+                                  except: existing_path)
+    if taken
+      raise "cannot write '#{slug}' into #{year}: a different post is already served " \
+            "at that address (#{taken}) -- resolve the slug clash by hand"
     end
 
     PostVersions.keep(existing_path, content_dir: CONTENT_DIR)

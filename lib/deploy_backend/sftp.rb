@@ -53,20 +53,23 @@ module DeployBackend
       print ? "#{base} ##{print}" : base
     end
 
-    # Switches that cannot move the connection anywhere: how loud it is,
-    # whether it compresses, how it copies. A deny-list and not an
-    # allow-list on purpose -- a switch nobody here has heard of stays in
-    # the identity, so the mistake is made in the direction that costs one
-    # re-upload rather than the direction that loses the manifest.
-    CHATTER = %w[-v -q -C -a -p -r -4 -6].freeze
-    TUNING = %w[-B -R -l -D].freeze
-    TAKES_VALUE = %w[-P -i -F -o -J -c -S -b -B -R -l -D].freeze
+    # Switches that cannot move a connection anywhere: how loud it is, how
+    # it copies, how much of the line it uses. `-v` is written `-vv` and
+    # `-vvv` too, which a literal list of strings missed -- and missing it
+    # is not harmless, because a switch that stays in the identity makes a
+    # second target out of one server and throws away the manifest.
+    CHATTER = /\A-(?:v+|q|C|4|6|a|p|r)\z/
+    # Tuning, not routing: buffer size, requests in flight, bandwidth cap.
+    # `-D` is NOT here -- it names the sftp server program on the far end,
+    # which is as much a part of "where this goes" as the host is.
+    TUNING = %w[-B -R -l].freeze
+    TAKES_VALUE = %w[-P -i -F -o -J -c -S -b -D -B -R -l].freeze
 
     # SFTP_ARGS is a LIST of switches, not a string.
     #
     # The same switches in another order are the same server: openssh reads
     # -P/-i/-F/-o/-J whichever way round they come, env.sh is a hand-edited
-    # file people reformat, and adding -v to watch a failing deploy is not
+    # file people reformat, and adding -vv to watch a failing deploy is not
     # moving to another host. Compared as a string, every such edit read as
     # a new target -- and a new target throws the manifest away, which is
     # the only record of what stands on the far end. The re-upload is the
@@ -74,26 +77,56 @@ module DeployBackend
     # unreachable, so a post deleted at home goes on being served forever
     # and no switch exists that would find it again.
     #
+    # A switch nobody here recognises stays IN. That costs a needless
+    # re-upload when it turns out to be harmless -- but the other mistake,
+    # dropping something that does move the connection, reports success
+    # while the new target sits empty, and a silently wrong site is worse
+    # than a slow deploy. Everything dropped above is dropped because it
+    # provably cannot change where the bytes land.
+    #
     # A digest rather than the switches themselves, because the manifest is
     # a 0644 file the docs call disposable while env.sh -- where -i names a
     # private key and -J names a bastion -- is the file they tell you to
     # keep at 600. Identity is only ever asked whether two of them are
     # equal, so hashing costs nothing.
     def args_fingerprint
-      tokens = split_args(ENV['SFTP_ARGS'].to_s.strip)
-      kept = []
-      until tokens.empty?
-        token = tokens.shift
-        if TAKES_VALUE.include?(token) && !tokens.empty?
-          value = tokens.shift
-          kept << "#{token} #{value}" unless TUNING.include?(token)
-        elsif !CHATTER.include?(token)
-          kept << token
-        end
-      end
+      kept = normalised_args
       return nil if kept.empty?
 
-      Digest::SHA256.hexdigest(kept.sort.join(' '))[0, 12]
+      Digest::SHA256.hexdigest(kept.join(' '))[0, 12]
+    end
+
+    def normalised_args
+      tokens = split_args(ENV['SFTP_ARGS'].to_s.strip)
+      kept = []
+      keys = []
+      until tokens.empty?
+        token = tokens.shift
+        next if token.match?(CHATTER)
+
+        key, glued = unglue(token)
+        value = glued || (TAKES_VALUE.include?(key) && !tokens.empty? ? tokens.shift : nil)
+        keys << key
+        next if value && TUNING.include?(key)
+
+        kept << (value ? "#{key} #{value}" : key)
+      end
+      # Order is dropped only where it cannot matter. ssh takes the FIRST
+      # value of a repeated -o, so the same switches in another order are
+      # then genuinely two configurations -- sorting those together would
+      # say one server where there are two, which is the mistake that
+      # leaves a target empty and calls it a success.
+      keys.uniq.size == keys.size ? kept.sort : kept
+    end
+
+    # "-P2022" and "-P 2022" are one switch written two ways, and so are
+    # "-oPort=2022" and "-o Port=2022". Reading them as different strings
+    # made a second target out of a line somebody merely tidied up.
+    def unglue(token)
+      return [token, nil] unless token.length > 2 && token.start_with?('-')
+
+      key = token[0, 2]
+      TAKES_VALUE.include?(key) ? [key, token[2..]] : [token, nil]
     end
 
     # Identity must never be the thing that raises: an unmatched quote is

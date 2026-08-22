@@ -489,14 +489,21 @@ module Checker
   def duplicate_finding(key, group)
     slug = group.first['slug'].to_s
     files = group.map { |post| post['__path'].to_s }
+    # The address does not find the files. A page collides on its slug
+    # however far apart the two dates are, so the reader would be grepping
+    # the archive for the pair they have to choose between -- and choosing
+    # between them IS the fix, so the fix says which two.
+    where = files.map do |file|
+      "\n   - #{File.join(File.basename(File.dirname(file)), File.basename(file))}"
+    end.join
     if key.first == 'page'
       error(t('address_duplicate_page', slug: slug, count: group.size),
-            t('address_duplicate_page_fix'),
+            t('address_duplicate_page_fix') + where,
             kind: :address_duplicate,
             data: { 'slug' => slug, 'address' => "/#{slug}/", 'files' => files })
     else
       error(t('address_duplicate', year: key.first, slug: slug, count: group.size),
-            t('address_duplicate_fix'),
+            t('address_duplicate_fix') + where,
             kind: :address_duplicate,
             data: { 'year' => key.first, 'slug' => slug,
                     'address' => "/posts/#{key.first}/#{slug}/", 'files' => files })

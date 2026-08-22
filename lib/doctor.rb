@@ -919,6 +919,14 @@ module Doctor
     end
 
     missing = BACKEND_VALUES.fetch(name, []).select { |v| ENV[v].to_s.empty? }
+    # A backend can be fully configured and still refuse to run: an
+    # unmatched quote in its extra switches aborts every deploy. doctor
+    # exists so that the state of an install is known before the deploy
+    # that needs it, so it must not tick a line that will stop on sight.
+    backend = DeployBackend::BACKENDS[name]
+    trouble = backend.respond_to?(:problem) ? backend.problem : nil
+    return [error(trouble, I18n.t('cli.deploy_args_fix'))] if trouble
+
     return [ok(t('backend_ok', name: name))] if missing.empty?
 
     # Not an error: an unconfigured backend is the documented state of a

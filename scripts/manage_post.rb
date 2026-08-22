@@ -31,6 +31,7 @@ require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
 require_relative '../lib/post_address'
+require_relative '../lib/address_guard'
 require_relative '../lib/publishing'
 require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
@@ -1584,7 +1585,9 @@ def write_scheduled_date(path, post, date, raw: nil, slug: nil)
     new_year = date.year.to_s
     new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
     if File.expand_path(new_path) != File.expand_path(path)
-      abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
+      taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
+                                    slug: post['slug'], except: path)
+      abort t('cli.post_already_exists', slug: post['slug'], path: taken) if taken
 
       FileUtils.mkdir_p(File.dirname(new_path))
       Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
@@ -1970,7 +1973,10 @@ def apply_queue_moves(moves)
       target_path = File.join(CONTENT_DIR, target.year.to_s, "#{entry[:post]['slug']}.json")
       next if File.expand_path(target_path) == File.expand_path(entry[:path])
 
-      abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
+      moved = entry[:post].merge('date' => target.iso8601)
+      taken = AddressGuard.occupant(moved, content_dir: CONTENT_DIR,
+                                    slug: entry[:post]['slug'], except: entry[:path])
+      abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: taken) if taken
     end
 
     done = 0
@@ -2842,28 +2848,22 @@ def rename_post(path, post, raw: nil)
   # site that would not build.
   new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
   new_media_dir = File.join(MEDIA_DIR, year, new_slug)
-  wanted = PostAddress.collision_keys(post, slug: new_slug)
-  taken_address = Dir.glob(File.join(CONTENT_DIR, '*', "#{new_slug}.json")).any? do |other|
-    # An occupant that will not read or parse still owns the place -- the
-    # same answer address_occupant gives eighty lines above this one. A
-    # file left unreadable by a restore, or evicted by the cloud sync this
-    # working copy lives in, read as "nobody lives here", and the rename
-    # walked straight into it. A false alarm costs one more slug to think
-    # of; a missed collision costs every build from then on.
-    candidate = begin
-      JSON.parse(File.read(other, encoding: 'utf-8'))
-    rescue StandardError
-      next true
-    end
-    next false unless candidate.is_a?(Hash)
-
-    (PostAddress.collision_keys(candidate) & wanted).any?
-  end
+  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug)
   if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
     # Not the shared post_already_exists text: that one says "continuing
     # would overwrite it -- resolve manually", and a refused rename
     # neither continues nor needs resolving. Picking another slug does.
-    puts t('cli.rename_taken', slug: new_slug)
+    #
+    # An occupant nobody can read is refused just the same -- a place whose
+    # owner will not open is not free space -- but it gets its own sentence,
+    # because "another post already uses that slug" is a claim about a file
+    # this process never managed to look at, and the reader would go
+    # looking for a post that may not be there.
+    if taken_address && AddressGuard.unreadable?(taken_address)
+      puts t('cli.rename_unreadable', slug: new_slug, path: taken_address)
+    else
+      puts t('cli.rename_taken', slug: new_slug)
+    end
     puts
     return old_slug
   end
@@ -3054,13 +3054,6 @@ def edit_post(slug, path: nil)
   new_path = File.join(new_dir, "#{slug}.json")
   new_media_dir = File.join(MEDIA_DIR, new_year, slug)
 
-  # Same guard as Publishing.publish: a date edit that moves the post
-  # into a year where another post already owns this slug must not
-  # overwrite that post's JSON (and displace its media directory).
-  if new_dir != File.dirname(path) && File.exist?(new_path)
-    abort t('cli.post_already_exists', slug: slug, path: new_path)
-  end
-
   updated = {
     'slug' => slug,
     'title' => new_title,
@@ -3120,6 +3113,17 @@ def edit_post(slug, path: nil)
   # /posts/2026/slug/ and /slug/ without touching the date. Every link to
   # the address it left then died with no stub behind it, and this is the
   # one path of the five that was still working it out on its own.
+  # Same guard as Publishing.publish: a date edit that moves the post
+  # into a year where another post already owns this slug must not
+  # overwrite that post's JSON (and displace its media directory).
+  # Asked on every save, not only when the folder changes: typing
+  # `type: page` into the frontmatter moves the post to /slug/ without
+  # moving its file anywhere, and the address it lands on can already be
+  # a page's. The build refuses to run on that, so the save that made it
+  # would be the last one before the site stopped building.
+  taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug, except: path)
+  abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+
   carried = Array(post['former_slugs']).map(&:to_s)
   updated['former_slugs'] = carried unless carried.empty?
   inherited = Array(post['redirect_from']).map(&:to_s)
@@ -3445,7 +3449,8 @@ def cmd_restore(slug)
   year = Time.parse(post['date']).year.to_s
   new_dir = File.join(CONTENT_DIR, year)
   new_path = File.join(new_dir, "#{slug}.json")
-  abort t('cli.post_already_exists', slug: slug, path: new_path) if File.exist?(new_path)
+  taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug)
+  abort t('cli.post_already_exists', slug: slug, path: taken) if taken
 
   FileUtils.mkdir_p(new_dir)
   FileUtils.mv(trash_json, new_path)

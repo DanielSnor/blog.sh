@@ -9,9 +9,11 @@
 # two branches missing, and so offered to rewrite a working link into an
 # address the site never answers at.
 #
-# The module deliberately holds no state and requires nothing: the build,
-# the checker and the repair pass can all depend on it without depending on
-# each other.
+# The module deliberately holds no state and requires nothing beyond the
+# standard library's date parsing: the build, the checker and the repair
+# pass can all depend on it without depending on each other.
+require 'time'
+
 module PostAddress
   module_function
 
@@ -58,11 +60,22 @@ module PostAddress
   # instead of warning on every build with nothing able to clear it.
   def spend_vacated(post, marker, slug: nil, year: nil)
     name = (slug || post['slug']).to_s
-    mine = page?(post) ? "/#{name}/" : "#{year || date_year(post)}/#{name}"
+    # A draft is served under its token and nowhere else, so there is no
+    # address it could be redirecting to itself. Working one out anyway
+    # subtracted a debt the post genuinely owes: one ordinary edit of a
+    # draft and the redirect to its old public address was gone, with the
+    # build silent and check calling the archive sound.
+    mine = if draft?(post)
+             nil
+           elsif page?(post)
+             "/#{name}/"
+           else
+             "#{year || date_year(post)}/#{name}"
+           end
     debts = Array(marker).map(&:to_s).reject(&:empty?)
 
-    olds = (Array(post['redirect_from']).map(&:to_s) + debts.grep(%r{\A/})).uniq - [mine]
-    former = (Array(post['former_slugs']).map(&:to_s) + debts.grep_v(%r{\A/})).uniq - [mine]
+    olds = (Array(post['redirect_from']).map(&:to_s) + debts.grep(%r{\A/})).uniq - [mine].compact
+    former = (Array(post['former_slugs']).map(&:to_s) + debts.grep_v(%r{\A/})).uniq - [mine].compact
 
     olds.empty? ? post.delete('redirect_from') : post['redirect_from'] = olds
     former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
@@ -99,16 +112,35 @@ module PostAddress
     post['state'].to_s == 'draft'
   end
 
+  # The build asks this now instead of keeping its own copy, which read
+  # only `page` and read it with a different notion of "no": `page: "No"`
+  # was a page to one of them and an ordinary post to the other, so the
+  # site served it under its year while the checker, the repair pass and
+  # the rename guard all thought it lived at the root. Since the collision
+  # keys, that disagreement also decides whether the build runs at all.
   def page?(post)
     value = post['page']
     return post['type'].to_s == 'page' if value.nil?
+    return false if value == false
 
-    ![false, 'false', 'no', 0, '0'].include?(value)
+    !%w[false no 0].include?(value.to_s.strip.downcase)
   end
 
   # The year in the post's own date -- what the address is built from.
   def date_year(post)
-    post['date'].to_s[0, 4]
+    raw = post['date'].to_s
+    return raw[0, 4] if raw.match?(/\A\d{4}/)
+
+    # An imported archive can carry "Thu, 01 Jan 2026 10:00:00 +0100", and
+    # four characters off the front of that is "Thu,". The build parses the
+    # date to find the year, so taking a substring here was one more way
+    # for the two to disagree -- with a redirect written to /posts/Thu,/ to
+    # show for it.
+    begin
+      Time.parse(raw).year.to_s
+    rescue StandardError
+      raw[0, 4]
+    end
   end
 
   # The year of the DIRECTORY the file sits in, which is what the checker
