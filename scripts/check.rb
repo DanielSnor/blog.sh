@@ -92,7 +92,11 @@ if repair
   require_relative '../lib/repair'
   require_relative '../lib/run_lock'
 
-  RunLock.acquire!(ROOT, label: 'check --repair')
+  # The lock is held around each WRITE, not around the reading and the
+  # deciding. A pass through a hundred findings is a conversation that can
+  # last minutes; holding the whole installation for it would mean a
+  # scheduled publish waits for somebody to finish reading, and the queue's
+  # own tick is the thing that must not be blocked.
   findings = Checker.run(root: ROOT, online: online, cap: nil)
   actionable = findings.reject { |f| f.level == :ok }
   if actionable.empty?
@@ -104,13 +108,19 @@ if repair
   applied = 0
   skipped = 0
   no_offer = 0
+  failed = 0
   actionable.each do |finding|
     proposal = Repair.propose(finding, idx)
     puts
     puts "#{paint_level(finding.level)} #{finding.text}"
     if proposal.nil?
       no_offer += 1
-      puts Tui.paint("   #{I18n.t('check.repair_no_offer')}", :dim)
+      # Two of the refusals are worth a sentence, because the tool DID find
+      # something and turned it down on purpose. Without this they read as
+      # "the tool cannot do this", which is a different thing.
+      reason = Repair.why_not(finding, idx)
+      key = reason ? "check.repair_no_offer_#{reason}" : 'check.repair_no_offer'
+      puts Tui.paint("   #{I18n.t(key)}", :dim)
       next
     end
 
@@ -119,10 +129,17 @@ if repair
     case answer
     when 'q' then break
     when 'a', 'y', 'j' then
-      if Repair.apply!(proposal, ROOT)
+      done = RunLock.hold(ROOT, label: 'check --repair') { Repair.apply!(proposal, ROOT) }
+      if done == RunLock::BUSY
+        failed += 1
+        puts Tui.paint("   #{I18n.t('check.repair_busy')}", :red)
+      elsif done
         applied += 1
         puts Tui.paint("   #{I18n.t('check.repair_applied')}", :green)
       else
+        # Counted, not just said: a run that changed nothing and a run whose
+        # changes were refused must not add up to the same summary.
+        failed += 1
         puts Tui.paint("   #{I18n.t('check.repair_failed')}", :red)
       end
     else
@@ -132,6 +149,7 @@ if repair
 
   puts
   puts I18n.t('check.repair_summary', applied: applied, skipped: skipped, no_offer: no_offer)
+  puts Tui.paint(I18n.t('check.repair_summary_failed', count: failed), :red) if failed.positive?
   puts Tui.paint(I18n.t('check.repair_rebuild'), :bold) if applied.positive?
   exit 0
 end

@@ -27,6 +27,53 @@ prints what an installation is running.
   link to one repository or a bare host name, each of which would otherwise
   end as an empty card indistinguishable from "has not pushed lately".
   Verified against two live servers before it was written.
+- **Media are read from the year the post's FILE lives in.** A post whose
+  date was corrected across a year boundary keeps its file (and its media)
+  where they were, while its address follows the date -- and the build was
+  the one place that looked media up by the date. It served the page with
+  a hole in it and said "MISSING media", while `check`, which looks where
+  the file is, called the archive sound. They agree now, and on the first
+  build after this upgrade such a picture is copied for the first time.
+  This one predates 1.4 by a long way; the repair pass is only what made
+  it visible.
+- **Letter case and unicode form of a filename no longer cost you the
+  picture.** `File.exist?` asks the volume, and on macOS the volume
+  resolves both -- so a post naming IMG_2043.JPG found img_2043.jpg and
+  rendered, while anything comparing the strings called the same file a
+  leftover. The engine now asks the directory what it actually writes: at
+  build time (the copy is renamed rather than left for the prune to
+  delete), in the markdown editor (the name from the disk is what gets
+  written into the post), and at deploy time (an "orphan" that is only the
+  old spelling of a file the build still has is not deleted). If your
+  archive has such a pair, `check` now says so and `--repair` offers to
+  write the name the directory uses.
+- **The deploy manifest knows which target it describes.** Pointing the
+  same backend at another target used to inherit the old manifest, which
+  says everything is already there -- so the new target stayed empty and
+  the run reported success. A manifest written for another target is now
+  thrown away out loud.
+
+### Changed
+
+- **`check` has a ninth kind of finding: two posts that would be served at
+  one address.** The build refuses to run in that state -- one post would
+  be written over the other and their media mixed -- so a check that
+  called such an archive sound was telling you the opposite of what you
+  were about to find out. It is an error, so `check` can now exit 1 where
+  it used to say nothing.
+- **`doctor` fails on a config the engine cannot use.** It knew about
+  three list keys; it now reports the same set of complaints the build
+  warns about -- a widget name nothing draws (which takes the whole
+  sidebar off every page), a section written in a shape it cannot hold,
+  a menu item with no label or no target, and prose written as a list.
+  Configs that were quietly wrong will start saying so.
+- **Renaming a post writes its redirect from the address the site actually
+  served.** For a post whose date was corrected across a year, and for
+  every page (which has no year in its address at all), the old address
+  was derived from the folder -- so the redirect pointed at an address
+  that never existed, and the build refused it with a warning nobody could
+  act on.
+
 - **`./blog.sh check --repair`: the checker's other half.** Until now
   `check` could say what was wrong with an archive and nothing more, so
   acting on it meant a hand-written script that re-derived what the checker
@@ -60,7 +107,6 @@ prints what an installation is running.
   a site that hosts its code outside GitHub can say so with the same row of
   icons everything else uses.
 
-### Changed
 
 - **A key that is written down speaks for itself.** `nav:` left standing
   with nothing under it used to fall back to the menu the engine picks,

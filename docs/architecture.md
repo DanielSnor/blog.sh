@@ -325,7 +325,7 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Eight questions, in one pass: media a post asks for and hasn't got; images
+Nine questions, in one pass: media a post asks for and hasn't got; images
 whose stored dimensions are 1px or smaller, which the build drops
 *together with their caption* and would otherwise lose silently; internal
 links pointing at an address nothing on this site answers at; links
@@ -334,11 +334,13 @@ answers 200 with the page the reader is already on -- the one kind here
 that fails at nothing and is therefore invisible from everywhere else;
 media directories no post owns any more; files in a post's own directory the
 post no longer names; two series whose names sit an edit or two apart,
-which is usually one series and a typo; and one old address claimed by
+which is usually one series and a typo; one old address claimed by
 two posts, where whichever renders last wins and the others' readers land
-on it.
+on it; and two posts that would be served at one address, which the build
+refuses to run on at all -- so an archive in that state used to be called
+sound by the one tool whose job is to say otherwise.
 
-Two rules shape the output. **It only ever reports** -- nothing here
+Two rules shape the plain run. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value
 of the tool is that its output can be trusted, and a checker that also
 acts has to be trusted twice. And each kind of finding is **capped**, the
@@ -352,6 +354,15 @@ warnings failed it. Like `export` and `stats` it has its own entry
 point (`scripts/check.rb`) rather than going through `manage_post.rb`,
 which applies the site timezone as it loads and aborts on a config it
 cannot read -- a run that exits explaining the config has checked nothing.
+
+Both rules have a door in them since 1.4, and both doors are opened by
+hand. `--repair` walks the findings and offers, per finding, the single
+repair that finding allows: a redirect written into the target post, a
+relative link rewritten, a file moved to the trash. Nothing is applied
+without a key press, a version is kept before a post is changed, and
+nothing is ever deleted. `--json` prints every finding instead of a
+capped screenful, because a cap is right for reading and useless for
+acting on -- a script cannot work from "...and 23 more".
 
 `--online` is the only part that leaves the machine, and it is asked for
 by name because it takes minutes rather than a second and, over an archive

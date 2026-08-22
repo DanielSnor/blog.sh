@@ -126,10 +126,27 @@ def log(msg)
   $stdout.flush
 end
 
+# What the manifest is about: the same backend can be pointed at another
+# target (a second site, a staging directory), and a manifest describing
+# the OLD one says every file is already there -- so the new target stays
+# empty while the run reports success. The target is written into the file
+# and checked on the way in; a mismatch throws the manifest away out loud,
+# which is the same thing a missing manifest does and is always safe.
+def manifest_target
+  BACKEND.respond_to?(:target) ? BACKEND.target.to_s : ''
+end
+
 def load_manifest
   return {} unless File.exist?(MANIFEST_PATH)
 
   data = JSON.parse(File.read(MANIFEST_PATH))
+  if data.is_a?(Hash) && data.key?('_target') && data['_target'].to_s != manifest_target
+    warn "⚠️  #{MANIFEST_PATH} was written for #{data['_target']} -- this run deploys to #{manifest_target}."
+    warn '   Treating it as empty: everything will be uploaded, and orphans on the new target cannot be'
+    warn '   found from here. That is the safe half of the mistake; the other half would be deleting them.'
+    return {}
+  end
+  data = data.reject { |key, _| key == '_target' } if data.is_a?(Hash)
   # Valid JSON of the wrong shape (a bare array, a number) is as unusable
   # as unparseable text, and left alone it crashes much later on
   # `stored[name]` with a bare TypeError -- exactly the place "deleting a
@@ -155,7 +172,17 @@ end
 # previous manifest survives a write that dies halfway (a full disk, a
 # killed container), instead of being truncated into the unreadable file
 # the branch above has to apologise for.
+
+# Case and unicode form removed, and nothing else: used only to ask whether
+# two names could be one file on a folding filesystem.
+def fold_deploy_name(name)
+  name.to_s.scrub.unicode_normalize(:nfc).downcase
+rescue ArgumentError, Encoding::CompatibilityError
+  name.to_s.scrub.downcase
+end
+
 def save_manifest(manifest)
+  manifest = manifest.merge('_target' => manifest_target)
   AtomicWrite.write_json(MANIFEST_PATH, manifest)
 end
 
@@ -347,6 +374,18 @@ skipped = files.size - to_upload.size
 # there the list is the whole one even under --only.
 orphan_source = ONLY && !SNAPSHOT ? ONLY & stored.keys : stored.keys
 orphans = (orphan_source - all_files).sort
+
+# An "orphan" that is only the OLD SPELLING of a file the build still has --
+# IMG_2043.JPG against img_2043.jpg -- is not an orphan. On a target whose
+# filesystem folds case or unicode form, the upload lands in that very
+# entry, so deleting it takes the picture with it. This is measured against
+# the WHOLE build, not against what this run happens to upload: measured
+# against the upload list it only held for one run, and the next deploy
+# (which uploads nothing) deleted the file after all. The manifest loses
+# the old key too, or the same orphan is re-derived on every future run.
+built_folded = all_files.to_h { |name| [fold_deploy_name(name), true] }
+folded_away, orphans = orphans.partition { |name| built_folded[fold_deploy_name(name)] }
+folded_away.each { |name| stored.delete(name) }
 
 # --- what the guards measure against ------------------------------------
 #

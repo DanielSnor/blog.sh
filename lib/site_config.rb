@@ -144,6 +144,109 @@ module SiteConfig
     parent.is_a?(Hash) && parent.key?(keys.last)
   end
 
+
+  # --- what the chrome's keys mean -----------------------------------------
+  #
+  # The chrome (nav, about, footer, social, widgets, layout) is configured
+  # in one file and read by three programs, and until now each of them
+  # worked out the meaning for itself: the build asked "is this key written
+  # down", ./style.sh asked "is it an Array", and doctor asked neither. So a
+  # widget name with a typo in it took the whole sidebar off every page
+  # while doctor called the config healthy, and an `about:` written as a
+  # list ended the build in a TypeError from inside an ERB template.
+  #
+  # Four states, one answer for all three programs:
+  #   absent    -- nothing is written; the engine decides. Never an error.
+  #   empty     -- written with nothing under it; the site decided: none of
+  #                these. Never an error.
+  #   malformed -- written in a shape the key cannot hold. Read as empty
+  #                everywhere (never a traceback), and always said out loud.
+  #   set       -- the site's own answer.
+  module Chrome
+    # The five cards the sidebar can draw. One list, because it used to be
+    # copied into four places and the copy in doctor was missing one of
+    # them -- which is exactly why an unknown name passed the check meant
+    # to catch it.
+    CARDS = %w[toots pixelfed commits bluesky rss].freeze
+    LISTS = [%w[nav], %w[social], %w[footer links]].freeze
+    MAPS = [%w[about], %w[footer], %w[widgets], %w[layout]].freeze
+    # The chrome's prose. Written as a list or a map it renders as nothing
+    # at all -- the page simply loses its about text, and until now without
+    # a word from anywhere.
+    TEXTS = [%w[about html], %w[about heading], %w[footer note_html],
+             %w[footer note_heading], %w[footer copyright], %w[banner claim]].freeze
+
+    module_function
+
+    def dig(data, *path)
+      path.reduce(data) { |acc, key| acc.is_a?(Hash) ? acc[key] : nil }
+    end
+
+    # Whether the key is WRITTEN DOWN, which is a different question from
+    # what it holds: `nav:` with nothing under it means "no menu", and no
+    # `nav:` at all means "engine, decide".
+    def written?(data, *path)
+      parent = path.length == 1 ? data : dig(data, *path[0..-2])
+      parent.is_a?(Hash) && parent.key?(path.last)
+    end
+
+    def state(data, *path, shape: :list)
+      return :absent unless written?(data, *path)
+
+      value = dig(data, *path)
+      return :empty if value.nil? || (value.respond_to?(:empty?) && value.empty?)
+      return :set if shape == :list ? value.is_a?(Array) : value.is_a?(Hash)
+
+      :malformed
+    end
+
+    # Always the right class, whatever the file says.
+    def list(data, *path)
+      value = dig(data, *path)
+      value.is_a?(Array) ? value : []
+    end
+
+    def map(data, *path)
+      value = dig(data, *path)
+      value.is_a?(Hash) ? value : {}
+    end
+
+    # Only names the sidebar can draw, each holding settings.
+    def widgets(data)
+      map(data, 'widgets').select { |name, conf| CARDS.include?(name) && conf.is_a?(Hash) }
+    end
+
+    # What the build will actually render from a nav entry: a label and
+    # somewhere to go.
+    def nav_item?(entry)
+      return false unless entry.is_a?(Hash)
+
+      label = entry['label'].to_s.strip
+      target = entry['tag'].to_s.strip.empty? ? entry['url'].to_s.strip : entry['tag'].to_s.strip
+      !label.empty? && !target.empty?
+    end
+
+    # Everything the config says that the engine cannot use, as data rather
+    # than as sentences -- so the build's warnings and doctor's findings
+    # cannot name a different set of keys from each other.
+    def complaints(data)
+      found = []
+      LISTS.each { |path| found << [:not_a_list, path.join('.')] if state(data, *path, shape: :list) == :malformed }
+      MAPS.each { |path| found << [:not_a_map, path.join('.')] if state(data, *path, shape: :map) == :malformed }
+      map(data, 'widgets').each do |name, conf|
+        next found << [:unknown_widget, name] unless CARDS.include?(name)
+
+        found << [:widget_shape, name] unless conf.is_a?(Hash)
+      end
+      list(data, 'nav').each_with_index { |entry, i| found << [:nav_item, i + 1] unless nav_item?(entry) }
+      TEXTS.each do |path|
+        value = dig(data, *path)
+        found << [:not_text, path.join('.')] unless value.nil? || value.is_a?(String) || value.is_a?(Numeric)
+      end
+      found
+    end
+  end
+
   # The comments/announcement network: :mastodon, :bluesky, or nil when
   # neither is configured. Deliberately exclusive -- a post's comments
   # live on exactly one network, so configuring both sections at once is

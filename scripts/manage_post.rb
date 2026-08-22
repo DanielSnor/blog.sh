@@ -30,6 +30,7 @@ require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
+require_relative '../lib/post_address'
 require_relative '../lib/publishing'
 require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
@@ -85,8 +86,11 @@ def draft_path(post)
   "/draft/#{post['draft_token']}/#{post['slug']}/"
 end
 
-def published_path(slug, year)
-  "/posts/#{year}/#{slug}/"
+# A page is served at the root, without a year -- so every message built
+# from a year told the author about an address the site never answered at,
+# and a rename recorded a redirect from one.
+def published_path(slug, year, page: false)
+  page ? "/#{slug}/" : "/posts/#{year}/#{slug}/"
 end
 
 # An install that never answered "where does this go?" still carries the
@@ -2282,7 +2286,7 @@ end
 # it. At the top of a frame it is just a gap.
 def props_frame_lines(post, path, slug, year)
   lines = ["  #{Tui.paint(props_title(post), :bold)}",
-           "  #{draft?(post) ? t('cli.props_draft_banner') : "posts/#{year}/#{post['slug']}/"}", '']
+           "  #{draft?(post) ? t('cli.props_draft_banner') : PostAddress.path(post).sub(%r{\A/}, '')}", '']
   if draft?(post)
     # No created/date line for a plain draft, on purpose: a draft has no
     # time -- its date is set by publishing or scheduling, and showing
@@ -3069,7 +3073,20 @@ def edit_post(slug, path: nil)
   # rename creates, and the stub mechanism has always been able to pay it;
   # nothing was writing the entry, so the old link just died. A draft
   # vacates nothing, exactly as in rename_post.
-  vacated = new_year != year && !draft?(post) ? "#{year}/#{slug}" : nil
+  # The year the post was SERVED under, which is the one in its date -- not
+# the folder it happens to sit in. For a post whose date was corrected
+# across a year boundary the two differ, and recording the folder's year
+# wrote a redirect from an address the site never answered at, which the
+# build then refused with a warning nobody could act on.
+old_address_year = post['date'].to_s[0, 4]
+# A page has no year in its address at all, so moving one between years
+# vacates nothing: recording it wrote a redirect from an address the site
+# never had, which the build then refused with a warning nobody could act on.
+vacated = if draft?(post) || PostAddress.page?(post) || new_year == old_address_year
+            nil
+          else
+            "#{old_address_year}/#{slug}"
+          end
   former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
   updated['former_slugs'] = former unless former.empty?
   updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
@@ -3223,6 +3240,19 @@ def delete_post(slug, path: nil)
   toot_gone, skeet_gone = retract_announcements(post)
 
   trash_dir = File.join(TRASH_DIR, year, slug)
+  # The media `check --repair` set aside for this post live in
+  # trash/<year>/<slug>/media/ -- the same directory this delete is about to
+  # clear for itself. Wiping it took files the repair pass had promised were
+  # restorable, without a word. They are kept aside and merged back below.
+  # Kept inside the trash, not in TMPDIR: a move across devices copies, and
+  # a temporary directory that fills up or is cleared mid-run takes files
+  # the repair pass promised were restorable.
+  kept_media = nil
+  if Dir.exist?(File.join(trash_dir, 'media'))
+    kept_media = File.join(TRASH_DIR, ".keep-#{slug}-#{Process.pid}")
+    FileUtils.mkdir_p(kept_media)
+  end
+  FileUtils.mv(Dir.glob(File.join(trash_dir, 'media', '*')), kept_media) if kept_media
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
   # The post's earlier drafts go with it. Left behind they would be an
@@ -3244,6 +3274,17 @@ def delete_post(slug, path: nil)
   File.write(File.join(trash_dir, 'post.json'), JSON.pretty_generate(trashed))
   File.delete(path)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
+  # ...and back in with them, beside the post's own media rather than
+  # instead of it: a name already taken keeps both copies.
+  if kept_media
+    FileUtils.mkdir_p(File.join(trash_dir, 'media'))
+    Dir.children(kept_media).each do |name|
+      target = File.join(trash_dir, 'media', name)
+      target = "#{target}.#{Time.now.strftime('%Y%m%d%H%M%S')}" if File.exist?(target)
+      FileUtils.mv(File.join(kept_media, name), target)
+    end
+    FileUtils.remove_entry(kept_media)
+  end
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)
   true
@@ -3299,8 +3340,63 @@ def pick_among_trashed(slug, paths)
   paths[input.to_i - 1]
 end
 
+# Media the repair pass set aside for a post that still exists: there is no
+# post.json to bring back, only files. `check --repair` promises the trash
+# is somewhere restore can reach, and this is the half that makes it true.
+def trashed_media_dirs(slug)
+  Dir.glob(File.join(TRASH_DIR, '*', slug, 'media')).select { |d| File.directory?(d) }.sort
+end
+
+def restore_media(slug, dirs)
+  dir = dirs.first
+  if dirs.size > 1
+    # The same rule as everywhere else in this file: never guess between
+    # two years, show both and ask.
+    dirs.each_with_index do |candidate, i|
+      count = Dir.children(candidate).reject { |f| f.start_with?('.') }.size
+      puts format('%2d.  %s  (%s)', i + 1, candidate.sub("#{ROOT}/", ''),
+                  t('cli.restore_media_count', count: count))
+    end
+    answer = Tui.plain_line(t('cli.restore_media_pick'))
+    index = Integer(answer, exception: false)
+    return unless index&.between?(1, dirs.size)
+
+    dir = dirs[index - 1]
+  end
+
+  year = File.basename(File.dirname(File.dirname(dir)))
+  target = File.join(MEDIA_DIR, year, slug)
+  FileUtils.mkdir_p(target)
+  returned = []
+  kept = []
+  Dir.children(dir).reject { |f| f.start_with?('.') }.sort.each do |name|
+    destination = File.join(target, name)
+    # Never over the top of a file that is there now: the archive it would
+    # replace is the one thing this command exists to protect.
+    if File.exist?(destination)
+      kept << name
+      next
+    end
+
+    FileUtils.mv(File.join(dir, name), destination)
+    returned << name
+  end
+  FileUtils.rmdir(dir) if Dir.children(dir).empty?
+  FileUtils.rmdir(File.dirname(dir)) if Dir.exist?(File.dirname(dir)) && Dir.children(File.dirname(dir)).empty?
+
+  puts t('cli.restored_media', count: returned.size, path: target.sub("#{ROOT}/", ''))
+  warn t('cli.restore_media_kept', files: kept.join(', ')) unless kept.empty?
+end
+
 def cmd_restore(slug)
   found = trashed_paths(slug)
+  if found.empty?
+    # A post that was never deleted can still have files waiting here --
+    # what `check --repair` set aside. Restoring those is not restoring a
+    # post, so it is asked and reported separately.
+    media = trashed_media_dirs(slug)
+    return restore_media(slug, media) unless media.empty?
+  end
   abort t('cli.nothing_in_trash', slug: slug) if found.empty?
 
   # Two years of the same slug can sit in the trash at once now, so the
@@ -3402,6 +3498,9 @@ def row_date(post)
   return '----------' if post[:state] == DRAFT && !post[:scheduled]
 
   Time.parse(post[:date]).strftime('%Y-%m-%d')
+rescue ArgumentError, TypeError
+  # A date nothing can parse must not cost the list its whole screen.
+  '----------'
 end
 
 def summary_row(post)
@@ -3890,9 +3989,27 @@ def trash_summary
   # and the wizard's whole Trash entry, answered "Trash is empty" over a full
   # trash. The engine's only undo, unreachable except by typing a slug the
   # author would have to remember.
-  (Dir.glob(File.join(TRASH_DIR, '*', '*', 'post.json')) +
-   Dir.glob(File.join(TRASH_DIR, '*', 'post.json')))
-    .uniq.sort.filter_map { |f| post_summary(f) }
+  posts = (Dir.glob(File.join(TRASH_DIR, '*', '*', 'post.json')) +
+           Dir.glob(File.join(TRASH_DIR, '*', 'post.json')))
+         .uniq.sort.filter_map { |f| post_summary(f) }
+  # ...and the media `check --repair` set aside for posts that were never
+  # deleted. Without these the list said "the trash is empty" over files
+  # the engine itself had just put there and promised were restorable.
+  media_only = Dir.glob(File.join(TRASH_DIR, '*', '*', 'media')).filter_map do |dir|
+    slug = File.basename(File.dirname(dir))
+    next if File.exist?(File.join(File.dirname(dir), 'post.json'))
+    next if posts.any? { |p| p[:slug] == slug }
+
+    count = Dir.children(dir).reject { |f| f.start_with?('.') }.size
+    next if count.zero?
+
+    # A date Time.parse can read: the row that draws this list parses it,
+    # and a bare year ("2026") is an ArgumentError -- which took down the
+    # whole trash picker, and with it the only undo the engine has.
+    { slug: slug, title: t('cli.restore_media_count', count: count),
+      date: "#{File.basename(File.dirname(File.dirname(dir)))}-01-01T00:00:00+00:00" }
+  end
+  posts + media_only.uniq { |entry| entry[:slug] }
 end
 
 # Lets `restore` be called with no slug: offers the trash's contents, same

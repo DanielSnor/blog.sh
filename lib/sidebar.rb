@@ -51,7 +51,17 @@ module Sidebar
   def write_all(public_dir, previous = {})
     FEEDS.to_h do |name, fetcher|
       path = File.join(public_dir, name)
-      items = fetcher.fetch_items
+      begin
+        items = fetcher.fetch_items
+      rescue CommitsFetcher::BadConfig => e
+        # A setting that cannot work is not an outage: keeping the last good
+        # answer would hide it for as long as the mistake stands. The card
+        # empties instead, and an empty card is not drawn -- which is how
+        # somebody finds out, on the site rather than in cron mail.
+        warn "#{name}: #{e.message}"
+        File.write(path, '[]')
+        next [name, false]
+      end
       fallback = items.empty? ? (previous[name] || read(path)) : nil
 
       if fallback
@@ -66,6 +76,12 @@ module Sidebar
   end
 
   def summary(results)
-    results.map { |name, count| "#{name}: #{count.nil? ? 'unchanged (fetch failed)' : "#{count} item(s)"}" }.join(', ')
+    results.map do |name, count|
+      case count
+      when nil then "#{name}: unchanged (fetch failed)"
+      when false then "#{name}: emptied (config cannot work)"
+      else "#{name}: #{count} item(s)"
+      end
+    end.join(', ')
   end
 end

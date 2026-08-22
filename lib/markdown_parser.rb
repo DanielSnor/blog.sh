@@ -557,6 +557,22 @@ module MarkdownParser
   # into incoming/ when the post is written; parse_body/wait_for_missing_images
   # (manage_post.rb) handle waiting for it to actually show up before anything
   # gets copied.
+
+  # Which spelling the directory itself uses for a file the volume already
+  # resolved. Exact match costs one lookup; anything else asks the volume
+  # for identity (dev+ino) rather than comparing strings. A volume that
+  # resolves nothing -- Linux, case-sensitive APFS -- lands on the last
+  # line and nothing changes.
+  def on_disk_name(dir, name)
+    children = Dir.children(dir)
+    return name if children.include?(name)
+
+    target = File.join(dir, name)
+    children.find { |child| File.identical?(File.join(dir, child), target) } || name
+  rescue SystemCallError
+    name
+  end
+
   def resolve_image(path, media_dir, counter, media_files = {}, incoming_dir: nil)
     expanded = File.expand_path(path)
     # realpath, not just expand_path: /tmp vs /private/tmp (macOS) or any
@@ -588,7 +604,13 @@ module MarkdownParser
     # relative to the current directory instead.
     if File.dirname(path) == '.'
       in_media = media_dir && File.expand_path(File.join(media_dir, path))
-      return [File.basename(in_media), nil] if in_media && File.exist?(in_media)
+      # The name the DIRECTORY uses, not the one the author typed. On macOS
+      # File.exist? resolves letter case and unicode form, so writing back
+      # what was typed is how a post comes to name IMG_2043.JPG for a file
+      # the disk calls img_2043.jpg. Both spellings then work here and the
+      # page renders -- but the archive now carries a disagreement that the
+      # checker has to notice and a Linux server would answer with a hole.
+      return [on_disk_name(File.dirname(in_media), File.basename(in_media)), nil] if in_media && File.exist?(in_media)
 
       expanded = File.expand_path(File.join(incoming_dir, path)) if incoming_dir
     end

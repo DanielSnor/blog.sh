@@ -15,6 +15,7 @@ require_relative 'exif_location'
 require_relative 'deploy_backend'
 require_relative 'slug'
 require_relative 'account_id'
+require_relative 'forge_address'
 # For the one thing doctor cannot answer from config alone: whether a
 # menu entry points at an address this archive produces. Sharing the
 # set with check rather than building a second one is the point --
@@ -150,7 +151,8 @@ module Doctor
     findings.concat(check_fonts(data, root))
     findings.concat(check_extra_css(data, root))
     findings.concat(check_nav(data, root))
-    findings.concat(check_list_shapes(data))
+    findings.concat(check_chrome_shapes(data))
+    findings.concat(check_sidebar(data))
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
@@ -667,20 +669,41 @@ module Doctor
     'rss' => 'feed_url'
   }.freeze
 
-  # The three keys that hold a list. A list key holds a list or nothing:
-  # `social:` with nothing under it is a site with no icons, which is a
-  # legitimate thing to want. A STRING under it is a mistake -- and until
-  # 1.4 it was a mistake the build reported as a NoMethodError in an engine
-  # file, while doctor called the same config healthy.
-  LIST_KEYS = [%w[social], %w[footer links], %w[nav]].freeze
+  # Everything the config says that the engine cannot use -- read from
+  # SiteConfig::Chrome, the same function the build warns from, so the two
+  # cannot name a different set of keys. Before this, doctor knew about
+  # three list keys and nothing else: a widget name with a typo in it took
+  # the sidebar off every page of the site while this said the config was
+  # healthy, and an `about:` written as a list ended the build in a
+  # TypeError out of an ERB template.
+  COMPLAINT_TEXT = {
+    not_a_list: %w[list_shape list_shape_fix],
+    not_a_map: %w[map_shape map_shape_fix],
+    unknown_widget: %w[widget_unknown widget_unknown_fix],
+    widget_shape: %w[widget_shape widget_shape_fix],
+    nav_item: %w[nav_item_shape nav_item_shape_fix],
+    not_text: %w[text_shape text_shape_fix]
+  }.freeze
 
-  def check_list_shapes(data)
-    LIST_KEYS.filter_map do |path|
-      value = dig(data, *path)
-      next if value.nil? || value.is_a?(Array)
-
-      error(t('list_shape', key: path.join('.')), t('list_shape_fix'))
+  def check_chrome_shapes(data)
+    SiteConfig::Chrome.complaints(data).map do |kind, what|
+      text_key, fix_key = COMPLAINT_TEXT.fetch(kind, %w[list_shape list_shape_fix])
+      error(t(text_key, key: what, name: what, index: what), t(fix_key))
     end
+  end
+
+  # A column reserved on every page with nothing to put in it. Since 1.4 the
+  # build stops drawing it, so this is the sentence that says why the site
+  # changed shape after an upgrade -- and names the switch that says it on
+  # purpose.
+  def check_sidebar(data)
+    return [] unless SiteConfig::Chrome.map(data, 'layout').fetch('sidebar', true)
+
+    cards = SiteConfig::Chrome.widgets(data).size
+    cards += 1 unless SiteConfig::Chrome.map(data, 'about')['html'].to_s.strip.empty?
+    return [warn(t('sidebar_empty'), t('sidebar_empty_fix'))] if cards.zero?
+
+    [ok(t('sidebar_ok', count: cards))]
   end
 
   def check_widgets(data)
@@ -689,10 +712,10 @@ module Doctor
 
     findings = []
     widgets.each do |name, conf|
-      unless conf.is_a?(Hash)
-        findings << error(t('widget_shape', name: name))
-        next
-      end
+      # Both of these are named by check_chrome_shapes, from the same list
+      # the build warns from; naming them twice would only make the report
+      # longer, not truer.
+      next unless conf.is_a?(Hash) && SiteConfig::Chrome::CARDS.include?(name)
 
       required = WIDGET_REQUIRED[name]
       if required && conf[required].to_s.empty?
@@ -705,21 +728,32 @@ module Doctor
         findings << error(t('widget_account_id', value: conf['account_id'].inspect), t('widget_account_id_fix'))
       end
 
-      # A Gitea/Forgejo address, when the widget points at one. The likely
-      # mistakes are a handle, a link to one repository, or a bare host --
-      # each of them ends as an empty card nobody notices, because a widget
-      # that fetches nothing looks exactly like a widget whose author has
-      # not pushed lately.
-      if name == 'commits' && !conf['instance'].to_s.strip.empty? &&
-         !conf['instance'].to_s.strip.match?(%r{\Ahttps?://[^/\s]+/?\z})
-        findings << error(t('widget_instance', value: conf['instance'].inspect), t('widget_instance_fix'))
+      # The commits widget's own two settings, checked by the same rules the
+      # fetcher uses (lib/forge_address.rb) rather than by a second copy of
+      # them. Each mistake here ends as an empty card, and an empty card is
+      # indistinguishable from an author who has not pushed lately.
+      if name == 'commits'
+        if ForgeAddress.username(conf['username']).nil?
+          findings << error(t('widget_username', value: conf['username'].inspect), t('widget_username_fix'))
+        end
+        instance = conf['instance'].to_s.strip
+        unless instance.empty?
+          if ForgeAddress.base(instance).nil?
+            findings << error(t('widget_instance', value: conf['instance'].inspect), t('widget_instance_fix'))
+          elsif ForgeAddress.path_under_host?(instance)
+            # A forge two directories deep is unusual, not impossible, so
+            # this is a look rather than a refusal.
+            findings << warn(t('widget_instance_repo', value: conf['instance'].inspect), t('widget_instance_repo_fix'))
+          end
+        end
       end
 
       findings << warn(t('widget_heading', name: name)) if conf['heading'].to_s.empty?
       limit = conf['limit']
       findings << error(t('widget_limit', name: name, value: limit.inspect)) if limit && !(limit.is_a?(Integer) && limit.positive?)
     end
-    findings << ok(t('widgets_ok', count: widgets.size)) if findings.empty? && widgets.any?
+    drawable = SiteConfig::Chrome.widgets(data).size
+    findings << ok(t('widgets_ok', count: drawable)) if findings.empty? && drawable.positive?
     findings
   end
 

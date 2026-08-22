@@ -13,6 +13,7 @@ require_relative '../lib/sidebar'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/embed'
+require_relative '../lib/post_address'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/file_size'
@@ -214,28 +215,32 @@ THEME_COLOR_DARK = ColorsCss.color_for(SITE_COLORS, 'dark', 'bg')
 # or footer.copyright either, called the same file healthy. A build that
 # stops on a file the checker vouches for is the one shape of failure this
 # release is about.
-ABOUT = SiteConfig.get('about', default: {})
-FOOTER = SiteConfig.get('footer', default: {})
-# A list key holds a list or nothing. Anything else -- a string where a list
-# was meant, a key that swallowed its own indentation and became a hash --
-# used to reach .map and end the build in a NoMethodError, with no page
-# regenerated and the traceback naming a line in the engine rather than the
-# line in the config that caused it. Read as empty here and reported by
-# `doctor`, which is where a config mistake belongs.
-def config_list(value)
-  value.is_a?(Array) ? value : []
-end
-
-SOCIAL = config_list(SiteConfig.get('social', default: []))
+ABOUT = SiteConfig::Chrome.map(SiteConfig.data, 'about')
+FOOTER = SiteConfig::Chrome.map(SiteConfig.data, 'footer')
+SOCIAL = SiteConfig::Chrome.list(SiteConfig.data, 'social')
 # Both the Mastodon comments/toot integration and every sidebar widget are
 # optional -- `get` (not `fetch`) so a site with none of this configured
 # just gets an empty hash instead of an aborted build.
-WIDGETS = SiteConfig.get('widgets', default: {})
+# Only the cards the sidebar can draw, each one a set of settings: the
+# template indexes into these without a guard, so a widget written as a
+# list (or a number, or `true`) used to end the build in a TypeError from
+# inside an ERB line. Names outside the list and wrong shapes are named by
+# the warning above and by doctor -- they do not also get to stop the build.
+WIDGETS = SiteConfig::Chrome.widgets(SiteConfig.data)
 # ...so the switch that decides the column asks both questions: does the
 # author want a sidebar, and is there anything to put in it.
+# Anything the config says that the engine cannot use is said here, once,
+# at the start of the build -- and it is the SAME list doctor reports, read
+# from the same function, so the two cannot name different keys. Read as
+# empty rather than fatal: a build that refuses to run leaves the site
+# standing on whatever was deployed last, which helps nobody.
+SiteConfig::Chrome.complaints(SiteConfig.data).each do |kind, what|
+  warn "config/site.yml: #{kind} -- #{what}"
+end
+
 SIDEBAR_SHOWN = LAYOUT_SIDEBAR &&
-                (!ABOUT.is_a?(Hash) || !ABOUT['html'].to_s.strip.empty? ||
-                 (WIDGETS.is_a?(Hash) && ASIDE_CARDS.any? { |name| WIDGETS[name] }))
+                (!ABOUT['html'].to_s.strip.empty? ||
+                 SiteConfig::Chrome.widgets(SiteConfig.data).any?)
 MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 # Computed once, here, because both halves it needs (the instance and the
 # social links) exist by this line and not before it.
@@ -399,7 +404,7 @@ def footer_links_html
   # file healthy. Its sibling `social:` has always read the empty answer
   # correctly (SiteConfig.get returns the default for nil), and the two
   # describe the same shape of data.
-  config_list(FOOTER['links']).map do |link|
+  SiteConfig::Chrome.list(SiteConfig.data, 'footer', 'links').map do |link|
     %(          <li><a href="#{h(link['url'])}">#{h(link['title'])}</a></li>)
   end.join("\n")
 end
@@ -429,7 +434,10 @@ end
 # directory, which the chrome has none of -- and a sidebar card 260px wide is
 # not where a photo grid belongs.
 def config_html(text)
-  return '' if text.to_s.strip.empty?
+  # A list or a hash here is a config mistake, not content: to_s would put
+  # a Ruby inspect string on every page of the site.
+  return '' unless text.is_a?(String)
+  return '' if text.strip.empty?
 
   config_blocks(text).map { |block| render_config_block(block) }.join("\n")
 end
@@ -438,7 +446,8 @@ end
 # a <p> the template gives its own class (footer.copyright, banner.claim):
 # inline Markdown only, no block wrapper to take that class away.
 def config_line_html(text)
-  return '' if text.to_s.strip.empty?
+  return '' unless text.is_a?(String)
+  return '' if text.strip.empty?
 
   body, formatting = MarkdownParser.parse_inline(MarkdownParser.collapse_soft_breaks(text.to_s.strip))
   # The sentinel has to come back out of link TITLES as well as out of the
@@ -1181,15 +1190,18 @@ def truthy?(value)
   !%w[false no 0].include?(value.to_s.strip.downcase)
 end
 
+# The rule itself lives in lib/post_address.rb, shared with the checker and
+# the repair pass -- three copies of "where does this post live" is how the
+# repair pass came to offer rewriting a working link into an address that
+# answers nowhere. The year is passed rather than read here because the
+# build has the post's time parsed and cached already.
+#
+# A page sits at the root, because that is what a page is -- and because
+# every redirect_from a migration carries for one (Ghost, WordPress,
+# Squarespace) is a root path. A dated address for something with no date
+# would be the odd one out on every site that has ever had pages.
 def post_path(post)
-  return "/draft/#{post['draft_token']}/#{post['slug']}/" if draft?(post)
-  # At the root, because that is what a page is -- and because every
-  # redirect_from a migration carries for one (Ghost, WordPress,
-  # Squarespace) is a root path. A dated address for something with no
-  # date would be the odd one out on every site that has ever had pages.
-  return "/#{post['slug']}/" if page?(post)
-
-  "/posts/#{post_time(post).year}/#{post['slug']}/"
+  PostAddress.path(post, year: draft?(post) || page?(post) ? nil : post_time(post).year)
 end
 
 def output_dir(post)
@@ -2077,6 +2089,15 @@ end
 def emit_copy(src, dest, compare_content: false)
   WRITTEN[dest] = true
   if File.exist?(dest)
+    # On a volume that ignores letter case or unicode form, File.exist?
+    # answers yes for a file the directory writes differently -- and then
+    # the copy is skipped, WRITTEN records the name we asked for, and
+    # prune_public (which reads the REAL name from the directory) deletes
+    # the file as an orphan. The page keeps its <img> and loses its
+    # picture, on the site as well as here, because deploy --prune repeats
+    # the deletion. So the file is renamed to the name being recorded
+    # before anything else is decided.
+    settle_name(dest)
     same = if compare_content
              File.binread(dest) == File.binread(src)
            else
@@ -2087,6 +2108,32 @@ def emit_copy(src, dest, compare_content: false)
 
   FileUtils.mkdir_p(File.dirname(dest))
   FileUtils.cp(src, dest)
+end
+
+# Make the directory write the name we are about to record. Only ever a
+# case-or-form rename of one and the same file: the entry is found by
+# identity (dev+ino), never by string comparison.
+def settle_name(dest)
+  dir = File.dirname(dest)
+  wanted = File.basename(dest)
+  children = Dir.children(dir)
+  return if children.include?(wanted)
+
+  actual = children.find { |name| File.identical?(File.join(dir, name), dest) }
+  return if actual.nil?
+
+  source = File.join(dir, actual)
+  File.rename(source, dest)
+  # On a case-sensitive volume a rename between two unicode forms of one
+  # name is a no-op: the directory still writes the old one, and
+  # prune_public would then delete it as an orphan. Copy under the name we
+  # mean, and take the old entry away.
+  return if Dir.children(dir).include?(File.basename(dest))
+
+  FileUtils.cp(source, dest)
+  File.delete(source) unless File.identical?(source, dest)
+rescue SystemCallError
+  nil
 end
 
 # A single pass over public/ -- walking it twice (files separately from
@@ -2158,6 +2205,14 @@ posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |f|
   # same blindness as an unparseable file, different exception.
   raise JSON::ParserError, "not a post object (#{parsed.class})" unless parsed.is_a?(Hash)
 
+  # Which year's DIRECTORY the file sits in -- the same key the checker,
+  # the exporter and stats already carry. A post whose date was corrected
+  # across a year boundary keeps its file (and its media) where they were,
+  # while its address follows the date; media were the one thing this build
+  # looked up by the date, so the picture was never copied and the page was
+  # served with a hole in it. check saw nothing wrong, because check looks
+  # where the file actually is.
+  parsed['__year'] = File.basename(File.dirname(f))
   parsed
 rescue JSON::ParserError, SystemCallError => e
   unreadable << "  #{f}: #{e.message.lines.first.to_s.strip[0, 100]}"
@@ -2374,6 +2429,18 @@ def cdata_safe(text)
   text.to_s.gsub(']]>', ']]]]><![CDATA[>')
 end
 
+
+# Where this post's media actually are: under the file's year, and -- for an
+# archive written before that was settled -- under the date's year if the
+# first has nothing.
+def media_source_dir(post, date_year)
+  by_file = File.join(MEDIA_DIR, (post['__year'] || date_year).to_s, post['slug'].to_s)
+  return by_file if Dir.exist?(by_file)
+
+  by_date = File.join(MEDIA_DIR, date_year.to_s, post['slug'].to_s)
+  Dir.exist?(by_date) ? by_date : by_file
+end
+
 def referenced_media_filenames(post)
   post['content'].flat_map do |block|
     [(block['media'] || []).first, (block['poster'] || []).first].compact.map { |m| m['url'] }
@@ -2385,8 +2452,12 @@ end
   dir = output_dir(post)
 
   # Media stays in media/<year>/<slug>/ even for drafts -- publishing
-  # doesn't move files, it just moves the output page.
-  source_media_dir = File.join(MEDIA_DIR, year.to_s, post['slug'])
+  # doesn't move files, it just moves the output page. The year here is the
+  # one the FILE lives under, not the one its date says: those two part
+  # company when a date is corrected across a year boundary, and every
+  # other part of the engine (check, export, delete, restore, the editor)
+  # reads the file's own year.
+  source_media_dir = media_source_dir(post, year)
   referenced_media_filenames(post).each do |name|
     # Basename for the same reason the page uses one: a "filename" carrying
     # "../" is a path, and File.join would honour it -- on the way in it

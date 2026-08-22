@@ -528,11 +528,19 @@ What it looks for, each with a line saying what to do about it:
   differing only in digits are left alone (`rok-2025` next to `rok-2026`
   is two year-series, not a typo).
 - **One old address claimed by two posts.** Whichever renders last wins
+- **Two posts that would be served at one address.** The build refuses to
+  run at all in this state, so this is the one finding that stands between
+  you and a site that cannot be rebuilt.
   and the other's readers land on it.
 
-It only reports. Nothing here deletes a directory or rewrites a post: the
+It only reports, unless you ask it not to. On its own -- and that is how
+cron runs it -- nothing here deletes a directory or rewrites a post: the
 value of the tool is that its output can be trusted, and a checker that
-also acts has to be trusted twice. Twenty findings of each kind are
+also acts has to be trusted twice. `--repair` is where the asking happens,
+one finding at a time and never without a key press; it is described
+below, and it earns its trust the hard way -- it adds rather than
+rewrites where it can, it moves files to the trash rather than deleting
+them, and it keeps a version of a post before changing it. Twenty findings of each kind are
 listed and the rest counted, so one bad import can't bury everything else.
 It exits non-zero on errors only, never on warnings, so it can hang off
 cron and speak up only when something is actually broken.
@@ -557,12 +565,17 @@ address into its `redirect_from`: one added line, your own text untouched,
 and every link to the old address answered at once, including the ones
 from outside the site that no check can see. A link written relative to the
 post is rewritten to the address it means. A media directory or file no
-post references is moved to the trash, where `restore` can reach it -- the
-repair pass never deletes anything.
+post references is moved to the trash the engine already uses --
+`trash/<year>/<slug>/media/` -- and `./blog.sh restore <slug>` puts it
+back; the repair pass never deletes anything. A file whose name differs
+from the one on disk only in letter case or unicode form is not a leftover
+at all: the pass offers to write the name the directory actually uses into
+the post, and never touches the file.
 
 Where the right answer is a matter of judgement -- two posts claiming one
 old address, an image the author has to look at, a link to something this
-archive never had -- it says so and passes over. A second run proposes
+archive never had, a slug two posts share across two years, or a target
+that is still a draft -- it says so and passes over. A second run proposes
 nothing, because the findings it repaired are gone; run `./blog.sh rebuild`
 afterwards to put the changes on the site.
 

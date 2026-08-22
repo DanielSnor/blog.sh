@@ -29,8 +29,13 @@ module DeployBackend
       !target.empty?
     end
 
+    # The remote DIRECTORY belongs to the target too: the same server with
+    # two directories on it is two targets, and a manifest that says
+    # "everything is already there" about the other one leaves the new
+    # directory empty while the run reports success.
     def target
-      ENV['SFTP_TARGET'].to_s
+      dir = ENV['SFTP_REMOTE_DIR'].to_s.gsub(%r{/+\z}, '')
+      dir.empty? ? ENV['SFTP_TARGET'].to_s : "#{ENV['SFTP_TARGET']}:#{dir}"
     end
 
     def manifest_suffix

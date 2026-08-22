@@ -68,7 +68,10 @@ HEX = /\A#(\h{3}|\h{6})\z/.freeze
 
 # The icons the build already knows how to draw. Anything else needs
 # icon_svg, which is markup and belongs in the file rather than a prompt.
-ICONS = %w[mastodon pixelfed linkedin github bluesky instagram threads facebook x youtube rss email].freeze
+# Kept in step with SOCIAL_ICONS in build/build_blog.rb -- an icon the
+# engine can draw and the wizard never offers is one nobody finds.
+ICONS = %w[mastodon pixelfed linkedin github gitea forgejo codeberg gitlab
+           bluesky instagram threads facebook x youtube rss email].freeze
 
 def current
   @current ||= begin
@@ -641,7 +644,7 @@ def section_footer
 end
 
 def section_social
-  entries = current['social']
+  entries = SiteConfig::Chrome.list(current, 'social')
   entries = [] unless entries.is_a?(Array)
 
   loop do
@@ -685,9 +688,12 @@ end
 # person is still the one who can say whether it is a typo or a post they
 # have not written yet.
 def section_nav
-  entries = current['nav']
-  derived = !entries.is_a?(Array)
-  entries = [] unless entries.is_a?(Array)
+  # The same question the build asks (SiteConfig::Chrome.written?), not a
+  # different one: since 1.4 a `nav:` key with nothing under it means "no
+  # menu", so describing that config as "the engine derives the menu" told
+  # the author the opposite of what their own site was doing.
+  derived = !SiteConfig::Chrome.written?(current, 'nav')
+  entries = SiteConfig::Chrome.list(current, 'nav')
   touched = false
 
   loop do
@@ -876,7 +882,7 @@ WIDGETS = {
 
 def section_widgets
   loop do
-    active = (current['widgets'] || {}).keys
+    active = SiteConfig::Chrome.map(current, 'widgets').keys
     state = [Tui.paint(t('widgets_current', list: active.empty? ? t('list_empty') : active.join(', ')), :dim)]
     options = WIDGETS.keys.map { |name| [name, t("widget_#{name}")] } + [['keep', t('list_keep')]]
     chosen = Wizard.choose(t('q_widget'), options, current_index: options.size - 1, note: state)
