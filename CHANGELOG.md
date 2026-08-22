@@ -51,7 +51,13 @@ prints what an installation is running.
   same backend at another target used to inherit the old manifest, which
   says everything is already there -- so the new target stayed empty and
   the run reported success. A manifest written for another target is now
-  thrown away out loud.
+  thrown away out loud. What counts as "another target" ignores the things
+  that cannot move a connection: the order the switches are written in, and
+  `-v` or `-q` added to watch a run. Reformatting a line in `env.sh` is not
+  a move, and treating it as one would throw away the only record of what
+  stands on the far end -- for `sftp` that record is what finds the files
+  you have deleted since. Only a digest of those switches is stored, so the
+  key path and jump host in `env.sh` stay in `env.sh`.
 
 ### Changed
 
@@ -72,7 +78,16 @@ prints what an installation is running.
   every page (which has no year in its address at all), the old address
   was derived from the folder -- so the redirect pointed at an address
   that never existed, and the build refused it with a warning nobody could
-  act on.
+  act on. Editing, publishing, unpublishing and re-importing now answer
+  that question in the same one place, which is what made the next entry
+  visible.
+- **Two pages cannot share a slug, and the build says so.** A page is
+  served at the root, so two of them with one slug collide however far
+  apart their dates are -- and the build used to write both and serve
+  whichever came last, silently losing one. It now stops, the way it
+  always has for two posts in one year, and `check` reports the pair at
+  `/slug/` instead of at an address with a year in it that no page ever
+  had.
 
 - **`./blog.sh check --repair`: the checker's other half.** Until now
   `check` could say what was wrong with an archive and nothing more, so
@@ -127,6 +142,13 @@ prints what an installation is running.
 
 ### Fixed
 
+- **Turning a post into a page (or back) no longer loses its address.**
+  `type: page` typed into the frontmatter -- or deleted from it -- moves a
+  post between `/posts/2026/slug/` and `/slug/` without touching the date,
+  and nothing was recorded behind it: every existing link to the address it
+  left died, and `check` called the archive sound. The redirect is written
+  now, whichever direction the change goes, and a re-import that does the
+  same thing behaves the same way.
 - **A list key that held something else ended the build in a traceback.**
   A string under `social:` (a URL pasted where a list of them belongs), or
   anything but a list under `footer.links` or `nav:`, reached `.map` and

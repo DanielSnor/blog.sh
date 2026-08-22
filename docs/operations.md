@@ -679,6 +679,17 @@ Things worth knowing:
   backend) records what the target already has. Deleting one is always
   safe -- the next deploy re-uploads everything once and rebuilds it. The
   guards are unaffected, because their reference lives elsewhere.
+- **...with one exception worth knowing.** `rsync`, `rclone` and `git`
+  diff the target themselves, so a lost manifest costs one full re-upload
+  and nothing else. For `sftp`, Surfer and a local directory the engine
+  never reads the far end, so the manifest is also the only record of what
+  stands on it: a file you delete at home *after* the manifest went missing
+  stays on the target, and no flag will find it again. This is why a deploy
+  says out loud that the manifest was written for another target instead of
+  quietly starting over -- and why the target's identity ignores the
+  switches that cannot move a connection (`-v`, `-q`, the order they are
+  written in), so reformatting a line in `env.sh` is not a new target.
+
 - **Switching backends** starts from a fresh manifest on purpose; the
   first deploy to a new target uploads the whole site. The baseline is
   *shared* across backends -- it describes the build, which is the same
