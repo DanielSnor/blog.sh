@@ -81,13 +81,17 @@ prints what an installation is running.
   act on. Editing, publishing, unpublishing and re-importing now answer
   that question in the same one place, which is what made the next entry
   visible.
-- **Two pages cannot share a slug, and the build says so.** A page is
-  served at the root, so two of them with one slug collide however far
-  apart their dates are -- and the build used to write both and serve
-  whichever came last, silently losing one. It now stops, the way it
-  always has for two posts in one year, and `check` reports the pair at
-  `/slug/` instead of at an address with a year in it that no page ever
-  had.
+- **Two pages sharing a slug stop being a silent loss.** A page is served
+  at the root, so two of them with one slug collide however far apart
+  their dates are -- and the build wrote both and served whichever came
+  last, with nothing said anywhere. The build now names both files on
+  every run, `check` calls it an error and reports it at `/slug/` rather
+  than at an address with a year in it that no page ever had, and the
+  paths that write a post refuse to create the pair in the first place.
+  The build warns rather than stops on purpose: publishing runs from cron,
+  where nobody is at the keyboard to read an abort, and a site that
+  already has such a pair should keep being served while its author
+  decides which page keeps the address.
 
 - **`./blog.sh check --repair`: the checker's other half.** Until now
   `check` could say what was wrong with an archive and nothing more, so

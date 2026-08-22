@@ -113,15 +113,22 @@ module PostAddress
   end
 
   # The build asks this now instead of keeping its own copy, which read
-  # only `page` and read it with a different notion of "no": `page: "No"`
-  # was a page to one of them and an ordinary post to the other, so the
-  # site served it under its year while the checker, the repair pass and
-  # the rename guard all thought it lived at the root. Since the collision
-  # keys, that disagreement also decides whether the build runs at all.
+  # `page` with a different notion of "no": `page: "No"` was a page to one
+  # of them and an ordinary post to the other.
+  #
+  # It asks about `page` and nothing else. This used to fall back to
+  # `type == 'page'` when the key was missing -- a rule no released engine
+  # ever served by (1.3 and 1.3.2 both read `truthy?(post['page'])` and
+  # nothing more), so honouring it here would have moved such a post from
+  # /posts/<year>/<slug>/ to /<slug>/ on the first build after an upgrade:
+  # out of the front page, out of the feed, out of the index, with its
+  # permalink dead and no redirect written, because nobody edited anything
+  # -- the engine would simply have started reading the file differently.
+  # A rule that changes where published work is served has to arrive as an
+  # edit somebody makes, not as a new opinion about an old file.
   def page?(post)
     value = post['page']
-    return post['type'].to_s == 'page' if value.nil?
-    return false if value == false
+    return false if value.nil? || value == false
 
     !%w[false no 0].include?(value.to_s.strip.downcase)
   end
@@ -129,18 +136,15 @@ module PostAddress
   # The year in the post's own date -- what the address is built from.
   def date_year(post)
     raw = post['date'].to_s
-    return raw[0, 4] if raw.match?(/\A\d{4}/)
-
-    # An imported archive can carry "Thu, 01 Jan 2026 10:00:00 +0100", and
-    # four characters off the front of that is "Thu,". The build parses the
-    # date to find the year, so taking a substring here was one more way
-    # for the two to disagree -- with a redirect written to /posts/Thu,/ to
-    # show for it.
-    begin
-      Time.parse(raw).year.to_s
-    rescue StandardError
-      raw[0, 4]
-    end
+    # Parsed, not sliced, and parsed FIRST. The build finds the year with
+    # Time.parse and serves the post there, so anything else here is a
+    # second opinion about the same file: four characters off the front of
+    # "Thu, 01 Jan 2026" is "Thu,", and "2025-12-31T24:00:00+01:00" is a
+    # legal way of writing the first instant of 2026, which the slice reads
+    # as 2025. Both wrote redirects from addresses the site never had.
+    Time.parse(raw).year.to_s
+  rescue StandardError
+    raw[0, 4]
   end
 
   # The year of the DIRECTORY the file sits in, which is what the checker

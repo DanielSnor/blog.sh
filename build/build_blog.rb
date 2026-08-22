@@ -2213,6 +2213,11 @@ posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |f|
   # served with a hole in it. check saw nothing wrong, because check looks
   # where the file actually is.
   parsed['__year'] = File.basename(File.dirname(f))
+  # The file this came out of. The duplicate message below names it,
+  # because an address does not find a file: two pages collide on a slug
+  # however far apart their dates are, and "/about/ (2x)" leaves the reader
+  # grepping the archive for the pair they have to choose between.
+  parsed['__path'] = f
   parsed
 rescue JSON::ParserError, SystemCallError => e
   unreadable << "  #{f}: #{e.message.lines.first.to_s.strip[0, 100]}"
@@ -2240,16 +2245,35 @@ posts.each do |p|
   PostAddress.collision_keys(p, year: post_time(p).year).each { |key| (collisions[key] ||= []) << p }
 end
 duplicates = collisions.select { |_, v| v.size > 1 }
-unless duplicates.empty?
-  # The address alone does not find the files: a page collides on its slug
-  # however far apart the two dates are, so "/about/ (2x)" leaves the
-  # reader grepping a whole archive for the pair they have to choose
-  # between. The files ARE the fix, so they are what the message hands over.
-  list = duplicates.map do |(year, slug), dupes|
-    where = dupes.map { |p| "      #{p['__path'] || "#{p['date'].to_s[0, 4]}/#{p['slug']}.json"}" }
-    "  #{year == 'page' ? "/#{slug}/" : "#{year}/#{slug}"} (#{dupes.size}x)\n#{where.join("\n")}"
-  end.join("\n")
-  abort("❌ Two posts at one address in content.nosync/posts/ -- build stopped:\n#{list}")
+
+def collision_lines(group)
+  group.map { |(year, slug), dupes|
+    where = dupes.map { |p| "      #{p['__path']}" }.join("\n")
+    "  #{year == 'page' ? "/#{slug}/" : "#{year}/#{slug}"} (#{dupes.size}x)\n#{where}"
+  }.join("\n")
+end
+
+# Two posts sharing a year and a slug cannot both be written: one output
+# directory, one media/<year>/<slug>/ between them, so one would silently
+# disappear. That has stopped the build since long before this rule was
+# written down in one place, and it still does.
+same_file, at_the_root = duplicates.partition { |(year, _), _| year != 'page' }
+unless same_file.empty?
+  abort("❌ Two posts at one address in content.nosync/posts/ -- build stopped:\n#{collision_lines(same_file)}")
+end
+
+# Two PAGES at one address lose one of the two as well -- but this one
+# warns rather than stops, and the difference is deliberate. Refusing to
+# build was tried and turned every path that writes a post into a way to
+# take the site down, the scheduler's cron included, where nobody is at
+# the keyboard to read the error and the archive stays broken until
+# somebody notices the site has stopped updating. `check` calls this an
+# error and the guards refuse to create it; a site that already has one
+# keeps being served, one page short and saying so on every build.
+at_the_root.each do |(_, slug), dupes|
+  warn("⚠️  #{dupes.size} posts are served at /#{slug}/ -- only the last one built stays:\n" \
+       "#{dupes.map { |p| "      #{p['__path']}" }.join("\n")}\n" \
+       '   Give one of them another slug (./blog.sh props -> address).')
 end
 
 # Slug is a tiebreaker, not decoration: sort_by isn't stable, and posts

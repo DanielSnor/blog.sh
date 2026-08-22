@@ -41,7 +41,11 @@ module AddressGuard
       rescue StandardError
         return other
       end
-      next unless candidate.is_a?(Hash)
+      # Valid JSON that is not a post object is in the same position as a
+      # file that will not parse: the build stops on it either way, and it
+      # is certainly not free space. unreadable? says the same, and these
+      # two answers have to agree.
+      return other unless candidate.is_a?(Hash)
 
       return other if (PostAddress.collision_keys(candidate) & wanted).any?
     end

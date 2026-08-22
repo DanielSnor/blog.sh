@@ -98,25 +98,35 @@ module DeployBackend
 
     def normalised_args
       tokens = split_args(ENV['SFTP_ARGS'].to_s.strip)
-      kept = []
-      keys = []
+      pairs = []
+      loose = false
       until tokens.empty?
         token = tokens.shift
         next if token.match?(CHATTER)
 
         key, glued = unglue(token)
         value = glued || (TAKES_VALUE.include?(key) && !tokens.empty? ? tokens.shift : nil)
-        keys << key
         next if value && TUNING.include?(key)
 
-        kept << (value ? "#{key} #{value}" : key)
+        # A bare word means a switch this code does not know takes a value,
+        # so its value is walking around loose. Sorting would part the two,
+        # and two different servers could then land on one fingerprint --
+        # the mistake that leaves a target empty and calls it success.
+        loose = true if value.nil? && !key.start_with?('-')
+        pairs << [key, value ? "#{key} #{value}" : key]
       end
-      # Order is dropped only where it cannot matter. ssh takes the FIRST
-      # value of a repeated -o, so the same switches in another order are
-      # then genuinely two configurations -- sorting those together would
-      # say one server where there are two, which is the mistake that
-      # leaves a target empty and calls it a success.
-      keys.uniq.size == keys.size ? kept.sort : kept
+      return pairs.map(&:last) if loose
+
+      # Sorted by KEY, with the original position as the tiebreaker. Two
+      # lines that differ only in the order of their switches come out the
+      # same, while a repeated -o keeps the order it was written in --
+      # openssh takes the first value of those, so swapping them really is
+      # a second configuration. Asking instead whether ANY key repeats
+      # turned one repeated switch into "this whole line is order
+      # sensitive", and two -o (StrictHostKeyChecking with its hosts file)
+      # is the commonest SFTP_ARGS there is: tidying such a line up threw
+      # the manifest away, orphans and all.
+      pairs.each_with_index.sort_by { |(key, _), index| [key, index] }.map { |(_, text), _| text }
     end
 
     # "-P2022" and "-P 2022" are one switch written two ways, and so are

@@ -1584,10 +1584,14 @@ def write_scheduled_date(path, post, date, raw: nil, slug: nil)
     updated = post.merge('date' => date.iso8601, 'scheduled' => true)
     new_year = date.year.to_s
     new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
+    # Asked whether or not the file moves: a date that stays inside the
+    # year can still land the post on an address another post is served
+    # at, and the old guard only looked when the folder changed.
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
+                                  slug: post['slug'], except: path)
+    abort t('cli.post_already_exists', slug: post['slug'], path: taken) if taken
+
     if File.expand_path(new_path) != File.expand_path(path)
-      taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
-                                    slug: post['slug'], except: path)
-      abort t('cli.post_already_exists', slug: post['slug'], path: taken) if taken
 
       FileUtils.mkdir_p(File.dirname(new_path))
       Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
@@ -1970,9 +1974,6 @@ def apply_queue_moves(moves)
     # the lock was taken, which no lock can do anything about.
     moves.each do |entry, target|
       abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
-      target_path = File.join(CONTENT_DIR, target.year.to_s, "#{entry[:post]['slug']}.json")
-      next if File.expand_path(target_path) == File.expand_path(entry[:path])
-
       moved = entry[:post].merge('date' => target.iso8601)
       taken = AddressGuard.occupant(moved, content_dir: CONTENT_DIR,
                                     slug: entry[:post]['slug'], except: entry[:path])
@@ -2766,8 +2767,23 @@ end
 # when that draft publishes. Told "this redirect never happens", the
 # owner's next move is dropping an address that is doing its job.
 def address_occupant(parts)
-  raw = File.read(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"), encoding: 'utf-8')
-  draft?(JSON.parse(raw)) ? :draft : :published
+  year, slug = parts
+  # The file may sit in any year's folder: what decides the address is the
+  # DATE. Reading only <year>/<slug>.json answered about a file rather than
+  # about an address, which is the same narrow question the six writing
+  # paths were asking until this release.
+  Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).sort.each do |file|
+    candidate = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue StandardError
+      next
+    end
+    next unless candidate.is_a?(Hash) && !PostAddress.page?(candidate)
+    next unless PostAddress.date_year(candidate) == year
+
+    return draft?(candidate) ? :draft : :published
+  end
+  nil
 rescue Errno::ENOENT
   nil
 rescue StandardError
@@ -3121,8 +3137,18 @@ def edit_post(slug, path: nil)
   # moving its file anywhere, and the address it lands on can already be
   # a page's. The build refuses to run on that, so the save that made it
   # would be the last one before the site stopped building.
-  taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug, except: path)
-  abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+  # Only when the save actually moves the post. An archive that already
+  # holds two posts at one address is exactly the archive somebody is
+  # trying to repair, and refusing the edit that would repair it -- while
+  # claiming it would overwrite a file it does not write to -- left them
+  # with the CLI unable to fix what the CLI had let happen.
+  moving = PostAddress.collision_keys(updated, slug: slug) !=
+           PostAddress.collision_keys(post, slug: slug) ||
+           File.expand_path(new_path) != File.expand_path(path)
+  if moving
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug, except: path)
+    abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+  end
 
   carried = Array(post['former_slugs']).map(&:to_s)
   updated['former_slugs'] = carried unless carried.empty?

@@ -65,6 +65,18 @@ module PostWriter
     copy_media(media_files, year, slug)
     sync_media_dimensions(post, year, slug, previous: previous)
     path = File.join(dir, "#{slug}.json")
+    # unique_slug settles the FILE name; it says nothing about the address.
+    # An imported page is served at the root, where a page already standing
+    # there has no year to be told apart by -- so the import wrote both,
+    # reported success, and left an archive whose two pages share one
+    # address. Raised, not aborted: the per-item rescue counts it, names it,
+    # and the rest of the import goes on.
+    taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug, except: path)
+    if taken
+      raise "cannot write '#{slug}': a different post is already served at that address " \
+            "(#{taken}) -- resolve the slug clash by hand"
+    end
+
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
     path
@@ -657,7 +669,12 @@ module PostWriter
     # marker survived forever, and after unpublish -> rename -> re-import
     # the old address 404'd while a marker for it sat in the JSON. Spent
     # here for the same reason and in the same way.
-    if post['state'] != 'draft' && post['unpublished_from']
+    # The sweep runs for every published post, not only for one carrying a
+    # marker: a post that went published -> draft -> published through the
+    # source can come back holding a redirect from the address it is served
+    # at again, and only this call can clear it. Left in, the build
+    # complains on every run and nothing the author does makes it stop.
+    if post['state'] != 'draft'
       PostAddress.spend_vacated(post, post.delete('unpublished_from'), slug: slug)
     end
 

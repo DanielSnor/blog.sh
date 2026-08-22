@@ -169,7 +169,7 @@ module Checker
     # not count towards a series page existing.
     series_sizes = Hash.new(0)
     posts.each do |post|
-      next if draft?(post) || post['page'] || post['unlisted']
+      next if draft?(post) || PostAddress.page?(post) || post['unlisted']
 
       slug = Slug.slugify(post['series'].to_s)
       series_sizes[slug] += 1 unless slug.empty?

@@ -58,6 +58,7 @@ require_relative '../lib/slug'
 # again here, so that all three agree about what a menu item can point
 # at.
 require_relative '../lib/checker'
+require_relative '../lib/post_address'
 
 def t(key, **vars)
   I18n.t("style.#{key}", **vars)
@@ -845,7 +846,9 @@ def nav_known
 end
 
 def nav_pages
-  @nav_pages ||= nav_posts.select { |p| p['page'] }.map { |p| "/#{p['slug']}/" }.sort
+  # Asked of PostAddress, because "page: No" is true to Ruby and false to
+  # the build: the menu offered an address the site does not answer at.
+  @nav_pages ||= nav_posts.select { |p| PostAddress.page?(p) }.map { |p| "/#{p['slug']}/" }.sort
 end
 
 # The tags worth putting in a menu are the ones with posts behind them, so
