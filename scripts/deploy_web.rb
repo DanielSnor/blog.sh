@@ -133,6 +133,11 @@ end
 # and checked on the way in; a mismatch throws the manifest away out loud,
 # which is the same thing a missing manifest does and is always safe.
 def manifest_target
+  # `identity` where a backend has one (sftp: the same server with two
+  # directories is two targets), `target` otherwise. Never the connection
+  # string itself -- that one has to stay exactly what the tool expects.
+  return BACKEND.identity.to_s if BACKEND.respond_to?(:identity)
+
   BACKEND.respond_to?(:target) ? BACKEND.target.to_s : ''
 end
 

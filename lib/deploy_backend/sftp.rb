@@ -29,13 +29,22 @@ module DeployBackend
       !target.empty?
     end
 
-    # The remote DIRECTORY belongs to the target too: the same server with
-    # two directories on it is two targets, and a manifest that says
-    # "everything is already there" about the other one leaves the new
-    # directory empty while the run reports success.
+    # Where to connect. This value is also the last argument handed to
+    # `sftp`, and openssh reads "user@host:path" as "start in path" -- so
+    # putting the remote directory in here made the batch's own `cd` land a
+    # second time and the whole site went to public_html/public_html.
     def target
+      ENV['SFTP_TARGET'].to_s
+    end
+
+    # WHICH target this is, for the deploy manifest only. The same server
+    # with two directories on it is two targets, and a manifest describing
+    # the other one says everything is already uploaded -- so the new
+    # directory stays empty while the run reports success. Kept apart from
+    # `target` because one is an identity and the other is an address.
+    def identity
       dir = ENV['SFTP_REMOTE_DIR'].to_s.gsub(%r{/+\z}, '')
-      dir.empty? ? ENV['SFTP_TARGET'].to_s : "#{ENV['SFTP_TARGET']}:#{dir}"
+      dir.empty? ? target : "#{target}:#{dir}"
     end
 
     def manifest_suffix

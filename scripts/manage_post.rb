@@ -74,8 +74,8 @@ def draft_url(post)
   "#{SITE_BASE_URL.to_s.chomp('/')}#{draft_path(post)}"
 end
 
-def published_url(slug, year)
-  "#{SITE_BASE_URL.to_s.chomp('/')}#{published_path(slug, year)}"
+def published_url(slug, year, page: false)
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{published_path(slug, year, page: page)}"
 end
 
 # The site-relative halves, split off so the local-preview hint below can
@@ -2848,7 +2848,15 @@ def rename_post(path, post, raw: nil)
   if draft?(post)
     puts t('cli.rename_confirm_draft', old: old_slug, new: new_slug)
   else
-    puts t('cli.rename_confirm', old_url: published_url(old_slug, year), new_url: published_url(new_slug, year))
+    # The addresses the site actually answers at: a page has no year in
+    # its address, and a post whose date was corrected across a year lives
+    # under the DATE's year, not the folder's. The banner two rows above
+    # this dialog had it right while the promise below did not.
+    page = PostAddress.page?(post)
+    address_year = post['date'].to_s[0, 4]
+    puts t('cli.rename_confirm',
+           old_url: published_url(old_slug, address_year, page: page),
+           new_url: published_url(new_slug, address_year, page: page))
   end
   unless Tui.key_choice(t('cli.rename_go')) == t('cli.confirm_yes_char')
     puts t('cli.cancelled')
@@ -2865,10 +2873,24 @@ def rename_post(path, post, raw: nil)
 
   updated = post.merge('slug' => new_slug)
   unless draft?(post)
-    former = Array(post['former_slugs']).map(&:to_s) + ["#{year}/#{old_slug}"]
-    # A rename back to an earlier slug must not leave that address
-    # redirecting to itself.
-    updated['former_slugs'] = (former.uniq - ["#{year}/#{new_slug}"])
+    # The year the post was SERVED under -- its date's, not its folder's.
+    # Those two part company after a date is corrected across a year, and
+    # recording the folder's year left the live address dying without a
+    # redirect while a stub appeared at an address nobody ever linked to.
+    address_year = post['date'].to_s[0, 4]
+    if PostAddress.page?(post)
+      # A page is served at the root, and former_slugs cannot express that
+      # (every entry of it is <year>/<slug>). Its old address is recorded
+      # the way every imported one is: as a redirect_from on the post that
+      # took its place.
+      olds = Array(post['redirect_from']).map(&:to_s) + ["/#{old_slug}/"]
+      updated['redirect_from'] = (olds.uniq - ["/#{new_slug}/"])
+    else
+      former = Array(post['former_slugs']).map(&:to_s) + ["#{address_year}/#{old_slug}"]
+      # A rename back to an earlier slug must not leave that address
+      # redirecting to itself.
+      updated['former_slugs'] = (former.uniq - ["#{address_year}/#{new_slug}"])
+    end
   end
 
   # Media first, replacement JSON second, old JSON last -- the same order

@@ -316,12 +316,20 @@ module Repair
     content = File.join(root, 'content.nosync', 'posts')
     slug = File.basename(path, '.json')
     year = File.basename(File.dirname(path))
-    # Counted before and after: asking whether ANY version exists answers
-    # yes for a post with history from last year, so a copy that could not
-    # be written now would have passed as one that was.
-    before = PostVersions.list(slug, year, content_dir: content).size
+    before = File.read(path, encoding: 'utf-8')
     PostVersions.keep(path, content_dir: content)
-    unless PostVersions.list(slug, year, content_dir: content).size > before
+    # What matters is whether the state BEFORE this change can be walked
+    # back to -- not whether the number of files grew. PostVersions.keep
+    # legitimately writes nothing when a byte-identical copy is already
+    # there (its guard against a re-import filling the history with
+    # duplicates), and at a full CAP the prune drops the oldest as the new
+    # one lands, so the count stays put. Counting called both of those a
+    # failure -- and the first one is every archive that was ever imported
+    # twice, which is most of the ones this pass exists for.
+    kept = PostVersions.list(slug, year, content_dir: content).any? do |file|
+      File.read(file, encoding: 'utf-8') == before
+    end
+    unless kept
       warn "version not kept for #{File.basename(path)} -- nothing was changed"
       return false
     end
