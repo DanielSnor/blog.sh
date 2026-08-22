@@ -461,7 +461,7 @@ See [Deploying](operations.md#deploying) for the rest of the guards.
 
 ```bash
 export SURFER_URL=https://surfer.example.com
-export SURFER_TOKEN=...        # create an access token in the Surfer web UI
+export SURFER_TOKEN=...        # create an access token in the Surfer admin UI (/_admin)
 export SURFER_REMOTE_DIR=      # optional subdirectory; empty = app root
 ```
 
@@ -503,8 +503,8 @@ export GIT_PAGES_CNAME=www.example.com # optional custom domain
 
 Free hosting with HTTPS. Setup on the host's side (GitHub shown,
 GitLab/Codeberg analogous): create a repository, then Settings → Pages
-→ "Deploy from a branch" → `gh-pages`. Every deploy force-pushes the
-build as a single-commit snapshot; a custom domain must be set via
+→ Build and deployment → Source → "Deploy from a branch" → `gh-pages`.
+Every deploy force-pushes the build as a single-commit snapshot; a custom domain must be set via
 `GIT_PAGES_CNAME` (the host stores it as a CNAME file *in the branch*,
 which a snapshot push would otherwise wipe).
 
@@ -591,7 +591,8 @@ announcement (logged, not an error).
 
 1. In `config/site.yml`, set `bluesky.handle` (e.g.
    `you.bsky.social`); `bluesky.pds` only if you self-host a PDS.
-2. On Bluesky: Settings → App Passwords → create one, and put it into
+2. On Bluesky: Settings → Privacy and security → App Passwords
+   (bsky.app/settings/app-passwords) → create one, and put it into
    env.sh as `BLUESKY_APP_PASSWORD` -- never the account password.
 3. Announcements fit Bluesky's 300-grapheme limit automatically (the
    excerpt shrinks; title, link and hashtags never do), with the link
@@ -628,13 +629,29 @@ Three things have to be true for it to work, and `./blog.sh doctor`
    can ask, and the token can't be shipped to a browser -- so cron reads
    the thread and writes `public/comments.json`, and the page renders
    from that. Without that cron job nothing new ever appears.
-2. **On Mastodon the token needs `read:statuses`** alongside
-   `write:statuses`. Reissue it under Preferences → Development if yours
-   predates this: a token without it gets a perfectly good answer with
+2. **The token needs `read:statuses`** alongside `write:statuses`. On
+   Mastodon that is a choice; on GoToSocial it is the only way comments
+   work at all (see the note below). Reissue it under Preferences →
+   Development if yours predates this: a token without it gets a perfectly good answer with
    the `favourited` field left out of it, which reads as "approved
    nothing". On Bluesky the existing app password is enough.
 3. **You have to go and star the comments worth keeping** -- see the
    warning above the list.
+
+**GoToSocial.** Live comments cannot work there, whatever you configure:
+every read of a thread needs a token, all four of its authentication
+requirements are on, and a token cannot be put in a visitor's browser.
+Turn on `comments.approval: fav` -- the cron reads the thread with the
+token and only the replies you star reach the page. Two more things worth
+knowing: the token is made under Settings → Applications → New
+Application (not Preferences → Development, which is Mastodon's path and
+does not exist here), with the scopes written space-separated -- it needs
+`read:statuses` as well as `write:statuses`, and both fit in one token
+because GoToSocial has granular scopes. And a GoToSocial
+instance usually allows 5000 characters rather than 500, so
+`mastodon.toot_length` is worth setting to whatever your server's
+`statuses-max-chars` says. `doctor --online` checks the first of these
+for you and says so in one sentence.
 
 Worth knowing before switching it on:
 

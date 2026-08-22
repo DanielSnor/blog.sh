@@ -780,6 +780,21 @@ module MarkdownParser
       counter -= 1 unless src # filename was recycled, the number wasn't consumed
       return [{ 'type' => 'video', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
     elsif (m = IMAGE_RE.match(para))
+      # An http(s) address is not a path. The engine publishes files it is
+      # given; a picture that lives on somebody else's server cannot be one
+      # of them, and treating the address as a filename produced a media
+      # entry pointing at a file nobody ever had -- the post then carried a
+      # picture that was never anywhere. Kept as a link, which is what the
+      # line actually is, and said out loud so the author can download the
+      # picture and write it as a file if they meant to keep it.
+      if m[2].to_s.match?(%r{\Ahttps?://})
+        warn "Note: #{m[2]} is on another server, so it stays a link. Download it into " \
+             'incoming/ and write ![alt](filename.jpg) to publish it with the post.'
+        return [{ 'type' => 'text', 'text' => "[#{m[1]}](#{m[2]})",
+                  'formatting' => [{ 'type' => 'link', 'url' => m[2], 'start' => 1,
+                                     'end' => 1 + m[1].to_s.length }] }, counter]
+      end
+
       counter += 1
       alt, path, caption = m[1], m[2], unescape_title(m[3])
       # A single exclamation mark is for images only. A video with just one

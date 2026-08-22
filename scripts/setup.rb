@@ -346,9 +346,9 @@ def tell_about_scheduler(site, current)
   say(t('section_scheduler_intro'))
   say('')
   # Quoted, and stdout thrown away. The path is the install's own -- and
-  # this one has lived under "Mobile Documents" since the first day, where
-  # an unquoted schedule line runs "/Users/.../Mobile" and fails in silence
-  # every fifteen minutes. The redirect keeps a tick with nothing to do
+  # a path with a space in it (an iCloud "Mobile Documents" folder, say)
+  # makes an unquoted schedule line run only the part before the space,
+  # and fail in silence every fifteen minutes. The redirect keeps a tick with nothing to do
   # from mailing; errors still go to stderr, which cron does mail.
   say("  */15 * * * * \"#{File.join(ROOT, 'scripts', 'publish-scheduled.sh')}\" >/dev/null", :green)
   say('')

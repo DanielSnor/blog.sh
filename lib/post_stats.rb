@@ -83,9 +83,29 @@ module PostStats
     SiteConfig.comments_approval
   end
 
+  # A status id is not a number. Mastodon writes decimal snowflakes,
+  # GoToSocial writes a 26-character ULID, and both are just an opaque
+  # string to everything here -- so the id pattern accepts letters too.
+  STATUS_ID = '[A-Za-z0-9]+'
+
+  # ORDER IS THE FIX, not a detail.
+  #
+  # GoToSocial's web address for a status is /@user/statuses/<ULID>, and
+  # Mastodon's is /@user/<id>. Widening the Mastodon pattern alone would
+  # make the loosest one match first and capture the literal word
+  # "statuses" as the id -- the engine would then ask for
+  # /api/v1/statuses/statuses/context, get a 404 and show nothing, which
+  # is worse than today's honest nil. Most specific first, Mastodon's
+  # last.
+  #
+  # Pleroma and Akkoma use /notice/<flake>, a third shape again. Out of
+  # scope here, written down so the next person does not have to find it
+  # twice.
   def parse_toot_url(url)
-    m = url.to_s.match(%r{\Ahttps?://([^/]+)/@[^/]+/(\d+)}) ||
-        url.to_s.match(%r{\Ahttps?://([^/]+)/users/[^/]+/statuses/(\d+)})
+    text = url.to_s
+    m = text.match(%r{\Ahttps?://([^/]+)/@[^/]+/statuses/(#{STATUS_ID})}o) ||     # GoToSocial web
+        text.match(%r{\Ahttps?://([^/]+)/users/[^/]+/statuses/(#{STATUS_ID})}o) || # ActivityPub URI
+        text.match(%r{\Ahttps?://([^/]+)/@[^/]+/(#{STATUS_ID})}o)                  # Mastodon web
     m && { instance: m[1], id: m[2] }
   end
 

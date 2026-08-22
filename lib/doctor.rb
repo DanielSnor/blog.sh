@@ -998,6 +998,7 @@ module Doctor
     end
 
     findings.concat(check_online_network(data))
+    findings.concat(check_online_thread_readable(data))
     findings.concat(check_online_approval(data))
     findings
   end
@@ -1009,7 +1010,6 @@ module Doctor
     approval = dig(data, 'comments', 'approval').to_s.strip.downcase
     return [] unless %w[fav favourite favorite].include?(approval)
 
-    require_relative 'post_stats'
     entry = PostStats.entries.max_by { |e| e[:date].to_s }
     return [warn(t('approval_probe_nothing'))] unless entry
 
@@ -1019,6 +1019,68 @@ module Doctor
     end
   rescue StandardError => e
     [warn(t('approval_probe_failed', message: e.message.to_s.lines.first.to_s.strip))]
+  end
+
+  # Can a VISITOR's browser read the thread? With moderation off that is
+  # the whole mechanism: the page fetches /context itself, with no token,
+  # because there is no way to put one in a browser. Mastodon answers such
+  # a request; GoToSocial refuses it outright (every one of its four
+  # require* flags is on, with nothing to configure), and a Mastodon in
+  # secure mode does the same -- so the comments section stays empty and
+  # the page says nothing about why.
+  #
+  # Asked as a CAPABILITY, never by the name of the software: "is this
+  # server one that lets anonymous readers in" is the question, and
+  # nodeinfo does not answer it.
+  def check_online_thread_readable(data)
+    return [] unless dig(data, 'mastodon', 'instance')
+    return [] if SiteConfig.comments_approval # moderated: a cron reads it WITH a token
+
+    sample = newest_announced_post
+    return [] unless sample
+
+    require_relative 'post_stats'
+    parsed = PostStats.parse_toot_url(sample)
+    return [] unless parsed
+
+    require 'net/http'
+    # The same scheme the announcement itself carries, because that is the
+    # address a reader's browser would go to.
+    scheme = sample.to_s.start_with?('http://') ? 'http' : 'https'
+    uri = URI("#{scheme}://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}/context")
+    req = Net::HTTP::Get.new(uri)
+    req['User-Agent'] = FeedHttp::USER_AGENT
+    res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',
+                          open_timeout: 10, read_timeout: 15) { |h| h.request(req) }
+
+    case res
+    when Net::HTTPSuccess
+      [ok(t('thread_public', instance: parsed[:instance]))]
+    when Net::HTTPUnauthorized, Net::HTTPForbidden
+      [error(t('thread_closed', instance: parsed[:instance]), t('thread_closed_fix'))]
+    else
+      [warn(t('thread_unchecked', instance: parsed[:instance], code: res.code))]
+    end
+  rescue StandardError => e
+    [warn(t('thread_unchecked', instance: dig(data, 'mastodon', 'instance'),
+                                code: e.message.to_s.lines.first.to_s.strip))]
+  end
+
+  # The most recent published post that carries an announcement address --
+  # the one a reader is most likely to be looking at.
+  def newest_announced_post
+    Dir.glob(File.join(content_dir, '*', '*.json')).sort.reverse_each do |file|
+      post = begin
+        JSON.parse(File.read(file, encoding: 'utf-8'))
+      rescue StandardError
+        next
+      end
+      next unless post.is_a?(Hash) && post['state'].to_s != 'draft'
+      next if post['mastodon_url'].to_s.empty?
+
+      return post['mastodon_url']
+    end
+    nil
   end
 
   def check_online_network(data)

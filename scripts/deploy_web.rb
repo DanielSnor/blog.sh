@@ -364,7 +364,7 @@ if ONLY
   present = ONLY & all_files
   gone = (ONLY & stored.keys) - all_files
   unknown = ONLY - all_files - stored.keys
-  abort("❌ #{unknown.join(', ')}: not found in public.nosync/.") if present.empty? && gone.empty?
+  abort(I18n.t('cli.deploy_only_unknown', names: unknown.join(', '))) if present.empty? && gone.empty?
 
   files = present
 end
@@ -499,7 +499,7 @@ end
 # Where the numbers in an abort came from. Without this the author reads
 # "5000 files were expected" and goes looking in the manifest, which may
 # not be what was compared at all.
-ref_source = BASE ? "the last accepted build (#{BASE['at']})" : 'the manifest (no accepted build recorded yet)'
+ref_source = BASE ? I18n.t('cli.deploy_ref_baseline', at: BASE['at']) : I18n.t('cli.deploy_ref_manifest')
 notices = []
 
 # This refusal was written when deletion on a batch backend meant "mirror
@@ -596,21 +596,17 @@ SHRINK_MIN_BYTES = 25_000_000
 # SNAPSHOT test, as the per-file size limit above.
 
 if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
-  abort(<<~MSG)
-    ❌ Stopped: public.nosync/ has #{build_files} files, but #{shrink_files} were expected from #{ref_source}.
-       That's a #{(100 - (build_files * 100.0 / shrink_files)).round}% drop -- looks like a broken build.
-       Check the build output. If the drop is expected (you deleted a lot of posts), run again with --force.
-  MSG
+  abort(I18n.t('cli.deploy_guard_shrink_files', have: build_files, expected: shrink_files,
+                                                source: ref_source,
+                                                percent: (100 - (build_files * 100.0 / shrink_files)).round))
 end
 
 # What the counts cannot see: the same number of files, each of them nearly
 # empty. A broken template or a lost media prefix does exactly that.
 if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
-  abort(<<~MSG)
-    ❌ Stopped: public.nosync/ holds #{FileSize.human(build_bytes)}, but #{FileSize.human(shrink_bytes)} were expected from #{ref_source}.
-       The file count looks reasonable, so this is content going missing inside the pages rather than pages going missing.
-       Check the build output. If the drop is expected, run again with --force.
-  MSG
+  abort(I18n.t('cli.deploy_guard_shrink_bytes', have: FileSize.human(build_bytes),
+                                                expected: FileSize.human(shrink_bytes),
+                                                source: ref_source))
 end
 
 # Typically duplicate posts (build_blog.rb has its own safeguard against a
@@ -618,11 +614,9 @@ end
 # badly merged import, or an accidentally copied tree. Normal growth is a
 # handful of files per published post.
 if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
-  abort(<<~MSG)
-    ❌ Stopped: public.nosync/ has #{build_files} files, only #{growth_files} were expected from #{ref_source}.
-       That's a #{((build_files * 100.0 / growth_files) - 100).round}% increase -- looks like a duplicated or broken build.
-       Check the build output. If the increase is expected (a bulk import/migration), run again with --force.
-  MSG
+  abort(I18n.t('cli.deploy_guard_growth_files', have: build_files, expected: growth_files,
+                                                source: ref_source,
+                                                percent: ((build_files * 100.0 / growth_files) - 100).round))
 end
 
 # A notice, not an abort: adding a video IS authoring, not a malfunction,

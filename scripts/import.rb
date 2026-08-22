@@ -338,7 +338,12 @@ def build_facebook
   return nil unless dir
 
   dir = File.expand_path(dir)
-  return Import::Facebook.new(dir) if Import::Facebook.posts_dir(dir)
+  # The wizard prints the sentence telling people to set this, so the
+  # wizard has to read it: with it set, the scripted path took the
+  # crossposts and the wizard produced a byte-identical run without them,
+  # and the advice under the count was the only thing that changed.
+  crossposts = %w[1 true yes].include?(ENV['FACEBOOK_CROSSPOSTS'].to_s.strip.downcase)
+  return Import::Facebook.new(dir, include_crossposts: crossposts) if Import::Facebook.posts_dir(dir)
 
   puts t('import.facebook_dir_invalid', dir: dir)
   nil

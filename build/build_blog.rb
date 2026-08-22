@@ -2224,7 +2224,7 @@ rescue JSON::ParserError, SystemCallError => e
   nil
 end
 unless unreadable.empty?
-  abort("❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:\n#{unreadable.join("\n")}")
+  abort("#{t('build.unreadable_posts')}\n#{unreadable.join("\n")}")
 end
 
 # Two posts sharing a year and slug would point at the same output path
@@ -2259,7 +2259,7 @@ end
 # written down in one place, and it still does.
 same_file, at_the_root = duplicates.partition { |(year, _), _| year != 'page' }
 unless same_file.empty?
-  abort("❌ Two posts at one address in content.nosync/posts/ -- build stopped:\n#{collision_lines(same_file)}")
+  abort("#{t('build.duplicate_address')}\n#{collision_lines(same_file)}")
 end
 
 # Two PAGES at one address lose one of the two as well -- but this one
@@ -2277,11 +2277,9 @@ at_the_root.each do |(_, slug), dupes|
   # does not disappear quietly: it keeps its entry in the sitemap and in
   # the search index, both of which then point a reader at the winner's
   # text under the loser's title.
-  warn("⚠️  #{dupes.size} posts are served at /#{slug}/ -- only one of them is:\n" \
+  warn("#{t('build.two_pages', count: dupes.size, slug: slug)}\n" \
        "#{dupes.map { |p| "      #{p['__path']}" }.join("\n")}\n" \
-       "   The site still builds and the OLDER one keeps the address; the other stays\n" \
-       "   in the sitemap and in search, pointing readers at text that is not its own.\n" \
-       '   Give one of them another slug (./blog.sh props -> address).')
+       "#{t('build.two_pages_fix')}")
 end
 
 # Slug is a tiebreaker, not decoration: sort_by isn't stable, and posts
@@ -2891,9 +2889,9 @@ end
 removed = prune_public
 
 puts
-puts "Built #{posts.size} posts across #{page_count} page(s) into #{PUBLIC_DIR}, plus #{tags_map.size} tag page(s), a search index, RSS feed and sitemap"
+puts t('build.summary', posts: posts.size, pages: page_count, dir: PUBLIC_DIR, tags: tags_map.size)
 if drafts.any?
   puts
-  puts "Drafts in progress (preview only, not in any listing): #{drafts.size}"
+  puts t('build.drafts', count: drafts.size)
 end
 puts "Removed #{removed} file(s) no longer generated" if removed.positive?

@@ -146,6 +146,27 @@ prints what an installation is running.
 
 ### Fixed
 
+- **Comments work on GoToSocial.** Two separate things were in the way,
+  and the site they were found on -- arch-linux.cz, the install that
+  prompted 1.3.2 -- had never shown a single comment under any post,
+  silently. First, the address: GoToSocial writes a status as
+  `/@user/statuses/<ULID>` and the engine knew only Mastodon's
+  `/@user/<digits>`, so nothing was ever fetched. (The obvious repair is a
+  trap: widening the Mastodon pattern alone makes it match first and read
+  the literal word "statuses" as the status id, which turns an honest
+  nothing into a request for a status that cannot exist. The patterns are
+  ordered most-specific-first now, in the Ruby and in the browser alike.)
+  Second, and worse: GoToSocial requires a token on every read of a
+  thread, so the live mode -- where the visitor's own browser fetches the
+  replies -- cannot work there at all, whatever the address looks like.
+  `comments.approval: fav`, where a cron reads the thread with a token and
+  only the replies you star reach the page, is the whole of what is
+  available; `doctor --online` now asks the server whether an anonymous
+  reader gets a thread and says which of the two you have. A Mastodon in
+  secure mode is in exactly the same position, which is why the check asks
+  about the capability rather than about the name of the software. An
+  address the browser cannot read at all now leaves the "reply" link
+  standing instead of an empty space.
 - **A bracket in an alt text no longer destroys the picture.** `![[es]
   W-ZERO3](...)` -- a real caption on a real photograph -- was a line the
   markdown reader could not parse, so the next `edit` turned the image

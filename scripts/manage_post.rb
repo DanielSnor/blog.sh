@@ -2524,8 +2524,13 @@ def props_loop(slug, screen)
         props_run(screen) { props_versions(path, slug) }
       when 'x'
         props_run(screen) { cmd_delete(slug) }
-        # Cancelled (the post still exists) -> stay in the dialog.
-        return unless find_post_path(slug)
+        # Gone -> leave. Still here -> the delete was cancelled, so stay.
+        # Asked about THIS file, not about the slug: with the same slug in
+        # two years, "does a post by this name still exist?" is answered by
+        # the OTHER one, and the dialog quietly redrew itself around a post
+        # nobody had opened -- same keys, different post, one keystroke
+        # from deleting that one too.
+        return unless File.exist?(path)
       when '' then return props_close(screen)
       else props_run(screen) { puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain') }
       end

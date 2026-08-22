@@ -24,6 +24,16 @@ nav:
   search_label: "Hledat"
   search_placeholder: "Hledat…"
 
+# Vlastní řeč buildu -- co vypíše na konci a čím zastaví, když archiv
+# postavit nejde. Do 1.4 to bylo natvrdo anglicky i na českém webu.
+build:
+  unreadable_posts: "❌ V content.nosync/posts/ jsou soubory, které nejdou přečíst — build zastaven:"
+  duplicate_address: "❌ Dva posty na jedné adrese v content.nosync/posts/ — build zastaven:"
+  summary: "Postaveno %{posts} postů na %{pages} stránkách do %{dir}, k tomu %{tags} štítkových stránek, index hledání, RSS a mapa webu"
+  drafts: "Rozepsané drafty (jen náhled, v žádném výpisu nejsou): %{count}"
+  two_pages: "⚠️  Na adrese /%{slug}/ se servíruje víc postů (%{count}), doopravdy ale jen jeden:"
+  two_pages_fix: "   Web se postaví a adresu si nechá ten STARŠÍ; ten druhý zůstane v mapě webu\n   i ve vyhledávání a povede čtenáře na cizí text.\n   Dej jednomu z nich jiný slug (./blog.sh props → adresa)."
+
 post:
   reading_time: "Na čtení %{minutes} min"
   reading_minutes: "%{minutes} min"
@@ -222,6 +232,12 @@ cli:
   template_body_placeholder: "Text prvního odstavce."
   deploy_backend_incomplete: "Cíl nasazení „%{name}“ nemá v env.sh vyplněné hodnoty — nahrávání přeskakuji. Sestavený web v public.nosync/ je hotový, ukáže ho ./blog.sh preview. Až ho budeš chtít nahrávat, doplň hodnoty do env.sh (vzor je v env.sh.example)."
   deploy_args_fix: "Nejspíš v tom řádku v env.sh zůstala neuzavřená uvozovka. Přepínače se do něj píšou jako běžný text v uvozovkách, třeba \"-P 2022 -i /home/dan/.ssh/klic\"."
+  deploy_guard_shrink_files: "❌ Zastaveno: v public.nosync/ je %{have} souborů, ale podle %{source} jich mělo být %{expected}.\n   To je propad o %{percent} % — vypadá to na rozbitý build.\n   Podívej se na výstup buildu. Jestli je ten úbytek v pořádku (smazal jsi hodně postů), spusť to znovu s --force."
+  deploy_guard_shrink_bytes: "❌ Zastaveno: public.nosync/ má %{have}, ale podle %{source} mělo mít %{expected}.\n   Počet souborů přitom vypadá rozumně, takže obsah nemizí po stránkách, ale uvnitř nich.\n   Podívej se na výstup buildu. Jestli je ten úbytek v pořádku, spusť to znovu s --force."
+  deploy_guard_growth_files: "❌ Zastaveno: v public.nosync/ je %{have} souborů, podle %{source} jich mělo být jen %{expected}.\n   To je nárůst o %{percent} % — vypadá to na zdvojený nebo rozbitý build.\n   Podívej se na výstup buildu. Jestli je ten nárůst v pořádku (hromadný import nebo migrace), spusť to znovu s --force."
+  deploy_only_unknown: "❌ %{names}: v public.nosync/ nic takového není."
+  deploy_ref_baseline: "posledního přijatého buildu (%{at})"
+  deploy_ref_manifest: "manifestu (žádný přijatý build zatím není)"
   deploy_state_unwritable: "Nahrávání proběhlo, jen se nepovedlo poznamenat si stav — nejspíš je plný disk. Příští běh proto nahraje všechno znovu; uvolni místo a je to bez následků."
   surfer_unreachable: "❌ Surfer na %{url} neodpovídá (%{reason}) — appka je nejspíš vypnutá, nebo SURFER_URL v env.sh míří jinam, než kde běží. Sestavený web čeká v public.nosync/; až server poběží (nebo adresu opravíš), nahraje ho ./blog.sh rebuild."
   what_next_prompt: "Co dál? [d] nechat draftem  [e] upravit  [p] publikovat  [s] naplánovat  [x] smazat: "
@@ -849,6 +865,10 @@ doctor:
   token_invalid_fix: "Od chvíle, kdy přestal fungovat, se nic neoznámilo a nic se neoznámí, dokud ho nevyměníš. Vytvoř nový a vlož ho do env.sh."
   token_invalid_bluesky_fix: "Vytvoř na Bluesky nové heslo aplikace (Nastavení → Soukromí a zabezpečení → Hesla aplikací) a zapiš ho do env.sh jako BLUESKY_APP_PASSWORD."
   token_unchecked: "Token se proti %{instance} nepodařilo ověřit (%{code})."
+  thread_public: "%{instance} pouští čtení vlákna i bez přihlášení — živé komentáře si prohlížeč načte sám."
+  thread_closed: "%{instance} nepustí návštěvníkův prohlížeč ke čtení vlákna (odpovídá 401/403)."
+  thread_closed_fix: "Živé komentáře tady fungovat nemůžou — token se do prohlížeče poslat nedá. Zapni `comments.approval: fav` v config/site.yml: vlákno pak čte cron s tokenem (scope read:statuses) a na web jdou jen odpovědi, které jsi označil hvězdou. Tak to má GoToSocial a Mastodon v secure mode."
+  thread_unchecked: "%{instance}: nepodařilo se ověřit, jestli pustí čtení vlákna bez přihlášení (%{code})."
 
 # ./setup.sh — průvodce základním nastavením (scripts/setup.rb). Prompt je
 # popisek, pod ním nápověda a předvyplněná hodnota. Nápověda říká, co to

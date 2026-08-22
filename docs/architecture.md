@@ -614,7 +614,15 @@ wrote. Then, in load order:
 - **Comments** (`comments.js`): a published post's announcement
   reference is baked into the page (`data-toot-url` or
   `data-bluesky-uri` -- exactly one network per site, see
-  `SiteConfig.comment_network`); the visitor's browser fetches the
+  `SiteConfig.comment_network`). Reading it in the browser needs a server
+  that serves a thread to an anonymous request; GoToSocial requires a
+  token there and so does Mastodon in secure mode, which leaves
+  `comments.approval` (a cron with a token) as the only way in. The
+  address itself comes in three shapes -- Mastodon's `/@user/<id>`,
+  GoToSocial's `/@user/statuses/<ULID>` and the ActivityPub
+  `/users/user/statuses/<id>` -- read by one rule written twice, in
+  `lib/post_stats.rb` and in `comments.js`, most specific pattern first.
+  Then the visitor's browser fetches the
   reply thread from the Mastodon instance's public context API or from
   Bluesky's public AppView (`getPostThread`, no auth). Everything
   except Mastodon's own sanitized status HTML is escaped via

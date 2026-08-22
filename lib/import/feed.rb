@@ -382,6 +382,21 @@ module Import
     end
 
     def read_source
+      # A DIRECTORY is the answer people give here -- they unpack the export
+      # and hand over the folder, not the .xml inside it -- and a file whose
+      # permissions were lost in a copy is the other. Both used to end in a
+      # raw Errno backtrace out of File.read, in a wizard whose whole job is
+      # to hold somebody's hand through their first import.
+      if File.directory?(@source.to_s)
+        inside = Dir.glob(File.join(@source.to_s, '*.{xml,rss,atom}')).sort
+        hint = inside.empty? ? '' : " Did you mean #{File.basename(inside.first)} inside it?"
+        abort("❌ #{@source} is a folder, and this import wants the file itself.#{hint}")
+      end
+
+      if File.exist?(@source.to_s) && !File.readable?(@source.to_s)
+        abort("❌ #{@source} cannot be read -- check the file's permissions.")
+      end
+
       return File.read(@source, encoding: 'utf-8') if File.exist?(@source.to_s)
 
       begin

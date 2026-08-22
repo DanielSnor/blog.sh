@@ -133,7 +133,8 @@ count swung wildly" shape it watches for. Check the numbers, then re-run
 ruby scripts/migrate_beehiiv.rb <posts.csv>
 ```
 
-In beehiiv: **Settings → Exports**, the posts CSV. One file, no media:
+In beehiiv: **Settings → Export Data → Export Posts → Export All
+Posts**, the posts CSV. One file, no media:
 each row carries the entire EMAIL as HTML, and most of the import is
 undoing that -- slicing out the real content, dropping template
 variables, tracking pixels and the unsubscribe footer, turning the
@@ -195,8 +196,9 @@ post gets its poster frame as an image -- better in an archive than a
 ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
 ```
 
-In Facebook: **Accounts Centre → Your information and permissions →
-Download your information**. Either format -- **HTML and JSON are both
+In Facebook: **Accounts Center (or Meta Account settings -- Meta is
+renaming it, and you may see either) → Your information and permissions
+→ Export your information → Create export**. Either format -- **HTML and JSON are both
 read**, and the export says which one it is, so there is nothing to
 choose here. Unpack the ZIP and point the script at the directory;
 photos and videos come from the archive itself, no network. Where you
@@ -228,8 +230,7 @@ across re-exports.
 ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
 ```
 
-In Ghost Admin: **Settings → Advanced → Import/Export → Export your
-content**. The JSON file is the whole database -- posts, pages, tags --
+In Ghost Admin: **Settings → Advanced → Import/Export → Export**. The JSON file is the whole database -- posts, pages, tags --
 but **not the images**: they appear only as `__GHOST_URL__/...`
 references, and the files themselves exist only on the live site. That is
 why the site URL is a required second argument, and why the import has to
@@ -256,8 +257,9 @@ labels, and are dropped.
 ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
 ```
 
-In Instagram: **Accounts Centre → Your information and permissions →
-Download your information**. Ask for either format -- **HTML and JSON are
+In Instagram: **Accounts Center (or Meta Account settings -- Meta is
+renaming it, and you may see either) → Your information and permissions
+→ Export your information → Create export**. Ask for either format -- **HTML and JSON are
 both read**, and the export says which one it is, so there is nothing to
 choose here. Unpack the zip and point the script at the directory itself;
 the photos and videos are in there, so this needs no network and no token.
@@ -531,7 +533,7 @@ printed into a `<title>` is the Squarespace case it was written for.
 ruby scripts/migrate_substack.rb <path-to-unpacked-export> [site-url]
 ```
 
-In Substack: **Settings → Exports → Export your data**. Unpack the ZIP
+In Substack: **Settings → Exports → Create new export**. Unpack the ZIP
 and point the script at the directory itself -- the one holding
 `posts.csv` and `posts/`. The site URL is optional: the `/p/<slug>`
 paths that redirects need come straight out of the export, the domain
@@ -556,7 +558,10 @@ tag), and the newest posts sometimes ship as CSV rows with no HTML body
 ruby scripts/migrate_threads.rb <path-to-unpacked-export>
 ```
 
-In Threads: **Settings → Account → Download your information**. Either
+In Threads: **Accounts Center → Your information and permissions →
+Export your information**, and note that Meta does not offer this on a
+computer at all -- it has to be done in the mobile app or a mobile
+browser, which is where people get stuck without being told why. Either
 format -- **HTML and JSON are both read**, and the export says which
 one it is. Unpack the ZIP and point the script at the directory. Your
 own standalone posts import with their media from the archive;

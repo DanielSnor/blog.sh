@@ -25,6 +25,16 @@ nav:
   search_label: "Search"
   search_placeholder: "Search…"
 
+# The build's own voice -- what it says when it finishes and what it says
+# when the archive cannot be built at all.
+build:
+  unreadable_posts: "❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:"
+  duplicate_address: "❌ Two posts at one address in content.nosync/posts/ -- build stopped:"
+  summary: "Built %{posts} posts across %{pages} page(s) into %{dir}, plus %{tags} tag page(s), a search index, RSS feed and sitemap"
+  drafts: "Drafts in progress (preview only, not in any listing): %{count}"
+  two_pages: "⚠️  %{count} posts are served at /%{slug}/ -- only one of them is:"
+  two_pages_fix: "   The site still builds and the OLDER one keeps the address; the other stays\n   in the sitemap and in search, pointing readers at text that is not its own.\n   Give one of them another slug (./blog.sh props -> address)."
+
 post:
   reading_time: "%{minutes} min read"
   reading_minutes: "%{minutes} min"
@@ -239,6 +249,12 @@ cli:
   template_body_placeholder: "First paragraph's text."
   deploy_backend_incomplete: "The %{name} deploy backend is not configured -- skipping the upload. The build in public.nosync/ is complete; view it with ./blog.sh preview. To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example)."
   deploy_args_fix: "That line in env.sh most likely has an unmatched quote in it. Switches are written into it as plain text in quotes, for example \"-P 2022 -i /home/dan/.ssh/key\"."
+  deploy_guard_shrink_files: "❌ Stopped: public.nosync/ has %{have} files, but %{expected} were expected from %{source}.\n   That is a %{percent}% drop -- looks like a broken build.\n   Check the build output. If the drop is expected (you deleted a lot of posts), run again with --force."
+  deploy_guard_shrink_bytes: "❌ Stopped: public.nosync/ holds %{have}, but %{expected} were expected from %{source}.\n   The file count looks reasonable, so this is content going missing inside the pages rather than pages going missing.\n   Check the build output. If the drop is expected, run again with --force."
+  deploy_guard_growth_files: "❌ Stopped: public.nosync/ has %{have} files, only %{expected} were expected from %{source}.\n   That is a %{percent}% increase -- looks like a duplicated or broken build.\n   Check the build output. If the increase is expected (a bulk import or migration), run again with --force."
+  deploy_only_unknown: "❌ %{names}: not found in public.nosync/."
+  deploy_ref_baseline: "the last accepted build (%{at})"
+  deploy_ref_manifest: "the manifest (no accepted build recorded yet)"
   deploy_state_unwritable: "The upload itself went through; only the note about it could not be written -- most likely a full disk. The next run will therefore upload everything again; free some space and nothing else comes of it."
   surfer_unreachable: "❌ The Surfer at %{url} is not answering (%{reason}) -- the app may be stopped, or SURFER_URL in env.sh points somewhere it does not run. The finished build waits in public.nosync/; once the server is up (or the address fixed), ./blog.sh rebuild ships it."
   what_next_prompt: "What next? [d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete: "
@@ -870,6 +886,10 @@ doctor:
   token_invalid_fix: "Nothing has been announced since it stopped working, and nothing will be until it is replaced. Create a new one and put it in env.sh."
   token_invalid_bluesky_fix: "Make a fresh app password in Bluesky (Settings -> Privacy and security -> App passwords) and put it in env.sh as BLUESKY_APP_PASSWORD."
   token_unchecked: "Could not check the token against %{instance} (%{code})."
+  thread_public: "%{instance} serves the thread without a login -- a visitor's browser reads the live comments itself."
+  thread_closed: "%{instance} does not let a visitor's browser read the thread (it answers 401/403)."
+  thread_closed_fix: "Live comments cannot work here -- a token cannot be put in a browser. Turn on `comments.approval: fav` in config/site.yml: the thread is then read by the cron with a token (scope read:statuses) and only the replies you starred reach the site. GoToSocial works this way, and so does a Mastodon in secure mode."
+  thread_unchecked: "%{instance}: could not verify whether it serves the thread without a login (%{code})."
 
 # ./setup.sh -- the core setup wizard (scripts/setup.rb). Prompts are a
 # label, a hint under it, and the pre-filled value. Hints explain what

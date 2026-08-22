@@ -25,6 +25,16 @@ nav:
   search_label: "Suche"
   search_placeholder: "Suchen…"
 
+# Die eigene Sprache des Builds -- was er am Ende sagt und womit er
+# abbricht, wenn das Archiv nicht gebaut werden kann.
+build:
+  unreadable_posts: "❌ Nicht lesbare Beitragsdateien in content.nosync/posts/ -- Build angehalten:"
+  duplicate_address: "❌ Zwei Beiträge unter einer Adresse in content.nosync/posts/ -- Build angehalten:"
+  summary: "%{posts} Beiträge auf %{pages} Seiten nach %{dir} gebaut, dazu %{tags} Schlagwortseiten, ein Suchindex, RSS-Feed und Sitemap"
+  drafts: "Entwürfe in Arbeit (nur Vorschau, in keiner Liste): %{count}"
+  two_pages: "⚠️  %{count} Beiträge werden unter /%{slug}/ ausgeliefert, tatsächlich aber nur einer:"
+  two_pages_fix: "   Die Site wird weiterhin gebaut, die Adresse behält der ÄLTERE; der andere bleibt\n   in der Sitemap und in der Suche und führt Leser zu fremdem Text.\n   Gib einem von beiden einen anderen Slug (./blog.sh props -> Adresse)."
+
 post:
   reading_time: "%{minutes} Min. Lesezeit"
   reading_minutes: "%{minutes} Min."
@@ -232,6 +242,12 @@ cli:
   template_body_placeholder: "Text des ersten Absatzes."
   deploy_backend_incomplete: "Das Deploy-Backend %{name} ist nicht konfiguriert -- der Upload wird übersprungen. Der Build in public.nosync/ ist vollständig; ./blog.sh preview zeigt ihn. Setze DEPLOY_BACKEND und seine Werte in env.sh (siehe env.sh.example), um wirklich zu deployen."
   deploy_args_fix: "In dieser Zeile in env.sh fehlt vermutlich ein schließendes Anführungszeichen. Schalter werden dort als normaler Text in Anführungszeichen geschrieben, zum Beispiel \"-P 2022 -i /home/dan/.ssh/key\"."
+  deploy_guard_shrink_files: "❌ Angehalten: public.nosync/ hat %{have} Dateien, laut %{source} sollten es %{expected} sein.\n   Das ist ein Rückgang um %{percent} % -- das sieht nach einem kaputten Build aus.\n   Sieh dir die Build-Ausgabe an. Wenn der Rückgang so gewollt ist (viele Beiträge gelöscht), führe es erneut mit --force aus."
+  deploy_guard_shrink_bytes: "❌ Angehalten: public.nosync/ umfasst %{have}, laut %{source} sollten es %{expected} sein.\n   Die Dateizahl wirkt dabei plausibel -- es fehlt also Inhalt INNERHALB der Seiten, nicht die Seiten selbst.\n   Sieh dir die Build-Ausgabe an. Wenn der Rückgang so gewollt ist, führe es erneut mit --force aus."
+  deploy_guard_growth_files: "❌ Angehalten: public.nosync/ hat %{have} Dateien, laut %{source} sollten es nur %{expected} sein.\n   Das ist ein Zuwachs um %{percent} % -- das sieht nach einem doppelten oder kaputten Build aus.\n   Sieh dir die Build-Ausgabe an. Wenn der Zuwachs so gewollt ist (ein Massenimport oder eine Migration), führe es erneut mit --force aus."
+  deploy_only_unknown: "❌ %{names}: in public.nosync/ nicht gefunden."
+  deploy_ref_baseline: "dem letzten akzeptierten Build (%{at})"
+  deploy_ref_manifest: "dem Manifest (noch kein akzeptierter Build vermerkt)"
   deploy_state_unwritable: "Der Upload selbst lief durch, nur die Notiz darüber ließ sich nicht schreiben -- vermutlich ist die Platte voll. Der nächste Lauf lädt deshalb alles erneut hoch; schaffe Platz, dann bleibt es folgenlos."
   surfer_unreachable: "❌ Der Surfer unter %{url} antwortet nicht (%{reason}) -- die App ist wohl gestoppt, oder SURFER_URL in env.sh zeigt woandershin. Der fertige Build wartet in public.nosync/; sobald der Server läuft (oder die Adresse stimmt), lädt ./blog.sh rebuild ihn hoch."
   what_next_prompt: "Wie weiter? [d] Entwurf lassen  [e] bearbeiten  [p] veröffentlichen  [s] planen  [x] löschen: "
@@ -859,6 +875,10 @@ doctor:
   token_invalid_fix: "Seit er nicht mehr funktioniert, wurde nichts angekündigt, und es wird auch nichts angekündigt, bis er ersetzt ist. Erstelle einen neuen und trage ihn in env.sh ein."
   token_invalid_bluesky_fix: "Erstelle in Bluesky ein neues App-Passwort (Einstellungen -> Privatsphäre und Sicherheit -> App-Passwörter) und trage es in env.sh als BLUESKY_APP_PASSWORD ein."
   token_unchecked: "Der Token konnte gegen %{instance} nicht geprüft werden (%{code})."
+  thread_public: "%{instance} liefert den Thread auch ohne Anmeldung -- der Browser der Besucherin liest die Kommentare selbst."
+  thread_closed: "%{instance} lässt den Browser der Besucherin den Thread nicht lesen (antwortet mit 401/403)."
+  thread_closed_fix: "Live-Kommentare können hier nicht funktionieren -- ein Token lässt sich nicht in einen Browser legen. Schalte `comments.approval: fav` in config/site.yml ein: Den Thread liest dann der Cron mit einem Token (Scope read:statuses), und auf die Seite kommen nur die Antworten, die du markiert hast. So arbeitet GoToSocial, und ein Mastodon im Secure Mode ebenso."
+  thread_unchecked: "%{instance}: ließ sich nicht prüfen, ob der Thread ohne Anmeldung ausgeliefert wird (%{code})."
 
 # ./setup.sh -- der Assistent für die Grundeinrichtung (scripts/setup.rb).
 # Eine Eingabeaufforderung besteht aus Bezeichnung, Hinweis und dem

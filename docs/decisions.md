@@ -103,8 +103,13 @@ its place on every row.
 **Comments are replies to an announcement post -- on exactly one
 network.** No comment database, no moderation queue, no GDPR surface,
 no spam plugin -- replies live where people already are (Mastodon or
-Bluesky, both with public unauthenticated thread APIs the visitor's
-browser reads directly). The two networks are deliberately exclusive:
+Bluesky, whose thread APIs a visitor's browser can read directly -- when
+the server allows it. GoToSocial does not: reading a thread there needs a
+token on every request, with nothing to configure, and a Mastodon in
+secure mode behaves the same. On such a server the live mode cannot work
+at all, and `comments.approval: fav` -- where a cron reads the thread WITH
+a token and only starred replies reach the page -- is the whole of what is
+available. `doctor --online` asks the question and says which one you have). The two networks are deliberately exclusive:
 configuring both would split every post's discussion into two
 half-threads, so the build refuses it. *Cost:* comments require a
 presence on the chosen network, and deleting the announcement deletes
