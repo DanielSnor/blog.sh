@@ -682,7 +682,11 @@ def run_import(adapter)
   # re-import (source-id matched, so safe) can add back later.
   if adapter.respond_to?(:keep_permalinks=)
     puts
-    adapter.keep_permalinks = Tui.key_choice(t('import.keep_permalinks_prompt')) == t('cli.confirm_yes_char')
+    # Tui.yes?, not a bare compare against the localized yes-char: the
+    # Czech prompt reads [a/N], but a reader who presses 'y' out of habit
+    # would otherwise get "no" silently and lose every old address. yes?
+    # accepts y / j / a and the localized character alike.
+    adapter.keep_permalinks = Tui.yes?(Tui.key_choice(t('import.keep_permalinks_prompt')))
   end
 
   puts

@@ -37,5 +37,12 @@ dir = File.expand_path(dir)
 abort("#{dir} has no your_posts*.json or your_posts*.html -- point this at the unpacked export directory") unless
   Import::Facebook.format_of(dir)
 
-Import::Cli.run(Import::Facebook.new(dir, include_crossposts: ENV['FACEBOOK_CROSSPOSTS'] == '1'),
+# Validated, not a bare == '1': FACEBOOK_CROSSPOSTS=yes would otherwise
+# mean "no" silently, the same trap KEEP_PERMALINKS was given a guard for.
+crossposts = case ENV['FACEBOOK_CROSSPOSTS']
+             when nil, '', '0' then false
+             when '1' then true
+             else abort("FACEBOOK_CROSSPOSTS must be 1 or 0 (got #{ENV['FACEBOOK_CROSSPOSTS'].inspect})")
+             end
+Import::Cli.run(Import::Facebook.new(dir, include_crossposts: crossposts),
                 limit: Import::Cli.limit_from_env)
