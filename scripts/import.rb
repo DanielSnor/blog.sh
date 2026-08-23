@@ -634,7 +634,10 @@ def report(result, dry_run:)
     from_written.first(3).each { |url| puts "  #{url}" }
   end
   unless skipped_failures.empty?
-    puts Tui.paint(t('import.media_failed_skipped', count: skipped_failures.size), :yellow)
+    # The same honesty as its sibling above: a preview downloads nothing,
+    # so nothing "could not be downloaded" in it.
+    puts Tui.paint(t(dry_run ? 'import.media_failed_skipped_preview' : 'import.media_failed_skipped',
+                     count: skipped_failures.size), :yellow)
     skipped_failures.first(3).each { |url| puts "  #{url}" }
   end
   return

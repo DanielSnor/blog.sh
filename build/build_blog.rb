@@ -1118,9 +1118,9 @@ def tags_html(post)
   pills = visible.map do |t|
     slug = tag_slug(t)
     if defined?(TAG_PAGES) && !TAG_PAGES.key?(slug)
-      %(<span class="tag-pill tag-pill-flat">#{CGI.escapeHTML(t)}</span>)
+      %(<span class="tag-pill tag-pill-flat">#{h(t)}</span>)
     else
-      %(<a class="tag-pill" href="/tag/#{slug}/">#{CGI.escapeHTML(t)}</a>)
+      %(<a class="tag-pill" href="/tag/#{slug}/">#{h(t)}</a>)
     end
   end.join
   %(<div class="tags">#{pills}</div>)
@@ -1191,7 +1191,7 @@ end
 # out of the listings into all of them. The two failures are not worth
 # the same, so this one errs towards hiding.
 def unlisted?(post)
-  truthy?(post['unlisted'])
+  PostAddress.unlisted?(post)
 end
 
 # "true"/"yes"/"1" as written by hand, and the real booleans YAML and JSON
@@ -1660,7 +1660,12 @@ def rss_item(post)
   # handed a <title> and <link> of the post's choosing, in an item that
   # still validated. The sequence is split across two CDATA sections, the
   # standard way, so it survives as text.
-  categories = (post['tags'] || []).map { |t| "<category>#{CGI.escapeHTML(t)}</category>" }.join
+  # The same visibility rule the pills follow (a tag that slugs to nothing
+  # is dropped), and the same coercion every other escape in this file
+  # uses -- a non-string tag out of a hand-edited JSON used to end the
+  # whole build in CGI.escapeHTML.
+  categories = (post['tags'] || []).reject { |t| tag_slug(t).empty? }
+                                   .map { |t| "<category>#{h(t)}</category>" }.join
   <<~ITEM
     <item>
       <title>#{title}</title>
@@ -2416,7 +2421,7 @@ end.freeze
 TAG_PAGES = posts.each_with_object({}) do |post, acc|
   Array(post['tags']).each do |tag|
     slug = tag_slug(tag)
-    acc[slug] = true unless slug.empty?
+    acc[slug] = true if Slug.pageable?(slug)
   end
 end.freeze
 
@@ -2628,14 +2633,27 @@ end
 page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_post)
 
 tags_map = {}
+overlong_tags = []
 posts.each do |post|
   (post['tags'] || []).each do |tag|
     slug = tag_slug(tag)
     next if slug.empty?
 
+    # An address that will not fit a filename: mkdir died on it with a raw
+    # ENAMETOOLONG, partway through writing the site. The tag stays on its
+    # posts (as a pill that is not a link); only the listing page is
+    # refused, and refused with a sentence.
+    unless Slug.pageable?(slug)
+      overlong_tags << tag.to_s[0, 60] unless overlong_tags.include?(tag.to_s[0, 60])
+      next
+    end
+
     tags_map[slug] ||= { name: tag, posts: [] }
     tags_map[slug][:posts] << post
   end
+end
+overlong_tags.each do |name|
+  warn "⚠️  Tag \"#{name}…\" is too long for a listing page's address -- it shows on its posts, but no /tag/ page is built for it."
 end
 
 # A feed per tag, but only for the tags the site's own menu points at.

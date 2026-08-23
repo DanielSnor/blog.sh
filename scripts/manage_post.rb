@@ -1992,6 +1992,20 @@ end
 # must not itself be able to abort on a missing locale key -- and the
 # times are the ISO form the JSON carries, since repairing that file by
 # hand is what the report is for.
+# A name for a file or directory stepping aside during a queue move:
+# dotted (so no post glob sees it), suffixed (so nothing mistakes it for
+# content), stamped with this process's pid and never an existing name --
+# a leftover from a crashed run must not be renamed onto.
+def park_name(dir, base, ext)
+  n = 0
+  loop do
+    candidate = File.join(dir, ".#{base}.queue-move.#{Process.pid}#{n.zero? ? '' : "-#{n}"}#{ext}")
+    return candidate unless File.exist?(candidate)
+
+    n += 1
+  end
+end
+
 def apply_queue_moves(moves)
   held = RunLock.hold(ROOT, label: 'queue') do
     # Checked here rather than in the three callers that used to each keep
@@ -2036,36 +2050,110 @@ def apply_queue_moves(moves)
     # that share a slug in two years is exactly that, both ways round.
     # Only such a post is parked, so an ordinary swap writes precisely
     # what it always wrote; the name it parks under is not a post name
-    # (leading dot, its own suffix), so nothing looking for posts sees it.
+    # (leading dot, its own suffix, this process's pid), so nothing
+    # looking for posts sees it and a leftover from a crashed run is
+    # never renamed onto.
+    #
+    # THREE things step aside, not one. Media and edit history are keyed
+    # by year/slug exactly like the post file, and the mover's own
+    # machinery (Publishing.relocate_media) treats whatever it finds at
+    # the destination as an orphan: it merged the two posts' pictures
+    # into one directory and deleted the arriving post's version history
+    # outright. Parked, each mover finds an empty destination and moves
+    # nothing; the parked trees are put down at their DESTINATION year
+    # once every write has landed.
     wanted = landing.map { |target_path, _| File.expand_path(target_path) }
     parked = []
-    moves.each_with_index do |(entry, _), i|
-      next unless wanted.each_with_index.any? { |w, j| j != i && w == File.expand_path(entry[:path]) }
-
-      temp = File.join(File.dirname(entry[:path]),
-                       ".#{File.basename(entry[:path], '.json')}.queue-move.json")
-      File.rename(entry[:path], temp)
-      parked << [temp, entry[:path]]
-      entry[:path] = temp
-    end
-
     done = 0
     begin
+      # Inside the begin on purpose: a parking rename that fails halfway
+      # (a read-only year folder, a full disk) must put the already-parked
+      # posts back before this leaves, or a post ends the run hidden under
+      # a name nothing looks for, with the archive certifying itself sound.
+      moves.each_with_index do |(entry, target), i|
+        next unless wanted.each_with_index.any? { |w, j| j != i && w == File.expand_path(entry[:path]) }
+
+        slug = entry[:post]['slug']
+        year = File.basename(File.dirname(entry[:path]))
+        dest_year = target.year.to_s
+        info = {
+          slug: slug,
+          json_temp: park_name(File.dirname(entry[:path]), File.basename(entry[:path], '.json'), '.json'),
+          json_home: entry[:path],
+          dest_json: File.join(CONTENT_DIR, dest_year, "#{slug}.json"),
+          media_home: File.join(MEDIA_DIR, year, slug),
+          dest_media: File.join(MEDIA_DIR, dest_year, slug),
+          versions_home: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug),
+          dest_versions: File.join(PostVersions.versions_root(CONTENT_DIR), dest_year, slug)
+        }
+        File.rename(entry[:path], info[:json_temp])
+        entry[:path] = info[:json_temp]
+        parked << info
+        if Dir.exist?(info[:media_home])
+          info[:media_temp] = park_name(File.dirname(info[:media_home]), slug, '')
+          File.rename(info[:media_home], info[:media_temp])
+        end
+        if Dir.exist?(info[:versions_home])
+          info[:versions_temp] = park_name(File.dirname(info[:versions_home]), slug, '')
+          File.rename(info[:versions_home], info[:versions_temp])
+        end
+      end
+
       moves.each do |entry, target|
         yield entry, target
         done += 1
       end
     rescue Exception
-      # Anything parked and not yet rewritten goes back under its own name
-      # before this leaves: a post that only ever existed under the parking
-      # name would be gone from the archive, which is worse than the
-      # half-applied move the message below describes.
-      parked.each { |temp, home| File.rename(temp, home) if File.exist?(temp) && !File.exist?(home) }
-      if done.positive?
+      # Everything parked and not yet consumed goes back under its own
+      # name before this leaves. The one shape that needs care is the one
+      # parking exists for: a finished mover's write is standing exactly
+      # where a parked post used to -- so the finished file first steps
+      # back to ITS own name (which the parking freed), keeping its new
+      # date; a file whose folder disagrees with its date is a state the
+      # engine reads correctly. Only if even that is blocked does the
+      # parked copy stay, and then it is named out loud rather than left
+      # for nobody to find.
+      stranded = []
+      parked.each do |info|
+        if File.exist?(info[:json_temp])
+          if !File.exist?(info[:json_home])
+            File.rename(info[:json_temp], info[:json_home])
+          else
+            owner = parked.find { |q| q[:dest_json] == info[:json_home] }
+            if owner && !File.exist?(owner[:json_home])
+              File.rename(info[:json_home], owner[:json_home])
+              File.rename(info[:json_temp], info[:json_home])
+            else
+              stranded << [info[:slug], info[:json_temp], info[:json_home]]
+            end
+          end
+        end
+        [%i[media_temp media_home], %i[versions_temp versions_home]].each do |temp_key, home_key|
+          temp = info[temp_key]
+          next unless temp && File.exist?(temp)
+
+          if File.exist?(info[home_key])
+            stranded << [info[:slug], temp, info[home_key]]
+          else
+            File.rename(temp, info[home_key])
+          end
+        end
+      end
+      if done.positive? || stranded.any?
         warn ''
-        warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
+        warn 'A write failed partway through the queue -- repair the paths below by hand before the cron next runs:'
         moves.each_with_index do |(entry, target), i|
-          warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+          state = if i < done
+                    "moved to #{target.iso8601}"
+                  elsif File.exist?(entry[:path])
+                    "still at #{entry[:time].iso8601}"
+                  else
+                    'see below'
+                  end
+          warn "  '#{entry[:slug]}' -- #{state}"
+        end
+        stranded.each do |slug, temp, home|
+          warn "  '#{slug}' -- rescued at #{temp}; rename it back to #{home} yourself"
         end
         warn ''
       end
@@ -2073,8 +2161,42 @@ def apply_queue_moves(moves)
     end
     # The mover writes its new file and deletes the one it came from; a
     # parking name left behind would be a duplicate of a post that is now
-    # somewhere else.
-    parked.each { |temp, _| File.delete(temp) if File.exist?(temp) }
+    # somewhere else. The parked media and history land at the year the
+    # post just moved to -- its own mover found nothing to carry, which
+    # was the point of parking them.
+    parked.each do |info|
+      File.delete(info[:json_temp]) if File.exist?(info[:json_temp])
+      begin
+        if info[:media_temp] && File.exist?(info[:media_temp])
+          FileUtils.mkdir_p(File.dirname(info[:dest_media]))
+          if Dir.exist?(info[:dest_media])
+            # A genuine orphan sitting at the destination: merged, the way
+            # every media move merges, never silently replaced.
+            PostWriter.move_media_dir(info[:media_temp], info[:dest_media])
+          else
+            File.rename(info[:media_temp], info[:dest_media])
+          end
+        end
+        if info[:versions_temp] && File.exist?(info[:versions_temp])
+          # An orphaned history at the destination is somebody else's past
+          # -- the same stance PostVersions.move takes, for the same reason.
+          FileUtils.rm_rf(info[:dest_versions])
+          FileUtils.mkdir_p(File.dirname(info[:dest_versions]))
+          File.rename(info[:versions_temp], info[:dest_versions])
+        end
+      rescue SystemCallError => e
+        # The posts themselves are already where they belong; only a
+        # side-car is still under its parking name. Said out loud with
+        # both paths -- and `check` reports a leftover parking name as an
+        # error, so even a message lost to a closed terminal resurfaces.
+        [%i[media_temp dest_media], %i[versions_temp dest_versions]].each do |temp_key, dest_key|
+          temp = info[temp_key]
+          next unless temp && File.exist?(temp)
+
+          warn "'#{info[:slug]}': #{e.message} -- its files are rescued at #{temp}; move them to #{info[dest_key]} yourself"
+        end
+      end
+    end
     true
   end
   return true unless held == RunLock::BUSY

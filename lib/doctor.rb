@@ -647,9 +647,9 @@ module Doctor
       # a menu item naming one that is not there 404s on every page of the
       # site while doctor called the menu fine.
       if url.start_with?('/assets/')
-        next if File.exist?(File.join(root, url.delete_prefix('/')))
+        next if nav_asset_present?(root, url)
 
-        findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
+        findings << error(t('nav_url_missing', label: label, url: url), t('nav_asset_missing_fix'))
         next
       end
       # Nothing to judge against on an archive with no posts in it yet.
@@ -660,6 +660,22 @@ module Doctor
     end
     findings << ok(t('nav_ok', count: entries.size)) if findings.empty? && !posts.empty?
     findings
+  end
+
+  # A menu item's address is a URL, and the raw string is not a path: a
+  # #fragment, a ?query and percent escapes all belong in one and none of
+  # them belong on disk. And the file the address serves may be one the
+  # BUILD generates (colors.css; the banner seeded out of defaults/), so
+  # what the site actually answers -- public.nosync -- counts as present
+  # too. Judged raw, doctor flagged five working menu items on one config
+  # and failed the install for them.
+  def nav_asset_present?(root, url)
+    path = url.split('#').first.to_s.split('?').first.to_s.delete_prefix('/')
+    return false if path.empty?
+
+    [path, Checker.percent_decoded(path)].uniq.any? do |form|
+      File.exist?(File.join(root, form)) || File.exist?(File.join(root, 'public.nosync', form))
+    end
   end
 
   # An address that is neither on this site nor anywhere else -- it only

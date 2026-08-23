@@ -133,6 +133,23 @@ module PostAddress
     !%w[false no 0].include?(value.to_s.strip.downcase)
   end
 
+  # Whether a post asked to stay out of the listings. Loose on purpose,
+  # and looser than `pinned`: "true"/"yes"/"1" and the real booleans all
+  # count, and anything else that is not a plain "false"/"no"/"0" counts
+  # too, because the two failures are not worth the same -- a typo that
+  # HIDES a post is recoverable, a typo that exposes one somebody meant to
+  # keep out of the listings is not. One predicate here rather than a copy
+  # in the build, one in publishing and bare truthiness in the checker:
+  # the bare-truthiness copy read the hand-written "no" as unlisted, so
+  # build and check disagreed about which tags have a page, and check
+  # reported a live listing as a dead link.
+  def unlisted?(post)
+    value = post['unlisted']
+    return false if value.nil? || value == false
+
+    !%w[false no 0].include?(value.to_s.strip.downcase)
+  end
+
   # The year in the post's own date -- what the address is built from.
   def date_year(post)
     raw = post['date'].to_s

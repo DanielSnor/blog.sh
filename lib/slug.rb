@@ -51,4 +51,17 @@ module Slug
   def slugify(s)
     fold(s).gsub(/[^a-z0-9]+/, '-').gsub(/\A-+|-+\z/, '')
   end
+
+  # Whether a tag slug can be a listing page's address. Empty means the
+  # tag has nothing to fold to (emoji-only, punctuation-only); overlong
+  # means the address will not fit a filename -- 200 bytes is the cap the
+  # engine already chose twice for post slugs, well under any
+  # filesystem's limit. One answer here for the build and the checker
+  # both, because the two disagreeing is a pill linking to a page the
+  # build refused to make -- or a build dying in mkdir on a name check
+  # had just called sound. Deliberately NOT inside slugify: heading
+  # anchors share it, and capping there would renumber published anchors.
+  def pageable?(slug)
+    !slug.empty? && slug.bytesize <= 200
+  end
 end

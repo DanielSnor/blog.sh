@@ -250,6 +250,19 @@ prints what an installation is running.
   left died, and `check` called the archive sound. The redirect is written
   now, whichever direction the change goes, and a re-import that does the
   same thing behaves the same way.
+- **The build and `check` read `unlisted` with one rule.** The build has
+  always taken the hand-written spellings -- `"no"`, `"false"`, `"0"` keep
+  a post IN the stream -- while the checker read bare truthiness, so the
+  two disagreed about which tags and series have a listing page, and
+  `check` reported a live page as a dead link, forever. One predicate now,
+  in one place, asked by the build, the checker and the publisher alike.
+- **A tag too long for a filename no longer stops the build.** The address
+  of its listing page would not fit (`mkdir` died with a raw
+  `ENAMETOOLONG`, partway through writing the site); such a tag now shows
+  on its posts -- as a pill that is not a link -- and the build says in one
+  sentence that no /tag/ page is made for it. A tag that is not text at
+  all (a number, a leftover object out of a hand-edited file) is rendered
+  as text instead of ending the build in `escapeHTML`.
 - **A draft's tags no longer link to pages that do not exist.** Tag listings
   are made from the stream, so a tag carried only by drafts, unlisted posts
   or pages never gets one -- and the pill for it was a link into a 404. On
@@ -264,17 +277,28 @@ prints what an installation is running.
   this manually" -- a thing there was nothing to resolve, since the two are
   each other's obstacle and neither can move first. Both halves are still
   checked before either is written, and a swap that would land two posts on
-  one address is still refused.
-- **A media file of zero bytes is now missing, not present.** `File.exist?`
-  said yes and a reader said no: an interrupted download leaves a name with
-  nothing behind it, the page shows a broken picture and the deploy carries
-  the emptiness to the server. `check` reports it the way it reports a file
-  that is not there at all.
-- **A Bandcamp player is no longer blocked by the page's own CSP.** Every
-  artist has their own subdomain and the stored player address keeps it,
-  while the policy named the bare `bandcamp.com` -- so the browser refused
-  the one iframe the page had just written. The policy names the host the
-  player is actually on.
+  one address is still refused. Everything keyed by year and slug trades
+  together: the posts' pictures and their edit histories step aside with
+  the files and land in the year each post moves to -- treated as leftovers
+  of a move, one post ended with the other's picture on its page and the
+  other's history deleted outright. A failure partway restores whatever had
+  stepped aside, and anything a hard crash still strands under a working
+  name is reported by `check`, with the one rename that puts it back.
+- **A media file nobody can read is now a finding, not a presence.**
+  `File.exist?` said yes and a reader said no -- to a file of zero bytes
+  (an interrupted download), to one without read permission, and to a
+  folder sitting under a picture's name. The page shows a broken picture
+  either way, and the copy to the server either carries the defect or
+  stops the build. `check` reports all three as their own kind of error,
+  with a sentence that says what is actually wrong -- not "missing from
+  its media directory" about a file somebody is looking straight at.
+- **The CSP for a Bandcamp player follows the stored player address.** The
+  policy used to name the bare `bandcamp.com` for every such block; the
+  engine's own lookup happens to store players on that host today, but the
+  engine accepts a stored address on any artist subdomain -- and for those
+  the fixed policy would have blocked the exact iframe the page had just
+  written. The policy now names whatever host the block's player is on,
+  and a block with no player asks the policy for nothing.
 - **The wizard writes the `env.sh` line the shell actually reads.** `env.sh`
   is a shell script: every line runs, so a name written twice is decided by
   the last one. `./setup.sh` rewrote the first, said it had saved, and left
@@ -285,13 +309,19 @@ prints what an installation is running.
   were read only by `scripts/migrate_wayback.rb`. Somebody followed the
   advice, started `./import.sh` again and nothing changed; an archive that
   needs `POST_PATTERN` had no way out of the wizard at all. Both paths read
-  the same variables from one place now.
-- **A wizard import that lost something ends with a non-zero status.** The
-  scripted importers have carried a failure in the exit code since 1.2;
-  `./import.sh`, which is what people actually run, returned 0 for a source
-  that died halfway through and for every item it failed to write. Its
-  preview also claimed that media it could not fetch had had "their posts
-  written without them" -- a preview writes nothing.
+  the same variables from one place now -- and both refuse nonsense with a
+  sentence: a delay that is not a number used to mean *no* throttle at all
+  (set by somebody trying to be gentler), an empty pattern matched every
+  archived path, and an unusable one dumped a parser backtrace over the
+  wizard.
+- **A wizard import whose source died, or that failed to write items, ends
+  with a non-zero status.** The scripted importers have carried exactly
+  those two failures in the exit code since 1.2; `./import.sh`, which is
+  what people actually run, returned 0 for both. (A missing media file
+  alone stays exit 0 on every path, scripted and wizard alike: the posts
+  were written and the report says which files were not.) The preview also
+  claimed that media it could not fetch had had "their posts written
+  without them" -- a preview writes nothing.
 - **`check --repair` says whose archive it is and that it is working.** It
   walked thousands of posts with nothing on screen at all: no header naming
   the installation it was about to change, and no sign it was doing

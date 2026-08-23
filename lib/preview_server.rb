@@ -205,8 +205,18 @@ module PreviewServer
     # inside public.nosync pointing out of the tree passed the name test
     # and was then served -- the preview would hand out anything on the
     # machine the link happened to name.
+    #
+    # The TARGET is resolved when it exists -- resolving only its parent
+    # left a symlinked FILE served from wherever it pointed, the exact
+    # hole the block describes, one shape over. And a path that simply is
+    # not there is judged by its nearest existing ancestor rather than
+    # refused: nothing about a missing page is forbidden -- the 404 branch
+    # is the answer to it, and this used to turn every miss two levels
+    # deep into a bare 403.
     begin
-      real = File.realpath(File.directory?(full) ? full : File.dirname(full))
+      probe = full
+      probe = File.dirname(probe) while !File.exist?(probe) && probe != File.dirname(probe)
+      real = File.realpath(probe)
       root_real = File.realpath(root)
       return nil unless real == root_real || real.start_with?("#{root_real}/")
     rescue SystemCallError

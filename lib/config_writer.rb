@@ -252,6 +252,31 @@ module ConfigWriter
       found
     end
 
+    # The value a COMMENTED key carries -- what ./style.sh's widget removal
+    # leaves behind, kept precisely so switching the widget back on is one
+    # answer rather than a re-typing. Only a singly-commented key answers:
+    # a doubly-commented one is the template's way of shipping a key
+    # deliberately OFF inside an optional block, and its value is prose,
+    # not somebody's answer. The caller still has to filter out the
+    # template's own placeholders; this method cannot tell an answer from
+    # an example, only an inactive line from a deliberately hidden one.
+    def inactive_value(key_path)
+      line_no = locate(key_path)
+      return nil if line_no.nil?
+
+      line = @lines[line_no]
+      return nil unless ConfigWriter.comment?(line)
+
+      bare = ConfigWriter.uncomment(line)
+      return nil if ConfigWriter.comment?(bare)
+
+      scalar = bare.sub(/\A\s*[A-Za-z_][A-Za-z0-9_-]*:/, '').sub(/\s#.*$/, '')
+      value = YAML.safe_load("v:#{scalar}")
+      value && value['v']
+    rescue StandardError
+      nil
+    end
+
     # A section as text: its declaration, its body, and the run of prose
     # comments documenting it directly above. Used to graft a section one
     # config is missing out of the template that has it -- which is how a
@@ -633,6 +658,25 @@ module ConfigWriter
           last = i
           next
         end
+        # A COMMENT that is not indented as deeply as the key is decided
+        # the way a blank line is: by what follows it, rather than by
+        # itself. People write notes to themselves flush against the left
+        # margin in the middle of an indented block ("# my account id,
+        # from /api/v1/accounts/lookup"), and read as "not deeper,
+        # therefore not mine" such a line ended the key's body in the
+        # middle of itself. deactivate then commented out the half above
+        # it and left the half below ACTIVE under a parent that is now a
+        # comment -- invalid YAML, which verify! refused and rolled back,
+        # taking every other answer in the wizard session with it.
+        #
+        # It is only PASSED OVER, never counted as the end of the body: a
+        # commented key at the end of a block (`# page_size: 10`, which is
+        # how the template offers an optional one) has to stay findable
+        # inside its parent's search range, and a comment that turns out
+        # to be trailing is left outside the extent because nothing deeper
+        # follows it.
+        next if ConfigWriter.comment?(@lines[i]) && line_indent <= indent
+
         break if line_indent <= indent
 
         last = i
@@ -792,12 +836,21 @@ module ConfigWriter
 
     # A setting the user declined: commented out rather than emptied, so
     # the template's explanation of it stays visible for later.
+    # EVERY active assignment goes, not one of them. `set` may pick the
+    # last line because the shell reads the last value -- but switching a
+    # name OFF by commenting one line out of two just promotes the other:
+    # "no deploy target" left the site deploying, with the diff on screen
+    # showing a line duly commented out.
     def unset(name)
-      line_no = find_line(name)
-      return self unless line_no
+      hit = false
+      @lines.each_index do |i|
+        next unless @lines[i].match?(/\A\s*export\s+#{Regexp.escape(name)}=/)
 
-      @lines[line_no] = "# #{@lines[line_no]}" unless ConfigWriter.comment?(@lines[line_no])
+        @lines[i] = "# #{@lines[i]}"
+        hit = true
+      end
       @intended.delete(name)
+      hit
       self
     end
 

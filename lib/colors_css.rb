@@ -218,9 +218,14 @@ module ColorsCss
   def safe_css_value(value, what)
     text = value.to_s.strip
     return nil if text.empty?
-    return text unless text.match?(CSS_VALUE_FORBIDDEN)
+    found = text[CSS_VALUE_FORBIDDEN]
+    return text unless found
 
-    warn "⚠️  config/site.yml: #{what} contains characters that can't go into CSS (;{}<>@\\) -- ignoring it."
+    # Named by what actually matched -- a hand-kept list drifted the
+    # moment the pattern learnt about comment markers, and the sentence
+    # then blamed characters the value demonstrably did not contain.
+    shown = { "\n" => '\\n', "\r" => '\\r' }.fetch(found, found)
+    warn "⚠️  config/site.yml: #{what} contains #{shown.inspect}, which can't go into CSS -- ignoring it."
     nil
   end
 

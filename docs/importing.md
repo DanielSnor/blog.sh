@@ -656,7 +656,10 @@ also counted.
 Every one of these variables works for `./import.sh` too, not only for
 the script: the wizard reads the same environment, so advice a run prints
 about `WAYBACK_DELAY` or `POST_PATTERN` can be followed by starting the
-wizard again with the variable set.
+wizard again with the variable set. The one exception is `KEEP_PERMALINKS`
+below -- the wizard asks that as a question and the question's answer
+wins, because recording the dead blog's paths is irreversible in a way a
+pace or a pattern is not.
 
 Kept permalinks (`KEEP_PERMALINKS=1`, or the wizard's question) record
 the dead blog's own paths -- the feed item's link in feed mode, the

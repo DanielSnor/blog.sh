@@ -85,6 +85,12 @@ module DeployBackend
         email = IO.popen(['git', '-C', work, 'config', 'user.email'], &:read).to_s.strip
         identity = email.empty? ? ['-c', 'user.name=deploy', '-c', 'user.email=deploy@localhost'] : []
 
+        # Two halves, both load-bearing and easy to trim as "surely
+        # redundant": excludesFile=/dev/null blanks the user's GLOBAL
+        # ignore file, -f overrides any .gitignore INSIDE the work tree
+        # (a site can legitimately publish one). Either alone still lets
+        # a pattern silently thin the snapshot -- pages missing from the
+        # live site with nothing said anywhere.
         ok = git.call('-c', 'core.excludesFile=/dev/null', 'add', '-A', '-f') &&
              system('git', '-C', work, *identity, 'commit', '-q', '-m',
                     "Deploy #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}") &&

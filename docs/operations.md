@@ -499,12 +499,19 @@ rather than a file under `public.nosync`: something to go and fix.
 
 What it looks for, each with a line saying what to do about it:
 
-- **A post file that will not read, or a date nothing can parse.** The
-  build refuses to run on either, so check says so first: without this it
-  counted the archive minus the broken file and called the rest sound.
+- **A post file that will not read, a date nothing can parse, or a post
+  whose text is not a list of blocks.** The build refuses to run on any of
+  them, so check says so first: without this it counted the archive minus
+  the broken file and called the rest sound.
+- **A file a queue move stepped aside and a crash left parked.** The
+  parking name is dotted precisely so no listing shows it -- which also
+  means nothing would ever find one again without this. The fix is one
+  rename, and the finding spells it out.
 - **Media a post asks for and hasn't got** -- a video's poster image
   included -- usually an import whose download failed. The page renders
-  a hole.
+  a hole. A file that is there and useless -- empty, unreadable, or a
+  folder under the picture's name -- is reported the same way, with a
+  sentence that says which it is.
 - **Images stored as 1px or smaller.** The build treats those as tracking
   pixels and drops them *together with their caption*, so the page loses
   both without saying so.

@@ -180,8 +180,13 @@ module Repair
     when :media_orphan
       Proposal.new(action: :trash, data: { 'path' => File.join('media.nosync', data['dir'].to_s) })
     when :media_stray
+      # The directory the checker actually walked -- for a post whose file
+      # sits in another year than its date, that is not year/slug. The old
+      # shape stays as the fallback so a finding out of an older --json
+      # dump still behaves.
+      dir = data['dir'].to_s.empty? ? File.join(data['year'].to_s, data['slug'].to_s) : data['dir'].to_s
       Proposal.new(action: :trash,
-                   data: { 'path' => File.join('media.nosync', data['year'].to_s, data['slug'].to_s, data['file'].to_s) })
+                   data: { 'path' => File.join('media.nosync', dir, data['file'].to_s) })
     end
   end
 
@@ -200,7 +205,7 @@ module Repair
 
     Proposal.new(action: :rename_media_ref,
                  data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s,
-                         'from' => from, 'to' => to })
+                         'dir' => data['dir'].to_s, 'from' => from, 'to' => to })
   end
 
   def propose_redirect(data, idx)
@@ -402,7 +407,12 @@ module Repair
     return false unless File.exist?(path)
 
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
-    dir = File.join(root, 'media.nosync', data['year'].to_s, data['slug'].to_s)
+    # The post file lives under the FILE year (the line above); the media
+    # may live under the date year -- the finding carries the directory
+    # that was actually read, and only falls back to year/slug for a
+    # finding out of an older --json dump.
+    rel = data['dir'].to_s.empty? ? File.join(data['year'].to_s, data['slug'].to_s) : data['dir'].to_s
+    dir = File.join(root, 'media.nosync', rel)
     # Asked again at the moment of writing, not trusted from the scan: the
     # directory has to hold that name NOW.
     return false unless Dir.exist?(dir) && Dir.children(dir).include?(data['to'])

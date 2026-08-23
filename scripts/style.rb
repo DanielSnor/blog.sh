@@ -461,8 +461,8 @@ def resolve_source(answer)
   return nil if path.empty?
 
   # Dragging a file from Finder into a terminal writes the spaces escaped
-  # ("/Users/…/Mobile\ Documents/…"). Typed by nobody, produced by the
-  # most natural gesture there is -- and refused as "no such file".
+  # ("~/Mobile\ Documents/…"). Typed by nobody, produced by the most
+  # natural gesture there is -- and refused as "no such file".
   path = path.gsub(/\\(.)/, '\1') if !File.exist?(path) && path.include?('\\')
 
   return File.expand_path(path) unless File.dirname(path) == '.'
@@ -705,7 +705,18 @@ def section_social
                              ['keep', t('list_keep')]
                            ], current_index: 2, note: state)
     case action
-    when 'add' then entries << ask_social_entry
+    when 'add'
+      # The same guard the other three list sections have (nav, extra CSS,
+      # font faces). Without it, backing out of "add one" -- pressing Enter
+      # past the name, which is this wizard's documented way to say never
+      # mind -- pushed nil into the list, and the next repaint of the rows
+      # dereferenced it: a Ruby backtrace, and every answer given anywhere
+      # in the session thrown away, because nothing is written until the
+      # review at the end.
+      entry = ask_social_entry
+      next unless entry
+
+      entries << entry
     when 'remove' then entries = remove_from(entries) { |e| "#{e['name']} #{e['url']}" }
     else break
     end
@@ -936,9 +947,11 @@ WIDGETS = {
 
 def section_widgets
   loop do
-    # Minus what this run has switched off: the pending edit is not on
-    # disk yet, and `current` reads the disk, so without this the widget
-    # just removed goes on being listed as active.
+    # Refreshed on every pass: `current` alone is the file as it was when
+    # the run started, so a widget configured a moment ago -- in this very
+    # loop -- was missing from its own state line. Minus what this run has
+    # switched off, which no merge of pending SETS can know about.
+    refresh_current
     active = SiteConfig::Chrome.map(current, 'widgets').keys - removed_widgets.to_a
     state = [Tui.paint(t('widgets_current', list: active.empty? ? t('list_empty') : active.join(', ')), :dim)]
     options = WIDGETS.keys.map { |name| [name, t("widget_#{name}")] }
@@ -980,11 +993,13 @@ end
 def configure_widget(name)
   # Setting one up again is the undo for having removed it.
   removed_widgets.delete(name)
-  heading = Wizard.ask(t('q_widget_heading'), at('widgets', name, 'heading') || t("widget_heading_#{name}"))
+  heading = Wizard.ask(t('q_widget_heading'),
+                       at('widgets', name, 'heading') || inactive_default(name, 'heading') || t("widget_heading_#{name}"))
   site.set(['widgets', name, 'heading'], heading) if heading
 
   WIDGETS[name].each do |key|
-    value = Wizard.ask_valid(t("q_widget_#{key}"), at('widgets', name, key) || default_for(key),
+    value = Wizard.ask_valid(t("q_widget_#{key}"),
+                             at('widgets', name, key) || inactive_default(name, key) || default_for(key),
                              hint: t("h_widget_#{key}")) do |answer|
       if key == 'limit'
         t('e_limit') unless answer.to_s.match?(/\A[1-9]\d*\z/)
@@ -1027,6 +1042,23 @@ end
 
 def default_for(key)
   key == 'limit' ? 3 : nil
+end
+
+# The answer a removal left commented in the config -- the other half of
+# the promise "switching it back on is one answer". The template's own
+# placeholder is not an answer somebody gave: offered as a default, an
+# Enter-through would write account_id "000000000000000000" into a live
+# widget, so anything equal to the example's value at the same path is
+# treated as no answer at all.
+def inactive_default(name, key)
+  value = site.inactive_value(['widgets', name, key.to_s])
+  return nil if value.nil?
+
+  value == example_config.inactive_value(['widgets', name, key.to_s]) ? nil : value
+end
+
+def example_config
+  @example_config ||= ConfigWriter::YamlFile.new(SITE_YML_EXAMPLE)
 end
 
 # --- fonts and analytics ---------------------------------------------
@@ -1248,7 +1280,13 @@ def refresh_current
   merged = current
   site.intended.each do |path, value|
     node = merged
-    path[0..-2].each { |k| node = (node[k] ||= {}) }
+    # The same tolerance `at` has, for the same reason: this is a tool
+    # people open BECAUSE their config is wrong, and a `widgets:` written
+    # as a list ended the run here with the answers already given.
+    path[0..-2].each do |k|
+      node[k] = {} unless node[k].is_a?(Hash)
+      node = node[k]
+    end
     node[path.last] = value
   end
   @current = merged

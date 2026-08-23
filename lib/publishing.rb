@@ -291,10 +291,7 @@ module Publishing
   # by hand or by a script -- the 17 Aug incident's own vector -- is
   # exactly who this is for.
   def unlisted?(post)
-    value = post['unlisted']
-    return false if value.nil? || value == false
-
-    !%w[false no 0].include?(value.to_s.strip.downcase)
+    PostAddress.unlisted?(post)
   end
 
   # Sends the announcement to whichever network the site configured and
