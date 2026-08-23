@@ -51,6 +51,23 @@ module Import
     # are posts (as opposed to listings, tag pages, calendars). A
     # platform pack supplies it for hosts it knows; anywhere else the
     # user does, or page mode refuses with samples to build one from.
+    # The knobs, with their environment variables as the default for each.
+    # ./import.sh builds this object itself and used to pass nothing at
+    # all, so its advice ("raise WAYBACK_DELAY", "pass POST_PATTERN")
+    # named variables that only scripts/migrate_wayback.rb read -- the
+    # person followed it, nothing changed, and a run that needs
+    # POST_PATTERN had no way out of the wizard at all.
+    def self.from_env(url, **overrides)
+      mode = :auto
+      mode = :pages if ENV['WAYBACK_MODE'].to_s == 'pages'
+      new(url, mode: mode,
+          delay: ENV['WAYBACK_DELAY'] ? ENV['WAYBACK_DELAY'].to_f : 1.0,
+          post_pattern: ENV['POST_PATTERN'],
+          pack: ENV['WAYBACK_PACK'],
+          from: ENV['WAYBACK_FROM'], to: ENV['WAYBACK_TO'],
+          **overrides)
+    end
+
     def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false, pack: nil,
                    from: nil, to: nil)
       @url = url.sub(%r{/+\z}, '')

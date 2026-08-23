@@ -524,8 +524,15 @@ module Tui
         # Counted from row_window, not window: with a context line under the
         # cursor one fewer row is shown, and the counter has to say so.
         shown = [row_window, items.size - offset].min
-        text = items.size > row_window ? "#{hint} · #{offset + 1}-#{offset + shown}/#{items.size}" : hint
-        rows << paint(truncate_to_width(text, term_width), :dim)
+        counted = items.size > row_window ? "#{hint} · #{offset + 1}-#{offset + shown}/#{items.size}" : hint
+        # The counter goes first when the row will not fit, and after that
+        # fit_keys drops whole keys from the MIDDLE rather than cutting the
+        # line wherever the width runs out. A German hint is long enough
+        # that a plain cut took "Esc" with it -- the way out of the menu,
+        # missing from the one row that lists the ways out. Knowing which
+        # page you are on is worth less than knowing how to leave.
+        text = display_width(counted) <= term_width ? counted : fit_keys(hint, term_width)
+        rows << paint(text, :dim)
       end
       print "\e[?25l"
       frame(rows, keep_last: hint ? 2 : 0)

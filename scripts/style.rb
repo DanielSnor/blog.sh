@@ -460,6 +460,11 @@ def resolve_source(answer)
   path = answer.to_s.strip.gsub(/\A['"]|['"]\z/, '')
   return nil if path.empty?
 
+  # Dragging a file from Finder into a terminal writes the spaces escaped
+  # ("/Users/…/Mobile\ Documents/…"). Typed by nobody, produced by the
+  # most natural gesture there is -- and refused as "no such file".
+  path = path.gsub(/\\(.)/, '\1') if !File.exist?(path) && path.include?('\\')
+
   return File.expand_path(path) unless File.dirname(path) == '.'
 
   in_incoming = File.join(INCOMING_DIR, path)
@@ -931,18 +936,50 @@ WIDGETS = {
 
 def section_widgets
   loop do
-    active = SiteConfig::Chrome.map(current, 'widgets').keys
+    # Minus what this run has switched off: the pending edit is not on
+    # disk yet, and `current` reads the disk, so without this the widget
+    # just removed goes on being listed as active.
+    active = SiteConfig::Chrome.map(current, 'widgets').keys - removed_widgets.to_a
     state = [Tui.paint(t('widgets_current', list: active.empty? ? t('list_empty') : active.join(', ')), :dim)]
-    options = WIDGETS.keys.map { |name| [name, t("widget_#{name}")] } + [['keep', t('list_keep')]]
+    options = WIDGETS.keys.map { |name| [name, t("widget_#{name}")] }
+    # Adding one was the only thing on offer; a widget switched on by
+    # mistake -- or one whose account no longer exists -- could only be
+    # got rid of by editing site.yml by hand.
+    options << ['remove', t('q_widget_remove')] if active.any?
+    options << ['keep', t('list_keep')]
     chosen = Wizard.choose(t('q_widget'), options, current_index: options.size - 1, note: state)
     break if chosen == 'keep'
 
-    configure_widget(chosen)
+    chosen == 'remove' ? remove_widget(active) : configure_widget(chosen)
   end
   puts
 end
 
+def remove_widget(active)
+  # A hand-written widget key the wizard has no name for is still one
+  # somebody may want gone -- it goes in the list under its own key
+  # rather than aborting the run on a missing translation.
+  options = active.map { |name| [name, WIDGETS.key?(name) ? t("widget_#{name}") : name] }
+  options << ['keep', t('list_keep')]
+  name = Wizard.choose(t('q_widget_which_remove'), options, current_index: options.size - 1)
+  return if name == 'keep'
+
+  site.deactivate(['widgets', name])
+  removed_widgets << name
+  # Commented out, not deleted: the heading and the account id stay in the
+  # file, so switching the widget back on later is one answer rather than
+  # a re-typing.
+  Wizard.say(t('widget_removed', name: name), :green)
+  Wizard.say('')
+end
+
+def removed_widgets
+  @removed_widgets ||= []
+end
+
 def configure_widget(name)
+  # Setting one up again is the undo for having removed it.
+  removed_widgets.delete(name)
   heading = Wizard.ask(t('q_widget_heading'), at('widgets', name, 'heading') || t("widget_heading_#{name}"))
   site.set(['widgets', name, 'heading'], heading) if heading
 

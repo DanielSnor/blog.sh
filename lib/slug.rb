@@ -26,7 +26,11 @@ module Slug
   TRANSLITERATION = {
     'ß' => 'ss', 'æ' => 'ae', 'œ' => 'oe', 'ø' => 'o', 'đ' => 'd',
     'ð' => 'd', 'þ' => 'th', 'ł' => 'l', 'ħ' => 'h', 'ŧ' => 't',
-    'ŋ' => 'n', 'ı' => 'i'
+    'ŋ' => 'n', 'ı' => 'i',
+    # Greek writes its sigma differently at the end of a word, and a
+    # reader searching for one form must find the other: without this the
+    # index and the query folded the same word two ways.
+    'ς' => 'σ'
   }.freeze
   TRANSLITERATION_RE = /[#{TRANSLITERATION.keys.join}]/
 

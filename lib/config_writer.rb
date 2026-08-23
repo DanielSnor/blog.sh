@@ -384,23 +384,33 @@ module ConfigWriter
       self
     end
 
-    # Comments a top-level section back out, with its whole body. This is
-    # what makes "mastodon OR bluesky, never both" enforceable: picking
-    # one network deactivates the other rather than leaving a config the
-    # build refuses to load (SiteConfig.comment_network aborts on both).
+    # Comments a section back out, with its whole body. This is what makes
+    # "mastodon OR bluesky, never both" enforceable: picking one network
+    # deactivates the other rather than leaving a config the build refuses
+    # to load (SiteConfig.comment_network aborts on both). A nested path
+    # works too -- that is how ./style.sh switches a single sidebar widget
+    # off -- and commenting rather than deleting is deliberate: the
+    # heading, the account id and the template's prose all stay, so
+    # switching the widget back on is one answer instead of a re-typing.
     def deactivate(key_path)
-      raise ArgumentError, 'only top-level sections can be deactivated' unless key_path.size == 1
-
       line_no = active_index[key_path]
-      return self unless line_no # already off -- nothing to do
+      return self unless line_no # already off, or never there -- nothing to do
 
       extent = value_extent(line_no)
       (line_no..extent).each do |i|
         next if ConfigWriter.blank?(@lines[i])
 
-        @lines[i] = "# #{@lines[i]}"
+        # A whole top-level block goes off the way the template writes an
+        # optional one, with the '#' at column 0; a key INSIDE an active
+        # block keeps its indentation and takes the '#' after it, which is
+        # how the same file writes its own inactive keys.
+        @lines[i] = if key_path.size == 1
+                      "# #{@lines[i]}"
+                    else
+                      "#{@lines[i][/\A */]}# #{@lines[i].lstrip}"
+                    end
       end
-      @intended.delete(key_path)
+      @intended.delete_if { |path, _| path[0, key_path.size] == key_path }
       self
     end
 
@@ -836,8 +846,13 @@ module ConfigWriter
     # every optional backend ships -- "# export RSYNC_TARGET=..."), so
     # setting one activates the documented line in place instead of
     # appending a duplicate at the bottom.
+    # The LAST active assignment, not the first. env.sh is a shell script:
+    # every line runs, so a name written twice ends up with the value from
+    # the bottom -- while the wizard rewrote the top one, reported success,
+    # and left the old value in force. A file with one assignment (all of
+    # them, in practice) is unaffected.
     def find_line(name)
-      active = @lines.index { |l| l.match?(/\A\s*export\s+#{Regexp.escape(name)}=/) }
+      active = @lines.rindex { |l| l.match?(/\A\s*export\s+#{Regexp.escape(name)}=/) }
       return active if active
 
       @lines.index { |l| l.match?(/\A\s*#\s*export\s+#{Regexp.escape(name)}=/) }

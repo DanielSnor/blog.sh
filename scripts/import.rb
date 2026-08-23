@@ -442,7 +442,10 @@ def build_wayback
     return nil
   end
 
-  Import::Wayback.new(url)
+  # Same environment variables as scripts/migrate_wayback.rb: the advice
+  # the run prints ("raise WAYBACK_DELAY", "pass POST_PATTERN") has to
+  # work for the person who followed it and started the wizard again.
+  Import::Wayback.from_env(url)
 end
 
 def build_wix
@@ -623,7 +626,11 @@ def report(result, dry_run:)
     from_written.delete_at(i) if i
   end
   unless from_written.empty?
-    puts Tui.paint(t('import.media_failed', count: from_written.size), :yellow)
+    # A preview downloads nothing and writes nothing, so the sentence about
+    # posts that "were written without them" is not available to it -- it
+    # says what the real run would do instead.
+    puts Tui.paint(t(dry_run ? 'import.media_failed_preview' : 'import.media_failed',
+                     count: from_written.size), :yellow)
     from_written.first(3).each { |url| puts "  #{url}" }
   end
   unless skipped_failures.empty?
@@ -710,6 +717,12 @@ def run_import(adapter)
   on_post = ->(written, post, _scanned) { puts "  #{written}/#{target} #{post['slug']}" }
   result = Import::Run.new(adapter, on_post: on_post).call
   report(result, dry_run: false)
+  # Whatever the run lost, the exit code has to carry -- scripts/*.rb have
+  # done this since 1.2 (lib/import/cli.rb), and the wizard, which is what
+  # people actually run, ended 0 on a source that died halfway and on every
+  # item it failed to write. The status is set here and acted on at the very
+  # end, so the offer to rebuild still happens.
+  @lost = result.interrupted || Array(result.respond_to?(:errors) ? result.errors : nil).any?
 
   puts
   rebuild = Tui.key_choice(t('import.rebuild_prompt'))
@@ -752,6 +765,7 @@ end
 
 begin
   run_import(adapter)
+  exit 1 if @lost
 rescue Interrupt
   # Ctrl-C during an hours-long run: say what state things are in, because
   # a half-finished import leaves real posts on disk.

@@ -245,6 +245,22 @@ module SiteConfig
       end
       found
     end
+
+    # The same complaints as sentences, in the site's language. doctor has
+    # had these since 1.3.1; the build printed the raw identifiers next to
+    # the raw key ("config/site.yml: not_a_list -- nav"), in English, on a
+    # Czech site -- and it is the build that most people see first.
+    def complaint_sentences(data, translate)
+      complaints(data).map do |kind, what|
+        key = COMPLAINT_KEYS.fetch(kind, 'list_shape')
+        translate.call(key, what)
+      end
+    end
+
+    COMPLAINT_KEYS = {
+      not_a_list: 'list_shape', not_a_map: 'map_shape', unknown_widget: 'widget_unknown',
+      widget_shape: 'widget_shape', nav_item: 'nav_item_shape', not_text: 'text_shape'
+    }.freeze
   end
 
   # The comments/announcement network: :mastodon, :bluesky, or nil when

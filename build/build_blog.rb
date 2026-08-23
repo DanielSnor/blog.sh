@@ -234,9 +234,9 @@ WIDGETS = SiteConfig::Chrome.widgets(SiteConfig.data)
 # from the same function, so the two cannot name different keys. Read as
 # empty rather than fatal: a build that refuses to run leaves the site
 # standing on whatever was deployed last, which helps nobody.
-SiteConfig::Chrome.complaints(SiteConfig.data).each do |kind, what|
-  warn "config/site.yml: #{kind} -- #{what}"
-end
+SiteConfig::Chrome.complaint_sentences(SiteConfig.data,
+                                       ->(key, what) { I18n.t("doctor.#{key}", key: what, name: what, index: what) })
+                  .each { |sentence| warn "config/site.yml: #{sentence}" }
 
 SIDEBAR_SHOWN = LAYOUT_SIDEBAR &&
                 (!ABOUT['html'].to_s.strip.empty? ||
@@ -1110,7 +1110,19 @@ def tags_html(post)
   visible = post['tags'].reject { |t| tag_slug(t).empty? }
   return '' if visible.empty?
 
-  pills = visible.map { |t| %(<a class="tag-pill" href="/tag/#{tag_slug(t)}/">#{CGI.escapeHTML(t)}</a>) }.join
+  # A tag whose listing page does not exist is still worth showing -- it
+  # is what the post is about -- but not as a link to nothing. Drafts,
+  # unlisted posts and pages are outside the stream that makes tag pages,
+  # so this is the only place their pills can differ from a published
+  # post's, where every tag has a page by construction.
+  pills = visible.map do |t|
+    slug = tag_slug(t)
+    if defined?(TAG_PAGES) && !TAG_PAGES.key?(slug)
+      %(<span class="tag-pill tag-pill-flat">#{CGI.escapeHTML(t)}</span>)
+    else
+      %(<a class="tag-pill" href="/tag/#{slug}/">#{CGI.escapeHTML(t)}</a>)
+    end
+  end.join
   %(<div class="tags">#{pills}</div>)
 end
 
@@ -2393,6 +2405,18 @@ SERIES_NAMES = posts.each_with_object({}) do |post, acc|
   name = post['series'].to_s.strip
   if !acc.key?(slug) || (acc[slug] == slug && name != slug)
     acc[slug] = name
+  end
+end.freeze
+
+# Which tags will actually have a listing page. Only posts IN THE STREAM
+# make one -- so a tag carried solely by drafts, by unlisted posts or by
+# pages has none, and the pill for it was a link into a 404. Ten of them
+# in nine drafts on one real archive, every one of them written by the
+# engine itself. Same shape, and same reason, as SERIES_PUBLISHED above.
+TAG_PAGES = posts.each_with_object({}) do |post, acc|
+  Array(post['tags']).each do |tag|
+    slug = tag_slug(tag)
+    acc[slug] = true unless slug.empty?
   end
 end.freeze
 

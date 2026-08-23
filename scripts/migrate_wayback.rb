@@ -43,13 +43,7 @@ require_relative '../lib/import/wayback'
 
 url = ARGV[0] || abort('usage: migrate_wayback.rb <https://dead-blog.example[/rss]>')
 abort("that is not a URL: #{url.inspect}") unless url.start_with?('http://', 'https://')
-delay = ENV['WAYBACK_DELAY'] ? ENV['WAYBACK_DELAY'].to_f : 1.0
-
-mode = ENV['WAYBACK_MODE'] == 'pages' ? :pages : :auto
-
-Import::Cli.run(Import::Wayback.new(url, delay: delay, mode: mode,
-                                         post_pattern: ENV['POST_PATTERN'],
-                                         pack: ENV['WAYBACK_PACK'],
-                                         from: ENV['WAYBACK_FROM'], to: ENV['WAYBACK_TO'],
-                                         keep_permalinks: Import::Cli.keep_permalinks_from_env),
+# The same reading of the environment the wizard does -- one place, so
+# the two paths cannot drift apart again.
+Import::Cli.run(Import::Wayback.from_env(url, keep_permalinks: Import::Cli.keep_permalinks_from_env),
                 limit: Import::Cli.limit_from_env)

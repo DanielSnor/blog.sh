@@ -32,6 +32,7 @@ PUBLIC_DIR = File.join(ROOT, 'public.nosync')
 # deploy's own lock check, turning the quiet skip into a failure mail.
 # The wrapper maps 3 back to 0.
 require_relative '../lib/run_lock'
+require_relative '../lib/i18n'
 RunLock.acquire!(ROOT, label: 'sidebar', busy_exit: 3)
 
 abort('❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb).') unless Dir.exist?(PUBLIC_DIR)
@@ -86,9 +87,8 @@ def previous_json(path)
   raise JSON::ParserError, "not an object (#{data.class})"
 rescue StandardError => e
   name = File.basename(path)
-  warn "⚠️  #{name} is unreadable (#{e.message.lines.first.to_s.strip[0, 60]}) -- ignoring it and writing a fresh one."
-  warn "   Whatever #{name} held for posts this run does not refetch is gone; " \
-       './scripts/refresh-sidebar.sh --full puts it back.'
+  warn I18n.t('cron.sidebar_unreadable', name: name,
+                                        reason: e.message.lines.first.to_s.strip[0, 60])
   {}
 end
 
@@ -116,8 +116,7 @@ fetched = PostStats.fetch_all(recent_only: !full_refresh)
 # everything, not to forget.
 live, unreadable = PostStats.entries_with_gaps
 if unreadable.positive?
-  warn "⚠️  #{unreadable} post file(s) could not be read -- comments.json and stats.json keep " \
-       'every entry this run, since there is no telling which of them are still published.'
+  warn I18n.t('cron.sidebar_gaps', count: unreadable)
 else
   previous_stats = previous_stats.slice(*live)
   previous_comments = previous_comments.slice(*live)
@@ -133,13 +132,12 @@ if full_refresh
   if fetched.any? || PostStats.entries.empty?
     File.write(FULL_REFRESH_PATH, Time.now.to_f.to_s)
   else
-    warn '⚠️  The full pass fetched nothing at all, so it is not recorded as done -- ' \
-         'the next run will try again instead of waiting a week.'
+    warn I18n.t('cron.sidebar_empty_pass')
   end
 end
 
-puts "stats.json: #{fetched.size} post(s) updated (#{stats.size} total)" \
-     "#{full_refresh ? ' [full refresh]' : ' [last ~90 days only]'}"
+puts I18n.t(full_refresh ? 'cron.sidebar_stats_full' : 'cron.sidebar_stats_recent',
+            updated: fetched.size, total: stats.size)
 
 # comments.json exists only while moderation is on -- with it off the
 # browser reads the live thread itself, and a copy nothing renders is
@@ -150,7 +148,7 @@ puts "stats.json: #{fetched.size} post(s) updated (#{stats.size} total)" \
 if PostStats.approval.nil?
   if File.exist?(COMMENTS_PATH)
     File.delete(COMMENTS_PATH)
-    puts 'comments.json: removed (comments.approval is off)'
+    puts I18n.t('cron.sidebar_comments_removed')
   end
 else
   # Merged, never replaced, exactly like the stats above: a post whose
@@ -160,6 +158,6 @@ else
   approved = fetched.reject { |_key, result| result['comments'].nil? }
   comments = previous_comments.merge(approved.transform_values { |result| result['comments'] })
   File.write(COMMENTS_PATH, comments.to_json)
-  puts "comments.json: #{approved.size} thread(s) updated, " \
-       "#{comments.values.sum { |list| Array(list).size }} approved comment(s) total"
+  puts I18n.t('cron.sidebar_comments', threads: approved.size,
+                                       comments: comments.values.sum { |list| Array(list).size })
 end

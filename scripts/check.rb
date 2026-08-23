@@ -90,6 +90,24 @@ if as_json
   exit(errors.zero? ? 0 : 1)
 end
 
+# One line per hundred posts on a pipe, a repainted counter on a terminal:
+# a log full of counters is unreadable, and a terminal with no counter is
+# indistinguishable from a stuck process.
+tty = $stdout.tty?
+progress = lambda do |done, total|
+  next unless tty || (done % 100).zero? || done == total
+
+  line = I18n.t('check.progress', done: done, total: total)
+  tty ? print("\r#{line}\e[K") : puts(line)
+end
+
+online_progress = lambda do |done, total|
+  next unless tty || (done % 50).zero? || done == total
+
+  line = I18n.t('check.progress_online', done: done, total: total)
+  tty ? print("\r#{line}\e[K") : puts(line)
+end
+
 # --repair walks the findings and offers, for each one, the single repair
 # that finding allows: the old address written into the target post's
 # redirect_from, a relative link rewritten to the address it means, a file
@@ -106,7 +124,19 @@ if repair
   # last minutes; holding the whole installation for it would mean a
   # scheduled publish waits for somebody to finish reading, and the queue's
   # own tick is the thing that must not be blocked.
-  findings = Checker.run(root: ROOT, online: online, cap: nil)
+  # The same opening the plain check has, and the same counter. Without
+  # them --repair spent minutes walking thousands of posts with nothing on
+  # screen at all: no header naming the site it was about to change, and
+  # no sign it was doing anything.
+  puts SiteHeader.render
+  puts
+  puts Tui.paint(I18n.t('check.repair_heading'), :bold)
+  puts
+  puts Tui.paint(I18n.t('check.running_online'), :dim) if online
+  findings = Checker.run(root: ROOT, progress: progress, online: online,
+                         online_progress: online_progress, cap: nil)
+  print("\r\e[K") if tty
+  puts unless tty
   actionable = findings.reject { |f| f.level == :ok }
   if actionable.empty?
     puts Tui.paint(I18n.t('check.repair_nothing'), :green)
@@ -167,24 +197,6 @@ puts SiteHeader.render
 puts
 puts Tui.paint(I18n.t('check.heading'), :bold)
 puts
-
-# One line per hundred posts on a pipe, a repainted counter on a terminal:
-# a log full of counters is unreadable, and a terminal with no counter is
-# indistinguishable from a stuck process.
-tty = $stdout.tty?
-progress = lambda do |done, total|
-  next unless tty || (done % 100).zero? || done == total
-
-  line = I18n.t('check.progress', done: done, total: total)
-  tty ? print("\r#{line}\e[K") : puts(line)
-end
-
-online_progress = lambda do |done, total|
-  next unless tty || (done % 50).zero? || done == total
-
-  line = I18n.t('check.progress_online', done: done, total: total)
-  tty ? print("\r#{line}\e[K") : puts(line)
-end
 
 puts Tui.paint(I18n.t('check.running_online'), :dim) if online
 

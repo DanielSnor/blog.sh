@@ -38,19 +38,26 @@ module AddressGuard
   # adding to it, is how publish, edit, scheduling, restore and re-import
   # came to silently eat a live published post.
   #
-  # `except` is the post's own file, which is never in its own way.
+  # `except` is the post's own file, which is never in its own way. It
+  # takes a list as well as a single path: a queue swap moves two posts
+  # past each other, and each of them stands exactly where the other is
+  # going. Asked one at a time, both writes are refused and a legitimate
+  # swap of two same-named posts in two years could not be done at all --
+  # while the pair, asked together, is a question about the state AFTER
+  # the move, which is the state that matters. The caller still has to
+  # check that the two are not moving onto the same address.
   def occupant(post, content_dir:, slug: nil, except: nil, path: nil)
     name = (slug || post['slug']).to_s
     return nil if name.empty?
 
-    mine_now = except && File.expand_path(except)
-    if path && File.exist?(path) && File.expand_path(path) != mine_now
+    mine_now = Array(except).compact.map { |p| File.expand_path(p) }
+    if path && File.exist?(path) && !mine_now.include?(File.expand_path(path))
       return path
     end
 
     wanted = PostAddress.collision_keys(post, slug: name)
     Dir.glob(File.join(content_dir, '*', "#{name}.json")).sort.each do |other|
-      next if mine_now && File.expand_path(other) == mine_now
+      next if mine_now.include?(File.expand_path(other))
 
       # A file that will not read or parse still owns its address. Guessing
       # "empty" from an unreadable file is how a restore left behind by a

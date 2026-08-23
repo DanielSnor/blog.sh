@@ -61,6 +61,14 @@ prints what an installation is running.
   stands on the far end -- for `sftp` that record is what finds the files
   you have deleted since. Only a digest of those switches is stored, so the
   key path and jump host in `env.sh` stay in `env.sh`.
+- **`./style.sh` can take a sidebar widget away again.** Adding one was the
+  only direction on offer, so a widget switched on by mistake -- or one
+  whose account no longer exists -- could be got rid of only by editing
+  `config/site.yml` by hand. The widget menu offers the removal whenever
+  something is switched on, and what it writes is the block commented out
+  rather than deleted: the heading, the account id and the template's own
+  prose stay in the file, so switching the widget back on later is one
+  answer instead of typing it all again.
 
 ### Changed
 
@@ -242,6 +250,58 @@ prints what an installation is running.
   left died, and `check` called the archive sound. The redirect is written
   now, whichever direction the change goes, and a re-import that does the
   same thing behaves the same way.
+- **A draft's tags no longer link to pages that do not exist.** Tag listings
+  are made from the stream, so a tag carried only by drafts, unlisted posts
+  or pages never gets one -- and the pill for it was a link into a 404. On
+  one real archive that was ten dead links across nine drafts, every one of
+  them written by the engine itself. Such a tag is still shown, because it
+  is what the post is about; it is simply not a link. Nothing changes for a
+  published post, whose every tag has a page by construction.
+- **Two posts sharing a slug in two years can trade places in the queue.**
+  The engine has always treated a slug repeated in another year as
+  ordinary. The queue did not: each half of the swap found the other
+  standing exactly where it was going, and the screen ended with "resolve
+  this manually" -- a thing there was nothing to resolve, since the two are
+  each other's obstacle and neither can move first. Both halves are still
+  checked before either is written, and a swap that would land two posts on
+  one address is still refused.
+- **A media file of zero bytes is now missing, not present.** `File.exist?`
+  said yes and a reader said no: an interrupted download leaves a name with
+  nothing behind it, the page shows a broken picture and the deploy carries
+  the emptiness to the server. `check` reports it the way it reports a file
+  that is not there at all.
+- **A Bandcamp player is no longer blocked by the page's own CSP.** Every
+  artist has their own subdomain and the stored player address keeps it,
+  while the policy named the bare `bandcamp.com` -- so the browser refused
+  the one iframe the page had just written. The policy names the host the
+  player is actually on.
+- **The wizard writes the `env.sh` line the shell actually reads.** `env.sh`
+  is a shell script: every line runs, so a name written twice is decided by
+  the last one. `./setup.sh` rewrote the first, said it had saved, and left
+  the old value in force -- with the diff on screen to prove it had worked.
+- **The import wizard's advice about the Wayback Machine now applies to
+  itself.** `WAYBACK_DELAY` and `POST_PATTERN` -- which a run recommends by
+  name when the Archive throttles it or its paths cannot be told apart --
+  were read only by `scripts/migrate_wayback.rb`. Somebody followed the
+  advice, started `./import.sh` again and nothing changed; an archive that
+  needs `POST_PATTERN` had no way out of the wizard at all. Both paths read
+  the same variables from one place now.
+- **A wizard import that lost something ends with a non-zero status.** The
+  scripted importers have carried a failure in the exit code since 1.2;
+  `./import.sh`, which is what people actually run, returned 0 for a source
+  that died halfway through and for every item it failed to write. Its
+  preview also claimed that media it could not fetch had had "their posts
+  written without them" -- a preview writes nothing.
+- **`check --repair` says whose archive it is and that it is working.** It
+  walked thousands of posts with nothing on screen at all: no header naming
+  the installation it was about to change, and no sign it was doing
+  anything, for minutes. It opens the way `check` does and counts as it
+  reads.
+- **The "not understood" line in `props` names the keys the row offers.**
+  The row grows `[v]` once a post has older versions and `[t]` on a site
+  with a network, while the refusal was a second, hand-kept list that never
+  learned either -- so the dialog offered a key and then denied knowing it.
+  The sentence is read off the row itself.
 - **A list key that held something else ended the build in a traceback.**
   A string under `social:` (a URL pasted where a list of them belongs), or
   anything but a list under `footer.links` or `nav:`, reached `.map` and

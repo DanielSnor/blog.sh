@@ -2007,14 +2007,46 @@ def apply_queue_moves(moves)
     # The byte compare stays what it always was, and still earns its keep
     # inside the lock: it catches the tick that finished a moment BEFORE
     # the lock was taken, which no lock can do anything about.
+    # Every file in this move is excused for every check: they are all
+    # about to leave where they stand. A swap of two posts that share a
+    # slug in two years has each one standing exactly where the other is
+    # going, and asked one at a time it was refused as "resolve this
+    # manually" -- a thing there was no way to resolve, since the two
+    # posts are each other's obstacle.
+    moving = moves.map { |entry, _| entry[:path] }
+    landing = []
     moves.each do |entry, target|
       abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
       moved = entry[:post].merge('date' => target.iso8601)
       target_path = File.join(CONTENT_DIR, target.year.to_s, "#{entry[:post]['slug']}.json")
       taken = AddressGuard.occupant(moved, content_dir: CONTENT_DIR,
-                                    slug: entry[:post]['slug'], except: entry[:path],
+                                    slug: entry[:post]['slug'], except: moving,
                                     path: target_path)
+      # ...which is why the moves are also checked against each OTHER: two
+      # posts excused from each other's way must still not be walking to
+      # the same place.
+      taken ||= landing.find { |seen, keys| seen == target_path || (keys & PostAddress.collision_keys(moved)).any? }&.first
       abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: taken) if taken
+
+      landing << [target_path, PostAddress.collision_keys(moved)]
+    end
+
+    # A post standing where another one is going has to step aside first,
+    # or the write that goes there overwrites it -- a swap of two posts
+    # that share a slug in two years is exactly that, both ways round.
+    # Only such a post is parked, so an ordinary swap writes precisely
+    # what it always wrote; the name it parks under is not a post name
+    # (leading dot, its own suffix), so nothing looking for posts sees it.
+    wanted = landing.map { |target_path, _| File.expand_path(target_path) }
+    parked = []
+    moves.each_with_index do |(entry, _), i|
+      next unless wanted.each_with_index.any? { |w, j| j != i && w == File.expand_path(entry[:path]) }
+
+      temp = File.join(File.dirname(entry[:path]),
+                       ".#{File.basename(entry[:path], '.json')}.queue-move.json")
+      File.rename(entry[:path], temp)
+      parked << [temp, entry[:path]]
+      entry[:path] = temp
     end
 
     done = 0
@@ -2024,6 +2056,11 @@ def apply_queue_moves(moves)
         done += 1
       end
     rescue Exception
+      # Anything parked and not yet rewritten goes back under its own name
+      # before this leaves: a post that only ever existed under the parking
+      # name would be gone from the archive, which is worse than the
+      # half-applied move the message below describes.
+      parked.each { |temp, home| File.rename(temp, home) if File.exist?(temp) && !File.exist?(home) }
       if done.positive?
         warn ''
         warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
@@ -2034,6 +2071,10 @@ def apply_queue_moves(moves)
       end
       raise
     end
+    # The mover writes its new file and deletes the one it came from; a
+    # parking name left behind would be a duplicate of a post that is now
+    # somewhere else.
+    parked.each { |temp, _| File.delete(temp) if File.exist?(temp) }
     true
   end
   return true unless held == RunLock::BUSY
@@ -2397,6 +2438,16 @@ def props_prompt(post, path, slug, network_label)
   with_versions_key(t(key, network: network_label), path, slug)
 end
 
+# "Not understood, try ..." -- listing the keys the row above is OFFERING,
+# read out of that row rather than out of a second, hand-kept sentence.
+# The two drifted: [v] (older versions) is added to the row only when the
+# post has versions, and [t] only on a site with a network, and neither
+# was ever named here.
+def props_unknown(prompt)
+  keys = prompt.scan(/\[([a-z])\]/).flatten
+  t('cli.props_unknown', keys: keys.join(' / '))
+end
+
 def cmd_props(slug)
   return Tui.screen { |screen| props_loop(slug, screen) } if Tui.interactive?
 
@@ -2480,7 +2531,7 @@ def props_loop(slug, screen)
         end
       when 'n'
         unless post['scheduled']
-          props_run(screen) { puts t('cli.props_unknown_draft') }
+          props_run(screen) { puts props_unknown(prompt) }
           next
         end
         props_run(screen) { unschedule_post(path, post, slug, raw: original_raw) }
@@ -2498,7 +2549,7 @@ def props_loop(slug, screen)
 
         return
       when '' then return props_close(screen)
-      else props_run(screen) { puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft') }
+      else props_run(screen) { puts props_unknown(prompt) }
       end
     else
       case key
@@ -2511,7 +2562,7 @@ def props_loop(slug, screen)
         return if p2.nil? || draft?(JSON.parse(File.read(p2, encoding: 'utf-8')))
       when 't'
         unless network_label
-          props_run(screen) { puts t('cli.props_unknown_published_plain') }
+          props_run(screen) { puts props_unknown(prompt) }
           next
         end
         props_run(screen) do
@@ -2536,7 +2587,7 @@ def props_loop(slug, screen)
         # from deleting that one too.
         return unless File.exist?(path)
       when '' then return props_close(screen)
-      else props_run(screen) { puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain') }
+      else props_run(screen) { puts props_unknown(prompt) }
       end
     end
   end

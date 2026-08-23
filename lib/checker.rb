@@ -360,7 +360,13 @@ module Checker
       dir = media_dir_for(root, post)
       urls = media_urls(post).reject { |url| url.empty? || url.include?('://') }
       claim_media(dir, urls).each do |url, claim|
-        if claim.nil?
+        # A file of zero bytes is there for File.exist? and missing for a
+        # reader: the page shows a broken picture, and the deploy carries
+        # the emptiness to the server. An interrupted download leaves
+        # exactly this.
+        if claim && File.size?(File.join(dir, claim.first)).nil?
+          missing << [post['slug'], url, post['__year']]
+        elsif claim.nil?
           missing << [post['slug'], url, post['__year']]
         elsif claim.last != :exact
           misnamed << [post['slug'], url, claim.first, claim.last, post['__year']]
