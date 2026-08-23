@@ -5,6 +5,7 @@ require 'time'
 require 'uri'
 require_relative '../i18n'
 require_relative '../slug'
+require_relative '../path_glob'
 require_relative 'html_blocks'
 require_relative 'permalinks'
 
@@ -45,7 +46,7 @@ module Import
     end
 
     def each_item(&block)
-      files = Dir.glob(File.join(@dir, 'posts', '*.html')).sort
+      files = PathGlob.under(@dir, 'posts', '*.html').sort
       @total = files.size
       files.each(&block)
     end

@@ -16,6 +16,7 @@ require_relative 'deploy_backend'
 require_relative 'slug'
 require_relative 'account_id'
 require_relative 'forge_address'
+require_relative 'path_glob'
 # For the one thing doctor cannot answer from config alone: whether a
 # menu entry points at an address this archive produces. Sharing the
 # set with check rather than building a second one is the point --
@@ -283,7 +284,7 @@ module Doctor
     path = File.join(ROOT, 'locales', "#{lang}.yml")
     return [] if File.exist?(path)
 
-    available = Dir.glob(File.join(ROOT, 'locales', '*.yml')).map { |f| File.basename(f, '.yml') }.sort
+    available = PathGlob.under(ROOT, 'locales', '*.yml').map { |f| File.basename(f, '.yml') }.sort
     [error(t('lang_unknown', lang: lang), t('lang_unknown_fix', available: available.join(', ')))]
   end
 
@@ -624,7 +625,23 @@ module Doctor
       label = entry['label'].to_s.strip
       slug = entry['tag'].to_s.strip
       if !slug.empty?
-        findings << error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix')) unless tags.include?(slug) || posts.empty?
+        # Compared through Slug.slugify, because that is what the build
+        # names a tag page with. A menu written with the tag's DISPLAY
+        # name -- `tag: "Foto Praha"` for a page built at
+        # /tag/foto-praha/ -- was told no post carried it and sent its
+        # owner looking for a post that had been retagged; the posts were
+        # there all along and the entry was simply in the wrong form.
+        # Still an error either way: the build addresses the tag exactly
+        # as written, so the item does 404 from every page.
+        unless tags.include?(slug) || posts.empty?
+          folded = Slug.slugify(slug)
+          findings << if tags.include?(folded)
+                        error(t('nav_tag_display_form', label: label, tag: slug, slug: folded),
+                              t('nav_tag_display_form_fix', slug: folded))
+                      else
+                        error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix'))
+                      end
+        end
         next
       end
 
@@ -886,7 +903,7 @@ module Doctor
   end
 
   def scheduled_posts
-    Dir.glob(File.join(content_dir, '*', '*.json')).filter_map do |path|
+    PathGlob.under(content_dir, '*', '*.json').filter_map do |path|
       post = JSON.parse(File.read(path, encoding: 'utf-8'))
       next unless post.is_a?(Hash) && post['state'] == 'draft' && post['scheduled']
 
@@ -948,7 +965,7 @@ module Doctor
     return nil if dirs.empty?
 
     dirs.flat_map do |dir|
-      Dir.glob(File.join(dir, '**', '*.{jpg,jpeg,JPG,JPEG}')).select do |path|
+      PathGlob.under(dir, '**', '*.{jpg,jpeg,JPG,JPEG}').select do |path|
         ExifLocation.present?(path)
       end
     end
@@ -1101,7 +1118,7 @@ module Doctor
   # The most recent published post that carries an announcement address --
   # the one a reader is most likely to be looking at.
   def newest_announced_post
-    Dir.glob(File.join(content_dir, '*', '*.json')).sort.reverse_each do |file|
+    PathGlob.under(content_dir, '*', '*.json').sort.reverse_each do |file|
       post = begin
         JSON.parse(File.read(file, encoding: 'utf-8'))
       rescue StandardError

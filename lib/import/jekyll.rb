@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'cgi'
+require 'digest'
 require 'json'
 require 'time'
 require 'yaml'
@@ -8,6 +9,7 @@ require 'yaml'
 # summary require it the same way.
 require_relative '../i18n'
 require_relative '../slug'
+require_relative '../path_glob'
 require_relative '../markdown_parser'
 # Only the postscript needs these, and only to say where a page actually
 # landed -- the same pair (and the same reason) as feed.rb.
@@ -43,6 +45,19 @@ module Import
       @dir = File.expand_path(dir)
       @permalink = permalink
       @keep_permalinks = keep_permalinks
+      # The identity of the TREE, which its last path component is not:
+      # "content" is what Hugo calls the directory on every site there is,
+      # and _posts/ what Jekyll calls it on every site there is. Two blogs
+      # imported one after the other therefore minted the same source keys
+      # -- and a source key is what PostWriter matches a re-import on, so
+      # the second blog's posts landed ON the first blog's and overwrote
+      # them in place, silently, one for one. The digest of the tree's own
+      # path is what tells two of them apart while a re-import of the SAME
+      # tree still recognises itself, which is the whole promise this key
+      # exists to keep. It is the path and nothing from inside the tree on
+      # purpose: anything read out of the files would change when the blog
+      # is edited, and a re-import would then duplicate the lot.
+      @account = "#{File.basename(@dir)}-#{Digest::MD5.hexdigest(@dir)[0, 8]}"
       @rearranged = 0
       @liquid_links = 0
       # Keyed by path rather than counted as they go: the wizard runs the
@@ -70,6 +85,7 @@ module Import
     # free_inline_images. An import may transform, but not quietly.
     def postscript
       notes = []
+      notes << I18n.t('import.note.ssg_hugo_site_root') unless tree_root == @dir
       notes << I18n.t('import.note.ssg_images_freed', count: @rearranged) if @rearranged.positive?
       notes << I18n.t('import.note.ssg_liquid_links_dropped', count: @liquid_links) if @liquid_links.positive?
       notes << I18n.t('import.note.ssg_media_missing', count: @missing_media.length) unless @missing_media.empty?
@@ -96,8 +112,8 @@ module Import
     end
 
     def each_item(&block)
-      posts = Dir.glob(File.join(@dir, '_posts', '**', '*.{md,markdown,html}'))
-      drafts = Dir.glob(File.join(@dir, '_drafts', '**', '*.{md,markdown,html}'))
+      posts = PathGlob.under(@dir, '_posts', '**', '*.{md,markdown,html}')
+      drafts = PathGlob.under(@dir, '_drafts', '**', '*.{md,markdown,html}')
       # No _posts/ means either a plain folder of markdown -- a
       # converter's output -- or a site built entirely on collections
       # (_docs, _tutorials), which Jekyll allows and jekyll/jekyll's own
@@ -105,7 +121,7 @@ module Import
       swept = posts.empty? && drafts.empty?
 
       if swept
-        root, nested = wider_net.partition { |path| File.dirname(path) == @dir }
+        root, nested = wider_net.partition { |path| File.dirname(path) == tree_root }
         # Whether a file in the root of a swept tree is a page or a post is
         # the one thing the tree does not say outright, and both answers
         # are wrong somewhere: a Hugo export keeps its articles in posts/,
@@ -115,11 +131,17 @@ module Import
         # the articles live somewhere else, what is left at the top is a
         # page. When everything is at the top, it is all posts, exactly as
         # before.
-        @furniture = nested.empty? ? [] : root.select { |path| not_a_page?(path) }
+        #
+        # Section listings are furniture at any depth, not just at the top
+        # -- see section_listing?. Both lists are counted through the
+        # ledger, so `files` is simply everything the net caught; the
+        # walk is sorted below, and was never in this order anyway.
+        @furniture = nested.select { |path| section_listing?(path) }
+        @furniture += root.select { |path| not_a_page?(path) } unless nested.empty?
         @pages = nested.empty? ? [] : root - @furniture
-        files = nested.empty? ? root : nested + @pages + @furniture
+        files = root + nested
       else
-        candidates = Dir.glob(File.join(@dir, '*.{md,markdown}'))
+        candidates = PathGlob.under(@dir, '*.{md,markdown}')
         @furniture = candidates.select { |path| not_a_page?(path) }
         @pages = candidates - @furniture
         files = posts + drafts + @pages + @furniture
@@ -173,7 +195,7 @@ module Import
         'content' => blocks,
         'source' => {
           'platform' => 'jekyll',
-          'account' => File.basename(@dir),
+          'account' => @account,
           'original_id' => path.delete_prefix("#{@dir}#{File::SEPARATOR}")
         }
       }
@@ -315,6 +337,64 @@ module Import
       NOT_A_PAGE.include?(base) || NOT_A_POST.include?(base)
     end
 
+    # `_index.md` is Hugo's listing for the directory it sits in, and a
+    # site has one per section -- so unlike the names above, this one is
+    # furniture wherever it is found rather than only at the top. Pointed
+    # at a content/ tree, content/posts/_index.md came in as a post called
+    # "index" whose body was the section's blurb, dated the day of the
+    # import; a site with a dozen sections brought a dozen of them.
+    #
+    # The underscore is the whole test, and it has to be: `index.md`
+    # WITHOUT one is the content of a Hugo page bundle -- a real post that
+    # happens to live in a directory of its own with its pictures.
+    def section_listing?(path)
+      File.basename(path).downcase.start_with?('_index.')
+    end
+
+    # Hugo's own names for a site's configuration. Their presence next to
+    # a content/ directory is what separates a SITE from a tree of posts.
+    HUGO_CONFIGS = %w[hugo.toml hugo.yaml hugo.yml hugo.json
+                      config.toml config.yaml config.yml config.json].freeze
+
+    # What actually gets walked. Normally the directory that was named --
+    # but a Hugo SITE root is not a tree of posts, it is a tree of posts
+    # inside content/ with the machinery of a website around it, and
+    # pointing at one is what a person naturally does ("import ~/mysite").
+    # Walked whole it cost the import everything the root split is for:
+    # nothing at all sat at the top level, so nothing was a page and
+    # nothing was furniture, and content/_index.md, content/about.md and
+    # layouts/_default/single.md alike came in as posts dated the day of
+    # the import.
+    #
+    # Guarded by the config file, because "content" is also just a word: a
+    # folder that merely has one is walked exactly as it always was, and
+    # only a directory that says in Hugo's own vocabulary what it is gets
+    # read as one. Said out loud in the postscript either way -- narrowing
+    # the walk is a decision, and a silent one would leave a stray note in
+    # the site root unimported and unmentioned.
+    def tree_root
+      @tree_root ||= hugo_site? ? File.join(@dir, 'content') : @dir
+    end
+
+    def hugo_site?
+      # A directory holding _posts/ has already said what it is, and it is
+      # not this -- checked here rather than left to the caller so the two
+      # readings of the tree can never disagree.
+      return false if File.directory?(File.join(@dir, '_posts')) || File.directory?(File.join(@dir, '_drafts'))
+      # Markdown of its own at the top means the tree IS here, whatever
+      # else is beside it -- except for the files a repository keeps for
+      # people rather than readers, which wider_net refuses at the root
+      # anyway. A Hugo site kept in git has a readme, and reading that as
+      # content would have left the feature never firing on the sites it
+      # was written for.
+      return false unless PathGlob.under(@dir, '*.{md,markdown}')
+                                  .all? { |path| NOT_A_POST.include?(File.basename(path, '.*').downcase) }
+      return false if PathGlob.under(@dir, 'content', '**', '*.{md,markdown}').empty?
+
+      HUGO_CONFIGS.any? { |name| File.file?(File.join(@dir, name)) } ||
+        File.directory?(File.join(@dir, 'config', '_default'))
+    end
+
     # Markdown only, deliberately, even though a tree WITH _posts/ reads
     # .html as well. This net is cast over a directory nobody has
     # vouched for, and an .html file in one is far more often a rendered
@@ -324,8 +404,8 @@ module Import
     # rare .html post in a folder with no _posts/; the wider one loses
     # the author's confidence in the whole import.
     def wider_net
-      Dir.glob(File.join(@dir, '**', '*.{md,markdown}')).reject do |path|
-        parts = path.delete_prefix("#{@dir}#{File::SEPARATOR}").split(File::SEPARATOR)
+      PathGlob.under(tree_root, '**', '*.{md,markdown}').reject do |path|
+        parts = path.delete_prefix("#{tree_root}#{File::SEPARATOR}").split(File::SEPARATOR)
         parts[0..-2].any? { |dir| NOT_CONTENT.include?(dir) } ||
           (parts.length == 1 && NOT_A_POST.include?(File.basename(parts[0], '.*').downcase))
       end

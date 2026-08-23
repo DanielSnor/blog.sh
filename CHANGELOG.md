@@ -242,7 +242,12 @@ prints what an installation is running.
   down with twelve complaints); and a banner file that is not there says so
   out loud, instead of into a frame a piped run never paints and a terminal
   cuts in half -- with a green "Measured: 1880x600", the OLD banner, right
-  underneath.
+  underneath. A banner replaced by an image of the same name and the same
+  size is installed at last: nothing in `site.yml` moved, so the run ended
+  on "nothing changed" and dropped the copy it had promised a moment
+  earlier, leaving the picture in `incoming/`. It is listed in the review
+  as the change it is, confirmed together with everything else, and copied
+  in only after that -- nothing reaches the install before you say yes.
 - **Turning a post into a page (or back) no longer loses its address.**
   `type: page` typed into the frontmatter -- or deleted from it -- moves a
   post between `/posts/2026/slug/` and `/slug/` without touching the date,
@@ -262,7 +267,29 @@ prints what an installation is running.
   on its posts -- as a pill that is not a link -- and the build says in one
   sentence that no /tag/ page is made for it. A tag that is not text at
   all (a number, a leftover object out of a hand-edited file) is rendered
-  as text instead of ending the build in `escapeHTML`.
+  as text instead of ending the build in `escapeHTML`. **Upgrading:** the
+  cap is 200 bytes of address, which is under the 255 a filename is usually
+  allowed -- so a tag between the two used to get its page and no longer
+  does. The first rebuild takes that page out of `public.nosync` and the
+  next deploy takes it off the server; a link to it from outside 404s from
+  then on, and the engine itself stopped writing one.
+- **The feed stopped naming categories nothing stands behind.** A tag that
+  folds away to nothing -- emoji-only, punctuation-only, the kind an
+  Instagram or Tumblr export hands over verbatim -- has no listing page and
+  is drawn as no pill, and was still written into every `<item>` as a
+  `<category>`. A reader that groups by category offered a subject this
+  site does not publish under and cannot be sent to. The pills, the tag
+  pages and the feed read one rule now.
+- **The search box folds a word the way the index folded it.** The Ruby
+  that writes `search-index.json` and the JavaScript that reads it had
+  drifted apart on what counts as whitespace: the browser collapsed
+  everything Unicode calls a space -- a no-break space, a line separator --
+  and the index only what ASCII does, so a title carrying one could not be
+  found by typing it out exactly. The browser now collapses what Ruby's
+  `\s` collapses and no more. Both sides also fold the Greek final sigma
+  `ς` onto `σ`, which is the same letter in the middle of a word: a query
+  and a title spelling it differently used to be two different words to the
+  search. The index is rewritten by the next build; no post file changes.
 - **A draft's tags no longer link to pages that do not exist.** Tag listings
   are made from the stream, so a tag carried only by drafts, unlisted posts
   or pages never gets one -- and the pill for it was a link into a 404. On
@@ -281,9 +308,15 @@ prints what an installation is running.
   together: the posts' pictures and their edit histories step aside with
   the files and land in the year each post moves to -- treated as leftovers
   of a move, one post ended with the other's picture on its page and the
-  other's history deleted outright. A failure partway restores whatever had
-  stepped aside, and anything a hard crash still strands under a working
-  name is reported by `check`, with the one rename that puts it back.
+  other's history deleted outright. A failure partway puts both posts back
+  as they were found -- name and date together: the half that had already
+  landed used to keep its new date in its old folder, which for a pair
+  sharing a slug is the other post's address, so the recovery itself
+  handed back an archive the build refused to run on until somebody
+  repaired it by hand. Anything a hard crash still strands under a working
+  name is reported by `check`, with the one rename that puts it back, and
+  the list a failure prints says what each post is really doing rather
+  than sending you to a "see below" with nothing below it.
 - **A media file nobody can read is now a finding, not a presence.**
   `File.exist?` said yes and a reader said no -- to a file of zero bytes
   (an interrupted download), to one without read permission, and to a
@@ -341,6 +374,41 @@ prints what an installation is running.
   and fails the install, which is where a config mistake belongs. A key
   with nothing under it stays what it has always been: none of them, and
   no complaint.
+- **Two markdown trees no longer overwrite each other.** A tree import
+  identified its source by the name of the directory it was pointed at,
+  and "content" is what Hugo calls that directory on every site there is
+  (as `_posts` is for Jekyll). Import two blogs one after the other and
+  the second one did not arrive beside the first: it matched it, post by
+  post, and replaced it in place -- the same machinery that makes a
+  re-import an update rather than a duplicate, aimed at the wrong archive.
+  The identity is now the tree's own path, so two of them are two, and a
+  re-run of the same one still recognises itself. One consequence worth
+  knowing before you upgrade: a tree imported under an earlier version and
+  imported again under this one is no longer recognised as the same source
+  and will come in a second time. Import first, upgrade after -- or expect
+  to delete one copy.
+- **A Hugo site root imports the site's content, not its machinery.**
+  Pointing at `~/mysite` rather than `~/mysite/content` is what a person
+  naturally does, and it went badly in a quiet way: with nothing at the
+  top level of what was walked, nothing could be recognised as a page and
+  nothing as the site's own furniture, so `content/_index.md` (the front
+  page), `content/about.md` and even a template out of `layouts/` all
+  arrived as articles dated the day of the import. A folder holding
+  Hugo's own configuration next to `content/` is now read as the site it
+  is -- content imported, the rest left alone, and the summary says so
+  rather than leaving anything you keep outside `content/` to go missing
+  without a word. Without that configuration nothing is guessed at and the
+  named folder is walked exactly as before. Separately, a section listing
+  (`_index.md`) is furniture wherever in the tree it sits: one per section
+  used to come in as a post called "index" whose body was the section's
+  blurb.
+- **The albums in a Facebook HTML export are counted.** The summary's
+  sentence about what an import does NOT take -- uncategorised photos,
+  albums, videos, all of which stay in the download -- counted albums by
+  looking for `.json` files, which an HTML export does not have. It
+  therefore said "albums (0)" over an export with a shelf of them, which
+  is worse than not mentioning albums at all: it is an answer, and it is
+  wrong. It counts in the format the export was actually downloaded in.
 
 ## 1.3.2 -- 2026-08-21
 

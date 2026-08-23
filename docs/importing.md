@@ -355,6 +355,14 @@ Pages count too: markdown in the root of the tree (`about.md`,
 `_posts/` and `_drafts/`, minus the names that are never a page
 (`index`, `404`, `feed`, `sitemap` and friends).
 
+**A Hugo site root works as well as its `content/`.** Point the import
+at the folder holding `hugo.toml` and `content/` and it reads the
+content directory, leaving `layouts/`, `archetypes/` and the built copy
+alone -- and says so in the summary, so nothing you keep outside
+`content/` goes missing without a word. Hugo's section listings
+(`_index.md`, one per section, wherever they sit) are the site's own
+furniture rather than posts, and are counted among the skipped.
+
 **A tree written by `./blog.sh export` comes back whole.** Its front
 matter carries a `blogsh:` block -- the post's identity and everything
 else no other engine has a word for -- and this importer reads it back,

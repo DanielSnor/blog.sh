@@ -66,6 +66,7 @@ require_relative '../lib/wizard'
 require_relative '../lib/version'
 require_relative '../lib/site_header'
 require_relative '../lib/publish_slots'
+require_relative '../lib/path_glob'
 
 def t(key, **vars)
   I18n.t("setup.#{key}", **vars)
@@ -135,7 +136,7 @@ end
 LOCALE_FOR = { 'en' => 'en_US', 'cs' => 'cs_CZ', 'de' => 'de_DE' }.freeze
 
 def available_languages
-  Dir.glob(File.join(ROOT, 'locales', '*.yml')).map { |f| File.basename(f, '.yml') }.sort
+  PathGlob.under(ROOT, 'locales', '*.yml').map { |f| File.basename(f, '.yml') }.sort
 end
 
 # --- network checks --------------------------------------------------

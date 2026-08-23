@@ -446,9 +446,19 @@ module Wizard
   # is false contributes nothing, so a run where the user pressed Enter
   # through every question reports "nothing changed" and leaves no
   # backups suggesting otherwise.
-  def review_and_write(files)
+  #
+  # `also` is the changes a run makes that are not lines in a file -- a
+  # picture waiting to be copied in, which is the one thing ./style.sh
+  # does to the install besides writing config. They are listed here for
+  # the reason the diffs are (the answer to `q_write` has to cover
+  # everything the run would do) and counted as changes for a reason the
+  # banner section found the hard way: replacing an image with one of the
+  # same name and the same dimensions moves nothing in site.yml, so the
+  # run reported "nothing changed" and left -- and the copy, which waits
+  # for :written, was dropped with it.
+  def review_and_write(files, also: [])
     changed = files.select { |(_, writer)| writer.changed? }
-    if changed.empty?
+    if changed.empty? && also.empty?
       puts t('nothing_changed')
       puts
       return :unchanged
@@ -457,6 +467,10 @@ module Wizard
     puts Tui.paint(t('section_review'), :bold)
     puts
     changed.each { |(label, writer)| show_diff(label, writer.diff) }
+    unless also.empty?
+      also.each { |line| puts line }
+      puts
+    end
 
     # The diff is what this question is about, so nothing may be painted
     # over it -- and confirm builds a frame out of the record whenever there
@@ -543,6 +557,13 @@ module Wizard
 
   # Wraps a wizard's main loop so an interrupt says the one thing worth
   # saying: nothing was written.
+  #
+  # And the one fault that lands before a single question is asked: both
+  # wizards open by building a writer over config/site.yml with
+  # config/site.yml.example behind it, and a tree without the template met
+  # them with a Ruby backtrace out of the constructor. It is not the
+  # user's config that is wrong -- the template ships with the engine and
+  # is simply not there.
   def guard
     yield
   rescue Interrupt
@@ -550,5 +571,17 @@ module Wizard
     puts
     puts t('interrupted')
     exit 130
+  rescue ConfigWriter::TemplateMissing => e
+    puts
+    puts Tui.paint("❌ #{t('template_missing', path: relative(e.path))}", :red)
+    puts
+    exit 1
+  end
+
+  # A path as the reader would type it: the engine's own root cut off, so
+  # a message names config/site.yml.example and not the whole checkout.
+  def relative(path)
+    root = "#{File.expand_path('..', __dir__)}/"
+    path.to_s.start_with?(root) ? path.to_s.delete_prefix(root) : path.to_s
   end
 end

@@ -11,6 +11,7 @@ require_relative 'exif_location'
 require_relative 'media_dimensions'
 require_relative 'site_config'
 require_relative 'i18n'
+require_relative 'path_glob'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
@@ -844,7 +845,7 @@ module PostWriter
   def self.each_post(content_dir: CONTENT_DIR)
     building = @index.nil?
     acc = {}
-    Dir.glob(File.join(content_dir, '*', '*.json')).each do |file|
+    PathGlob.under(content_dir, '*', '*.json').each do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
       next unless post.is_a?(Hash)
 

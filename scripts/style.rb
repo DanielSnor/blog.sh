@@ -480,13 +480,31 @@ def queue_file(source, href)
   href
 end
 
+# Where the pending banner would land: whatever this run chose, else
+# whatever the config already says. Asked in two places now -- the review
+# lists the copy as a change, and the install carries it out.
+def pending_banner_target
+  site.intended[%w[banner src]] || at('banner', 'src') || '/assets/images/header.png'
+end
+
+# The one change these wizards make that is not a line in a file, in the
+# shape review_and_write lists changes in. Without it a run whose only
+# change is the picture -- an image replaced by one of the same name and
+# the same dimensions moves nothing in site.yml -- ended on "nothing
+# changed", and the copy, which waits for a confirmed write, was dropped
+# with it: the wizard said the banner would be installed, then said
+# nothing had changed, and left the file sitting in incoming/.
+def pending_review
+  return [] unless @pending_banner
+
+  [Tui.paint(t('review_banner', name: File.basename(@pending_banner),
+                                path: pending_banner_target), :green)]
+end
+
 # Runs after review_and_write reports :written -- never before it.
 def install_pending_files
   require 'fileutils'
-  if @pending_banner
-    src = site.intended[%w[banner src]] || at('banner', 'src') || '/assets/images/header.png'
-    queue_file(@pending_banner, src)
-  end
+  queue_file(@pending_banner, pending_banner_target) if @pending_banner
   return if @pending_files.nil? || @pending_files.empty?
 
   left = []
@@ -1271,7 +1289,7 @@ def run
   # the run's whole verdict arrived glued to the bottom edge of the menu:
   # "…· Esc dokončit" and under it, touching, "Nic se nezměnilo".
   puts
-  outcome = Wizard.review_and_write([[relative(SITE_YML), site]])
+  outcome = Wizard.review_and_write([[relative(SITE_YML), site]], also: pending_review)
   # A refused or rolled-back write is exit 1 (a cancel at the diff stays 0
   # -- that is the user's choice, not a fault).
   exit 1 if outcome == :failed

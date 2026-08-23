@@ -20,6 +20,7 @@ require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 require_relative '../lib/colors_css'
 require_relative '../lib/post_text'
+require_relative '../lib/path_glob'
 
 SiteConfig.use_site_timezone!
 
@@ -2179,7 +2180,7 @@ end
 def prune_public
   dirs = []
   removed = 0
-  Dir.glob(File.join(PUBLIC_DIR, '**', '*'), File::FNM_DOTMATCH).each do |path|
+  PathGlob.under(PUBLIC_DIR, '**', '*', flags: File::FNM_DOTMATCH).each do |path|
     if File.directory?(path)
       dirs << path
     elsif !WRITTEN[path]
@@ -2207,12 +2208,12 @@ FileUtils.mkdir_p(PUBLIC_DIR)
 # still renders before the owner has drawn anything. An existing file is
 # the owner's and is never overwritten; defaults/ itself stays unpublished.
 DEFAULT_IMAGES_DIR = File.join(ROOT, 'assets', 'images', 'defaults')
-Dir.glob(File.join(DEFAULT_IMAGES_DIR, '*')).each do |src|
+PathGlob.under(DEFAULT_IMAGES_DIR, '*').each do |src|
   live = File.join(ROOT, 'assets', 'images', File.basename(src))
   FileUtils.cp(src, live) unless File.exist?(live)
 end
 
-Dir.glob(File.join(ROOT, 'assets', '**', '*')).each do |src|
+PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
   next unless File.file?(src)
   next if src.start_with?("#{DEFAULT_IMAGES_DIR}/")
 
@@ -2235,7 +2236,7 @@ index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'
 # thousand files it was, and every listing command failed the same way, so
 # there was no way to find it from inside the tool.
 unreadable = []
-posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |f|
+posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   parsed = JSON.parse(File.read(f, encoding: 'utf-8'))
   # Valid JSON of the wrong shape ("[1,2,3]", "null", a bare string) used to
   # sail past this and die much later with a TypeError that named no file --

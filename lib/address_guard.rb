@@ -2,6 +2,7 @@
 
 require 'json'
 require_relative 'post_address'
+require_relative 'path_glob'
 
 # lib/address_guard.rb -- who already lives where this post is going.
 #
@@ -56,7 +57,7 @@ module AddressGuard
     end
 
     wanted = PostAddress.collision_keys(post, slug: name)
-    Dir.glob(File.join(content_dir, '*', "#{name}.json")).sort.each do |other|
+    PathGlob.under(content_dir, '*', "#{name}.json").sort.each do |other|
       next if mine_now.include?(File.expand_path(other))
 
       # A file that will not read or parse still owns its address. Guessing

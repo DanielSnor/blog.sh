@@ -35,6 +35,7 @@ require_relative '../lib/address_guard'
 require_relative '../lib/publishing'
 require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
+require_relative '../lib/path_glob'
 require_relative '../lib/tui'
 require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
@@ -1033,7 +1034,7 @@ end
 # Times already claimed by scheduled drafts, so the next offer skips
 # them -- that is what turns a set of slots into a queue.
 def scheduled_entries(except_slug: nil)
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
     post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
     next unless post.is_a?(Hash) && post['scheduled'] && post['slug'] != except_slug
 
@@ -1314,7 +1315,7 @@ def find_post_path(slug)
   chosen = RESOLVED_PATHS[slug]
   return chosen if chosen && File.exist?(chosen)
 
-  matches = Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).sort
+  matches = PathGlob.under(CONTENT_DIR, '*', "#{slug}.json").sort
   return matches.first if matches.size <= 1
 
   RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
@@ -1662,7 +1663,7 @@ end
 # must drop out of the list rather than get swapped around as a stale
 # copy.
 def queue_entries
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
     raw = File.read(file, encoding: 'utf-8') rescue next
     post = JSON.parse(raw) rescue next
     next unless post.is_a?(Hash) && post['scheduled']
@@ -2015,6 +2016,54 @@ def park_name(dir, base, ext)
   end
 end
 
+# A finished mover getting out of a parked post's way: back to its own
+# name, which the parking freed, and back to its own DATE with it
+# whenever keeping the new one would leave the two of them on one
+# address. That is precisely the swap parking exists for -- the pair
+# share a slug, so a mover holding the partner's year is served exactly
+# where the partner is about to be put back. The rescue used to keep the
+# new date on the grounds that a file whose folder disagrees with its
+# date is a state the engine reads correctly, which is true of one post
+# and not of two: the queue's own recovery handed back an archive that
+# will not build until somebody repairs it by hand.
+#
+# The original bytes go back, not a patched date: they are what was read
+# before the prompt, so the post ends the run byte for byte as it was
+# found. Answers whether it did -- a rename that could not be followed by
+# the rewrite says no, since the post then still holds the date it moved
+# to, and the report calls that "moved".
+def step_back(owner, partner)
+  File.rename(partner[:json_home], owner[:json_home])
+  return false unless one_address?(owner, partner)
+
+  AtomicWrite.write(owner[:json_home], owner[:raw] || JSON.pretty_generate(owner[:post]))
+  true
+rescue StandardError
+  false
+end
+
+# Whether the mover, left at the date it has just moved to, would be
+# served at the same address as the post about to be put back beside it.
+# Asked of PostAddress, which is where the build asks it.
+def one_address?(owner, partner)
+  moved = owner[:post].merge('date' => owner[:target].iso8601)
+  (PostAddress.collision_keys(moved) & PostAddress.collision_keys(partner[:post])).any?
+end
+
+# Whether a parked post can be put back where it came from. Not
+# File.exist? on the name -- two posts collide on their ADDRESS, whatever
+# folder they sit in -- so the question goes to the same guard the
+# pre-flight uses. Anything it cannot answer counts as occupied: this
+# runs while an exception is on its way out, and the one thing it must
+# not do is add a second post to an address rather than leave a rescued
+# one parked under a name that `check` reports.
+def way_home_clear?(info)
+  AddressGuard.occupant(info[:post], content_dir: CONTENT_DIR, slug: info[:slug],
+                        except: info[:json_temp], path: info[:json_home]).nil?
+rescue StandardError
+  false
+end
+
 def apply_queue_moves(moves)
   held = RunLock.hold(ROOT, label: 'queue') do
     # Checked here rather than in the three callers that used to each keep
@@ -2087,6 +2136,14 @@ def apply_queue_moves(moves)
         dest_year = target.year.to_s
         info = {
           slug: slug,
+          # What the file said before it was touched, and where it was
+          # going: between them they are what puts a post back exactly as
+          # it was found -- see step_back, which needs the date as well as
+          # the name.
+          index: i,
+          post: entry[:post],
+          raw: entry[:raw],
+          target: target,
           json_temp: park_name(File.dirname(entry[:path]), File.basename(entry[:path], '.json'), '.json'),
           json_home: entry[:path],
           dest_json: File.join(CONTENT_DIR, dest_year, "#{slug}.json"),
@@ -2116,25 +2173,40 @@ def apply_queue_moves(moves)
       # Everything parked and not yet consumed goes back under its own
       # name before this leaves. The one shape that needs care is the one
       # parking exists for: a finished mover's write is standing exactly
-      # where a parked post used to -- so the finished file first steps
-      # back to ITS own name (which the parking freed), keeping its new
-      # date; a file whose folder disagrees with its date is a state the
-      # engine reads correctly. Only if even that is blocked does the
-      # parked copy stay, and then it is named out loud rather than left
-      # for nobody to find.
+      # where a parked post used to -- so the finished file steps back to
+      # ITS own name (which the parking freed) and, when it has to, to its
+      # own date with it. Only then is the way home asked about, and only
+      # if it is still blocked does the parked copy stay -- named out loud
+      # rather than left for nobody to find.
       stranded = []
+      # What each post ended up doing, written down as it happens. The
+      # report at the bottom used to work this out afterwards -- from how
+      # far the loop got, and from whether entry[:path] was still there --
+      # and both answers are wrong here: the recovery moves files of its
+      # own, and in a swap the two posts share every path there is, so
+      # nothing on disk can be asked which of them it belongs to.
+      landed = moves.each_index.map { |i| i < done ? :moved : :home }
       parked.each do |info|
         if File.exist?(info[:json_temp])
-          if !File.exist?(info[:json_home])
+          # A finished mover standing exactly where this post came from,
+          # with its own name free to go back to. Gets out of the way
+          # first -- and if it went back whole, it is not "moved" any more.
+          owner = parked.find { |q| q[:dest_json] == info[:json_home] }
+          in_the_way = owner && File.exist?(info[:json_home]) && !File.exist?(owner[:json_home])
+          landed[owner[:index]] = :home if in_the_way && step_back(owner, info)
+
+          # The name being free is not the same question as the address
+          # being free, and it is the address the build refuses to build
+          # two of -- so it is the one asked here, by the guard that
+          # answers it everywhere else. Asking about the name alone is
+          # how this recovery used to put a parked post back beside a
+          # mover that was serving the same address from another folder.
+          if way_home_clear?(info)
             File.rename(info[:json_temp], info[:json_home])
+            landed[info[:index]] = :home
           else
-            owner = parked.find { |q| q[:dest_json] == info[:json_home] }
-            if owner && !File.exist?(owner[:json_home])
-              File.rename(info[:json_home], owner[:json_home])
-              File.rename(info[:json_temp], info[:json_home])
-            else
-              stranded << [info[:slug], info[:json_temp], info[:json_home]]
-            end
+            landed[info[:index]] = :parked
+            stranded << [info[:slug], info[:json_temp], info[:json_home]]
           end
         end
         [%i[media_temp media_home], %i[versions_temp versions_home]].each do |temp_key, home_key|
@@ -2154,13 +2226,18 @@ def apply_queue_moves(moves)
         # The dates stay ISO on purpose: this list is read with a file
         # manager open next to it, and the folder they name is the year
         # in the timestamp, not whatever the locale's date_format writes.
+        #
+        # Every row comes off `landed`, which the recovery kept as it
+        # went. "see below" is one of those answers rather than a guess,
+        # so it can no longer be printed for a post with nothing below it
+        # -- which is what a mover put back under its own name got, while
+        # the one the recovery had stepped back was still being announced
+        # as moved to the date it no longer holds.
         moves.each_with_index do |(entry, target), i|
-          state = if i < done
-                    t('cli.queue_move_moved', date: target.iso8601)
-                  elsif File.exist?(entry[:path])
-                    t('cli.queue_move_stayed', date: entry[:time].iso8601)
-                  else
-                    t('cli.queue_move_see_below')
+          state = case landed[i]
+                  when :moved then t('cli.queue_move_moved', date: target.iso8601)
+                  when :parked then t('cli.queue_move_see_below')
+                  else t('cli.queue_move_stayed', date: entry[:time].iso8601)
                   end
           warn "  '#{entry[:slug]}' -- #{state}"
         end
@@ -3004,7 +3081,7 @@ end
 # year its file sits in. Same question address_occupant answers for a
 # post's address, asked the way a page is served.
 def root_occupant(name)
-  Dir.glob(File.join(CONTENT_DIR, '*', "#{name}.json")).sort.each do |file|
+  PathGlob.under(CONTENT_DIR, '*', "#{name}.json").sort.each do |file|
     candidate = begin
       JSON.parse(File.read(file, encoding: 'utf-8'))
     rescue StandardError
@@ -3050,7 +3127,7 @@ def address_occupant(parts)
   # DATE. Reading only <year>/<slug>.json answered about a file rather than
   # about an address, which is the same narrow question the six writing
   # paths were asking until this release.
-  Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).sort.each do |file|
+  PathGlob.under(CONTENT_DIR, '*', "#{slug}.json").sort.each do |file|
     candidate = begin
       JSON.parse(File.read(file, encoding: 'utf-8'))
     rescue StandardError
@@ -3599,7 +3676,7 @@ def delete_post(slug, path: nil)
     kept_media = File.join(TRASH_DIR, ".keep-#{slug}-#{Process.pid}")
     FileUtils.mkdir_p(kept_media)
   end
-  FileUtils.mv(Dir.glob(File.join(trash_dir, 'media', '*')), kept_media) if kept_media
+  FileUtils.mv(PathGlob.under(trash_dir, 'media', '*'), kept_media) if kept_media
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
   # The post's earlier drafts go with it. Left behind they would be an
@@ -3652,7 +3729,7 @@ end
 # the trash grew years. Both are restorable -- an upgrade must not strand
 # somebody's undo.
 def trashed_paths(slug)
-  (Dir.glob(File.join(TRASH_DIR, '*', slug, 'post.json')) +
+  (PathGlob.under(TRASH_DIR, '*', slug, 'post.json') +
    [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) }.uniq.sort
 end
 
@@ -3696,7 +3773,7 @@ end
 # post.json to bring back, only files. `check --repair` promises the trash
 # is somewhere restore can reach, and this is the half that makes it true.
 def trashed_media_dirs(slug)
-  Dir.glob(File.join(TRASH_DIR, '*', slug, 'media')).select { |d| File.directory?(d) }.sort
+  PathGlob.under(TRASH_DIR, '*', slug, 'media').select { |d| File.directory?(d) }.sort
 end
 
 def restore_media(slug, dirs)
@@ -3861,7 +3938,7 @@ def summary_row(post)
 end
 
 def load_posts_summary
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map { |f| post_summary(f) }
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map { |f| post_summary(f) }
 end
 
 def cmd_list(filters)
@@ -3921,7 +3998,7 @@ def browse_row(post)
 end
 
 def browse_posts
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
     summary = post_summary(file)
     # Keyed by year/slug, not slug: backdating makes the same slug in two
     # years easy (the archive really has such pairs), and a slug-keyed
@@ -4350,13 +4427,13 @@ def trash_summary
   # and the wizard's whole Trash entry, answered "Trash is empty" over a full
   # trash. The engine's only undo, unreachable except by typing a slug the
   # author would have to remember.
-  posts = (Dir.glob(File.join(TRASH_DIR, '*', '*', 'post.json')) +
-           Dir.glob(File.join(TRASH_DIR, '*', 'post.json')))
+  posts = (PathGlob.under(TRASH_DIR, '*', '*', 'post.json') +
+           PathGlob.under(TRASH_DIR, '*', 'post.json'))
          .uniq.sort.filter_map { |f| post_summary(f) }
   # ...and the media `check --repair` set aside for posts that were never
   # deleted. Without these the list said "the trash is empty" over files
   # the engine itself had just put there and promised were restorable.
-  media_only = Dir.glob(File.join(TRASH_DIR, '*', '*', 'media')).filter_map do |dir|
+  media_only = PathGlob.under(TRASH_DIR, '*', '*', 'media').filter_map do |dir|
     slug = File.basename(File.dirname(dir))
     next if File.exist?(File.join(File.dirname(dir), 'post.json'))
     next if posts.any? { |p| p[:slug] == slug }

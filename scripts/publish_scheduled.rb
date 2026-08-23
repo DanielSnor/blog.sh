@@ -22,6 +22,7 @@ require_relative '../lib/publishing'
 require_relative '../lib/atomic_write'
 require_relative '../lib/i18n'
 require_relative '../lib/site_config'
+require_relative '../lib/path_glob'
 
 # Cron mail reads stdout and stderr as one stream, and a block-buffered
 # stdout lets every warning overtake the lines it belongs after.
@@ -46,7 +47,7 @@ RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0)
 # marker too now -- two copies of the same path is how they drift apart.
 DEPLOY_PENDING = Publishing::DEPLOY_PENDING
 
-due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
+due = PathGlob.under(Publishing::CONTENT_DIR, '*', '*.json').filter_map do |path|
   begin
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
     raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)

@@ -43,6 +43,7 @@ require 'time'
 require_relative '../lib/deploy_backend'
 require_relative '../lib/atomic_write'
 require_relative '../lib/file_size'
+require_relative '../lib/path_glob'
 # This script talks to the author too (an unconfigured target below says
 # so out loud), and until 1.3.1 it said it in English on a Czech install
 # -- the only entry point that did. i18n arrives the way scripts/doctor.rb
@@ -333,7 +334,7 @@ end
 STATE = load_state
 PREV = STATE['last_run'].is_a?(Hash) ? STATE['last_run'] : {}
 
-files = Dir.glob(File.join(PUBLIC_DIR, '**', '*'))
+files = PathGlob.under(PUBLIC_DIR, '**', '*')
             .select { |f| File.file?(f) }
             .map { |f| f.delete_prefix("#{PUBLIC_DIR}/") }
             .sort

@@ -7,6 +7,7 @@ require 'uri'
 require_relative 'feed_http'
 require_relative 'i18n'
 require_relative 'site_config'
+require_relative 'path_glob'
 
 # lib/post_stats.rb -- favourite/boost/comment counts for announced
 # posts, precomputed server-side into public/stats.json, and (when
@@ -155,7 +156,7 @@ module PostStats
   end
 
   def entries
-    Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8'))
       raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
 

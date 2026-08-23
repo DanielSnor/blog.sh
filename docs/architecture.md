@@ -332,7 +332,9 @@ refuses to run on (or, for the slug, misplaces the page for), so a check that st
 quiet about them was calling an archive sound that was about to stop the
 site; files a queue move stepped aside and a crash left parked, which no
 listing shows and one rename repairs; media a post asks for and hasn't got
--- or has in a shape no reader can use; images
+-- or has in a shape no reader can use, or has under a spelling that is not
+the one the post names, where a volume that folds letter case and unicode
+form renders the page and one that does not has the hole already; images
 whose stored dimensions are 1px or smaller, which the build drops
 *together with their caption* and would otherwise lose silently; internal
 links pointing at an address nothing on this site answers at; links

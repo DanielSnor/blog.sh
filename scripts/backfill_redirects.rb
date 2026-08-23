@@ -24,6 +24,7 @@ require 'json'
 require 'uri'
 require_relative '../lib/atomic_write'
 require_relative '../lib/import/permalinks'
+require_relative '../lib/path_glob'
 
 ROOT = File.expand_path('..', __dir__)
 CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
@@ -42,7 +43,7 @@ already = 0
 skipped_domain = 0
 unusable = 0
 
-Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).sort.each do |file|
+PathGlob.under(CONTENT_DIR, '*', '*.json').sort.each do |file|
   post = JSON.parse(File.read(file, encoding: 'utf-8'))
   next unless post['state'] == 'published'
 

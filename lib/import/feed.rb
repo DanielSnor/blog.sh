@@ -5,6 +5,7 @@ require 'uri'
 require_relative '../feed_http'
 require_relative '../i18n'
 require_relative '../slug'
+require_relative '../path_glob'
 # Only the postscript needs this, and only to ask where a page actually
 # landed -- see #written_pages. The mapping itself stays writer-agnostic,
 # and post_writer pulls in nothing from the run layer, so an adapter is
@@ -388,7 +389,7 @@ module Import
       # raw Errno backtrace out of File.read, in a wizard whose whole job is
       # to hold somebody's hand through their first import.
       if File.directory?(@source.to_s)
-        inside = Dir.glob(File.join(@source.to_s, '*.{xml,rss,atom}')).sort
+        inside = PathGlob.under(@source.to_s, '*.{xml,rss,atom}').sort
         hint = inside.empty? ? '' : " Did you mean #{File.basename(inside.first)} inside it?"
         abort("❌ #{@source} is a folder, and this import wants the file itself.#{hint}")
       end

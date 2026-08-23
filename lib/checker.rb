@@ -10,6 +10,7 @@ require 'time'
 require_relative 'post_address'
 require_relative 'slug'
 require_relative 'i18n'
+require_relative 'path_glob'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -142,7 +143,7 @@ module Checker
   def load_posts(root)
     @unreadable = []
     dir = File.join(root, 'content.nosync', 'posts')
-    Dir.glob(File.join(dir, '*', '*.json')).sort.filter_map do |path|
+    PathGlob.under(dir, '*', '*.json').sort.filter_map do |path|
       raw = File.read(path, encoding: 'utf-8')
       # A file that is not valid UTF-8 is one the build dies on -- JSON's
       # own parser raises deep in a C extension, a raw backtrace with no
@@ -224,9 +225,9 @@ module Checker
   # to every listing, until the same slug moves again. The message carries
   # the path, because the fix is one rename.
   def check_parked_leftovers(root)
-    strays = Dir.glob(File.join(root, 'content.nosync', 'posts', '*', '.*queue-move*')) +
-             Dir.glob(File.join(root, 'media.nosync', '*', '.*queue-move*')) +
-             Dir.glob(File.join(root, 'content.nosync', 'versions', '*', '.*queue-move*'))
+    strays = PathGlob.under(root, 'content.nosync', 'posts', '*', '.*queue-move*') +
+             PathGlob.under(root, 'media.nosync', '*', '.*queue-move*') +
+             PathGlob.under(root, 'content.nosync', 'versions', '*', '.*queue-move*')
     strays.sort.map do |path|
       # The advice depends on whether the name it came from is free. If the
       # move was interrupted DURING parking, the home name is empty and the
@@ -365,6 +366,20 @@ module Checker
     File.file?(path) && File.readable?(path) && !File.size?(path).nil?
   end
 
+  # Which of the three it was. The sentence used to list all three every
+  # time -- "empty, unreadable, or not a file at all" -- so whoever read
+  # it had to go and look themselves, and the three want different
+  # answers: a folder is deleted, a permission bit is chmod'ed, an empty
+  # file is fetched again. Asked in the order the failures shadow each
+  # other in: a directory is unreadable AND sizeless, so it has to be
+  # named first.
+  def unusable_media_cause(path)
+    return 'dir' if File.directory?(path)
+    return 'unreadable' unless File.readable?(path)
+
+    'empty'
+  end
+
   def media_dir_for(root, post)
     by_file = File.join(root, 'media.nosync', post['__year'].to_s, post['slug'].to_s)
     return by_file if Dir.exist?(by_file)
@@ -457,7 +472,8 @@ module Checker
         # because "missing from its media directory" is false about a file
         # somebody is looking straight at.
         if claim && !readable_media_file?(File.join(dir, claim.first))
-          unusable << [post['slug'], claim.first, post['__year'], rel_dir]
+          unusable << [post['slug'], claim.first, post['__year'], rel_dir,
+                       unusable_media_cause(File.join(dir, claim.first))]
         elsif claim.nil?
           missing << [post['slug'], url, post['__year']]
         elsif claim.last != :exact
@@ -471,9 +487,11 @@ module Checker
       error(t('media_missing', slug: slug, file: url), t('media_missing_fix'),
             kind: :media_missing, data: { 'slug' => slug, 'file' => url, 'year' => year })
     end, cap) +
-      capped(unusable.map do |slug, file, year, rel|
-        error(t('media_unusable', slug: slug, file: file), t('media_unusable_fix'),
-              kind: :media_unusable, data: { 'slug' => slug, 'file' => file, 'year' => year, 'dir' => rel })
+      capped(unusable.map do |slug, file, year, rel, cause|
+        error(t('media_unusable', slug: slug, file: file, cause: t("media_cause_#{cause}")),
+              t('media_unusable_fix'),
+              kind: :media_unusable,
+              data: { 'slug' => slug, 'file' => file, 'year' => year, 'dir' => rel, 'cause' => cause })
       end, cap) +
       # Not "missing" -- the file is right there, under a spelling the post
       # does not use. Whether it is broken depends on the volume: where the
@@ -599,7 +617,7 @@ module Checker
       slug = post['slug'].to_s
       [File.join(post['__year'].to_s, slug), File.join(PostAddress.date_year(post), slug)]
     end.to_set
-    orphans = Dir.glob(File.join(media_root, '*', '*')).select { |p| File.directory?(p) }.filter_map do |dir|
+    orphans = PathGlob.under(media_root, '*', '*').select { |p| File.directory?(p) }.filter_map do |dir|
       rel = dir.sub("#{media_root}/", '')
       rel unless owned.include?(rel)
     end

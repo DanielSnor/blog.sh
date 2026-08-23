@@ -3,6 +3,7 @@
 require 'fileutils'
 require 'json'
 require_relative 'i18n'
+require_relative 'path_glob'
 
 # The undo the engine did not have. Deleting a post has always been
 # reversible -- it goes to trash/ and `restore` brings it back -- but
@@ -61,7 +62,7 @@ module PostVersions
     # and pushed out the one version that predated the author's own edit.
     # The question this list exists to answer, "what did it say before I
     # broke it", was then answered with the broken text ten times over.
-    newest = Dir.glob(File.join(dir, '*.json')).max
+    newest = PathGlob.under(dir, '*.json').max
     return false if newest && FileUtils.compare_file(path, newest)
 
     FileUtils.cp(path, File.join(dir, "#{stamp}.json"))
@@ -74,7 +75,7 @@ module PostVersions
   # Sorted newest first, which is the order they are offered in.
   def list(slug, year, content_dir:)
     dir = File.join(versions_root(content_dir), year.to_s, slug.to_s)
-    Dir.glob(File.join(dir, '*.json')).sort.reverse
+    PathGlob.under(dir, '*.json').sort.reverse
   end
 
   # Versions travel with the post. Without this, restoring a post from the
@@ -123,7 +124,7 @@ module PostVersions
   end
 
   def prune(dir, cap)
-    files = Dir.glob(File.join(dir, '*.json')).sort
+    files = PathGlob.under(dir, '*.json').sort
     return if files.size <= cap
 
     files.first(files.size - cap).each { |f| File.delete(f) }

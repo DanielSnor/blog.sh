@@ -51,6 +51,22 @@ module ConfigWriter
   # paste" rather than letting it reach the user as a backtrace.
   class MissingKey < StandardError; end
 
+  # Raised when the shipped template a file would be seeded from is not on
+  # disk. A MissingKey by inheritance, because that is what it is -- but
+  # its own class, because the answer is not "your config is missing a
+  # setting" but "config/site.yml.example is gone, put it back". Without
+  # it, a tree whose template had been deleted met both wizards with a
+  # five-line Ruby backtrace out of the constructor, before either had
+  # asked a single question.
+  class TemplateMissing < MissingKey
+    attr_reader :path
+
+    def initialize(path)
+      @path = path
+      super("no template at #{path}")
+    end
+  end
+
   # Raised when the file we just wrote doesn't parse back to the values we
   # put in it. The file is restored before this is raised -- see save!.
   class VerificationFailed < StandardError; end
@@ -568,7 +584,10 @@ module ConfigWriter
     # file behind.
     def read_or_seed
       return File.read(@path) if File.exist?(@path)
-      raise MissingKey, "no #{@path} and no template to seed it from" unless @template && File.exist?(@template)
+      # The path when there is no template to name: a writer opened over
+      # the example itself (style.rb reads the shipped defaults out of it)
+      # has none, and the file the sentence has to name is that one.
+      raise TemplateMissing, (@template || @path).to_s unless @template && File.exist?(@template)
 
       File.read(@template)
     end
@@ -688,9 +707,26 @@ module ConfigWriter
 
     # Is this line YAML structure (a key or a sequence entry) rather than
     # prose? Measured on the activated form, so a commented key counts.
+    #
+    # A sentence can open with a word and a colon, and "key: value" alone
+    # cannot tell the two apart: `# Optional: posts per listing page` sits
+    # directly above `# page_size: 10` in the shipped template, read as a
+    # key, and stopped the walk in the middle of its own paragraph -- so a
+    # config that asked for page_size got the second and third lines of
+    # the explanation and not the first, opening mid-sentence. What
+    # separates them is the VALUE: a setting carries one scalar (quoted, a
+    # number, a flow collection, a block scalar) or nothing at all, while
+    # prose carries a run of bare words.
     def structure?(line)
-      effective = ConfigWriter.comment?(line) ? ConfigWriter.uncomment(line) : line
-      effective.match?(/\A\s*(-\s|[A-Za-z_][A-Za-z0-9_-]*:(\s|\z))/)
+      effective = (ConfigWriter.comment?(line) ? ConfigWriter.uncomment(line) : line).chomp
+      return true if effective.match?(/\A\s*-\s/)
+
+      declaration = effective.match(/\A\s*[A-Za-z_][A-Za-z0-9_-]*:(?:\s+(?<value>.*))?\z/)
+      return false unless declaration
+
+      value = declaration[:value].to_s.strip
+      value.empty? || value.start_with?('"', "'", '[', '{', '|', '>', '#', '&', '*') ||
+        !value.match?(/\S\s+\S/)
     end
 
     # Turns ONE commented line into active YAML. Anchored on the key name
@@ -1022,7 +1058,10 @@ module ConfigWriter
 
     def read_or_seed
       return File.read(@path) if File.exist?(@path)
-      raise MissingKey, "no #{@path} and no template to seed it from" unless @template && File.exist?(@template)
+      # The path when there is no template to name: a writer opened over
+      # the example itself (style.rb reads the shipped defaults out of it)
+      # has none, and the file the sentence has to name is that one.
+      raise TemplateMissing, (@template || @path).to_s unless @template && File.exist?(@template)
 
       File.read(@template)
     end
