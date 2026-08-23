@@ -102,7 +102,16 @@ module Checker
 
   def run(root:, progress: nil, online: false, online_progress: nil, cap: CAP)
     posts = load_posts(root)
-    return [warn(t('no_posts'), kind: :no_posts)] if posts.empty?
+    # "No posts" only when there is genuinely nothing -- not when every
+    # file present was unreadable. load_posts drops the broken ones and
+    # remembers them; firing the empty-archive early return before
+    # check_unbuildable had a chance to surface them called an archive the
+    # build dies on "empty" and exited 0, the exact silent drop the
+    # @unreadable machinery exists to prevent.
+    if posts.empty?
+      unbuildable = check_unbuildable(posts, cap)
+      return unbuildable.any? ? unbuildable : [warn(t('no_posts'), kind: :no_posts)]
+    end
 
     known = known_paths(posts)
     findings = []
@@ -179,6 +188,18 @@ module Checker
                           t('post_content_unreadable_fix'), kind: :post_content_unreadable,
                           data: { 'file' => post['__path'].to_s })
       end
+      # A slug is one path segment. A hand-edited or imported one carrying a
+      # slash or a `..` turns the post's address into a path that climbs
+      # out of where the build writes -- the build chokes on it while check
+      # called the archive sound. The engine's own slugs are [a-z0-9-];
+      # only the genuinely dangerous shapes are flagged, so a unicode slug
+      # from an import is left alone.
+      slug = post['slug'].to_s
+      if slug.include?('/') || slug.split(/[\\\/]/).include?('..') || slug.start_with?('.') || slug.include?("\0")
+        findings << error(t('post_bad_slug', file: short_path(post['__path'].to_s), slug: slug.inspect),
+                          t('post_bad_slug_fix'), kind: :post_bad_slug,
+                          data: { 'file' => post['__path'].to_s, 'slug' => slug })
+      end
       next if parseable_date?(post['date'])
 
       findings << error(t('post_date_unreadable', file: short_path(post['__path'].to_s),
@@ -200,10 +221,30 @@ module Checker
              Dir.glob(File.join(root, 'media.nosync', '*', '.*queue-move*')) +
              Dir.glob(File.join(root, 'content.nosync', 'versions', '*', '.*queue-move*'))
     strays.sort.map do |path|
-      error(t('parked_leftover', file: path.sub("#{root}/", '')),
-            t('parked_leftover_fix'), kind: :parked_leftover,
-            data: { 'file' => path.sub("#{root}/", '') })
+      # The advice depends on whether the name it came from is free. If the
+      # move was interrupted DURING parking, the home name is empty and the
+      # parked file IS the post -- rename it back. If it was interrupted
+      # after a mover landed (the wider window), the swapped post is already
+      # sitting at that home name, so the parked file is a STALE COPY:
+      # renaming it back would overwrite live content. Telling the two apart
+      # is the difference between a repair and a second data loss.
+      home = parked_home(path)
+      occupied = home && File.exist?(home)
+      fix = occupied ? 'parked_leftover_fix_stale' : 'parked_leftover_fix'
+      rel = path.sub("#{root}/", '')
+      error(t('parked_leftover', file: rel), t(fix, home: home&.sub("#{root}/", '')),
+            kind: :parked_leftover, data: { 'file' => rel, 'stale' => occupied })
     end
+  end
+
+  # The name a parked file or directory would return to:
+  # `.<name>.queue-move.<pid>[-n][.<ext>]` -> `<name>[.<ext>]` beside it.
+  def parked_home(path)
+    base = File.basename(path)
+    m = base.match(/\A\.(.+)\.queue-move\.\d+(?:-\d+)?(\.[^.]+)?\z/)
+    return nil unless m
+
+    File.join(File.dirname(path), "#{m[1]}#{m[2]}")
   end
 
   def parseable_date?(value)

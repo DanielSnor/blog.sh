@@ -37,7 +37,9 @@ module PreviewServer
     '.js' => 'text/javascript; charset=utf-8', '.json' => 'application/json; charset=utf-8',
     '.xml' => 'application/xml; charset=utf-8', '.txt' => 'text/plain; charset=utf-8',
     '.svg' => 'image/svg+xml', '.png' => 'image/png', '.jpg' => 'image/jpeg',
-    '.jpeg' => 'image/jpeg', '.gif' => 'image/gif', '.webp' => 'image/webp',
+    '.jpeg' => 'image/jpeg', '.jpe' => 'image/jpeg', '.jfif' => 'image/jpeg',
+    '.gif' => 'image/gif', '.webp' => 'image/webp', '.bmp' => 'image/bmp',
+    '.tif' => 'image/tiff', '.tiff' => 'image/tiff', '.svgz' => 'image/svg+xml',
     '.ico' => 'image/x-icon', '.woff' => 'font/woff', '.woff2' => 'font/woff2',
     '.mp4' => 'video/mp4', '.mov' => 'video/quicktime', '.m4v' => 'video/x-m4v',
     '.mp3' => 'audio/mpeg', '.m4a' => 'audio/mp4', '.ogg' => 'audio/ogg',
@@ -83,22 +85,23 @@ module PreviewServer
 
     verb, raw_path, = request_line.split(' ')
     headers = read_headers(client)
+    head = verb == 'HEAD'
 
     unless %w[GET HEAD].include?(verb)
-      return respond(client, 405, 'Method Not Allowed', 'text/plain', 'Only GET/HEAD are supported')
+      return respond(client, 405, 'Method Not Allowed', 'text/plain', 'Only GET/HEAD are supported', head: head)
     end
 
     path = resolve_path(root, raw_path)
     if path.nil?
-      respond(client, 403, 'Forbidden', 'text/plain', 'Forbidden')
+      respond(client, 403, 'Forbidden', 'text/plain', 'Forbidden', head: head)
     elsif !File.file?(path)
       # The build makes a 404 page; the preview is where its own site is
       # looked at, so it should be the one the reader would get.
       own = File.join(root, '404.html')
       if File.file?(own)
-        respond(client, 404, 'Not Found', 'text/html; charset=utf-8', File.read(own, encoding: 'utf-8'))
+        respond(client, 404, 'Not Found', 'text/html; charset=utf-8', File.read(own, encoding: 'utf-8'), head: head)
       else
-        respond(client, 404, 'Not Found', 'text/plain', '404 Not Found')
+        respond(client, 404, 'Not Found', 'text/plain', '404 Not Found', head: head)
       end
     else
       send_file(client, path, verb, headers['range'])
@@ -168,7 +171,7 @@ module PreviewServer
 
     if range == :unsatisfiable
       return respond(client, 416, 'Range Not Satisfiable', 'text/plain', 'Range Not Satisfiable',
-                     extra: { 'Content-Range' => "bytes */#{size}" })
+                     extra: { 'Content-Range' => "bytes */#{size}" }, head: verb == 'HEAD')
     end
 
     if range
@@ -198,6 +201,10 @@ module PreviewServer
     return nil if raw_path.nil?
 
     clean = percent_decode(raw_path.split('?').first.to_s)
+    # A NUL byte (%00) makes every File call raise "string contains null
+    # byte", which escaped handle() before any response was written -- the
+    # connection just dropped. It is never part of a real path; refuse it.
+    return nil if clean.include?("\0")
     full = File.expand_path(File.join(root, clean))
     return nil unless full == root || full.start_with?("#{root}/")
 
@@ -235,9 +242,13 @@ module PreviewServer
   # cached search-index.json or stylesheet quietly showing the previous
   # build is indistinguishable from "my change didn't work" -- the most
   # confusing failure a preview can produce.
-  def respond(client, code, reason, content_type, body, size: nil, extra: {})
+  def respond(client, code, reason, content_type, body, size: nil, extra: {}, head: false)
     write_head(client, code, reason, content_type, size || body&.bytesize || 0, **extra)
-    client.write(body) if body
+    # HEAD carries the headers of the GET it stands in for -- Content-Length
+    # and all -- but never the body. The error responses (404, 403, 405,
+    # 416) went out with their body regardless, which is a protocol bug a
+    # strict client trips over.
+    client.write(body) if body && !head
   end
 
   def write_head(client, code, reason, content_type, size, **extra)

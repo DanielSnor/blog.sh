@@ -184,13 +184,17 @@ def load_manifest
   return data if data.is_a?(Hash)
 
   raise JSON::ParserError, "not an object (#{data.class})"
-rescue JSON::ParserError => e
+rescue JSON::ParserError, SystemCallError => e
   # Treating this as "nothing was ever uploaded" silently is how orphans
   # become permanently unprunable: the target keeps files this side no
   # longer knows about. Say it out loud. The guards are unaffected either
   # way -- their reference is the accepted build, not this file -- so an
   # unreadable manifest now costs a full re-upload and the orphan list,
-  # nothing more.
+  # nothing more. SystemCallError as well as a parse error: a manifest left
+  # root-owned by one sudo run (the uid trap this project keeps hitting on
+  # its own servers) raised a raw EACCES here and killed every deploy,
+  # while load_state twenty lines down already degraded gracefully on the
+  # very same class.
   warn "⚠️  #{MANIFEST_PATH} is unreadable (#{e.message.lines.first.to_s.strip[0, 60]}) -- treating it as empty."
   warn '   Everything will be re-uploaded. Files already on the target that this build no longer generates'
   warn '   can no longer be found automatically; check the target if you have deleted posts recently.'
@@ -213,6 +217,19 @@ end
 def save_manifest(manifest)
   manifest = manifest.merge('_target' => manifest_target)
   AtomicWrite.write_json(MANIFEST_PATH, manifest)
+  true
+rescue SystemCallError => e
+  # The manifest is bookkeeping, exactly like the baseline save_state
+  # writes -- and save_state has always refused to let bookkeeping become
+  # the error the author sees. save_manifest did not: a full disk (or a
+  # read-only root) at the periodic mid-upload save, or in the ensure
+  # block, killed a working transfer at the 25th file with a raw backtrace
+  # and left the run's own outcome record unwritten. Losing the manifest
+  # costs one full re-upload next time, which is worth a sentence and not
+  # worth dying over.
+  warn "⚠️  #{MANIFEST_PATH}: #{e.message.lines.first.to_s.strip}"
+  warn "   #{I18n.t('cli.deploy_state_unwritable')}"
+  false
 end
 
 def load_state

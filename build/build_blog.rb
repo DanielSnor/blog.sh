@@ -413,6 +413,26 @@ def h(text)
   CGI.escapeHTML(text.to_s)
 end
 
+# An href is only as safe as its SCHEME, and CGI.escapeHTML does nothing
+# about that: it neutralises quotes and angle brackets but leaves
+# `javascript:` / `vbscript:` / `data:` intact, so an imported
+# <a href="javascript:..."> from a multi-author or scraped source rendered
+# live into every page and the feed. Same stance the engine already takes
+# for embeds (Embed.safe_uri) and the video-unavailable fallback: an
+# allowlist, not a blocklist. Browsers ignore ASCII whitespace and control
+# characters inside a scheme, so those are stripped before the scheme is
+# read. No scheme at all is a relative link or an anchor and always passes;
+# a scheme that is not one of these is dropped to a dead anchor.
+HREF_SAFE_SCHEMES = %w[http https mailto tel].freeze
+def safe_href(url)
+  raw = url.to_s
+  probe = raw.gsub(/[\u0000-\u0020]/, '')
+  scheme = probe[/\A([a-z][a-z0-9+.\-]*):/i, 1]
+  return raw if scheme.nil? || HREF_SAFE_SCHEMES.include?(scheme.downcase)
+
+  '#'
+end
+
 # --- Markdown in the site's own chrome ------------------------------------
 #
 # about.html, footer.note_html, footer.copyright and banner.claim are the
@@ -569,8 +589,8 @@ def wrap_tag(chunk, format)
   when 'small' then "<small>#{chunk}</small>"
   when 'link'
     title = format['title'] ? %( title="#{CGI.escapeHTML(format['title'].to_s)}") : ''
-    %(<a href="#{CGI.escapeHTML(format['url'].to_s)}"#{title}>#{chunk}</a>)
-  when 'mention' then %(<a href="#{CGI.escapeHTML(format.dig('blog', 'url').to_s)}">#{chunk}</a>)
+    %(<a href="#{CGI.escapeHTML(safe_href(format['url']))}"#{title}>#{chunk}</a>)
+  when 'mention' then %(<a href="#{CGI.escapeHTML(safe_href(format.dig('blog', 'url')))}">#{chunk}</a>)
   when 'color' then %(<span style="color:#{CGI.escapeHTML(format['hex'].to_s)}">#{chunk}</span>)
   else chunk
   end
@@ -737,7 +757,7 @@ def render_video(block, media_prefix)
     # unescaped it closed the href and wrote markup of its own into every
     # page the post appears on -- and into the RSS feed, which carries the
     # same rendered HTML.
-    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
+    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{h(safe_href(block['url']))}">#{h(block['url'])}</a></p>)
   end
 end
 
@@ -842,7 +862,7 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
       # none has nothing left to draw at all.
       description.empty? ? '' : %(<p class="link-block">#{description}</p>)
     else
-      %(<p class="link-block"><a href="#{CGI.escapeHTML(block['url'].to_s)}"><strong>#{title}</strong></a><br>#{description}</p>)
+      %(<p class="link-block"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
     end
   else
     "<pre>#{block.to_json}</pre>"

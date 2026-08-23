@@ -499,10 +499,11 @@ rather than a file under `public.nosync`: something to go and fix.
 
 What it looks for, each with a line saying what to do about it:
 
-- **A post file that will not read, a date nothing can parse, or a post
-  whose text is not a list of blocks.** The build refuses to run on any of
-  them, so check says so first: without this it counted the archive minus
-  the broken file and called the rest sound.
+- **A post file that will not read, a date nothing can parse, a post whose
+  text is not a list of blocks, or a slug that is not one path segment
+  (a slash or a `..` in it).** The build refuses to run on any of them, or
+  writes the page nowhere good, so check says so first: without this it
+  counted the archive minus the broken file and called the rest sound.
 - **A file a queue move stepped aside and a crash left parked.** The
   parking name is dotted precisely so no listing shows it -- which also
   means nothing would ever find one again without this. The fix is one

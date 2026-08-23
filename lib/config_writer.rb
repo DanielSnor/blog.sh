@@ -148,6 +148,23 @@ module ConfigWriter
   # -- and the last line is the reason it strips exactly one level and not
   # all of them: an optional key inside an optional block must still be
   # optional after its block is activated.
+  # Can this path be written without moving anything -- the directory that
+  # will hold the atomic temp, the file itself if it is there, and the .bak
+  # if one would be made. Read-only, so review_and_write can ask about
+  # EVERY file before it writes the first: the whole point of the wizard's
+  # "nothing was written" is that it is true, and it stopped being true the
+  # day two files were written in turn and the second was refused.
+  def self.write_blocker(path, backup: true)
+    dir = File.dirname(path)
+    return dir unless File.writable?(dir)
+    return path if File.exist?(path) && !File.writable?(path)
+
+    bak = "#{path}.bak"
+    return bak if backup && File.exist?(bak) && !File.writable?(bak)
+
+    nil
+  end
+
   def self.uncomment(line)
     line.sub(/\A(\s*)#[ ]?/) { Regexp.last_match(1) }
   end
@@ -301,6 +318,71 @@ module ConfigWriter
       end
       @lines[start..value_extent(decl)].join
     end
+
+    # A leaf key's template text -- its line and the run of prose directly
+    # above it -- located tolerantly, because the template ships an
+    # optional key double-commented (`#     # instance:`) so uncommenting
+    # its section wholesale leaves it off. locate/declares? strip one
+    # comment level and miss it; this strips as many as it takes.
+    # declares?, but seeing through ANY number of leading '#': the
+    # template ships an optional key double-commented, and a whole section
+    # commented once on top of that.
+    def tolerant_declares?(line, key, indent)
+      bare = line
+      bare = ConfigWriter.uncomment(bare) while ConfigWriter.comment?(bare)
+      bare.match?(/\A {#{indent}}#{Regexp.escape(key)}:(\s|\z)/)
+    end
+
+    # value_extent measured on the fully-uncommented indentation, so a
+    # commented template block has a measurable body.
+    def tolerant_extent(line_no)
+      strip = lambda do |l|
+        b = l
+        b = ConfigWriter.uncomment(b) while ConfigWriter.comment?(b)
+        ConfigWriter.blank?(b) ? nil : b[/\A */].length
+      end
+      indent = strip.call(@lines[line_no])
+      last = line_no
+      ((line_no + 1)...@lines.size).each do |i|
+        li = strip.call(@lines[i])
+        next if li.nil?
+        break if li <= indent
+
+        last = i
+      end
+      last
+    end
+
+    def leaf_block(key_path)
+      # Bounded to the parent's own block, walked segment by segment --
+      # otherwise a finder for `instance:` matches the `#   # instance:`
+      # EXAMPLE in the file's "how to read the # lines" header long before
+      # the real one inside commits:, and grafts the whole header instead.
+      range = (0...@lines.size)
+      key_path.each_with_index do |seg, depth|
+        indent = depth * ConfigWriter::INDENT
+        hit = range.find { |i| tolerant_declares?(@lines[i], seg, indent) }
+        return nil unless hit
+
+        range = depth == key_path.size - 1 ? (hit..hit) : (hit + 1..tolerant_extent(hit))
+      end
+      decl = range.first
+
+      start = decl
+      while start.positive?
+        above = @lines[start - 1]
+        break unless ConfigWriter.comment?(above) && !ConfigWriter.blank?(above)
+        break if structure?(above)
+
+        start -= 1
+      end
+      # A little sibling object over just this slice, so its .lines is the
+      # leaf's block -- graft_leaf normalises and activates it.
+      block = self.class.allocate
+      block.instance_variable_set(:@lines, @lines[start..decl])
+      block
+    end
+
 
     # What save! would change. Built here rather than shelled out to
     # diff(1): the wizard shows this before asking for confirmation, and
@@ -523,12 +605,24 @@ module ConfigWriter
         begin
           activate(prefix)
         rescue MissingKey
-          raise unless graft(prefix)
-          # The template may carry the section active (mastodon:) or
-          # commented (bluesky:, widgets:); only the latter needs turning on.
-          next if active_index[prefix]
+          # A whole section the file lacks is grafted from the template.
+          # A single LEAF the file lacks -- widgets.commits.instance on a
+          # config written before 1.4 added it, the exact case the forge
+          # widget was built for -- is not a missing section: its parent
+          # is active and present, only this one key never existed in the
+          # file. Graft that one line (with its documentation) from the
+          # template into the parent's body, then activate it.
+          if graft(prefix)
+            # The template may carry the section active (mastodon:) or
+            # commented (bluesky:, widgets:); only the latter needs turning on.
+            next if active_index[prefix]
 
-          activate(prefix)
+            activate(prefix)
+          elsif depth.positive? && active_index[key_path[0...depth]] && graft_leaf(prefix)
+            next
+          else
+            raise
+          end
         end
       end
       active_index[key_path] || raise(MissingKey, "#{key_path.join('.')} is not in #{@path}")
@@ -564,6 +658,31 @@ module ConfigWriter
         body = body.map { |l| ConfigWriter.normalize_comment(l) } if active_index[parent]
         @lines.insert(value_extent(parent_line) + 1, *body)
       end
+      true
+    end
+
+    # Copies a SINGLE leaf key out of the template into an active parent
+    # section the file already has -- the counterpart of graft, which
+    # copies a whole missing section. widgets.commits.instance is why this
+    # exists: 1.4 added the key, so every config written before it has an
+    # active `commits:` block with no `instance` line in any form, and the
+    # forge question -- the release's headline feature, aimed at exactly
+    # those sites -- died on it. The template's line (with the prose above
+    # it) is grafted in, activated, and left for the caller to give a value.
+    def graft_leaf(key_path)
+      return false unless @template && File.exist?(@template)
+
+      block = self.class.new(@template).leaf_block(key_path)
+      return false unless block
+
+      parent = key_path[0..-2]
+      parent_line = locate(parent)
+      return false unless parent_line
+
+      body = block.instance_variable_get(:@lines).map { |l| ConfigWriter.normalize_comment(l) }
+      # The key line itself active, the prose above it left as comments.
+      body[-1] = ConfigWriter.uncomment(body[-1]) while ConfigWriter.comment?(body[-1])
+      @lines.insert(value_extent(parent_line) + 1, *body)
       true
     end
 
@@ -638,6 +757,16 @@ module ConfigWriter
     def value_extent(line_no)
       indent = ConfigWriter.indent_of(@lines[line_no])
       last = line_no
+      # Have we passed a comment at or above the key's own indent since the
+      # last real line? If so, we are inside a commented-out SECTION that
+      # follows the key (its `# bluesky:` head sat at the key's indent), and
+      # its own deeper-indented body lines (`#   handle:`) must not be
+      # mistaken for the key's children and swallowed. A commented child of
+      # the key itself (`# page_size: 10` right under `base_url`, with no
+      # shallower comment before it) is reached with this still false, so it
+      # stays findable inside the block. Getting this wrong deleted ~100
+      # documented lines from site.yml on the first setup write.
+      saw_shallow_comment = false
       ((line_no + 1)...@lines.size).each do |i|
         line_indent = ConfigWriter.indent_of(@lines[i])
         if line_indent.nil? # blank -- may be interior, decided by what follows
@@ -656,30 +785,33 @@ module ConfigWriter
         # ending it.
         if line_indent == indent && ConfigWriter.uncomment(@lines[i]).lstrip.match?(/\A-(\s|\z)/)
           last = i
+          saw_shallow_comment = false
           next
         end
-        # A COMMENT that is not indented as deeply as the key is decided
-        # the way a blank line is: by what follows it, rather than by
-        # itself. People write notes to themselves flush against the left
-        # margin in the middle of an indented block ("# my account id,
-        # from /api/v1/accounts/lookup"), and read as "not deeper,
-        # therefore not mine" such a line ended the key's body in the
-        # middle of itself. deactivate then commented out the half above
-        # it and left the half below ACTIVE under a parent that is now a
-        # comment -- invalid YAML, which verify! refused and rolled back,
-        # taking every other answer in the wizard session with it.
-        #
-        # It is only PASSED OVER, never counted as the end of the body: a
-        # commented key at the end of a block (`# page_size: 10`, which is
-        # how the template offers an optional one) has to stay findable
-        # inside its parent's search range, and a comment that turns out
-        # to be trailing is left outside the extent because nothing deeper
-        # follows it.
-        next if ConfigWriter.comment?(@lines[i]) && line_indent <= indent
+        # A comment is decided by what FOLLOWS it, the way a blank line is:
+        #   * at or above the key's indent -- it may be a note flush inside
+        #     a nested block ("# my account id"), or the head of a
+        #     commented-out section after the key. Passed over, and it arms
+        #     saw_shallow_comment so the section's own deeper body below it
+        #     cannot be annexed.
+        #   * deeper than the key -- a child. A genuine trailing child of
+        #     the key (`# page_size` under `site:`) commits, so it stays in
+        #     the block and remains findable; the body of a following
+        #     commented section (reached only after a shallower comment) does
+        #     not.
+        if ConfigWriter.comment?(@lines[i])
+          if line_indent <= indent
+            saw_shallow_comment = true
+          elsif !saw_shallow_comment
+            last = i
+          end
+          next
+        end
 
         break if line_indent <= indent
 
         last = i
+        saw_shallow_comment = false
       end
       last
     end

@@ -1331,6 +1331,15 @@ def pick_among_years(slug, paths)
   readable = paths.filter_map { |f| (summary = post_summary(f)) && [f, summary] }
   abort t('cli.post_not_found', slug: slug) if readable.empty?
 
+  # If only one copy could be read, there is nothing to choose between --
+  # the "ambiguity" is with a file nothing can read, which post_summary has
+  # already reported. Use the readable one rather than asking "which of the
+  # 1?" and calling it years.
+  if readable.size == 1 && paths.size > 1
+    warn t('cli.ambiguous_one_readable', slug: slug)
+    return readable.first.first
+  end
+
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }
   question = t('cli.ambiguous_slug', slug: slug, count: paths.size)
@@ -3649,6 +3658,11 @@ end
 def pick_among_trashed(slug, paths)
   readable = paths.filter_map { |f| (summary = post_summary(f)) && [f, summary] }
   abort t('cli.nothing_in_trash', slug: slug) if readable.empty?
+
+  if readable.size == 1 && paths.size > 1
+    warn t('cli.ambiguous_one_readable', slug: slug)
+    return readable.first.first
+  end
 
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }

@@ -344,6 +344,7 @@ cli:
 
   enter_number_or_slug: "Zadej číslo nebo slug: "
   ambiguous_slug: "Slug '%{slug}' existuje ve %{count} různých letech — který post myslíš?"
+  ambiguous_one_readable: "Slug '%{slug}' nese ještě jeden post, jehož soubor nešlo přečíst, takže se použije tenhle. Nečitelnou kopii oprav nebo smaž -- ./blog.sh check ji pojmenuje."
   enter_number: "Číslo (cokoliv jiného zruší): "
   cancelled_empty: "Zrušeno.\n\n"
   no_posts_to_pick: "Žádné posty k výběru."
@@ -936,8 +937,11 @@ check:
   json_and_repair: "❌ --json a --repair naráz nejdou: --json je popis archivu, jak vypadá teď, kdežto --repair ho mění. Pusť napřed `check --repair` a pak `check --json`."
   post_unreadable_fix: "Build v tomhle stavu vůbec neproběhne. Oprav ten soubor, nebo ho odlož stranou — dokud tam takhle leží, kontrola nad ním nic neví a web se nepostaví."
   post_content_unreadable: "Post %{file} má text v něčem, co není seznam bloků (%{value})."
+  post_bad_slug: "%{file} má slug, který není jedním segmentem cesty (%{slug})."
+  post_bad_slug_fix: "Slug se stává adresou postu, jednu složku hluboko. Lomítko nebo `..` v něm způsobí, že build zapíše mimo své místo, nebo skončí. Přejmenuj post: ./blog.sh props <slug> -> [r]."
   parked_leftover: "Přerušený přesun ve frontě nechal %{file} odstavený pod pracovním jménem."
   parked_leftover_fix: "Ten soubor (nebo složka) je post, jeho média nebo historie úprav, jedno přejmenování od místa, kam patří: umaž úvodní tečku a příponu .queue-move a je zpátky."
+  parked_leftover_fix_stale: "%{home} už existuje, takže tohle je skoro jistě zastaralá kopie z přerušeného přesunu — post, kam patří, je zpátky na místě. Porovnej obojí a tenhle zbytek smaž, až ověříš, že živý je celý. Nepřejmenovávej ho přes soubor, který tam je."
   post_content_unreadable_fix: "Obsah postu je seznam, jeden záznam na blok. Na čemkoli jiném build skončí chybou. Otevři ho přes ./blog.sh edit, nebo obnov starší verzi přes props [v]."
   post_date_unreadable: "Post %{file} nemá datum, se kterým by se dalo pracovat (%{value})."
   post_date_unreadable_fix: "Datum je to, podle čeho se určuje adresa i pořadí, takže build na něm skončí chybou. Doplň ho ve tvaru 2026-08-22T10:00:00+02:00."
@@ -1257,7 +1261,7 @@ style:
   widget_set: "✅ Widget %{name} je nastavený. Naplní ho ./scripts/refresh-sidebar.sh; pouštěj ho z cronu, ať je aktuální."
   widget_removed: "✅ Widget %{name} je odebraný. V configu zůstal zakomentovaný, takže se dá kdykoli zapnout zpátky."
 
-  fonts_intro: "Písmo se tady nastavuje jen dvěma řádkům na hlavičce — názvu a popisu; písmo zbytku webu je dané enginem. Vlastní soubor s písmem patří do assets/fonts/ a zapisuje se ručně do config/site.yml pod fonts.faces."
+  fonts_intro: "Písma nastavená tady platí jen pro dva řádky v hlavičce -- název a popis; zbytek typografie webu přichází s enginem. Vlastní soubor písma dej do assets/fonts/ a otázky níže ho za tebe zapíšou do config/site.yml pod fonts.faces."
   q_font_title: "Písmo názvu webu na hlavičce"
   h_font_banner_title: "Seznam písem, jak ho bere CSS — použije se první, které má čtenář v systému. Třeba: \"Iowan Old Style\", Palatino, Georgia, serif"
   q_font_title_size: "Velikost názvu"

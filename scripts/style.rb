@@ -1268,6 +1268,9 @@ def run
   # "…· Esc dokončit" and under it, touching, "Nic se nezměnilo".
   puts
   outcome = Wizard.review_and_write([[relative(SITE_YML), site]])
+  # A refused or rolled-back write is exit 1 (a cancel at the diff stays 0
+  # -- that is the user's choice, not a fault).
+  exit 1 if outcome == :failed
   return unless outcome == :written
 
   install_pending_files

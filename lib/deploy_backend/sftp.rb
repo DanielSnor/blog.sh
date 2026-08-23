@@ -243,7 +243,11 @@ module DeployBackend
       done = output.lines.filter_map do |line|
         next unless line =~ /(?:^|sftp> )put\s+(?:"[^"]*"|\S+)\s+(?:"([^"]*)"|(\S+))/
 
-        name = Regexp.last_match(1) || Regexp.last_match(2)
+        # The destination is written with a leading './' now (remote()), so
+        # a name that starts with '-' is not read as a flag. Strip it back
+        # off before matching what was ASKED for -- the manifest is keyed on
+        # the plain relative path, not the addressing form.
+        name = (Regexp.last_match(1) || Regexp.last_match(2)).sub(%r{\A\./}, '')
         name if remote[name]
       end
       done.pop unless ok || done.empty?
@@ -254,22 +258,22 @@ module DeployBackend
       cmds = []
       dir = ENV['SFTP_REMOTE_DIR'].to_s.gsub(%r{/+\z}, '')
       unless dir.empty?
-        cmds << "-mkdir #{quote(dir)}"
-        cmds << "cd #{quote(dir)}"
+        cmds << "-mkdir #{remote(dir)}"
+        cmds << "cd #{remote(dir)}"
       end
 
       # Parents before children, each -mkdir tolerant of already existing.
       files.flat_map { |f| ancestors(File.dirname(f)) }.uniq.sort.each do |d|
-        cmds << "-mkdir #{quote(d)}"
+        cmds << "-mkdir #{remote(d)}"
       end
-      files.each { |f| cmds << "put #{quote(File.join(public_dir, f))} #{quote(f)}" }
+      files.each { |f| cmds << "put #{quote(File.join(public_dir, f))} #{remote(f)}" }
 
       if prune
-        orphans.each { |f| cmds << "-rm #{quote(f)}" }
+        orphans.each { |f| cmds << "-rm #{remote(f)}" }
         # Deepest first, so emptied trees collapse -- -rmdir quietly skips
         # any directory that still has files in it.
         orphans.flat_map { |f| ancestors(File.dirname(f)) }.uniq
-               .sort_by { |d| -d.count('/') }.each { |d| cmds << "-rmdir #{quote(d)}" }
+               .sort_by { |d| -d.count('/') }.each { |d| cmds << "-rmdir #{remote(d)}" }
       end
       cmds
     end
@@ -290,6 +294,20 @@ module DeployBackend
       raise "sftp cannot address a name with a newline in it: #{path.inspect}" if path.to_s.include?("\n")
 
       %("#{path.to_s.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}")
+    end
+
+    # A REMOTE path, quoted, and made safe to sit where the sftp client's
+    # rm/mkdir/rmdir getopt-parse their first argument: a name that starts
+    # with '-' ("- old.html", the kind a Wix or Tumblr export leaves) is
+    # read as a flag ("rm: Invalid flag") no matter how it is quoted, so it
+    # was never deleted and the manifest forgot it. A leading './' makes the
+    # first character a slash and resolves to the same file (verified against
+    # OpenSSH sftp). Absolute paths and ones already dot-anchored are left
+    # as they are.
+    def remote(path)
+      p = path.to_s
+      p = "./#{p}" unless p.start_with?('/', './')
+      quote(p)
     end
   end
 end

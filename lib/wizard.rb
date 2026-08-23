@@ -473,14 +473,28 @@ module Wizard
     end
     puts
 
+    # Every file is checked for writability BEFORE the first is written, so
+    # the refusal genuinely happens before anything changes -- which is
+    # what "nothing was written" promises. Writing them in turn and letting
+    # the second fail left the first already replaced: site.yml new, env.sh
+    # old, the two out of step, and a message swearing nothing had changed.
+    blocked = changed.filter_map do |(_, writer)|
+      path = writer.respond_to?(:path) ? writer.path : nil
+      path && ConfigWriter.write_blocker(path)
+    end.first
+    if blocked
+      puts Tui.paint("❌ #{t('write_denied', message: "#{blocked}: not writable")}", :red)
+      puts
+      return :failed
+    end
+
     begin
       changed.each { |(_, writer)| writer.save! }
     rescue ConfigWriter::NotWritable => e
-      # Nothing was written and nothing was lost: the refusal happens on
-      # the first file the filesystem says no to, before any of them is
-      # replaced. What the reader needs is which file and the fact that
-      # the backup is written first -- a config they own is still stuck
-      # behind a .bak they do not, which is the shape this arrives in.
+      # The pre-flight above catches the ordinary permission refusal before
+      # any file is touched; this remains for the race where a mode changes
+      # between the check and the write. Rare enough that naming the file
+      # (the Errno does) is enough.
       puts Tui.paint("❌ #{t('write_denied', message: e.message)}", :red)
       puts
       return :failed

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'tempfile'
+require 'digest'
 
 module DeployBackend
   # One rsync run instead of per-file uploads -- rsync does its own
@@ -29,6 +30,23 @@ module DeployBackend
 
     def manifest_suffix
       '.rsync'
+    end
+
+    # The manifest's own name for where this deploy goes. RSYNC_SSH carries
+    # the route -- a port, an -i key, an -F ssh-config host -- so a
+    # different value behind the same RSYNC_TARGET is a different machine,
+    # and a manifest describing the old one says every file is already
+    # there while the new target stays empty and the run reports success.
+    # sftp's identity fixed exactly this; rsync had no identity at all, so
+    # it took `target` and never noticed the route change. A digest of the
+    # routing string, appended, is enough: if it changes at all the
+    # manifest is thrown away and everything re-uploaded, which is always
+    # the safe direction.
+    def identity
+      ssh = ENV['RSYNC_SSH'].to_s.strip
+      return target if ssh.empty?
+
+      "#{target} ##{Digest::SHA256.hexdigest(ssh)[0, 12]}"
     end
 
     # Deletion here is by NAME, one orphan at a time, so it composes with
@@ -79,7 +97,13 @@ module DeployBackend
              true
            else
              Tempfile.create('blog-sh-rsync') do |f|
-               f.puts(wanted)
+               # Each name prefixed with './'. rsync reads a --files-from line
+               # that starts with '#' or ';' as a COMMENT and silently drops
+               # it -- so a file called '#hash.html' never left the machine
+               # while the manifest recorded it delivered. The './' makes the
+               # first character a slash, not a marker, and changes nothing
+               # about where the file lands (verified against macOS openrsync).
+               f.puts(wanted.map { |name| "./#{name}" })
                f.flush
                run.call(['-I', '--files-from', f.path])
              end
@@ -113,17 +137,23 @@ module DeployBackend
       end
     end
 
-    # Every directory on the way to the file, then the file: rsync will not
-    # descend into a directory its filters exclude, so the path has to be
-    # opened one level at a time. Wildcards in a name are neutralised --
-    # rsync reads *, ? and [ as patterns, and a picture called "sazba[1].jpg"
-    # would otherwise stand for more than itself.
+    # Every directory on the way to the file, then the file, each as an
+    # EXPLICIT anchored include rule ("+ /path"). rsync's include-from file
+    # has richer syntax than a plain list: a line starting '#' or ';' is a
+    # comment, and '- '/'+ ' is a rule prefix -- so an orphan called
+    # '- old.html' or '#draft.html' was read as syntax, never included in
+    # the delete, and stayed live on the server while the manifest forgot
+    # it. Writing every line as its own '+ ' rule makes whatever follows
+    # pattern text, and the leading '/' anchors it to the transfer root.
+    # Wildcards are still bracket-escaped -- rsync reads *, ? and [ as
+    # patterns, and a picture called "sazba[1].jpg" would otherwise stand
+    # for more than itself.
     def include_lines(name)
       parts = name.to_s.split('/')
       file = parts.pop
       lines = []
-      parts.each_index { |i| lines << "#{literal(parts[0..i].join('/'))}/" }
-      lines << literal([*parts, file].join('/'))
+      parts.each_index { |i| lines << "+ /#{literal(parts[0..i].join('/'))}/" }
+      lines << "+ /#{literal([*parts, file].join('/'))}"
       lines
     end
 

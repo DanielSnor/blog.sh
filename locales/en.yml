@@ -361,6 +361,7 @@ cli:
 
   enter_number_or_slug: "Enter a number or slug: "
   ambiguous_slug: "Slug '%{slug}' exists in %{count} different years -- which post do you mean?"
+  ambiguous_one_readable: "Another post shares the slug '%{slug}' but its file could not be read, so this one is used. Fix or remove the unreadable copy -- ./blog.sh check names it."
   enter_number: "Number (anything else cancels): "
   cancelled_empty: "Cancelled.\n\n"
   no_posts_to_pick: "No posts to choose from."
@@ -958,8 +959,11 @@ check:
   json_and_repair: "❌ --json and --repair cannot run together: --json is a document about the archive as it stands, --repair changes it. Run `check --repair` first, then `check --json`."
   post_unreadable_fix: "The build refuses to run in this state. Repair the file or move it aside -- while it sits there like this, check knows nothing about it and the site will not build."
   post_content_unreadable: "%{file} has its text in something that is not a list of blocks (%{value})."
+  post_bad_slug: "%{file} has a slug that is not a single path segment (%{slug})."
+  post_bad_slug_fix: "A slug becomes the post's address, one folder deep. A slash or a `..` in it makes the build write outside where it should, or stop. Rename the post: ./blog.sh props <slug> -> [r]."
   parked_leftover: "An interrupted queue move left %{file} parked under a working name."
   parked_leftover_fix: "The file (or folder) is a post, its media or its edit history, one rename away from where it belongs: strip the leading dot and the .queue-move suffix to put it back."
+  parked_leftover_fix_stale: "%{home} already exists, so this is almost certainly a stale copy from the interrupted move -- the post it belongs to is back in place. Compare the two, and delete this leftover once you have confirmed the live one is whole. Do NOT rename it over the file that is there."
   post_content_unreadable_fix: "A post's content is a list, one entry per block. The build ends in an error on anything else. Open it with ./blog.sh edit, or restore an older version with props [v]."
   post_date_unreadable: "%{file} has no date anything can work with (%{value})."
   post_date_unreadable_fix: "The date is what the address and the ordering are made of, so the build ends in an error on it. Write one as 2026-08-22T10:00:00+02:00."
@@ -1279,7 +1283,7 @@ style:
   widget_set: "✅ The %{name} widget is set up. ./scripts/refresh-sidebar.sh fills it in; run it from cron to keep it fresh."
   widget_removed: "✅ The %{name} widget is gone. It stays commented out in the config, so you can switch it back on any time."
 
-  fonts_intro: "Fonts set here apply to just two lines on the banner -- the name and the description; the rest of the site's type comes with the engine. A font file of your own goes in assets/fonts/ and is written into config/site.yml under fonts.faces by hand."
+  fonts_intro: "Fonts set here apply to just two lines on the banner -- the name and the description; the rest of the site's type comes with the engine. A font file of your own goes in assets/fonts/, and the questions below add it to config/site.yml under fonts.faces for you."
   q_font_title: "Font for the site's name on the banner"
   h_font_banner_title: "A list of fonts the way CSS takes it -- the first one the reader's system has wins. E.g.: \"Iowan Old Style\", Palatino, Georgia, serif"
   q_font_title_size: "Size of the site's name"

@@ -354,6 +354,7 @@ cli:
 
   enter_number_or_slug: "Nummer oder Slug eingeben: "
   ambiguous_slug: "Slug '%{slug}' existiert in %{count} verschiedenen Jahren -- welcher Beitrag ist gemeint?"
+  ambiguous_one_readable: "Ein weiterer Beitrag trägt den Slug '%{slug}', aber seine Datei war nicht lesbar, daher wird dieser verwendet. Repariere oder entferne die unlesbare Kopie -- ./blog.sh check benennt sie."
   enter_number: "Nummer (alles andere bricht ab): "
   cancelled_empty: "Abgebrochen.\n\n"
   no_posts_to_pick: "Keine Beiträge zur Auswahl."
@@ -948,8 +949,11 @@ check:
   json_and_repair: "❌ --json und --repair gehen nicht zusammen: --json beschreibt das Archiv, wie es ist, --repair verändert es. Führe erst `check --repair` aus, danach `check --json`."
   post_unreadable_fix: "Der Build läuft in diesem Zustand gar nicht. Repariere die Datei oder lege sie beiseite -- solange sie so dort liegt, weiß check nichts von ihr und die Site wird nicht gebaut."
   post_content_unreadable: "%{file} hat seinen Text in etwas, das keine Liste von Blöcken ist (%{value})."
+  post_bad_slug: "%{file} hat einen Slug, der kein einzelnes Pfadsegment ist (%{slug})."
+  post_bad_slug_fix: "Ein Slug wird zur Adresse des Beitrags, eine Ordnerebene tief. Ein Schrägstrich oder ein `..` darin lässt den Build außerhalb schreiben oder abbrechen. Benenne den Beitrag um: ./blog.sh props <slug> -> [r]."
   parked_leftover: "Ein unterbrochener Warteschlangen-Umzug hat %{file} unter einem Arbeitsnamen abgestellt."
   parked_leftover_fix: "Die Datei (oder der Ordner) ist ein Beitrag, seine Medien oder seine Bearbeitungshistorie, eine Umbenennung von ihrem Platz entfernt: führenden Punkt und die Endung .queue-move entfernen, und sie ist zurück."
+  parked_leftover_fix_stale: "%{home} existiert bereits, das hier ist also fast sicher eine veraltete Kopie aus dem unterbrochenen Umzug -- der zugehörige Beitrag ist wieder an seinem Platz. Vergleiche beide und lösche diesen Rest, sobald der lebende vollständig ist. Benenne ihn NICHT über die vorhandene Datei."
   post_content_unreadable_fix: "Der Inhalt eines Beitrags ist eine Liste, ein Eintrag pro Block. An allem anderen endet der Build mit einem Fehler. Öffne ihn mit ./blog.sh edit oder stelle eine ältere Fassung über props [v] wieder her."
   post_date_unreadable: "%{file} hat kein Datum, mit dem sich arbeiten ließe (%{value})."
   post_date_unreadable_fix: "Das Datum bestimmt Adresse und Reihenfolge, der Build endet daran mit einem Fehler. Schreibe es als 2026-08-22T10:00:00+02:00."
@@ -1269,7 +1273,7 @@ style:
   widget_set: "✅ Das Widget %{name} ist eingerichtet. Gefüllt wird es von ./scripts/refresh-sidebar.sh; per Cron bleibt es aktuell."
   widget_removed: "✅ Das Widget %{name} ist entfernt. Es bleibt auskommentiert in der Konfiguration und lässt sich jederzeit wieder einschalten."
 
-  fonts_intro: "Die Schrift wird hier nur für zwei Zeilen auf dem Banner gesetzt -- Name und Beschreibung; die Schrift des Rests der Website bringt die Engine mit. Eine eigene Schriftdatei gehört nach assets/fonts/ und wird von Hand in config/site.yml unter fonts.faces eingetragen."
+  fonts_intro: "Die hier gesetzten Schriften gelten nur für zwei Zeilen im Banner -- den Namen und die Beschreibung; die übrige Typografie kommt mit der Engine. Eine eigene Schriftdatei kommt nach assets/fonts/, und die Fragen unten tragen sie für dich in config/site.yml unter fonts.faces ein."
   q_font_title: "Schrift für den Namen der Website auf dem Banner"
   h_font_banner_title: "Eine Liste von Schriften, wie CSS sie nimmt -- die erste, die das System des Lesers hat, gewinnt. Z. B.: \"Iowan Old Style\", Palatino, Georgia, serif"
   q_font_title_size: "Größe des Namens"

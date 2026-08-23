@@ -1035,7 +1035,14 @@ module Doctor
     approval = dig(data, 'comments', 'approval').to_s.strip.downcase
     return [] unless %w[fav favourite favorite].include?(approval)
 
-    entry = PostStats.entries.max_by { |e| e[:date].to_s }
+    # The newest announcement the token can actually be tested against: a
+    # Mastodon entry on the configured instance (a foreign one is refused
+    # by approval_probe, and testing there is meaningless anyway), or any
+    # Bluesky entry. Falling back to the plain newest only when there is
+    # no same-host candidate, so the message is still about a real post.
+    entries = PostStats.entries
+    testable = entries.reject { |e| e[:kind] == :mastodon && PostStats.foreign_host?(PostStats.parse_toot_url(e[:key])&.dig(:instance)) }
+    entry = (testable.max_by { |e| e[:date].to_s } || entries.max_by { |e| e[:date].to_s })
     return [warn(t('approval_probe_nothing'))] unless entry
 
     case PostStats.approval_probe(entry)

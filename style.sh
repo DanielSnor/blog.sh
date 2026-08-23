@@ -33,8 +33,8 @@ another; the changes are written once at the end, after you have seen
 them as a diff.
 
   palette     the seven colours per mode, as a whole palette rather than
-              fourteen prompts -- the engine ships four (config/palettes.yml,
-              add your own), or enter the values by hand
+              fourteen prompts -- pick one of the palettes the engine ships
+              in config/palettes.yml, add your own, or enter the values by hand
   banner      point it at an image file: it is copied into place and
               MEASURED, so banner.width/height match the file and pages
               stop jumping as it loads

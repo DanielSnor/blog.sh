@@ -2,6 +2,7 @@
 
 require 'tempfile'
 require 'shellwords'
+require 'digest'
 
 module DeployBackend
   # rclone covers the long tail of targets in one integration: S3, R2, B2,
@@ -42,6 +43,19 @@ module DeployBackend
 
     def manifest_suffix
       '.rclone'
+    end
+
+    # RCLONE_ARGS can carry --config, which re-resolves the whole remote to
+    # a different provider, so it is part of "where this goes" the same way
+    # RSYNC_SSH is for rsync. Without folding it in, pointing the deploy at
+    # another remote reused the old manifest and left the new one empty
+    # while reporting success. A digest of the args, appended; any change
+    # throws the manifest away, which is the safe direction.
+    def identity
+      extra = ENV['RCLONE_ARGS'].to_s.strip
+      return target if extra.empty?
+
+      "#{target} ##{Digest::SHA256.hexdigest(extra)[0, 12]}"
     end
 
     # Deletion here is by NAME, one orphan at a time, so it composes with

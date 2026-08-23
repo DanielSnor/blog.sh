@@ -577,6 +577,11 @@ end
 
 def review_and_write(site, env)
   outcome = Wizard.review_and_write([[relative(SITE_YML), site], [relative(ENV_SH), env]])
+  # A write the filesystem refused, or one verify! rolled back, is a
+  # failure the exit code has to carry -- a scripted or CI setup that only
+  # checks the status saw a clean 0 while nothing was saved. A cancel
+  # (the user declined at the diff) stays 0: that is a choice, not a fault.
+  exit 1 if outcome == :failed
   return unless outcome == :written
 
   # env.sh was read by the SHELL that started this process, so everything

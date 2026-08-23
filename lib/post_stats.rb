@@ -598,6 +598,18 @@ module PostStats
   def approval_probe(entry)
     if entry[:kind] == :mastodon
       parsed = parse_toot_url!(entry[:key])
+      # The same boundary fetch_mastodon keeps: the write-scoped token goes
+      # to the CONFIGURED instance and nowhere else. The entry is whatever
+      # announcement is newest, and on an archive with a legacy or imported
+      # one that can be a host the site does not run on -- sending the
+      # bearer there hands a stranger a credential that can post as the
+      # author. Refused with a sentence doctor already renders (it turns a
+      # raise into approval_probe_failed) rather than leaked.
+      if foreign_host?(parsed[:instance])
+        raise "the newest announcement is on #{parsed[:instance]}, which is not the instance in " \
+              'config/site.yml -- the token is not sent to another server to test it, so favourite ' \
+              'visibility cannot be checked from here.'
+      end
       status = JSON.parse(FeedHttp.get("https://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}",
                                        bearer: mastodon_token!))
       status.key?('favourited') ? :ok : :blind
