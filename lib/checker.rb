@@ -143,7 +143,14 @@ module Checker
     @unreadable = []
     dir = File.join(root, 'content.nosync', 'posts')
     Dir.glob(File.join(dir, '*', '*.json')).sort.filter_map do |path|
-      post = JSON.parse(File.read(path, encoding: 'utf-8'))
+      raw = File.read(path, encoding: 'utf-8')
+      # A file that is not valid UTF-8 is one the build dies on -- JSON's
+      # own parser raises deep in a C extension, a raw backtrace with no
+      # post named. Caught here so check reports it (and check exits
+      # non-zero) instead of parsing far enough to call the archive sound.
+      raise JSON::ParserError, 'not valid UTF-8' unless raw.valid_encoding?
+
+      post = JSON.parse(raw)
       # Not a post object either -- the build stops on both, and "not a
       # Hash" used to leave here as quietly as a syntax error.
       raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)

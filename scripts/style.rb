@@ -1195,7 +1195,11 @@ def edit_list(entries, fields)
     when 'add'
       entry = {}
       fields.each { |f| entry[f] = Wizard.ask(t("q_list_#{f}"), '') }
-      entries << entry
+      # Answering nothing to every field means "never mind", not "add an
+      # empty row" -- a footer link with no title and no address rendered
+      # as a bare <li></li> on every page. Pressing Enter past the
+      # questions is the wizard's documented way to back out.
+      entries << entry unless entry.values.all? { |v| v.to_s.strip.empty? }
     when 'remove'
       entries = remove_from(entries) { |e| yield(e) }
     else

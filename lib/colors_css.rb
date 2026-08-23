@@ -117,7 +117,14 @@ module ColorsCss
     # must degrade to the default palette everywhere, not TypeError in
     # whichever caller asked first (theme-color did).
     per_mode = colors.is_a?(Hash) ? colors[mode] : nil
-    (per_mode.is_a?(Hash) ? per_mode[key] : nil) || DEFAULT_COLORS[mode][key]
+    raw = per_mode.is_a?(Hash) ? per_mode[key] : nil
+    # Through the same CSS-value guard the fonts use: a colour is a hex or
+    # rgb() or a name, none of which carry ';', '{', a comment marker or a
+    # newline -- and one that does (a hand-edit typo, a value from an
+    # imported palette) would otherwise be written verbatim into
+    # colors.css and take the rest of the stylesheet down with it, silently.
+    # A rejected value falls back to the shipped default, said out loud.
+    safe_css_value(raw, "colors.#{mode}.#{key}") || DEFAULT_COLORS[mode][key]
   end
 
   def color_properties(colors, mode)
@@ -157,7 +164,8 @@ module ColorsCss
   # means "derive from the palette", not "use a shipped constant".
   def color_for_optional(colors, mode, key)
     per_mode = colors[mode]
-    per_mode.is_a?(Hash) ? per_mode[key] : nil
+    raw = per_mode.is_a?(Hash) ? per_mode[key] : nil
+    safe_css_value(raw, "colors.#{mode}.#{key}")
   end
 
   def color_declarations(colors, mode, indent)

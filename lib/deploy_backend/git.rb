@@ -85,13 +85,19 @@ module DeployBackend
         email = IO.popen(['git', '-C', work, 'config', 'user.email'], &:read).to_s.strip
         identity = email.empty? ? ['-c', 'user.name=deploy', '-c', 'user.email=deploy@localhost'] : []
 
-        # Two halves, both load-bearing and easy to trim as "surely
+        # Three halves, all load-bearing and easy to trim as "surely
         # redundant": excludesFile=/dev/null blanks the user's GLOBAL
         # ignore file, -f overrides any .gitignore INSIDE the work tree
-        # (a site can legitimately publish one). Either alone still lets
-        # a pattern silently thin the snapshot -- pages missing from the
-        # live site with nothing said anywhere.
-        ok = git.call('-c', 'core.excludesFile=/dev/null', 'add', '-A', '-f') &&
+        # (a site can legitimately publish one) -- either alone still lets
+        # a pattern silently thin the snapshot, pages missing from the live
+        # site with nothing said anywhere. And autocrlf=false stops a
+        # user's global core.autocrlf=true from rewriting the line endings
+        # of every text file on the way in: the bytes the build produced
+        # are the bytes that must ship, or a served file no longer matches
+        # its own integrity hash and a diff nobody made appears on the site.
+        ok = git.call('-c', 'core.excludesFile=/dev/null',
+                      '-c', 'core.autocrlf=false', '-c', 'core.safecrlf=false',
+                      'add', '-A', '-f') &&
              system('git', '-C', work, *identity, 'commit', '-q', '-m',
                     "Deploy #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}") &&
              git.call('push', '-q', '--force', remote, "HEAD:refs/heads/#{branch}")
