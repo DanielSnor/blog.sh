@@ -30,10 +30,30 @@ nav:
 build:
   unreadable_posts: "❌ Nicht lesbare Beitragsdateien in content.nosync/posts/ -- Build angehalten:"
   duplicate_address: "❌ Zwei Beiträge unter einer Adresse in content.nosync/posts/ -- Build angehalten:"
-  summary: "%{posts} Beiträge auf %{pages} Seiten nach %{dir} gebaut, dazu %{tags} Schlagwortseiten, ein Suchindex, RSS-Feed und Sitemap"
+  # Jede Zahl bekommt ihre eigene Beschriftung -- „Beiträge: 1“ statt
+  # „1 Beiträge“ --, denn das I18n der Engine kennt keine Pluralformen und
+  # bekommt auch keine. Ein Satz, der das Wort beugen muss, liest sich bei
+  # irgendeiner Zahl immer falsch; Beschriftung und Doppelpunkt bei keiner.
+  summary: "Gebaut nach %{dir} -- Beiträge: %{posts}, Listenseiten: %{pages}, Schlagwortseiten: %{tags}, dazu ein Suchindex, RSS-Feed und Sitemap"
   drafts: "Entwürfe in Arbeit (nur Vorschau, in keiner Liste): %{count}"
   two_pages: "⚠️  %{count} Beiträge werden unter /%{slug}/ ausgeliefert, tatsächlich aber nur einer:"
   two_pages_fix: "   Die Site wird weiterhin gebaut, die Adresse behält der ÄLTERE; der andere bleibt\n   in der Sitemap und in der Suche und führt Leser zu fremdem Text.\n   Gib einem von beiden einen anderen Slug (./blog.sh props -> Adresse)."
+  # Was der Build über das sagt, was er nicht gebaut hat -- in der
+  # Reihenfolge, in der er darauf stößt. All das kommt in echten Archiven
+  # vor: die Weiterleitungslisten bringt ein Import mit, den Rest ein von
+  # Hand bearbeitetes JSON. Jede Zeile nennt den Beitrag, um den es geht,
+  # denn der Build läuft ohne ihn weiter.
+  extra_css_offsite: "⚠️  site.extra_css: %{value} ist kein Pfad auf dieser Website, die Content-Security-Policy der Seite würde die Datei also verwerfen -- übersprungen. Kopiere sie nach assets/ und benenne sie als /assets/css/<name>.css."
+  page_reserved_name: "⚠️  Die Seite „%{slug}“ läge auf einer Adresse, die die Engine selbst benutzt (/%{slug}/) -- nicht gebaut. Benenne sie um."
+  draft_no_token: "⚠️  Der Entwurf „%{slug}“ hat kein draft_token -- seine Vorschau läge auf einer erratbaren Adresse und wird deshalb nicht gebaut. Speichere ihn mit ./blog.sh edit erneut."
+  pinned_more_than_one: "⚠️  Mehr als ein Beitrag ist angeheftet; verwendet wird der neueste (%{slug})."
+  tag_too_long: "⚠️  Das Schlagwort „%{name}…“ ist zu lang für die Adresse einer Listenseite -- an seinen Beiträgen steht es, eine /tag/-Seite wird dafür aber nicht gebaut."
+  former_slug_unusable: "⚠️  %{slug}: unbrauchbarer former_slugs-Eintrag %{entry} -- erwartet wird „Jahr/Slug“."
+  former_slug_taken: "⚠️  %{slug}: Weiterleitung von %{former} übersprungen -- diese Adresse ist schon belegt (eine lebende Seite oder die Weiterleitung eines früheren Beitrags)."
+  redirect_from_unusable: "⚠️  %{slug}: unbrauchbarer redirect_from-Eintrag %{entry} -- erwartet wird ein Pfad ab der Wurzel der Website, etwa „/alter-beitrag/“."
+  redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} übersprungen -- /%{segment}/ gehört der Website selbst."
+  redirect_from_taken: "⚠️  %{slug}: redirect_from %{origin} übersprungen -- diese Adresse ist schon belegt (eine lebende Seite, eine Datei der Website oder eine frühere Weiterleitung)."
+  redirect_from_directory: "⚠️  %{slug}: redirect_from %{origin} übersprungen -- eine frühere Weiterleitung hat aus dieser Adresse schon ein Verzeichnis gemacht."
 
 post:
   reading_time: "%{minutes} Min. Lesezeit"
@@ -158,7 +178,7 @@ cli:
   cancelled_nothing_saved: "Abgebrochen, nichts gespeichert.\n\n"
   unreadable_post: "⚠️  Überspringe unlesbare Beitragsdatei %{path}: %{error}"
   editor_buffer_kept: "Dein Text ist nicht verloren -- er liegt in %{path}, und das nächste add/edit bietet ihn wieder an."
-  buffer_found: "📝 Hier liegt Text aus einem abgebrochenen %{what}%{when}: %{lines} Zeile(n), beginnt mit „%{preview}\"."
+  buffer_found: "📝 Hier liegt Text aus einem abgebrochenen %{what}%{when}: %{lines} Zeile(n), beginnt mit „%{preview}“."
   buffer_found_when: ", %{time}"
   buffer_unknown_origin: "einer früheren Sitzung"
   buffer_belongs_elsewhere: "Er gehört zu %{command} -- ihn woanders wiederherzustellen würde einen anderen Beitrag daraus machen."
@@ -179,6 +199,12 @@ cli:
   heic_convert_failed: "❌ %{file}: HEIC-Umwandlung via %{tool} fehlgeschlagen -- es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Wandle von Hand um: %{command}"
   media_too_large: "❌ %{files}: über dem Limit von %{limit} pro Datei, das das strengste Deploy-Ziel ablehnt -- es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Verkleinere sie, oder lass sie aus dem Beitrag heraus und verlinke sie."
   media_large: "⚠️  %{files}: nahe am Limit von %{limit} pro Datei. Gespeichert -- aber jeder Leser zahlt diese Bytes, überlege eine Verkleinerung."
+  # Eine Datei kommt in einem Medienverzeichnis unter einem Namen an, der
+  # schon belegt ist. Die im Weg wird beiseitegelegt statt überschrieben,
+  # und laut benannt -- an einer fremden Datei sagt nichts, dass man sie
+  # wegwerfen darf. Das Präfix „media:“ ist das Verzeichnis, kein Wort zum
+  # Übersetzen.
+  media_name_taken: "media: %{name} war schon belegt -- die Datei, die dort lag, heißt jetzt %{moved}"
   video_hevc: "⚠️  %{files}: als HEVC aufgenommen -- die meisten Browser spielen das ab, aber nicht alle; die übrigen Leser bekommen statt des Videos einen leeren Player. Gespeichert wird es trotzdem. Neu kodiert läuft es überall (braucht ffmpeg -- auf dem Mac `brew install ffmpeg`):\n     %{command}"
   video_quicktime: "⚠️  %{files}: ein QuickTime-.mov-Container. Das Video darin ist in Ordnung, aber den Container akzeptiert nicht jeder Browser; .mp4 nehmen alle. Gespeichert wird es trotzdem. Das Umpacken kopiert das Video unverändert, ohne neu zu kodieren (braucht ffmpeg):\n     %{command}"
   embed_lookup_working: "🔎 %{url}: frage den Dienst nach seinem Player…"
@@ -249,6 +275,38 @@ cli:
   deploy_ref_baseline: "dem letzten akzeptierten Build (%{at})"
   deploy_ref_manifest: "dem Manifest (noch kein akzeptierter Build vermerkt)"
   deploy_state_unwritable: "Der Upload selbst lief durch, nur die Notiz darüber ließ sich nicht schreiben -- vermutlich ist die Platte voll. Der nächste Lauf lädt deshalb alles erneut hoch; schaffe Platz, dann bleibt es folgenlos."
+  # Der Rest dessen, was scripts/deploy_web.rb laut sagt. Zahlen sind so
+  # formuliert, dass keine Sprache Pluralformen braucht; die Bezeichnung
+  # des Backends und die Adresse des Ziels werden unverändert eingesetzt
+  # -- so nennt sich das Werkzeug selbst, und so steht es in env.sh.
+  deploy_header: "Deploy der Website -> %{backend}: %{target}"
+  deploy_public_missing: "❌ public.nosync/ existiert nicht -- baue zuerst (ruby build/build_blog.rb)."
+  deploy_public_empty: "❌ Angehalten: public.nosync/ ist leer -- baue zuerst (ruby build/build_blog.rb)."
+  deploy_file_vanished: "❌ %{name} ist mitten im Deploy aus public.nosync/ verschwunden -- baue erneut."
+  deploy_manifest_foreign: "⚠️  %{path} wurde für %{was} geschrieben -- dieser Lauf deployt nach %{now}.\n   Es wird als leer behandelt: alles wird hochgeladen, und verwaiste Dateien auf dem neuen Ziel\n   sind von hier aus nicht auffindbar. Das ist die sichere Hälfte des Fehlers; die andere wäre, sie zu löschen."
+  deploy_manifest_unreadable: "⚠️  %{path} ist nicht lesbar (%{reason}) -- es wird als leer behandelt.\n   Alles wird erneut hochgeladen. Dateien, die schon auf dem Ziel liegen und dieser Build nicht mehr\n   erzeugt, sind nicht mehr automatisch auffindbar; sieh auf dem Ziel nach, wenn du zuletzt Beiträge gelöscht hast."
+  deploy_baseline_unreadable: "⚠️  %{path} ist nicht lesbar (%{reason}) -- es wird als nicht vorhanden behandelt.\n   Die Zuwachs-Sicherung hat für diesen einen Lauf keine Referenz; sie wird unten neu vermerkt."
+  deploy_files_too_large: "❌ Angehalten: Dateien über dem Limit von %{limit} pro Datei: %{count}.\n%{list}\n   Ein Limit gilt für jedes Backend, damit die Website zwischen ihnen portabel bleibt -- das\n   strengste unterstützte Ziel (Git Pages) lehnt alles Größere ab, und --force hebt das nicht\n   auf: das Ziel würde die Datei bei jedem Lauf ablehnen. Verkleinere sie, oder nimm sie aus dem Beitrag heraus."
+  deploy_stale_too_large: "⚠️  %{files} liegt bereits auf dem Ziel, über dem Limit von %{limit} pro Datei -- diese Website lässt sich nicht mehr auf ein Ziel umziehen, das es durchsetzt."
+  deploy_large_files: "⚠️  Große Dateien: %{files}%{more} -- unter dem Limit von %{limit}, aber für diese Bytes zahlt jede Leserin mit."
+  deploy_large_files_more: " und %{count} weitere"
+  deploy_growth_notice: "⚠️  Der Build ist seit %{source} von %{was} auf %{now} gewachsen -- zu erwarten, wenn du Medien hinzugefügt hast, sonst einen Blick wert."
+  deploy_prev_outcome: "ℹ️  Vorheriger Deploy (%{at}, %{backend}) endete als '%{outcome}': hochgeladen %{uploaded}, fehlgeschlagen %{failed}. Dieser Lauf vergleicht erneut gegen das Manifest; die Sicherungen gelten wie immer."
+  deploy_unfinished_streak: "⚠️  Deploys in Folge, die nicht durchgelaufen sind: %{count} -- etwas wird jedes Mal abgelehnt (eine zu große Datei, die Zugangsdaten, das Ziel). Die Sicherungen sind an; was scheitert, steht unten."
+  deploy_no_growth_reference: "ℹ️  Es gibt noch nichts, woran sich der Zuwachs messen ließe -- diese Sicherung setzt für diesen einen Lauf aus (die Rückgang-Sicherung misst weiter gegen das Manifest)."
+  deploy_selection: "Ausgewählte Dateien: %{files}, %{bytes} im Build, neu oder geändert: %{changed}, unverändert (übersprungen): %{unchanged}"
+  deploy_orphans_delete: "Zu löschende verwaiste Dateien: %{count}%{why}"
+  deploy_orphans_kept: "⚠️  Verwaiste Dateien auf dem Ziel: %{count} -- mit --prune löschen"
+  deploy_orphans_why_prune: " (--prune)"
+  deploy_orphans_why_snapshot: " (Snapshot-Deploy)"
+  deploy_orphans_why_only: " (in --only genannt, nicht mehr im Build)"
+  deploy_orphans_no_single_delete: "⚠️  %{names}: nicht mehr im Build, aber %{backend} kann keine einzelnen Dateien löschen -- führe ./scripts/deploy-web.sh --prune aus, um sie vom Ziel zu nehmen."
+  deploy_dry_delete: "löschen"
+  deploy_dry_orphan: "verwaist"
+  deploy_delete_failed_kept: "❌ Löschen fehlgeschlagen, bleibt im Manifest: %{name}"
+  deploy_partial_landed: "Dateien, die noch angekommen und vermerkt sind: %{count} -- der nächste Lauf setzt dort fort"
+  deploy_outcome_unrecorded: "⚠️  Das Ergebnis des Deploys ließ sich nicht in %{path} vermerken: %{error}"
+  deploy_done: "Fertig: hochgeladen %{uploaded}, gelöscht %{deleted}, fehlgeschlagen %{failed}, unverändert %{unchanged}"
   surfer_unreachable: "❌ Der Surfer unter %{url} antwortet nicht (%{reason}) -- die App ist wohl gestoppt, oder SURFER_URL in env.sh zeigt woandershin. Der fertige Build wartet in public.nosync/; sobald der Server läuft (oder die Adresse stimmt), lädt ./blog.sh rebuild ihn hoch."
   what_next_prompt: "Wie weiter? [d] Entwurf lassen  [e] bearbeiten  [p] veröffentlichen  [s] planen  [x] löschen: "
   left_as_draft: "Bleibt Entwurf. Später veröffentlichen: ./blog.sh publish %{slug}"
@@ -277,6 +335,11 @@ cli:
   queue_carried: "Getragen: '%{slug}' steht jetzt an %{position}. Stelle und erscheint %{date}."
   queue_compact_prompt: "Den Rest der Warteschlange (%{count}) einen Slot nach vorn rücken? [j/N] "
   queue_compacted: "Warteschlange gerückt: jeder folgende Post übernahm den früheren Slot."
+  queue_move_failed: "Ein Schreibvorgang ist mitten in der Warteschlange gescheitert -- repariere die Pfade unten von Hand, bevor der Cron das nächste Mal läuft:"
+  queue_move_moved: "verschoben auf %{date}"
+  queue_move_stayed: "liegt weiter bei %{date}"
+  queue_move_see_below: "siehe unten"
+  queue_move_stranded: "gerettet unter %{temp}; benenne es von Hand zurück auf %{home}"
   menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
   menu_hint_plain: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc abbrechen"
   wizard_menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc beenden"
@@ -508,6 +571,21 @@ poster:
   no_bluesky_password_post: "BLUESKY_APP_PASSWORD ist nicht gesetzt, die Bluesky-Ankündigung wurde nicht gepostet."
   no_bluesky_password_delete: "BLUESKY_APP_PASSWORD ist nicht gesetzt, die Bluesky-Ankündigung wurde nicht gelöscht."
   stats_fetch_failed: "Das Laden der Statistiken schlug fehl (%{key}): %{message}"
+  # Der Rest dessen, was die beiden Poster sagen, wenn ein Netzwerk sie
+  # abweist. Jeder Satz rahmt eine Diagnose ein, die so bleibt, wie der
+  # Server oder Ruby sie geschrieben hat: %{error} ist ein Ausnahmetext,
+  # %{code} ein HTTP-Status, %{body} die Antwort selbst. Der Satz darum ist
+  # das, was ein Mensch liest; was darin steht, gibt er weiter.
+  mastodon_api_error: "Die Mastodon-API antwortete mit %{code}: %{body}"
+  mastodon_api_error_delete: "Die Mastodon-API antwortete beim Löschen des Toots mit %{code}: %{body}"
+  mastodon_post_failed: "Das Posten auf Mastodon schlug fehl: %{error}"
+  mastodon_delete_failed: "Das Löschen des Toots schlug fehl: %{error}"
+  mastodon_id_unreadable: "Aus der Adresse %{url} lässt sich die Toot-ID nicht ablesen, er wurde nicht gelöscht."
+  bluesky_post_failed: "Das Posten auf Bluesky schlug fehl: %{error}"
+  bluesky_no_record_address: "Das Posten auf Bluesky schlug fehl: Der Server antwortete ohne brauchbare Record-Adresse (%{answer})"
+  bluesky_delete_failed: "Das Löschen der Bluesky-Ankündigung schlug fehl: %{error}"
+  bluesky_uri_unreadable: "Die at://-Adresse %{uri} ist nicht lesbar, die Ankündigung wurde nicht gelöscht."
+  bluesky_check_failed: "Auf Bluesky ließ sich nicht nachsehen, ob es die Ankündigung schon gibt: %{error}"
 
 redirect:
   moved: "Dieser Beitrag ist umgezogen:"
@@ -604,6 +682,10 @@ import:
   cancelled: "Abgebrochen, nichts geschrieben."
   interrupted: "Unterbrochen. Bereits geschriebene Beiträge liegen in content.nosync/ -- den Import erneut auszuführen ist sicher, er überschreibt sie an Ort und Stelle."
   source_died: "⚠️  Die Quelle hat nach %{count} Eintrag/Einträgen aufgehört zu antworten: %{error}. Die Zahlen unten sind eine Teilsumme, nicht die ganze Quelle. Bereits geschriebene Beiträge sind gespeichert -- ein erneuter Lauf ist sicher, sie werden über ihre Source-ID zugeordnet und nie dupliziert."
+  livejournal_http: "LiveJournal antwortete mit HTTP %{code}"
+  wayback_too_many_redirects: "zu viele Weiterleitungen (%{url})"
+  wayback_http: "HTTP %{code} (%{url})"
+  wix_not_csv: "%{file} ist nicht als CSV lesbar (%{reason}) -- der Schaden steckt in der Datei auf der Platte, nicht bei Wix"
   group:
     blogs: "Blog / Publishing-Plattform"
     social: "Soziales Netzwerk"
@@ -1213,18 +1295,18 @@ style:
   q_show_title: "Den Kurznamen über das Banner schreiben? [J/n] "
   q_show_claim: "Und die Beschreibung ebenfalls? [J/n] "
 
-  q_about_heading: "Überschrift für „Über mich\""
-  h_about_heading: "Zum Beispiel „Über mich\" oder „Wer hier schreibt\"."
+  q_about_heading: "Überschrift für „Über mich“"
+  h_about_heading: "Zum Beispiel „Über mich“ oder „Wer hier schreibt“."
   q_about_html: "Deine Kurzbiografie"
   h_about_html: "Ein paar Sätze über dich, in Markdown -- genau wie in einem Beitrag."
   c_about_html: "Schreib deine Kurzbiografie unten. Markdown funktioniert hier wie in einem Beitrag:\n**fett**, [ein Link](https://example.com), eine Liste, eine Leerzeile beginnt einen neuen Absatz.\nHTML ist weiterhin erlaubt -- ein Foto kommt nach wie vor als <img> hinein.\nZeilen, die mit // beginnen, werden verworfen."
 
   q_footer_links_heading: "Überschrift über den Links in der Fußzeile"
-  h_footer_links_heading: "Zum Beispiel „Links\" oder „Anderswo\"."
+  h_footer_links_heading: "Zum Beispiel „Links“ oder „Anderswo“."
   q_footer_note_heading: "Überschrift über dem Hinweis in der Fußzeile"
-  h_footer_note_heading: "Zum Beispiel „Etwas gefunden?\"."
+  h_footer_note_heading: "Zum Beispiel „Etwas gefunden?“."
   q_footer_social_heading: "Überschrift über den Netzwerk-Icons"
-  h_footer_social_heading: "Zum Beispiel „Du findest mich auf\"."
+  h_footer_social_heading: "Zum Beispiel „Du findest mich auf“."
   q_footer_copyright: "Copyright-Zeile"
   h_footer_copyright: "Z. B.: &copy; 2026 Petra Klein -- Markdown funktioniert, HTML-Entities auch: &copy; wird zu ©."
   q_footer_note: "Der Hinweis in der Fußzeile"

@@ -2150,19 +2150,22 @@ def apply_queue_moves(moves)
       end
       if done.positive? || stranded.any?
         warn ''
-        warn 'A write failed partway through the queue -- repair the paths below by hand before the cron next runs:'
+        warn t('cli.queue_move_failed')
+        # The dates stay ISO on purpose: this list is read with a file
+        # manager open next to it, and the folder they name is the year
+        # in the timestamp, not whatever the locale's date_format writes.
         moves.each_with_index do |(entry, target), i|
           state = if i < done
-                    "moved to #{target.iso8601}"
+                    t('cli.queue_move_moved', date: target.iso8601)
                   elsif File.exist?(entry[:path])
-                    "still at #{entry[:time].iso8601}"
+                    t('cli.queue_move_stayed', date: entry[:time].iso8601)
                   else
-                    'see below'
+                    t('cli.queue_move_see_below')
                   end
           warn "  '#{entry[:slug]}' -- #{state}"
         end
         stranded.each do |slug, temp, home|
-          warn "  '#{slug}' -- rescued at #{temp}; rename it back to #{home} yourself"
+          warn "  '#{slug}' -- #{t('cli.queue_move_stranded', temp: temp, home: home)}"
         end
         warn ''
       end

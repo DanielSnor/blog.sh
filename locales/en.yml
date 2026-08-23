@@ -30,10 +30,29 @@ nav:
 build:
   unreadable_posts: "❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:"
   duplicate_address: "❌ Two posts at one address in content.nosync/posts/ -- build stopped:"
-  summary: "Built %{posts} posts across %{pages} page(s) into %{dir}, plus %{tags} tag page(s), a search index, RSS feed and sitemap"
+  # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
+  # because the engine's I18n has no plural forms and is not getting any.
+  # A sentence that has to decline the noun reads wrong in every language
+  # at some number; a label and a colon reads right at all of them.
+  summary: "Built into %{dir} -- posts: %{posts}, listing pages: %{pages}, tag pages: %{tags}, plus a search index, RSS feed and sitemap"
   drafts: "Drafts in progress (preview only, not in any listing): %{count}"
   two_pages: "⚠️  %{count} posts are served at /%{slug}/ -- only one of them is:"
   two_pages_fix: "   The site still builds and the OLDER one keeps the address; the other stays\n   in the sitemap and in search, pointing readers at text that is not its own.\n   Give one of them another slug (./blog.sh props -> address)."
+  # What the build says about the things it refused to build, in the order
+  # it meets them. All of them fire on real archives -- an import brings
+  # the redirect lists, a hand-edited JSON brings the rest -- and each one
+  # names the post it is about, because the build goes on without it.
+  extra_css_offsite: "⚠️  site.extra_css: %{value} is not a path on this site, so the page's Content-Security-Policy would discard it -- skipped. Copy the file into assets/ and name it as /assets/css/<name>.css."
+  page_reserved_name: "⚠️  Page '%{slug}' would sit on an address the engine already uses (/%{slug}/) -- not built. Rename it."
+  draft_no_token: "⚠️  Draft '%{slug}' has no draft_token -- its preview would be at a guessable address, so it is not built. Re-save it with ./blog.sh edit."
+  pinned_more_than_one: "⚠️  More than one post is pinned; using the newest (%{slug})."
+  tag_too_long: "⚠️  Tag \"%{name}…\" is too long for a listing page's address -- it shows on its posts, but no /tag/ page is built for it."
+  former_slug_unusable: "⚠️  %{slug}: unusable former_slugs entry %{entry} -- expected \"year/slug\"."
+  former_slug_taken: "⚠️  %{slug}: redirect for %{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
+  redirect_from_unusable: "⚠️  %{slug}: unusable redirect_from entry %{entry} -- expected a site-root path like \"/old-post/\"."
+  redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} skipped -- /%{segment}/ belongs to the site itself."
+  redirect_from_taken: "⚠️  %{slug}: redirect_from %{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
+  redirect_from_directory: "⚠️  %{slug}: redirect_from %{origin} skipped -- an earlier redirect already made a directory of that address."
 
 post:
   reading_time: "%{minutes} min read"
@@ -190,6 +209,11 @@ cli:
   heic_convert_failed: "❌ %{file}: HEIC conversion via %{tool} failed -- nothing was saved and the file stays where it is. Convert by hand: %{command}"
   media_too_large: "❌ %{files}: over the %{limit} per-file limit, which the strictest deploy target refuses -- nothing was saved and the file stays where it is. Shrink it, or leave it out of the post and link to it instead."
   media_large: "⚠️  %{files}: close to the %{limit} per-file limit. Saved -- but every reader pays for those bytes, so consider shrinking it."
+  # A file arriving into a media directory under a name that is already
+  # taken. The one in the way is moved aside rather than overwritten, and
+  # named out loud, because nothing about a stray file says it is safe to
+  # destroy. The "media:" prefix is the directory, not a word to translate.
+  media_name_taken: "media: %{name} was already taken -- the file that was there is now %{moved}"
   video_hevc: "⚠️  %{files}: recorded as HEVC, which most browsers play but not all -- readers on the rest get an empty player instead of the video. Saved either way. Re-encoding it plays everywhere (needs ffmpeg -- `brew install ffmpeg` on a Mac):\n     %{command}"
   video_quicktime: "⚠️  %{files}: a QuickTime .mov container. The video inside is fine, but not every browser accepts the container; .mp4 is the one they all take. Saved either way. Repacking copies the video across untouched, no re-encoding (needs ffmpeg):\n     %{command}"
   embed_lookup_working: "🔎 %{url}: asking the service where its player is…"
@@ -256,6 +280,38 @@ cli:
   deploy_ref_baseline: "the last accepted build (%{at})"
   deploy_ref_manifest: "the manifest (no accepted build recorded yet)"
   deploy_state_unwritable: "The upload itself went through; only the note about it could not be written -- most likely a full disk. The next run will therefore upload everything again; free some space and nothing else comes of it."
+  # The rest of scripts/deploy_web.rb's narration. Counted lines are worded
+  # so no language needs plural forms; the backend's own label and the
+  # target address are interpolated raw, because they are what the tool
+  # calls itself and what has to be typed back into env.sh.
+  deploy_header: "Deploy web -> %{backend}: %{target}"
+  deploy_public_missing: "❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb)."
+  deploy_public_empty: "❌ Stopped: public.nosync/ is empty -- run the build first (ruby build/build_blog.rb)."
+  deploy_file_vanished: "❌ %{name} disappeared from public.nosync/ mid-deploy -- run the build again."
+  deploy_manifest_foreign: "⚠️  %{path} was written for %{was} -- this run deploys to %{now}.\n   Treating it as empty: everything will be uploaded, and orphans on the new target cannot be\n   found from here. That is the safe half of the mistake; the other half would be deleting them."
+  deploy_manifest_unreadable: "⚠️  %{path} is unreadable (%{reason}) -- treating it as empty.\n   Everything will be re-uploaded. Files already on the target that this build no longer generates\n   can no longer be found automatically; check the target if you have deleted posts recently."
+  deploy_baseline_unreadable: "⚠️  %{path} is unreadable (%{reason}) -- treating it as absent.\n   The growth guard has no reference for this one run; it is recorded again below."
+  deploy_files_too_large: "❌ Stopped: files over the %{limit} per-file limit: %{count}.\n%{list}\n   One limit applies to every backend, so the site stays portable between them -- the strictest\n   supported target (git pages) refuses anything larger, and --force does not lift this: the\n   target would refuse the file on every run. Shrink it, or take it out of the post."
+  deploy_stale_too_large: "⚠️  %{files} already on the target, over the %{limit} per-file limit -- this site can no longer be moved to a target that enforces it."
+  deploy_large_files: "⚠️  Large files: %{files}%{more} -- under the %{limit} limit, but every reader pays for those bytes."
+  deploy_large_files_more: " and %{count} more"
+  deploy_growth_notice: "⚠️  The build grew from %{was} to %{now} since %{source} -- expected if you added media, worth a look if you didn't."
+  deploy_prev_outcome: "ℹ️  Previous deploy (%{at}, %{backend}) ended as '%{outcome}': uploaded %{uploaded}, failed %{failed}. This run re-diffs against the manifest; the guards apply as normal."
+  deploy_unfinished_streak: "⚠️  Deploys in a row that have not finished: %{count} -- something is being refused every time (an oversized file, credentials, the target). The guards are on; the failures below say what."
+  deploy_no_growth_reference: "ℹ️  Nothing to measure growth against yet -- that guard stands down for this one run (the drop guard still measures against the manifest)."
+  deploy_selection: "Files selected: %{files}, %{bytes} in the build, new or changed: %{changed}, unchanged (skipped): %{unchanged}"
+  deploy_orphans_delete: "Orphans to delete: %{count}%{why}"
+  deploy_orphans_kept: "⚠️  Orphaned files on the target: %{count} -- delete them with --prune"
+  deploy_orphans_why_prune: " (--prune)"
+  deploy_orphans_why_snapshot: " (snapshot deploy)"
+  deploy_orphans_why_only: " (named in --only, no longer in the build)"
+  deploy_orphans_no_single_delete: "⚠️  %{names}: no longer in the build, but %{backend} cannot delete single files -- run ./scripts/deploy-web.sh --prune to take them off the target."
+  deploy_dry_delete: "delete"
+  deploy_dry_orphan: "orphan"
+  deploy_delete_failed_kept: "❌ delete failed, kept in manifest: %{name}"
+  deploy_partial_landed: "Files that did land and are written down: %{count} -- the next run resumes from there"
+  deploy_outcome_unrecorded: "⚠️  Could not record the deploy outcome in %{path}: %{error}"
+  deploy_done: "Done: uploaded %{uploaded}, deleted %{deleted}, failed %{failed}, unchanged %{unchanged}"
   surfer_unreachable: "❌ The Surfer at %{url} is not answering (%{reason}) -- the app may be stopped, or SURFER_URL in env.sh points somewhere it does not run. The finished build waits in public.nosync/; once the server is up (or the address fixed), ./blog.sh rebuild ships it."
   what_next_prompt: "What next? [d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
@@ -284,6 +340,15 @@ cli:
   queue_carried: "Carried: '%{slug}' is now %{position}. in the queue and publishes %{date}."
   queue_compact_prompt: "Shift the rest of the queue (%{count}) a slot earlier? [y/N] "
   queue_compacted: "Queue shifted: every following post took over the earlier slot."
+  # The one report a reordering leaves behind when a write broke off in
+  # the middle of it. It is read by somebody about to move files by hand,
+  # so the dates in it stay ISO -- only the sentences around them are the
+  # site's language.
+  queue_move_failed: "A write failed partway through the queue -- repair the paths below by hand before the cron next runs:"
+  queue_move_moved: "moved to %{date}"
+  queue_move_stayed: "still at %{date}"
+  queue_move_see_below: "see below"
+  queue_move_stranded: "rescued at %{temp}; rename it back to %{home} yourself"
   menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
   menu_hint_plain: "↑↓ move · Enter select · 1-%{count} quick pick · Esc cancel"
   wizard_menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc quit"
@@ -516,6 +581,21 @@ poster:
   no_bluesky_password_post: "BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not posted."
   no_bluesky_password_delete: "BLUESKY_APP_PASSWORD is not set, the Bluesky announcement was not deleted."
   stats_fetch_failed: "Fetching the stats failed (%{key}): %{message}"
+  # The rest of what the two posters say when a network refuses them. Each
+  # line frames a diagnostic that stays as the server or Ruby wrote it:
+  # %{error} is an exception message, %{code} an HTTP status, %{body} the
+  # answer itself. The sentence around it is what a person reads; what is
+  # inside it is what they paste to whoever is asked to look.
+  mastodon_api_error: "Mastodon API returned %{code}: %{body}"
+  mastodon_api_error_delete: "Mastodon API returned %{code} while deleting the toot: %{body}"
+  mastodon_post_failed: "Posting to Mastodon failed: %{error}"
+  mastodon_delete_failed: "Deleting the toot failed: %{error}"
+  mastodon_id_unreadable: "Can't determine the toot ID from URL %{url}, it was not deleted."
+  bluesky_post_failed: "Posting to Bluesky failed: %{error}"
+  bluesky_no_record_address: "Posting to Bluesky failed: the server answered without a usable record address (%{answer})"
+  bluesky_delete_failed: "Deleting the Bluesky announcement failed: %{error}"
+  bluesky_uri_unreadable: "Can't parse the at:// URI %{uri}, the announcement was not deleted."
+  bluesky_check_failed: "Could not check Bluesky for an existing announcement: %{error}"
 
 # The one line on a renamed post's redirect stub -- the page a reader sees
 # for a fraction of a second (or with meta-refresh disabled) at an old
@@ -616,6 +696,15 @@ import:
   cancelled: "Cancelled, nothing was written."
   interrupted: "Interrupted. Posts written so far are already in content.nosync/ -- re-running the import is safe, it overwrites them in place."
   source_died: "⚠️  The source stopped answering after %{count} item(s): %{error}. The counts below are a partial tally, not the whole source. Posts already written are saved -- re-running is safe, they are matched on their source id and never duplicated."
+  # What an adapter says when the source itself fails. Each of these is
+  # raised, and the rescue that catches it drops the text into
+  # source_died or into a per-item error line -- sentences that are
+  # already translated, so an English fragment inside them is the one
+  # thing the reader cannot act on.
+  livejournal_http: "LiveJournal answered HTTP %{code}"
+  wayback_too_many_redirects: "too many redirects (%{url})"
+  wayback_http: "HTTP %{code} (%{url})"
+  wix_not_csv: "%{file} is not readable as CSV (%{reason}) -- the damage is in the file on disk, not at Wix"
   group:
     blogs: "Blog / publishing platform"
     social: "Social network"

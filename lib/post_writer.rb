@@ -10,6 +10,7 @@ require_relative 'post_versions'
 require_relative 'exif_location'
 require_relative 'media_dimensions'
 require_relative 'site_config'
+require_relative 'i18n'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
@@ -800,7 +801,8 @@ module PostWriter
           n = 1
           n += 1 while File.exist?("#{aside}#{n}")
           FileUtils.mv(dest, "#{aside}#{n}")
-          warn "media: #{File.basename(to)}/#{f} was already taken -- the file that was there is now #{File.basename("#{aside}#{n}")}"
+          warn I18n.t('cli.media_name_taken', name: "#{File.basename(to)}/#{f}",
+                                              moved: File.basename("#{aside}#{n}"))
         end
         FileUtils.mv(File.join(from, f), dest)
       end

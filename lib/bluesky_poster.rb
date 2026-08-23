@@ -88,13 +88,13 @@ module BlueskyPoster
     uri = result['uri'].to_s
     rkey = uri.split('/').last.to_s
     unless uri.start_with?('at://') && uri.include?('/app.bsky.feed.post/') && !rkey.empty?
-      warn "Posting to Bluesky failed: the server answered without a usable record address (#{result.inspect[0, 120]})"
+      warn I18n.t('poster.bluesky_no_record_address', answer: result.inspect[0, 120])
       return nil
     end
 
     { url: "https://bsky.app/profile/#{HANDLE}/post/#{rkey}", uri: uri }
   rescue StandardError => e
-    warn "Posting to Bluesky failed: #{e.message}"
+    warn I18n.t('poster.bluesky_post_failed', error: e.message)
     nil
   end
 
@@ -111,7 +111,7 @@ module BlueskyPoster
 
     m = at_uri.to_s.match(%r{\Aat://([^/]+)/([^/]+)/(.+)\z})
     unless m
-      warn "Can't parse the at:// URI #{at_uri}, the announcement was not deleted."
+      warn I18n.t('poster.bluesky_uri_unreadable', uri: at_uri)
       return false
     end
 
@@ -122,7 +122,7 @@ module BlueskyPoster
               jwt: session['accessJwt'])
     true
   rescue StandardError => e
-    warn "Deleting the Bluesky announcement failed: #{e.message}"
+    warn I18n.t('poster.bluesky_delete_failed', error: e.message)
     false
   end
 
@@ -179,7 +179,7 @@ module BlueskyPoster
     { url: "https://bsky.app/profile/#{HANDLE}/post/#{rkey}", uri: hit['uri'] }
   rescue StandardError => e
     # Never fatal: not finding out is the state we were already in.
-    warn "Could not check Bluesky for an existing announcement: #{e.message}"
+    warn I18n.t('poster.bluesky_check_failed', error: e.message)
     nil
   end
 

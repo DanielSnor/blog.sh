@@ -53,13 +53,13 @@ module MastodonPoster
     res = Net::HTTP.start(uri.host, uri.port, use_ssl: true,
                           open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) { |http| http.request(req) }
     unless res.is_a?(Net::HTTPSuccess)
-      warn "Mastodon API returned #{res.code}: #{res.body}"
+      warn I18n.t('poster.mastodon_api_error', code: res.code, body: res.body)
       return nil
     end
 
     JSON.parse(res.body)['url']
   rescue StandardError => e
-    warn "Posting to Mastodon failed: #{e.message}"
+    warn I18n.t('poster.mastodon_post_failed', error: e.message)
     nil
   end
 
@@ -77,7 +77,7 @@ module MastodonPoster
 
     status_id = status_url.to_s.split('/').last
     if status_id.to_s.empty?
-      warn "Can't determine the toot ID from URL #{status_url}, it was not deleted."
+      warn I18n.t('poster.mastodon_id_unreadable', url: status_url)
       return false
     end
 
@@ -92,13 +92,13 @@ module MastodonPoster
     res = Net::HTTP.start(uri.host, uri.port, use_ssl: true,
                           open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) { |http| http.request(req) }
     unless res.is_a?(Net::HTTPSuccess)
-      warn "Mastodon API returned #{res.code} while deleting the toot: #{res.body}"
+      warn I18n.t('poster.mastodon_api_error_delete', code: res.code, body: res.body)
       return false
     end
 
     true
   rescue StandardError => e
-    warn "Deleting the toot failed: #{e.message}"
+    warn I18n.t('poster.mastodon_delete_failed', error: e.message)
     false
   end
 end

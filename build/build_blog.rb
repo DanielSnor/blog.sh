@@ -118,9 +118,9 @@ def extra_css_hrefs
     # the one shape that looks local at a glance.
     next href if href.start_with?('/') && !href.start_with?('//')
 
-    warn "⚠️  site.extra_css: #{raw.inspect} is not a path on this site, so the page's " \
-         'Content-Security-Policy would discard it -- skipped. Copy the file into assets/ ' \
-         'and name it as /assets/css/<name>.css.'
+    # I18n.t and not the t() shorthand below: this list is read while the
+    # file is still being loaded, above the line that defines it.
+    warn I18n.t('build.extra_css_offsite', value: raw.inspect)
     nil
   end
 end
@@ -2354,7 +2354,7 @@ unlisted_posts, posts = posts.partition { |p| unlisted?(p) }
 pages.reject! do |page|
   next false unless RESERVED_ROOT_SEGMENTS.include?(page['slug'].to_s.downcase)
 
-  warn "⚠️  Page '#{page['slug']}' would sit on an address the engine already uses (/#{page['slug']}/) -- not built. Rename it."
+  warn t('build.page_reserved_name', slug: page['slug'])
   true
 end
 # `unlisted` on a PAGE means the same as it does on a post, and pages are
@@ -2376,7 +2376,7 @@ unlisted_posts.concat(unlisted_pages)
 drafts.reject! do |post|
   next false unless post['draft_token'].to_s.strip.empty?
 
-  warn "⚠️  Draft '#{post['slug']}' has no draft_token -- its preview would be at a guessable address, so it is not built. Re-save it with ./blog.sh edit."
+  warn t('build.draft_no_token', slug: post['slug'])
   true
 end
 
@@ -2626,13 +2626,13 @@ end
     # -- and a ".." here would write the stub outside posts/, up to and
     # including over the homepage or above public.nosync entirely.
     unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' }
-      warn "⚠️  #{post['slug']}: unusable former_slugs entry #{former.inspect} -- expected \"year/slug\"."
+      warn t('build.former_slug_unusable', slug: post['slug'], entry: former.inspect)
       next
     end
 
     dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
     if WRITTEN[dest]
-      warn "⚠️  #{post['slug']}: redirect for #{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
+      warn t('build.former_slug_taken', slug: post['slug'], former: former)
       next
     end
 
@@ -2648,7 +2648,7 @@ end
 pinned = ->(post) { %w[true yes 1].include?(post['pinned'].to_s.strip.downcase) }
 pinned_post = posts.find(&pinned)
 if posts.count(&pinned) > 1
-  warn "⚠️  More than one post is pinned; using the newest (#{pinned_post['slug']})."
+  warn t('build.pinned_more_than_one', slug: pinned_post['slug'])
 end
 page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_post)
 
@@ -2673,7 +2673,7 @@ posts.each do |post|
   end
 end
 overlong_tags.each do |name|
-  warn "⚠️  Tag \"#{name}…\" is too long for a listing page's address -- it shows on its posts, but no /tag/ page is built for it."
+  warn t('build.tag_too_long', name: name)
 end
 
 # A feed per tag, but only for the tags the site's own menu points at.
@@ -2906,11 +2906,11 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
     if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
-      warn "⚠️  #{post['slug']}: unusable redirect_from entry #{origin.inspect} -- expected a site-root path like \"/old-post/\"."
+      warn t('build.redirect_from_unusable', slug: post['slug'], entry: origin.inspect)
       next
     end
     if REDIRECT_FROM_RESERVED.include?(parts.first)
-      warn "⚠️  #{post['slug']}: redirect_from #{origin.inspect} skipped -- /#{parts.first}/ belongs to the site itself."
+      warn t('build.redirect_from_reserved', slug: post['slug'], entry: origin.inspect, segment: parts.first)
       next
     end
 
@@ -2931,7 +2931,7 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
     # same loud skip -- the build's own output always wins over a stub.
     prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| WRITTEN[p] }
     if WRITTEN[dest] || prefix_file
-      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
+      warn t('build.redirect_from_taken', slug: post['slug'], origin: origin)
       next
     end
     # The third collision: the destination is a DIRECTORY an earlier stub
@@ -2940,7 +2940,7 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
     # file over a directory is EISDIR, and one bad pair of imported
     # entries must not kill the whole build.
     if File.directory?(dest)
-      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- an earlier redirect already made a directory of that address."
+      warn t('build.redirect_from_directory', slug: post['slug'], origin: origin)
       next
     end
 

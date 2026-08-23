@@ -245,7 +245,7 @@ module Import
       body << '</struct></value></param></params></methodCall>'
 
       response = Net::HTTP.post(ENDPOINT, body, 'Content-Type' => 'text/xml')
-      raise "LiveJournal answered HTTP #{response.code}" unless response.code == '200'
+      raise I18n.t('import.livejournal_http', code: response.code) unless response.code == '200'
 
       # Same as the feed adapter: rexml is a default gem, and a distro
       # that split it out of its Ruby package should hear what to install

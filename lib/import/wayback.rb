@@ -536,13 +536,13 @@ module Import
       case response
       when Net::HTTPSuccess then response.body
       when Net::HTTPRedirection
-        raise "too many redirects (#{url})" if redirects_left.zero?
+        raise I18n.t('import.wayback_too_many_redirects', url: url) if redirects_left.zero?
 
         http_get(URI.join(url, response['location']).to_s, redirects_left - 1)
       when Net::HTTPServerError, Net::HTTPTooManyRequests
-        raise Busy, "HTTP #{response.code} (#{url})"
+        raise Busy, I18n.t('import.wayback_http', code: response.code, url: url)
       else
-        raise "HTTP #{response.code} (#{url})"
+        raise I18n.t('import.wayback_http', code: response.code, url: url)
       end
     end
 
