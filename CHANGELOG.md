@@ -28,8 +28,9 @@ build would refuse it. Nothing to migrate -- `git pull`, rebuild, deploy.
 
 ### Added
 
-- **The commits widget reads Gitea and Forgejo, not just GitHub.** Asked for
-  by the first person outside this project to run the engine: most of the
+- **The commits widget reads Gitea and Forgejo, not just GitHub.** Asked
+  for by one of the first people outside this project to run the engine:
+  most of the
   Fediverse hosts its code on Codeberg or its own Forgejo, and the
   workaround was to mirror to GitHub for the sake of one sidebar card.
   `widgets.commits.instance` takes the server's address and that is the
