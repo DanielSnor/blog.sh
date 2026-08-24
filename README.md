@@ -636,3 +636,9 @@ deployment in hands other than the author's -- the planning blog of the
 *Elegant Lich* magazine. Its owner's first-install feedback is already
 in the engine: an announcement that cannot happen now says why, and the
 example config explains its own comment conventions.
+
+[arch-linux.cz](https://arch-linux.cz) is the community blog of the Czech
+Arch Linux user group -- a skinned deployment (the stock engine under its
+own stylesheet, no template edits) and the first site to pair the engine
+with GoToSocial. Both of 1.3.2's fixes and this release's GoToSocial
+comments were found on it.

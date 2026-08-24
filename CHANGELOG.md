@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.4 -- 2026-08-23
+## 1.4 -- 2026-08-24
 
 The widest release since 1.0, and the most thoroughly tested one. Three
 things arrived: the commits widget reads Gitea and Forgejo (the release's
@@ -168,6 +168,19 @@ build would refuse it. Nothing to migrate -- `git pull`, rebuild, deploy.
   when there is something to put in it -- `layout.sidebar: false` still
   turns it off outright, and a site with an about text or a single widget
   renders exactly as before.
+
+- **The whole engine speaks the site's language.** The wizards and the
+  everyday commands were translated; the narration around them was not --
+  a Czech or German site watched its own deploy, its build warnings, its
+  announcement failures and its import errors go by in English, one line
+  above a translated sentence. Sixty-odd sentences moved into the
+  locales: the deploy's progress and closing tally, all eleven build
+  warnings, every Bluesky and Mastodon failure, the import errors that
+  surface through the interrupted-source report, the queue's repair
+  instructions. What a server sent back (an HTTP code, a raw answer)
+  stays as it arrived; the sentence around it is the site's. Counted
+  lines are written label-then-number, so no language has to decline
+  "1 posts".
 
 ### Fixed
 
@@ -479,6 +492,113 @@ build would refuse it. Nothing to migrate -- `git pull`, rebuild, deploy.
   therefore said "albums (0)" over an export with a shelf of them, which
   is worse than not mentioning albums at all: it is an answer, and it is
   wrong. It counts in the format the export was actually downloaded in.
+
+- **A link imported with an active-content address is defused.** An
+  archive the author did not write -- a multi-author blog, a reblog, a
+  scraped source -- can carry `<a href="javascript:...">`, and escaping
+  quotes does nothing about the scheme: the link rendered live into every
+  page and the RSS feed. An href now passes an allowlist (http, https,
+  mailto, tel; no scheme at all is a relative link and always passes),
+  the same stance embeds have always taken, and anything else becomes a
+  dead anchor. The text of the link stays; only the trap is removed.
+- **A broken colour cannot take the stylesheet down.** Colour values were
+  written into `colors.css` verbatim, so a `;` or a comment marker in one
+  -- a hand-edit typo, an imported palette -- silently ended the file
+  mid-rule and the site rendered undressed. Colours now pass the same
+  guard the fonts already did: a value that cannot go into CSS is named
+  out loud and the shipped default stands in.
+- **The git backend ships the bytes the build produced.** A user's global
+  `core.autocrlf=true` rewrote the line endings of every text file on the
+  way into the snapshot commit -- a served file no longer matched its own
+  integrity hash, and a diff nobody made appeared on the site. The
+  snapshot commit now pins `autocrlf=false`, alongside the existing
+  defences against global ignore files.
+- **rsync and sftp carry a filename their own tools would misread.**
+  rsync reads a `--files-from` line starting with `#` or `;` as a
+  comment, and an `--include-from` line starting with `-` or `+` as a
+  rule -- so a file called `#draft.html` never uploaded (while the
+  manifest recorded it delivered), and an orphan called `- old.html` was
+  never pruned (while the manifest forgot it). sftp's own client read the
+  leading dash of `- old.html` as a flag, whatever the quoting. Names are
+  now written in forms the tools take literally -- `./` in front for the
+  lists, explicit `+ /` rules for the filter -- and everything lands, and
+  prunes, under its own name.
+- **Rerouting a deploy no longer inherits the old target's manifest.**
+  What `RSYNC_SSH` and `RCLONE_ARGS` carry -- a port, a key, an ssh
+  config, an rclone `--config` -- is part of where the files go, and a
+  manifest describing the old machine says everything is already there:
+  the new target stayed empty while the run reported success. Both now
+  fold their routing into the manifest identity, the same way sftp
+  already did; a changed route means a full upload, which is always the
+  safe direction.
+- **A manifest the process cannot read or write degrades, it does not
+  crash.** A manifest left root-owned by one sudo run -- the uid trap
+  this project keeps walking into on its own servers -- killed every
+  later deploy with a raw backtrace, and a full disk at the periodic
+  mid-upload save killed a working transfer at the 25th file. Both now
+  degrade with a sentence, the way the baseline always has: an unreadable
+  manifest costs one full re-upload, an unwritable one costs the
+  bookkeeping, and neither costs the deploy.
+- **`doctor --online` keeps the token at home.** The favourite-visibility
+  probe tested whatever announcement was newest -- and on an archive
+  carrying a legacy or imported one, that could be a host the site does
+  not run on, handing a foreign server a credential that can post as the
+  author. The probe now refuses a foreign host with a sentence (the
+  fetches always have), and doctor picks the newest announcement on the
+  configured instance to test against instead.
+- **`doctor` diagnoses a broken config in the site's language.** The one
+  scenario doctor exists for -- a `site.yml` that will not parse -- was
+  the one where it fell back to English, because reading the language
+  used the very parse that had just failed. The language is now dug out
+  of the raw file when parsing fails, so the syntax-error diagnosis
+  arrives in the language the site was written in.
+- **`check` refuses everything the build refuses.** Four ways an archive
+  could be unbuildable slipped past it: a post file that is not valid
+  UTF-8 (the build dies deep in the JSON parser, naming no post), a post
+  whose text is not a list of blocks, a slug that is not one path
+  segment (a `/` or a `..` in it walks the page out of the build tree),
+  and an archive whose every file is unreadable -- reported as "empty",
+  exit 0. All four are findings now, and check exits non-zero on each,
+  because an archive check calls sound must be one the build will run on.
+- **A crash in the middle of a queue move cannot cost a post.** The swap
+  writes were already checked and parked; what remained was the
+  aftermath. A recovery that ran after the second write failed could
+  restore the partner into a collision with the mover's new date -- two
+  posts on one address, build refused. And `check`'s advice about a
+  parked leftover asserted "the post it belongs to is back in place"
+  from the file's name alone -- when after a hard kill the parked file
+  can be the only copy of a post there is, and following the advice
+  destroyed it. The recovery now steps the finished mover back to its
+  original bytes when keeping the new date would collide; the crash
+  report lists what actually happened to every post; and check decides
+  stale-or-not on the parked post's own identity: proven-stale names
+  where the live copy sits, unproven says plainly this may be the only
+  copy -- compare, rename back under a free name, never delete.
+- **"Nothing was written" is true across both files.** setup writes
+  `site.yml` and `env.sh` in turn, and a refusal on the second left the
+  first already replaced -- the two out of step, under a message swearing
+  nothing had changed. Every file is checked for writability before the
+  first is written, the refusal names the actual obstacle (the directory,
+  the file, or a genuinely present `.bak` -- not a `.bak` that is not
+  there), and a refused or rolled-back write ends the wizard with a
+  non-zero exit instead of a quiet success.
+- **An import answer of "y" means yes in every language.** The wizard's
+  keep-permalinks question compared the key against the localized
+  yes-character alone, so on a Czech install -- whose prompt reads
+  `[a/N]` -- a reader pressing `y` out of habit got "no" silently and
+  lost every old address the flag exists to keep. `y`, `j` and `a` all
+  mean yes now, everywhere. And `FACEBOOK_CROSSPOSTS=yes` -- the obvious
+  guess -- aborts with a sentence instead of silently meaning "no", the
+  same guard `KEEP_PERMALINKS` already had.
+- **Enter backs out of "add one" everywhere, and a pending copy is a
+  listed change.** Answering nothing to a social icon crashed the whole
+  style run with a backtrace (and every answer of the session with it);
+  answering nothing to a footer link wrote an empty `<li>` onto every
+  page. Both read as "never mind" now, like their sibling sections
+  always did. And a banner -- or a stylesheet, or a font -- replaced by
+  a file of the same size no longer vanishes into "Nothing changed":
+  every pending copy is a line in the review, confirmed and installed
+  with the rest, or dropped untouched on a "no".
 
 ## 1.3.2 -- 2026-08-21
 
