@@ -600,6 +600,18 @@ build would refuse it. Nothing to migrate -- `git pull`, rebuild, deploy.
   a file of the same size no longer vanishes into "Nothing changed":
   every pending copy is a line in the review, confirmed and installed
   with the rest, or dropped untouched on a "no".
+- **Two examples in the markdown cheat sheet had stopped playing.** The
+  audio one named a SoundCloud track that is gone, and SoundCloud answers
+  a missing track with its app shell and a straight-faced 200 -- the same
+  false success the Wayback importer already counts; the PeerTube video
+  was gone as well, and its id still had the valid 22-character shape. So
+  neither line looked wrong until somebody pasted it and got an empty
+  player, which is the worst way for a cheat sheet to fail: it is where a
+  reader goes to find out the gesture works at all. Both were replaced
+  with addresses checked against the services rather than guessed at, and
+  the Vimeo, Spotify and YouTube examples were checked the same way and
+  are all still playing. **Upgrading:** `/markdown/` is built on every
+  site, so this page is one of the files your next deploy carries.
 
 ## 1.3.2 -- 2026-08-21
 
