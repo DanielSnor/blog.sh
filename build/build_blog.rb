@@ -2569,7 +2569,7 @@ end
     if File.exist?(src)
       emit_copy(src, dest)
     else
-      warn "MISSING media: #{post['slug']} -> #{filename}"
+      warn t('build.media_missing', slug: post['slug'], filename: filename)
       # The page still links this file, so a copy already in public.nosync
       # has to survive prune_public -- otherwise a source that is missing
       # for a moment (a media directory mid-move, a file being replaced)
@@ -2814,7 +2814,7 @@ if File.exist?(CHEAT_SHEET_SOURCE)
               description: t('markdown_page.description'),
               path: CHEAT_SHEET_PATH))
 else
-  warn "MISSING #{CHEAT_SHEET_SOURCE} -- /markdown/ will not be generated"
+  warn t('build.cheat_sheet_missing', path: CHEAT_SHEET_SOURCE)
 end
 
 # Sidebar.write_all writes its own files (and reads previous content itself
@@ -2957,4 +2957,4 @@ if drafts.any?
   puts
   puts t('build.drafts', count: drafts.size)
 end
-puts "Removed #{removed} file(s) no longer generated" if removed.positive?
+puts t('build.pruned', count: removed) if removed.positive?

@@ -10,7 +10,21 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.4 -- unreleased
+## 1.4 -- 2026-08-23
+
+The widest release since 1.0, and the most thoroughly tested one. Three
+things arrived: the commits widget reads Gitea and Forgejo (the release's
+reason to exist -- most of the Fediverse hosts its code there), comments
+work on GoToSocial with the same favourite-moderation Mastodon has, and
+the whole engine now speaks the site's language everywhere -- deploy,
+build warnings, announcement failures, import errors, all of it, in en,
+cs and de alike. Underneath sits a long audit over real archives: one
+address guard that publish, edit, scheduling, restore and re-import all
+ask before writing anywhere; a queue that can swap two same-slug posts
+across years with their media and edit history riding along; deploy
+backends that survive hostile filenames, rerouted targets and unreadable
+manifests; and a check that never again calls an archive sound when the
+build would refuse it. Nothing to migrate -- `git pull`, rebuild, deploy.
 
 ### Added
 
@@ -178,6 +192,39 @@ prints what an installation is running.
   about the capability rather than about the name of the software. An
   address the browser cannot read at all now leaves the "reply" link
   standing instead of an empty space.
+- **An install in a folder called `blog [1]` no longer publishes an empty
+  site.** Every listing the engine makes -- the archive, the built pages,
+  the media, an unpacked export -- was built by pasting the directory's own
+  absolute path in front of a pattern, and a path is not a pattern: `[1]`,
+  which is what a second copy of a download gets called, reads as "one
+  character, and it is `1`". The listing then described a directory named
+  `blog 1`, nothing was there, and nothing said so. `build` reported 0
+  posts over a full archive and wrote a site with nothing in it, `deploy`
+  refused with "public.nosync/ is empty" -- and refusing was the lucky
+  ending, because a backend that commits whatever it is handed would have
+  pushed that emptiness live -- while `check` called the archive sound,
+  since it could not see the posts either. An export unpacked into
+  `Takeout [1]` was read as no export at all, for the same reason; `{`, `}`,
+  `*` and `?` in a folder name did the same thing more quietly, and `*` did
+  it while matching the WRONG directory rather than none. Directory names
+  are read as names now, everywhere, and the import wizard's Tab completion
+  offers such a folder instead of going silent over it. **Upgrading:**
+  nothing to do -- if this was your install, the first build after the
+  upgrade finds your archive again.
+- **A post whose slug carries `[`, `{`, `*` or `?` is no longer invisible
+  to the commands.** The other half of the same join: the post's own name
+  went into the pattern. A post called `foto[1]` was published by `build`,
+  shown by `list` and passed by `check` -- while `props` and `delete` said
+  "post not found" over it, `restore` called the trash empty with its files
+  sitting in there, and the guard that asks whether an address is taken
+  reported it free, which is the answer that lets a new post be written
+  over a live one. `--repair` was in the same position and could have set
+  aside a picture the post was using. A `*` did worse than vanish: it
+  matched the posts NEXT to it, so a command asked about `star*` offered
+  `starec` as though the two were one name. The engine's own slugs are
+  `[a-z0-9-]` and never carry any of this -- a file edited by hand does, an
+  archive written by something else does, and so does an old address an
+  import writes down, spelled the way the old site served it.
 - **A bracket in an alt text no longer destroys the picture.** `![[es]
   W-ZERO3](...)` -- a real caption on a real photograph -- was a line the
   markdown reader could not parse, so the next `edit` turned the image
@@ -243,11 +290,16 @@ prints what an installation is running.
   out loud, instead of into a frame a piped run never paints and a terminal
   cuts in half -- with a green "Measured: 1880x600", the OLD banner, right
   underneath. A banner replaced by an image of the same name and the same
-  size is installed at last: nothing in `site.yml` moved, so the run ended
-  on "nothing changed" and dropped the copy it had promised a moment
-  earlier, leaving the picture in `incoming/`. It is listed in the review
-  as the change it is, confirmed together with everything else, and copied
-  in only after that -- nothing reaches the install before you say yes.
+  size is installed at last -- and so is a stylesheet or a font file put
+  back beside a `site.yml` that already names it: nothing in the config
+  moved, so the run ended on "nothing changed" and dropped the copy it had
+  promised a moment earlier, leaving the file in `incoming/`. Every file a
+  run would copy in is listed in the review as the change it is, confirmed
+  together with everything else, and copied in only after that -- nothing
+  reaches the install before you say yes. Answering the banner question
+  with the picture already installed, which is what you type to re-measure
+  artwork you replaced by hand, says so and copies nothing, instead of
+  ending the run on a Ruby backtrace.
 - **Turning a post into a page (or back) no longer loses its address.**
   `type: page` typed into the frontmatter -- or deleted from it -- moves a
   post between `/posts/2026/slug/` and `/slug/` without touching the date,
@@ -314,9 +366,13 @@ prints what an installation is running.
   sharing a slug is the other post's address, so the recovery itself
   handed back an archive the build refused to run on until somebody
   repaired it by hand. Anything a hard crash still strands under a working
-  name is reported by `check`, with the one rename that puts it back, and
-  the list a failure prints says what each post is really doing rather
-  than sending you to a "see below" with nothing below it.
+  name is reported by `check`, which asks whether the post inside it is
+  still in the archive somewhere before it says what to do: a copy of a
+  post that landed is named as a leftover to remove, a parked file that is
+  the only copy of its post is named as exactly that, and neither is ever
+  advised over the top of a post standing at the same name. The list a
+  failure prints says what each post is really doing rather than sending
+  you to a "see below" with nothing below it.
 - **A media file nobody can read is now a finding, not a presence.**
   `File.exist?` said yes and a reader said no -- to a file of zero bytes
   (an interrupted download), to one without read permission, and to a
@@ -381,9 +437,15 @@ prints what an installation is running.
   the second one did not arrive beside the first: it matched it, post by
   post, and replaced it in place -- the same machinery that makes a
   re-import an update rather than a duplicate, aimed at the wrong archive.
-  The identity is now the tree's own path, so two of them are two, and a
-  re-run of the same one still recognises itself. One consequence worth
-  knowing before you upgrade: a tree imported under an earlier version and
+  The identity is now the name the site gives itself -- `baseURL` or
+  `title` out of Hugo's configuration, `url` or `title` out of Jekyll's
+  `_config.yml` -- so two blogs are two, and the same one still recognises
+  itself after it has been moved, renamed or unpacked on another machine.
+  A tree that declares nothing (a bare `content/`, a converter's dump, a
+  skeleton nobody has edited) falls back to the path it was imported from,
+  which tells trees apart but only while each stays where it was;
+  docs/importing.md says which is which. One consequence worth knowing
+  before you upgrade: a tree imported under an earlier version and
   imported again under this one is no longer recognised as the same source
   and will come in a second time. Import first, upgrade after -- or expect
   to delete one copy.
@@ -397,11 +459,19 @@ prints what an installation is running.
   Hugo's own configuration next to `content/` is now read as the site it
   is -- content imported, the rest left alone, and the summary says so
   rather than leaving anything you keep outside `content/` to go missing
-  without a word. Without that configuration nothing is guessed at and the
-  named folder is walked exactly as before. Separately, a section listing
-  (`_index.md`) is furniture wherever in the tree it sits: one per section
-  used to come in as a post called "index" whose body was the section's
-  blurb.
+  without a word. It holds for a `content/` with no sections in it as
+  well, which is where the first attempt at this stopped short: a flat
+  one got the narrowed walk and none of the reading it is for. Without
+  that configuration nothing is guessed at and the named folder is walked
+  exactly as before -- and if the site folder keeps markdown of its own at
+  the top, that is what happens and the summary now names the file that
+  decided it, instead of leaving the whole decision unsaid. Separately, a
+  section listing (`_index.md`) is furniture wherever in the tree it sits:
+  one per section used to come in as a post called "index" whose body was
+  the section's blurb. A branch bundle is not one of them -- a directory
+  whose only markdown is its `_index.md`, carrying prose or files of its
+  own, is the page somebody wrote that way, and it comes in under the
+  directory's name.
 - **The albums in a Facebook HTML export are counted.** The summary's
   sentence about what an import does NOT take -- uncategorised photos,
   albums, videos, all of which stay in the download -- counted albums by

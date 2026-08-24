@@ -57,7 +57,11 @@ module AddressGuard
     end
 
     wanted = PostAddress.collision_keys(post, slug: name)
-    PathGlob.under(content_dir, '*', "#{name}.json").sort.each do |other|
+    # Through PathGlob.literal, because a slug with a "[" in it is a name
+    # and not a pattern: read as one, the listing came back empty and this
+    # method answered "the address is free" over an occupied address --
+    # the exact silence it exists to end.
+    PathGlob.under(content_dir, '*', "#{PathGlob.literal(name)}.json").sort.each do |other|
       next if mine_now.include?(File.expand_path(other))
 
       # A file that will not read or parse still owns its address. Guessing

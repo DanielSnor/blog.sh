@@ -366,7 +366,10 @@ module Repair
     # answered with whichever came first alphabetically.
     year = data['year'].to_s
     path = year.empty? ? nil : post_file(root, year, data['slug'])
-    path = PathGlob.under(root, 'content.nosync', 'posts', '*', "#{data['slug']}.json").first unless path && File.exist?(path)
+    unless path && File.exist?(path)
+      path = PathGlob.under(root, 'content.nosync', 'posts', '*',
+                            "#{PathGlob.literal(data['slug'])}.json").first
+    end
     return false unless path && File.exist?(path)
 
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
@@ -490,7 +493,7 @@ module Repair
     # path is named after. A post whose date was corrected keeps its file
     # where it was while the build puts its media under the date's year, so
     # asking one directory could miss the very post that uses this file.
-    owners = PathGlob.under(root, 'content.nosync', 'posts', '*', "#{slug}.json")
+    owners = PathGlob.under(root, 'content.nosync', 'posts', '*', "#{PathGlob.literal(slug)}.json")
     return true if owners.empty?
 
     # A whole directory is refused only when a post of that name actually

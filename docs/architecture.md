@@ -32,6 +32,18 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
 - Media lives next to its post in `media.nosync/<year>/<slug>/`,
   referenced by bare filename; nothing is ever hotlinked.
 
+Everything that walks those directories walks them through
+`lib/path_glob.rb`. `Dir.glob` reads its whole argument as a pattern, and
+the installation's own absolute path used to be the first half of it -- so
+an install in `~/Sites/blog [1]` had `[1]` read as a character class, every
+listing came back empty, and `build` reported an empty archive without
+naming a path. `PathGlob.under(dir, '*', '*.json')` passes the directory as
+`base:`, which `Dir.glob` never parses, and re-joins the results, so callers
+keep the absolute paths and the order they always had. The pattern half
+stays a pattern: a slug, a filename or a typed directory that lands there
+goes through `PathGlob.literal` first, which escapes the metacharacters so
+the name stands for itself.
+
 ### Field reference
 
 The authoritative schema for anyone writing an importer -- new
@@ -331,7 +343,8 @@ posts whose slug is not one path segment -- all of them states the BUILD
 refuses to run on (or, for the slug, misplaces the page for), so a check that stayed
 quiet about them was calling an archive sound that was about to stop the
 site; files a queue move stepped aside and a crash left parked, which no
-listing shows and one rename repairs; media a post asks for and hasn't got
+listing shows and whose repair depends on whether the post inside them is
+still in the archive anywhere else; media a post asks for and hasn't got
 -- or has in a shape no reader can use, or has under a spelling that is not
 the one the post names, where a volume that folds letter case and unicode
 form renders the page and one that does not has the hole already; images

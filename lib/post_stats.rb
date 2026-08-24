@@ -134,10 +134,7 @@ module PostStats
   end
 
   def parse_toot_url!(url)
-    parse_toot_url(url) ||
-      raise("mastodon_url #{url.to_s.inspect} is not an address this engine can read -- expected " \
-            'https://instance/@user/123 or https://instance/users/user/statuses/123, so no ' \
-            'engagement or comments can be fetched for that post.')
+    parse_toot_url(url) || raise(I18n.t('stats.probe_unreadable_url', url: url.to_s.inspect))
   end
 
   # The same list, plus how many post files could not be read at all. A
@@ -606,11 +603,8 @@ module PostStats
       # bearer there hands a stranger a credential that can post as the
       # author. Refused with a sentence doctor already renders (it turns a
       # raise into approval_probe_failed) rather than leaked.
-      if foreign_host?(parsed[:instance])
-        raise "the newest announcement is on #{parsed[:instance]}, which is not the instance in " \
-              'config/site.yml -- the token is not sent to another server to test it, so favourite ' \
-              'visibility cannot be checked from here.'
-      end
+      raise I18n.t('stats.probe_foreign_instance', instance: parsed[:instance]) if foreign_host?(parsed[:instance])
+
       status = JSON.parse(FeedHttp.get("https://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}",
                                        bearer: mastodon_token!))
       status.key?('favourited') ? :ok : :blind
@@ -620,10 +614,7 @@ module PostStats
       # #notFoundPost and #blockedPost come back in place of a post, so
       # there is no viewer to read and nothing here is a verdict on the
       # credentials.
-      if post.nil?
-        raise "the announcement #{entry[:key]} did not come back from the network -- it was deleted, " \
-              'blocked or briefly unreachable, so there was no thread to test the app password against.'
-      end
+      raise I18n.t('stats.probe_no_thread', key: entry[:key]) if post.nil?
 
       post['viewer'].nil? ? :blind : :ok
     end

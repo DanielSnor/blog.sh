@@ -375,7 +375,12 @@ def section_banner
       # The one that says the file was not found matters most -- it is the
       # answer to "why did nothing happen?", and it was the row most
       # reliably erased.
-      Wizard.remember(Tui.paint(t('banner_pending', path: src), :green))
+      #
+      # Answering with the file already in place promises no copy, because
+      # there will not be one -- the measurement is the whole point of that
+      # answer, and it has just been taken.
+      Wizard.remember(Tui.paint(in_place?(path, src) ? "✅ #{t('file_in_place', path: src)}"
+                                                     : t('banner_pending', path: src), :green))
     else
       # Said, not remembered. `remember` puts a row in the frame, which a
       # piped run never paints at all and a terminal cuts at its width --
@@ -487,18 +492,37 @@ def pending_banner_target
   site.intended[%w[banner src]] || at('banner', 'src') || '/assets/images/header.png'
 end
 
-# The one change these wizards make that is not a line in a file, in the
-# shape review_and_write lists changes in. Without it a run whose only
-# change is the picture -- an image replaced by one of the same name and
-# the same dimensions moves nothing in site.yml -- ended on "nothing
-# changed", and the copy, which waits for a confirmed write, was dropped
-# with it: the wizard said the banner would be installed, then said
-# nothing had changed, and left the file sitting in incoming/.
-def pending_review
-  return [] unless @pending_banner
+# An answer that names the file already installed -- what you type to
+# re-measure artwork you replaced by hand or dropped in from Finder --
+# resolves to the target itself. There is nothing to copy, and FileUtils
+# answers a copy onto itself with "same file" and a backtrace.
+def in_place?(source, href)
+  target = File.join(ROOT, href.to_s.sub(%r{\A/}, ''))
+  File.file?(target) && File.identical?(source, target)
+end
 
-  [Tui.paint(t('review_banner', name: File.basename(@pending_banner),
-                                path: pending_banner_target), :green)]
+# The changes these wizards make that are not lines in a file, in the shape
+# review_and_write lists changes in: the banner picture, and every
+# stylesheet and font file the other sections queued. Without them a run
+# whose only change is a file -- an image replaced by one of the same name
+# and the same dimensions moves nothing in site.yml, and putting back a
+# skin.css the config already names moves nothing either -- ended on
+# "nothing changed", and the copies, which wait for a confirmed write, were
+# dropped with it: the wizard said the file would be installed, then said
+# nothing had changed, and left it sitting in incoming/.
+#
+# A copy that would land where it came from is left out: it is not a
+# change, and listing it would promise something the install then does not
+# do.
+def pending_review
+  copies = Array(@pending_files).dup
+  copies.unshift([@pending_banner, pending_banner_target, :banner]) if @pending_banner
+  copies.filter_map do |source, href, banner|
+    next if in_place?(source, href)
+
+    Tui.paint(t(banner ? 'review_banner' : 'review_file',
+                name: File.basename(source), path: href), :green)
+  end
 end
 
 # Runs after review_and_write reports :written -- never before it.
@@ -509,6 +533,14 @@ def install_pending_files
 
   left = []
   @pending_files.each do |source, href|
+    if in_place?(source, href)
+      # Said out loud rather than skipped in silence: the answer was
+      # accepted, and the reason nothing was copied is that nothing had to
+      # be. Never dropped from incoming/ either -- the source IS the
+      # installed file.
+      puts Tui.paint(t('file_in_place', path: href), :green)
+      next
+    end
     target = File.join(ROOT, href.sub(%r{\A/}, ''))
     FileUtils.mkdir_p(File.dirname(target))
     FileUtils.cp(source, target)

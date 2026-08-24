@@ -395,7 +395,16 @@ module Tui
   def complete_path(str)
     typed = str.to_s
     home = Dir.home
-    pattern = typed.empty? ? '*' : "#{typed.sub(/\A~/, home)}*"
+    # The typed part is a NAME as far as brackets and braces go. "Takeout
+    # [1]" is what a second download of an export is called, and read as a
+    # character class it completes to nothing -- which, with no append
+    # character, looks exactly like "there is nothing there" and leaves the
+    # author guessing whether the path is wrong. A "*" or a "?" is left
+    # live: those somebody types on purpose, the way they would at a shell
+    # prompt. (PathGlob.literal is the full-strength sibling, for patterns
+    # where nothing at all is meant as a wildcard.)
+    escaped = typed.sub(/\A~/, home).gsub(/[\[\]{}]/) { |char| "\\#{char}" }
+    pattern = typed.empty? ? '*' : "#{escaped}*"
     Dir.glob(pattern).map do |hit|
       shown = typed.start_with?('~') ? hit.sub(/\A#{Regexp.escape(home)}/, '~') : hit
       File.directory?(hit) ? "#{shown}/" : shown

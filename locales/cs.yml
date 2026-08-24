@@ -52,6 +52,15 @@ build:
   redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} přeskočeno — /%{segment}/ patří webu samotnému."
   redirect_from_taken: "⚠️  %{slug}: redirect_from %{origin} přeskočeno — ta adresa je už obsazená (živá stránka, soubor webu, nebo dřívější přesměrování)."
   redirect_from_directory: "⚠️  %{slug}: redirect_from %{origin} přeskočeno — dřívější přesměrování už z té adresy udělalo adresář."
+  # Na skutečném archivu nejčastější z nich a poslední, co v buildu ještě
+  # zůstávalo natvrdo: post jmenuje obrázek, který ve své složce médií
+  # nemá. Každý import, co narazil na mrtvý obrázkový hosting, jich pár
+  # zanechá.
+  media_missing: "⚠️  %{slug}: jmenuje soubor médií, který ve své složce nemá — %{filename}. Stránka na něj pořád odkazuje, takže ta adresa bude 404, dokud soubor nedodáš."
+  # Tohle už není věc archivu: taháček chodí s enginem.
+  cheat_sheet_missing: "⚠️  %{path} chybí — stránka /markdown/ s taháčkem se nepostaví. Chodí s enginem; nejčastěji za to může nepovedený pull."
+  # Konec podpisu buildu, počítaný s popiskem jako všechno nad ním.
+  pruned: "Souborů, které už nic negeneruje a byly smazané: %{count}"
 
 post:
   reading_time: "Na čtení %{minutes} min"
@@ -277,7 +286,7 @@ cli:
   deploy_files_too_large: "❌ Zastaveno: souborů nad limitem %{limit} na soubor: %{count}.\n%{list}\n   Limit platí pro každý backend, aby se web dal mezi nimi stěhovat — nejstriktnější\n   podporovaný cíl (git pages) nic většího nepřijme a --force to nezvedne: cíl by ten\n   soubor odmítl při každém běhu. Zmenši ho, nebo ho z postu vynech."
   deploy_stale_too_large: "⚠️  %{files} na cíli už je, nad limitem %{limit} na soubor — tenhle web se na cíl, který limit vynucuje, přestěhovat nedá."
   deploy_large_files: "⚠️  Velké soubory: %{files}%{more} — pod limitem %{limit}, ale ty bajty platí každý čtenář."
-  deploy_large_files_more: " a dalších %{count}"
+  deploy_large_files_more: ", dalších souborů: %{count}"
   deploy_growth_notice: "⚠️  Build vyrostl z %{was} na %{now} od %{source} — čekané, jestli jsi přidával média, jinak to stojí za pohled."
   deploy_prev_outcome: "ℹ️  Předchozí nasazení (%{at}, %{backend}) skončilo jako '%{outcome}': nahráno %{uploaded}, selhalo %{failed}. Tenhle běh porovnává znovu proti manifestu; pojistky platí jako vždycky."
   deploy_unfinished_streak: "⚠️  Nasazení po sobě, která nedoběhla: %{count} — něco se odmítá pokaždé (moc velký soubor, přihlašovací údaje, cíl). Pojistky jsou zapnuté; co selhalo, je vidět níž."
@@ -328,6 +337,7 @@ cli:
   queue_move_stayed: "zůstal na %{date}"
   queue_move_see_below: "viz níže"
   queue_move_stranded: "zachráněn v %{temp}; přejmenuj ho ručně zpátky na %{home}"
+  queue_move_blocked: "kopie je zachráněná v %{temp} a %{home} je obsazený — obojí ručně porovnej, než něco přesuneš nebo smažeš, protože přejmenovat tuhle přes to, co tam je, znamená přepsat post"
   menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
   menu_hint_plain: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · Esc zrušit"
   wizard_menu_hint: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · Esc konec"
@@ -734,6 +744,7 @@ import:
     pages_imported: "Stránek se přeneslo %{count} a leží na %{paths}. Zatím na ně nic na webu neodkazuje — menu se odvozuje z typů obsahu, dokud neřekneš jinak, takže je přidej pod `nav:` v config/site.yml, jestli tam patří."
     pages_and_more: " a dalších %{count}"
     ssg_hugo_site_root: "Složka, na kterou import mířil, není strom postů, ale web postavený v Hugu — naimportovalo se z ní content/ a zbytek (layouts, archetypes, vygenerovaná kopie) zůstal stranou. Jestli něco, co chceš, leží mimo content/, namiř import rovnou na tu složku."
+    ssg_hugo_site_root_declined: "Složka, na kterou import mířil, má v sobě konfiguraci Huga, ale nahoře má i vlastní markdown (%{files}) — prošla se tedy celá místo čtení jako web a spolu s content/ přišly i layouts/ a archetypes/. Jestli tyhle soubory nejsou posty, namiř import rovnou na content/."
     ssg_images_freed: "Obrázků uvnitř řádku textu, kde je post neumí ukázat: %{count} — každý dostal vlastní řádek, a obrázek, který byl jen ozdobou odkazu, se stal jeho textem."
     ssg_liquid_links_dropped: "Odkazů adresovaných přes Liquid ({{ site.repository }}, {% link %}, {% post_url %}): %{count} — taková adresa mimo Jekyll nic neznamená. Slova zůstala, adresa šla pryč; lepší než odkaz mířící na stránku tohohle blogu, která tu nikdy nebyla."
     ssg_media_missing: "Obrázků, které jmenují soubor, jenž ve stromu není: %{count} — každý si v postu podržel místo, alt text i popisek a míří na chybějící jméno. Chybí jen samotný soubor; build to bude hlásit, dokud ho do složky médií postu nedodáš."
@@ -1027,7 +1038,8 @@ check:
   post_bad_slug_fix: "Slug se stává adresou postu, jednu složku hluboko. Lomítko nebo `..` v něm způsobí, že build zapíše mimo své místo, nebo skončí. Přejmenuj post: ./blog.sh props <slug> -> [r]."
   parked_leftover: "Přerušený přesun ve frontě nechal %{file} odstavený pod pracovním jménem."
   parked_leftover_fix: "Ten soubor (nebo složka) je post, jeho média nebo historie úprav, jedno přejmenování od místa, kam patří: umaž úvodní tečku a příponu .queue-move a je zpátky."
-  parked_leftover_fix_stale: "%{home} už existuje, takže tohle je skoro jistě zastaralá kopie z přerušeného přesunu — post, kam patří, je zpátky na místě. Porovnej obojí a tenhle zbytek smaž, až ověříš, že živý je celý. Nepřejmenovávej ho přes soubor, který tam je."
+  parked_leftover_fix_stale: "Tentýž post je v archivu v %{live}, tohle je tedy kopie, kterou po sobě nechal přerušený přesun. Porovnej obojí a tenhle zbytek smaž, až ověříš, že živý je celý. Nepřejmenovávej ho zpátky: archiv by pak ten post měl dvakrát."
+  parked_leftover_fix_blocked: "%{home} drží JINÝ post a tenhle není nikde jinde v archivu — takže tenhle soubor může být jeho jediná kopie. Nepřejmenovávej ho přes to, co tam je, a nemaž ho: obojí porovnej a tenhle vrať pod jméno, které je volné (rok určuje jeho datum)."
   post_content_unreadable_fix: "Obsah postu je seznam, jeden záznam na blok. Na čemkoli jiném build skončí chybou. Otevři ho přes ./blog.sh edit, nebo obnov starší verzi přes props [v]."
   post_date_unreadable: "Post %{file} nemá datum, se kterým by se dalo pracovat (%{value})."
   post_date_unreadable_fix: "Datum je to, podle čeho se určuje adresa i pořadí, takže build na něm skončí chybou. Doplň ho ve tvaru 2026-08-22T10:00:00+02:00."
@@ -1048,6 +1060,14 @@ stats:
   no_mastodon_token: "comments.approval je zapnuté, ale MASTODON_ACCESS_TOKEN není nastavený — bez něj API nikdy neřekne, kterým odpovědím jsi dal hvězdu."
   no_bluesky_password: "comments.approval je zapnuté, ale BLUESKY_APP_PASSWORD není nastavené — bez něj API nikdy neřekne, které odpovědi se ti líbí."
   blind_answer: "comments.approval je zapnuté, ale odpověď ze sítě %{network} neřekla, které posty jsou označené hvězdou — požadavek nebyl přihlášený, nebo tokenu chybí read:statuses. Odmítám to místo toho, abych přes už schválené komentáře zapsal prázdné vlákno."
+  # Proč se načtení ani sonda na schvalování nedají provést vůbec, a to ze
+  # stejného důvodu jako tři věty nad tím: fetch_one je cituje do varování,
+  # které jmenuje post, a doctor je celé vloží do %{message} v
+  # approval_probe_failed. Každá na jeden řádek — doctor cituje první řádek
+  # a nic za ním.
+  probe_unreadable_url: "mastodon_url %{url} není adresa, kterou tenhle engine umí přečíst — čeká se https://instance/@uzivatel/123 nebo https://instance/users/uzivatel/statuses/123, takže se pro ten post nedají načíst ani ohlasy, ani komentáře."
+  probe_foreign_instance: "poslední oznámení leží na %{instance}, což není instance z config/site.yml — token se kvůli testu na cizí server neposílá, takže se odtud viditelnost hvězd ověřit nedá."
+  probe_no_thread: "oznámení %{key} se ze sítě nevrátilo — je smazané, zablokované nebo chvíli nedostupné, takže nebylo na čem heslo aplikace vyzkoušet."
   unknown_option: "Neznámý přepínač: %{option}. stats bere jen --json, nic jiného."
   no_posts: "Zatím není co počítat."
   heading_archive: "Archiv"
@@ -1205,7 +1225,9 @@ wizard:
   q_write: "Zapsat tyhle změny? [a/N] "
   cancelled: "Nic se nezapsalo."
   write_failed: "Výsledek se nenačetl zpátky tak, jak byl zadaný, takže se nic nezměnilo: %{message}"
-  write_denied: "Nic se nezapsalo: %{message}. Záloha (.bak) se píše dřív než samotný soubor, takže ta po jiném uživateli blokuje zápis stejně spolehlivě jako soubor sám — zkontroluj, komu patří obojí."
+  write_denied: "Nic se nezapsalo: %{message}."
+  write_denied_backup: "Nic se nezapsalo: do %{path} se nedá zapisovat. Záloha (.bak) se dělá dřív než samotný soubor, takže ta po jiném uživateli blokuje zápis stejně spolehlivě jako soubor sám — zkontroluj, komu patří obojí."
+  write_denied_dir: "Nic se nezapsalo: do %{path} se nedá zapisovat. Nový text se píše vedle souboru a teprve pak se přesune na místo, takže zapisovat musí jít do ADRESÁŘE, ne jen do souboru — zkontroluj, komu patří."
   section_review: "Co by se změnilo"
   done: "Hotovo — projít a zapsat"
   menu_hint_exit: "↑↓ pohyb · Enter vybrat · 1-%{count} rychlá volba · Esc dokončit"
@@ -1284,6 +1306,7 @@ style:
   banner_unmeasurable: "Rozměry obrázku nejde přečíst, šířka a výška zůstaly, jak byly. PNG, JPEG, GIF a WebP se čtou vždycky."
   banner_measured: "✅ Změřeno: %{width}x%{height}. Přesně to rezervuje místo, než se obrázek načte."
   review_banner: "obrázek hlavičky: %{name} — zkopíruje se jako %{path}"
+  review_file: "%{name} — zkopíruje se jako %{path}"
   q_banner_alt: "Alternativní text hlavičky"
   h_banner_alt: "Co místo obrázku přečte odečítač obrazovky nevidomému čtenáři. Třeba: Podzimní les v mlze."
   q_show_title: "Vypsat krátký název webu přes hlavičku? [A/n] "
@@ -1403,6 +1426,7 @@ style:
   q_css_anyway: "Přidat ho přesto?"
   file_will_go: "Uloží se jako %{path}."
   file_copied: "Zkopírováno do %{path}."
+  file_in_place: "Už je na místě jako %{path} — není co kopírovat."
   incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je na místě, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně."
   q_banner_claim: "Vlastní text přetisku pod bannerem"
   h_banner_claim: "Enter nechá současný. Prázdné = použije se popis webu. Tady smí být <br> pro zalomení, což popis webu nesmí (jde i do meta a RSS)."

@@ -54,6 +54,15 @@ build:
   redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} übersprungen -- /%{segment}/ gehört der Website selbst."
   redirect_from_taken: "⚠️  %{slug}: redirect_from %{origin} übersprungen -- diese Adresse ist schon belegt (eine lebende Seite, eine Datei der Website oder eine frühere Weiterleitung)."
   redirect_from_directory: "⚠️  %{slug}: redirect_from %{origin} übersprungen -- eine frühere Weiterleitung hat aus dieser Adresse schon ein Verzeichnis gemacht."
+  # Auf einem echten Archiv die häufigste davon und die letzte, die im
+  # Build noch als Literal stand: ein Beitrag nennt ein Bild, das sein
+  # Medienordner nicht hat. Jeder Import, der auf einen toten Bild-Host
+  # traf, hinterlässt ein paar davon.
+  media_missing: "⚠️  %{slug}: nennt eine Mediendatei, die sein Ordner nicht hat -- %{filename}. Die Seite verlinkt sie weiterhin, diese Adresse bleibt also ein 404, bis die Datei da ist."
+  # Gar nicht die Schuld eines Archivs: der Spickzettel kommt mit der Engine.
+  cheat_sheet_missing: "⚠️  %{path} fehlt -- die Spickzettel-Seite /markdown/ wird nicht gebaut. Sie kommt mit der Engine; meist steckt ein schiefgegangener Pull dahinter."
+  # Der Schluss der Bilanz, gezählt mit Beschriftung wie alles darüber.
+  pruned: "Dateien, die nichts mehr erzeugt, entfernt: %{count}"
 
 post:
   reading_time: "%{minutes} Min. Lesezeit"
@@ -289,7 +298,7 @@ cli:
   deploy_files_too_large: "❌ Angehalten: Dateien über dem Limit von %{limit} pro Datei: %{count}.\n%{list}\n   Ein Limit gilt für jedes Backend, damit die Website zwischen ihnen portabel bleibt -- das\n   strengste unterstützte Ziel (Git Pages) lehnt alles Größere ab, und --force hebt das nicht\n   auf: das Ziel würde die Datei bei jedem Lauf ablehnen. Verkleinere sie, oder nimm sie aus dem Beitrag heraus."
   deploy_stale_too_large: "⚠️  %{files} liegt bereits auf dem Ziel, über dem Limit von %{limit} pro Datei -- diese Website lässt sich nicht mehr auf ein Ziel umziehen, das es durchsetzt."
   deploy_large_files: "⚠️  Große Dateien: %{files}%{more} -- unter dem Limit von %{limit}, aber für diese Bytes zahlt jede Leserin mit."
-  deploy_large_files_more: " und %{count} weitere"
+  deploy_large_files_more: ", weitere Dateien: %{count}"
   deploy_growth_notice: "⚠️  Der Build ist seit %{source} von %{was} auf %{now} gewachsen -- zu erwarten, wenn du Medien hinzugefügt hast, sonst einen Blick wert."
   deploy_prev_outcome: "ℹ️  Vorheriger Deploy (%{at}, %{backend}) endete als '%{outcome}': hochgeladen %{uploaded}, fehlgeschlagen %{failed}. Dieser Lauf vergleicht erneut gegen das Manifest; die Sicherungen gelten wie immer."
   deploy_unfinished_streak: "⚠️  Deploys in Folge, die nicht durchgelaufen sind: %{count} -- etwas wird jedes Mal abgelehnt (eine zu große Datei, die Zugangsdaten, das Ziel). Die Sicherungen sind an; was scheitert, steht unten."
@@ -340,6 +349,7 @@ cli:
   queue_move_stayed: "liegt weiter bei %{date}"
   queue_move_see_below: "siehe unten"
   queue_move_stranded: "gerettet unter %{temp}; benenne es von Hand zurück auf %{home}"
+  queue_move_blocked: "eine Kopie ist unter %{temp} gerettet, und %{home} ist belegt -- vergleiche beide von Hand, bevor du eines davon verschiebst oder löschst, denn diese über das Vorhandene zu benennen überschreibt einen Beitrag"
   menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
   menu_hint_plain: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc abbrechen"
   wizard_menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc beenden"
@@ -745,6 +755,7 @@ import:
     pages_imported: "%{count} Seite(n) kamen mit und liegen unter %{paths}. Noch verweist nichts auf der Website auf sie -- das Menü wird aus deinen Inhaltstypen abgeleitet, solange du nichts anderes sagst; trage sie also unter `nav:` in config/site.yml ein, wenn sie dorthin gehören."
     pages_and_more: " und %{count} weitere"
     ssg_hugo_site_root: "Der genannte Ordner ist kein Baum aus Beiträgen, sondern eine Hugo-Website -- importiert wurde daraus content/, der Rest (layouts, archetypes, die gebaute Kopie) blieb unangetastet. Wenn etwas, das du willst, außerhalb von content/ liegt, richte den Import direkt auf diesen Ordner."
+    ssg_hugo_site_root_declined: "Der genannte Ordner enthält Hugos Konfiguration, ganz oben aber auch eigenes Markdown (%{files}) -- er wurde deshalb ganz durchlaufen statt als Website gelesen, und mit content/ kamen auch layouts/ und archetypes/ mit. Wenn diese Dateien keine Beiträge sind, richte den Import direkt auf content/."
     ssg_images_freed: "%{count} Bild(er) standen mitten in einer Textzeile, wo ein Beitrag sie nicht zeigen kann -- jedes bekam eine eigene Zeile, und ein Bild, das nur Zierde eines Links war, wurde zum Linktext."
     ssg_liquid_links_dropped: "%{count} Link(s) waren über Liquid adressiert ({{ site.repository }}, {% link %}, {% post_url %}) -- eine Adresse, die außerhalb von Jekyll nichts bedeutet. Die Worte blieben, die Adresse fiel weg, statt auf eine Seite dieses Blogs zu zeigen, die es nie gab."
     ssg_media_missing: "%{count} Bild(er) nannten eine Datei, die der Baum nicht hat. Jedes behielt seinen Platz im Beitrag, mit Alt-Text und Bildunterschrift, und zeigt auf den fehlenden Namen -- es fehlt nur die Datei selbst, und der Build sagt es, bis sie im Medienordner des Beitrags liegt."
@@ -1041,7 +1052,8 @@ check:
   post_bad_slug_fix: "Ein Slug wird zur Adresse des Beitrags, eine Ordnerebene tief. Ein Schrägstrich oder ein `..` darin lässt den Build außerhalb schreiben oder abbrechen. Benenne den Beitrag um: ./blog.sh props <slug> -> [r]."
   parked_leftover: "Ein unterbrochener Warteschlangen-Umzug hat %{file} unter einem Arbeitsnamen abgestellt."
   parked_leftover_fix: "Die Datei (oder der Ordner) ist ein Beitrag, seine Medien oder seine Bearbeitungshistorie, eine Umbenennung von ihrem Platz entfernt: führenden Punkt und die Endung .queue-move entfernen, und sie ist zurück."
-  parked_leftover_fix_stale: "%{home} existiert bereits, das hier ist also fast sicher eine veraltete Kopie aus dem unterbrochenen Umzug -- der zugehörige Beitrag ist wieder an seinem Platz. Vergleiche beide und lösche diesen Rest, sobald der lebende vollständig ist. Benenne ihn NICHT über die vorhandene Datei."
+  parked_leftover_fix_stale: "Derselbe Beitrag liegt im Archiv unter %{live}, das hier ist also die Kopie, die der unterbrochene Umzug zurückgelassen hat. Vergleiche beide und lösche diesen Rest, sobald der lebende vollständig ist. Benenne ihn NICHT zurück: das Archiv hätte den Beitrag sonst zweimal."
+  parked_leftover_fix_blocked: "%{home} ist von einem ANDEREN Beitrag belegt, und dieser hier steht sonst nirgends im Archiv -- diese Datei kann also die einzige Kopie davon sein. Benenne sie nicht über das, was dort liegt, und lösche sie nicht: vergleiche beide und lege diese dann unter einem freien Namen ab (das Jahr bestimmt ihr Datum)."
   post_content_unreadable_fix: "Der Inhalt eines Beitrags ist eine Liste, ein Eintrag pro Block. An allem anderen endet der Build mit einem Fehler. Öffne ihn mit ./blog.sh edit oder stelle eine ältere Fassung über props [v] wieder her."
   post_date_unreadable: "%{file} hat kein Datum, mit dem sich arbeiten ließe (%{value})."
   post_date_unreadable_fix: "Das Datum bestimmt Adresse und Reihenfolge, der Build endet daran mit einem Fehler. Schreibe es als 2026-08-22T10:00:00+02:00."
@@ -1062,6 +1074,14 @@ stats:
   no_mastodon_token: "comments.approval ist an, aber MASTODON_ACCESS_TOKEN ist nicht gesetzt -- ohne das sagt die API nie, welche Antworten du favorisiert hast."
   no_bluesky_password: "comments.approval ist an, aber BLUESKY_APP_PASSWORD ist nicht gesetzt -- ohne das sagt die API nie, welche Antworten dir gefallen."
   blind_answer: "comments.approval ist an, aber die Antwort von %{network} sagte nicht, welche Beiträge favorisiert sind -- die Anfrage war nicht authentifiziert, oder dem Token fehlt read:statuses. Wird abgelehnt, statt ein leeres Gespräch über die bereits freigegebenen Kommentare zu schreiben."
+  # Warum das Laden und die Freigabe-Prüfung gar nicht laufen können, aus
+  # demselben Grund wie die drei Sätze darüber: fetch_one zitiert sie in
+  # eine Warnung, die den Beitrag nennt, und doctor setzt sie ganz in
+  # %{message} von approval_probe_failed ein. Je eine Zeile -- doctor
+  # zitiert die erste und nichts danach.
+  probe_unreadable_url: "mastodon_url %{url} ist keine Adresse, die diese Engine lesen kann -- erwartet wird https://instanz/@benutzer/123 oder https://instanz/users/benutzer/statuses/123, für diesen Beitrag lassen sich also weder Reaktionen noch Kommentare laden."
+  probe_foreign_instance: "die neueste Ankündigung liegt auf %{instance}, was nicht die Instanz aus config/site.yml ist -- der Token wird zum Testen nicht an einen anderen Server geschickt, die Sichtbarkeit der Favoriten lässt sich von hier also nicht prüfen."
+  probe_no_thread: "die Ankündigung %{key} kam nicht aus dem Netz zurück -- gelöscht, blockiert oder kurz nicht erreichbar, es gab also keinen Thread, an dem sich das App-Passwort prüfen ließe."
   unknown_option: "Unbekannte Option: %{option}. stats kennt nur --json."
   no_posts: "Es gibt noch nichts zu zählen."
   heading_archive: "Das Archiv"
@@ -1219,7 +1239,9 @@ wizard:
   q_write: "Diese Änderungen schreiben? [j/N] "
   cancelled: "Nichts geschrieben."
   write_failed: "Das Ergebnis ließ sich nicht so zurücklesen, wie es angefordert wurde, deshalb wurde nichts geändert: %{message}"
-  write_denied: "Es wurde nichts geschrieben: %{message}. Die Sicherung (.bak) wird vor der Datei selbst geschrieben, deshalb blockiert eine von einem anderen Benutzer hinterlassene den Schreibvorgang genauso wie die Datei -- prüfe, wem beides gehört."
+  write_denied: "Es wurde nichts geschrieben: %{message}."
+  write_denied_backup: "Es wurde nichts geschrieben: %{path} ist nicht beschreibbar. Die Sicherung (.bak) wird vor der Datei selbst angelegt, deshalb blockiert eine von einem anderen Benutzer hinterlassene den Schreibvorgang genauso wie die Datei -- prüfe, wem beides gehört."
+  write_denied_dir: "Es wurde nichts geschrieben: %{path} ist nicht beschreibbar. Der neue Text wird neben der Datei geschrieben und dann an seinen Platz verschoben, beschreibbar sein muss also das VERZEICHNIS und nicht nur die Datei -- prüfe, wem es gehört."
   section_review: "Was sich ändern würde"
   done: "Fertig -- ansehen und schreiben"
   menu_hint_exit: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc abschließen"
@@ -1298,6 +1320,7 @@ style:
   banner_unmeasurable: "Die Bildgröße war nicht lesbar, Breite und Höhe blieben unverändert. PNG, JPEG, GIF und WebP sind immer lesbar."
   banner_measured: "✅ Vermessen: %{width}x%{height}. Genau das reserviert den Platz, bevor das Bild lädt."
   review_banner: "Bannerbild: %{name} -- wird als %{path} kopiert"
+  review_file: "%{name} -- wird als %{path} kopiert"
   q_banner_alt: "Alternativtext für das Banner"
   h_banner_alt: "Was ein Screenreader einem blinden Leser anstelle des Bildes vorliest. Z. B.: Ein Herbstwald im Nebel."
   q_show_title: "Den Kurznamen über das Banner schreiben? [J/n] "
@@ -1417,6 +1440,7 @@ style:
   q_css_anyway: "Trotzdem hinzufügen?"
   file_will_go: "Wird gespeichert als %{path}."
   file_copied: "Kopiert nach %{path}."
+  file_in_place: "Liegt bereits als %{path} an Ort und Stelle -- nichts zu kopieren."
   incoming_not_cleaned: "In incoming/ geblieben: %{files} -- die Kopie liegt am Platz, das Original ließ sich nicht löschen (keine Schreibrechte auf incoming/). Bitte von Hand entfernen."
   q_banner_claim: "Eigener Claim-Text über dem Banner"
   h_banner_claim: "Enter behält den aktuellen. Leer heißt: die Seitenbeschreibung wird verwendet. Dieser darf <br> tragen, die Beschreibung nicht -- sie geht auch in meta und RSS."

@@ -53,6 +53,15 @@ build:
   redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} skipped -- /%{segment}/ belongs to the site itself."
   redirect_from_taken: "⚠️  %{slug}: redirect_from %{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
   redirect_from_directory: "⚠️  %{slug}: redirect_from %{origin} skipped -- an earlier redirect already made a directory of that address."
+  # The commonest of them on a real archive, and the last one that was
+  # still a literal in the build: a post naming a picture its media folder
+  # does not hold. Every import that met a dead image host leaves some.
+  media_missing: "⚠️  %{slug}: names a media file its folder does not hold -- %{filename}. The page still links it, so that address stays a 404 until the file arrives."
+  # Not an archive's doing at all: the cheat sheet ships with the engine.
+  cheat_sheet_missing: "⚠️  %{path} is missing -- the /markdown/ cheat sheet page is not built. It ships with the engine; a pull that went wrong is the usual reason."
+  # The tail of the sign-off, counted the labelled way like everything
+  # above it.
+  pruned: "Files that nothing generates any more, removed: %{count}"
 
 post:
   reading_time: "%{minutes} min read"
@@ -349,6 +358,7 @@ cli:
   queue_move_stayed: "still at %{date}"
   queue_move_see_below: "see below"
   queue_move_stranded: "rescued at %{temp}; rename it back to %{home} yourself"
+  queue_move_blocked: "a copy is rescued at %{temp}, and %{home} is taken -- compare the two by hand before you move or delete either, because renaming this one over what is there would write over a post"
   menu_hint: "↑↓ move · Enter select · number = row · type = slug · Esc back"
   menu_hint_plain: "↑↓ move · Enter select · 1-%{count} quick pick · Esc cancel"
   wizard_menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc quit"
@@ -764,6 +774,7 @@ import:
     pages_imported: "%{count} page(s) came across and are at %{paths}. Nothing on the site links to them yet -- the menu is derived from your content types until you say otherwise, so add them under `nav:` in config/site.yml if they belong there."
     pages_and_more: " and %{count} more"
     ssg_hugo_site_root: "The folder you named is a Hugo site rather than a tree of posts, so content/ was imported and the rest of it -- layouts, archetypes, the built copy -- was left alone. If something you wanted lives outside content/, point the import straight at that folder."
+    ssg_hugo_site_root_declined: "The folder you named holds Hugo's configuration, but it also holds markdown of its own at the top (%{files}) -- so it was walked whole rather than read as a site, and layouts/ and archetypes/ came along with content/. If those files are not posts, point the import at content/ instead."
     ssg_images_freed: "%{count} image(s) sat inside a line of text, where a post cannot show them -- each was moved onto a line of its own, and a picture that was only a link's decoration became the link's text."
     ssg_liquid_links_dropped: "%{count} link(s) were addressed through Liquid ({{ site.repository }}, {% link %}, {% post_url %}) -- an address that means nothing outside Jekyll. The words were kept and the address dropped, rather than left pointing at a page of this blog that was never there."
     ssg_media_missing: "%{count} image(s) named a file the tree does not have. Each kept its place in its post, with its alt text and caption, pointing at the missing name -- only the file itself is absent, and the build will say so until it arrives in the post's media folder."
@@ -1058,7 +1069,8 @@ check:
   post_bad_slug_fix: "A slug becomes the post's address, one folder deep. A slash or a `..` in it makes the build write outside where it should, or stop. Rename the post: ./blog.sh props <slug> -> [r]."
   parked_leftover: "An interrupted queue move left %{file} parked under a working name."
   parked_leftover_fix: "The file (or folder) is a post, its media or its edit history, one rename away from where it belongs: strip the leading dot and the .queue-move suffix to put it back."
-  parked_leftover_fix_stale: "%{home} already exists, so this is almost certainly a stale copy from the interrupted move -- the post it belongs to is back in place. Compare the two, and delete this leftover once you have confirmed the live one is whole. Do NOT rename it over the file that is there."
+  parked_leftover_fix_stale: "The same post is in the archive at %{live}, so this is the copy the interrupted move left behind. Compare the two, and delete this leftover once you have confirmed the live one is whole. Do NOT rename it back: the archive would then hold the post twice."
+  parked_leftover_fix_blocked: "%{home} is taken by a DIFFERENT post, and this post is nowhere else in the archive -- so this file may be the only copy of it there is. Do not rename it over what is there and do not delete it: compare the two, then put this one back under a name that is free (its date decides the year)."
   post_content_unreadable_fix: "A post's content is a list, one entry per block. The build ends in an error on anything else. Open it with ./blog.sh edit, or restore an older version with props [v]."
   post_date_unreadable: "%{file} has no date anything can work with (%{value})."
   post_date_unreadable_fix: "The date is what the address and the ordering are made of, so the build ends in an error on it. Write one as 2026-08-22T10:00:00+02:00."
@@ -1079,6 +1091,14 @@ stats:
   no_mastodon_token: "comments.approval is on but MASTODON_ACCESS_TOKEN is not set -- without it the API never says which replies you favourited."
   no_bluesky_password: "comments.approval is on but BLUESKY_APP_PASSWORD is not set -- without it the API never says which replies you liked."
   blind_answer: "comments.approval is on but the %{network} answer did not say which posts are favourited -- the request was not authenticated, or the token is missing read:statuses. Refusing rather than publishing an empty thread over the comments already approved."
+  # Why the fetch and the approval probe could not run at all, for the
+  # same reason as the three above: fetch_one quotes them into a warning
+  # naming the post, and doctor drops them whole into
+  # approval_probe_failed's %{message}. One line each -- doctor quotes the
+  # first line and nothing after it.
+  probe_unreadable_url: "mastodon_url %{url} is not an address this engine can read -- expected https://instance/@user/123 or https://instance/users/user/statuses/123, so no engagement or comments can be fetched for that post."
+  probe_foreign_instance: "the newest announcement is on %{instance}, which is not the instance in config/site.yml -- the token is not sent to another server to test it, so favourite visibility cannot be checked from here."
+  probe_no_thread: "the announcement %{key} did not come back from the network -- it was deleted, blocked or briefly unreachable, so there was no thread to test the app password against."
   unknown_option: "Unknown option: %{option}. stats takes --json, nothing else."
   no_posts: "There is nothing to count yet."
   heading_archive: "The archive"
@@ -1236,7 +1256,9 @@ wizard:
   q_write: "Write these changes? [y/N] "
   cancelled: "Nothing written."
   write_failed: "The result did not read back the way it was asked for, so nothing was changed: %{message}"
-  write_denied: "Nothing was written: %{message}. The backup (.bak) is written before the file itself, so one left behind by another user blocks the write as surely as the file would -- check who owns both."
+  write_denied: "Nothing was written: %{message}."
+  write_denied_backup: "Nothing was written: %{path} is not writable. The backup (.bak) is made before the file itself, so one left behind by another user blocks the write as surely as the file would -- check who owns both."
+  write_denied_dir: "Nothing was written: %{path} is not writable. The new text is written beside the file and then moved into place, so what has to let you write is the DIRECTORY, not just the file -- check who owns it."
   section_review: "What this would change"
   done: "Done -- review and write"
   menu_hint_exit: "↑↓ move · Enter select · 1-%{count} quick pick · Esc finish"
@@ -1315,6 +1337,7 @@ style:
   banner_unmeasurable: "The image size could not be read, so width and height were left as they were. PNG, JPEG, GIF and WebP are always readable."
   banner_measured: "✅ Measured: %{width}x%{height}. That is what reserves the space before it loads."
   review_banner: "banner image: %{name} -- to be copied in as %{path}"
+  review_file: "%{name} -- to be copied in as %{path}"
   q_banner_alt: "Alt text for the banner"
   h_banner_alt: "What a screen reader says to a blind reader in place of the image. E.g.: An autumn forest in fog."
   q_show_title: "Paint the site's short name over the banner? [Y/n] "
@@ -1434,6 +1457,7 @@ style:
   q_css_anyway: "Add it anyway?"
   file_will_go: "It will be saved as %{path}."
   file_copied: "Copied to %{path}."
+  file_in_place: "Already in place as %{path} -- nothing to copy."
   incoming_not_cleaned: "Left in incoming/: %{files} -- the copy is in place, but the original could not be deleted (no write permission on incoming/). Remove it by hand."
   q_banner_claim: "Your own claim text over the banner"
   h_banner_claim: "Enter keeps the current one. Empty means the site description is used. This one may carry <br>; the description may not, since it also goes into meta and RSS."

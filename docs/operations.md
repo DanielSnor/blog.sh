@@ -506,8 +506,12 @@ What it looks for, each with a line saying what to do about it:
   counted the archive minus the broken file and called the rest sound.
 - **A file a queue move stepped aside and a crash left parked.** The
   parking name is dotted precisely so no listing shows it -- which also
-  means nothing would ever find one again without this. The fix is one
-  rename, and the finding spells it out.
+  means nothing would ever find one again without this. What to do with
+  it depends on whether the post inside is still in the archive somewhere:
+  a copy of a post that landed is a leftover to compare and delete, a
+  parked file that is the only copy of its post is one to put back under
+  a free name, and the finding says which of the two it is looking at.
+  It never tells you to write over the post standing at that name.
 - **Media a post asks for and hasn't got** -- a video's poster image
   included -- usually an import whose download failed. The page renders
   a hole. A file that is there and useless -- empty, unreadable, or a

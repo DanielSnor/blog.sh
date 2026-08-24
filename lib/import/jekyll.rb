@@ -51,13 +51,21 @@ module Import
       # imported one after the other therefore minted the same source keys
       # -- and a source key is what PostWriter matches a re-import on, so
       # the second blog's posts landed ON the first blog's and overwrote
-      # them in place, silently, one for one. The digest of the tree's own
-      # path is what tells two of them apart while a re-import of the SAME
-      # tree still recognises itself, which is the whole promise this key
-      # exists to keep. It is the path and nothing from inside the tree on
-      # purpose: anything read out of the files would change when the blog
-      # is edited, and a re-import would then duplicate the lot.
-      @account = "#{File.basename(@dir)}-#{Digest::MD5.hexdigest(@dir)[0, 8]}"
+      # them in place, silently, one for one.
+      #
+      # What tells two of them apart is the name the site gives itself: a
+      # Hugo configuration's baseURL, a Jekyll _config.yml's url, either
+      # one's title. That name travels WITH the tree, so an export moved
+      # out of ~/Downloads, restored to another folder or unpacked on a
+      # second machine still recognises itself -- and it is the one thing
+      # read out of the tree that editing the blog does not change.
+      #
+      # A tree that declares nothing (a converter's dump, a bare content/)
+      # falls back to the digest of its own path, which tells two of them
+      # apart but only while both stay where they were. See
+      # declared_identity for what the fallback costs and docs/importing.md
+      # for how it is said to the author.
+      @account = source_account
       @rearranged = 0
       @liquid_links = 0
       # Keyed by path rather than counted as they go: the wizard runs the
@@ -86,6 +94,14 @@ module Import
     def postscript
       notes = []
       notes << I18n.t('import.note.ssg_hugo_site_root') unless tree_root == @dir
+      # The same decision the other way round, which was the silent half:
+      # a folder with Hugo's configuration in it and markdown of its own
+      # at the top is walked whole -- layouts/ and archetypes/ included --
+      # because that markdown may be the tree the author meant. Which file
+      # decided it is the only thing that makes the outcome fixable.
+      if tree_root == @dir && hugo_layout?
+        notes << I18n.t('import.note.ssg_hugo_site_root_declined', files: stray_root_names)
+      end
       notes << I18n.t('import.note.ssg_images_freed', count: @rearranged) if @rearranged.positive?
       notes << I18n.t('import.note.ssg_liquid_links_dropped', count: @liquid_links) if @liquid_links.positive?
       notes << I18n.t('import.note.ssg_media_missing', count: @missing_media.length) unless @missing_media.empty?
@@ -132,13 +148,28 @@ module Import
         # page. When everything is at the top, it is all posts, exactly as
         # before.
         #
+        # Except where the tree has already said what it is: a Hugo SITE
+        # root names itself in Hugo's own vocabulary, and the top of its
+        # content/ is where a Hugo site keeps its standalone pages -- a
+        # site with no section at all has nowhere to LIST an article, so a
+        # flat content/ is a site of pages rather than a blog. The guess
+        # above exists for the converter's flat dump, and a converter's
+        # dump does not arrive with a hugo.toml beside it; without this a
+        # site whose content/ happens to be flat got the narrowed walk and
+        # none of what narrowing is for -- its front page came in as a post
+        # called "index" carrying the site's own blurb, and its about page
+        # as an article.
+        split = tree_root != @dir || !nested.empty?
+        #
         # Section listings are furniture at any depth, not just at the top
-        # -- see section_listing?. Both lists are counted through the
-        # ledger, so `files` is simply everything the net caught; the
-        # walk is sorted below, and was never in this order anyway.
-        @furniture = nested.select { |path| section_listing?(path) }
-        @furniture += root.select { |path| not_a_page?(path) } unless nested.empty?
-        @pages = nested.empty? ? [] : root - @furniture
+        # -- see section_listing?, which is asked about the root as well
+        # for the same reason: `_index.md` is Hugo's word, not a guess.
+        # Both lists are counted through the ledger, so `files` is simply
+        # everything the net caught; the walk is sorted below, and was
+        # never in this order anyway.
+        @furniture = (root + nested).select { |path| section_listing?(path) }
+        @furniture |= root.select { |path| not_a_page?(path) } if split
+        @pages = split ? root - @furniture : []
         files = root + nested
       else
         candidates = PathGlob.under(@dir, '*.{md,markdown}')
@@ -344,11 +375,46 @@ module Import
     # "index" whose body was the section's blurb, dated the day of the
     # import; a site with a dozen sections brought a dozen of them.
     #
-    # The underscore is the whole test, and it has to be: `index.md`
+    # The underscore is half the test, and it has to be: `index.md`
     # WITHOUT one is the content of a Hugo page bundle -- a real post that
     # happens to live in a directory of its own with its pictures.
+    #
+    # The other half is whether the directory has anything to list. Hugo
+    # spells a BRANCH BUNDLE `_index.md` too -- a page that owns a folder
+    # of its own pictures, which is how the themes named further up write
+    # About and Contact -- and the name alone cannot tell one from a
+    # section's blurb. Refusing both took a real page's prose out of the
+    # import entirely, with nothing in the summary naming the file.
     def section_listing?(path)
-      File.basename(path).downcase.start_with?('_index.')
+      return false unless File.basename(path).downcase.start_with?('_index.')
+
+      dir = File.dirname(path)
+      # The tree's own top, which is the home page's listing whatever else
+      # is or is not beside it.
+      return true if dir == tree_root
+      # The pages a section exists to list.
+      return true if PathGlob.under(dir, '**', '*.{md,markdown,html}').any? { |other| other != path }
+
+      empty_section?(path, dir)
+    end
+
+    # A directory holding nothing but its own `_index.md` is either a
+    # section nobody has filled yet or a branch bundle -- and a bundle
+    # carries what a listing does not: prose of its own, or the files it
+    # owns. Either one reads as content; neither leaves it furniture.
+    #
+    # Both halves are needed. The real Hugo archive has two sections of the
+    # first kind, navody/ and zpravy/: a title, no body, nothing beside
+    # them -- and a rule that went by files alone would have published both
+    # as posts, while one that went by prose alone would still drop an
+    # About page that happens to have no pictures.
+    def empty_section?(path, dir)
+      return false if PathGlob.under(dir, '**', '*').any? { |entry| entry != path && !File.directory?(entry) }
+
+      _meta, body = front_matter(File.read(path, encoding: 'utf-8'))
+      body.to_s.strip.empty?
+    rescue SystemCallError
+      true
     end
 
     # Hugo's own names for a site's configuration. Their presence next to
@@ -377,22 +443,131 @@ module Import
     end
 
     def hugo_site?
+      hugo_layout? && stray_root_markdown.empty?
+    end
+
+    # Everything that makes a folder a Hugo site except its own top level.
+    # Kept apart from hugo_site? so the postscript can say the one case
+    # where the answer is no for a reason the author can act on -- see
+    # stray_root_markdown.
+    def hugo_layout?
       # A directory holding _posts/ has already said what it is, and it is
       # not this -- checked here rather than left to the caller so the two
       # readings of the tree can never disagree.
       return false if File.directory?(File.join(@dir, '_posts')) || File.directory?(File.join(@dir, '_drafts'))
-      # Markdown of its own at the top means the tree IS here, whatever
-      # else is beside it -- except for the files a repository keeps for
-      # people rather than readers, which wider_net refuses at the root
-      # anyway. A Hugo site kept in git has a readme, and reading that as
-      # content would have left the feature never firing on the sites it
-      # was written for.
-      return false unless PathGlob.under(@dir, '*.{md,markdown}')
-                                  .all? { |path| NOT_A_POST.include?(File.basename(path, '.*').downcase) }
       return false if PathGlob.under(@dir, 'content', '**', '*.{md,markdown}').empty?
 
       HUGO_CONFIGS.any? { |name| File.file?(File.join(@dir, name)) } ||
         File.directory?(File.join(@dir, 'config', '_default'))
+    end
+
+    # Markdown of its own at the top means the tree IS here, whatever else
+    # is beside it -- except for the files a repository keeps for people
+    # rather than readers, which wider_net refuses at the root anyway. A
+    # Hugo site kept in git has a readme, and reading that as content would
+    # have left the feature never firing on the sites it was written for.
+    #
+    # One TODO.md next to hugo.toml therefore turns the site reading off
+    # for the whole folder, which is the safe way round -- but it used to
+    # do it in silence, and the postscript that exists to make this
+    # decision audible only spoke when the decision went the other way.
+    def stray_root_markdown
+      @stray_root_markdown ||= PathGlob.under(@dir, '*.{md,markdown}')
+                                       .reject { |path| NOT_A_POST.include?(File.basename(path, '.*').downcase) }
+    end
+
+    # How many of those names the note carries. A folder with a hundred of
+    # them is a markdown tree and the reading is not in doubt anyway; the
+    # case the note is written for is one or two stray files.
+    STRAY_ROOT_SAMPLE = 5
+
+    def stray_root_names
+      names = stray_root_markdown.first(STRAY_ROOT_SAMPLE).map { |path| File.basename(path) }
+      names << '...' if stray_root_markdown.length > names.length
+      names.join(', ')
+    end
+
+    # Jekyll's configuration, the counterpart of HUGO_CONFIGS. Read only
+    # for the name the site gives itself -- everything else in it describes
+    # a build this engine does not run.
+    JEKYLL_CONFIGS = %w[_config.yml _config.yaml].freeze
+
+    # The keys that name a site, per generator. baseURL and url first
+    # because a domain belongs to one blog; a title is a fallback, and two
+    # blogs can share one.
+    HUGO_IDENTITY_KEYS = %w[baseurl title].freeze
+    JEKYLL_IDENTITY_KEYS = %w[url title].freeze
+
+    # What `hugo new site` and `jekyll new` leave in the file untouched.
+    # Two skeletons nobody has edited declare the SAME name, and an
+    # identity two different blogs share is worse than none: it is exactly
+    # the silent overwrite the path digest was introduced to end. A tree
+    # that still says these things is treated as saying nothing.
+    PLACEHOLDER_IDENTITIES = [
+      %r{\Ahttps?://(www\.)?example\.(org|com|net)/?\z}i,
+      %r{\Ahttps?://localhost(:\d+)?/?\z}i,
+      /\Amy new hugo site\z/i,
+      /\Ayour awesome title\z/i,
+      /\Ayour awesome site\z/i
+    ].freeze
+
+    def source_account
+      names = declared_identity
+      return "#{File.basename(@dir)}-#{Digest::MD5.hexdigest(@dir)[0, 8]}" if names.empty?
+
+      # A readable half out of the strongest name the tree gave -- the host
+      # of a baseURL, or the title -- so the account in the archive still
+      # says which blog it is. The digest is over all of them.
+      label = Slug.slugify(names.first[%r{//([^/]+)}, 1] || names.first)
+      label = File.basename(@dir) if label.empty?
+      "#{label}-#{Digest::MD5.hexdigest(names.join('|'))[0, 8]}"
+    end
+
+    # The names the tree gives itself, strongest first, or empty. Every
+    # configuration the tree holds is read and every identity key in it
+    # kept, so a site that edited its title but not its baseURL (or the
+    # other way round) is still told apart from the skeleton it started as.
+    def declared_identity
+      names = []
+      HUGO_CONFIGS.each { |name| names.concat(identity_values(File.join(@dir, name), HUGO_IDENTITY_KEYS)) }
+      PathGlob.under(@dir, 'config', '_default', '*.{toml,yaml,yml,json}').sort.each do |path|
+        names.concat(identity_values(path, HUGO_IDENTITY_KEYS))
+      end
+      JEKYLL_CONFIGS.each { |name| names.concat(identity_values(File.join(@dir, name), JEKYLL_IDENTITY_KEYS)) }
+      names
+    end
+
+    # A configuration file is somebody else's, in a format this engine does
+    # not otherwise read -- so anything it does badly costs the identity
+    # and nothing more, and the path digest takes over.
+    def identity_values(path, keys)
+      return [] unless File.file?(path)
+
+      raw = File.read(path, encoding: 'utf-8')
+      data = path.end_with?('.toml') ? toml_subset(raw) : config_yaml(raw)
+      return [] unless data.is_a?(Hash)
+
+      lower = data.each_with_object({}) { |(key, value), out| out[key.to_s.downcase] = value }
+      keys.filter_map { |key| declared_name(lower[key]) }
+    rescue StandardError
+      []
+    end
+
+    # safe_load, and deliberately without `aliases:`. The file belongs to
+    # somebody else, so it is read under the narrowest reader there is --
+    # the same one front_matter uses. A `_config.yml` written with a YAML
+    # anchor (`<<: *defaults`) therefore reads as nothing here, and the
+    # tree falls back to the path digest: one more way to declare nothing,
+    # not a way to read a stranger's file more liberally.
+    def config_yaml(raw)
+      YAML.safe_load(raw, permitted_classes: [Date, Time])
+    end
+
+    def declared_name(value)
+      name = value.to_s.strip
+      return nil if name.empty? || PLACEHOLDER_IDENTITIES.any? { |shape| name.match?(shape) }
+
+      name
     end
 
     # Markdown only, deliberately, even though a tree WITH _posts/ reads
@@ -1020,8 +1195,11 @@ module Import
     def base_name(path)
       base = File.basename(path).sub(/\.(md|markdown|html)\z/, '').sub(DATED_NAME, '')
       # A Hugo page bundle is a directory with an index.md -- the
-      # directory is the name.
-      base == 'index' ? File.basename(File.dirname(path)) : base
+      # directory is the name. A branch bundle spells the same thing
+      # `_index.md` (see section_listing?) and Hugo serves it from the
+      # directory just the same, so an About page written that way comes
+      # in at /about/ rather than as a post called "index".
+      %w[index _index].include?(base) ? File.basename(File.dirname(path)) : base
     end
 
     def explicit_slug(meta)

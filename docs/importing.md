@@ -68,12 +68,29 @@ duplicated.
   match would destroy a post you can't get back.
 
   The other exception is about WHERE the export sits. Several sources have
-  no account name anywhere in their files (Facebook, Threads, Jekyll, Wix,
-  Movable Type, Substack), so the identity borrows the export's own
-  directory or file name. Unpack the next export into a folder named after
-  its date and every post in it is a new post: the archive imports a second
-  time, slugs and all. Import from the same path each time -- or rename the
-  new export to the old name -- and matching works as described.
+  no account name anywhere in their files (Facebook, Threads, Wix, Movable
+  Type, Substack), so the identity borrows the export's own directory or
+  file name. Unpack the next export into a folder named after its date and
+  every post in it is a new post: the archive imports a second time, slugs
+  and all. Import from the same path each time -- or rename the new export
+  to the old name -- and matching works as described.
+
+  A markdown tree is the one source that can do better, because a site
+  built by Hugo or Jekyll writes its own name down. The identity is that
+  name -- `baseURL` or `title` out of `hugo.toml` (or `config/_default/`),
+  `url` or `title` out of `_config.yml` -- so such a tree can be moved,
+  renamed, restored somewhere else or unpacked on a second machine and a
+  re-import still finds its own posts. A tree that declares nothing falls
+  back to the full path it was imported from, and that is the case to know
+  about: a bare `content/` directory, a folder of `_posts/` with no
+  `_config.yml` beside them, or anything a converter produced matches only
+  while it stays where it was. Point the import at the site root rather
+  than at the content directory where you can -- that is where the
+  configuration is. A skeleton nobody has edited yet (`hugo new site`
+  leaves `baseURL` at example.org, `jekyll new` leaves the title at "Your
+  awesome title") counts as declaring nothing, on purpose: two untouched
+  skeletons would otherwise claim the same identity and the second import
+  would land on top of the first.
 - **Origin becomes a tag.** Every imported post is tagged with its platform
   (`tumblr`, `wordpress`, ...; for a plain feed, the site's domain), so
   `/tag/tumblr/` is the whole of one old blog. Deduplicated
@@ -359,9 +376,19 @@ Pages count too: markdown in the root of the tree (`about.md`,
 at the folder holding `hugo.toml` and `content/` and it reads the
 content directory, leaving `layouts/`, `archetypes/` and the built copy
 alone -- and says so in the summary, so nothing you keep outside
-`content/` goes missing without a word. Hugo's section listings
-(`_index.md`, one per section, wherever they sit) are the site's own
-furniture rather than posts, and are counted among the skipped.
+`content/` goes missing without a word. It holds whether or not the site
+ever made a section: with a flat `content/`, the top of it is pages, the
+same as with a dozen sections below. If you keep markdown of your own at
+the top of the site folder (a `TODO.md`, a `NOTES.md`), the whole folder
+is walked instead -- that file may be the tree you meant -- and the
+summary names the file that decided it.
+
+Hugo's section listings (`_index.md`, one per section, wherever they sit)
+are the site's own furniture rather than posts, and are counted among the
+skipped. A branch bundle is the exception the name cannot show: a
+directory whose only markdown is its `_index.md` and which carries prose
+or files of its own is a page written that way (`about/_index.md` with
+its pictures beside it), and it is imported under the directory's name.
 
 **A tree written by `./blog.sh export` comes back whole.** Its front
 matter carries a `blogsh:` block -- the post's identity and everything

@@ -447,15 +447,17 @@ module Wizard
   # through every question reports "nothing changed" and leaves no
   # backups suggesting otherwise.
   #
-  # `also` is the changes a run makes that are not lines in a file -- a
-  # picture waiting to be copied in, which is the one thing ./style.sh
-  # does to the install besides writing config. They are listed here for
+  # `also` is the changes a run makes that are not lines in a file --
+  # every file ./style.sh has queued for copying into the install: the
+  # banner picture, a stylesheet, a font face. They are listed here for
   # the reason the diffs are (the answer to `q_write` has to cover
   # everything the run would do) and counted as changes for a reason the
   # banner section found the hard way: replacing an image with one of the
   # same name and the same dimensions moves nothing in site.yml, so the
   # run reported "nothing changed" and left -- and the copy, which waits
-  # for :written, was dropped with it.
+  # for :written, was dropped with it. Reading the picture as the only
+  # such change is how the identical hole survived one section over, where
+  # a skin.css the config already named was promised and then dropped.
   def review_and_write(files, also: [])
     changed = files.select { |(_, writer)| writer.changed? }
     if changed.empty? && also.empty?
@@ -494,10 +496,17 @@ module Wizard
     # old, the two out of step, and a message swearing nothing had changed.
     blocked = changed.filter_map do |(_, writer)|
       path = writer.respond_to?(:path) ? writer.path : nil
-      path && ConfigWriter.write_blocker(path)
+      blocker = path && ConfigWriter.write_blocker(path)
+      blocker && [path, blocker]
     end.first
     if blocked
-      puts Tui.paint("❌ #{t('write_denied', message: "#{blocked}: not writable")}", :red)
+      path, blocker = blocked
+      # Which of the two it is decides the sentence, because the advice
+      # differs and the wrong one sends the reader hunting for a file that
+      # is not in the way: told to go and look at a .bak, they find no .bak.
+      # write_blocker returns the backup or the directory, nothing else.
+      key = blocker == "#{path}.bak" ? 'write_denied_backup' : 'write_denied_dir'
+      puts Tui.paint("❌ #{t(key, path: relative(blocker))}", :red)
       puts
       return :failed
     end

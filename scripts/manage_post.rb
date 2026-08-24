@@ -1315,7 +1315,11 @@ def find_post_path(slug)
   chosen = RESOLVED_PATHS[slug]
   return chosen if chosen && File.exist?(chosen)
 
-  matches = PathGlob.under(CONTENT_DIR, '*', "#{slug}.json").sort
+  # The slug is a name, not a pattern -- see PathGlob.literal. Without it
+  # every command that resolves a post by slug ("foto[1]", which a hand
+  # edit or an import can mint) answered "post not found" over a post the
+  # build was publishing.
+  matches = PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").sort
   return matches.first if matches.size <= 1
 
   RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
@@ -2064,6 +2068,60 @@ rescue StandardError
   false
 end
 
+# Whether this mover's write is really standing at its destination.
+# Existence is not the question: in the swap parking exists for, both
+# posts answer to the same name, so the file at that address can just as
+# well be the OTHER one -- put there by a mover, or by this recovery a
+# moment ago. Asked against what the mover itself writes (the post with
+# the target date on it), field for field, because being wrong here means
+# removing the last copy of a post.
+def landed_at_destination?(info)
+  return false unless File.exist?(info[:dest_json])
+
+  JSON.parse(File.read(info[:dest_json], encoding: 'utf-8')) ==
+    info[:post].merge('date' => info[:target].iso8601, 'scheduled' => true)
+rescue StandardError
+  false
+end
+
+# The parked media and history of a mover that finished: they land at the
+# year the post just moved to -- its own mover found nothing to carry,
+# which was the point of parking them. Shared with the recovery, which
+# reaches this same state whenever a write landed and only the delete
+# behind it did not.
+def settle_parked_side_cars(info)
+  if info[:media_temp] && File.exist?(info[:media_temp])
+    FileUtils.mkdir_p(File.dirname(info[:dest_media]))
+    if Dir.exist?(info[:dest_media])
+      # A genuine orphan sitting at the destination: merged, the way every
+      # media move merges, never silently replaced.
+      PostWriter.move_media_dir(info[:media_temp], info[:dest_media])
+    else
+      File.rename(info[:media_temp], info[:dest_media])
+    end
+  end
+  return unless info[:versions_temp] && File.exist?(info[:versions_temp])
+
+  # An orphaned history at the destination is somebody else's past -- the
+  # same stance PostVersions.move takes, for the same reason.
+  FileUtils.rm_rf(info[:dest_versions])
+  FileUtils.mkdir_p(File.dirname(info[:dest_versions]))
+  File.rename(info[:versions_temp], info[:dest_versions])
+end
+
+# A rename inside the recovery, which runs with an exception already on
+# its way out. Answers whether it happened instead of raising: a raise
+# from in here replaces the failure the author is about to read and takes
+# the report with it -- and the report is the only place a parked copy is
+# named out loud, so the run would end on a backtrace about a rename with
+# not one word about any of the posts.
+def try_rename(from, to)
+  File.rename(from, to)
+  true
+rescue StandardError
+  false
+end
+
 def apply_queue_moves(moves)
   held = RunLock.hold(ROOT, label: 'queue') do
     # Checked here rather than in the three callers that used to each keep
@@ -2123,6 +2181,7 @@ def apply_queue_moves(moves)
     wanted = landing.map { |target_path, _| File.expand_path(target_path) }
     parked = []
     done = 0
+    moving = false
     begin
       # Inside the begin on purpose: a parking rename that fails halfway
       # (a read-only year folder, a full disk) must put the already-parked
@@ -2165,6 +2224,7 @@ def apply_queue_moves(moves)
         end
       end
 
+      moving = true
       moves.each do |entry, target|
         yield entry, target
         done += 1
@@ -2186,7 +2246,47 @@ def apply_queue_moves(moves)
       # own, and in a swap the two posts share every path there is, so
       # nothing on disk can be asked which of them it belongs to.
       landed = moves.each_index.map { |i| i < done ? :moved : :home }
+      # The mover that finished and was not tidied up after: its write
+      # landed and only the delete behind it did not, so what stands under
+      # its parking name is a copy of a post that is already where it was
+      # asked to go. `done` cannot see that -- the exception came out of
+      # that very delete, so the loop never counted the move. Settled
+      # before anything else reads the disk, because left standing the
+      # loop below takes the leftover for a post that never moved: it
+      # calls a finished mover "see below" and sends the author to rename
+      # the copy over the post that did move.
+      #
+      # Exactly one mover can be in that state, and it is `moves[done]` --
+      # the one that was running. Asked that narrowly on purpose: two posts
+      # can be identical but for the date the move rewrites, and then "the
+      # destination holds this post" is true of a file the mover never
+      # wrote. Both halves have to hold, or the wrong copy is the one that
+      # gets removed.
       parked.each do |info|
+        next unless moving && info[:index] == done
+        next unless File.exist?(info[:json_temp]) && landed_at_destination?(info)
+
+        info[:settled] = true
+        landed[info[:index]] = :moved
+        begin
+          File.delete(info[:json_temp])
+          settle_parked_side_cars(info)
+        rescue StandardError
+          # Even the tidying can fail -- the disk that brought us here is
+          # still full. Whatever is left under a parking name gets a row
+          # of its own rather than a raise on the way out.
+          left = [%i[json_temp dest_json], %i[media_temp dest_media], %i[versions_temp dest_versions]]
+          left.each do |temp_key, dest_key|
+            temp = info[temp_key]
+            next unless temp && File.exist?(temp)
+
+            stranded << [info[:slug], temp, info[dest_key], File.exist?(info[dest_key])]
+          end
+        end
+      end
+      parked.each do |info|
+        next if info[:settled]
+
         if File.exist?(info[:json_temp])
           # A finished mover standing exactly where this post came from,
           # with its own name free to go back to. Gets out of the way
@@ -2201,26 +2301,28 @@ def apply_queue_moves(moves)
           # answers it everywhere else. Asking about the name alone is
           # how this recovery used to put a parked post back beside a
           # mover that was serving the same address from another folder.
-          if way_home_clear?(info)
-            File.rename(info[:json_temp], info[:json_home])
+          home_clear = way_home_clear?(info)
+          if home_clear && try_rename(info[:json_temp], info[:json_home])
             landed[info[:index]] = :home
           else
             landed[info[:index]] = :parked
-            stranded << [info[:slug], info[:json_temp], info[:json_home]]
+            # The last field is what the row is allowed to advise. A clear
+            # way home means the rename merely failed, and doing it by
+            # hand is exactly right; a blocked one means something else is
+            # served at that address, and the instruction has to be the
+            # careful one -- this file can be the only copy of its post.
+            stranded << [info[:slug], info[:json_temp], info[:json_home], !home_clear]
           end
         end
         [%i[media_temp media_home], %i[versions_temp versions_home]].each do |temp_key, home_key|
           temp = info[temp_key]
           next unless temp && File.exist?(temp)
 
-          if File.exist?(info[home_key])
-            stranded << [info[:slug], temp, info[home_key]]
-          else
-            File.rename(temp, info[home_key])
-          end
+          taken = File.exist?(info[home_key])
+          stranded << [info[:slug], temp, info[home_key], taken] if taken || !try_rename(temp, info[home_key])
         end
       end
-      if done.positive? || stranded.any?
+      if done.positive? || landed.include?(:moved) || stranded.any?
         warn ''
         warn t('cli.queue_move_failed')
         # The dates stay ISO on purpose: this list is read with a file
@@ -2241,8 +2343,18 @@ def apply_queue_moves(moves)
                   end
           warn "  '#{entry[:slug]}' -- #{state}"
         end
-        stranded.each do |slug, temp, home|
-          warn "  '#{slug}' -- #{t('cli.queue_move_stranded', temp: temp, home: home)}"
+        stranded.each do |slug, temp, home, blocked|
+          # Asked again here rather than only where the row was made: the
+          # recovery goes on moving files after a strand is recorded, so a
+          # name that was free then can be occupied by the time this is
+          # read -- and "rename it back" is an instruction to overwrite
+          # whatever got there in between.
+          note = if blocked || File.exist?(home)
+                   t('cli.queue_move_blocked', temp: temp, home: home)
+                 else
+                   t('cli.queue_move_stranded', temp: temp, home: home)
+                 end
+          warn "  '#{slug}' -- #{note}"
         end
         warn ''
       end
@@ -2250,29 +2362,11 @@ def apply_queue_moves(moves)
     end
     # The mover writes its new file and deletes the one it came from; a
     # parking name left behind would be a duplicate of a post that is now
-    # somewhere else. The parked media and history land at the year the
-    # post just moved to -- its own mover found nothing to carry, which
-    # was the point of parking them.
+    # somewhere else.
     parked.each do |info|
       File.delete(info[:json_temp]) if File.exist?(info[:json_temp])
       begin
-        if info[:media_temp] && File.exist?(info[:media_temp])
-          FileUtils.mkdir_p(File.dirname(info[:dest_media]))
-          if Dir.exist?(info[:dest_media])
-            # A genuine orphan sitting at the destination: merged, the way
-            # every media move merges, never silently replaced.
-            PostWriter.move_media_dir(info[:media_temp], info[:dest_media])
-          else
-            File.rename(info[:media_temp], info[:dest_media])
-          end
-        end
-        if info[:versions_temp] && File.exist?(info[:versions_temp])
-          # An orphaned history at the destination is somebody else's past
-          # -- the same stance PostVersions.move takes, for the same reason.
-          FileUtils.rm_rf(info[:dest_versions])
-          FileUtils.mkdir_p(File.dirname(info[:dest_versions]))
-          File.rename(info[:versions_temp], info[:dest_versions])
-        end
+        settle_parked_side_cars(info)
       rescue SystemCallError => e
         # The posts themselves are already where they belong; only a
         # side-car is still under its parking name. Said out loud with
@@ -3081,7 +3175,7 @@ end
 # year its file sits in. Same question address_occupant answers for a
 # post's address, asked the way a page is served.
 def root_occupant(name)
-  PathGlob.under(CONTENT_DIR, '*', "#{name}.json").sort.each do |file|
+  PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(name)}.json").sort.each do |file|
     candidate = begin
       JSON.parse(File.read(file, encoding: 'utf-8'))
     rescue StandardError
@@ -3127,7 +3221,7 @@ def address_occupant(parts)
   # DATE. Reading only <year>/<slug>.json answered about a file rather than
   # about an address, which is the same narrow question the six writing
   # paths were asking until this release.
-  PathGlob.under(CONTENT_DIR, '*', "#{slug}.json").sort.each do |file|
+  PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").sort.each do |file|
     candidate = begin
       JSON.parse(File.read(file, encoding: 'utf-8'))
     rescue StandardError
@@ -3729,7 +3823,7 @@ end
 # the trash grew years. Both are restorable -- an upgrade must not strand
 # somebody's undo.
 def trashed_paths(slug)
-  (PathGlob.under(TRASH_DIR, '*', slug, 'post.json') +
+  (PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'post.json') +
    [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) }.uniq.sort
 end
 
@@ -3773,7 +3867,7 @@ end
 # post.json to bring back, only files. `check --repair` promises the trash
 # is somewhere restore can reach, and this is the half that makes it true.
 def trashed_media_dirs(slug)
-  PathGlob.under(TRASH_DIR, '*', slug, 'media').select { |d| File.directory?(d) }.sort
+  PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) }.sort
 end
 
 def restore_media(slug, dirs)

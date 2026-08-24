@@ -152,6 +152,38 @@ module ConfigWriter
     end
   end
 
+  # What would stop save! from replacing this path, as a path to name --
+  # the directory that will hold the atomic temp, or the .bak if one would
+  # be made -- and nil when nothing would. Read-only, so review_and_write
+  # can ask about EVERY file before it writes the first: the whole point of
+  # the wizard's "nothing was written" is that it is true, and it stopped
+  # being true the day two files were written in turn and the second was
+  # refused.
+  #
+  # It answers for exactly what save! does and not one check more. A
+  # refusal here ends the run on exit 1, so a check save! does not make is
+  # not caution, it is a wizard that dead-ends where it used to recover:
+  #
+  #   * The file itself is deliberately NOT consulted. AtomicWrite writes a
+  #     sibling temp and renames it over the target, which needs the
+  #     DIRECTORY, not the file -- a root-made config the app user cannot
+  #     open for writing is replaced perfectly well, and refusing it left
+  #     both wizards dead on a `docker exec` leftover they used to survive.
+  #   * The .bak matters only when there is a file to copy into it, which
+  #     is save!'s own `had_file` (EnvFile.save! makes the same test). With
+  #     no config yet -- delete the mangled one and re-run the wizard, the
+  #     most ordinary recovery there is -- no backup is made, and a
+  #     leftover one is not in the way of anything.
+  def self.write_blocker(path, backup: true)
+    dir = File.dirname(path)
+    return dir unless File.writable?(dir)
+
+    bak = "#{path}.bak"
+    return bak if backup && File.exist?(path) && File.exist?(bak) && !File.writable?(bak)
+
+    nil
+  end
+
   # Strips one level of commenting: the first '#' and at most one space
   # after it, keeping what precedes it. One rule covers both shapes the
   # template uses --
@@ -164,23 +196,6 @@ module ConfigWriter
   # -- and the last line is the reason it strips exactly one level and not
   # all of them: an optional key inside an optional block must still be
   # optional after its block is activated.
-  # Can this path be written without moving anything -- the directory that
-  # will hold the atomic temp, the file itself if it is there, and the .bak
-  # if one would be made. Read-only, so review_and_write can ask about
-  # EVERY file before it writes the first: the whole point of the wizard's
-  # "nothing was written" is that it is true, and it stopped being true the
-  # day two files were written in turn and the second was refused.
-  def self.write_blocker(path, backup: true)
-    dir = File.dirname(path)
-    return dir unless File.writable?(dir)
-    return path if File.exist?(path) && !File.writable?(path)
-
-    bak = "#{path}.bak"
-    return bak if backup && File.exist?(bak) && !File.writable?(bak)
-
-    nil
-  end
-
   def self.uncomment(line)
     line.sub(/\A(\s*)#[ ]?/) { Regexp.last_match(1) }
   end
@@ -794,14 +809,16 @@ module ConfigWriter
       indent = ConfigWriter.indent_of(@lines[line_no])
       last = line_no
       # Have we passed a comment at or above the key's own indent since the
-      # last real line? If so, we are inside a commented-out SECTION that
-      # follows the key (its `# bluesky:` head sat at the key's indent), and
-      # its own deeper-indented body lines (`#   handle:`) must not be
-      # mistaken for the key's children and swallowed. A commented child of
-      # the key itself (`# page_size: 10` right under `base_url`, with no
-      # shallower comment before it) is reached with this still false, so it
-      # stays findable inside the block. Getting this wrong deleted ~100
-      # documented lines from site.yml on the first setup write.
+      # last real line? If so, we have left the key's body -- what follows
+      # is a sibling, or a commented-out SECTION after the key (its
+      # `# bluesky:` head sat at the key's indent), or the prose between two
+      # sections -- and their own deeper-indented lines (`#   handle:`, a
+      # hanging-indented paragraph) must not be mistaken for the key's
+      # children and swallowed. A commented child of the key itself
+      # (`# page_size: 10` right under `base_url`, with no shallower comment
+      # before it) is reached with this still false, so it stays findable
+      # inside the block. Getting this wrong deleted ~100 documented lines
+      # from site.yml on the first setup write.
       saw_shallow_comment = false
       ((line_no + 1)...@lines.size).each do |i|
         line_indent = ConfigWriter.indent_of(@lines[i])
@@ -825,19 +842,25 @@ module ConfigWriter
           next
         end
         # A comment is decided by what FOLLOWS it, the way a blank line is:
-        #   * at or above the key's indent -- it may be a note flush inside
-        #     a nested block ("# my account id"), or the head of a
-        #     commented-out section after the key. Passed over, and it arms
-        #     saw_shallow_comment so the section's own deeper body below it
-        #     cannot be annexed.
+        #   * at or above the key's indent -- passed over, never counted as
+        #     the end of the body, and it arms saw_shallow_comment so what
+        #     lies below cannot be annexed. With ONE exception: a line that
+        #     is still a comment after one '#' is stripped is not the file
+        #     talking, it is a line of a block that is already switched off.
+        #     Removing a widget comments the template's own flush-left prose
+        #     a second time ("# #     # instance is optional ..."), which
+        #     lands at column 0 INSIDE the block -- armed there, it hid every
+        #     answer below it, and a widget switched off forgot its account
+        #     id and its limit instead of offering them back.
         #   * deeper than the key -- a child. A genuine trailing child of
         #     the key (`# page_size` under `site:`) commits, so it stays in
         #     the block and remains findable; the body of a following
-        #     commented section (reached only after a shallower comment) does
-        #     not.
+        #     commented section, and the hanging indent of the paragraph
+        #     documenting it, are reached only after a shallower comment and
+        #     do not.
         if ConfigWriter.comment?(@lines[i])
           if line_indent <= indent
-            saw_shallow_comment = true
+            saw_shallow_comment = true unless ConfigWriter.comment?(ConfigWriter.uncomment(@lines[i]))
           elsif !saw_shallow_comment
             last = i
           end

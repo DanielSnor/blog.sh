@@ -29,6 +29,11 @@
 # so they are re-joined and every caller keeps the absolute paths it always
 # had, in the same order -- the base is a common prefix, so sorting is
 # unaffected.
+#
+# That leaves the other half of the join. A pattern like "#{slug}.json" is
+# still half NAME -- the slug is somebody's post, not a wildcard -- and a
+# slug of "foto[1]" put the same blindness one directory further in:
+# `literal` is what makes such a piece stand for itself.
 module PathGlob
   module_function
 
@@ -45,5 +50,28 @@ module PathGlob
     return [] if base.empty?
 
     Dir.glob(File.join(*parts), flags, base: base).map { |rel| File.join(base, rel) }
+  end
+
+  # One piece of the PATTERN that is a name rather than a wildcard: a slug,
+  # a filename, a directory somebody typed. Everything the engine itself
+  # mints is [a-z0-9-] and needs none of this -- but a post file edited by
+  # hand carries whatever was typed into it, an archive can be written by
+  # something that is not this engine, and an old address an import records
+  # in redirect_from is spelled the way the old site served it. check
+  # passes all of those on purpose, because they break nothing on disk.
+  # They broke the lookups instead: PathGlob.under(CONTENT_DIR, '*',
+  # "foto[1].json") describes a file called "foto1.json", so props, delete,
+  # restore and the address guard all answered "no such post" over a post
+  # the build had just published, and the guard's "the address is free" is
+  # the answer that overwrites it.
+  #
+  # A backslash in front of each metacharacter is how Dir.glob and
+  # File.fnmatch spell "this character, itself" -- the same job rsync.rb's
+  # literal() does for rsync's include rules, in that syntax's own
+  # spelling. The backslash itself goes on the list, or a name carrying one
+  # would escape whatever came next. It holds as long as nobody passes
+  # File::FNM_NOESCAPE to `under`; nobody does.
+  def literal(part)
+    part.to_s.gsub(/[*?\[\]{}\\]/) { |char| "\\#{char}" }
   end
 end

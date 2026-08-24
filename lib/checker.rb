@@ -111,13 +111,21 @@ module Checker
     # @unreadable machinery exists to prevent.
     if posts.empty?
       unbuildable = check_unbuildable(posts, cap)
-      return unbuildable.any? ? unbuildable : [warn(t('no_posts'), kind: :no_posts)]
+      # Parked leftovers are asked about here too. A crash mid-swap can
+      # leave every post in the archive standing under a parking name, and
+      # an archive that reads as empty ONLY because its posts are hidden
+      # is the one case where "no posts yet" is the worst thing to say:
+      # it is the answer that sends the author away.
+      parked = check_parked_leftovers(root, posts)
+      return unbuildable + parked if unbuildable.any? || parked.any?
+
+      return [warn(t('no_posts'), kind: :no_posts)]
     end
 
     known = known_paths(posts)
     findings = []
     findings.concat(check_unbuildable(posts, cap))
-    findings.concat(check_parked_leftovers(root))
+    findings.concat(check_parked_leftovers(root, posts))
     findings.concat(check_media(root, posts, progress, cap))
     findings.concat(check_degenerate_images(posts, cap))
     findings.concat(check_internal_links(posts, known, cap))
@@ -223,26 +231,75 @@ module Checker
   # also means nothing would ever find one again without this: a post, its
   # pictures or its history can sit a rename away from existing, invisible
   # to every listing, until the same slug moves again. The message carries
-  # the path, because the fix is one rename.
-  def check_parked_leftovers(root)
+  # the path, and says which of three things the file is.
+  def check_parked_leftovers(root, posts)
     strays = PathGlob.under(root, 'content.nosync', 'posts', '*', '.*queue-move*') +
              PathGlob.under(root, 'media.nosync', '*', '.*queue-move*') +
              PathGlob.under(root, 'content.nosync', 'versions', '*', '.*queue-move*')
+    return [] if strays.empty?
+
+    # Every post the archive still holds, keyed by what a queue move does
+    # NOT rewrite -- because the one question worth asking about a parked
+    # file is whether the post inside it exists anywhere else. Built only
+    # when there is something to ask it about: this walks the whole archive.
+    live = posts.to_h { |post| [post_identity(post), post['__path'].to_s] }
     strays.sort.map do |path|
-      # The advice depends on whether the name it came from is free. If the
-      # move was interrupted DURING parking, the home name is empty and the
-      # parked file IS the post -- rename it back. If it was interrupted
-      # after a mover landed (the wider window), the swapped post is already
-      # sitting at that home name, so the parked file is a STALE COPY:
-      # renaming it back would overwrite live content. Telling the two apart
-      # is the difference between a repair and a second data loss.
+      # Three different states, and telling them apart is the difference
+      # between a repair and a second data loss.
+      #
+      # The post in the parked file is still in the archive somewhere: a
+      # stale copy the interrupted move left behind, safe to remove once
+      # it has been compared against the live one.
+      #
+      # It is nowhere else and its own name is free: one rename puts it
+      # back, which is what the parking name is shaped for.
+      #
+      # It is nowhere else and its name is TAKEN. Whether the name is free
+      # was once asked on its own, and read as "the post it belongs to is
+      # back in place" -- which parking guarantees is false: a post is only
+      # ever parked because ANOTHER post is moving to its address, so
+      # whatever stands at that name is the other half of the swap. The
+      # parked file can then be the only copy of its post there is, and
+      # nothing may be renamed over it or deleted unread.
       home = parked_home(path)
-      occupied = home && File.exist?(home)
-      fix = occupied ? 'parked_leftover_fix_stale' : 'parked_leftover_fix'
+      identity = parked_identity(path)
+      elsewhere = identity && live[identity]
       rel = path.sub("#{root}/", '')
-      error(t('parked_leftover', file: rel), t(fix, home: home&.sub("#{root}/", '')),
-            kind: :parked_leftover, data: { 'file' => rel, 'stale' => occupied })
+      fix = if elsewhere
+              t('parked_leftover_fix_stale', live: elsewhere.sub("#{root}/", ''))
+            elsif home && File.exist?(home)
+              t('parked_leftover_fix_blocked', home: home.sub("#{root}/", ''))
+            else
+              t('parked_leftover_fix')
+            end
+      error(t('parked_leftover', file: rel), fix,
+            kind: :parked_leftover, data: { 'file' => rel, 'stale' => !elsewhere.nil? })
     end
+  end
+
+  # What a queue move rewrites, and therefore what a post's identity
+  # cannot be made of: write_scheduled_date hands the post the target date
+  # and sets the scheduled flag. `__path` and `__year` are the checker's
+  # own bookkeeping and were never in the file.
+  MOVED_BY_QUEUE = %w[date scheduled __path __year].freeze
+
+  # A post as something two files can be compared by. Sorted, so the same
+  # post written twice compares equal whatever order its keys came back in.
+  def post_identity(post)
+    JSON.generate(post.reject { |key, _| MOVED_BY_QUEUE.include?(key) }.sort)
+  end
+
+  # The same, read off a parked file. Only a parked POST can answer this: a
+  # parked media or versions folder is a directory, with nothing in it that
+  # says whether the post it belongs to still has a copy elsewhere -- so it
+  # is never called stale, which is the safe half of not knowing.
+  def parked_identity(path)
+    return nil unless path.end_with?('.json') && File.file?(path)
+
+    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    post.is_a?(Hash) ? post_identity(post) : nil
+  rescue StandardError
+    nil
   end
 
   # The name a parked file or directory would return to:
