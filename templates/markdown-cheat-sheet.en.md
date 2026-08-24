@@ -283,7 +283,7 @@ Two exclamation marks, otherwise same as an image. Works for a local file (.mp4,
 !![Video caption](/path/to/video.mp4)
 !![Video caption](https://www.youtube.com/watch?v=jNQXAC9IVRw)
 !![Video caption](https://vimeo.com/76979871)
-!![Video caption](https://framatube.org/w/aRVpP8pRc9Nz1Aq9dFGxnw)
+!![Video caption](https://framatube.org/w/kkGMgK9ZtnKfYAgnEtQxbv)
 ```
 
 !![The very first video on YouTube](https://www.youtube.com/watch?v=jNQXAC9IVRw)
@@ -303,7 +303,7 @@ the only moment writing a post needs the network.)
 ```
 !![Audio caption](/path/to/recording.mp3)
 !![Audio caption](https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT)
-!![Audio caption](https://soundcloud.com/nasa/apollo-11-onboard-recorder)
+!![Audio caption](https://soundcloud.com/nasa/sputnik-beep)
 ```
 
 ## Attachments
