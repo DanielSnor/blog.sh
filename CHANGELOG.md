@@ -583,12 +583,16 @@ build would refuse it. Nothing to migrate -- `git pull`, rebuild, deploy.
   the file, or a genuinely present `.bak` -- not a `.bak` that is not
   there), and a refused or rolled-back write ends the wizard with a
   non-zero exit instead of a quiet success.
-- **An import answer of "y" means yes in every language.** The wizard's
-  keep-permalinks question compared the key against the localized
-  yes-character alone, so on a Czech install -- whose prompt reads
-  `[a/N]` -- a reader pressing `y` out of habit got "no" silently and
-  lost every old address the flag exists to keep. `y`, `j` and `a` all
-  mean yes now, everywhere. And `FACEBOOK_CROSSPOSTS=yes` -- the obvious
+- **An answer of "y" means yes in every language, in every dialog.** The
+  import wizard's keep-permalinks question compared the key against the
+  localized yes-character alone, so on a Czech install -- whose prompt
+  reads `[a/N]` -- a reader pressing `y` out of habit got "no" silently
+  and lost every old address the flag exists to keep. Two dialogs in
+  `props` did the same and were missed the first time round: renaming a
+  slug answered "Cancelled" to anything but the local character, and so
+  did dropping an old address, so on an English or German install the
+  habit of pressing `a` read as a refusal. `y`, `j` and `a` all mean yes
+  now, everywhere, out of one definition rather than four. And `FACEBOOK_CROSSPOSTS=yes` -- the obvious
   guess -- aborts with a sentence instead of silently meaning "no", the
   same guard `KEEP_PERMALINKS` already had.
 - **Enter backs out of "add one" everywhere, and a pending copy is a

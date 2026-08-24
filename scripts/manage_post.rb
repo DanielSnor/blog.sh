@@ -3141,7 +3141,7 @@ def props_addresses(path, slug)
 
     key, former = entries[index]
     print t('cli.addresses_drop_confirm', address: former)
-    next unless Tui.key_choice('') == t('cli.confirm_yes_char')
+    next unless Tui.yes?(Tui.key_choice(''))
 
     abort_if_post_changed(path, raw, slug)
     updated = post.dup
@@ -3347,7 +3347,7 @@ def rename_post(path, post, raw: nil)
            old_url: published_url(old_slug, address_year, page: page),
            new_url: published_url(new_slug, address_year, page: page))
   end
-  unless Tui.key_choice(t('cli.rename_go')) == t('cli.confirm_yes_char')
+  unless Tui.yes?(Tui.key_choice(t('cli.rename_go')))
     puts t('cli.cancelled')
     puts
     return old_slug
