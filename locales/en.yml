@@ -122,6 +122,15 @@ type:
 index:
   empty: "No posts of this type yet."
 
+archive:
+  # The archive index: /archive/ is the map of years, /archive/<year>/ is
+  # that year's posts. Months are written as numbers, the way this site
+  # writes dates everywhere else.
+  title: "Archive"
+  description: "Every post on %{site_title}, by year and month."
+  year_title: "Archive %{year}"
+  year_description: "Posts from %{year} on %{site_title}."
+  back: "Back to all years"
 search:
   # Doubles as the page's own heading when no query has been typed yet.
   kind: "Search"

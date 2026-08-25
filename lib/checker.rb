@@ -58,7 +58,7 @@ module Checker
   # left over from an import. A checker that is confidently wrong about a
   # working address costs more than one that says nothing, which is the rule
   # the comment on known_paths sets out and this list was breaking.
-  FIXED_PATHS = ['/', '/search/', '/markdown/',
+  FIXED_PATHS = ['/', '/search/', '/markdown/', '/archive/',
                  '/rss.xml', '/sitemap.xml', '/robots.txt', '/404.html'].freeze
 
   # A listing's later pages live under <listing>/page/N/, whatever the
@@ -371,6 +371,16 @@ module Checker
     end
     posts.each do |post|
       paths << post_path(post)
+      # A year of the archive index exists when a post in the stream lives
+      # in it -- worked out from the posts rather than written down, because
+      # a hand-kept list of years is a list that goes stale on new year's
+      # day. The year is the ADDRESS's, matching what the build groups by:
+      # taking the displayed date instead would invent /archive/2015/ for a
+      # post served under 2014 and call the site's own link dead.
+      unless draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post)
+        year = PostAddress.date_year(post)
+        paths << "/archive/#{year}/" if year
+      end
       # A tag page is built from the STREAM, exactly like a series page:
       # a tag carried only by a draft, a page or an unlisted post never
       # gets one. Counting those tags as known made every link to such a

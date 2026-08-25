@@ -121,6 +121,15 @@ type:
 index:
   empty: "Zatím žádné příspěvky tohoto typu."
 
+archive:
+  # Rejstřík archivu: /archive/ je mapa let, /archive/<rok>/ je seznam
+  # příspěvků toho roku. Měsíce se píšou číslem, protože tak tenhle web
+  # píše datum všude jinde.
+  title: "Archiv"
+  description: "Všechny příspěvky na %{site_title} podle let a měsíců."
+  year_title: "Archiv %{year}"
+  year_description: "Příspěvky z roku %{year} na %{site_title}."
+  back: "Zpět na přehled let"
 search:
   # Zároveň slouží jako nadpis stránky, dokud není zadaný žádný dotaz.
   kind: "Vyhledávání"

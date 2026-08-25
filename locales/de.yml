@@ -124,6 +124,15 @@ type:
 index:
   empty: "Noch keine Beiträge dieses Typs."
 
+archive:
+  # Das Archivregister: /archive/ ist die Jahresübersicht,
+  # /archive/<Jahr>/ sind die Beiträge des Jahres. Monate stehen als
+  # Zahlen, so wie diese Seite Daten überall sonst schreibt.
+  title: "Archiv"
+  description: "Alle Beiträge auf %{site_title}, nach Jahr und Monat."
+  year_title: "Archiv %{year}"
+  year_description: "Beiträge aus %{year} auf %{site_title}."
+  back: "Zurück zur Jahresübersicht"
 search:
   # Dient zugleich als Überschrift der Seite, solange keine Suchanfrage
   # eingegeben wurde.

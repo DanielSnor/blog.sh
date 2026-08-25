@@ -1487,7 +1487,27 @@ def hero_time_html(post, heading: false)
   return '' if page?(post)
 
   stamp = %(<time datetime="#{h(post_time(post).iso8601)}">#{h(post_display_date(post))}</time>)
+  link = archive_link_for(post)
+  stamp = %(<a href="#{h(link)}">#{stamp}</a>) if link
   heading ? %(<h1 class="post-hero__date">#{stamp}</h1>) : stamp
+end
+
+# Where a post's own date stamp leads: to the month it was written in,
+# inside the archive index. The stamp is on every post page and led nowhere
+# until now, so the index is reachable from anywhere in the archive without
+# adding a control to the page.
+#
+# Nil for anything the index does not list -- a draft, a page, an unlisted
+# post -- because a stamp pointing at a year page that will not mention it
+# is worse than a stamp pointing nowhere.
+#
+# The year is the ADDRESS's, matching what the index groups by and what the
+# checker will look for.
+def archive_link_for(post)
+  return nil if draft?(post) || page?(post) || unlisted?(post)
+
+  time = post_time(post)
+  "/archive/#{time.year}/#m#{format('%02d', time.month)}"
 end
 
 # Whether the post says what it is called. Untitled posts -- an imported
@@ -1792,6 +1812,17 @@ def render_sitemap(posts, tags_map, content_types)
     type_posts = posts.select { |post| dominant_content_type(post) == type }
     latest = type_posts.max_by { |p| p['date'] }
     urls << sitemap_url("#{SITE_BASE_URL}/type/#{type}/", latest && post_time(latest).iso8601)
+  end
+
+  # The archive index and one entry per year that has posts in it. Grouped
+  # by the year of the ADDRESS, the same way the pages themselves are, so a
+  # crawler is never sent to a year the build did not write. A year with
+  # nothing in it appears on the map as an empty row but has no page, so it
+  # has nothing to list here either.
+  urls << sitemap_url("#{SITE_BASE_URL}/archive/", posts.first && post_time(posts.first).iso8601)
+  posts.group_by { |post| post_time(post).year }.each do |year, in_year|
+    latest = in_year.max_by { |p| p['date'] }
+    urls << sitemap_url("#{SITE_BASE_URL}/archive/#{year}/", latest && post_time(latest).iso8601)
   end
 
   <<~XML
@@ -2793,6 +2824,106 @@ def search_index_entry(post)
     excerpt: truncate_excerpt(name ? rest : text),
     folded: PostText.searchable(post, text)
   }
+end
+
+# --- The archive index -------------------------------------------------
+#
+# A map of the whole archive in two levels and no more. /archive/ is a row
+# per year with a strip of twelve months; /archive/<year>/ is one line per
+# post. No excerpts and no pictures: this is an index, not another listing,
+# and the point of it is that a reader can see the shape of twenty-three
+# years at once -- which nothing on the site could show before. Pagination
+# cannot: it is anchored from the oldest post, so /page/128/ says nothing
+# about whether it is 2009 or 2014.
+#
+# Grouped by the year of the post's ADDRESS, not of its displayed date.
+# Those two can differ by one for a post published either side of midnight
+# on 31 December, and the address is what this is a map OF -- the checker
+# compares paths, and a row pointing at a year the post does not live in
+# would be a dead link the moment it happened.
+#
+# Cheap by construction, which is why the year pages are safe to have: a
+# new post rewrites the map and the current year and nothing else. 2014 has
+# not changed since new year's eve 2014 and never will, so a deploy that
+# compares content has nothing to upload for it.
+ARCHIVE_PATH = '/archive/'
+archive_by_year = posts.group_by { |post| post_time(post).year }
+
+unless archive_by_year.empty?
+  # Every year between the first and the last, including the ones with
+  # nothing in them -- sean.cz has a silent 2025 between 2024 and 2026, and
+  # a map that skipped it would draw an axis that lies about the gap.
+  archive_span = archive_by_year.keys.max.downto(archive_by_year.keys.min).to_a
+
+  month_cells = lambda do |year, by_month|
+    (1..12).map do |m|
+      count = (by_month[m] || []).length
+      label = CGI.escapeHTML(m.to_s)
+      if count.zero?
+        %(<span class="archive-month is-empty">#{label}</span>)
+      else
+        # Four steps of shading, because "has posts / has none" is not the
+        # thing worth seeing: on this archive a month holds anywhere from
+        # one post to eighty-seven, and a map that draws those the same
+        # answers a question nobody asked. The thresholds are read off a
+        # real archive rather than picked round: most months sit under
+        # fifteen, and the handful above forty are the bursts.
+        level = if count < 5 then 1
+                elsif count < 15 then 2
+                elsif count < 40 then 3
+                else 4
+                end
+        %(<a class="archive-month is-l#{level}" href="/archive/#{year}/#m#{format('%02d', m)}" ) +
+          %(title="#{count}">#{label}</a>)
+      end
+    end.join
+  end
+
+  rows = archive_span.map do |year|
+    in_year = archive_by_year[year] || []
+    by_month = in_year.group_by { |post| post_time(post).month }
+    name = in_year.empty? ? %(<span class="archive-year-name">#{year}</span>) : %(<a class="archive-year-name" href="/archive/#{year}/">#{year}</a>)
+    %(<li class="archive-year#{in_year.empty? ? ' is-empty' : ''}">#{name}) +
+      %(<span class="archive-year-count">#{in_year.length}</span>) +
+      %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
+  end
+
+  emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
+       layout(%(<h1 class="listing-heading">#{h(t('archive.title'))}</h1>\n) +
+              %(<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
+              title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
+              description: t('archive.description', site_title: SITE_TITLE),
+              path: ARCHIVE_PATH))
+
+  archive_span.each do |year|
+    in_year = archive_by_year[year] || []
+    # A year nobody wrote in gets a row on the map but no page of its own:
+    # there is nothing to put on it, and an empty page is an invitation to
+    # a dead end.
+    next if in_year.empty?
+
+    sections = in_year.group_by { |post| post_time(post).month }.sort.map do |month, in_month|
+      # The month heading is a number, the way this site writes dates: two
+      # of the three shipped languages spell months with digits anyway, and
+      # spelling them out would mean thirty-six new translations for the
+      # one language that does not.
+      lines = in_month.sort_by { |post| [post['date'], post['slug']] }.map do |post|
+        %(<li><time datetime="#{h(post_time(post).strftime('%Y-%m-%d'))}">) +
+          %(#{post_display_time(post).day}.</time> ) +
+          %(<a href="#{h(post_path(post))}">#{h(post_title_for(post))}</a></li>)
+      end
+      %(<section class="archive-section" id="m#{format('%02d', month)}">) +
+        %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
+    end
+
+    emit(File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html'),
+         layout(%(<h1 class="listing-heading">#{h(t('archive.year_title', year: year))}</h1>\n) +
+                %(<p class="archive-back"><a href="#{ARCHIVE_PATH}">#{h(t('archive.back'))}</a></p>\n) +
+                sections.join("\n"),
+                title: "#{t('archive.year_title', year: year)} – #{SITE_SHORT_NAME}",
+                description: t('archive.year_description', year: year, site_title: SITE_TITLE),
+                path: "/archive/#{year}/"))
+  end
 end
 
 # posts is sorted newest-first, so splitting into "first N" / "the rest" is

@@ -1450,3 +1450,76 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
     animation-iteration-count: 1 !important;
   }
 }
+
+/* The archive index. A row per year with a strip of twelve months, so the
+   shape of the whole archive is visible at once -- which is the only thing
+   this page does that no listing could. An empty month is drawn rather
+   than skipped: on an archive spanning twenty-three years the silences are
+   as much of the picture as the busy stretches, and so is an empty year. */
+.archive-map { list-style: none; padding: 0; margin: 0; }
+.archive-year {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.archive-year-name { min-width: 3.4rem; font-weight: 600; color: var(--accent); text-decoration: none; }
+.archive-year.is-empty .archive-year-name { color: var(--meta-text); font-weight: 400; }
+.archive-year-count { min-width: 2.6rem; text-align: right; color: var(--meta-text); font-size: 0.85rem; }
+.archive-months { display: flex; gap: 3px; flex-wrap: nowrap; }
+/* Fixed width so the twelve cells line up down the page: the strip is only
+   readable as a shape if January sits above January. */
+.archive-month {
+  width: 1.6rem;
+  padding: 0.15rem 0;
+  text-align: center;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  background: var(--pill-bg);
+  color: var(--text);
+  text-decoration: none;
+}
+/* Four steps mixed out of the site's own accent, so the map takes the
+   palette with it instead of introducing a colour of its own. The text
+   stays --text on the lighter two and flips on the darker two, which is
+   where mixing enough accent in stops leaving room for it. */
+.archive-month.is-l1 { background: color-mix(in srgb, var(--accent) 18%, var(--pill-bg)); }
+.archive-month.is-l2 { background: color-mix(in srgb, var(--accent) 42%, var(--pill-bg)); }
+.archive-month.is-l3 { background: color-mix(in srgb, var(--accent) 70%, var(--pill-bg)); color: var(--bg); }
+.archive-month.is-l4 { background: var(--accent); color: var(--bg); }
+.archive-month:hover { outline: 2px solid var(--text); outline-offset: 1px; }
+.archive-month.is-empty { background: transparent; border: 1px solid var(--border); color: var(--meta-text); }
+
+.archive-back { margin: 0 0 1.5rem; }
+.archive-section { margin: 0 0 1.75rem; }
+/* The month sticks while its own months' worth of posts scrolls past.
+   A year here can be four hundred lines long, and a number left at the top
+   of the section stops answering "which month am I in?" after the first
+   screenful. 70px is the sticky bar's own height, the same figure
+   scroll-padding-top uses above; the background is its own, or the lines
+   underneath show through as they pass. */
+.archive-section h2 {
+  position: sticky;
+  top: 70px;
+  z-index: 1;
+  margin: 0 0 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 1.1rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.archive-list { list-style: none; padding: 0; margin: 0; }
+.archive-list li { display: flex; gap: 0.6rem; padding: 0.2rem 0; align-items: baseline; }
+.archive-list time { min-width: 2.2rem; text-align: right; color: var(--meta-text); font-size: 0.85rem; flex: 0 0 auto; }
+
+@media (max-width: 700px) {
+  /* The strip is what has to survive a phone: the year and the count give
+     up their fixed columns first, and the cells shrink rather than wrap,
+     because a strip that wraps to two lines stops being one shape. */
+  .archive-year { gap: 0.4rem; }
+  .archive-year-name { min-width: 2.9rem; }
+  .archive-year-count { min-width: 2rem; font-size: 0.8rem; }
+  .archive-months { gap: 2px; }
+  .archive-month { width: 1.35rem; font-size: 0.72rem; }
+}
