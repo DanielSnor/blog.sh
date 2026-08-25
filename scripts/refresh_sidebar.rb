@@ -10,6 +10,7 @@
 # isn't fetched by the visitor's browser, but server-side (see lib/sidebar.rb).
 
 require_relative '../lib/sidebar'
+require_relative '../lib/public_file'
 require_relative '../lib/post_stats'
 require_relative '../lib/site_config'
 
@@ -157,7 +158,7 @@ else
   # request blanking a whole discussion.
   approved = fetched.reject { |_key, result| result['comments'].nil? }
   comments = previous_comments.merge(approved.transform_values { |result| result['comments'] })
-  File.write(COMMENTS_PATH, comments.to_json)
+  PublicFile.write(COMMENTS_PATH, comments.to_json)
   puts I18n.t('cron.sidebar_comments', threads: approved.size,
                                        comments: comments.values.sum { |list| Array(list).size })
 end

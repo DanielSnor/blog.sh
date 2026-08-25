@@ -2,6 +2,7 @@
 
 require 'json'
 require_relative 'site_config'
+require_relative 'public_file'
 require_relative 'pixelfed_fetcher'
 require_relative 'mastodon_fetcher'
 require_relative 'commits_fetcher'
@@ -74,17 +75,17 @@ module Sidebar
         # empties instead, and an empty card is not drawn -- which is how
         # somebody finds out, on the site rather than in cron mail.
         warn "#{name}: #{e.message}"
-        File.write(path, '[]')
+        PublicFile.write(path, '[]')
         next [name, false]
       end
       fallback = items.empty? ? (previous[name] || read(path)) : nil
 
       if fallback
         warn "#{name}: fetch returned nothing, keeping last known content"
-        File.write(path, fallback)
+        PublicFile.write(path, fallback)
         [name, nil]
       else
-        File.write(path, items.to_json)
+        PublicFile.write(path, items.to_json)
         [name, items.size]
       end
     end

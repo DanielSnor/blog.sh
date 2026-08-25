@@ -59,7 +59,14 @@ module Checker
   # left over from an import. A checker that is confidently wrong about a
   # working address costs more than one that says nothing, which is the rule
   # the comment on known_paths sets out and this list was breaking.
-  FIXED_PATHS = ['/', '/search/', '/markdown/', '/archive/', '/tag/',
+  # /archive/ and /tag/ are deliberately NOT here. They were, and neither
+  # is unconditional: the map needs one post in the stream and the tag
+  # index needs one tag on one of them. A menu entry pointing at either
+  # was then ticked as sound by doctor while it 404'd from every page of
+  # the site -- the exact failure check_nav exists to prevent. They are
+  # worked out in known_paths instead, from the same condition the build
+  # guards them with.
+  FIXED_PATHS = ['/', '/search/', '/markdown/',
                  '/rss.xml', '/sitemap.xml', '/robots.txt', '/404.html'].freeze
 
   # A listing's later pages live under <listing>/page/N/, whatever the
@@ -412,6 +419,10 @@ module Checker
       slug = Slug.slugify(post['series'].to_s)
       series_sizes[slug] += 1 unless slug.empty?
     end
+    # Whether the two roots exist at all, decided by the same conditions
+    # the build guards them with rather than assumed.
+    stream_post = false
+    stream_tag = false
     posts.each do |post|
       paths << post_path(post)
       # A year of the archive index exists when a post in the stream lives
@@ -420,7 +431,9 @@ module Checker
       # day. The year is the ADDRESS's, matching what the build groups by:
       # taking the displayed date instead would invent /archive/2015/ for a
       # post served under 2014 and call the site's own link dead.
-      unless draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post)
+      in_stream = !(draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post))
+      if in_stream
+        stream_post = true
         year = PostAddress.date_year(post)
         paths << "/archive/#{year}/" if year
       end
@@ -429,11 +442,11 @@ module Checker
       # gets one. Counting those tags as known made every link to such a
       # tag look sound -- including the ones the site puts in its own menu,
       # on every page, where doctor then called the menu fine.
-      in_stream = !(draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post))
       (in_stream ? Array(post['tags']) : []).each do |tag|
         slug = Slug.slugify(tag.to_s)
         next if slug.empty?
 
+        stream_tag = true
         paths << "/tag/#{slug}/"
         # A tag the site names in its menu gets a feed of its own. Which
         # tags those are is a config question, so the feed is accepted
@@ -458,6 +471,11 @@ module Checker
         Array(post['redirect_from']).each { |origin| paths << origin.to_s }
       end
     end
+    # The map exists once one post is in the stream; the tag index once
+    # one of those carries a tag. A site whose tags all live on drafts,
+    # pages or unlisted posts has neither.
+    paths << '/archive/' if stream_post
+    paths << '/tag/' if stream_tag
     paths
   end
 

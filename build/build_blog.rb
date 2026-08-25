@@ -10,6 +10,7 @@ require 'cgi'
 require 'uri'
 require 'digest'
 require_relative '../lib/sidebar'
+require_relative '../lib/public_file'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/embed'
@@ -1804,11 +1805,16 @@ def sitemap_url(loc, lastmod = nil)
   "<url><loc>#{loc}</loc>#{lastmod_tag}</url>"
 end
 
-def render_sitemap(posts, tags_map, content_types)
-  urls = [sitemap_url("#{SITE_BASE_URL}/", posts.first && post_time(posts.first).iso8601)]
+# `entries`, not `posts`: the caller hands this posts AND pages, and the name
+# it used to have is what produced the defect below. Everything with an
+# address belongs on a sitemap, so the combined list is right for the URL
+# list -- but the archive is built from the STREAM alone, so it is given the
+# stream rather than left to guess from a list that is not one.
+def render_sitemap(entries, tags_map, content_types, stream)
+  urls = [sitemap_url("#{SITE_BASE_URL}/", entries.first && post_time(entries.first).iso8601)]
 
-  posts.each do |post|
-    urls << sitemap_url("#{SITE_BASE_URL}#{post_path(post)}", post_time(post).iso8601)
+  entries.each do |entry|
+    urls << sitemap_url("#{SITE_BASE_URL}#{post_path(entry)}", post_time(entry).iso8601)
   end
 
   tags_map.each do |slug, data|
@@ -1817,7 +1823,7 @@ def render_sitemap(posts, tags_map, content_types)
   end
 
   content_types.each do |type|
-    type_posts = posts.select { |post| dominant_content_type(post) == type }
+    type_posts = entries.select { |entry| dominant_content_type(entry) == type }
     latest = type_posts.max_by { |p| p['date'] }
     urls << sitemap_url("#{SITE_BASE_URL}/type/#{type}/", latest && post_time(latest).iso8601)
   end
@@ -1825,17 +1831,21 @@ def render_sitemap(posts, tags_map, content_types)
   # The tag index: one entry, and only when there is at least one tag with a
   # page of its own -- a site with no tags builds no index and must not be
   # advertising one.
-  urls << sitemap_url("#{SITE_BASE_URL}/tag/", posts.first && post_time(posts.first).iso8601) if tags_map.any?
+  urls << sitemap_url("#{SITE_BASE_URL}/tag/", entries.first && post_time(entries.first).iso8601) if tags_map.any?
 
-  # The archive index and one entry per year that has posts in it. Grouped
-  # by the year of the ADDRESS, the same way the pages themselves are, so a
-  # crawler is never sent to a year the build did not write. A year with
-  # nothing in it appears on the map as an empty row but has no page, so it
-  # has nothing to list here either.
-  urls << sitemap_url("#{SITE_BASE_URL}/archive/", posts.first && post_time(posts.first).iso8601)
-  posts.group_by { |post| post_time(post).year }.each do |year, in_year|
-    latest = in_year.max_by { |p| p['date'] }
-    urls << sitemap_url("#{SITE_BASE_URL}/archive/#{year}/", latest && post_time(latest).iso8601)
+  # The archive index and one entry per year that has posts in it, from the
+  # stream and only the stream -- the same list the map itself is grouped
+  # from. Grouping the combined list sent crawlers to /archive/<year>/ for
+  # every year that held nothing but a page: an About page older than the
+  # oldest post, or a Contact page added to a blog whose last post was two
+  # years ago. The root was worse -- written unconditionally, while the build
+  # skips the whole map when the stream is empty.
+  unless stream.empty?
+    urls << sitemap_url("#{SITE_BASE_URL}/archive/", stream.first && post_time(stream.first).iso8601)
+    stream.group_by { |post| post_time(post).year }.each do |year, in_year|
+      latest = in_year.max_by { |p| p['date'] }
+      urls << sitemap_url("#{SITE_BASE_URL}/archive/#{year}/", latest && post_time(latest).iso8601)
+    end
   end
 
   <<~XML
@@ -2166,28 +2176,43 @@ WRITTEN = {}
 # the permissions were whatever the author's umask happened to be: on a
 # machine with umask 077 an import wrote its pictures 600 and the site
 # served holes. Reported from an install doing exactly that.
-PUBLIC_READABLE = 0o444
-PUBLIC_TRAVERSABLE = 0o555
+# Defined in lib/public_file.rb, not here: the build is not the only writer
+# into public/ and a rule kept in the build is a rule the cron cannot read.
+PUBLIC_READABLE = PublicFile::READABLE
+PUBLIC_TRAVERSABLE = PublicFile::TRAVERSABLE
 
 def world_readable?(path, stat = nil)
-  ((stat || File.stat(path)).mode & PUBLIC_READABLE) == PUBLIC_READABLE
+  PublicFile.readable?(path, stat)
 end
 
 # A file nobody can reach is as good as unreadable, so the directories on
 # the way to it get the same treatment -- read AND execute, since a
 # directory without +x cannot be entered even when it can be listed.
 #
-# Walks up to PUBLIC_DIR and stops at the first directory that is already
-# right: everything above it was made by the same code and is right too, so
-# this costs one stat on the common path rather than one per level.
+# Directories this run has already put right, so the walk below costs one
+# hash lookup per file after the first time it climbs a given branch.
+TRAVERSED = {}
+
+# Walks up to PUBLIC_DIR, stopping only at a directory THIS RUN has already
+# handled.
+#
+# It used to stop at the first directory that merely LOOKED right, on the
+# grounds that everything above it was made by the same code. That is false
+# the moment a new directory is created inside an old one that is wrong:
+# mkdir_p mints the new leaf at 0777 & ~umask, so publishing a post into a
+# year directory left at 0700 made a correct new page behind a shut gate --
+# the walk stopped on the child it had just created and never looked up.
+# The author then saw a 404 for the post they had just published, rebuilt,
+# and the build said "Postaveno" and changed nothing.
 def make_traversable(dir)
   path = File.expand_path(dir)
   root = File.expand_path(PUBLIC_DIR)
   while path.start_with?(root)
-    mode = File.stat(path).mode & 0o7777
-    break if (mode & PUBLIC_TRAVERSABLE) == PUBLIC_TRAVERSABLE
+    break if TRAVERSED[path]
 
-    File.chmod(mode | PUBLIC_TRAVERSABLE, path)
+    mode = File.stat(path).mode & 0o7777
+    File.chmod(mode | PUBLIC_TRAVERSABLE, path) unless (mode & PUBLIC_TRAVERSABLE) == PUBLIC_TRAVERSABLE
+    TRAVERSED[path] = true
     parent = File.dirname(path)
     break if parent == path
 
@@ -2198,18 +2223,23 @@ rescue SystemCallError
 end
 
 def make_readable(path)
-  mode = File.stat(path).mode & 0o7777
-  File.chmod(mode | PUBLIC_READABLE, path)
-rescue SystemCallError
-  # A file somebody else owns cannot be chmod'ed by us, and refusing to
-  # build over it would be worse than leaving it as it is: the build has
-  # already written what it had to write.
-  nil
+  PublicFile.make_readable(path)
 end
 
 def emit(path, content)
   WRITTEN[path] = true
   bytes = content.to_s.b
+  dir = File.dirname(path)
+  FileUtils.mkdir_p(dir)
+  # Before the early return, not after. A file whose bytes AND mode are both
+  # right can still sit behind a directory nobody can enter, and that is
+  # precisely what `chmod -R a+r public.nosync` leaves behind: read without
+  # execute, every directory at 744, every file at 644. The build was then
+  # permanently blind to it -- it returned here on the matching bytes and
+  # never reached the walk -- while rsync -az carried the 744 to the server
+  # verbatim. Directories were half of what PUBLIC_TRAVERSABLE was added for
+  # and the half that never got repaired.
+  make_traversable(dir)
   # Permissions count as "up to date" too. Without this the fix below could
   # never reach a file that already exists with the wrong ones -- which is
   # what happened to the reporter: chmod, rebuild, nothing, because the
@@ -2219,9 +2249,6 @@ def emit(path, content)
     return if File.binread(path) == bytes && world_readable?(path, stat)
   end
 
-  dir = File.dirname(path)
-  FileUtils.mkdir_p(dir)
-  make_traversable(dir)
   File.binwrite(path, bytes)
   make_readable(path)
 end
@@ -2276,6 +2303,12 @@ end
 # in-place edit rather than only that one.
 def emit_copy(src, dest, compare_content: false)
   WRITTEN[dest] = true
+  dir = File.dirname(dest)
+  FileUtils.mkdir_p(dir)
+  # Before the early return, for the reason emit gives: a picture whose
+  # bytes and mode are both right is still unreachable behind a directory
+  # nobody can enter, and the return below never reached the walk.
+  make_traversable(dir)
   if File.exist?(dest)
     # On a volume that ignores letter case or unicode form, File.exist?
     # answers yes for a file the directory writes differently -- and then
@@ -2298,9 +2331,6 @@ def emit_copy(src, dest, compare_content: false)
     return if same && world_readable?(dest)
   end
 
-  dir = File.dirname(dest)
-  FileUtils.mkdir_p(dir)
-  make_traversable(dir)
   FileUtils.cp(src, dest)
   make_readable(dest)
 end
@@ -2499,8 +2529,15 @@ drafts, posts = posts.partition { |p| draft?(p) }
 # A page at the root cannot be allowed to shadow an address the engine
 # already owns. The rest of the site lives under /posts/, /tag/, /type/,
 # /draft/ and the two generated pages, so those are the names to refuse.
-RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
-                            robots.txt 404 favicon.ico].freeze
+# `archive` joined this list late, and the gap had a cost: the map was
+# added in 1.5 without touching these names, so a page slugged `archive`
+# was accepted, rendered, and then flatly overwritten by the map -- with
+# no warning from the build, a green `check`, a silent `doctor`, and the
+# page still listed in the search index, so searching for it by name
+# handed the reader the map. `archive` is one of the commonest names a
+# blog has for a page.
+RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page rss.xml
+                            sitemap.xml robots.txt 404 favicon.ico].freeze
 pages, posts = posts.partition { |p| page?(p) }
 # Out of the stream on the same principle as pages, one step further:
 # a page is taken out of the listings but stays findable (sitemap,
@@ -3183,7 +3220,7 @@ emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES))
+emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts))
 # The crawlers that collect text to train on, as of this release. A list in
 # the engine goes stale, which is why the free-text key below exists beside
 # it -- but a list nobody has to research is the difference between a site
