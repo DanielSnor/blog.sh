@@ -739,6 +739,9 @@ import:
     wix: "Wix (Blog-CSV-Export)"
     twitter: "Twitter/X (entpackter Export)"
     feed: "WordPress-Export oder RSS/Atom-Feed"
+  poll:
+    heading: "Umfrage (Abstimmende: %{voters})"
+    option: "%{name} -- %{votes}"
   reason:
     reply: "Antwort"
     repost: "Repost"
@@ -815,6 +818,7 @@ import:
     wayback_images_spread: "Das Archiv hält %{count} Bild(er) von %{host} (%{spread}) -- Bilder aus Jahren, die dort fehlen, können nicht ankommen, egal worauf die Beiträge verweisen."
     wayback_unanswered: "%{count} Archiv-Anfrage(n) blieben auch nach Wiederholung unbeantwortet -- was sie hielten, fehlt in diesem Lauf. Ein neuer Lauf ist sicher und holt es nach."
     wix_dropped: "Rich-Content-Knoten ohne blog.sh-Entsprechung sind entfallen: %{listed}."
+    mastodon_polls: "In eine Liste mit Stimmenzahlen umgewandelte Umfragen: %{count}."
 
 # ./blog.sh doctor -- liest die Konfiguration auf der Platte und sagt, was
 # daran nicht stimmt (lib/doctor.rb). Jede Zeile mit einem Hinweis muss

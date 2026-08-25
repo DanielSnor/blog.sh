@@ -3,6 +3,7 @@
 require 'json'
 require 'time'
 require_relative '../slug'
+require_relative '../i18n'
 require_relative 'html_blocks'
 
 module Import
@@ -19,6 +20,7 @@ module Import
   class Mastodon
     def initialize(export_dir)
       @export_dir = export_dir
+      @polls = 0
     end
 
     def label
@@ -46,6 +48,7 @@ module Import
       return :reply if object['inReplyTo']
 
       blocks = HtmlBlocks.parse(object['content'].to_s).blocks
+      blocks.concat(poll_blocks(object))
       blocks.concat(attachment_blocks(object, media))
       return :empty if blocks.empty?
 
@@ -68,7 +71,43 @@ module Import
       }
     end
 
+    # How many polls this run turned into a list. Said out loud because the
+    # shape of the post changes: the options are the author's own words and
+    # are kept, but they arrive as a list rather than as whatever the reader
+    # remembers voting in.
+    def postscript
+      return nil if @polls.zero?
+
+      I18n.t('import.note.mastodon_polls', count: @polls)
+    end
+
     private
+
+    # An ActivityPub Question carries its choices in oneOf (single answer)
+    # or anyOf (multiple), each with a vote count in replies.totalItems,
+    # plus votersCount and endTime. None of it was read: the post published
+    # as a question with no answers -- "I'd like your opinion on this" and
+    # then nothing -- and the run said nothing either, which is the opposite
+    # of how everything else here treats content it cannot carry.
+    #
+    # The options ARE content: the author wrote them. So they are kept
+    # rather than counted and dropped, and the votes go with them, because
+    # an archived poll without its result is half the story. These are
+    # settled results from an export, not a poll still running, so there is
+    # nothing here that can mislead by being early.
+    def poll_blocks(object)
+      options = Array(object['oneOf'] || object['anyOf'])
+      return [] if options.empty?
+
+      @polls += 1
+      items = options.map do |option|
+        { 'text' => I18n.t('import.poll.option', name: option['name'].to_s,
+                                                 votes: option.dig('replies', 'totalItems').to_i) }
+      end
+      [{ 'type' => 'text',
+         'text' => I18n.t('import.poll.heading', voters: object['votersCount'].to_i) },
+       { 'type' => 'list', 'style' => 'ul', 'items' => items }]
+    end
 
     def outbox_path
       File.join(@export_dir, 'outbox.json')

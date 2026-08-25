@@ -728,6 +728,9 @@ import:
     wix: "Wix (CSV export blogu)"
     twitter: "Twitter/X (rozbalený archiv)"
     feed: "Export z WordPressu nebo RSS/Atom feed"
+  poll:
+    heading: "Anketa (hlasujících: %{voters})"
+    option: "%{name} — %{votes}"
   reason:
     reply: "odpověď"
     repost: "repost"
@@ -804,6 +807,7 @@ import:
     wayback_images_spread: "Obrázků %{host} v Archivu: %{count} (%{spread}) — obrázky z let, která tam chybí, dorazit nemůžou, ať na ně posty odkazují jakkoli."
     wayback_unanswered: "Dotazů na Archiv bez odpovědi i po opakování: %{count} — cokoli držely, v tomhle běhu chybí. Opakovaný běh je bezpečný a dobere to."
     wix_dropped: "Uzly Rich Contentu bez ekvivalentu v blog.sh vypadly: %{listed}."
+    mastodon_polls: "Anket převedených na seznam možností s počty hlasů: %{count}."
 
 # ./blog.sh doctor — přečte konfiguraci na disku a řekne, co je s ní
 # špatně (lib/doctor.rb). Každý řádek s radou musí dávat smysl sám o sobě:

@@ -758,6 +758,9 @@ import:
     wix: "Wix (blog CSV export)"
     twitter: "Twitter/X (archive export)"
     feed: "WordPress export or RSS/Atom feed"
+  poll:
+    heading: "Poll (voters: %{voters})"
+    option: "%{name} -- %{votes}"
   reason:
     reply: "reply"
     repost: "repost"
@@ -834,6 +837,7 @@ import:
     wayback_images_spread: "The Archive holds %{count} image(s) of %{host} (%{spread}) -- pictures from years missing there cannot arrive, whatever the posts reference."
     wayback_unanswered: "%{count} Archive quer(y/ies) went unanswered even after retrying -- anything they held is missing from this run. Re-running is safe and picks it up."
     wix_dropped: "Rich Content nodes with no blog.sh equivalent were dropped: %{listed}."
+    mastodon_polls: "Polls turned into a list of options with their vote counts: %{count}."
 
 # ./blog.sh doctor -- reads the configuration on disk and reports what is
 # wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on

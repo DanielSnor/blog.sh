@@ -1392,7 +1392,14 @@ def post_og_image(post)
   # Basename, the same as the page's own <img> uses: this address goes into
   # og:image and into the JSON-LD, and a name carrying "../" pointed both
   # of them outside the post -- at whatever happens to sit there.
-  "#{SITE_BASE_URL}#{post_path(post)}#{File.basename(media['url'].to_s)}"
+  # Percent-encoded, like the page's own <img>. 83baf51 escaped the URL
+  # in the markup and left these two behind, so the picture on the page
+  # pointed at foto%20%231.jpg while og:image pointed at "foto #1.jpg" --
+  # where a scraper reads everything from the # as a fragment, requests
+  # "foto " and gets a 404. The link card on Mastodon and Bluesky and the
+  # search engine's thumbnail were then blank for exactly the pictures
+  # whose names needed the encoding most.
+  "#{SITE_BASE_URL}#{post_path(post)}#{media_name_encoded(media['url'])}"
 end
 
 def post_description(post)
@@ -2727,9 +2734,15 @@ NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 # would rewrite pages that have nothing wrong with them.
 URL_UNSAFE_IN_PATH = /[#%?"'<>\s\\^`{|}]/.freeze
 
+# The address half, with no markup escaping: og:image and the JSON-LD go
+# through their own (a template h(), and to_json), and a second layer
+# there would put a literal &amp; in a URL.
+def media_name_encoded(name)
+  File.basename(name.to_s).gsub(URL_UNSAFE_IN_PATH) { |c| format('%%%02X', c.ord) }
+end
+
 def media_src(prefix, name)
-  escaped = File.basename(name.to_s).gsub(URL_UNSAFE_IN_PATH) { |c| format('%%%02X', c.ord) }
-  "#{prefix}#{h(escaped)}"
+  "#{prefix}#{h(media_name_encoded(name))}"
 end
 
 # "]]>" cannot appear inside a CDATA section at all -- the only escape is
@@ -2867,7 +2880,15 @@ page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_pos
 tags_map = {}
 overlong_tags = []
 posts.each do |post|
-  (post['tags'] || []).each do |tag|
+  # Folded by SLUG before anything is appended, because the map groups by
+  # slug while the loop walked tag STRINGS: "sci-fi" and "Sci Fi", "Praha"
+  # and "praha", "Cesko" and "Česko" -- or the same tag simply typed twice
+  # -- are one page, and the post was appended to it once per spelling. The
+  # listing then showed the post twice in a row, the tag's feed carried two
+  # <item>s with the same guid, and the index said 2 beside a tag that one
+  # post carries. First spelling wins, matching how the map already picks a
+  # display name across posts.
+  (post['tags'] || []).uniq { |tag| tag_slug(tag) }.each do |tag|
     slug = tag_slug(tag)
     next if slug.empty?
 

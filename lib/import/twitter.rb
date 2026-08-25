@@ -5,6 +5,7 @@ require 'time'
 require 'uri'
 require_relative '../entity_text'
 require_relative '../slug'
+require_relative '../path_glob'
 require_relative 'html_blocks'
 
 module Import
@@ -25,12 +26,15 @@ module Import
       "Twitter/X (@#{account})"
     end
 
-    # tweets.js runs to tens of megabytes on a full archive, and reading plus
-    # parsing it is a silent minute or more -- worth saying out loud before
-    # it starts.
+    # These run to tens of megabytes on a full archive, and reading plus
+    # parsing them is a silent minute or more -- worth saying out loud
+    # before it starts, and worth naming HOW MANY files, since a split
+    # archive read as one is the defect below.
     def preamble
-      size = File.size(tweets_path) / 1_048_576.0
-      "Reading #{tweets_path} (#{size.round(1)} MB)…"
+      paths = tweets_paths
+      size = paths.sum { |p| File.size(p) } / 1_048_576.0
+      where = paths.length > 1 ? "#{paths.length} files in #{@data_dir}" : paths.first.to_s
+      "Reading #{where} (#{size.round(1)} MB)…"
     end
 
     def total
@@ -73,15 +77,32 @@ module Import
 
     private
 
-    def tweets_path
-      File.join(@data_dir, 'tweets.js')
+    # The archive's own data/manifest.js declares tweets as a LIST of files
+    # with globalName "YTD.tweets.part0": X splits a large export into
+    # data/tweets.js, tweets-part1.js, tweets-part2.js and so on. Only the
+    # first was ever opened, and the loss was completely quiet -- no error,
+    # no line in the summary, exit 0, and the "N item(s) in the source"
+    # header counted part0 alone, so even the number looked self-consistent.
+    # facebook.rb and instagram.rb have globbed their numbered series from
+    # the start; this is the same shape and now gets the same treatment.
+    #
+    # Matched exactly rather than with a bare tweets*.js, so a file the
+    # archive gains later cannot be parsed as tweets by accident.
+    TWEETS_FILE = /\Atweets(-part\d+)?\.js\z/
+
+    def tweets_paths
+      PathGlob.under(@data_dir, 'tweets*.js')
+              .select { |p| File.basename(p).match?(TWEETS_FILE) }
+              .sort_by { |p| File.basename(p)[/\d+/].to_i }
     end
 
-    # Both files are JavaScript assignments wrapping a JSON array, so the
+    # Each file is a JavaScript assignment wrapping a JSON array, so the
     # prefix up to the opening bracket is dropped before parsing.
     def load_tweets
-      raw = File.read(tweets_path, encoding: 'utf-8')
-      JSON.parse(raw.sub(/\A[^\[]*/, '')).map { |t| t['tweet'] }
+      tweets_paths.flat_map do |path|
+        raw = File.read(path, encoding: 'utf-8')
+        JSON.parse(raw.sub(/\A[^\[]*/, '')).map { |t| t['tweet'] }
+      end
     end
 
     def account
