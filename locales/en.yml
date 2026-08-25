@@ -1043,6 +1043,7 @@ check:
   repair_no_offer_duplicate: "Two posts carry that slug, in different years, so it names neither of them. This one needs a person."
   repair_add_redirect: "Write %{origin} into the redirect_from of %{slug} (%{to}) -- one added line, every link to the old address answered, including the ones from outside."
   repair_rewrite_link: "Rewrite the link in %{slug}: %{from} -> %{to}"
+  repair_decode_entities: "Rewrite the entity codes in %{slug} as the characters they stand for: &amp; to &, &lt; to <. The previous version of the post is kept in its history."
   repair_rename_media_ref: "Write the name the directory actually uses into %{slug}: %{from} -> %{to} (the file itself is not touched)."
   repair_trash: "Move %{path} to the trash (restorable, never deleted)."
   repair_prompt: "Apply? [a] apply  [s] skip  [q] stop"

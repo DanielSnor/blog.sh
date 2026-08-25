@@ -1026,6 +1026,7 @@ check:
   repair_no_offer_duplicate: "Zwei Beiträge tragen diesen Slug in verschiedenen Jahren, er benennt also keinen von beiden. Hier muss ein Mensch entscheiden."
   repair_add_redirect: "%{origin} in redirect_from von %{slug} (%{to}) eintragen -- eine hinzugefügte Zeile, und jeder Link auf die alte Adresse wird beantwortet, auch die von außen."
   repair_rewrite_link: "Den Link in %{slug} umschreiben: %{from} -> %{to}"
+  repair_decode_entities: "Die Entity-Codes in %{slug} durch die Zeichen ersetzen, für die sie stehen: &amp; zu &, &lt; zu <. Die vorherige Version des Beitrags bleibt in der Historie."
   repair_rename_media_ref: "Den Namen eintragen, den das Verzeichnis wirklich verwendet, in %{slug}: %{from} -> %{to} (die Datei selbst bleibt unberührt)."
   repair_trash: "%{path} in den Papierkorb verschieben (wiederherstellbar, nie gelöscht)."
   repair_prompt: "Ausführen? [a] ja  [s] überspringen  [q] Ende"

@@ -1012,6 +1012,7 @@ check:
   repair_no_offer_duplicate: "Ten slug nesou dva posty v různých letech, takže nepojmenovává ani jeden. Tady musí rozhodnout člověk."
   repair_add_redirect: "Zapsat %{origin} do redirect_from postu %{slug} (%{to}) — jeden přidaný řádek, a odpoví se na všechny odkazy na starou adresu včetně těch zvenčí."
   repair_rewrite_link: "Přepsat odkaz v postu %{slug}: %{from} -> %{to}"
+  repair_decode_entities: "Přepsat v postu %{slug} kódy entit na znaky, které zastupují: &amp; na &, &lt; na <. Předchozí verze postu zůstane v historii."
   repair_rename_media_ref: "Zapsat do postu %{slug} jméno, které adresář opravdu používá: %{from} -> %{to} (soubor samotný se nedotýká)."
   repair_trash: "Přesunout %{path} do koše (dá se vrátit, nemaže se)."
   repair_prompt: "Provést? [a] ano  [s] přeskočit  [q] konec"

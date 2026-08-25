@@ -219,7 +219,11 @@ module Checker
     found.map do |post, hits|
       warn(t('post_entities', slug: post['slug'], entities: hits.first(3).join(' ')),
            t('post_entities_fix'), kind: :post_entities,
-           data: { 'slug' => post['slug'].to_s, 'year' => PostAddress.date_year(post).to_s,
+           # file_year, not date_year: the repair opens this as a PATH,
+           # and a post whose date was corrected across a year boundary
+           # keeps its file where it was so its address does not move.
+           # Every other finding in this file records __year already.
+           data: { 'slug' => post['slug'].to_s, 'year' => PostAddress.file_year(post).to_s,
                    'entities' => hits })
     end
   end
