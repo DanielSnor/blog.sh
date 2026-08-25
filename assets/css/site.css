@@ -1253,7 +1253,7 @@ aside .card { margin-bottom: 1.5rem; }
 }
 
 footer {
-  background: var(--nav-bg);
+  background: var(--footer-bg);
   border-radius: 4px;
   padding: 1.5rem;
   display: grid;
