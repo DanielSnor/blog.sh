@@ -2161,13 +2161,69 @@ end
 # cloud-synced folder.
 WRITTEN = {}
 
+# Readable by everyone, because everything under public/ is on its way to a
+# web server -- which runs as somebody else. Nothing here used to say so, so
+# the permissions were whatever the author's umask happened to be: on a
+# machine with umask 077 an import wrote its pictures 600 and the site
+# served holes. Reported from an install doing exactly that.
+PUBLIC_READABLE = 0o444
+PUBLIC_TRAVERSABLE = 0o555
+
+def world_readable?(path, stat = nil)
+  ((stat || File.stat(path)).mode & PUBLIC_READABLE) == PUBLIC_READABLE
+end
+
+# A file nobody can reach is as good as unreadable, so the directories on
+# the way to it get the same treatment -- read AND execute, since a
+# directory without +x cannot be entered even when it can be listed.
+#
+# Walks up to PUBLIC_DIR and stops at the first directory that is already
+# right: everything above it was made by the same code and is right too, so
+# this costs one stat on the common path rather than one per level.
+def make_traversable(dir)
+  path = File.expand_path(dir)
+  root = File.expand_path(PUBLIC_DIR)
+  while path.start_with?(root)
+    mode = File.stat(path).mode & 0o7777
+    break if (mode & PUBLIC_TRAVERSABLE) == PUBLIC_TRAVERSABLE
+
+    File.chmod(mode | PUBLIC_TRAVERSABLE, path)
+    parent = File.dirname(path)
+    break if parent == path
+
+    path = parent
+  end
+rescue SystemCallError
+  nil
+end
+
+def make_readable(path)
+  mode = File.stat(path).mode & 0o7777
+  File.chmod(mode | PUBLIC_READABLE, path)
+rescue SystemCallError
+  # A file somebody else owns cannot be chmod'ed by us, and refusing to
+  # build over it would be worse than leaving it as it is: the build has
+  # already written what it had to write.
+  nil
+end
+
 def emit(path, content)
   WRITTEN[path] = true
   bytes = content.to_s.b
-  return if File.exist?(path) && File.binread(path) == bytes
+  # Permissions count as "up to date" too. Without this the fix below could
+  # never reach a file that already exists with the wrong ones -- which is
+  # what happened to the reporter: chmod, rebuild, nothing, because the
+  # bytes matched and the build had nothing else to look at.
+  if File.exist?(path)
+    stat = File.stat(path)
+    return if File.binread(path) == bytes && world_readable?(path, stat)
+  end
 
-  FileUtils.mkdir_p(File.dirname(path))
+  dir = File.dirname(path)
+  FileUtils.mkdir_p(dir)
+  make_traversable(dir)
   File.binwrite(path, bytes)
+  make_readable(path)
 end
 
 FAVICON_PNG = File.join(ROOT, 'assets', 'images', 'favicon.png')
@@ -2235,11 +2291,18 @@ def emit_copy(src, dest, compare_content: false)
            else
              File.size(dest) == File.size(src) && File.mtime(dest) >= File.mtime(src)
            end
-    return if same
+    # ...and readable, for the reason emit gives. A chmod changes neither
+    # size nor mtime -- it moves ctime, which nothing here was reading -- so
+    # a picture copied under a strict umask stayed unreadable through every
+    # rebuild that followed.
+    return if same && world_readable?(dest)
   end
 
-  FileUtils.mkdir_p(File.dirname(dest))
+  dir = File.dirname(dest)
+  FileUtils.mkdir_p(dir)
+  make_traversable(dir)
   FileUtils.cp(src, dest)
+  make_readable(dest)
 end
 
 # Make the directory write the name we are about to record. Only ever a
@@ -3067,7 +3130,16 @@ Sidebar::FEEDS.each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
 # an empty one if it doesn't exist yet. Fetching it on every build would mean
 # two Mastodon requests per tooted post.
 STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
-File.write(STATS_PATH, '{}') unless File.exist?(STATS_PATH)
+# Written directly rather than through emit, because cron owns the contents
+# and the build only guarantees the file exists -- but it is served to the
+# same browsers as everything else, so it needs the same permissions. It was
+# the one file left behind by the sweep above: 600 on a strict umask, and a
+# stats row that quietly showed nothing.
+unless File.exist?(STATS_PATH)
+  File.write(STATS_PATH, '{}')
+  make_readable(STATS_PATH)
+end
+make_readable(STATS_PATH) unless world_readable?(STATS_PATH)
 WRITTEN[STATS_PATH] = true
 
 # The approved comments, written by the same cron and needing the same
