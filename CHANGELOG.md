@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.4 -- 2026-08-24
+## 1.4 -- 2026-08-25
 
 The widest release since 1.0, and the most thoroughly tested one. Three
 things arrived: the commits widget reads Gitea and Forgejo (the release's
