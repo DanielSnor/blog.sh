@@ -133,6 +133,13 @@ archive:
   year_title: "Archiv %{year}"
   year_description: "Beiträge aus %{year} auf %{site_title}."
   back: "Zurück zur Jahresübersicht"
+tags:
+  # Das Schlagwortverzeichnis unter /tag/. Sortiert nach dem gefalteten
+  # Namen statt nach Bytes, sonst landen Umlaute hinter dem z.
+  title: "Schlagwörter"
+  description: "Alle Schlagwörter auf %{site_title}."
+  sort_alpha: "Alphabetisch"
+  sort_count: "Nach Häufigkeit"
 search:
   # Dient zugleich als Überschrift der Seite, solange keine Suchanfrage
   # eingegeben wurde.

@@ -131,6 +131,13 @@ archive:
   year_title: "Archive %{year}"
   year_description: "Posts from %{year} on %{site_title}."
   back: "Back to all years"
+tags:
+  # The tag index at /tag/. Sorted by the folded name rather than by bytes,
+  # or every accented tag would land after z.
+  title: "Tags"
+  description: "Every tag on %{site_title}."
+  sort_alpha: "A to Z"
+  sort_count: "Most used"
 search:
   # Doubles as the page's own heading when no query has been typed yet.
   kind: "Search"

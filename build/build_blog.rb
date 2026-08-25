@@ -268,6 +268,8 @@ end
 def client_i18n_json
   {
     date_locale: t('js.date_locale'),
+    tags_sort_alpha: t('tags.sort_alpha'),
+    tags_sort_count: t('tags.sort_count'),
     stats_favourited: t('js.stats_favourited'),
     stats_boosted: t('js.stats_boosted'),
     stats_comments: t('js.stats_comments'),
@@ -1814,6 +1816,11 @@ def render_sitemap(posts, tags_map, content_types)
     urls << sitemap_url("#{SITE_BASE_URL}/type/#{type}/", latest && post_time(latest).iso8601)
   end
 
+  # The tag index: one entry, and only when there is at least one tag with a
+  # page of its own -- a site with no tags builds no index and must not be
+  # advertising one.
+  urls << sitemap_url("#{SITE_BASE_URL}/tag/", posts.first && post_time(posts.first).iso8601) if tags_map.any?
+
   # The archive index and one entry per year that has posts in it. Grouped
   # by the year of the ADDRESS, the same way the pages themselves are, so a
   # crawler is never sent to a year the build did not write. A year with
@@ -2784,6 +2791,41 @@ tags_map.each do |slug, data|
                 feed_path: FEED_TAG_SLUGS.include?(slug) ? "/tag/#{slug}/rss.xml" : nil,
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
+end
+
+# --- The tag index ------------------------------------------------------
+#
+# /tag/ was a dead address: the site built a listing per tag and nothing
+# that showed them all, so the only complete list of a site's own subjects
+# lived in the terminal. Asked for by a site whose tags are subjects rather
+# than provenance, where the list is short enough to read at a glance.
+#
+# Every tag that has a page, and no others: a tag carried only by a draft,
+# a page or an unlisted post is drawn under its post as a flat pill with no
+# link, and listing it here would point at a 404.
+#
+# Sorted by the FOLDED name, not the raw one. Ruby sorts strings by bytes,
+# which puts every accented tag after z -- on one real archive that is
+# fifty-two of them, and the last six in byte order are `skoleni`,
+# `skolitel`, `sumava`, `svihov`, `zelnava`, `zivotvkorporatu` (with their
+# diacritics). A reader looking for one between `sirky` and `sport` would
+# not find it there. `browse` in the CLI already folds for this reason.
+unless tags_map.empty?
+  tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
+                           .sort_by { |_, name, _| [Slug.fold(name), name] }
+  items = tag_index_rows.map do |slug, name, count|
+    # The count travels in an attribute as well as in the text: the switch
+    # reorders these in the DOM, and reading a number back out of rendered
+    # markup is how a sort starts depending on how a number is punctuated.
+    %(<li class="tag-index-item" data-count="#{count}"><a href="/tag/#{h(slug)}/">#{h(name)}</a>) +
+      %(<span class="tag-index-count">#{count}</span></li>)
+  end
+  emit(File.join(PUBLIC_DIR, 'tag', 'index.html'),
+       layout(%(<h1 class="listing-heading">#{h(t('tags.title'))}</h1>\n) +
+              %(<ul class="tag-index" id="tag-index">\n#{items.join("\n")}\n</ul>),
+              title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
+              description: t('tags.description', site_title: SITE_TITLE),
+              path: '/tag/'))
 end
 
 # A series gets a listing of its own, in series order rather than newest

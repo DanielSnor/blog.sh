@@ -3,6 +3,7 @@
 require 'json'
 require 'time'
 require_relative 'post_text'
+require_relative 'slug'
 require_relative 'content_type'
 require_relative 'post_address'
 require_relative 'path_glob'
@@ -128,7 +129,7 @@ module Stats
     posts.each { |p| Array(p['tags']).each { |tag| counts[tag.to_s] += 1 } }
     { 'unique' => counts.size,
       'per_post' => posts.empty? ? 0.0 : (counts.values.sum.to_f / posts.size).round(1),
-      'top' => counts.sort_by { |tag, count| [-count, tag] }.first(TOP_TAGS).map { |tag, count| [tag, count] } }
+      'top' => counts.sort_by { |tag, count| [-count, Slug.fold(tag.to_s)] }.first(TOP_TAGS).map { |tag, count| [tag, count] } }
   end
 
   # Both numbers, because they answer different questions and can differ

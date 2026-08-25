@@ -58,7 +58,7 @@ module Checker
   # left over from an import. A checker that is confidently wrong about a
   # working address costs more than one that says nothing, which is the rule
   # the comment on known_paths sets out and this list was breaking.
-  FIXED_PATHS = ['/', '/search/', '/markdown/', '/archive/',
+  FIXED_PATHS = ['/', '/search/', '/markdown/', '/archive/', '/tag/',
                  '/rss.xml', '/sitemap.xml', '/robots.txt', '/404.html'].freeze
 
   # A listing's later pages live under <listing>/page/N/, whatever the
