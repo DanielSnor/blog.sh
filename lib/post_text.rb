@@ -51,7 +51,19 @@ module PostText
   # A sentence end, but only one followed by a space or the end of the text.
   # The four-word minimum below is what keeps "Apple Inc." from becoming the
   # name of a post about a share price -- and with it "tj.", "atd.", "č.".
-  SENTENCE_RE = /\A(.{3,}?[.!?])(?:[[:space:]]|\z)/
+  #
+  # Two dots are not one of them. The class used to be a bare [.!?], so the
+  # SECOND dot of ".." closed a sentence -- and ".." is a pause somebody
+  # typed, not punctuation: it ends nothing, in any language. A golden diff
+  # over a real archive put a number on it: 152 names ended on a dangling
+  # "..", and 150 of those were a cut through the middle of a thought. One
+  # of them turned "A hupky do peří .. d8-D" into the name "A hupky do peří
+  # .." and pushed the author's own emoticon into the perex.
+  #
+  # Three dots ARE an ellipsis and do end a sentence, so they stay. This is
+  # a rule about typography rather than about Czech, which is what the rest
+  # of this file demands of itself: nothing here may be a language guess.
+  SENTENCE_RE = /\A(.{3,}?(?:(?<!\.)\.(?!\.)|\.\.\.|[!?]))(?:[[:space:]]|\z)/
 
   # What an untitled post gets called, and where its text picks up
   # afterwards -- returned together, never separately.
