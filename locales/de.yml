@@ -1069,6 +1069,8 @@ check:
   post_content_unreadable: "%{file} hat seinen Text in etwas, das keine Liste von Blöcken ist (%{value})."
   post_bad_slug: "%{file} hat einen Slug, der kein einzelnes Pfadsegment ist (%{slug})."
   post_bad_slug_fix: "Ein Slug wird zur Adresse des Beitrags, eine Ordnerebene tief. Ein Schrägstrich oder ein `..` darin lässt den Build außerhalb schreiben oder abbrechen. Benenne den Beitrag um: ./blog.sh props <slug> -> [r]."
+  post_entities: "%{slug}: Der Text enthält HTML-Entities (%{entities}) statt der Zeichen, für die sie stehen."
+  post_entities_fix: "Stammt aus einem Archiv, das sie maskiert hat (Twitter tut das mit &, < und >); die Engine dekodiert sie seit 1.4, ältere Importe nicht. `check --repair` bietet die Umwandlung an. Wenn die Entities Absicht waren, lass sie stehen."
   parked_leftover: "Ein unterbrochener Warteschlangen-Umzug hat %{file} unter einem Arbeitsnamen abgestellt."
   parked_leftover_fix: "Die Datei (oder der Ordner) ist ein Beitrag, seine Medien oder seine Bearbeitungshistorie, eine Umbenennung von ihrem Platz entfernt: führenden Punkt und die Endung .queue-move entfernen, und sie ist zurück."
   parked_leftover_fix_stale: "Derselbe Beitrag liegt im Archiv unter %{live}, das hier ist also die Kopie, die der unterbrochene Umzug zurückgelassen hat. Vergleiche beide und lösche diesen Rest, sobald der lebende vollständig ist. Benenne ihn NICHT zurück: das Archiv hätte den Beitrag sonst zweimal."

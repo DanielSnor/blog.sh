@@ -7,6 +7,7 @@ require 'net/http'
 require 'uri'
 require 'timeout'
 require 'time'
+require_relative 'entity_text'
 require_relative 'post_address'
 require_relative 'slug'
 require_relative 'i18n'
@@ -135,6 +136,7 @@ module Checker
     findings.concat(check_redirects(posts))
     findings.concat(check_series_names(posts))
     findings.concat(check_duplicate_addresses(posts))
+    findings.concat(check_html_entities(posts))
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
 
@@ -185,6 +187,43 @@ module Checker
   # parse: both are states the build refuses to run on, so a check that
   # calls the archive sound while either is present is telling the author
   # the opposite of what they are about to find out.
+  # Text that still carries HTML entities instead of the characters they
+  # stand for: "journalists &amp; writers" reads as "journalists &amp;
+  # writers" on the page, because the build escapes it again -- correctly,
+  # since as far as it knows the ampersand is what the author wrote.
+  #
+  # Where they come from: Twitter escapes <, > and & in its archive and says
+  # nothing about it, and the importer only learned to decode them in 1.4.
+  # Every archive imported before that carries them, and an upgrade cannot
+  # help -- the entities are in the posts by then. Reported from one such
+  # site, and true of 10 posts on another.
+  #
+  # A warning rather than an error, and offered rather than applied: an
+  # author writing ABOUT html has every right to "&amp;" in their text, and
+  # nothing here can tell the two apart.
+  # No cap here, and none anywhere else in a check either: capping is
+  # `capped`'s job, done once, and `--json` asks for all of them by passing
+  # nil. Slicing here took that nil and died on it -- which took the whole
+  # --json document with it, along with its count, its total and its kinds.
+  def check_html_entities(posts)
+    found = posts.filter_map do |post|
+      next if draft?(post)
+
+      texts = Array(post['content']).select { |b| b.is_a?(Hash) && b['type'] == 'text' }
+      hits = texts.filter_map { |b| b['text'].to_s[EntityText::ANY_ENTITY] if EntityText.entities?(b['text']) }
+      next if hits.empty?
+
+      [post, hits.uniq]
+    end
+
+    found.map do |post, hits|
+      warn(t('post_entities', slug: post['slug'], entities: hits.first(3).join(' ')),
+           t('post_entities_fix'), kind: :post_entities,
+           data: { 'slug' => post['slug'].to_s, 'year' => PostAddress.date_year(post).to_s,
+                   'entities' => hits })
+    end
+  end
+
   def check_unbuildable(posts, cap = CAP)
     findings = unreadable_files.map do |path, reason|
       error(t('post_unreadable', file: short_path(path), reason: reason),

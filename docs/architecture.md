@@ -337,7 +337,7 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Eleven questions, in one pass: files the checker cannot read at all, posts
+Twelve questions, in one pass: files the checker cannot read at all, posts
 whose date nothing can parse, posts whose text is not a list of blocks, and
 posts whose slug is not one path segment -- all of them states the BUILD
 refuses to run on (or, for the slug, misplaces the page for), so a check that stayed

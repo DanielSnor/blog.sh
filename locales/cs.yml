@@ -1055,6 +1055,8 @@ check:
   post_content_unreadable: "Post %{file} má text v něčem, co není seznam bloků (%{value})."
   post_bad_slug: "%{file} má slug, který není jedním segmentem cesty (%{slug})."
   post_bad_slug_fix: "Slug se stává adresou postu, jednu složku hluboko. Lomítko nebo `..` v něm způsobí, že build zapíše mimo své místo, nebo skončí. Přejmenuj post: ./blog.sh props <slug> -> [r]."
+  post_entities: "%{slug}: text obsahuje HTML entity (%{entities}) místo znaků, které zastupují."
+  post_entities_fix: "Vzniká importem z archivu, který znaky escapoval (Twitter to dělá u &, < a >); engine to od 1.4 dekóduje sám, starší importy ne. `check --repair` nabídne převod. Pokud jsi entity psal/a záměrně, nech je být."
   parked_leftover: "Přerušený přesun ve frontě nechal %{file} odstavený pod pracovním jménem."
   parked_leftover_fix: "Ten soubor (nebo složka) je post, jeho média nebo historie úprav, jedno přejmenování od místa, kam patří: umaž úvodní tečku a příponu .queue-move a je zpátky."
   parked_leftover_fix_stale: "Tentýž post je v archivu v %{live}, tohle je tedy kopie, kterou po sobě nechal přerušený přesun. Porovnej obojí a tenhle zbytek smaž, až ověříš, že živý je celý. Nepřejmenovávej ho zpátky: archiv by pak ten post měl dvakrát."

@@ -1086,6 +1086,8 @@ check:
   post_content_unreadable: "%{file} has its text in something that is not a list of blocks (%{value})."
   post_bad_slug: "%{file} has a slug that is not a single path segment (%{slug})."
   post_bad_slug_fix: "A slug becomes the post's address, one folder deep. A slash or a `..` in it makes the build write outside where it should, or stop. Rename the post: ./blog.sh props <slug> -> [r]."
+  post_entities: "%{slug}: the text carries HTML entities (%{entities}) instead of the characters they stand for."
+  post_entities_fix: "Comes from an archive that escaped them (Twitter does this to &, < and >); the engine has decoded them since 1.4, older imports did not. `check --repair` offers to convert them. If you wrote the entities on purpose, leave them."
   parked_leftover: "An interrupted queue move left %{file} parked under a working name."
   parked_leftover_fix: "The file (or folder) is a post, its media or its edit history, one rename away from where it belongs: strip the leading dot and the .queue-move suffix to put it back."
   parked_leftover_fix_stale: "The same post is in the archive at %{live}, so this is the copy the interrupted move left behind. Compare the two, and delete this leftover once you have confirmed the live one is whole. Do NOT rename it back: the archive would then hold the post twice."

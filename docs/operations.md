@@ -548,6 +548,16 @@ What it looks for, each with a line saying what to do about it:
   you and a site that cannot be rebuilt.
   and the other's readers land on it.
 
+- **Text carrying HTML entities instead of the characters they stand
+  for.** `journalists &amp; writers` reads as `journalists &amp; writers`
+  on the page: the build escapes it again, correctly, because as far as it
+  knows the ampersand is what you wrote. Twitter escapes `&`, `<` and `>`
+  in its archive without saying so, and the importer only learned to decode
+  them in 1.4 -- so an archive imported before that carries them, and
+  upgrading cannot help, since by then they are in the posts. Reported
+  rather than corrected: somebody writing *about* html has every right to
+  `&amp;` in their text.
+
 It only reports, unless you ask it not to. On its own -- and that is how
 cron runs it -- nothing here deletes a directory or rewrites a post: the
 value of the tool is that its output can be trusted, and a checker that

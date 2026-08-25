@@ -3,6 +3,7 @@
 require 'cgi'
 require 'json'
 require 'fileutils'
+require_relative 'entity_text'
 require_relative 'atomic_write'
 require_relative 'post_versions'
 require_relative 'checker'
@@ -178,6 +179,13 @@ module Repair
     when :link_dead then propose_redirect(data, idx)
     when :link_relative then propose_rewrite(data, idx)
     when :media_misnamed then propose_rename(data)
+    when :post_entities
+      # Nothing to work out: the fix is the text itself, decoded. The
+      # decision the reader is being asked for is whether those entities
+      # were meant literally -- which is why this is offered one post at a
+      # time rather than swept.
+      Proposal.new(action: :decode_entities,
+                   data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s })
     when :media_orphan
       Proposal.new(action: :trash, data: { 'path' => File.join('media.nosync', data['dir'].to_s) })
     when :media_stray
@@ -278,10 +286,37 @@ module Repair
     case proposal.action
     when :add_redirect then add_redirect(proposal.data, root)
     when :rewrite_link then rewrite_link(proposal.data, root)
+    when :decode_entities then decode_entities(proposal.data, root)
     when :rename_media_ref then rename_media_ref(proposal.data, root)
     when :trash then trash(proposal.data, root)
     else false
     end
+  end
+
+  # Decoding is done by the same code the Twitter importer uses, spans and
+  # all: the text shrinks, so every formatting offset after an entity has to
+  # move with it or a link ends up over the wrong words. Writing that twice
+  # is how the two would drift.
+  def decode_entities(data, root)
+    path = post_file(root, data['year'], data['slug'])
+    return false unless File.exist?(path)
+
+    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    changed = false
+    Array(post['content']).each do |block|
+      next unless block.is_a?(Hash) && block['type'] == 'text' && EntityText.entities?(block['text'])
+
+      decoded, = EntityText.decode(block['text'].to_s, block['formatting'] || [])
+      block['text'] = decoded
+      changed = true
+    end
+    return true unless changed
+    return false unless keep_version(path, root)
+
+    AtomicWrite.write_json(path, post)
+    true
+  rescue StandardError
+    false
   end
 
   def post_file(root, year, slug)

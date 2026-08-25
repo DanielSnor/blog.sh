@@ -3,6 +3,7 @@
 require 'json'
 require 'time'
 require 'uri'
+require_relative '../entity_text'
 require_relative '../slug'
 require_relative 'html_blocks'
 
@@ -171,31 +172,7 @@ module Import
     # delivered and the spans are moved afterwards, by however much the text
     # shrank ahead of them.
     def decode_entities_in(text, formatting)
-      moved = Array.new(text.length + 1)
-      decoded = +''
-      index = 0
-      while index < text.length
-        moved[index] = decoded.length
-        match = text[index..].match(/\A&(?:#x?[0-9a-fA-F]+|\w+);/)
-        replacement = match && HtmlBlocks.decode_entities(match[0])
-        if match && replacement != match[0]
-          decoded << replacement
-          # An index that lands INSIDE an entity has no character of its own
-          # to point at; it belongs after the letter the entity became.
-          (1...match[0].length).each { |offset| moved[index + offset] = decoded.length }
-          index += match[0].length
-        else
-          decoded << text[index]
-          index += 1
-        end
-      end
-      moved[text.length] = decoded.length
-
-      formatting.each do |span|
-        span['start'] = moved[span['start']] || span['start']
-        span['end'] = moved[span['end']] || span['end']
-      end
-      [decoded, formatting]
+      EntityText.decode(text, formatting)
     end
 
     def content_blocks(tweet, media)
