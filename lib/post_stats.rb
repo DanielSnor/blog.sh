@@ -7,6 +7,7 @@ require 'uri'
 require_relative 'feed_http'
 require_relative 'i18n'
 require_relative 'site_config'
+require_relative 'path_glob'
 
 # lib/post_stats.rb -- favourite/boost/comment counts for announced
 # posts, precomputed server-side into public/stats.json, and (when
@@ -83,9 +84,29 @@ module PostStats
     SiteConfig.comments_approval
   end
 
+  # A status id is not a number. Mastodon writes decimal snowflakes,
+  # GoToSocial writes a 26-character ULID, and both are just an opaque
+  # string to everything here -- so the id pattern accepts letters too.
+  STATUS_ID = '[A-Za-z0-9]+'
+
+  # ORDER IS THE FIX, not a detail.
+  #
+  # GoToSocial's web address for a status is /@user/statuses/<ULID>, and
+  # Mastodon's is /@user/<id>. Widening the Mastodon pattern alone would
+  # make the loosest one match first and capture the literal word
+  # "statuses" as the id -- the engine would then ask for
+  # /api/v1/statuses/statuses/context, get a 404 and show nothing, which
+  # is worse than today's honest nil. Most specific first, Mastodon's
+  # last.
+  #
+  # Pleroma and Akkoma use /notice/<flake>, a third shape again. Out of
+  # scope here, written down so the next person does not have to find it
+  # twice.
   def parse_toot_url(url)
-    m = url.to_s.match(%r{\Ahttps?://([^/]+)/@[^/]+/(\d+)}) ||
-        url.to_s.match(%r{\Ahttps?://([^/]+)/users/[^/]+/statuses/(\d+)})
+    text = url.to_s
+    m = text.match(%r{\Ahttps?://([^/]+)/@[^/]+/statuses/(#{STATUS_ID})}o) ||     # GoToSocial web
+        text.match(%r{\Ahttps?://([^/]+)/users/[^/]+/statuses/(#{STATUS_ID})}o) || # ActivityPub URI
+        text.match(%r{\Ahttps?://([^/]+)/@[^/]+/(#{STATUS_ID})}o)                  # Mastodon web
     m && { instance: m[1], id: m[2] }
   end
 
@@ -98,15 +119,41 @@ module PostStats
   # which address is unreadable in both places: fetch_one turns it into a
   # warning naming the post, and doctor into approval_probe_failed, which
   # quotes the message instead of accusing the credentials.
+  # A host the site does NOT say it announces on. Only ever true when the
+  # site names an instance and the post names a different one: with no
+  # instance configured there is nothing to compare against, and the
+  # archive's own URLs are then the only thing that knows where the
+  # announcements live. Compared without scheme or path, because both
+  # spellings turn up in configs written by hand.
+  def foreign_host?(host)
+    configured = SiteConfig.get('mastodon', 'instance').to_s
+                           .sub(%r{\Ahttps?://}, '').sub(%r{/.*\z}, '').downcase
+    return false if configured.empty?
+
+    configured != host.to_s.downcase
+  end
+
   def parse_toot_url!(url)
-    parse_toot_url(url) ||
-      raise("mastodon_url #{url.to_s.inspect} is not an address this engine can read -- expected " \
-            'https://instance/@user/123 or https://instance/users/user/statuses/123, so no ' \
-            'engagement or comments can be fetched for that post.')
+    parse_toot_url(url) || raise(I18n.t('stats.probe_unreadable_url', url: url.to_s.inspect))
+  end
+
+  # The same list, plus how many post files could not be read at all. A
+  # caller that NARROWS something by this list has to know that: a file
+  # that will not parse is not a post that went away, and treating the two
+  # alike deletes a published post's approved discussion from a file the
+  # public reads.
+  def entries_with_gaps
+    before = unreadable_count
+    list = entries.map { |entry| entry[:key] }
+    [list, unreadable_count - before]
+  end
+
+  def unreadable_count
+    @unreadable_count ||= 0
   end
 
   def entries
-    Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8'))
       raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
 
@@ -132,6 +179,7 @@ module PostStats
       # AFTER the widgets had been written locally: the local build looked
       # current while the live site stayed frozen.
       warn "Skipping unreadable post file #{file}: #{e.class}: #{e.message.lines.first.to_s.strip[0, 80]}"
+      @unreadable_count = unreadable_count + 1
       nil
     end
   end
@@ -148,7 +196,20 @@ module PostStats
   def fetch_mastodon(url)
     parsed = parse_toot_url!(url)
 
-    token = approval ? mastodon_token! : nil
+    # The token goes to the CONFIGURED instance and nowhere else. Which
+    # host is asked comes from the post's own mastodon_url -- an imported
+    # archive, a hand edit, an account that moved -- and sending the site's
+    # bearer token to whatever hostname a post file happens to name hands
+    # somebody else's server a credential that can read and write as the
+    # author. Without the token the public parts of the thread still
+    # answer; the private ones are not this engine's to fetch from a
+    # stranger.
+    stranger = foreign_host?(parsed[:instance])
+    token = approval && !stranger ? mastodon_token! : nil
+    if stranger
+      warn "⚠️  #{parsed[:instance]} is not the instance in config/site.yml -- asked without the " \
+           'token, so anything that needs one (a favourite, a follower-only reply) will be missing.'
+    end
     base = "https://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}"
     status = JSON.parse(FeedHttp.get(base, bearer: token))
     context = JSON.parse(FeedHttp.get("#{base}/context", bearer: token))
@@ -535,6 +596,15 @@ module PostStats
   def approval_probe(entry)
     if entry[:kind] == :mastodon
       parsed = parse_toot_url!(entry[:key])
+      # The same boundary fetch_mastodon keeps: the write-scoped token goes
+      # to the CONFIGURED instance and nowhere else. The entry is whatever
+      # announcement is newest, and on an archive with a legacy or imported
+      # one that can be a host the site does not run on -- sending the
+      # bearer there hands a stranger a credential that can post as the
+      # author. Refused with a sentence doctor already renders (it turns a
+      # raise into approval_probe_failed) rather than leaked.
+      raise I18n.t('stats.probe_foreign_instance', instance: parsed[:instance]) if foreign_host?(parsed[:instance])
+
       status = JSON.parse(FeedHttp.get("https://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}",
                                        bearer: mastodon_token!))
       status.key?('favourited') ? :ok : :blind
@@ -544,10 +614,7 @@ module PostStats
       # #notFoundPost and #blockedPost come back in place of a post, so
       # there is no viewer to read and nothing here is a verdict on the
       # credentials.
-      if post.nil?
-        raise "the announcement #{entry[:key]} did not come back from the network -- it was deleted, " \
-              'blocked or briefly unreachable, so there was no thread to test the app password against.'
-      end
+      raise I18n.t('stats.probe_no_thread', key: entry[:key]) if post.nil?
 
       post['viewer'].nil? ? :blind : :ok
     end

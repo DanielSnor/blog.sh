@@ -13,12 +13,14 @@ require_relative '../lib/sidebar'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/embed'
+require_relative '../lib/post_address'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 require_relative '../lib/colors_css'
 require_relative '../lib/post_text'
+require_relative '../lib/path_glob'
 
 SiteConfig.use_site_timezone!
 
@@ -117,9 +119,9 @@ def extra_css_hrefs
     # the one shape that looks local at a glance.
     next href if href.start_with?('/') && !href.start_with?('//')
 
-    warn "⚠️  site.extra_css: #{raw.inspect} is not a path on this site, so the page's " \
-         'Content-Security-Policy would discard it -- skipped. Copy the file into assets/ ' \
-         'and name it as /assets/css/<name>.css.'
+    # I18n.t and not the t() shorthand below: this list is read while the
+    # file is still being loaded, above the line that defines it.
+    warn I18n.t('build.extra_css_offsite', value: raw.inspect)
     nil
   end
 end
@@ -182,6 +184,11 @@ BANNER = SiteConfig.fetch('banner')
 # per visual property would turn config/site.yml into a stylesheet written
 # in YAML.
 LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
+# The column is only worth reserving when something would stand in it. A site
+# with no about text and no widgets kept an empty <aside> and the grid kept
+# its 260px beside it, so the content sat in a narrowed column with a blank
+# strip alongside -- held space for furniture that was never coming.
+ASIDE_CARDS = %w[toots pixelfed commits bluesky rss].freeze
 # The lead image lifted out of the text and shown above the title. Off
 # unless a site asks for it, because it reshapes every post page it
 # touches -- and a site is entitled to have had the shape it has.
@@ -209,13 +216,32 @@ THEME_COLOR_DARK = ColorsCss.color_for(SITE_COLORS, 'dark', 'bg')
 # or footer.copyright either, called the same file healthy. A build that
 # stops on a file the checker vouches for is the one shape of failure this
 # release is about.
-ABOUT = SiteConfig.get('about', default: {})
-FOOTER = SiteConfig.get('footer', default: {})
-SOCIAL = SiteConfig.get('social', default: [])
+ABOUT = SiteConfig::Chrome.map(SiteConfig.data, 'about')
+FOOTER = SiteConfig::Chrome.map(SiteConfig.data, 'footer')
+SOCIAL = SiteConfig::Chrome.list(SiteConfig.data, 'social')
 # Both the Mastodon comments/toot integration and every sidebar widget are
 # optional -- `get` (not `fetch`) so a site with none of this configured
 # just gets an empty hash instead of an aborted build.
-WIDGETS = SiteConfig.get('widgets', default: {})
+# Only the cards the sidebar can draw, each one a set of settings: the
+# template indexes into these without a guard, so a widget written as a
+# list (or a number, or `true`) used to end the build in a TypeError from
+# inside an ERB line. Names outside the list and wrong shapes are named by
+# the warning above and by doctor -- they do not also get to stop the build.
+WIDGETS = SiteConfig::Chrome.widgets(SiteConfig.data)
+# ...so the switch that decides the column asks both questions: does the
+# author want a sidebar, and is there anything to put in it.
+# Anything the config says that the engine cannot use is said here, once,
+# at the start of the build -- and it is the SAME list doctor reports, read
+# from the same function, so the two cannot name different keys. Read as
+# empty rather than fatal: a build that refuses to run leaves the site
+# standing on whatever was deployed last, which helps nobody.
+SiteConfig::Chrome.complaint_sentences(SiteConfig.data,
+                                       ->(key, what) { I18n.t("doctor.#{key}", key: what, name: what, index: what) })
+                  .each { |sentence| warn "config/site.yml: #{sentence}" }
+
+SIDEBAR_SHOWN = LAYOUT_SIDEBAR &&
+                (!ABOUT['html'].to_s.strip.empty? ||
+                 SiteConfig::Chrome.widgets(SiteConfig.data).any?)
 MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 # Computed once, here, because both halves it needs (the instance and the
 # social links) exist by this line and not before it.
@@ -329,6 +355,10 @@ SOCIAL_ICONS = {
   'pixelfed' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 24C5.3726 24 0 18.6274 0 12S5.3726 0 12 0s12 5.3726 12 12-5.3726 12-12 12m-.9526-9.3802h2.2014c2.0738 0 3.7549-1.6366 3.7549-3.6554S15.3226 7.309 13.2488 7.309h-3.1772c-1.1964 0-2.1663.9442-2.1663 2.1089v8.208z"/></svg>',
   'linkedin' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
   'github' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>',
+  'gitea' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M4.209 4.603c-.247 0-.525.02-.84.088-.333.07-1.28.283-2.054 1.027C-.403 7.25.035 9.685.089 10.052c.065.446.263 1.687 1.21 2.768 1.749 2.141 5.513 2.092 5.513 2.092s.462 1.103 1.168 2.119c.955 1.263 1.936 2.248 2.89 2.367 2.406 0 7.212-.004 7.212-.004s.458.004 1.08-.394c.535-.324 1.013-.893 1.013-.893s.492-.527 1.18-1.73c.21-.37.385-.729.538-1.068 0 0 2.107-4.471 2.107-8.823-.042-1.318-.367-1.55-.443-1.627-.156-.156-.366-.153-.366-.153s-4.475.252-6.792.306c-.508.011-1.012.023-1.512.027v4.474l-.634-.301c0-1.39-.004-4.17-.004-4.17-1.107.016-3.405-.084-3.405-.084s-5.399-.27-5.987-.324c-.187-.011-.401-.032-.648-.032zm.354 1.832h.111s.271 2.269.6 3.597C5.549 11.147 6.22 13 6.22 13s-.996-.119-1.641-.348c-.99-.324-1.409-.714-1.409-.714s-.73-.511-1.096-1.52C1.444 8.73 2.021 7.7 2.021 7.7s.32-.859 1.47-1.145c.395-.106.863-.12 1.072-.12zm8.33 2.554c.26.003.509.127.509.127l.868.422-.529 1.075a.686.686 0 0 0-.614.359.685.685 0 0 0 .072.756l-.939 1.924a.69.69 0 0 0-.66.527.687.687 0 0 0 .347.763.686.686 0 0 0 .867-.206.688.688 0 0 0-.069-.882l.916-1.874a.667.667 0 0 0 .237-.02.657.657 0 0 0 .271-.137 8.826 8.826 0 0 1 1.016.512.761.761 0 0 1 .286.282c.073.21-.073.569-.073.569-.087.29-.702 1.55-.702 1.55a.692.692 0 0 0-.676.477.681.681 0 1 0 1.157-.252c.073-.141.141-.282.214-.431.19-.397.515-1.16.515-1.16.035-.066.218-.394.103-.814-.095-.435-.48-.638-.48-.638-.467-.301-1.116-.58-1.116-.58s0-.156-.042-.27a.688.688 0 0 0-.148-.241l.516-1.062 2.89 1.401s.48.218.583.619c.073.282-.019.534-.069.657-.24.587-2.1 4.317-2.1 4.317s-.232.554-.748.588a1.065 1.065 0 0 1-.393-.045l-.202-.08-4.31-2.1s-.417-.218-.49-.596c-.083-.31.104-.691.104-.691l2.073-4.272s.183-.37.466-.497a.855.855 0 0 1 .35-.077z"/></svg>',
+  'forgejo' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M16.7773 0c1.6018 0 2.9004 1.2986 2.9004 2.9005s-1.2986 2.9004-2.9004 2.9004c-1.0854 0-2.0315-.596-2.5288-1.4787H12.91c-2.3322 0-4.2272 1.8718-4.2649 4.195l-.0007 2.1175a7.0759 7.0759 0 0 1 4.148-1.4205l.1176-.001 1.3385.0002c.4973-.8827 1.4434-1.4788 2.5288-1.4788 1.6018 0 2.9004 1.2986 2.9004 2.9005s-1.2986 2.9004-2.9004 2.9004c-1.0854 0-2.0315-.596-2.5288-1.4787H12.91c-2.3322 0-4.2272 1.8718-4.2649 4.195l-.0007 2.319c.8827.4973 1.4788 1.4434 1.4788 2.5287 0 1.602-1.2986 2.9005-2.9005 2.9005-1.6018 0-2.9004-1.2986-2.9004-2.9005 0-1.0853.596-2.0314 1.4788-2.5287l-.0002-9.9831c0-3.887 3.1195-7.0453 6.9915-7.108l.1176-.001h1.3385C14.7458.5962 15.692 0 16.7773 0ZM7.2227 19.9052c-.6596 0-1.1943.5347-1.1943 1.1943s.5347 1.1943 1.1943 1.1943 1.1944-.5347 1.1944-1.1943-.5348-1.1943-1.1944-1.1943Zm9.5546-10.4644c-.6596 0-1.1944.5347-1.1944 1.1943s.5348 1.1943 1.1944 1.1943c.6596 0 1.1943-.5347 1.1943-1.1943s-.5347-1.1943-1.1943-1.1943Zm0-7.7346c-.6596 0-1.1944.5347-1.1944 1.1943s.5348 1.1943 1.1944 1.1943c.6596 0 1.1943-.5347 1.1943-1.1943s-.5347-1.1943-1.1943-1.1943Z"/></svg>',
+  'codeberg' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M11.999.747A11.974 11.974 0 0 0 0 12.75c0 2.254.635 4.465 1.833 6.376L11.837 6.19c.072-.092.251-.092.323 0l4.178 5.402h-2.992l.065.239h3.113l.882 1.138h-3.674l.103.374h3.86l.777 1.003h-4.358l.135.483h4.593l.695.894h-5.038l.165.589h5.326l.609.785h-5.717l.182.65h6.038l.562.727h-6.397l.183.65h6.717A12.003 12.003 0 0 0 24 12.75 11.977 11.977 0 0 0 11.999.747zm3.654 19.104.182.65h5.326c.173-.204.353-.433.513-.65zm.385 1.377.18.65h3.563c.233-.198.485-.428.712-.65zm.383 1.377.182.648h1.203c.356-.204.685-.412 1.042-.648zz"/></svg>',
+  'gitlab' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0537.8585.8585 0 0 0-.3362.4049L.4332 9.5015l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.03.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.4619-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z"/></svg>',
   'bluesky' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8Z"/></svg>',
   'instagram' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zm0 10.162a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>',
   'threads' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z"/></svg>',
@@ -375,13 +405,33 @@ def footer_links_html
   # file healthy. Its sibling `social:` has always read the empty answer
   # correctly (SiteConfig.get returns the default for nil), and the two
   # describe the same shape of data.
-  (FOOTER['links'] || []).map do |link|
+  SiteConfig::Chrome.list(SiteConfig.data, 'footer', 'links').map do |link|
     %(          <li><a href="#{h(link['url'])}">#{h(link['title'])}</a></li>)
   end.join("\n")
 end
 
 def h(text)
   CGI.escapeHTML(text.to_s)
+end
+
+# An href is only as safe as its SCHEME, and CGI.escapeHTML does nothing
+# about that: it neutralises quotes and angle brackets but leaves
+# `javascript:` / `vbscript:` / `data:` intact, so an imported
+# <a href="javascript:..."> from a multi-author or scraped source rendered
+# live into every page and the feed. Same stance the engine already takes
+# for embeds (Embed.safe_uri) and the video-unavailable fallback: an
+# allowlist, not a blocklist. Browsers ignore ASCII whitespace and control
+# characters inside a scheme, so those are stripped before the scheme is
+# read. No scheme at all is a relative link or an anchor and always passes;
+# a scheme that is not one of these is dropped to a dead anchor.
+HREF_SAFE_SCHEMES = %w[http https mailto tel].freeze
+def safe_href(url)
+  raw = url.to_s
+  probe = raw.gsub(/[\u0000-\u0020]/, '')
+  scheme = probe[/\A([a-z][a-z0-9+.\-]*):/i, 1]
+  return raw if scheme.nil? || HREF_SAFE_SCHEMES.include?(scheme.downcase)
+
+  '#'
 end
 
 # --- Markdown in the site's own chrome ------------------------------------
@@ -405,7 +455,10 @@ end
 # directory, which the chrome has none of -- and a sidebar card 260px wide is
 # not where a photo grid belongs.
 def config_html(text)
-  return '' if text.to_s.strip.empty?
+  # A list or a hash here is a config mistake, not content: to_s would put
+  # a Ruby inspect string on every page of the site.
+  return '' unless text.is_a?(String)
+  return '' if text.strip.empty?
 
   config_blocks(text).map { |block| render_config_block(block) }.join("\n")
 end
@@ -414,7 +467,8 @@ end
 # a <p> the template gives its own class (footer.copyright, banner.claim):
 # inline Markdown only, no block wrapper to take that class away.
 def config_line_html(text)
-  return '' if text.to_s.strip.empty?
+  return '' unless text.is_a?(String)
+  return '' if text.strip.empty?
 
   body, formatting = MarkdownParser.parse_inline(MarkdownParser.collapse_soft_breaks(text.to_s.strip))
   # The sentinel has to come back out of link TITLES as well as out of the
@@ -536,8 +590,8 @@ def wrap_tag(chunk, format)
   when 'small' then "<small>#{chunk}</small>"
   when 'link'
     title = format['title'] ? %( title="#{CGI.escapeHTML(format['title'].to_s)}") : ''
-    %(<a href="#{CGI.escapeHTML(format['url'].to_s)}"#{title}>#{chunk}</a>)
-  when 'mention' then %(<a href="#{CGI.escapeHTML(format.dig('blog', 'url').to_s)}">#{chunk}</a>)
+    %(<a href="#{CGI.escapeHTML(safe_href(format['url']))}"#{title}>#{chunk}</a>)
+  when 'mention' then %(<a href="#{CGI.escapeHTML(safe_href(format.dig('blog', 'url')))}">#{chunk}</a>)
   when 'color' then %(<span style="color:#{CGI.escapeHTML(format['hex'].to_s)}">#{chunk}</span>)
   else chunk
   end
@@ -704,7 +758,7 @@ def render_video(block, media_prefix)
     # unescaped it closed the href and wrote markup of its own into every
     # page the post appears on -- and into the RSS feed, which carries the
     # same rendered HTML.
-    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
+    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{h(safe_href(block['url']))}">#{h(block['url'])}</a></p>)
   end
 end
 
@@ -809,7 +863,7 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
       # none has nothing left to draw at all.
       description.empty? ? '' : %(<p class="link-block">#{description}</p>)
     else
-      %(<p class="link-block"><a href="#{CGI.escapeHTML(block['url'].to_s)}"><strong>#{title}</strong></a><br>#{description}</p>)
+      %(<p class="link-block"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
     end
   else
     "<pre>#{block.to_json}</pre>"
@@ -1077,7 +1131,19 @@ def tags_html(post)
   visible = post['tags'].reject { |t| tag_slug(t).empty? }
   return '' if visible.empty?
 
-  pills = visible.map { |t| %(<a class="tag-pill" href="/tag/#{tag_slug(t)}/">#{CGI.escapeHTML(t)}</a>) }.join
+  # A tag whose listing page does not exist is still worth showing -- it
+  # is what the post is about -- but not as a link to nothing. Drafts,
+  # unlisted posts and pages are outside the stream that makes tag pages,
+  # so this is the only place their pills can differ from a published
+  # post's, where every tag has a page by construction.
+  pills = visible.map do |t|
+    slug = tag_slug(t)
+    if defined?(TAG_PAGES) && !TAG_PAGES.key?(slug)
+      %(<span class="tag-pill tag-pill-flat">#{h(t)}</span>)
+    else
+      %(<a class="tag-pill" href="/tag/#{slug}/">#{h(t)}</a>)
+    end
+  end.join
   %(<div class="tags">#{pills}</div>)
 end
 
@@ -1127,7 +1193,7 @@ end
 # archive is not looking for it and a subscriber did not ask to be told it
 # changed.
 def page?(post)
-  truthy?(post['page'])
+  PostAddress.page?(post)
 end
 
 # A published post that is not in the stream: it keeps its ordinary
@@ -1146,7 +1212,7 @@ end
 # out of the listings into all of them. The two failures are not worth
 # the same, so this one errs towards hiding.
 def unlisted?(post)
-  truthy?(post['unlisted'])
+  PostAddress.unlisted?(post)
 end
 
 # "true"/"yes"/"1" as written by hand, and the real booleans YAML and JSON
@@ -1157,15 +1223,18 @@ def truthy?(value)
   !%w[false no 0].include?(value.to_s.strip.downcase)
 end
 
+# The rule itself lives in lib/post_address.rb, shared with the checker and
+# the repair pass -- three copies of "where does this post live" is how the
+# repair pass came to offer rewriting a working link into an address that
+# answers nowhere. The year is passed rather than read here because the
+# build has the post's time parsed and cached already.
+#
+# A page sits at the root, because that is what a page is -- and because
+# every redirect_from a migration carries for one (Ghost, WordPress,
+# Squarespace) is a root path. A dated address for something with no date
+# would be the odd one out on every site that has ever had pages.
 def post_path(post)
-  return "/draft/#{post['draft_token']}/#{post['slug']}/" if draft?(post)
-  # At the root, because that is what a page is -- and because every
-  # redirect_from a migration carries for one (Ghost, WordPress,
-  # Squarespace) is a root path. A dated address for something with no
-  # date would be the odd one out on every site that has ever had pages.
-  return "/#{post['slug']}/" if page?(post)
-
-  "/posts/#{post_time(post).year}/#{post['slug']}/"
+  PostAddress.path(post, year: draft?(post) || page?(post) ? nil : post_time(post).year)
 end
 
 def output_dir(post)
@@ -1612,7 +1681,12 @@ def rss_item(post)
   # handed a <title> and <link> of the post's choosing, in an item that
   # still validated. The sequence is split across two CDATA sections, the
   # standard way, so it survives as text.
-  categories = (post['tags'] || []).map { |t| "<category>#{CGI.escapeHTML(t)}</category>" }.join
+  # The same visibility rule the pills follow (a tag that slugs to nothing
+  # is dropped), and the same coercion every other escape in this file
+  # uses -- a non-string tag out of a hand-edited JSON used to end the
+  # whole build in CGI.escapeHTML.
+  categories = (post['tags'] || []).reject { |t| tag_slug(t).empty? }
+                                   .map { |t| "<category>#{h(t)}</category>" }.join
   <<~ITEM
     <item>
       <title>#{title}</title>
@@ -2053,6 +2127,15 @@ end
 def emit_copy(src, dest, compare_content: false)
   WRITTEN[dest] = true
   if File.exist?(dest)
+    # On a volume that ignores letter case or unicode form, File.exist?
+    # answers yes for a file the directory writes differently -- and then
+    # the copy is skipped, WRITTEN records the name we asked for, and
+    # prune_public (which reads the REAL name from the directory) deletes
+    # the file as an orphan. The page keeps its <img> and loses its
+    # picture, on the site as well as here, because deploy --prune repeats
+    # the deletion. So the file is renamed to the name being recorded
+    # before anything else is decided.
+    settle_name(dest)
     same = if compare_content
              File.binread(dest) == File.binread(src)
            else
@@ -2065,13 +2148,39 @@ def emit_copy(src, dest, compare_content: false)
   FileUtils.cp(src, dest)
 end
 
+# Make the directory write the name we are about to record. Only ever a
+# case-or-form rename of one and the same file: the entry is found by
+# identity (dev+ino), never by string comparison.
+def settle_name(dest)
+  dir = File.dirname(dest)
+  wanted = File.basename(dest)
+  children = Dir.children(dir)
+  return if children.include?(wanted)
+
+  actual = children.find { |name| File.identical?(File.join(dir, name), dest) }
+  return if actual.nil?
+
+  source = File.join(dir, actual)
+  File.rename(source, dest)
+  # On a case-sensitive volume a rename between two unicode forms of one
+  # name is a no-op: the directory still writes the old one, and
+  # prune_public would then delete it as an orphan. Copy under the name we
+  # mean, and take the old entry away.
+  return if Dir.children(dir).include?(File.basename(dest))
+
+  FileUtils.cp(source, dest)
+  File.delete(source) unless File.identical?(source, dest)
+rescue SystemCallError
+  nil
+end
+
 # A single pass over public/ -- walking it twice (files separately from
 # directories) costs real time once there are thousands of entries, since
 # stat-ing each one isn't free, especially on a cloud-synced volume.
 def prune_public
   dirs = []
   removed = 0
-  Dir.glob(File.join(PUBLIC_DIR, '**', '*'), File::FNM_DOTMATCH).each do |path|
+  PathGlob.under(PUBLIC_DIR, '**', '*', flags: File::FNM_DOTMATCH).each do |path|
     if File.directory?(path)
       dirs << path
     elsif !WRITTEN[path]
@@ -2099,12 +2208,12 @@ FileUtils.mkdir_p(PUBLIC_DIR)
 # still renders before the owner has drawn anything. An existing file is
 # the owner's and is never overwritten; defaults/ itself stays unpublished.
 DEFAULT_IMAGES_DIR = File.join(ROOT, 'assets', 'images', 'defaults')
-Dir.glob(File.join(DEFAULT_IMAGES_DIR, '*')).each do |src|
+PathGlob.under(DEFAULT_IMAGES_DIR, '*').each do |src|
   live = File.join(ROOT, 'assets', 'images', File.basename(src))
   FileUtils.cp(src, live) unless File.exist?(live)
 end
 
-Dir.glob(File.join(ROOT, 'assets', '**', '*')).each do |src|
+PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
   next unless File.file?(src)
   next if src.start_with?("#{DEFAULT_IMAGES_DIR}/")
 
@@ -2127,20 +2236,33 @@ index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'
 # thousand files it was, and every listing command failed the same way, so
 # there was no way to find it from inside the tool.
 unreadable = []
-posts = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |f|
+posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   parsed = JSON.parse(File.read(f, encoding: 'utf-8'))
   # Valid JSON of the wrong shape ("[1,2,3]", "null", a bare string) used to
   # sail past this and die much later with a TypeError that named no file --
   # same blindness as an unparseable file, different exception.
   raise JSON::ParserError, "not a post object (#{parsed.class})" unless parsed.is_a?(Hash)
 
+  # Which year's DIRECTORY the file sits in -- the same key the checker,
+  # the exporter and stats already carry. A post whose date was corrected
+  # across a year boundary keeps its file (and its media) where they were,
+  # while its address follows the date; media were the one thing this build
+  # looked up by the date, so the picture was never copied and the page was
+  # served with a hole in it. check saw nothing wrong, because check looks
+  # where the file actually is.
+  parsed['__year'] = File.basename(File.dirname(f))
+  # The file this came out of. The duplicate message below names it,
+  # because an address does not find a file: two pages collide on a slug
+  # however far apart their dates are, and "/about/ (2x)" leaves the reader
+  # grepping the archive for the pair they have to choose between.
+  parsed['__path'] = f
   parsed
 rescue JSON::ParserError, SystemCallError => e
   unreadable << "  #{f}: #{e.message.lines.first.to_s.strip[0, 100]}"
   nil
 end
 unless unreadable.empty?
-  abort("❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:\n#{unreadable.join("\n")}")
+  abort("#{t('build.unreadable_posts')}\n#{unreadable.join("\n")}")
 end
 
 # Two posts sharing a year and slug would point at the same output path
@@ -2149,10 +2271,53 @@ end
 # mixed up. This used to be a silent risk on any conflicting file copy
 # (cloud sync, a manual cp/SFTP on the server) -- better to fail loudly here
 # than publish a broken archive.
-duplicates = posts.group_by { |p| [post_time(p).year, p['slug']] }.select { |_, v| v.size > 1 }
-unless duplicates.empty?
-  list = duplicates.map { |(year, slug), dupes| "  #{year}/#{slug} (#{dupes.size}x)" }.join("\n")
-  abort("❌ Duplicate year/slug in content.nosync/posts/ -- build stopped:\n#{list}")
+# Asked of PostAddress, not worked out here, because the checker and the
+# rename guard have to refuse exactly what this refuses -- and when the
+# three of them each had their own version, a rename could hand the archive
+# a state this abort then stopped the whole site on. The second key is new
+# here: two PAGES of one slug are served at one address however far apart
+# their dates are, and this used to build both and keep whichever it wrote
+# last, silently.
+collisions = {}
+posts.each do |p|
+  PostAddress.collision_keys(p, year: post_time(p).year).each { |key| (collisions[key] ||= []) << p }
+end
+duplicates = collisions.select { |_, v| v.size > 1 }
+
+def collision_lines(group)
+  group.map { |(year, slug), dupes|
+    where = dupes.map { |p| "      #{p['__path']}" }.join("\n")
+    "  #{year == 'page' ? "/#{slug}/" : "#{year}/#{slug}"} (#{dupes.size}x)\n#{where}"
+  }.join("\n")
+end
+
+# Two posts sharing a year and a slug cannot both be written: one output
+# directory, one media/<year>/<slug>/ between them, so one would silently
+# disappear. That has stopped the build since long before this rule was
+# written down in one place, and it still does.
+same_file, at_the_root = duplicates.partition { |(year, _), _| year != 'page' }
+unless same_file.empty?
+  abort("#{t('build.duplicate_address')}\n#{collision_lines(same_file)}")
+end
+
+# Two PAGES at one address lose one of the two as well -- but this one
+# warns rather than stops, and the difference is deliberate. Refusing to
+# build was tried and turned every path that writes a post into a way to
+# take the site down, the scheduler's cron included, where nobody is at
+# the keyboard to read the error and the archive stays broken until
+# somebody notices the site has stopped updating. `check` calls this an
+# error and the guards refuse to create it; a site that already has one
+# keeps being served, one page short and saying so on every build.
+at_the_root.each do |(_, slug), dupes|
+  # Which one survives is worth saying out loud: posts are written newest
+  # first, so the page that stays is the OLDER of the two -- the opposite
+  # of what somebody who just wrote the second one expects. And the loser
+  # does not disappear quietly: it keeps its entry in the sitemap and in
+  # the search index, both of which then point a reader at the winner's
+  # text under the loser's title.
+  warn("#{t('build.two_pages', count: dupes.size, slug: slug)}\n" \
+       "#{dupes.map { |p| "      #{p['__path']}" }.join("\n")}\n" \
+       "#{t('build.two_pages_fix')}")
 end
 
 # Slug is a tiebreaker, not decoration: sort_by isn't stable, and posts
@@ -2190,7 +2355,7 @@ unlisted_posts, posts = posts.partition { |p| unlisted?(p) }
 pages.reject! do |page|
   next false unless RESERVED_ROOT_SEGMENTS.include?(page['slug'].to_s.downcase)
 
-  warn "⚠️  Page '#{page['slug']}' would sit on an address the engine already uses (/#{page['slug']}/) -- not built. Rename it."
+  warn t('build.page_reserved_name', slug: page['slug'])
   true
 end
 # `unlisted` on a PAGE means the same as it does on a post, and pages are
@@ -2212,7 +2377,7 @@ unlisted_posts.concat(unlisted_pages)
 drafts.reject! do |post|
   next false unless post['draft_token'].to_s.strip.empty?
 
-  warn "⚠️  Draft '#{post['slug']}' has no draft_token -- its preview would be at a guessable address, so it is not built. Re-save it with ./blog.sh edit."
+  warn t('build.draft_no_token', slug: post['slug'])
   true
 end
 
@@ -2269,6 +2434,18 @@ SERIES_NAMES = posts.each_with_object({}) do |post, acc|
   end
 end.freeze
 
+# Which tags will actually have a listing page. Only posts IN THE STREAM
+# make one -- so a tag carried solely by drafts, by unlisted posts or by
+# pages has none, and the pill for it was a link into a 404. Ten of them
+# in nine drafts on one real archive, every one of them written by the
+# engine itself. Same shape, and same reason, as SERIES_PUBLISHED above.
+TAG_PAGES = posts.each_with_object({}) do |post, acc|
+  Array(post['tags']).each do |tag|
+    slug = tag_slug(tag)
+    acc[slug] = true if Slug.pageable?(slug)
+  end
+end.freeze
+
 PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
 NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
@@ -2297,9 +2474,19 @@ end.freeze
 # The <nav> bar itself outlives them, because the search field lives in
 # it and templates/layout.html.erb asks for search on every page it
 # renders (redirect stubs, which skip layout() on purpose, carry no bar).
+# nil means "nothing configured, pick the default menu"; [] means "a menu of
+# nothing", and the difference is whether `nav:` is written down at all.
+# Until 1.4 a `nav:` key with nothing under it fell back to the default
+# menu, while the same emptiness under `links:` meant no links -- one
+# editing accident, two opposite answers. A key that is written down now
+# speaks for itself everywhere.
 def configured_nav_items
+  return nil unless SiteConfig.key?('nav')
+
   entries = SiteConfig.get('nav', default: nil)
-  return nil unless entries.is_a?(Array)
+  # Written down but not a list: doctor names it, and the build takes the
+  # key at its word rather than quietly restoring a menu nobody asked for.
+  return [] unless entries.is_a?(Array)
 
   entries.filter_map do |entry|
     next unless entry.is_a?(Hash)
@@ -2340,6 +2527,18 @@ def cdata_safe(text)
   text.to_s.gsub(']]>', ']]]]><![CDATA[>')
 end
 
+
+# Where this post's media actually are: under the file's year, and -- for an
+# archive written before that was settled -- under the date's year if the
+# first has nothing.
+def media_source_dir(post, date_year)
+  by_file = File.join(MEDIA_DIR, (post['__year'] || date_year).to_s, post['slug'].to_s)
+  return by_file if Dir.exist?(by_file)
+
+  by_date = File.join(MEDIA_DIR, date_year.to_s, post['slug'].to_s)
+  Dir.exist?(by_date) ? by_date : by_file
+end
+
 def referenced_media_filenames(post)
   post['content'].flat_map do |block|
     [(block['media'] || []).first, (block['poster'] || []).first].compact.map { |m| m['url'] }
@@ -2351,8 +2550,12 @@ end
   dir = output_dir(post)
 
   # Media stays in media/<year>/<slug>/ even for drafts -- publishing
-  # doesn't move files, it just moves the output page.
-  source_media_dir = File.join(MEDIA_DIR, year.to_s, post['slug'])
+  # doesn't move files, it just moves the output page. The year here is the
+  # one the FILE lives under, not the one its date says: those two part
+  # company when a date is corrected across a year boundary, and every
+  # other part of the engine (check, export, delete, restore, the editor)
+  # reads the file's own year.
+  source_media_dir = media_source_dir(post, year)
   referenced_media_filenames(post).each do |name|
     # Basename for the same reason the page uses one: a "filename" carrying
     # "../" is a path, and File.join would honour it -- on the way in it
@@ -2366,7 +2569,7 @@ end
     if File.exist?(src)
       emit_copy(src, dest)
     else
-      warn "MISSING media: #{post['slug']} -> #{filename}"
+      warn t('build.media_missing', slug: post['slug'], filename: filename)
       # The page still links this file, so a copy already in public.nosync
       # has to survive prune_public -- otherwise a source that is missing
       # for a moment (a media directory mid-move, a file being replaced)
@@ -2424,13 +2627,13 @@ end
     # -- and a ".." here would write the stub outside posts/, up to and
     # including over the homepage or above public.nosync entirely.
     unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' }
-      warn "⚠️  #{post['slug']}: unusable former_slugs entry #{former.inspect} -- expected \"year/slug\"."
+      warn t('build.former_slug_unusable', slug: post['slug'], entry: former.inspect)
       next
     end
 
     dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
     if WRITTEN[dest]
-      warn "⚠️  #{post['slug']}: redirect for #{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
+      warn t('build.former_slug_taken', slug: post['slug'], former: former)
       next
     end
 
@@ -2446,19 +2649,32 @@ end
 pinned = ->(post) { %w[true yes 1].include?(post['pinned'].to_s.strip.downcase) }
 pinned_post = posts.find(&pinned)
 if posts.count(&pinned) > 1
-  warn "⚠️  More than one post is pinned; using the newest (#{pinned_post['slug']})."
+  warn t('build.pinned_more_than_one', slug: pinned_post['slug'])
 end
 page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_post)
 
 tags_map = {}
+overlong_tags = []
 posts.each do |post|
   (post['tags'] || []).each do |tag|
     slug = tag_slug(tag)
     next if slug.empty?
 
+    # An address that will not fit a filename: mkdir died on it with a raw
+    # ENAMETOOLONG, partway through writing the site. The tag stays on its
+    # posts (as a pill that is not a link); only the listing page is
+    # refused, and refused with a sentence.
+    unless Slug.pageable?(slug)
+      overlong_tags << tag.to_s[0, 60] unless overlong_tags.include?(tag.to_s[0, 60])
+      next
+    end
+
     tags_map[slug] ||= { name: tag, posts: [] }
     tags_map[slug][:posts] << post
   end
+end
+overlong_tags.each do |name|
+  warn t('build.tag_too_long', name: name)
 end
 
 # A feed per tag, but only for the tags the site's own menu points at.
@@ -2598,7 +2814,7 @@ if File.exist?(CHEAT_SHEET_SOURCE)
               description: t('markdown_page.description'),
               path: CHEAT_SHEET_PATH))
 else
-  warn "MISSING #{CHEAT_SHEET_SOURCE} -- /markdown/ will not be generated"
+  warn t('build.cheat_sheet_missing', path: CHEAT_SHEET_SOURCE)
 end
 
 # Sidebar.write_all writes its own files (and reads previous content itself
@@ -2691,11 +2907,11 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
     if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
-      warn "⚠️  #{post['slug']}: unusable redirect_from entry #{origin.inspect} -- expected a site-root path like \"/old-post/\"."
+      warn t('build.redirect_from_unusable', slug: post['slug'], entry: origin.inspect)
       next
     end
     if REDIRECT_FROM_RESERVED.include?(parts.first)
-      warn "⚠️  #{post['slug']}: redirect_from #{origin.inspect} skipped -- /#{parts.first}/ belongs to the site itself."
+      warn t('build.redirect_from_reserved', slug: post['slug'], entry: origin.inspect, segment: parts.first)
       next
     end
 
@@ -2716,7 +2932,7 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
     # same loud skip -- the build's own output always wins over a stub.
     prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| WRITTEN[p] }
     if WRITTEN[dest] || prefix_file
-      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
+      warn t('build.redirect_from_taken', slug: post['slug'], origin: origin)
       next
     end
     # The third collision: the destination is a DIRECTORY an earlier stub
@@ -2725,7 +2941,7 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
     # file over a directory is EISDIR, and one bad pair of imported
     # entries must not kill the whole build.
     if File.directory?(dest)
-      warn "⚠️  #{post['slug']}: redirect_from #{origin} skipped -- an earlier redirect already made a directory of that address."
+      warn t('build.redirect_from_directory', slug: post['slug'], origin: origin)
       next
     end
 
@@ -2736,9 +2952,9 @@ end
 removed = prune_public
 
 puts
-puts "Built #{posts.size} posts across #{page_count} page(s) into #{PUBLIC_DIR}, plus #{tags_map.size} tag page(s), a search index, RSS feed and sitemap"
+puts t('build.summary', posts: posts.size, pages: page_count, dir: PUBLIC_DIR, tags: tags_map.size)
 if drafts.any?
   puts
-  puts "Drafts in progress (preview only, not in any listing): #{drafts.size}"
+  puts t('build.drafts', count: drafts.size)
 end
-puts "Removed #{removed} file(s) no longer generated" if removed.positive?
+puts t('build.pruned', count: removed) if removed.positive?

@@ -221,7 +221,13 @@ module MarkdownParser
 
   # --- block-level regexes -------------------------------------------------
 
-  IMAGE_RE = /\A!\[([^\]]*)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
+  # The alt text is read up to the FIRST "](", not up to the first "]".
+  # Titles carry brackets -- "[es] W-ZERO3" is a real post's picture -- and
+  # a line the parser cannot read comes back as a paragraph of literal
+  # markdown: the image block is gone, its file is pruned as unreferenced
+  # a moment later, and the page then shows the author's absolute disk path
+  # as text. VIDEO_RE has always been written this way; this one was not.
+  IMAGE_RE = /\A!\[(.*?)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
   # Two exclamation marks = video, whether a local file or YouTube.
   # Deliberately explicit: a bare address on its own line stays a plain
   # paragraph, so a video can also just be linked to instead of every link
@@ -557,6 +563,22 @@ module MarkdownParser
   # into incoming/ when the post is written; parse_body/wait_for_missing_images
   # (manage_post.rb) handle waiting for it to actually show up before anything
   # gets copied.
+
+  # Which spelling the directory itself uses for a file the volume already
+  # resolved. Exact match costs one lookup; anything else asks the volume
+  # for identity (dev+ino) rather than comparing strings. A volume that
+  # resolves nothing -- Linux, case-sensitive APFS -- lands on the last
+  # line and nothing changes.
+  def on_disk_name(dir, name)
+    children = Dir.children(dir)
+    return name if children.include?(name)
+
+    target = File.join(dir, name)
+    children.find { |child| File.identical?(File.join(dir, child), target) } || name
+  rescue SystemCallError
+    name
+  end
+
   def resolve_image(path, media_dir, counter, media_files = {}, incoming_dir: nil)
     expanded = File.expand_path(path)
     # realpath, not just expand_path: /tmp vs /private/tmp (macOS) or any
@@ -588,7 +610,13 @@ module MarkdownParser
     # relative to the current directory instead.
     if File.dirname(path) == '.'
       in_media = media_dir && File.expand_path(File.join(media_dir, path))
-      return [File.basename(in_media), nil] if in_media && File.exist?(in_media)
+      # The name the DIRECTORY uses, not the one the author typed. On macOS
+      # File.exist? resolves letter case and unicode form, so writing back
+      # what was typed is how a post comes to name IMG_2043.JPG for a file
+      # the disk calls img_2043.jpg. Both spellings then work here and the
+      # page renders -- but the archive now carries a disagreement that the
+      # checker has to notice and a Linux server would answer with a hole.
+      return [on_disk_name(File.dirname(in_media), File.basename(in_media)), nil] if in_media && File.exist?(in_media)
 
       expanded = File.expand_path(File.join(incoming_dir, path)) if incoming_dir
     end
@@ -752,6 +780,21 @@ module MarkdownParser
       counter -= 1 unless src # filename was recycled, the number wasn't consumed
       return [{ 'type' => 'video', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
     elsif (m = IMAGE_RE.match(para))
+      # An http(s) address is not a path. The engine publishes files it is
+      # given; a picture that lives on somebody else's server cannot be one
+      # of them, and treating the address as a filename produced a media
+      # entry pointing at a file nobody ever had -- the post then carried a
+      # picture that was never anywhere. Kept as a link, which is what the
+      # line actually is, and said out loud so the author can download the
+      # picture and write it as a file if they meant to keep it.
+      if m[2].to_s.match?(%r{\Ahttps?://})
+        warn "Note: #{m[2]} is on another server, so it stays a link. Download it into " \
+             'incoming/ and write ![alt](filename.jpg) to publish it with the post.'
+        return [{ 'type' => 'text', 'text' => "[#{m[1]}](#{m[2]})",
+                  'formatting' => [{ 'type' => 'link', 'url' => m[2], 'start' => 1,
+                                     'end' => 1 + m[1].to_s.length }] }, counter]
+      end
+
       counter += 1
       alt, path, caption = m[1], m[2], unescape_title(m[3])
       # A single exclamation mark is for images only. A video with just one

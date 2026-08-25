@@ -1,0 +1,96 @@
+# frozen_string_literal: true
+
+require 'json'
+require_relative 'post_address'
+require_relative 'path_glob'
+
+# lib/address_guard.rb -- who already lives where this post is going.
+#
+# Six paths write a post into a year: publish (including the scheduler's
+# cron), edit, scheduling a date, moving the queue, restoring from the
+# trash and re-importing. Each of them asked `File.exist?` about the exact
+# file it was about to write, which answers a narrower question than the
+# one that matters. Two posts collide when they share a year and a slug --
+# whatever FOLDER they sit in -- and two pages collide on their slug alone,
+# because a page is served at the root with no year in its address.
+#
+# The build refuses to run on either, so a path that failed to see the
+# collision did not merely overwrite something: it left an archive that
+# will not build, and on the scheduler's path there is nobody at the
+# keyboard to read the error. Deciding this in six places is how five of
+# them stayed a step behind the sixth.
+module AddressGuard
+  module_function
+
+  # The file standing in the way of this write, or nil. Two questions, and
+  # both of them have to be asked here, because five callers asked only one
+  # of them each and each one asked the other's.
+  #
+  #   `path`  -- the FILE about to be written. A different post already
+  #              there is overwritten with no trash, no version and no
+  #              warning, and that is not hypothetical: a post whose file
+  #              sits in one year's folder while its date puts its address
+  #              in another (which the engine documents as ordinary) has a
+  #              free address and an occupied path at the same time.
+  #   the address -- which no path check can see, because a page is served
+  #              at the root and a post follows its date, not its folder.
+  #
+  # Replacing the old File.exist? with the address check, rather than
+  # adding to it, is how publish, edit, scheduling, restore and re-import
+  # came to silently eat a live published post.
+  #
+  # `except` is the post's own file, which is never in its own way. It
+  # takes a list as well as a single path: a queue swap moves two posts
+  # past each other, and each of them stands exactly where the other is
+  # going. Asked one at a time, both writes are refused and a legitimate
+  # swap of two same-named posts in two years could not be done at all --
+  # while the pair, asked together, is a question about the state AFTER
+  # the move, which is the state that matters. The caller still has to
+  # check that the two are not moving onto the same address.
+  def occupant(post, content_dir:, slug: nil, except: nil, path: nil)
+    name = (slug || post['slug']).to_s
+    return nil if name.empty?
+
+    mine_now = Array(except).compact.map { |p| File.expand_path(p) }
+    if path && File.exist?(path) && !mine_now.include?(File.expand_path(path))
+      return path
+    end
+
+    wanted = PostAddress.collision_keys(post, slug: name)
+    # Through PathGlob.literal, because a slug with a "[" in it is a name
+    # and not a pattern: read as one, the listing came back empty and this
+    # method answered "the address is free" over an occupied address --
+    # the exact silence it exists to end.
+    PathGlob.under(content_dir, '*', "#{PathGlob.literal(name)}.json").sort.each do |other|
+      next if mine_now.include?(File.expand_path(other))
+
+      # A file that will not read or parse still owns its address. Guessing
+      # "empty" from an unreadable file is how a restore left behind by a
+      # permission bit, or a copy the cloud has evicted, reads as free
+      # space -- and the build stops on what gets written into it.
+      candidate = begin
+        JSON.parse(File.read(other, encoding: 'utf-8'))
+      rescue StandardError
+        return other
+      end
+      # Valid JSON that is not a post object is in the same position as a
+      # file that will not parse: the build stops on it either way, and it
+      # is certainly not free space. unreadable? says the same, and these
+      # two answers have to agree.
+      return other unless candidate.is_a?(Hash)
+
+      return other if (PostAddress.collision_keys(candidate) & wanted).any?
+    end
+    nil
+  end
+
+  # True when a file cannot be read or is not a post at all. The occupant
+  # is refused either way -- an address whose owner nobody can read is
+  # still not free -- but "another post already uses that slug" would be
+  # a claim about a file this process never managed to look at.
+  def unreadable?(path)
+    !JSON.parse(File.read(path, encoding: 'utf-8')).is_a?(Hash)
+  rescue StandardError
+    true
+  end
+end

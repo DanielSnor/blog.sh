@@ -68,7 +68,11 @@ module ColorsCss
   # A value from config lands inside a CSS declaration, so it must not be
   # able to end one. Everything here would either break the stylesheet or
   # smuggle in rules of its own -- a font stack needs none of it.
-  CSS_VALUE_FORBIDDEN = /[;{}<>@\\\n\r]/.freeze
+  # Comment markers belong here too: a font name carrying "/*" opens a
+  # comment that swallows everything after it -- in the generated file
+  # that was the entire light palette, silently, and the site came out in
+  # the browser's own default colours with nothing said anywhere.
+  CSS_VALUE_FORBIDDEN = %r{[;{}<>@\\\n\r]|/\*|\*/}
 
   module_function
 
@@ -113,7 +117,14 @@ module ColorsCss
     # must degrade to the default palette everywhere, not TypeError in
     # whichever caller asked first (theme-color did).
     per_mode = colors.is_a?(Hash) ? colors[mode] : nil
-    (per_mode.is_a?(Hash) ? per_mode[key] : nil) || DEFAULT_COLORS[mode][key]
+    raw = per_mode.is_a?(Hash) ? per_mode[key] : nil
+    # Through the same CSS-value guard the fonts use: a colour is a hex or
+    # rgb() or a name, none of which carry ';', '{', a comment marker or a
+    # newline -- and one that does (a hand-edit typo, a value from an
+    # imported palette) would otherwise be written verbatim into
+    # colors.css and take the rest of the stylesheet down with it, silently.
+    # A rejected value falls back to the shipped default, said out loud.
+    safe_css_value(raw, "colors.#{mode}.#{key}") || DEFAULT_COLORS[mode][key]
   end
 
   def color_properties(colors, mode)
@@ -153,7 +164,8 @@ module ColorsCss
   # means "derive from the palette", not "use a shipped constant".
   def color_for_optional(colors, mode, key)
     per_mode = colors[mode]
-    per_mode.is_a?(Hash) ? per_mode[key] : nil
+    raw = per_mode.is_a?(Hash) ? per_mode[key] : nil
+    safe_css_value(raw, "colors.#{mode}.#{key}")
   end
 
   def color_declarations(colors, mode, indent)
@@ -173,6 +185,14 @@ module ColorsCss
   # not working and gives nothing to go on.
   def font_face_css(fonts, fonts_dir)
     faces = fonts['faces']
+    # A mapping instead of a list is the shape somebody writes when they
+    # have one face: `faces:` then `family:` under it. Skipping it without
+    # a word left them with a config that looks right and a site with no
+    # custom font, and nothing to go on.
+    if faces && !faces.is_a?(Array)
+      warn_face("fonts.faces has to be a list of entries (each with family and file), not #{faces.class.to_s.downcase}")
+      return ''
+    end
     return '' unless faces.is_a?(Array) && faces.any?
 
     blocks = faces.filter_map { |face| font_face_block(face, fonts_dir) }
@@ -206,9 +226,14 @@ module ColorsCss
   def safe_css_value(value, what)
     text = value.to_s.strip
     return nil if text.empty?
-    return text unless text.match?(CSS_VALUE_FORBIDDEN)
+    found = text[CSS_VALUE_FORBIDDEN]
+    return text unless found
 
-    warn "⚠️  config/site.yml: #{what} contains characters that can't go into CSS (;{}<>@\\) -- ignoring it."
+    # Named by what actually matched -- a hand-kept list drifted the
+    # moment the pattern learnt about comment markers, and the sentence
+    # then blamed characters the value demonstrably did not contain.
+    shown = { "\n" => '\\n', "\r" => '\\r' }.fetch(found, found)
+    warn "⚠️  config/site.yml: #{what} contains #{shown.inspect}, which can't go into CSS -- ignoring it."
     nil
   end
 

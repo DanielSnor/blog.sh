@@ -4,6 +4,8 @@ require 'json'
 require 'time'
 require_relative 'post_text'
 require_relative 'content_type'
+require_relative 'post_address'
+require_relative 'path_glob'
 
 # lib/stats.rb -- what `./blog.sh stats` counts. Numbers only: this
 # module never prints, never colours and never translates, so the same
@@ -47,7 +49,7 @@ module Stats
 
   def load_posts(root)
     dir = File.join(root, 'content.nosync', 'posts')
-    Dir.glob(File.join(dir, '*', '*.json')).sort.filter_map do |path|
+    PathGlob.under(dir, '*', '*.json').sort.filter_map do |path|
       post = JSON.parse(File.read(path, encoding: 'utf-8'))
       next unless post.is_a?(Hash)
 
@@ -134,7 +136,7 @@ module Stats
   # ask for. A gap between them is `check`'s business (an orphan or a
   # missing file), not this command's -- it only reports.
   def media(root, posts)
-    files = Dir.glob(File.join(root, 'media.nosync', '*', '*', '*')).select { |f| File.file?(f) }
+    files = PathGlob.under(root, 'media.nosync', '*', '*', '*').select { |f| File.file?(f) }
     { 'files' => files.size,
       'bytes' => files.sum { |f| File.size(f) },
       'referenced' => posts.sum { |p| Array(p['content']).sum { |b| Array(b['media']).size + Array(b['poster']).size } },
@@ -163,7 +165,7 @@ module Stats
   end
 
   def page?(post)
-    post['type'].to_s == 'page' || truthy?(post['page'])
+    PostAddress.page?(post)
   end
 
   def truthy?(value)

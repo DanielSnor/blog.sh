@@ -30,9 +30,12 @@ require_relative '../lib/slug'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
+require_relative '../lib/post_address'
+require_relative '../lib/address_guard'
 require_relative '../lib/publishing'
 require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
+require_relative '../lib/path_glob'
 require_relative '../lib/tui'
 require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
@@ -73,8 +76,8 @@ def draft_url(post)
   "#{SITE_BASE_URL.to_s.chomp('/')}#{draft_path(post)}"
 end
 
-def published_url(slug, year)
-  "#{SITE_BASE_URL.to_s.chomp('/')}#{published_path(slug, year)}"
+def published_url(slug, year, page: false)
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{published_path(slug, year, page: page)}"
 end
 
 # The site-relative halves, split off so the local-preview hint below can
@@ -85,8 +88,11 @@ def draft_path(post)
   "/draft/#{post['draft_token']}/#{post['slug']}/"
 end
 
-def published_path(slug, year)
-  "/posts/#{year}/#{slug}/"
+# A page is served at the root, without a year -- so every message built
+# from a year told the author about an address the site never answered at,
+# and a rename recorded a redirect from one.
+def published_path(slug, year, page: false)
+  page ? "/#{slug}/" : "/posts/#{year}/#{slug}/"
 end
 
 # An install that never answered "where does this go?" still carries the
@@ -856,8 +862,15 @@ def cmd_add
   # new photo ended up nowhere and the post showed the old one.
   base_slug = slug
   serial = 2
+  # The address as well as the file: a new post is a draft, served under
+  # its token, but the day it publishes it takes /posts/<year>/<slug>/ --
+  # and a post whose FILE sits in another year can already be served
+  # there. Walking on to the next serial is the whole fix; nobody has to
+  # be told, because the name was never promised to anyone yet.
   while File.exist?(File.join(CONTENT_DIR, date.year.to_s, "#{slug}.json")) ||
-        Dir.exist?(File.join(MEDIA_DIR, date.year.to_s, slug))
+        Dir.exist?(File.join(MEDIA_DIR, date.year.to_s, slug)) ||
+        AddressGuard.occupant({ 'slug' => slug, 'date' => date.iso8601 },
+                              content_dir: CONTENT_DIR, slug: slug)
     slug = "#{base_slug}-#{serial}"
     serial += 1
   end
@@ -899,6 +912,19 @@ def cmd_add
     post['hero'] = hero_wanted unless hero_wanted == SITE_HERO
   end
   post['toc'] = truthy_frontmatter?(meta['toc']) if meta.key?('toc') && !meta['toc'].to_s.strip.empty?
+
+  # The slug was settled before the editor opened, when nobody yet knew
+  # whether this would be a page -- and a page is served at the root, where
+  # the year in the file name buys it nothing. Walk on to the next serial
+  # now that the answer is in, so that the write below never has to refuse.
+  if PostAddress.page?(post)
+    base = post['slug']
+    serial = 2
+    while AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: post['slug'])
+      post['slug'] = "#{base}-#{serial}"
+      serial += 1
+    end
+  end
 
   path = PostWriter.write(post, media_files: media_files)
   discard_editor_buffer
@@ -1008,7 +1034,7 @@ end
 # Times already claimed by scheduled drafts, so the next offer skips
 # them -- that is what turns a set of slots into a queue.
 def scheduled_entries(except_slug: nil)
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
     post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue next
     next unless post.is_a?(Hash) && post['scheduled'] && post['slug'] != except_slug
 
@@ -1289,7 +1315,11 @@ def find_post_path(slug)
   chosen = RESOLVED_PATHS[slug]
   return chosen if chosen && File.exist?(chosen)
 
-  matches = Dir.glob(File.join(CONTENT_DIR, '*', "#{slug}.json")).sort
+  # The slug is a name, not a pattern -- see PathGlob.literal. Without it
+  # every command that resolves a post by slug ("foto[1]", which a hand
+  # edit or an import can mint) answered "post not found" over a post the
+  # build was publishing.
+  matches = PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").sort
   return matches.first if matches.size <= 1
 
   RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
@@ -1305,6 +1335,15 @@ def pick_among_years(slug, paths)
   # already named it, and a row and its path must stay index-aligned.
   readable = paths.filter_map { |f| (summary = post_summary(f)) && [f, summary] }
   abort t('cli.post_not_found', slug: slug) if readable.empty?
+
+  # If only one copy could be read, there is nothing to choose between --
+  # the "ambiguity" is with a file nothing can read, which post_summary has
+  # already reported. Use the readable one rather than asking "which of the
+  # 1?" and calling it years.
+  if readable.size == 1 && paths.size > 1
+    warn t('cli.ambiguous_one_readable', slug: slug)
+    return readable.first.first
+  end
 
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }
@@ -1362,8 +1401,13 @@ def cmd_toot(slug)
   # for every caller alike -- and unlike the truthy test that used to sit
   # here, it is not fooled by an empty string into refusing a first toot,
   # and not blind to an announcement living on the other network.
-  year = File.basename(File.dirname(path))
+  # The year of the ADDRESS, not of the folder. A post whose date was
+  # corrected across a year keeps its file where it was -- the engine says
+  # so in half a dozen comments -- and the announcement is public and
+  # cannot be edited afterwards, so getting it from the folder meant a
+  # permanent link into nothing.
   date = Time.parse(post['date'])
+  year = PostAddress.date_year(post)
   fields = announce_on_publish(post, year, date)
   # false means the network was asked and said no -- the poster has already
   # printed what it heard, so "see above" has an above. nil means nobody
@@ -1418,14 +1462,24 @@ def cmd_bluesky(slug)
     return
   end
 
-  year = File.basename(File.dirname(path))
+  # The address year again, not the folder's: what goes out in a toot is
+  # public and cannot be corrected afterwards.
   date = Time.parse(post['date'])
+  year = PostAddress.date_year(post)
 
   # Before sending: is one already out there? This command runs precisely
   # when the post carries no announcement address -- which means either
   # none was ever sent, or one was sent and the reply never came back. The
   # second case used to end with two announcements of the same post.
-  if (found = BlueskyPoster.find_announcement(Publishing.post_url(post['slug'], year)))
+  # The address the announcement carries is the one it is found by later,
+  # so this has to ask the same question the announcement asked.
+  # BOTH shapes for a page: until 1.4 an announcement carried
+  # /posts/<year>/<slug>/ even for a page, so looking only for the address
+  # a page has today would miss the announcement that is actually out
+  # there -- and the post would be announced a second time.
+  candidates = [Publishing.post_url(post['slug'], year, page: PostAddress.page?(post))]
+  candidates << Publishing.post_url(post['slug'], year, page: false) if PostAddress.page?(post)
+  if (found = candidates.uniq.filter_map { |url| BlueskyPoster.find_announcement(url) }.first)
     updated = post.merge('bluesky_url' => found[:url], 'bluesky_uri' => found[:uri])
     AtomicWrite.write_json(path, updated)
     puts t('cli.bluesky_recovered', url: found[:url])
@@ -1579,8 +1633,14 @@ def write_scheduled_date(path, post, date, raw: nil, slug: nil)
     updated = post.merge('date' => date.iso8601, 'scheduled' => true)
     new_year = date.year.to_s
     new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
+    # Asked whether or not the file moves: a date that stays inside the
+    # year can still land the post on an address another post is served
+    # at, and the old guard only looked when the folder changed.
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
+                                  slug: post['slug'], except: path, path: new_path)
+    abort t('cli.post_already_exists', slug: post['slug'], path: taken) if taken
+
     if File.expand_path(new_path) != File.expand_path(path)
-      abort t('cli.post_already_exists', slug: post['slug'], path: new_path) if File.exist?(new_path)
 
       FileUtils.mkdir_p(File.dirname(new_path))
       Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
@@ -1607,7 +1667,7 @@ end
 # must drop out of the list rather than get swapped around as a stale
 # copy.
 def queue_entries
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
     raw = File.read(file, encoding: 'utf-8') rescue next
     post = JSON.parse(raw) rescue next
     next unless post.is_a?(Hash) && post['scheduled']
@@ -1946,6 +2006,122 @@ end
 # must not itself be able to abort on a missing locale key -- and the
 # times are the ISO form the JSON carries, since repairing that file by
 # hand is what the report is for.
+# A name for a file or directory stepping aside during a queue move:
+# dotted (so no post glob sees it), suffixed (so nothing mistakes it for
+# content), stamped with this process's pid and never an existing name --
+# a leftover from a crashed run must not be renamed onto.
+def park_name(dir, base, ext)
+  n = 0
+  loop do
+    candidate = File.join(dir, ".#{base}.queue-move.#{Process.pid}#{n.zero? ? '' : "-#{n}"}#{ext}")
+    return candidate unless File.exist?(candidate)
+
+    n += 1
+  end
+end
+
+# A finished mover getting out of a parked post's way: back to its own
+# name, which the parking freed, and back to its own DATE with it
+# whenever keeping the new one would leave the two of them on one
+# address. That is precisely the swap parking exists for -- the pair
+# share a slug, so a mover holding the partner's year is served exactly
+# where the partner is about to be put back. The rescue used to keep the
+# new date on the grounds that a file whose folder disagrees with its
+# date is a state the engine reads correctly, which is true of one post
+# and not of two: the queue's own recovery handed back an archive that
+# will not build until somebody repairs it by hand.
+#
+# The original bytes go back, not a patched date: they are what was read
+# before the prompt, so the post ends the run byte for byte as it was
+# found. Answers whether it did -- a rename that could not be followed by
+# the rewrite says no, since the post then still holds the date it moved
+# to, and the report calls that "moved".
+def step_back(owner, partner)
+  File.rename(partner[:json_home], owner[:json_home])
+  return false unless one_address?(owner, partner)
+
+  AtomicWrite.write(owner[:json_home], owner[:raw] || JSON.pretty_generate(owner[:post]))
+  true
+rescue StandardError
+  false
+end
+
+# Whether the mover, left at the date it has just moved to, would be
+# served at the same address as the post about to be put back beside it.
+# Asked of PostAddress, which is where the build asks it.
+def one_address?(owner, partner)
+  moved = owner[:post].merge('date' => owner[:target].iso8601)
+  (PostAddress.collision_keys(moved) & PostAddress.collision_keys(partner[:post])).any?
+end
+
+# Whether a parked post can be put back where it came from. Not
+# File.exist? on the name -- two posts collide on their ADDRESS, whatever
+# folder they sit in -- so the question goes to the same guard the
+# pre-flight uses. Anything it cannot answer counts as occupied: this
+# runs while an exception is on its way out, and the one thing it must
+# not do is add a second post to an address rather than leave a rescued
+# one parked under a name that `check` reports.
+def way_home_clear?(info)
+  AddressGuard.occupant(info[:post], content_dir: CONTENT_DIR, slug: info[:slug],
+                        except: info[:json_temp], path: info[:json_home]).nil?
+rescue StandardError
+  false
+end
+
+# Whether this mover's write is really standing at its destination.
+# Existence is not the question: in the swap parking exists for, both
+# posts answer to the same name, so the file at that address can just as
+# well be the OTHER one -- put there by a mover, or by this recovery a
+# moment ago. Asked against what the mover itself writes (the post with
+# the target date on it), field for field, because being wrong here means
+# removing the last copy of a post.
+def landed_at_destination?(info)
+  return false unless File.exist?(info[:dest_json])
+
+  JSON.parse(File.read(info[:dest_json], encoding: 'utf-8')) ==
+    info[:post].merge('date' => info[:target].iso8601, 'scheduled' => true)
+rescue StandardError
+  false
+end
+
+# The parked media and history of a mover that finished: they land at the
+# year the post just moved to -- its own mover found nothing to carry,
+# which was the point of parking them. Shared with the recovery, which
+# reaches this same state whenever a write landed and only the delete
+# behind it did not.
+def settle_parked_side_cars(info)
+  if info[:media_temp] && File.exist?(info[:media_temp])
+    FileUtils.mkdir_p(File.dirname(info[:dest_media]))
+    if Dir.exist?(info[:dest_media])
+      # A genuine orphan sitting at the destination: merged, the way every
+      # media move merges, never silently replaced.
+      PostWriter.move_media_dir(info[:media_temp], info[:dest_media])
+    else
+      File.rename(info[:media_temp], info[:dest_media])
+    end
+  end
+  return unless info[:versions_temp] && File.exist?(info[:versions_temp])
+
+  # An orphaned history at the destination is somebody else's past -- the
+  # same stance PostVersions.move takes, for the same reason.
+  FileUtils.rm_rf(info[:dest_versions])
+  FileUtils.mkdir_p(File.dirname(info[:dest_versions]))
+  File.rename(info[:versions_temp], info[:dest_versions])
+end
+
+# A rename inside the recovery, which runs with an exception already on
+# its way out. Answers whether it happened instead of raising: a raise
+# from in here replaces the failure the author is about to read and takes
+# the report with it -- and the report is the only place a parked copy is
+# named out loud, so the run would end on a backtrace about a rename with
+# not one word about any of the posts.
+def try_rename(from, to)
+  File.rename(from, to)
+  true
+rescue StandardError
+  false
+end
+
 def apply_queue_moves(moves)
   held = RunLock.hold(ROOT, label: 'queue') do
     # Checked here rather than in the three callers that used to each keep
@@ -1961,30 +2137,248 @@ def apply_queue_moves(moves)
     # The byte compare stays what it always was, and still earns its keep
     # inside the lock: it catches the tick that finished a moment BEFORE
     # the lock was taken, which no lock can do anything about.
+    # Every file in this move is excused for every check: they are all
+    # about to leave where they stand. A swap of two posts that share a
+    # slug in two years has each one standing exactly where the other is
+    # going, and asked one at a time it was refused as "resolve this
+    # manually" -- a thing there was no way to resolve, since the two
+    # posts are each other's obstacle.
+    moving = moves.map { |entry, _| entry[:path] }
+    landing = []
     moves.each do |entry, target|
       abort_if_post_changed(entry[:path], entry[:raw], entry[:post]['slug']) if entry[:raw]
+      moved = entry[:post].merge('date' => target.iso8601)
       target_path = File.join(CONTENT_DIR, target.year.to_s, "#{entry[:post]['slug']}.json")
-      next if File.expand_path(target_path) == File.expand_path(entry[:path])
+      taken = AddressGuard.occupant(moved, content_dir: CONTENT_DIR,
+                                    slug: entry[:post]['slug'], except: moving,
+                                    path: target_path)
+      # ...which is why the moves are also checked against each OTHER: two
+      # posts excused from each other's way must still not be walking to
+      # the same place.
+      taken ||= landing.find { |seen, keys| seen == target_path || (keys & PostAddress.collision_keys(moved)).any? }&.first
+      abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: taken) if taken
 
-      abort t('cli.post_already_exists', slug: entry[:post]['slug'], path: target_path) if File.exist?(target_path)
+      landing << [target_path, PostAddress.collision_keys(moved)]
     end
 
+    # A post standing where another one is going has to step aside first,
+    # or the write that goes there overwrites it -- a swap of two posts
+    # that share a slug in two years is exactly that, both ways round.
+    # Only such a post is parked, so an ordinary swap writes precisely
+    # what it always wrote; the name it parks under is not a post name
+    # (leading dot, its own suffix, this process's pid), so nothing
+    # looking for posts sees it and a leftover from a crashed run is
+    # never renamed onto.
+    #
+    # THREE things step aside, not one. Media and edit history are keyed
+    # by year/slug exactly like the post file, and the mover's own
+    # machinery (Publishing.relocate_media) treats whatever it finds at
+    # the destination as an orphan: it merged the two posts' pictures
+    # into one directory and deleted the arriving post's version history
+    # outright. Parked, each mover finds an empty destination and moves
+    # nothing; the parked trees are put down at their DESTINATION year
+    # once every write has landed.
+    wanted = landing.map { |target_path, _| File.expand_path(target_path) }
+    parked = []
     done = 0
+    moving = false
     begin
+      # Inside the begin on purpose: a parking rename that fails halfway
+      # (a read-only year folder, a full disk) must put the already-parked
+      # posts back before this leaves, or a post ends the run hidden under
+      # a name nothing looks for, with the archive certifying itself sound.
+      moves.each_with_index do |(entry, target), i|
+        next unless wanted.each_with_index.any? { |w, j| j != i && w == File.expand_path(entry[:path]) }
+
+        slug = entry[:post]['slug']
+        year = File.basename(File.dirname(entry[:path]))
+        dest_year = target.year.to_s
+        info = {
+          slug: slug,
+          # What the file said before it was touched, and where it was
+          # going: between them they are what puts a post back exactly as
+          # it was found -- see step_back, which needs the date as well as
+          # the name.
+          index: i,
+          post: entry[:post],
+          raw: entry[:raw],
+          target: target,
+          json_temp: park_name(File.dirname(entry[:path]), File.basename(entry[:path], '.json'), '.json'),
+          json_home: entry[:path],
+          dest_json: File.join(CONTENT_DIR, dest_year, "#{slug}.json"),
+          media_home: File.join(MEDIA_DIR, year, slug),
+          dest_media: File.join(MEDIA_DIR, dest_year, slug),
+          versions_home: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug),
+          dest_versions: File.join(PostVersions.versions_root(CONTENT_DIR), dest_year, slug)
+        }
+        File.rename(entry[:path], info[:json_temp])
+        entry[:path] = info[:json_temp]
+        parked << info
+        if Dir.exist?(info[:media_home])
+          info[:media_temp] = park_name(File.dirname(info[:media_home]), slug, '')
+          File.rename(info[:media_home], info[:media_temp])
+        end
+        if Dir.exist?(info[:versions_home])
+          info[:versions_temp] = park_name(File.dirname(info[:versions_home]), slug, '')
+          File.rename(info[:versions_home], info[:versions_temp])
+        end
+      end
+
+      moving = true
       moves.each do |entry, target|
         yield entry, target
         done += 1
       end
     rescue Exception
-      if done.positive?
+      # Everything parked and not yet consumed goes back under its own
+      # name before this leaves. The one shape that needs care is the one
+      # parking exists for: a finished mover's write is standing exactly
+      # where a parked post used to -- so the finished file steps back to
+      # ITS own name (which the parking freed) and, when it has to, to its
+      # own date with it. Only then is the way home asked about, and only
+      # if it is still blocked does the parked copy stay -- named out loud
+      # rather than left for nobody to find.
+      stranded = []
+      # What each post ended up doing, written down as it happens. The
+      # report at the bottom used to work this out afterwards -- from how
+      # far the loop got, and from whether entry[:path] was still there --
+      # and both answers are wrong here: the recovery moves files of its
+      # own, and in a swap the two posts share every path there is, so
+      # nothing on disk can be asked which of them it belongs to.
+      landed = moves.each_index.map { |i| i < done ? :moved : :home }
+      # The mover that finished and was not tidied up after: its write
+      # landed and only the delete behind it did not, so what stands under
+      # its parking name is a copy of a post that is already where it was
+      # asked to go. `done` cannot see that -- the exception came out of
+      # that very delete, so the loop never counted the move. Settled
+      # before anything else reads the disk, because left standing the
+      # loop below takes the leftover for a post that never moved: it
+      # calls a finished mover "see below" and sends the author to rename
+      # the copy over the post that did move.
+      #
+      # Exactly one mover can be in that state, and it is `moves[done]` --
+      # the one that was running. Asked that narrowly on purpose: two posts
+      # can be identical but for the date the move rewrites, and then "the
+      # destination holds this post" is true of a file the mover never
+      # wrote. Both halves have to hold, or the wrong copy is the one that
+      # gets removed.
+      parked.each do |info|
+        next unless moving && info[:index] == done
+        next unless File.exist?(info[:json_temp]) && landed_at_destination?(info)
+
+        info[:settled] = true
+        landed[info[:index]] = :moved
+        begin
+          File.delete(info[:json_temp])
+          settle_parked_side_cars(info)
+        rescue StandardError
+          # Even the tidying can fail -- the disk that brought us here is
+          # still full. Whatever is left under a parking name gets a row
+          # of its own rather than a raise on the way out.
+          left = [%i[json_temp dest_json], %i[media_temp dest_media], %i[versions_temp dest_versions]]
+          left.each do |temp_key, dest_key|
+            temp = info[temp_key]
+            next unless temp && File.exist?(temp)
+
+            stranded << [info[:slug], temp, info[dest_key], File.exist?(info[dest_key])]
+          end
+        end
+      end
+      parked.each do |info|
+        next if info[:settled]
+
+        if File.exist?(info[:json_temp])
+          # A finished mover standing exactly where this post came from,
+          # with its own name free to go back to. Gets out of the way
+          # first -- and if it went back whole, it is not "moved" any more.
+          owner = parked.find { |q| q[:dest_json] == info[:json_home] }
+          in_the_way = owner && File.exist?(info[:json_home]) && !File.exist?(owner[:json_home])
+          landed[owner[:index]] = :home if in_the_way && step_back(owner, info)
+
+          # The name being free is not the same question as the address
+          # being free, and it is the address the build refuses to build
+          # two of -- so it is the one asked here, by the guard that
+          # answers it everywhere else. Asking about the name alone is
+          # how this recovery used to put a parked post back beside a
+          # mover that was serving the same address from another folder.
+          home_clear = way_home_clear?(info)
+          if home_clear && try_rename(info[:json_temp], info[:json_home])
+            landed[info[:index]] = :home
+          else
+            landed[info[:index]] = :parked
+            # The last field is what the row is allowed to advise. A clear
+            # way home means the rename merely failed, and doing it by
+            # hand is exactly right; a blocked one means something else is
+            # served at that address, and the instruction has to be the
+            # careful one -- this file can be the only copy of its post.
+            stranded << [info[:slug], info[:json_temp], info[:json_home], !home_clear]
+          end
+        end
+        [%i[media_temp media_home], %i[versions_temp versions_home]].each do |temp_key, home_key|
+          temp = info[temp_key]
+          next unless temp && File.exist?(temp)
+
+          taken = File.exist?(info[home_key])
+          stranded << [info[:slug], temp, info[home_key], taken] if taken || !try_rename(temp, info[home_key])
+        end
+      end
+      if done.positive? || landed.include?(:moved) || stranded.any?
         warn ''
-        warn 'A write failed partway through the queue -- repair the times below by hand before the cron next runs:'
+        warn t('cli.queue_move_failed')
+        # The dates stay ISO on purpose: this list is read with a file
+        # manager open next to it, and the folder they name is the year
+        # in the timestamp, not whatever the locale's date_format writes.
+        #
+        # Every row comes off `landed`, which the recovery kept as it
+        # went. "see below" is one of those answers rather than a guess,
+        # so it can no longer be printed for a post with nothing below it
+        # -- which is what a mover put back under its own name got, while
+        # the one the recovery had stepped back was still being announced
+        # as moved to the date it no longer holds.
         moves.each_with_index do |(entry, target), i|
-          warn "  '#{entry[:slug]}' -- #{i < done ? "moved to #{target.iso8601}" : "still at #{entry[:time].iso8601}"}"
+          state = case landed[i]
+                  when :moved then t('cli.queue_move_moved', date: target.iso8601)
+                  when :parked then t('cli.queue_move_see_below')
+                  else t('cli.queue_move_stayed', date: entry[:time].iso8601)
+                  end
+          warn "  '#{entry[:slug]}' -- #{state}"
+        end
+        stranded.each do |slug, temp, home, blocked|
+          # Asked again here rather than only where the row was made: the
+          # recovery goes on moving files after a strand is recorded, so a
+          # name that was free then can be occupied by the time this is
+          # read -- and "rename it back" is an instruction to overwrite
+          # whatever got there in between.
+          note = if blocked || File.exist?(home)
+                   t('cli.queue_move_blocked', temp: temp, home: home)
+                 else
+                   t('cli.queue_move_stranded', temp: temp, home: home)
+                 end
+          warn "  '#{slug}' -- #{note}"
         end
         warn ''
       end
       raise
+    end
+    # The mover writes its new file and deletes the one it came from; a
+    # parking name left behind would be a duplicate of a post that is now
+    # somewhere else.
+    parked.each do |info|
+      File.delete(info[:json_temp]) if File.exist?(info[:json_temp])
+      begin
+        settle_parked_side_cars(info)
+      rescue SystemCallError => e
+        # The posts themselves are already where they belong; only a
+        # side-car is still under its parking name. Said out loud with
+        # both paths -- and `check` reports a leftover parking name as an
+        # error, so even a message lost to a closed terminal resurfaces.
+        [%i[media_temp dest_media], %i[versions_temp dest_versions]].each do |temp_key, dest_key|
+          temp = info[temp_key]
+          next unless temp && File.exist?(temp)
+
+          warn "'#{info[:slug]}': #{e.message} -- its files are rescued at #{temp}; move them to #{info[dest_key]} yourself"
+        end
+      end
     end
     true
   end
@@ -2215,7 +2609,7 @@ def cmd_unpublish(slug)
                        # this into a former_slugs redirect -- otherwise the old public URL
                        # would 404 with no trace, exactly what renames promise not to do.
                        # Publishing back under the same address just consumes the marker.
-                       'unpublished_from' => "#{File.basename(File.dirname(path))}/#{slug}")
+                       'unpublished_from' => PostAddress.vacated_marker(post, slug: slug))
   # Kept when the delete failed, so the address survives to be retried --
   # and so a re-publish can see there is already an announcement out there.
   if toot_gone
@@ -2282,7 +2676,7 @@ end
 # it. At the top of a frame it is just a gap.
 def props_frame_lines(post, path, slug, year)
   lines = ["  #{Tui.paint(props_title(post), :bold)}",
-           "  #{draft?(post) ? t('cli.props_draft_banner') : "posts/#{year}/#{post['slug']}/"}", '']
+           "  #{draft?(post) ? t('cli.props_draft_banner') : PostAddress.path(post).sub(%r{\A/}, '')}", '']
   if draft?(post)
     # No created/date line for a plain draft, on purpose: a draft has no
     # time -- its date is set by publishing or scheduling, and showing
@@ -2314,7 +2708,7 @@ def props_frame_lines(post, path, slug, year)
   # Old addresses are counted, not listed: a post renamed a few times
   # would push everything else off the screen, and the list is one
   # keypress away in [a].
-  addresses = Array(post['former_slugs']).size
+  addresses = address_entries(post).size
   lines << props_line('addresses', addresses.positive? ? t('cli.props_addresses_count', count: addresses) : nil)
   lines.compact!
   # The whole queue, after the property list rather than inside it: it is
@@ -2347,6 +2741,16 @@ def props_prompt(post, path, slug, network_label)
           'cli.props_actions_published_plain'
         end
   with_versions_key(t(key, network: network_label), path, slug)
+end
+
+# "Not understood, try ..." -- listing the keys the row above is OFFERING,
+# read out of that row rather than out of a second, hand-kept sentence.
+# The two drifted: [v] (older versions) is added to the row only when the
+# post has versions, and [t] only on a site with a network, and neither
+# was ever named here.
+def props_unknown(prompt)
+  keys = prompt.scan(/\[([a-z])\]/).flatten
+  t('cli.props_unknown', keys: keys.join(' / '))
 end
 
 def cmd_props(slug)
@@ -2432,7 +2836,7 @@ def props_loop(slug, screen)
         end
       when 'n'
         unless post['scheduled']
-          props_run(screen) { puts t('cli.props_unknown_draft') }
+          props_run(screen) { puts props_unknown(prompt) }
           next
         end
         props_run(screen) { unschedule_post(path, post, slug, raw: original_raw) }
@@ -2450,7 +2854,7 @@ def props_loop(slug, screen)
 
         return
       when '' then return props_close(screen)
-      else props_run(screen) { puts t(post['scheduled'] ? 'cli.props_unknown_scheduled' : 'cli.props_unknown_draft') }
+      else props_run(screen) { puts props_unknown(prompt) }
       end
     else
       case key
@@ -2463,7 +2867,7 @@ def props_loop(slug, screen)
         return if p2.nil? || draft?(JSON.parse(File.read(p2, encoding: 'utf-8')))
       when 't'
         unless network_label
-          props_run(screen) { puts t('cli.props_unknown_published_plain') }
+          props_run(screen) { puts props_unknown(prompt) }
           next
         end
         props_run(screen) do
@@ -2480,10 +2884,15 @@ def props_loop(slug, screen)
         props_run(screen) { props_versions(path, slug) }
       when 'x'
         props_run(screen) { cmd_delete(slug) }
-        # Cancelled (the post still exists) -> stay in the dialog.
-        return unless find_post_path(slug)
+        # Gone -> leave. Still here -> the delete was cancelled, so stay.
+        # Asked about THIS file, not about the slug: with the same slug in
+        # two years, "does a post by this name still exist?" is answered by
+        # the OTHER one, and the dialog quietly redrew itself around a post
+        # nobody had opened -- same keys, different post, one keystroke
+        # from deleting that one too.
+        return unless File.exist?(path)
       when '' then return props_close(screen)
-      else props_run(screen) { puts t(network_label ? 'cli.props_unknown_published' : 'cli.props_unknown_published_plain') }
+      else props_run(screen) { puts props_unknown(prompt) }
       end
     end
   end
@@ -2640,7 +3049,19 @@ def props_versions(path, slug)
   return if index.nil?
 
   chosen = versions[index]
-  restored = JSON.parse(File.read(chosen, encoding: 'utf-8'))
+  restored = begin
+    JSON.parse(File.read(chosen, encoding: 'utf-8'))
+  rescue JSON::ParserError, SystemCallError => e
+    # A version is a file like any other -- a half-written save, a copy the
+    # cloud is still bringing down. Ending the whole CLI in a parser error
+    # was the one thing this screen must not do: it is where somebody goes
+    # precisely BECAUSE something is wrong.
+    puts Tui.paint("⚠️  #{File.basename(chosen)}: #{e.class} -- #{e.message.lines.first.to_s.strip[0, 80]}", :yellow)
+    puts
+    next_round = true
+    nil
+  end
+  return props_versions(path, slug) if restored.nil? && next_round
   # One key, not a typed word. This engine keeps typing for what DISAPPEARS
   # -- deleting a post and unpublishing one both ask for the slug -- and
   # restoring a version loses nothing: the current text is kept as a version
@@ -2696,15 +3117,19 @@ def props_addresses(path, slug)
     # minutes. The write below refuses if anything moved in between.
     raw = File.read(path, encoding: 'utf-8')
     post = JSON.parse(raw)
-    entries = Array(post['former_slugs']).map(&:to_s)
+    entries = address_entries(post)
     if entries.empty?
       puts t('cli.addresses_none')
       puts
       return
     end
 
-    current = "#{File.basename(File.dirname(path))}/#{slug}"
-    rows = entries.each_with_index.map { |former, i| address_row(former, current, i) }
+    # The post's own address today, in the shape its kind of address is
+    # written in -- a page's has no year in it. Compared against, so the
+    # row for "the address I am at right now" is not marked as taken by
+    # somebody else.
+    current = PostAddress.vacated_marker(post, slug: slug)
+    rows = entries.each_with_index.map { |(_, value), i| address_row(value, current, i) }
     # Into the frame, not above it -- see version_pick.
     index = address_pick(rows, [Tui.paint(t('cli.addresses_heading', count: entries.size), :dim), ''])
     # The blank line after a picker is the caller's to write -- Tui.menu
@@ -2714,14 +3139,14 @@ def props_addresses(path, slug)
     puts
     return if index.nil?
 
-    former = entries[index]
+    key, former = entries[index]
     print t('cli.addresses_drop_confirm', address: former)
-    next unless Tui.key_choice('') == t('cli.confirm_yes_char')
+    next unless Tui.yes?(Tui.key_choice(''))
 
     abort_if_post_changed(path, raw, slug)
-    remaining = entries - [former]
     updated = post.dup
-    remaining.empty? ? updated.delete('former_slugs') : updated['former_slugs'] = remaining
+    remaining = Array(updated[key]).map(&:to_s) - [former]
+    remaining.empty? ? updated.delete(key) : updated[key] = remaining
     AtomicWrite.write_json(path, updated)
     puts Tui.paint(t('cli.addresses_dropped', address: former), :green)
     maybe_rebuild
@@ -2735,10 +3160,45 @@ end
 # The comparison is against the post's whole current address, not its
 # slug: a post that moved between years keeps its slug, and the address it
 # vacated is precisely the one another post can take.
+# Both lists, in one list. A post records the addresses it has left in
+# former_slugs ("year/slug"); a PAGE records them in redirect_from
+# ("/slug/"), because a page's address has no year to write down. The
+# dialog read only the first, so a renamed page was told it had no old
+# addresses at all -- while the build warned about the one it could not
+# place, on every single run, with nothing anywhere able to clear it.
+def address_entries(post)
+  Array(post['former_slugs']).map { |value| ['former_slugs', value.to_s] } +
+    Array(post['redirect_from']).map { |value| ['redirect_from', value.to_s] }
+end
+
+# Who is standing at a root address today: a page of that slug, whatever
+# year its file sits in. Same question address_occupant answers for a
+# post's address, asked the way a page is served.
+def root_occupant(name)
+  PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(name)}.json").sort.each do |file|
+    candidate = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue StandardError
+      next
+    end
+    next unless candidate.is_a?(Hash) && PostAddress.page?(candidate)
+
+    return draft?(candidate) ? :draft : :published
+  end
+  nil
+end
+
 def address_row(former, current, index)
   parts = former.split('/').reject(&:empty?)
-  occupant = parts.size == 2 && former != current ? address_occupant(parts) : nil
-  note = if parts.size != 2
+  page_address = former.start_with?('/')
+  occupant = if former == current
+               nil
+             elsif page_address && parts.size == 1
+               root_occupant(parts.first)
+             elsif parts.size == 2
+               address_occupant(parts)
+             end
+  note = if !page_address && parts.size != 2
            "  #{t('cli.addresses_unusable')}"
          elsif occupant == :draft
            "  #{t('cli.addresses_taken_draft')}"
@@ -2756,8 +3216,23 @@ end
 # when that draft publishes. Told "this redirect never happens", the
 # owner's next move is dropping an address that is doing its job.
 def address_occupant(parts)
-  raw = File.read(File.join(CONTENT_DIR, parts[0], "#{parts[1]}.json"), encoding: 'utf-8')
-  draft?(JSON.parse(raw)) ? :draft : :published
+  year, slug = parts
+  # The file may sit in any year's folder: what decides the address is the
+  # DATE. Reading only <year>/<slug>.json answered about a file rather than
+  # about an address, which is the same narrow question the six writing
+  # paths were asking until this release.
+  PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").sort.each do |file|
+    candidate = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue StandardError
+      next
+    end
+    next unless candidate.is_a?(Hash) && !PostAddress.page?(candidate)
+    next unless PostAddress.date_year(candidate) == year
+
+    return draft?(candidate) ? :draft : :published
+  end
+  nil
 rescue Errno::ENOENT
   nil
 rescue StandardError
@@ -2828,15 +3303,33 @@ def rename_post(path, post, raw: nil)
     return old_slug
   end
 
-  # Same guard as edit and publish: the address and the media directory
-  # are both keyed by year/slug, and neither may land on another post's.
+  # Same guard as edit and publish, and it has to refuse EXACTLY what the
+  # build refuses -- so it asks PostAddress the same question the build
+  # asks, instead of working out its own answer. Comparing served
+  # addresses was its own answer, and it let through both pairs the build
+  # stops on: a draft (served under its token, but its file and media sit
+  # under year/slug like everyone else's) and a page (served at the root,
+  # so its year never seemed to matter). Either one turned a rename into a
+  # site that would not build.
   new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
   new_media_dir = File.join(MEDIA_DIR, year, new_slug)
-  if File.exist?(new_path) || Dir.exist?(new_media_dir)
+  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug,
+                                        path: new_path)
+  if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
     # Not the shared post_already_exists text: that one says "continuing
     # would overwrite it -- resolve manually", and a refused rename
     # neither continues nor needs resolving. Picking another slug does.
-    puts t('cli.rename_taken', slug: new_slug)
+    #
+    # An occupant nobody can read is refused just the same -- a place whose
+    # owner will not open is not free space -- but it gets its own sentence,
+    # because "another post already uses that slug" is a claim about a file
+    # this process never managed to look at, and the reader would go
+    # looking for a post that may not be there.
+    if taken_address && AddressGuard.unreadable?(taken_address)
+      puts t('cli.rename_unreadable', slug: new_slug, path: taken_address)
+    else
+      puts t('cli.rename_taken', slug: new_slug)
+    end
     puts
     return old_slug
   end
@@ -2844,9 +3337,17 @@ def rename_post(path, post, raw: nil)
   if draft?(post)
     puts t('cli.rename_confirm_draft', old: old_slug, new: new_slug)
   else
-    puts t('cli.rename_confirm', old_url: published_url(old_slug, year), new_url: published_url(new_slug, year))
+    # The addresses the site actually answers at: a page has no year in
+    # its address, and a post whose date was corrected across a year lives
+    # under the DATE's year, not the folder's. The banner two rows above
+    # this dialog had it right while the promise below did not.
+    page = PostAddress.page?(post)
+    address_year = PostAddress.date_year(post)
+    puts t('cli.rename_confirm',
+           old_url: published_url(old_slug, address_year, page: page),
+           new_url: published_url(new_slug, address_year, page: page))
   end
-  unless Tui.key_choice(t('cli.rename_go')) == t('cli.confirm_yes_char')
+  unless Tui.yes?(Tui.key_choice(t('cli.rename_go')))
     puts t('cli.cancelled')
     puts
     return old_slug
@@ -2861,10 +3362,15 @@ def rename_post(path, post, raw: nil)
 
   updated = post.merge('slug' => new_slug)
   unless draft?(post)
-    former = Array(post['former_slugs']).map(&:to_s) + ["#{year}/#{old_slug}"]
-    # A rename back to an earlier slug must not leave that address
-    # redirecting to itself.
-    updated['former_slugs'] = (former.uniq - ["#{year}/#{new_slug}"])
+    # The year the post was SERVED under -- its date's, not its folder's.
+    # Those two part company after a date is corrected across a year, and
+    # recording the folder's year left the live address dying without a
+    # redirect while a stub appeared at an address nobody ever linked to.
+    # One rule for the address being vacated, and one for where the debt is
+    # written down -- see lib/post_address.rb. A rename back to an earlier
+    # slug must not leave that address redirecting to itself, which is what
+    # spend_vacated takes care of.
+    PostAddress.spend_vacated(updated, PostAddress.vacated_marker(post, slug: old_slug), slug: new_slug)
   end
 
   # Media first, replacement JSON second, old JSON last -- the same order
@@ -3014,13 +3520,6 @@ def edit_post(slug, path: nil)
   new_path = File.join(new_dir, "#{slug}.json")
   new_media_dir = File.join(MEDIA_DIR, new_year, slug)
 
-  # Same guard as Publishing.publish: a date edit that moves the post
-  # into a year where another post already owns this slug must not
-  # overwrite that post's JSON (and displace its media directory).
-  if new_dir != File.dirname(path) && File.exist?(new_path)
-    abort t('cli.post_already_exists', slug: slug, path: new_path)
-  end
-
   updated = {
     'slug' => slug,
     'title' => new_title,
@@ -3069,11 +3568,47 @@ def edit_post(slug, path: nil)
   # rename creates, and the stub mechanism has always been able to pay it;
   # nothing was writing the entry, so the old link just died. A draft
   # vacates nothing, exactly as in rename_post.
-  vacated = new_year != year && !draft?(post) ? "#{year}/#{slug}" : nil
-  former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
-  updated['former_slugs'] = former unless former.empty?
+  # Both lists come across first, because what the save owes is decided
+  # against what the post already carries -- and then the debt is asked of
+  # PostAddress in both directions: the address the post HAD, and the one
+  # the save gives it.
+  #
+  # Asking only about the year was the hole. `type: page` typed into the
+  # frontmatter -- or deleted from it, which the editor shows precisely so
+  # that saving cannot silently un-page a page -- moves a post between
+  # /posts/2026/slug/ and /slug/ without touching the date. Every link to
+  # the address it left then died with no stub behind it, and this is the
+  # one path of the five that was still working it out on its own.
+  # Same guard as Publishing.publish: a date edit that moves the post
+  # into a year where another post already owns this slug must not
+  # overwrite that post's JSON (and displace its media directory).
+  # Asked on every save, not only when the folder changes: typing
+  # `type: page` into the frontmatter moves the post to /slug/ without
+  # moving its file anywhere, and the address it lands on can already be
+  # a page's. The build refuses to run on that, so the save that made it
+  # would be the last one before the site stopped building.
+  # Only when the save actually moves the post. An archive that already
+  # holds two posts at one address is exactly the archive somebody is
+  # trying to repair, and refusing the edit that would repair it -- while
+  # claiming it would overwrite a file it does not write to -- left them
+  # with the CLI unable to fix what the CLI had let happen.
+  moving = PostAddress.collision_keys(updated, slug: slug) !=
+           PostAddress.collision_keys(post, slug: slug) ||
+           File.expand_path(new_path) != File.expand_path(path)
+  if moving
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug,
+                                  except: path, path: new_path)
+    abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+  end
+
+  carried = Array(post['former_slugs']).map(&:to_s)
+  updated['former_slugs'] = carried unless carried.empty?
+  inherited = Array(post['redirect_from']).map(&:to_s)
+  updated['redirect_from'] = inherited unless inherited.empty?
+  was = draft?(post) ? nil : PostAddress.vacated_marker(post, slug: slug)
+  now = draft?(updated) ? nil : PostAddress.vacated_marker(updated, slug: slug)
+  PostAddress.spend_vacated(updated, was == now ? nil : was, slug: slug)
   updated['unpublished_from'] = post['unpublished_from'] if post['unpublished_from']
-  updated['redirect_from'] = post['redirect_from'] if post['redirect_from']
   updated['mastodon_url'] = post['mastodon_url'] if post['mastodon_url']
   updated['bluesky_url'] = post['bluesky_url'] if post['bluesky_url']
   updated['bluesky_uri'] = post['bluesky_uri'] if post['bluesky_uri']
@@ -3223,6 +3758,19 @@ def delete_post(slug, path: nil)
   toot_gone, skeet_gone = retract_announcements(post)
 
   trash_dir = File.join(TRASH_DIR, year, slug)
+  # The media `check --repair` set aside for this post live in
+  # trash/<year>/<slug>/media/ -- the same directory this delete is about to
+  # clear for itself. Wiping it took files the repair pass had promised were
+  # restorable, without a word. They are kept aside and merged back below.
+  # Kept inside the trash, not in TMPDIR: a move across devices copies, and
+  # a temporary directory that fills up or is cleared mid-run takes files
+  # the repair pass promised were restorable.
+  kept_media = nil
+  if Dir.exist?(File.join(trash_dir, 'media'))
+    kept_media = File.join(TRASH_DIR, ".keep-#{slug}-#{Process.pid}")
+    FileUtils.mkdir_p(kept_media)
+  end
+  FileUtils.mv(PathGlob.under(trash_dir, 'media', '*'), kept_media) if kept_media
   FileUtils.rm_rf(trash_dir)
   FileUtils.mkdir_p(trash_dir)
   # The post's earlier drafts go with it. Left behind they would be an
@@ -3244,6 +3792,17 @@ def delete_post(slug, path: nil)
   File.write(File.join(trash_dir, 'post.json'), JSON.pretty_generate(trashed))
   File.delete(path)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
+  # ...and back in with them, beside the post's own media rather than
+  # instead of it: a name already taken keeps both copies.
+  if kept_media
+    FileUtils.mkdir_p(File.join(trash_dir, 'media'))
+    Dir.children(kept_media).each do |name|
+      target = File.join(trash_dir, 'media', name)
+      target = "#{target}.#{Time.now.strftime('%Y%m%d%H%M%S')}" if File.exist?(target)
+      FileUtils.mv(File.join(kept_media, name), target)
+    end
+    FileUtils.remove_entry(kept_media)
+  end
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)
   true
@@ -3264,7 +3823,7 @@ end
 # the trash grew years. Both are restorable -- an upgrade must not strand
 # somebody's undo.
 def trashed_paths(slug)
-  (Dir.glob(File.join(TRASH_DIR, '*', slug, 'post.json')) +
+  (PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'post.json') +
    [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) }.uniq.sort
 end
 
@@ -3273,6 +3832,11 @@ end
 def pick_among_trashed(slug, paths)
   readable = paths.filter_map { |f| (summary = post_summary(f)) && [f, summary] }
   abort t('cli.nothing_in_trash', slug: slug) if readable.empty?
+
+  if readable.size == 1 && paths.size > 1
+    warn t('cli.ambiguous_one_readable', slug: slug)
+    return readable.first.first
+  end
 
   paths = readable.map(&:first)
   rows = readable.map { |(_, summary)| summary_row(summary) }
@@ -3299,8 +3863,63 @@ def pick_among_trashed(slug, paths)
   paths[input.to_i - 1]
 end
 
+# Media the repair pass set aside for a post that still exists: there is no
+# post.json to bring back, only files. `check --repair` promises the trash
+# is somewhere restore can reach, and this is the half that makes it true.
+def trashed_media_dirs(slug)
+  PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) }.sort
+end
+
+def restore_media(slug, dirs)
+  dir = dirs.first
+  if dirs.size > 1
+    # The same rule as everywhere else in this file: never guess between
+    # two years, show both and ask.
+    dirs.each_with_index do |candidate, i|
+      count = Dir.children(candidate).reject { |f| f.start_with?('.') }.size
+      puts format('%2d.  %s  (%s)', i + 1, candidate.sub("#{ROOT}/", ''),
+                  t('cli.restore_media_count', count: count))
+    end
+    answer = Tui.plain_line(t('cli.restore_media_pick'))
+    index = Integer(answer, exception: false)
+    return unless index&.between?(1, dirs.size)
+
+    dir = dirs[index - 1]
+  end
+
+  year = File.basename(File.dirname(File.dirname(dir)))
+  target = File.join(MEDIA_DIR, year, slug)
+  FileUtils.mkdir_p(target)
+  returned = []
+  kept = []
+  Dir.children(dir).reject { |f| f.start_with?('.') }.sort.each do |name|
+    destination = File.join(target, name)
+    # Never over the top of a file that is there now: the archive it would
+    # replace is the one thing this command exists to protect.
+    if File.exist?(destination)
+      kept << name
+      next
+    end
+
+    FileUtils.mv(File.join(dir, name), destination)
+    returned << name
+  end
+  FileUtils.rmdir(dir) if Dir.children(dir).empty?
+  FileUtils.rmdir(File.dirname(dir)) if Dir.exist?(File.dirname(dir)) && Dir.children(File.dirname(dir)).empty?
+
+  puts t('cli.restored_media', count: returned.size, path: target.sub("#{ROOT}/", ''))
+  warn t('cli.restore_media_kept', files: kept.join(', ')) unless kept.empty?
+end
+
 def cmd_restore(slug)
   found = trashed_paths(slug)
+  if found.empty?
+    # A post that was never deleted can still have files waiting here --
+    # what `check --repair` set aside. Restoring those is not restoring a
+    # post, so it is asked and reported separately.
+    media = trashed_media_dirs(slug)
+    return restore_media(slug, media) unless media.empty?
+  end
   abort t('cli.nothing_in_trash', slug: slug) if found.empty?
 
   # Two years of the same slug can sit in the trash at once now, so the
@@ -3312,7 +3931,8 @@ def cmd_restore(slug)
   year = Time.parse(post['date']).year.to_s
   new_dir = File.join(CONTENT_DIR, year)
   new_path = File.join(new_dir, "#{slug}.json")
-  abort t('cli.post_already_exists', slug: slug, path: new_path) if File.exist?(new_path)
+  taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug, path: new_path)
+  abort t('cli.post_already_exists', slug: slug, path: taken) if taken
 
   FileUtils.mkdir_p(new_dir)
   FileUtils.mv(trash_json, new_path)
@@ -3402,6 +4022,9 @@ def row_date(post)
   return '----------' if post[:state] == DRAFT && !post[:scheduled]
 
   Time.parse(post[:date]).strftime('%Y-%m-%d')
+rescue ArgumentError, TypeError
+  # A date nothing can parse must not cost the list its whole screen.
+  '----------'
 end
 
 def summary_row(post)
@@ -3409,7 +4032,7 @@ def summary_row(post)
 end
 
 def load_posts_summary
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map { |f| post_summary(f) }
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map { |f| post_summary(f) }
 end
 
 def cmd_list(filters)
@@ -3420,7 +4043,11 @@ def cmd_list(filters)
 
     true
   end
-  posts.sort_by! { |p| p[:date] }
+  # A post whose date is missing or unreadable sorts last instead of
+  # ending the command: `list` is one of the ways somebody goes LOOKING for
+  # the post that is broken, and a raw comparison error out of sort_by
+  # named neither the file nor the problem.
+  posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
   posts.each { |p| puts summary_row(p) }
   drafts = posts.count { |p| p[:state] == DRAFT }
@@ -3465,7 +4092,7 @@ def browse_row(post)
 end
 
 def browse_posts
-  Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+  PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
     summary = post_summary(file)
     # Keyed by year/slug, not slug: backdating makes the same slug in two
     # years easy (the archive really has such pairs), and a slug-keyed
@@ -3814,7 +4441,11 @@ RECENT_LIST_COUNT = 50
 
 def recent_posts(limit)
   posts = load_posts_summary
-  posts.sort_by! { |p| p[:date] }
+  # A post whose date is missing or unreadable sorts last instead of
+  # ending the command: `list` is one of the ways somebody goes LOOKING for
+  # the post that is broken, and a raw comparison error out of sort_by
+  # named neither the file nor the problem.
+  posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
   posts.first(limit)
 end
@@ -3890,9 +4521,27 @@ def trash_summary
   # and the wizard's whole Trash entry, answered "Trash is empty" over a full
   # trash. The engine's only undo, unreachable except by typing a slug the
   # author would have to remember.
-  (Dir.glob(File.join(TRASH_DIR, '*', '*', 'post.json')) +
-   Dir.glob(File.join(TRASH_DIR, '*', 'post.json')))
-    .uniq.sort.filter_map { |f| post_summary(f) }
+  posts = (PathGlob.under(TRASH_DIR, '*', '*', 'post.json') +
+           PathGlob.under(TRASH_DIR, '*', 'post.json'))
+         .uniq.sort.filter_map { |f| post_summary(f) }
+  # ...and the media `check --repair` set aside for posts that were never
+  # deleted. Without these the list said "the trash is empty" over files
+  # the engine itself had just put there and promised were restorable.
+  media_only = PathGlob.under(TRASH_DIR, '*', '*', 'media').filter_map do |dir|
+    slug = File.basename(File.dirname(dir))
+    next if File.exist?(File.join(File.dirname(dir), 'post.json'))
+    next if posts.any? { |p| p[:slug] == slug }
+
+    count = Dir.children(dir).reject { |f| f.start_with?('.') }.size
+    next if count.zero?
+
+    # A date Time.parse can read: the row that draws this list parses it,
+    # and a bare year ("2026") is an ArgumentError -- which took down the
+    # whole trash picker, and with it the only undo the engine has.
+    { slug: slug, title: t('cli.restore_media_count', count: count),
+      date: "#{File.basename(File.dirname(File.dirname(dir)))}-01-01T00:00:00+00:00" }
+  end
+  posts + media_only.uniq { |entry| entry[:slug] }
 end
 
 # Lets `restore` be called with no slug: offers the trash's contents, same
@@ -4335,7 +4984,13 @@ else
     unless Dir.exist?(File.join(ROOT, 'public.nosync'))
       abort t('cli.preview_missing_public')
     end
-    port = (ARGV.shift || '8000').to_i
+    # "preview draft" is a thing somebody types, and to_i turned it into
+    # port 0 -- the system then handed out a random port and the line on
+    # screen said http://localhost:0/, which is not where it is listening.
+    asked = ARGV.shift || '8000'
+    abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
+
+    port = asked.to_i
     puts t('cli.preview_serving', url: "http://localhost:#{port}/")
     # The serve loop below blocks forever -- with stdout piped (not a TTY)
     # the URL line would sit in the buffer the whole time, so push it out.

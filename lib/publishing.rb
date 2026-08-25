@@ -6,6 +6,8 @@ require 'time'
 # For $CHILD_STATUS -- the exit status of the build and the deploy is what
 # tells "the lock was busy" from "it broke", and $? does not read as either.
 require 'English'
+require_relative 'post_address'
+require_relative 'address_guard'
 require_relative 'site_config'
 require_relative 'atomic_write'
 require_relative 'post_writer'
@@ -48,7 +50,14 @@ module Publishing
     (ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')).to_s.chomp('/')
   end
 
-  def post_url(slug, year)
+  # `page:` because a page is served at the root: the announcement for one
+  # carried /posts/<year>/<slug>/, an address the site never answers at, so
+  # the toot that told the world about a new page linked to a 404 -- and
+  # the URL is also what finds the announcement again later, to update or
+  # withdraw it.
+  def post_url(slug, year, page: false)
+    return "#{base_url}/#{slug}/" if page
+
     "#{base_url}/posts/#{year}/#{slug}/"
   end
 
@@ -94,17 +103,24 @@ module Publishing
     # former_slugs, so a rename back to an earlier slug can never leave
     # an address redirecting to itself (or a build warning that never
     # goes away).
-    vacated = updated.delete('unpublished_from')
-    former = (Array(updated['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{new_year}/#{slug}"]
-    former.empty? ? updated.delete('former_slugs') : updated['former_slugs'] = former
+    # A page's debt is written as "/old-slug/" and belongs in redirect_from;
+    # a post's is "<year>/<slug>" and belongs in former_slugs. One function
+    # knows which (lib/post_address.rb), because this was decided in five
+    # places and each got it wrong at a different time.
+    PostAddress.spend_vacated(updated, updated.delete('unpublished_from'), slug: slug)
 
     new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
-    if new_year != old_year
-      # A different post can already own <new_year>/<slug> -- writing
-      # there would replace it wholesale, and the build's duplicate
-      # check never fires because only one file remains.
-      abort(I18n.t('cli.post_already_exists', slug: slug, path: new_path)) if File.exist?(new_path)
+    # A different post can already own the address this one is about to
+    # take -- and writing there leaves an archive the build refuses to
+    # run on. Asked of AddressGuard, and asked on EVERY publish rather
+    # than only when the year changes: a draft published onto a page's
+    # slug never moved years at all, and the scheduler's cron reaches
+    # this line with nobody at the keyboard to read what went wrong.
+    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug,
+                                  except: path, path: new_path)
+    abort(I18n.t('cli.post_already_exists', slug: slug, path: taken)) if taken
 
+    if new_year != old_year
       FileUtils.mkdir_p(File.dirname(new_path))
       relocate_media(slug, old_year, new_year)
     end
@@ -144,8 +160,8 @@ module Publishing
   # title/url/hashtags must never be truncated (a cut-off URL is a dead
   # link, a cut-off hashtag is a broken one) -- only the perex shrinks to
   # make the whole toot fit under Mastodon's TOOT_LENGTH limit.
-  def compose_toot(title:, slug:, year:, blocks:, tags:)
-    url = post_url(slug, year)
+  def compose_toot(title:, slug:, year:, blocks:, tags:, page: false)
+    url = post_url(slug, year, page: page)
     hashtags = hashtags_for(tags)
     fixed_length = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length
     budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
@@ -192,8 +208,8 @@ module Publishing
   # The Bluesky counterpart of compose_toot: same never-truncate rule for
   # title/url/hashtags, 300-grapheme budget. Links and hashtags become
   # clickable via facets, which BlueskyPoster builds from this text.
-  def compose_bluesky_post(title:, slug:, year:, blocks:, tags:)
-    url = post_url(slug, year)
+  def compose_bluesky_post(title:, slug:, year:, blocks:, tags:, page: false)
+    url = post_url(slug, year, page: page)
     hashtags = hashtags_for(tags)
     fixed = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
     budget = BLUESKY_LENGTH - grapheme_length(fixed) - 2
@@ -275,10 +291,7 @@ module Publishing
   # by hand or by a script -- the 17 Aug incident's own vector -- is
   # exactly who this is for.
   def unlisted?(post)
-    value = post['unlisted']
-    return false if value.nil? || value == false
-
-    !%w[false no 0].include?(value.to_s.strip.downcase)
+    PostAddress.unlisted?(post)
   end
 
   # Sends the announcement to whichever network the site configured and
@@ -303,12 +316,14 @@ module Publishing
     case SiteConfig.comment_network
     when :mastodon
       url = MastodonPoster.publish(compose_toot(title: title, slug: slug, year: year,
-                                                blocks: blocks, tags: tags),
+                                                blocks: blocks, tags: tags,
+                                                page: PostAddress.page?(post)),
                                    idempotency_key: "#{year}/#{slug}")
       url ? { 'mastodon_url' => url } : false
     when :bluesky
       result = BlueskyPoster.publish(compose_bluesky_post(title: title, slug: slug, year: year,
-                                                          blocks: blocks, tags: tags))
+                                                          blocks: blocks, tags: tags,
+                                                          page: PostAddress.page?(post)))
       result ? { 'bluesky_url' => result[:url], 'bluesky_uri' => result[:uri] } : false
     end
   end

@@ -230,7 +230,13 @@ module Embed
     when 'mixcloud' then ['https://www.mixcloud.com', 'https://player-widget.mixcloud.com']
     when 'archive_org' then ['https://archive.org']
     when 'peertube', 'funkwhale' then src(block) ? [block['embed_origin'].to_s] : []
-    when 'bandcamp' then src(block) ? ['https://bandcamp.com'] : []
+    when 'bandcamp'
+      # Every artist has their own subdomain, and the stored player address
+      # keeps it. A CSP naming the bare bandcamp.com would block exactly
+      # the iframe the page just rendered.
+      resolved = src(block)
+      uri = resolved && safe_uri(resolved)
+      uri ? [origin_of(uri)] : []
     else []
     end
   end

@@ -15,6 +15,8 @@ require_relative 'exif_location'
 require_relative 'deploy_backend'
 require_relative 'slug'
 require_relative 'account_id'
+require_relative 'forge_address'
+require_relative 'path_glob'
 # For the one thing doctor cannot answer from config alone: whether a
 # menu entry points at an address this archive produces. Sharing the
 # set with check rather than building a second one is the point --
@@ -150,9 +152,12 @@ module Doctor
     findings.concat(check_fonts(data, root))
     findings.concat(check_extra_css(data, root))
     findings.concat(check_nav(data, root))
+    findings.concat(check_chrome_shapes(data))
+    findings.concat(check_sidebar(data))
     findings.concat(check_widgets(data))
     findings.concat(check_publishing(data))
     findings.concat(check_scheduler)
+    findings.concat(check_deploy_pending)
     findings.concat(check_media_location(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
@@ -279,7 +284,7 @@ module Doctor
     path = File.join(ROOT, 'locales', "#{lang}.yml")
     return [] if File.exist?(path)
 
-    available = Dir.glob(File.join(ROOT, 'locales', '*.yml')).map { |f| File.basename(f, '.yml') }.sort
+    available = PathGlob.under(ROOT, 'locales', '*.yml').map { |f| File.basename(f, '.yml') }.sort
     [error(t('lang_unknown', lang: lang), t('lang_unknown_fix', available: available.join(', ')))]
   end
 
@@ -608,7 +613,10 @@ module Doctor
 
     posts = Checker.load_posts(root)
     known = Checker.known_paths(posts)
-    tags = posts.flat_map { |p| Array(p['tags']).map { |t| Slug.slugify(t.to_s) } }.to_set
+    # Asked of Checker, because the build only writes a tag page for a tag
+    # some post in the STREAM carries: counting a draft's tag as known let
+    # doctor tick a menu whose items 404 on every page of the site.
+    tags = Checker.stream_tags(posts)
 
     findings = []
     entries.each do |entry|
@@ -617,7 +625,23 @@ module Doctor
       label = entry['label'].to_s.strip
       slug = entry['tag'].to_s.strip
       if !slug.empty?
-        findings << error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix')) unless tags.include?(slug) || posts.empty?
+        # Compared through Slug.slugify, because that is what the build
+        # names a tag page with. A menu written with the tag's DISPLAY
+        # name -- `tag: "Foto Praha"` for a page built at
+        # /tag/foto-praha/ -- was told no post carried it and sent its
+        # owner looking for a post that had been retagged; the posts were
+        # there all along and the entry was simply in the wrong form.
+        # Still an error either way: the build addresses the tag exactly
+        # as written, so the item does 404 from every page.
+        unless tags.include?(slug) || posts.empty?
+          folded = Slug.slugify(slug)
+          findings << if tags.include?(folded)
+                        error(t('nav_tag_display_form', label: label, tag: slug, slug: folded),
+                              t('nav_tag_display_form_fix', slug: folded))
+                      else
+                        error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix'))
+                      end
+        end
         next
       end
 
@@ -635,7 +659,16 @@ module Doctor
       end
 
       next unless url.start_with?('/')
-      next if url.start_with?('//', '/type/', '/assets/')
+      next if url.start_with?('//', '/type/')
+      # /assets/ is not automatically sound: it is a real file on disk, and
+      # a menu item naming one that is not there 404s on every page of the
+      # site while doctor called the menu fine.
+      if url.start_with?('/assets/')
+        next if nav_asset_present?(root, url)
+
+        findings << error(t('nav_url_missing', label: label, url: url), t('nav_asset_missing_fix'))
+        next
+      end
       # Nothing to judge against on an archive with no posts in it yet.
       next if posts.empty?
       next if known.include?(url) || known.include?("#{url}/")
@@ -644,6 +677,22 @@ module Doctor
     end
     findings << ok(t('nav_ok', count: entries.size)) if findings.empty? && !posts.empty?
     findings
+  end
+
+  # A menu item's address is a URL, and the raw string is not a path: a
+  # #fragment, a ?query and percent escapes all belong in one and none of
+  # them belong on disk. And the file the address serves may be one the
+  # BUILD generates (colors.css; the banner seeded out of defaults/), so
+  # what the site actually answers -- public.nosync -- counts as present
+  # too. Judged raw, doctor flagged five working menu items on one config
+  # and failed the install for them.
+  def nav_asset_present?(root, url)
+    path = url.split('#').first.to_s.split('?').first.to_s.delete_prefix('/')
+    return false if path.empty?
+
+    [path, Checker.percent_decoded(path)].uniq.any? do |form|
+      File.exist?(File.join(root, form)) || File.exist?(File.join(root, 'public.nosync', form))
+    end
   end
 
   # An address that is neither on this site nor anywhere else -- it only
@@ -666,16 +715,53 @@ module Doctor
     'rss' => 'feed_url'
   }.freeze
 
+  # Everything the config says that the engine cannot use -- read from
+  # SiteConfig::Chrome, the same function the build warns from, so the two
+  # cannot name a different set of keys. Before this, doctor knew about
+  # three list keys and nothing else: a widget name with a typo in it took
+  # the sidebar off every page of the site while this said the config was
+  # healthy, and an `about:` written as a list ended the build in a
+  # TypeError out of an ERB template.
+  COMPLAINT_TEXT = {
+    not_a_list: %w[list_shape list_shape_fix],
+    not_a_map: %w[map_shape map_shape_fix],
+    unknown_widget: %w[widget_unknown widget_unknown_fix],
+    widget_shape: %w[widget_shape widget_shape_fix],
+    nav_item: %w[nav_item_shape nav_item_shape_fix],
+    not_text: %w[text_shape text_shape_fix]
+  }.freeze
+
+  def check_chrome_shapes(data)
+    SiteConfig::Chrome.complaints(data).map do |kind, what|
+      text_key, fix_key = COMPLAINT_TEXT.fetch(kind, %w[list_shape list_shape_fix])
+      error(t(text_key, key: what, name: what, index: what), t(fix_key))
+    end
+  end
+
+  # A column reserved on every page with nothing to put in it. Since 1.4 the
+  # build stops drawing it, so this is the sentence that says why the site
+  # changed shape after an upgrade -- and names the switch that says it on
+  # purpose.
+  def check_sidebar(data)
+    return [] unless SiteConfig::Chrome.map(data, 'layout').fetch('sidebar', true)
+
+    cards = SiteConfig::Chrome.widgets(data).size
+    cards += 1 unless SiteConfig::Chrome.map(data, 'about')['html'].to_s.strip.empty?
+    return [warn(t('sidebar_empty'), t('sidebar_empty_fix'))] if cards.zero?
+
+    [ok(t('sidebar_ok', count: cards))]
+  end
+
   def check_widgets(data)
     widgets = data['widgets']
     return [] unless widgets.is_a?(Hash)
 
     findings = []
     widgets.each do |name, conf|
-      unless conf.is_a?(Hash)
-        findings << error(t('widget_shape', name: name))
-        next
-      end
+      # Both of these are named by check_chrome_shapes, from the same list
+      # the build warns from; naming them twice would only make the report
+      # longer, not truer.
+      next unless conf.is_a?(Hash) && SiteConfig::Chrome::CARDS.include?(name)
 
       required = WIDGET_REQUIRED[name]
       if required && conf[required].to_s.empty?
@@ -688,11 +774,32 @@ module Doctor
         findings << error(t('widget_account_id', value: conf['account_id'].inspect), t('widget_account_id_fix'))
       end
 
+      # The commits widget's own two settings, checked by the same rules the
+      # fetcher uses (lib/forge_address.rb) rather than by a second copy of
+      # them. Each mistake here ends as an empty card, and an empty card is
+      # indistinguishable from an author who has not pushed lately.
+      if name == 'commits'
+        if ForgeAddress.username(conf['username']).nil?
+          findings << error(t('widget_username', value: conf['username'].inspect), t('widget_username_fix'))
+        end
+        instance = conf['instance'].to_s.strip
+        unless instance.empty?
+          if ForgeAddress.base(instance).nil?
+            findings << error(t('widget_instance', value: conf['instance'].inspect), t('widget_instance_fix'))
+          elsif ForgeAddress.path_under_host?(instance)
+            # A forge two directories deep is unusual, not impossible, so
+            # this is a look rather than a refusal.
+            findings << warn(t('widget_instance_repo', value: conf['instance'].inspect), t('widget_instance_repo_fix'))
+          end
+        end
+      end
+
       findings << warn(t('widget_heading', name: name)) if conf['heading'].to_s.empty?
       limit = conf['limit']
       findings << error(t('widget_limit', name: name, value: limit.inspect)) if limit && !(limit.is_a?(Integer) && limit.positive?)
     end
-    findings << ok(t('widgets_ok', count: widgets.size)) if findings.empty? && widgets.any?
+    drawable = SiteConfig::Chrome.widgets(data).size
+    findings << ok(t('widgets_ok', count: drawable)) if findings.empty? && drawable.positive?
     findings
   end
 
@@ -721,6 +828,25 @@ module Doctor
   # single run.
   SCHEDULER_STALE_AFTER = 2 * 3600
 
+  # The site owes a deploy: something published and the upload that should
+  # have followed did not happen. The marker is written by every path that
+  # can leave that debt -- the manual publish and the cron alike -- but the
+  # only thing that ever READ it was the scheduled run, which is optional.
+  # On an install without that cron the message said "the next scheduled
+  # run will retry it" about a run that does not exist, and nothing else
+  # mentioned the debt again.
+  def check_deploy_pending
+    marker = File.join(ROOT, '.deploy-pending')
+    return [] unless File.exist?(marker)
+
+    since = begin
+      Time.parse(File.read(marker).strip)
+    rescue StandardError
+      File.mtime(marker)
+    end
+    [error(t('deploy_pending', ago: humanize_age(Time.now - since)), t('deploy_pending_fix'))]
+  end
+
   def check_scheduler
     queue = scheduled_posts
     return [] if queue.empty?
@@ -737,7 +863,18 @@ module Doctor
     end
 
     age = Time.now - last
-    return [ok(t('scheduler_ok', count: queue.size, ago: humanize_age(age)))] if age <= SCHEDULER_STALE_AFTER
+    if age <= SCHEDULER_STALE_AFTER
+      # A live runner and a post still sitting past its date is the worst
+      # of the three states, and it used to be the only one that read as
+      # ✅: something IS running the queue, so the heartbeat is fresh --
+      # and the post is not going out, tick after tick, because every
+      # attempt fails. "The queue has 1 post waiting and something ran it
+      # 0 minutes ago" was true and told nobody anything.
+      return [error(t('scheduler_overdue', count: overdue, ago: humanize_age(age)),
+                    t('scheduler_overdue_fix'))] if overdue.positive?
+
+      return [ok(t('scheduler_ok', count: queue.size, ago: humanize_age(age)))]
+    end
 
     stale = t('scheduler_stale', ago: humanize_age(age), count: queue.size)
     [overdue.positive? ? error(stale, t('scheduler_fix')) : warn(stale, t('scheduler_fix'))]
@@ -766,7 +903,7 @@ module Doctor
   end
 
   def scheduled_posts
-    Dir.glob(File.join(content_dir, '*', '*.json')).filter_map do |path|
+    PathGlob.under(content_dir, '*', '*.json').filter_map do |path|
       post = JSON.parse(File.read(path, encoding: 'utf-8'))
       next unless post.is_a?(Hash) && post['state'] == 'draft' && post['scheduled']
 
@@ -828,7 +965,7 @@ module Doctor
     return nil if dirs.empty?
 
     dirs.flat_map do |dir|
-      Dir.glob(File.join(dir, '**', '*.{jpg,jpeg,JPG,JPEG}')).select do |path|
+      PathGlob.under(dir, '**', '*.{jpg,jpeg,JPG,JPEG}').select do |path|
         ExifLocation.present?(path)
       end
     end
@@ -858,6 +995,14 @@ module Doctor
     end
 
     missing = BACKEND_VALUES.fetch(name, []).select { |v| ENV[v].to_s.empty? }
+    # A backend can be fully configured and still refuse to run: an
+    # unmatched quote in its extra switches aborts every deploy. doctor
+    # exists so that the state of an install is known before the deploy
+    # that needs it, so it must not tick a line that will stop on sight.
+    backend = DeployBackend::BACKENDS[name]
+    trouble = backend.respond_to?(:problem) ? backend.problem : nil
+    return [error(trouble, I18n.t('cli.deploy_args_fix'))] if trouble
+
     return [ok(t('backend_ok', name: name))] if missing.empty?
 
     # Not an error: an unconfigured backend is the documented state of a
@@ -895,6 +1040,7 @@ module Doctor
     end
 
     findings.concat(check_online_network(data))
+    findings.concat(check_online_thread_readable(data))
     findings.concat(check_online_approval(data))
     findings
   end
@@ -906,8 +1052,14 @@ module Doctor
     approval = dig(data, 'comments', 'approval').to_s.strip.downcase
     return [] unless %w[fav favourite favorite].include?(approval)
 
-    require_relative 'post_stats'
-    entry = PostStats.entries.max_by { |e| e[:date].to_s }
+    # The newest announcement the token can actually be tested against: a
+    # Mastodon entry on the configured instance (a foreign one is refused
+    # by approval_probe, and testing there is meaningless anyway), or any
+    # Bluesky entry. Falling back to the plain newest only when there is
+    # no same-host candidate, so the message is still about a real post.
+    entries = PostStats.entries
+    testable = entries.reject { |e| e[:kind] == :mastodon && PostStats.foreign_host?(PostStats.parse_toot_url(e[:key])&.dig(:instance)) }
+    entry = (testable.max_by { |e| e[:date].to_s } || entries.max_by { |e| e[:date].to_s })
     return [warn(t('approval_probe_nothing'))] unless entry
 
     case PostStats.approval_probe(entry)
@@ -916,6 +1068,68 @@ module Doctor
     end
   rescue StandardError => e
     [warn(t('approval_probe_failed', message: e.message.to_s.lines.first.to_s.strip))]
+  end
+
+  # Can a VISITOR's browser read the thread? With moderation off that is
+  # the whole mechanism: the page fetches /context itself, with no token,
+  # because there is no way to put one in a browser. Mastodon answers such
+  # a request; GoToSocial refuses it outright (every one of its four
+  # require* flags is on, with nothing to configure), and a Mastodon in
+  # secure mode does the same -- so the comments section stays empty and
+  # the page says nothing about why.
+  #
+  # Asked as a CAPABILITY, never by the name of the software: "is this
+  # server one that lets anonymous readers in" is the question, and
+  # nodeinfo does not answer it.
+  def check_online_thread_readable(data)
+    return [] unless dig(data, 'mastodon', 'instance')
+    return [] if SiteConfig.comments_approval # moderated: a cron reads it WITH a token
+
+    sample = newest_announced_post
+    return [] unless sample
+
+    require_relative 'post_stats'
+    parsed = PostStats.parse_toot_url(sample)
+    return [] unless parsed
+
+    require 'net/http'
+    # The same scheme the announcement itself carries, because that is the
+    # address a reader's browser would go to.
+    scheme = sample.to_s.start_with?('http://') ? 'http' : 'https'
+    uri = URI("#{scheme}://#{parsed[:instance]}/api/v1/statuses/#{parsed[:id]}/context")
+    req = Net::HTTP::Get.new(uri)
+    req['User-Agent'] = FeedHttp::USER_AGENT
+    res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',
+                          open_timeout: 10, read_timeout: 15) { |h| h.request(req) }
+
+    case res
+    when Net::HTTPSuccess
+      [ok(t('thread_public', instance: parsed[:instance]))]
+    when Net::HTTPUnauthorized, Net::HTTPForbidden
+      [error(t('thread_closed', instance: parsed[:instance]), t('thread_closed_fix'))]
+    else
+      [warn(t('thread_unchecked', instance: parsed[:instance], code: res.code))]
+    end
+  rescue StandardError => e
+    [warn(t('thread_unchecked', instance: dig(data, 'mastodon', 'instance'),
+                                code: e.message.to_s.lines.first.to_s.strip))]
+  end
+
+  # The most recent published post that carries an announcement address --
+  # the one a reader is most likely to be looking at.
+  def newest_announced_post
+    PathGlob.under(content_dir, '*', '*.json').sort.reverse_each do |file|
+      post = begin
+        JSON.parse(File.read(file, encoding: 'utf-8'))
+      rescue StandardError
+        next
+      end
+      next unless post.is_a?(Hash) && post['state'].to_s != 'draft'
+      next if post['mastodon_url'].to_s.empty?
+
+      return post['mastodon_url']
+    end
+    nil
   end
 
   def check_online_network(data)

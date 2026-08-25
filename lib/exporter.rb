@@ -7,6 +7,8 @@ require 'yaml'
 require_relative 'markdown_writer'
 require_relative 'embed'
 require_relative 'file_size'
+require_relative 'post_address'
+require_relative 'path_glob'
 
 # lib/exporter.rb -- the archive as a tree of markdown files: what
 # `./blog.sh export` writes, and the mirror of lib/import/. The engine
@@ -66,7 +68,7 @@ module Exporter
   # being exported.
   def load_posts(root)
     dir = File.join(root, 'content.nosync', 'posts')
-    Dir.glob(File.join(dir, '*', '*.json')).sort.filter_map do |path|
+    PathGlob.under(dir, '*', '*.json').sort.filter_map do |path|
       post = JSON.parse(File.read(path, encoding: 'utf-8'))
       next unless post.is_a?(Hash)
 
@@ -87,7 +89,7 @@ module Exporter
   # written before, and both are still read -- the same pair
   # scripts/manage_post.rb accepts.
   def page?(post)
-    post['type'].to_s == 'page' || truthy?(post['page'])
+    PostAddress.page?(post)
   end
 
   def truthy?(value)
@@ -174,7 +176,7 @@ module Exporter
 
     dest = File.join(target, ASSETS, year, slug)
     FileUtils.mkdir_p(dest) unless dry_run
-    Dir.glob(File.join(source, '*')).sort.each do |file|
+    PathGlob.under(source, '*').sort.each do |file|
       next unless File.file?(file)
 
       result.media += 1

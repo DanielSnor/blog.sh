@@ -32,6 +32,18 @@ One post = one JSON file at `content.nosync/posts/<year>/<slug>.json`:
 - Media lives next to its post in `media.nosync/<year>/<slug>/`,
   referenced by bare filename; nothing is ever hotlinked.
 
+Everything that walks those directories walks them through
+`lib/path_glob.rb`. `Dir.glob` reads its whole argument as a pattern, and
+the installation's own absolute path used to be the first half of it -- so
+an install in `~/Sites/blog [1]` had `[1]` read as a character class, every
+listing came back empty, and `build` reported an empty archive without
+naming a path. `PathGlob.under(dir, '*', '*.json')` passes the directory as
+`base:`, which `Dir.glob` never parses, and re-joins the results, so callers
+keep the absolute paths and the order they always had. The pattern half
+stays a pattern: a slug, a filename or a typed directory that lands there
+goes through `PathGlob.literal` first, which escapes the metacharacters so
+the name stands for itself.
+
 ### Field reference
 
 The authoritative schema for anyone writing an importer -- new
@@ -51,7 +63,7 @@ dedup by `source`).
 | `state` | `"published"` \| `"draft"` | absent = published |
 | `draft_token` | string | drafts only -- the hidden preview URL segment |
 | `created_at` | string | drafts only -- publish-time "was the date edited?" check |
-| `type` | string | explicit dominant content type; absent = derived from blocks. `type: page` is not a content type but the way a page is written -- see `page` below |
+| `type` | string | explicit dominant content type; absent = derived from blocks. `type: page` belongs in FRONT MATTER only: what a stored post carries is `page: true`, and nothing reads `type` when deciding where a post is served |
 | `source` | object | `platform` plus optionally `account`, `original_id` -- the re-import dedup key |
 | `mastodon_url` | string | the post's comment toot (Mastodon sites), set on publish/`toot` |
 | `bluesky_url` | string | the announcement's human link (Bluesky sites), set on publish/`bluesky` |
@@ -325,7 +337,17 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Eight questions, in one pass: media a post asks for and hasn't got; images
+Eleven questions, in one pass: files the checker cannot read at all, posts
+whose date nothing can parse, posts whose text is not a list of blocks, and
+posts whose slug is not one path segment -- all of them states the BUILD
+refuses to run on (or, for the slug, misplaces the page for), so a check that stayed
+quiet about them was calling an archive sound that was about to stop the
+site; files a queue move stepped aside and a crash left parked, which no
+listing shows and whose repair depends on whether the post inside them is
+still in the archive anywhere else; media a post asks for and hasn't got
+-- or has in a shape no reader can use, or has under a spelling that is not
+the one the post names, where a volume that folds letter case and unicode
+form renders the page and one that does not has the hole already; images
 whose stored dimensions are 1px or smaller, which the build drops
 *together with their caption* and would otherwise lose silently; internal
 links pointing at an address nothing on this site answers at; links
@@ -334,11 +356,13 @@ answers 200 with the page the reader is already on -- the one kind here
 that fails at nothing and is therefore invisible from everywhere else;
 media directories no post owns any more; files in a post's own directory the
 post no longer names; two series whose names sit an edit or two apart,
-which is usually one series and a typo; and one old address claimed by
+which is usually one series and a typo; one old address claimed by
 two posts, where whichever renders last wins and the others' readers land
-on it.
+on it; and two posts that would be served at one address, which the build
+refuses to run on at all -- so an archive in that state used to be called
+sound by the one tool whose job is to say otherwise.
 
-Two rules shape the output. **It only ever reports** -- nothing here
+Two rules shape the plain run. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value
 of the tool is that its output can be trusted, and a checker that also
 acts has to be trusted twice. And each kind of finding is **capped**, the
@@ -352,6 +376,15 @@ warnings failed it. Like `export` and `stats` it has its own entry
 point (`scripts/check.rb`) rather than going through `manage_post.rb`,
 which applies the site timezone as it loads and aborts on a config it
 cannot read -- a run that exits explaining the config has checked nothing.
+
+Both rules have a door in them since 1.4, and both doors are opened by
+hand. `--repair` walks the findings and offers, per finding, the single
+repair that finding allows: a redirect written into the target post, a
+relative link rewritten, a file moved to the trash. Nothing is applied
+without a key press, a version is kept before a post is changed, and
+nothing is ever deleted. `--json` prints every finding instead of a
+capped screenful, because a cap is right for reading and useless for
+acting on -- a script cannot work from "...and 23 more".
 
 `--online` is the only part that leaves the machine, and it is asked for
 by name because it takes minutes rather than a second and, over an archive
@@ -600,7 +633,15 @@ wrote. Then, in load order:
 - **Comments** (`comments.js`): a published post's announcement
   reference is baked into the page (`data-toot-url` or
   `data-bluesky-uri` -- exactly one network per site, see
-  `SiteConfig.comment_network`); the visitor's browser fetches the
+  `SiteConfig.comment_network`). Reading it in the browser needs a server
+  that serves a thread to an anonymous request; GoToSocial requires a
+  token there and so does Mastodon in secure mode, which leaves
+  `comments.approval` (a cron with a token) as the only way in. The
+  address itself comes in three shapes -- Mastodon's `/@user/<id>`,
+  GoToSocial's `/@user/statuses/<ULID>` and the ActivityPub
+  `/users/user/statuses/<id>` -- read by one rule written twice, in
+  `lib/post_stats.rb` and in `comments.js`, most specific pattern first.
+  Then the visitor's browser fetches the
   reply thread from the Mastodon instance's public context API or from
   Bluesky's public AppView (`getPostThread`, no auth). Everything
   except Mastodon's own sanitized status HTML is escaped via

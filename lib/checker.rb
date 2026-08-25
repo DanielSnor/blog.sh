@@ -6,8 +6,11 @@ require 'fileutils'
 require 'net/http'
 require 'uri'
 require 'timeout'
+require 'time'
+require_relative 'post_address'
 require_relative 'slug'
 require_relative 'i18n'
+require_relative 'path_glob'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -28,7 +31,14 @@ module Checker
   # `count` is how many findings the line stands for: 1 for an ordinary
   # finding, and for a "...and N more" line the N that was not printed --
   # which is what lets the summary total the archive instead of the screen.
-  Finding = Struct.new(:level, :text, :fix, :count, keyword_init: true) do
+  # `kind` and `data` are the finding itself; `text` and `fix` are one way
+  # of saying it. Until 1.4 there was only the sentence, which meant nothing
+  # downstream could act on a finding without parsing prose -- and the lists
+  # were already capped at twenty by the time anyone saw them, so the rest
+  # was not merely unsaid but gone. `./blog.sh check --json` prints the
+  # whole list, and it costs nothing to keep: the screen is still built from
+  # the same objects.
+  Finding = Struct.new(:level, :text, :fix, :count, :kind, :data, keyword_init: true) do
     def error?
       level == :error
     end
@@ -65,38 +75,72 @@ module Checker
     I18n.t("check.#{key}", **vars)
   end
 
-  def ok(text)
-    Finding.new(level: :ok, text: text, count: 1)
+  def ok(text, kind: nil, data: nil)
+    Finding.new(level: :ok, text: text, count: 1, kind: kind, data: data)
   end
 
-  def warn(text, fix = nil)
-    Finding.new(level: :warn, text: text, fix: fix, count: 1)
+  def warn(text, fix = nil, kind: nil, data: nil)
+    Finding.new(level: :warn, text: text, fix: fix, count: 1, kind: kind, data: data)
   end
 
-  def error(text, fix = nil)
-    Finding.new(level: :error, text: text, fix: fix, count: 1)
+  def error(text, fix = nil, kind: nil, data: nil)
+    Finding.new(level: :error, text: text, fix: fix, count: 1, kind: kind, data: data)
   end
 
-  def run(root:, progress: nil, online: false, online_progress: nil)
+  # How many findings of one kind a screen is willing to show. The rest ride
+  # along as a single "...and N more", whose count is what lets the summary
+  # total the archive rather than the screen.
+  CAP = 20
+
+  # Capping happens here, in one place, and only when a cap is asked for:
+  # the checks build every finding they have and hand the whole list over.
+  # `--json` passes nil and gets all of them.
+  def capped(findings, cap)
+    return findings if cap.nil? || findings.size <= cap
+
+    findings.first(cap) + more(findings.size - cap, findings.first.level)
+  end
+
+  def run(root:, progress: nil, online: false, online_progress: nil, cap: CAP)
     posts = load_posts(root)
-    return [warn(t('no_posts'))] if posts.empty?
+    # "No posts" only when there is genuinely nothing -- not when every
+    # file present was unreadable. load_posts drops the broken ones and
+    # remembers them; firing the empty-archive early return before
+    # check_unbuildable had a chance to surface them called an archive the
+    # build dies on "empty" and exited 0, the exact silent drop the
+    # @unreadable machinery exists to prevent.
+    if posts.empty?
+      unbuildable = check_unbuildable(posts, cap)
+      # Parked leftovers are asked about here too. A crash mid-swap can
+      # leave every post in the archive standing under a parking name, and
+      # an archive that reads as empty ONLY because its posts are hidden
+      # is the one case where "no posts yet" is the worst thing to say:
+      # it is the answer that sends the author away.
+      parked = check_parked_leftovers(root, posts)
+      return unbuildable + parked if unbuildable.any? || parked.any?
+
+      return [warn(t('no_posts'), kind: :no_posts)]
+    end
 
     known = known_paths(posts)
     findings = []
-    findings.concat(check_media(root, posts, progress))
-    findings.concat(check_degenerate_images(posts))
-    findings.concat(check_internal_links(posts, known))
-    findings.concat(check_relative_links(posts))
-    findings.concat(check_orphan_media(root, posts))
-    findings.concat(check_stray_media(root, posts))
+    findings.concat(check_unbuildable(posts, cap))
+    findings.concat(check_parked_leftovers(root, posts))
+    findings.concat(check_media(root, posts, progress, cap))
+    findings.concat(check_degenerate_images(posts, cap))
+    findings.concat(check_internal_links(posts, known, cap))
+    findings.concat(check_relative_links(posts, cap))
+    findings.concat(check_orphan_media(root, posts, cap))
+    findings.concat(check_stray_media(root, posts, cap))
     findings.concat(check_redirects(posts))
     findings.concat(check_series_names(posts))
+    findings.concat(check_duplicate_addresses(posts))
     local_clean = findings.none? { |f| f.error? || f.warn? }
-    findings << ok(t('all_clear', posts: posts.size)) if local_clean
+    findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
 
     if online
       cache = Cache.new(File.join(root, 'tmp', 'link-check.json'))
-      findings.concat(check_external_links(posts, cache: cache, online_progress: online_progress))
+      findings.concat(check_external_links(posts, cache: cache, online_progress: online_progress, cap: cap))
       cache.save
     end
     findings
@@ -105,32 +149,192 @@ module Checker
   # --- reading the archive ------------------------------------------------
 
   def load_posts(root)
+    @unreadable = []
     dir = File.join(root, 'content.nosync', 'posts')
-    Dir.glob(File.join(dir, '*', '*.json')).sort.filter_map do |path|
-      post = JSON.parse(File.read(path, encoding: 'utf-8'))
-      next unless post.is_a?(Hash)
+    PathGlob.under(dir, '*', '*.json').sort.filter_map do |path|
+      raw = File.read(path, encoding: 'utf-8')
+      # A file that is not valid UTF-8 is one the build dies on -- JSON's
+      # own parser raises deep in a C extension, a raw backtrace with no
+      # post named. Caught here so check reports it (and check exits
+      # non-zero) instead of parsing far enough to call the archive sound.
+      raise JSON::ParserError, 'not valid UTF-8' unless raw.valid_encoding?
+
+      post = JSON.parse(raw)
+      # Not a post object either -- the build stops on both, and "not a
+      # Hash" used to leave here as quietly as a syntax error.
+      raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)
 
       post['__path'] = path
       post['__year'] = File.basename(File.dirname(path))
       post
-    rescue JSON::ParserError
+    rescue StandardError => e
+      # Remembered, not discarded. A file the checker cannot read is a file
+      # the BUILD refuses to run on -- and dropping it silently meant check
+      # counted the archive minus that post and called the whole thing
+      # sound, while the next build stopped dead on it.
+      @unreadable << [path, "#{e.class}: #{e.message.lines.first.to_s.strip[0, 90]}"]
       nil
     end
+  end
+
+  def unreadable_files
+    @unreadable ||= []
+  end
+
+  # Files the checker could not read, and posts whose date it could not
+  # parse: both are states the build refuses to run on, so a check that
+  # calls the archive sound while either is present is telling the author
+  # the opposite of what they are about to find out.
+  def check_unbuildable(posts, cap = CAP)
+    findings = unreadable_files.map do |path, reason|
+      error(t('post_unreadable', file: short_path(path), reason: reason),
+            t('post_unreadable_fix'), kind: :post_unreadable,
+            data: { 'file' => path, 'reason' => reason })
+    end
+    posts.each do |post|
+      # A post whose content is not a list of blocks. Every reader here
+      # wraps it in Array() so the check itself survives such a file --
+      # and that made this tool say "the archive is sound" about a post
+      # the build dies on with a raw NoMethodError, which is the exact
+      # thing check_unbuildable exists to prevent. Surviving it is not the
+      # same as blessing it.
+      unless post['content'].nil? || post['content'].is_a?(Array)
+        findings << error(t('post_content_unreadable', file: short_path(post['__path'].to_s),
+                                                       value: post['content'].class.to_s),
+                          t('post_content_unreadable_fix'), kind: :post_content_unreadable,
+                          data: { 'file' => post['__path'].to_s })
+      end
+      # A slug is one path segment. A hand-edited or imported one carrying a
+      # slash or a `..` turns the post's address into a path that climbs
+      # out of where the build writes -- the build chokes on it while check
+      # called the archive sound. The engine's own slugs are [a-z0-9-];
+      # only the genuinely dangerous shapes are flagged, so a unicode slug
+      # from an import is left alone.
+      slug = post['slug'].to_s
+      if slug.include?('/') || slug.split(/[\\\/]/).include?('..') || slug.start_with?('.') || slug.include?("\0")
+        findings << error(t('post_bad_slug', file: short_path(post['__path'].to_s), slug: slug.inspect),
+                          t('post_bad_slug_fix'), kind: :post_bad_slug,
+                          data: { 'file' => post['__path'].to_s, 'slug' => slug })
+      end
+      next if parseable_date?(post['date'])
+
+      findings << error(t('post_date_unreadable', file: short_path(post['__path'].to_s),
+                                                  value: post['date'].inspect),
+                        t('post_date_unreadable_fix'), kind: :post_date_unreadable,
+                        data: { 'file' => post['__path'].to_s })
+    end
+    capped(findings, cap)
+  end
+
+  # Files a queue move stepped aside and a crash left behind. The parking
+  # name is dotted precisely so nothing mistakes it for content -- which
+  # also means nothing would ever find one again without this: a post, its
+  # pictures or its history can sit a rename away from existing, invisible
+  # to every listing, until the same slug moves again. The message carries
+  # the path, and says which of three things the file is.
+  def check_parked_leftovers(root, posts)
+    strays = PathGlob.under(root, 'content.nosync', 'posts', '*', '.*queue-move*') +
+             PathGlob.under(root, 'media.nosync', '*', '.*queue-move*') +
+             PathGlob.under(root, 'content.nosync', 'versions', '*', '.*queue-move*')
+    return [] if strays.empty?
+
+    # Every post the archive still holds, keyed by what a queue move does
+    # NOT rewrite -- because the one question worth asking about a parked
+    # file is whether the post inside it exists anywhere else. Built only
+    # when there is something to ask it about: this walks the whole archive.
+    live = posts.to_h { |post| [post_identity(post), post['__path'].to_s] }
+    strays.sort.map do |path|
+      # Three different states, and telling them apart is the difference
+      # between a repair and a second data loss.
+      #
+      # The post in the parked file is still in the archive somewhere: a
+      # stale copy the interrupted move left behind, safe to remove once
+      # it has been compared against the live one.
+      #
+      # It is nowhere else and its own name is free: one rename puts it
+      # back, which is what the parking name is shaped for.
+      #
+      # It is nowhere else and its name is TAKEN. Whether the name is free
+      # was once asked on its own, and read as "the post it belongs to is
+      # back in place" -- which parking guarantees is false: a post is only
+      # ever parked because ANOTHER post is moving to its address, so
+      # whatever stands at that name is the other half of the swap. The
+      # parked file can then be the only copy of its post there is, and
+      # nothing may be renamed over it or deleted unread.
+      home = parked_home(path)
+      identity = parked_identity(path)
+      elsewhere = identity && live[identity]
+      rel = path.sub("#{root}/", '')
+      fix = if elsewhere
+              t('parked_leftover_fix_stale', live: elsewhere.sub("#{root}/", ''))
+            elsif home && File.exist?(home)
+              t('parked_leftover_fix_blocked', home: home.sub("#{root}/", ''))
+            else
+              t('parked_leftover_fix')
+            end
+      error(t('parked_leftover', file: rel), fix,
+            kind: :parked_leftover, data: { 'file' => rel, 'stale' => !elsewhere.nil? })
+    end
+  end
+
+  # What a queue move rewrites, and therefore what a post's identity
+  # cannot be made of: write_scheduled_date hands the post the target date
+  # and sets the scheduled flag. `__path` and `__year` are the checker's
+  # own bookkeeping and were never in the file.
+  MOVED_BY_QUEUE = %w[date scheduled __path __year].freeze
+
+  # A post as something two files can be compared by. Sorted, so the same
+  # post written twice compares equal whatever order its keys came back in.
+  def post_identity(post)
+    JSON.generate(post.reject { |key, _| MOVED_BY_QUEUE.include?(key) }.sort)
+  end
+
+  # The same, read off a parked file. Only a parked POST can answer this: a
+  # parked media or versions folder is a directory, with nothing in it that
+  # says whether the post it belongs to still has a copy elsewhere -- so it
+  # is never called stale, which is the safe half of not knowing.
+  def parked_identity(path)
+    return nil unless path.end_with?('.json') && File.file?(path)
+
+    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    post.is_a?(Hash) ? post_identity(post) : nil
+  rescue StandardError
+    nil
+  end
+
+  # The name a parked file or directory would return to:
+  # `.<name>.queue-move.<pid>[-n][.<ext>]` -> `<name>[.<ext>]` beside it.
+  def parked_home(path)
+    base = File.basename(path)
+    m = base.match(/\A\.(.+)\.queue-move\.\d+(?:-\d+)?(\.[^.]+)?\z/)
+    return nil unless m
+
+    File.join(File.dirname(path), "#{m[1]}#{m[2]}")
+  end
+
+  def parseable_date?(value)
+    return false if value.to_s.strip.empty?
+
+    Time.parse(value.to_s)
+    true
+  rescue StandardError
+    false
+  end
+
+  def short_path(path)
+    File.join(File.basename(File.dirname(path)), File.basename(path))
   end
 
   def draft?(post)
     post['state'].to_s == 'draft'
   end
 
+  # Shared with the build and the repair pass (lib/post_address.rb), so all
+  # three answer this with one voice. Note it reads the year off the post's
+  # DATE, like the build does: the directory the file sits in can differ
+  # from the date after a correction, and the address follows the date.
   def post_path(post)
-    return "/draft/#{post['draft_token']}/#{post['slug']}/" if draft?(post)
-    # A page is served at the root, not under a year. Reading its
-    # address off the year was quiet in both directions: a link to
-    # /about/ was reported dead, and the dated address it invented
-    # instead was accepted from anywhere.
-    return "/#{post['slug']}/" if post['page']
-
-    "/posts/#{post['__year']}/#{post['slug']}/"
+    PostAddress.path(post)
   end
 
   # Every address the build will answer at: the posts themselves, the tag
@@ -142,6 +346,17 @@ module Checker
   # -- a checker that reports links as dead because it disagrees with the
   # build is worse than one that says nothing about them. /type/ links are
   # therefore accepted without inspection.
+  # The tags that will actually have a page: carried by a post in the
+  # stream. A tag only a draft, a page or an unlisted post wears never gets
+  # one, so a menu item pointing at it is dead on every page of the site.
+  # Shared with doctor rather than worked out twice -- this is exactly the
+  # kind of list that drifts.
+  def stream_tags(posts)
+    posts.reject { |post| draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post) }
+         .flat_map { |post| Array(post['tags']).map { |tag| Slug.slugify(tag.to_s) } }
+         .select { |slug| Slug.pageable?(slug) }.to_set
+  end
+
   def known_paths(posts)
     paths = Set.new(FIXED_PATHS)
     # How many posts in the STREAM carry each series -- the same set the
@@ -149,14 +364,20 @@ module Checker
     # not count towards a series page existing.
     series_sizes = Hash.new(0)
     posts.each do |post|
-      next if draft?(post) || post['page'] || post['unlisted']
+      next if draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post)
 
       slug = Slug.slugify(post['series'].to_s)
       series_sizes[slug] += 1 unless slug.empty?
     end
     posts.each do |post|
       paths << post_path(post)
-      (post['tags'] || []).each do |tag|
+      # A tag page is built from the STREAM, exactly like a series page:
+      # a tag carried only by a draft, a page or an unlisted post never
+      # gets one. Counting those tags as known made every link to such a
+      # tag look sound -- including the ones the site puts in its own menu,
+      # on every page, where doctor then called the menu fine.
+      in_stream = !(draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post))
+      (in_stream ? Array(post['tags']) : []).each do |tag|
         slug = Slug.slugify(tag.to_s)
         next if slug.empty?
 
@@ -175,41 +396,183 @@ module Checker
       # pages the build never writes.
       series = Slug.slugify(post['series'].to_s)
       paths << "/series/#{series}/" if series_sizes[series] >= 2
-      Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
-      Array(post['redirect_from']).each { |origin| paths << origin.to_s }
+      # Only for a post the site actually serves: the build writes a
+      # redirect stub for a post's old addresses, and a draft has no page
+      # to redirect TO -- so counting its former addresses as known let a
+      # link to one pass as sound while the reader gets a 404.
+      if in_stream || !draft?(post)
+        Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
+        Array(post['redirect_from']).each { |origin| paths << origin.to_s }
+      end
     end
     paths
   end
 
   # --- the checks ----------------------------------------------------------
 
+
+  # Where this post's media are, asked the same way the build asks: the
+  # year of the FILE, and -- for an archive written before that was settled
+  # -- the year of the date if the first has nothing. Answering it
+  # differently from the build is what let one of them report a hole the
+  # other one had never noticed.
+  # The reader's question about a media file: is there a plain, readable,
+  # non-empty file at this path? A directory, a permission bit and an
+  # interrupted download all answer File.exist? and all break the page.
+  def readable_media_file?(path)
+    File.file?(path) && File.readable?(path) && !File.size?(path).nil?
+  end
+
+  # Which of the three it was. The sentence used to list all three every
+  # time -- "empty, unreadable, or not a file at all" -- so whoever read
+  # it had to go and look themselves, and the three want different
+  # answers: a folder is deleted, a permission bit is chmod'ed, an empty
+  # file is fetched again. Asked in the order the failures shadow each
+  # other in: a directory is unreadable AND sizeless, so it has to be
+  # named first.
+  def unusable_media_cause(path)
+    return 'dir' if File.directory?(path)
+    return 'unreadable' unless File.readable?(path)
+
+    'empty'
+  end
+
+  def media_dir_for(root, post)
+    by_file = File.join(root, 'media.nosync', post['__year'].to_s, post['slug'].to_s)
+    return by_file if Dir.exist?(by_file)
+
+    by_date = File.join(root, 'media.nosync', PostAddress.date_year(post), post['slug'].to_s)
+    Dir.exist?(by_date) ? by_date : by_file
+  end
+
+  # Which file on disk a reference means -- the one question both media
+  # checks were answering differently, and the reason `--repair` could put
+  # a live photograph in the trash.
+  #
+  # `File.exist?` asks the VOLUME, and on macOS the volume resolves both
+  # letter case and unicode normalisation: a post naming IMG_2043.JPG finds
+  # img_2043.jpg and the page renders. `Dir.children` compares bytes, so
+  # the same file, seen from the other side, belonged to nobody -- a stray.
+  # One said the archive was whole, the other offered to tidy the photograph
+  # away, and both were reading the same directory.
+  #
+  # Three ways a name can be claimed, in this order:
+  #   :exact    -- the directory holds it byte for byte.
+  #   :identity -- the volume resolves the reference to a file the directory
+  #                writes differently. Decided by dev+ino (File.identical?),
+  #                which is the volume's OWN notion of sameness: two
+  #                spellings of one file share it, two real files never do.
+  #   :fold     -- the volume resolves nothing (Linux, case-sensitive APFS)
+  #                but exactly one file differs only in case or unicode
+  #                form. Two candidates mean two files, and then the machine
+  #                does not guess: the reference is simply missing.
+  def claim_media(dir, urls)
+    children = Dir.exist?(dir) ? Dir.children(dir).reject { |f| f.start_with?('.') } : []
+    by_fold = children.group_by { |name| fold_name(name) }
+
+    urls.to_h do |url|
+      [url, claim_one(dir, url, children, by_fold)]
+    end
+  end
+
+  def claim_one(dir, url, children, by_fold)
+    # The name being in the directory is not the same as the file being
+    # there: a dangling symlink is listed by Dir.children and opens to
+    # nothing. The build copies by reading, so it reported the picture as
+    # MISSING while check -- trusting the name alone -- called the archive
+    # sound and left the page pointing at an address with no file behind it.
+    return [url, :exact] if children.include?(url) && File.exist?(File.join(dir, url))
+
+    referenced = File.join(dir, url)
+    if File.exist?(referenced)
+      same = children.find { |name| File.identical?(referenced, File.join(dir, name)) }
+      return [same, :identity] if same
+    end
+
+    folded = by_fold[fold_name(url)]
+    folded && folded.size == 1 ? [folded.first, :fold] : nil
+  end
+
+  # Case and unicode form removed, and nothing else: this is only ever used
+  # to ask "could these two spellings be one file", never to rename anything.
+  def fold_name(name)
+    # scrub FIRST: an export that lied about its encoding can put a byte in
+    # a filename that is not valid UTF-8 at all, and both unicode_normalize
+    # and downcase raise on it -- which used to take the whole run down,
+    # because the rescue called the very method that had just raised.
+    clean = name.to_s.scrub
+    clean.unicode_normalize(:nfc).downcase
+  rescue ArgumentError, Encoding::CompatibilityError
+    clean.b.downcase
+  end
+
   # A post whose media never arrived. The import summary said so at the
   # time and nothing has said so since, which is why a whole archive can
   # carry these for years without anyone knowing.
-  def check_media(root, posts, progress)
+  def check_media(root, posts, progress, cap = CAP)
     missing = []
+    misnamed = []
+    unusable = []
     posts.each_with_index do |post, index|
       progress&.call(index + 1, posts.size)
-      dir = File.join(root, 'media.nosync', post['__year'], post['slug'].to_s)
-      media_urls(post).each do |url|
-        next if url.empty? || url.include?('://')
-
-        missing << [post['slug'], url] unless File.exist?(File.join(dir, url))
+      dir = media_dir_for(root, post)
+      rel_dir = dir.sub("#{File.join(root, 'media.nosync')}/", '')
+      urls = media_urls(post).reject { |url| url.empty? || url.include?('://') }
+      claim_media(dir, urls).each do |url, claim|
+        # Present under its name and useless to a reader: empty (an
+        # interrupted download), unreadable (a permission bit), or not a
+        # file at all (a directory where a picture should be). File.exist?
+        # says yes to every one of them, the page shows a broken picture,
+        # and the copy into public.nosync either carries the defect to the
+        # server or stops the build with a raw Errno -- so the test here is
+        # the reader's, not the name's. Its own kind and its own sentence,
+        # because "missing from its media directory" is false about a file
+        # somebody is looking straight at.
+        if claim && !readable_media_file?(File.join(dir, claim.first))
+          unusable << [post['slug'], claim.first, post['__year'], rel_dir,
+                       unusable_media_cause(File.join(dir, claim.first))]
+        elsif claim.nil?
+          missing << [post['slug'], url, post['__year']]
+        elsif claim.last != :exact
+          misnamed << [post['slug'], url, claim.first, claim.last, post['__year'], rel_dir]
+        end
       end
     end
-    return [] if missing.empty?
+    return [] if missing.empty? && misnamed.empty? && unusable.empty?
 
-    missing.first(20).map do |slug, url|
-      error(t('media_missing', slug: slug, file: url), t('media_missing_fix'))
-    end + more(missing.size - 20, :error)
+    capped(missing.map do |slug, url, year|
+      error(t('media_missing', slug: slug, file: url), t('media_missing_fix'),
+            kind: :media_missing, data: { 'slug' => slug, 'file' => url, 'year' => year })
+    end, cap) +
+      capped(unusable.map do |slug, file, year, rel, cause|
+        error(t('media_unusable', slug: slug, file: file, cause: t("media_cause_#{cause}")),
+              t('media_unusable_fix'),
+              kind: :media_unusable,
+              data: { 'slug' => slug, 'file' => file, 'year' => year, 'dir' => rel, 'cause' => cause })
+      end, cap) +
+      # Not "missing" -- the file is right there, under a spelling the post
+      # does not use. Whether it is broken depends on the volume: where the
+      # filesystem resolves the difference the page renders today (a
+      # warning), where it does not the hole is already there (an error).
+      # And when the two spellings look identical on screen -- NFC against
+      # NFD -- the sentence has to say so, or it reads as nonsense.
+      capped(misnamed.map do |slug, url, actual, how, year, rel|
+        key = url.unicode_normalize(:nfc) == actual.unicode_normalize(:nfc) &&
+              url.downcase != actual.downcase ? 'media_misnamed_form' : 'media_misnamed'
+        text = t(key, slug: slug, file: url, actual: actual)
+        data = { 'slug' => slug, 'file' => url, 'actual' => actual, 'year' => year,
+                 'match' => how.to_s, 'dir' => rel }
+        how == :fold ? error(text, t('media_misnamed_fix'), kind: :media_misnamed, data: data)
+                     : warn(text, t('media_misnamed_fix'), kind: :media_misnamed, data: data)
+      end, cap)
   end
 
   # Images the build will drop on the floor: a size of 1px or less is the
   # tracking pixel rule, and the block goes with its caption. Nothing on
   # the rendered page shows that anything used to be there.
-  def check_degenerate_images(posts)
+  def check_degenerate_images(posts, cap = CAP)
     found = posts.flat_map do |post|
-      (post['content'] || []).filter_map do |block|
+      (Array(post['content']) || []).filter_map do |block|
         next unless block.is_a?(Hash) && block['type'] == 'image'
 
         media = (block['media'] || []).first || {}
@@ -222,33 +585,51 @@ module Checker
     end
     return [] if found.empty?
 
-    found.first(20).map do |slug, url, w, h|
-      warn(t('image_degenerate', slug: slug, file: url, width: w, height: h), t('image_degenerate_fix'))
-    end + more(found.size - 20, :warn)
+    capped(found.map do |slug, url, w, h|
+      warn(t('image_degenerate', slug: slug, file: url, width: w, height: h), t('image_degenerate_fix'),
+           kind: :image_degenerate, data: { 'slug' => slug, 'file' => url, 'width' => w, 'height' => h })
+    end, cap)
+  end
+
+
+  # Percent escapes undone and nothing else -- no "+" for space, which is a
+  # rule of query strings, not of paths, and turning a literal plus into a
+  # space is how a working address becomes a broken one.
+  def percent_decoded(path)
+    decoded = path.to_s.gsub(/%[0-9A-Fa-f]{2}/) { |escape| escape[1, 2].hex.chr }
+                  .force_encoding(Encoding::UTF_8)
+    decoded.valid_encoding? ? decoded : path.to_s
   end
 
   # Links from one post to another address on this site that nothing will
   # ever answer at -- the residue of an import that rewrote permalinks, or
   # of a slug that was renamed before renaming kept a redirect.
-  def check_internal_links(posts, known)
+  def check_internal_links(posts, known, cap = CAP)
     dead = []
     posts.each do |post|
       internal_links(post).each do |url|
         path = url.split('#').first.split('?').first.to_s
         next if path.empty? || path.start_with?('/type/') || path.start_with?('/assets/')
-        next if known.include?(path) || known.include?("#{path}/")
+        # Both spellings: a browser writes an accented address with percent
+        # escapes, and the addresses this site answers at are written plain.
+        # Comparing only the literal one reported a working link as dead --
+        # for ever, because repairing it changes nothing a literal
+        # comparison can see.
+        next if [path, percent_decoded(path)].any? { |form| known.include?(form) || known.include?("#{form}/") }
 
         # A later page of a listing is judged by the listing it belongs to.
         base = path.sub(PAGE_SUFFIX, '/')
         next if base != path && (known.include?(base) || known.include?("#{base}/"))
 
-        dead << [post['slug'], url]
+        dead << [post['slug'], url, post['__year']]
       end
     end
     return [] if dead.empty?
 
-    dead.first(20).map { |slug, url| error(t('link_dead', slug: slug, url: url), t('link_dead_fix')) } +
-      more(dead.size - 20, :error)
+    capped(dead.map do |slug, url, year|
+      error(t('link_dead', slug: slug, url: url), t('link_dead_fix'),
+            kind: :link_dead, data: { 'slug' => slug, 'url' => url, 'year' => year })
+    end, cap)
   end
 
   # Links that are written relative to wherever they happen to be read
@@ -265,31 +646,44 @@ module Checker
   # answers 200 with the post the reader is already on. Nothing fails,
   # nothing is logged, and the reader simply never arrives -- which is why
   # 73 of them sat in one archive through every audit it ever had.
-  def check_relative_links(posts)
+  def check_relative_links(posts, cap = CAP)
     found = posts.flat_map do |post|
-      all_links(post).select { |url| relative_link?(url) }.map { |url| [post['slug'], url] }
+      all_links(post).select { |url| relative_link?(url) }.map { |url| [post['slug'], url, post['__year']] }
     end
     return [] if found.empty?
 
-    found.first(20).map { |slug, url| error(t('link_relative', slug: slug, url: url), t('link_relative_fix')) } +
-      more(found.size - 20, :error)
+    capped(found.map do |slug, url, year|
+      error(t('link_relative', slug: slug, url: url), t('link_relative_fix'),
+            kind: :link_relative, data: { 'slug' => slug, 'url' => url, 'year' => year })
+    end, cap)
   end
 
   # Media directories no post claims. Pure disk, invisible from anywhere --
   # left behind by a delete, a rename, or an import that ran twice.
-  def check_orphan_media(root, posts)
+  def check_orphan_media(root, posts, cap = CAP)
     media_root = File.join(root, 'media.nosync')
     return [] unless Dir.exist?(media_root)
 
-    owned = posts.map { |post| File.join(post['__year'], post['slug'].to_s) }.to_set
-    orphans = Dir.glob(File.join(media_root, '*', '*')).select { |p| File.directory?(p) }.filter_map do |dir|
+    # BOTH years a post can own media under: the folder its file sits in,
+    # and the year in its date. The two differ whenever a date was
+    # corrected across a New Year -- which the engine treats as ordinary
+    # and the build reads media from either -- so counting only the folder
+    # called a directory the site is serving from "orphaned", and
+    # --repair then offered to put a live photograph in the trash.
+    owned = posts.flat_map do |post|
+      slug = post['slug'].to_s
+      [File.join(post['__year'].to_s, slug), File.join(PostAddress.date_year(post), slug)]
+    end.to_set
+    orphans = PathGlob.under(media_root, '*', '*').select { |p| File.directory?(p) }.filter_map do |dir|
       rel = dir.sub("#{media_root}/", '')
       rel unless owned.include?(rel)
     end
     return [] if orphans.empty?
 
-    orphans.first(20).map { |rel| warn(t('media_orphan', dir: rel), t('media_orphan_fix')) } +
-      more(orphans.size - 20, :warn)
+    capped(orphans.map do |rel|
+      warn(t('media_orphan', dir: rel), t('media_orphan_fix'),
+           kind: :media_orphan, data: { 'dir' => rel })
+    end, cap)
   end
 
   # The same leftovers one level down: files inside a directory a post
@@ -299,21 +693,89 @@ module Checker
   # referenced files exist, never whether existing files are referenced.
   # After the renumbering fix these strays are the one shape of orphan
   # left standing, and they were invisible from every side.
-  def check_stray_media(root, posts)
+  def check_stray_media(root, posts, cap = CAP)
     strays = posts.flat_map do |post|
-      dir = File.join(root, 'media.nosync', post['__year'], post['slug'].to_s)
+      dir = media_dir_for(root, post)
       next [] unless Dir.exist?(dir)
 
-      referenced = media_urls(post).to_set
+      # A stray is a file no reference CLAIMS -- not a file whose name no
+      # reference spells the same way. That difference is the whole of the
+      # blocker this check used to feed.
+      claimed = claim_media(dir, media_urls(post)).values.compact.map(&:first).to_set
+      rel_dir = dir.sub("#{File.join(root, 'media.nosync')}/", '')
       Dir.children(dir).reject { |f| f.start_with?('.') }
-         .reject { |f| referenced.include?(f) }
-         .map { |f| [post['slug'], f] }
+         .reject { |f| claimed.include?(f) }
+         .map { |f| [post['slug'], f, post['__year'], rel_dir] }
     end
     return [] if strays.empty?
 
-    strays.first(20).map do |slug, file|
-      warn(t('media_stray', slug: slug, file: file), t('media_stray_fix'))
-    end + more(strays.size - 20, :warn)
+    # `dir` is the directory that was actually walked -- which, for a post
+    # whose file sits in another year than its date, is not the one `year`
+    # names. --repair rebuilt the path from `year` and offered to trash a
+    # file at an address that does not exist, and failed every time.
+    capped(strays.map do |slug, file, year, rel|
+      warn(t('media_stray', slug: slug, file: file), t('media_stray_fix'),
+           kind: :media_stray, data: { 'slug' => slug, 'file' => file, 'year' => year, 'dir' => rel })
+    end, cap)
+  end
+
+  # Two posts that would be served at one address. The build refuses to run
+  # at all in this state (it would write one over the other and mix their
+  # media), so a check that calls the archive sound is telling the author
+  # the opposite of what they are about to find out.
+  def check_duplicate_addresses(posts, cap = CAP)
+    # Grouped by EVERY key a post can collide on, and drafts included --
+    # both of them mirroring what the build actually refuses to run on.
+    # One key per post was the hole: a page went into the page group and
+    # out of the year group, so a page and a post sharing a slug in one
+    # year never met here -- while the build, which keys both of them by
+    # year and slug, stopped dead on exactly that pair. check handed out a
+    # clean bill for an archive that could not be built at all.
+    ordered = {}
+    posts.each do |post|
+      PostAddress.collision_keys(post).each { |key| (ordered[key] ||= []) << post }
+    end
+    colliding = ordered.select { |_, group| group.size > 1 }
+    return [] if colliding.empty?
+
+    # Two pages of one slug dated in one year collide on both of their
+    # keys. Report the pair once, under the key that names the address a
+    # reader would actually type.
+    by_files = {}
+    colliding.each do |key, group|
+      files = group.map { |post| post['__path'].to_s }.sort
+      by_files[files] = [key, group] if by_files[files].nil? || key.first == 'page'
+    end
+
+    capped(by_files.values.map { |key, group| duplicate_finding(key, group) }, cap)
+  end
+
+  # A page has no year in its address, so a message built from one sends
+  # the reader to a URL the site does not answer at -- and "give it a date
+  # in another year", the advice that ends the other message, changes
+  # nothing at all for two pages.
+  def duplicate_finding(key, group)
+    slug = group.first['slug'].to_s
+    files = group.map { |post| post['__path'].to_s }
+    # The address does not find the files. A page collides on its slug
+    # however far apart the two dates are, so the reader would be grepping
+    # the archive for the pair they have to choose between -- and choosing
+    # between them IS the fix, so the fix says which two.
+    where = files.map do |file|
+      "\n   - #{File.join(File.basename(File.dirname(file)), File.basename(file))}"
+    end.join
+    if key.first == 'page'
+      error(t('address_duplicate_page', slug: slug, count: group.size),
+            t('address_duplicate_page_fix') + where,
+            kind: :address_duplicate,
+            data: { 'slug' => slug, 'address' => "/#{slug}/", 'files' => files })
+    else
+      error(t('address_duplicate', year: key.first, slug: slug, count: group.size),
+            t('address_duplicate_fix') + where,
+            kind: :address_duplicate,
+            data: { 'year' => key.first, 'slug' => slug,
+                    'address' => "/posts/#{key.first}/#{slug}/", 'files' => files })
+    end
   end
 
   # Two posts claiming one old address. The build answers with whichever it
@@ -345,7 +807,10 @@ module Checker
       names = [a, b].map { |slug| groups[slug].map { |p| p['series'].to_s.strip }.uniq.first }
       findings << warn(t('series_similar', a: names[0], count_a: groups[a].size,
                                            b: names[1], count_b: groups[b].size),
-                       t('series_similar_fix'))
+                       t('series_similar_fix'),
+                       kind: :series_similar,
+                       data: { 'a' => names[0], 'posts_a' => groups[a].size,
+                               'b' => names[1], 'posts_b' => groups[b].size })
     end
     findings
   end
@@ -390,7 +855,8 @@ module Checker
     claims.filter_map do |origin, slugs|
       next if slugs.uniq.size < 2
 
-      error(t('redirect_collision', origin: origin, slugs: slugs.uniq.join(', ')), t('redirect_collision_fix'))
+      error(t('redirect_collision', origin: origin, slugs: slugs.uniq.join(', ')), t('redirect_collision_fix'),
+            kind: :redirect_collision, data: { 'origin' => origin, 'slugs' => slugs.uniq })
     end
   end
 
@@ -413,7 +879,7 @@ module Checker
   # links to one site should not read as an attack on it.
   ONLINE_HOST_PAUSE = 1.0
 
-  def check_external_links(posts, cache: nil, online_progress: nil)
+  def check_external_links(posts, cache: nil, online_progress: nil, cap: CAP)
     urls = external_urls(posts)
     return [] if urls.empty?
 
@@ -443,13 +909,15 @@ module Checker
     end
 
     gone = results.select { |_, verdict| verdict[:gone] }
-    return [ok(t('online_ok', count: urls.size))] if gone.empty?
+    return [ok(t('online_ok', count: urls.size), kind: :online_ok, data: { 'checked' => urls.size })] if gone.empty?
 
     owners = url_owners(posts)
-    gone.keys.first(20).map do |url|
+    capped(gone.keys.map do |url|
       error(t('link_gone', slug: owners[url].to_s, url: url, reason: gone[url][:reason]),
-            t('link_gone_fix'))
-    end + more(gone.size - 20, :error)
+            t('link_gone_fix'),
+            kind: :link_gone,
+            data: { 'slug' => owners[url].to_s, 'url' => url, 'reason' => gone[url][:reason] })
+    end, cap)
   end
 
   # HEAD first: a link checker has no use for the body, and a HEAD over a
@@ -540,7 +1008,8 @@ module Checker
   def more(remaining, level)
     return [] unless remaining.positive?
 
-    [Finding.new(level: level, text: t('and_more', count: remaining), count: remaining)]
+    [Finding.new(level: level, text: t('and_more', count: remaining), count: remaining,
+                 kind: :and_more, data: { 'count' => remaining })]
   end
 
   # Both places a block keeps a file: the media themselves and a video's
@@ -549,7 +1018,7 @@ module Checker
   # was never reported missing, and the stray check below would have
   # reported every poster that exists as a leftover.
   def media_urls(post)
-    (post['content'] || []).flat_map do |block|
+    (Array(post['content']) || []).flat_map do |block|
       next [] unless block.is_a?(Hash)
 
       %w[media poster].flat_map do |key|
@@ -582,7 +1051,7 @@ module Checker
   # Both places a link can live: a block that is a link card, and a
   # formatting span inside any text the post carries.
   def all_links(post)
-    (post['content'] || []).flat_map do |block|
+    (Array(post['content']) || []).flat_map do |block|
       next [] unless block.is_a?(Hash)
 
       urls = []

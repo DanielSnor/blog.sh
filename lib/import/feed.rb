@@ -5,6 +5,7 @@ require 'uri'
 require_relative '../feed_http'
 require_relative '../i18n'
 require_relative '../slug'
+require_relative '../path_glob'
 # Only the postscript needs this, and only to ask where a page actually
 # landed -- see #written_pages. The mapping itself stays writer-agnostic,
 # and post_writer pulls in nothing from the run layer, so an adapter is
@@ -59,8 +60,7 @@ module Import
     # `nav:` has earned a menu of 404s. A name added there and forgotten
     # here only makes this note optimistic; the build still refuses and
     # still says so.
-    RESERVED_PAGE_SLUGS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
-                             robots.txt 404 favicon.ico].freeze
+    RESERVED_PAGE_SLUGS = Import::RESERVED_PAGE_SLUGS
 
     # keep_permalinks is a writer, not just an option, because the wizard
     # only learns the answer after the adapter exists: the question is
@@ -233,7 +233,6 @@ module Import
       home = live.count { |page| page[:already_home] }
       notes << I18n.t('import.note.feed_pages_home', count: home) if home.positive?
       notes << I18n.t('import.note.feed_linked_images', count: @linked_images) if @linked_images.positive?
-      notes << Import.pages_note(live.map { |page| "/#{page[:slug]}/" })
       notes << reserved_pages_note(reserved)
       notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
@@ -384,6 +383,21 @@ module Import
     end
 
     def read_source
+      # A DIRECTORY is the answer people give here -- they unpack the export
+      # and hand over the folder, not the .xml inside it -- and a file whose
+      # permissions were lost in a copy is the other. Both used to end in a
+      # raw Errno backtrace out of File.read, in a wizard whose whole job is
+      # to hold somebody's hand through their first import.
+      if File.directory?(@source.to_s)
+        inside = PathGlob.under(@source.to_s, '*.{xml,rss,atom}').sort
+        hint = inside.empty? ? '' : " Did you mean #{File.basename(inside.first)} inside it?"
+        abort("❌ #{@source} is a folder, and this import wants the file itself.#{hint}")
+      end
+
+      if File.exist?(@source.to_s) && !File.readable?(@source.to_s)
+        abort("❌ #{@source} cannot be read -- check the file's permissions.")
+      end
+
       return File.read(@source, encoding: 'utf-8') if File.exist?(@source.to_s)
 
       begin

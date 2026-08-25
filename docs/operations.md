@@ -487,6 +487,7 @@ Three things are worth knowing before you rely on the result:
 ```bash
 ./blog.sh check            # walks every post and every media file
 ./blog.sh check --online   # also asks whether the links that leave the site still answer
+./blog.sh check --json     # the findings as data: every one of them, no screen
 ```
 
 `doctor` asks whether the installation is sound and takes a second;
@@ -498,9 +499,24 @@ rather than a file under `public.nosync`: something to go and fix.
 
 What it looks for, each with a line saying what to do about it:
 
+- **A post file that will not read, a date nothing can parse, a post whose
+  text is not a list of blocks, or a slug that is not one path segment
+  (a slash or a `..` in it).** The build refuses to run on any of them, or
+  writes the page nowhere good, so check says so first: without this it
+  counted the archive minus the broken file and called the rest sound.
+- **A file a queue move stepped aside and a crash left parked.** The
+  parking name is dotted precisely so no listing shows it -- which also
+  means nothing would ever find one again without this. What to do with
+  it depends on whether the post inside is still in the archive somewhere:
+  a copy of a post that landed is a leftover to compare and delete, a
+  parked file that is the only copy of its post is one to put back under
+  a free name, and the finding says which of the two it is looking at.
+  It never tells you to write over the post standing at that name.
 - **Media a post asks for and hasn't got** -- a video's poster image
   included -- usually an import whose download failed. The page renders
-  a hole.
+  a hole. A file that is there and useless -- empty, unreadable, or a
+  folder under the picture's name -- is reported the same way, with a
+  sentence that says which it is.
 - **Images stored as 1px or smaller.** The build treats those as tracking
   pixels and drops them *together with their caption*, so the page loses
   both without saying so.
@@ -527,11 +543,19 @@ What it looks for, each with a line saying what to do about it:
   differing only in digits are left alone (`rok-2025` next to `rok-2026`
   is two year-series, not a typo).
 - **One old address claimed by two posts.** Whichever renders last wins
+- **Two posts that would be served at one address.** The build refuses to
+  run at all in this state, so this is the one finding that stands between
+  you and a site that cannot be rebuilt.
   and the other's readers land on it.
 
-It only reports. Nothing here deletes a directory or rewrites a post: the
+It only reports, unless you ask it not to. On its own -- and that is how
+cron runs it -- nothing here deletes a directory or rewrites a post: the
 value of the tool is that its output can be trusted, and a checker that
-also acts has to be trusted twice. Twenty findings of each kind are
+also acts has to be trusted twice. `--repair` is where the asking happens,
+one finding at a time and never without a key press; it is described
+below, and it earns its trust the hard way -- it adds rather than
+rewrites where it can, it moves files to the trash rather than deleting
+them, and it keeps a version of a post before changing it. Twenty findings of each kind are
 listed and the rest counted, so one bad import can't bury everything else.
 It exits non-zero on errors only, never on warnings, so it can hang off
 cron and speak up only when something is actually broken.
@@ -548,6 +572,37 @@ and a GET with 200 for the same address. Verdicts are remembered in
 `tmp/link-check.json` for two weeks, so running it again next week only
 asks about the links it hasn't seen lately; deleting that file just means
 the next run asks about everything.
+
+`--repair` walks the findings and offers, for each one, the single repair
+that finding allows -- nothing is applied without a key press. A dead link
+to an old address is repaired on the **target** post, by writing that
+address into its `redirect_from`: one added line, your own text untouched,
+and every link to the old address answered at once, including the ones
+from outside the site that no check can see. A link written relative to the
+post is rewritten to the address it means. A media directory or file no
+post references is moved to the trash the engine already uses --
+`trash/<year>/<slug>/media/` -- and `./blog.sh restore <slug>` puts it
+back; the repair pass never deletes anything. A file whose name differs
+from the one on disk only in letter case or unicode form is not a leftover
+at all: the pass offers to write the name the directory actually uses into
+the post, and never touches the file.
+
+Where the right answer is a matter of judgement -- two posts claiming one
+old address, an image the author has to look at, a link to something this
+archive never had, a slug two posts share across two years, or a target
+that is still a draft -- it says so and passes over. A second run proposes
+nothing, because the findings it repaired are gone; run `./blog.sh rebuild`
+afterwards to put the changes on the site.
+
+The screen shows at most twenty findings of a kind and totals the rest in
+a "...and N more" line, which is right for reading and useless for acting
+on: a script that wants to add `redirect_from` for every dead link cannot
+work from a summary. `--json` prints all of them instead, each with the
+kind it is (`link_dead`, `media_stray`, `series_similar`...) and the data
+it is about -- the post's slug, the address, the file. The exit code is
+the same in both modes: 0 when the archive is sound, 1 when something in
+it is not.
+
 
 ## Counting the archive
 
@@ -639,6 +694,17 @@ Things worth knowing:
   backend) records what the target already has. Deleting one is always
   safe -- the next deploy re-uploads everything once and rebuilds it. The
   guards are unaffected, because their reference lives elsewhere.
+- **...with one exception worth knowing.** `rsync`, `rclone` and `git`
+  diff the target themselves, so a lost manifest costs one full re-upload
+  and nothing else. For `sftp`, Surfer and a local directory the engine
+  never reads the far end, so the manifest is also the only record of what
+  stands on it: a file you delete at home *after* the manifest went missing
+  stays on the target, and no flag will find it again. This is why a deploy
+  says out loud that the manifest was written for another target instead of
+  quietly starting over -- and why the target's identity ignores the
+  switches that cannot move a connection (`-v`, `-q`, the order they are
+  written in), so reformatting a line in `env.sh` is not a new target.
+
 - **Switching backends** starts from a fresh manifest on purpose; the
   first deploy to a new target uploads the whole site. The baseline is
   *shared* across backends -- it describes the build, which is the same
@@ -720,7 +786,7 @@ A second, optional job publishes scheduled drafts
 when nothing is due, so a tight interval costs nothing:
 
 ```
-*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh >/dev/null
 ```
 
 Every run of that job touches `.last-scheduled-run` in the project root,
@@ -820,9 +886,9 @@ whole), but restoring from the archive itself is exact.
 | Deploy stopped with a "% drop/increase" message | One of the four guards ([Deploying](#deploying)) -- broken build until proven otherwise, `--force` only when the change is intended. |
 | Deploy or save stopped naming an oversized file | The one file-size limit ([Deploying](#deploying)) -- shrink the file, or take it out of the post and link to it instead. |
 | `N deploys in a row have not finished` | Something is refused every time; the failures listed under that line say which ([Deploying](#deploying)). |
-| `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer UI and update `SURFER_TOKEN`. |
+| `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer admin UI (/_admin) and update `SURFER_TOKEN`. |
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
-| `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
+| `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → Privacy and security → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
 | Every comment disappeared after turning on `comments.approval` | Expected until you star them -- moderation publishes only favourited replies ([Cron](#cron-sidebar-widgets-and-post-stats)). If starring changes nothing either, `./blog.sh doctor --online` catches the usual cause: a token without `read:statuses`. |
 | A comment you starred still isn't on the site | It arrives with the next `refresh-sidebar.sh` run; an older post waits for the full pass, which `--full` does now ([Cron](#cron-sidebar-widgets-and-post-stats)). Check the cron job is actually installed. |
 | `comments.approval is on but MASTODON_ACCESS_TOKEN is not set` | The cron run refused to publish rather than emptying every thread; the pages keep their last known comments until the token is there ([Cron](#cron-sidebar-widgets-and-post-stats)). Same for `BLUESKY_APP_PASSWORD` on a Bluesky site. |

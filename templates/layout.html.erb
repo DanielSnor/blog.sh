@@ -67,12 +67,12 @@
     </div>
     <%= partial('nav', search: true, active: nav_active) %>
 
-    <div class="layout<%= LAYOUT_SIDEBAR ? '' : ' layout--no-aside' %>">
+    <div class="layout<%= SIDEBAR_SHOWN ? '' : ' layout--no-aside' %>">
       <main>
 <%= main_html %>
       </main>
 
-      <% if LAYOUT_SIDEBAR %><%= partial('aside') %><% end %>
+      <% if SIDEBAR_SHOWN %><%= partial('aside') %><% end %>
     </div>
 
     <%= partial('footer') %>

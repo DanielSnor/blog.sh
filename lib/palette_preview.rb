@@ -115,6 +115,11 @@ module PalettePreview
   # a lone file, so its references point straight into the built tree.
   def rebase(page, base)
     page = page.gsub(/(src|href)="\//) { "#{Regexp.last_match(1)}=\"#{base}/" }
+    # CSS carries addresses of its own -- a @font-face file is url(/assets/…)
+    # -- and leaving those alone meant the uploaded preview lost the site's
+    # fonts and fell back to whatever the phone had. Quoted or bare, all
+    # three spellings.
+    page = page.gsub(/url\((['"]?)\//) { "url(#{Regexp.last_match(1)}#{base}/" }
     page.gsub(/srcset="([^"]*)"/) do
       list = Regexp.last_match(1)
       %(srcset="#{list.gsub(%r{(\A|,\s*)/}) { "#{Regexp.last_match(1)}#{base}/" }}")

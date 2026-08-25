@@ -189,15 +189,29 @@ module RunLock
     holder = '' unless holder_alive?(holder)
     detail = holder.empty? ? '' : " (#{holder})"
     stuck = stuck_hint(holder)
-    # Dropping the holder detail is right, but it takes the only actionable
-    # fact with it: that the run in the way is almost always the scheduled
-    # one, and will be gone shortly. Without that, the message describes a
-    # situation and offers nothing to do about it -- and the case where it
-    # matters most is the interactive one, where waiting is not automatic.
-    # Cron comes back on its own in fifteen minutes; a person who just
-    # confirmed a palette does not.
-    "ℹ️  Another #{label ? "#{label} " : ''}run is still going#{detail} -- " \
+    # The KIND named is the holder's, read out of its own line, not the
+    # blocked run's. `label` here is this process's -- so a `queue` run
+    # waiting on the publishing cron announced "another queue run is still
+    # going", pointing at the wrong culprit. The holder line is
+    # "pid label... iso8601"; the middle is its label. Falls back to this
+    # run's label only when the holder could not say who it is (a
+    # read-only handle, the cron-as-root case).
+    holder_label = holder_label(holder) || label
+    "ℹ️  Another #{holder_label ? "#{holder_label} " : ''}run is still going#{detail} -- " \
       "skipping this one. Nothing is broken; try again in a minute.#{stuck}"
+  end
+
+  # The holder's own label, pulled from its line "pid label... iso8601":
+  # everything between the pid and the timestamp. nil when the line is
+  # empty or unshaped, so the caller falls back to its own label.
+  def holder_label(holder)
+    return nil if holder.to_s.strip.empty?
+
+    parts = holder.split(/\s+/)
+    return nil if parts.size < 3
+
+    middle = parts[1..-2].join(' ')
+    middle.empty? || middle == 'run' ? nil : middle
   end
 
   # The holder line is "pid label iso8601-start". Empty when the holder is

@@ -51,13 +51,48 @@ module Import
     # are posts (as opposed to listings, tag pages, calendars). A
     # platform pack supplies it for hosts it knows; anywhere else the
     # user does, or page mode refuses with samples to build one from.
+    # The knobs, with their environment variables as the default for each.
+    # ./import.sh builds this object itself and used to pass nothing at
+    # all, so its advice ("raise WAYBACK_DELAY", "pass POST_PATTERN")
+    # named variables that only scripts/migrate_wayback.rb read -- the
+    # person followed it, nothing changed, and a run that needs
+    # POST_PATTERN had no way out of the wizard at all.
+    def self.from_env(url, **overrides)
+      mode = :auto
+      mode = :pages if ENV['WAYBACK_MODE'].to_s == 'pages'
+      new(url, mode: mode,
+          delay: ENV['WAYBACK_DELAY'].to_s.strip.empty? ? 1.0 : ENV['WAYBACK_DELAY'],
+          post_pattern: ENV['POST_PATTERN'],
+          pack: ENV['WAYBACK_PACK'],
+          from: ENV['WAYBACK_FROM'], to: ENV['WAYBACK_TO'],
+          **overrides)
+    end
+
     def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false, pack: nil,
                    from: nil, to: nil)
       @url = url.sub(%r{/+\z}, '')
       @from = stamp(from, 'WAYBACK_FROM')
       @to = stamp(to, 'WAYBACK_TO')
-      @delay = delay
-      @post_pattern = post_pattern && Regexp.new(post_pattern)
+      # Refused with a sentence, the way the two stamps above refuse
+      # theirs. Unchecked, a typo ("2", "2s") went through .to_f as the
+      # most aggressive run possible against a service this file documents
+      # as rate-limiting -- set by somebody trying to be GENTLER -- and a
+      # negative value made every request look like the Archive timing out.
+      @delay = Float(delay, exception: false)
+      abort("❌ WAYBACK_DELAY takes seconds between requests (1, 2.5) -- got #{delay.inspect}") if @delay.nil? || @delay.negative?
+      # An empty pattern is no pattern -- '' compiles to //, which matches
+      # every archived path: the front page, every monthly listing and the
+      # feed itself all became posts, and pack detection was silently off.
+      # A pattern that will not compile is refused with the parser's own
+      # sentence rather than dumped as a backtrace over the wizard.
+      @post_pattern =
+        unless post_pattern.to_s.empty?
+          begin
+            Regexp.new(post_pattern)
+          rescue RegexpError => e
+            abort("❌ POST_PATTERN is not a usable regular expression: #{e.message}")
+          end
+        end
       @mode = mode
       @keep_permalinks = keep_permalinks
       @pack_name = pack.to_s.empty? ? nil : pack.to_s
@@ -501,13 +536,13 @@ module Import
       case response
       when Net::HTTPSuccess then response.body
       when Net::HTTPRedirection
-        raise "too many redirects (#{url})" if redirects_left.zero?
+        raise I18n.t('import.wayback_too_many_redirects', url: url) if redirects_left.zero?
 
         http_get(URI.join(url, response['location']).to_s, redirects_left - 1)
       when Net::HTTPServerError, Net::HTTPTooManyRequests
-        raise Busy, "HTTP #{response.code} (#{url})"
+        raise Busy, I18n.t('import.wayback_http', code: response.code, url: url)
       else
-        raise "HTTP #{response.code} (#{url})"
+        raise I18n.t('import.wayback_http', code: response.code, url: url)
       end
     end
 

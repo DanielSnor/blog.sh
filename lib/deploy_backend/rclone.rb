@@ -2,6 +2,7 @@
 
 require 'tempfile'
 require 'shellwords'
+require 'digest'
 
 module DeployBackend
   # rclone covers the long tail of targets in one integration: S3, R2, B2,
@@ -29,17 +30,72 @@ module DeployBackend
       ENV['RCLONE_TARGET'].to_s
     end
 
+    # Same question sftp answers, for the same reason: an unmatched quote
+    # in RCLONE_ARGS is a typo in a hand-edited env.sh, and it belongs in a
+    # sentence before the run starts, not in a backtrace from the middle
+    # of one.
+    def problem
+      Shellwords.split(ENV['RCLONE_ARGS'].to_s)
+      nil
+    rescue ArgumentError => e
+      "RCLONE_ARGS: #{e.message}"
+    end
+
     def manifest_suffix
       '.rclone'
     end
 
+    # RCLONE_ARGS can carry --config, which re-resolves the whole remote to
+    # a different provider, so it is part of "where this goes" the same way
+    # RSYNC_SSH is for rsync. Without folding it in, pointing the deploy at
+    # another remote reused the old manifest and left the new one empty
+    # while reporting success. A digest of the args, appended; any change
+    # throws the manifest away, which is the safe direction.
+    def identity
+      extra = ENV['RCLONE_ARGS'].to_s.strip
+      return target if extra.empty?
+
+      "#{target} ##{Digest::SHA256.hexdigest(extra)[0, 12]}"
+    end
+
+    # Deletion here is by NAME, one orphan at a time, so it composes with
+    # --only: asking for two files and taking one down is a coherent run.
+    # Backends that could only mirror had to refuse that combination.
+    def deletes_by_name?
+      true
+    end
+
+    # Named deletions rather than a mirror: `rclone delete --files-from`
+    # removes these paths and looks at nothing else on the target.
+    def prune_orphans(orphans, logger)
+      names = Array(orphans)
+      return true if names.empty?
+
+      Tempfile.create('blog-sh-rclone-prune') do |f|
+        f.puts(names)
+        f.flush
+        full = ['rclone', 'delete', target, '--files-from', f.path]
+        full += Shellwords.split(ENV['RCLONE_ARGS'].to_s) unless ENV['RCLONE_ARGS'].to_s.empty?
+        logger&.call("  #{full.join(' ')} (#{names.size} orphan(s))")
+        system(*full)
+      end
+    end
+
     # only:  restricts the transfer to the listed files (--files-from).
-    # prune: switches copy -> sync; never combined with only:, matching
-    #        deploy_web.rb, which skips orphans under --only.
+    # prune: deletes exactly the orphans deploy_web.rb named; never
+    #        combined with only:, matching deploy_web.rb, which skips
+    #        orphans under --only.
     # force: retransfers regardless of size/modtime (--ignore-times).
-    # files:/orphans: unused -- rclone delta-diffs against the target itself.
+    # files: unused -- rclone delta-diffs against the target itself.
+    #
+    # `sync` used to do the pruning, and `sync` does not prune, it MIRRORS:
+    # anything on the far end this build did not produce is deleted, the
+    # engine's or not. On a real bucket that is somebody else's prefix, a
+    # hand-written robots.txt, a certificate challenge -- gone, while the
+    # run reports the two deletions the manifest knew about. The engine is
+    # a guest on that target, not its owner.
     def sync(public_dir:, files: nil, orphans: nil, only: nil, prune: false, force: false, logger: nil)
-      args = ['rclone', prune && !only ? 'sync' : 'copy', "#{public_dir}/", target]
+      args = ['rclone', 'copy', "#{public_dir}/", target]
       args << '--ignore-times' if force
       args += Shellwords.split(ENV['RCLONE_ARGS'].to_s) unless ENV['RCLONE_ARGS'].to_s.empty?
 
@@ -49,15 +105,20 @@ module DeployBackend
         system(*full)
       end
 
-      ok = if only
-             Tempfile.create('blog-sh-rclone') do |f|
-               f.puts(only)
-               f.flush
-               run.call(['--files-from', f.path])
-             end
+      # Same reason as rsync: deploy_web decided by content hash, and
+      # rclone deciding again by size and modtime made the manifest
+      # describe bytes that never left this machine.
+      wanted = only || Array(files)
+      ok = if wanted.empty?
+             true
            else
-             run.call([])
+             Tempfile.create('blog-sh-rclone') do |f|
+               f.puts(wanted)
+               f.flush
+               run.call(['--ignore-times', '--files-from', f.path])
+             end
            end
+      ok = prune_orphans(orphans, logger) if ok && prune
       logger&.call(ok ? '  ✅ rclone finished' : '  ❌ rclone failed')
       !!ok
     end

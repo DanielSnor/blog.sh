@@ -266,7 +266,14 @@ module Wizard
     # left alone: a caller that painted a row measured it as it meant it,
     # and an ANSI string's length is not its width.
     rows = Array(note).flat_map do |row|
-      row.to_s.include?("\e") ? [row] : Tui.wrap_to_width(row.to_s, Tui.term_width)
+      # A row painted in one colour from end to end can still be wrapped:
+      # take the paint off, wrap the words, put the same paint back on each
+      # line. Leaving every coloured row alone meant the explanations --
+      # which are dim, all of them -- were cut at the frame instead, and
+      # half the sentence about the derived menu (or the palette) was
+      # simply not there. Rows with colour CHANGING inside them are still
+      # left as their author measured them.
+      row.to_s.include?("\e") ? wrap_painted(row.to_s) : Tui.wrap_to_width(row.to_s, Tui.term_width)
     end
     unless Tui.interactive?
       rows.each { |row| puts row }
@@ -311,6 +318,17 @@ module Wizard
 
   # A menu that can be left, for wizards built as a set of sections
   # rather than one pass. Returns nil when the user is done.
+  # One colour around the whole row, or nothing to do. The pattern is
+  # deliberately narrow: an escape anywhere in the middle means the caller
+  # is doing something this cannot measure, and guessing there would break
+  # a row that is correct today.
+  def wrap_painted(row)
+    match = row.match(/\A(\e\[[0-9;]*m)([^\e]*)(\e\[0m)\z/)
+    return [row] unless match
+
+    Tui.wrap_to_width(match[2], Tui.term_width).map { |line| "#{match[1]}#{line}#{match[3]}" }
+  end
+
   def choose_or_exit(label, options)
     rows = options.map { |(_, desc)| desc } + [t('done')]
     unless Tui.interactive?
@@ -428,9 +446,21 @@ module Wizard
   # is false contributes nothing, so a run where the user pressed Enter
   # through every question reports "nothing changed" and leaves no
   # backups suggesting otherwise.
-  def review_and_write(files)
+  #
+  # `also` is the changes a run makes that are not lines in a file --
+  # every file ./style.sh has queued for copying into the install: the
+  # banner picture, a stylesheet, a font face. They are listed here for
+  # the reason the diffs are (the answer to `q_write` has to cover
+  # everything the run would do) and counted as changes for a reason the
+  # banner section found the hard way: replacing an image with one of the
+  # same name and the same dimensions moves nothing in site.yml, so the
+  # run reported "nothing changed" and left -- and the copy, which waits
+  # for :written, was dropped with it. Reading the picture as the only
+  # such change is how the identical hole survived one section over, where
+  # a skin.css the config already named was promised and then dropped.
+  def review_and_write(files, also: [])
     changed = files.select { |(_, writer)| writer.changed? }
-    if changed.empty?
+    if changed.empty? && also.empty?
       puts t('nothing_changed')
       puts
       return :unchanged
@@ -439,6 +469,10 @@ module Wizard
     puts Tui.paint(t('section_review'), :bold)
     puts
     changed.each { |(label, writer)| show_diff(label, writer.diff) }
+    unless also.empty?
+      also.each { |line| puts line }
+      puts
+    end
 
     # The diff is what this question is about, so nothing may be painted
     # over it -- and confirm builds a frame out of the record whenever there
@@ -455,14 +489,35 @@ module Wizard
     end
     puts
 
+    # Every file is checked for writability BEFORE the first is written, so
+    # the refusal genuinely happens before anything changes -- which is
+    # what "nothing was written" promises. Writing them in turn and letting
+    # the second fail left the first already replaced: site.yml new, env.sh
+    # old, the two out of step, and a message swearing nothing had changed.
+    blocked = changed.filter_map do |(_, writer)|
+      path = writer.respond_to?(:path) ? writer.path : nil
+      blocker = path && ConfigWriter.write_blocker(path)
+      blocker && [path, blocker]
+    end.first
+    if blocked
+      path, blocker = blocked
+      # Which of the two it is decides the sentence, because the advice
+      # differs and the wrong one sends the reader hunting for a file that
+      # is not in the way: told to go and look at a .bak, they find no .bak.
+      # write_blocker returns the backup or the directory, nothing else.
+      key = blocker == "#{path}.bak" ? 'write_denied_backup' : 'write_denied_dir'
+      puts Tui.paint("❌ #{t(key, path: relative(blocker))}", :red)
+      puts
+      return :failed
+    end
+
     begin
       changed.each { |(_, writer)| writer.save! }
     rescue ConfigWriter::NotWritable => e
-      # Nothing was written and nothing was lost: the refusal happens on
-      # the first file the filesystem says no to, before any of them is
-      # replaced. What the reader needs is which file and the fact that
-      # the backup is written first -- a config they own is still stuck
-      # behind a .bak they do not, which is the shape this arrives in.
+      # The pre-flight above catches the ordinary permission refusal before
+      # any file is touched; this remains for the race where a mode changes
+      # between the check and the write. Rare enough that naming the file
+      # (the Errno does) is enough.
       puts Tui.paint("❌ #{t('write_denied', message: e.message)}", :red)
       puts
       return :failed
@@ -511,6 +566,13 @@ module Wizard
 
   # Wraps a wizard's main loop so an interrupt says the one thing worth
   # saying: nothing was written.
+  #
+  # And the one fault that lands before a single question is asked: both
+  # wizards open by building a writer over config/site.yml with
+  # config/site.yml.example behind it, and a tree without the template met
+  # them with a Ruby backtrace out of the constructor. It is not the
+  # user's config that is wrong -- the template ships with the engine and
+  # is simply not there.
   def guard
     yield
   rescue Interrupt
@@ -518,5 +580,17 @@ module Wizard
     puts
     puts t('interrupted')
     exit 130
+  rescue ConfigWriter::TemplateMissing => e
+    puts
+    puts Tui.paint("❌ #{t('template_missing', path: relative(e.path))}", :red)
+    puts
+    exit 1
+  end
+
+  # A path as the reader would type it: the engine's own root cut off, so
+  # a message names config/site.yml.example and not the whole checkout.
+  def relative(path)
+    root = "#{File.expand_path('..', __dir__)}/"
+    path.to_s.start_with?(root) ? path.to_s.delete_prefix(root) : path.to_s
   end
 end

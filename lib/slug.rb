@@ -26,7 +26,11 @@ module Slug
   TRANSLITERATION = {
     'ß' => 'ss', 'æ' => 'ae', 'œ' => 'oe', 'ø' => 'o', 'đ' => 'd',
     'ð' => 'd', 'þ' => 'th', 'ł' => 'l', 'ħ' => 'h', 'ŧ' => 't',
-    'ŋ' => 'n', 'ı' => 'i'
+    'ŋ' => 'n', 'ı' => 'i',
+    # Greek writes its sigma differently at the end of a word, and a
+    # reader searching for one form must find the other: without this the
+    # index and the query folded the same word two ways.
+    'ς' => 'σ'
   }.freeze
   TRANSLITERATION_RE = /[#{TRANSLITERATION.keys.join}]/
 
@@ -46,5 +50,18 @@ module Slug
   # fold + everything non-alphanumeric collapsed to single dashes, trimmed.
   def slugify(s)
     fold(s).gsub(/[^a-z0-9]+/, '-').gsub(/\A-+|-+\z/, '')
+  end
+
+  # Whether a tag slug can be a listing page's address. Empty means the
+  # tag has nothing to fold to (emoji-only, punctuation-only); overlong
+  # means the address will not fit a filename -- 200 bytes is the cap the
+  # engine already chose twice for post slugs, well under any
+  # filesystem's limit. One answer here for the build and the checker
+  # both, because the two disagreeing is a pill linking to a page the
+  # build refused to make -- or a build dying in mkdir on a name check
+  # had just called sound. Deliberately NOT inside slugify: heading
+  # anchors share it, and capping there would renumber published anchors.
+  def pageable?(slug)
+    !slug.empty? && slug.bytesize <= 200
   end
 end

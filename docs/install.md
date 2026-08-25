@@ -223,8 +223,23 @@ The example is fully commented. The short version:
   somebody gets from a machine is a legitimate position and the engine
   does not take it on your behalf either way).
 
+The `commits` widget reads GitHub unless you give it `instance` -- the
+address of a Gitea or Forgejo server (Codeberg, your own git). The address
+is the whole configuration: nothing else has to be said, because it already
+answers which kind of host this is. That path costs one request where
+GitHub costs one per commit, since a Gitea activity item carries the
+commits it is about.
+
+`social`, `footer.links` and `nav` are lists, and a list key holds a list
+or nothing at all: emptiness is a legitimate answer everywhere. Anything
+else under one of them -- a single URL pasted where a list belongs -- is a
+mistake `doctor` names and the build reads as empty, rather than a
+traceback out of an engine file.
+
 `social` is the row of icons in the footer. Each entry takes `name`,
-`url` and either `icon` (a name from the built-in set) or `icon_svg`
+`url` and either `icon` (a name from the built-in set: mastodon, pixelfed,
+linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky, instagram,
+threads, facebook, x, youtube, rss, email) or `icon_svg`
 (your own markup), plus an optional `rel` that is passed through to the
 rendered link. `rel: "me"` on the Mastodon entry is what gets your site
 verified -- the green check mark next to it on your profile: Mastodon
@@ -303,10 +318,15 @@ An entry missing either half is skipped rather than rendered as an empty
 link. An empty list is a decision rather than a mistake: the entries and
 the button that opens them are gone, which is also how a site turns the
 menu off, so there is no second key for that. The bar itself stays, since
-the search field is rendered inside it.
+the search field is rendered inside it. `nav:` with nothing under it at all
+-- the key left standing after its entries were deleted -- reads the same
+way, because a key that is written down is an answer; leave the key out
+entirely to ask the engine for its own menu again.
 
 `layout.sidebar` and `layout.hero` switch whole regions on and off. The
-sidebar is on unless you say otherwise; the hero -- the post's first
+sidebar is on unless you say otherwise -- though it is only drawn when
+something would stand in it, so a site with no about text and no widgets
+gets its full width back without having to say so; the hero -- the post's first
 usable image lifted out of the text and run full width above the title --
 is off unless you ask, because it reshapes every post page it touches and
 a site is entitled to keep the shape it has. A single post can still ask
@@ -441,7 +461,7 @@ See [Deploying](operations.md#deploying) for the rest of the guards.
 
 ```bash
 export SURFER_URL=https://surfer.example.com
-export SURFER_TOKEN=...        # create an access token in the Surfer web UI
+export SURFER_TOKEN=...        # create an access token in the Surfer admin UI (/_admin)
 export SURFER_REMOTE_DIR=      # optional subdirectory; empty = app root
 ```
 
@@ -483,8 +503,8 @@ export GIT_PAGES_CNAME=www.example.com # optional custom domain
 
 Free hosting with HTTPS. Setup on the host's side (GitHub shown,
 GitLab/Codeberg analogous): create a repository, then Settings → Pages
-→ "Deploy from a branch" → `gh-pages`. Every deploy force-pushes the
-build as a single-commit snapshot; a custom domain must be set via
+→ Build and deployment → Source → "Deploy from a branch" → `gh-pages`.
+Every deploy force-pushes the build as a single-commit snapshot; a custom domain must be set via
 `GIT_PAGES_CNAME` (the host stores it as a CNAME file *in the branch*,
 which a snapshot push would otherwise wipe).
 
@@ -571,7 +591,8 @@ announcement (logged, not an error).
 
 1. In `config/site.yml`, set `bluesky.handle` (e.g.
    `you.bsky.social`); `bluesky.pds` only if you self-host a PDS.
-2. On Bluesky: Settings → App Passwords → create one, and put it into
+2. On Bluesky: Settings → Privacy and security → App Passwords
+   (bsky.app/settings/app-passwords) → create one, and put it into
    env.sh as `BLUESKY_APP_PASSWORD` -- never the account password.
 3. Announcements fit Bluesky's 300-grapheme limit automatically (the
    excerpt shrinks; title, link and hashtags never do), with the link
@@ -608,13 +629,29 @@ Three things have to be true for it to work, and `./blog.sh doctor`
    can ask, and the token can't be shipped to a browser -- so cron reads
    the thread and writes `public/comments.json`, and the page renders
    from that. Without that cron job nothing new ever appears.
-2. **On Mastodon the token needs `read:statuses`** alongside
-   `write:statuses`. Reissue it under Preferences → Development if yours
-   predates this: a token without it gets a perfectly good answer with
+2. **The token needs `read:statuses`** alongside `write:statuses`. On
+   Mastodon that is a choice; on GoToSocial it is the only way comments
+   work at all (see the note below). Reissue it under Preferences →
+   Development if yours predates this: a token without it gets a perfectly good answer with
    the `favourited` field left out of it, which reads as "approved
    nothing". On Bluesky the existing app password is enough.
 3. **You have to go and star the comments worth keeping** -- see the
    warning above the list.
+
+**GoToSocial.** Live comments cannot work there, whatever you configure:
+every read of a thread needs a token, all four of its authentication
+requirements are on, and a token cannot be put in a visitor's browser.
+Turn on `comments.approval: fav` -- the cron reads the thread with the
+token and only the replies you star reach the page. Two more things worth
+knowing: the token is made under Settings → Applications → New
+Application (not Preferences → Development, which is Mastodon's path and
+does not exist here), with the scopes written space-separated -- it needs
+`read:statuses` as well as `write:statuses`, and both fit in one token
+because GoToSocial has granular scopes. And a GoToSocial
+instance usually allows 5000 characters rather than 500, so
+`mastodon.toot_length` is worth setting to whatever your server's
+`statuses-max-chars` says. `doctor --online` checks the first of these
+for you and says so in one sentence.
 
 Worth knowing before switching it on:
 

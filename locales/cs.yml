@@ -24,6 +24,44 @@ nav:
   search_label: "Hledat"
   search_placeholder: "Hledat…"
 
+# Vlastní řeč buildu -- co vypíše na konci a čím zastaví, když archiv
+# postavit nejde. Do 1.4 to bylo natvrdo anglicky i na českém webu.
+build:
+  unreadable_posts: "❌ V content.nosync/posts/ jsou soubory, které nejdou přečíst — build zastaven:"
+  duplicate_address: "❌ Dva posty na jedné adrese v content.nosync/posts/ — build zastaven:"
+  # Každý počet má svůj popisek — „postů: 1“, ne „1 postů“ — protože I18n
+  # v enginu nezná množná čísla a nikdy je znát nebude. Věta, která musí
+  # skloňovat, u nějakého čísla vždycky zaskřípe; popisek s dvojtečkou
+  # sedí u všech.
+  summary: "Postaveno do %{dir} — postů: %{posts}, stránek výpisu: %{pages}, štítkových stránek: %{tags}, k tomu index hledání, RSS a mapa webu"
+  drafts: "Rozepsané drafty (jen náhled, v žádném výpisu nejsou): %{count}"
+  two_pages: "⚠️  Na adrese /%{slug}/ se servíruje víc postů (%{count}), doopravdy ale jen jeden:"
+  two_pages_fix: "   Web se postaví a adresu si nechá ten STARŠÍ; ten druhý zůstane v mapě webu\n   i ve vyhledávání a povede čtenáře na cizí text.\n   Dej jednomu z nich jiný slug (./blog.sh props → adresa)."
+  # Co build říká o tom, co postavit odmítl, v pořadí, jak na to naráží.
+  # Všechno tohle padá na skutečných archivech — seznamy přesměrování
+  # přinese import, zbytek ručně editovaný JSON — a každá hláška
+  # pojmenuje post, o který jde, protože build jede dál i bez něj.
+  extra_css_offsite: "⚠️  site.extra_css: %{value} není cesta na tomhle webu, takže by ho Content-Security-Policy stránky zahodila — přeskočeno. Zkopíruj soubor do assets/ a pojmenuj ho jako /assets/css/<jméno>.css."
+  page_reserved_name: "⚠️  Stránka „%{slug}“ by seděla na adrese, kterou engine sám používá (/%{slug}/) — nepostavená. Přejmenuj ji."
+  draft_no_token: "⚠️  Draft „%{slug}“ nemá draft_token — náhled by byl na uhodnutelné adrese, takže se nestaví. Ulož ho znovu přes ./blog.sh edit."
+  pinned_more_than_one: "⚠️  Připnutý je víc než jeden post; použije se ten nejnovější (%{slug})."
+  tag_too_long: "⚠️  Štítek „%{name}…“ je na adresu výpisové stránky moc dlouhý — na svých postech se ukazuje, ale stránka /tag/ se pro něj nestaví."
+  former_slug_unusable: "⚠️  %{slug}: nepoužitelná položka former_slugs %{entry} — čeká se tvar „rok/slug“."
+  former_slug_taken: "⚠️  %{slug}: přesměrování z %{former} přeskočeno — ta adresa je už obsazená (živá stránka, nebo přesměrování dřívějšího postu)."
+  redirect_from_unusable: "⚠️  %{slug}: nepoužitelná položka redirect_from %{entry} — čeká se cesta od kořene webu, třeba „/stary-post/“."
+  redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} přeskočeno — /%{segment}/ patří webu samotnému."
+  redirect_from_taken: "⚠️  %{slug}: redirect_from %{origin} přeskočeno — ta adresa je už obsazená (živá stránka, soubor webu, nebo dřívější přesměrování)."
+  redirect_from_directory: "⚠️  %{slug}: redirect_from %{origin} přeskočeno — dřívější přesměrování už z té adresy udělalo adresář."
+  # Na skutečném archivu nejčastější z nich a poslední, co v buildu ještě
+  # zůstávalo natvrdo: post jmenuje obrázek, který ve své složce médií
+  # nemá. Každý import, co narazil na mrtvý obrázkový hosting, jich pár
+  # zanechá.
+  media_missing: "⚠️  %{slug}: jmenuje soubor médií, který ve své složce nemá — %{filename}. Stránka na něj pořád odkazuje, takže ta adresa bude 404, dokud soubor nedodáš."
+  # Tohle už není věc archivu: taháček chodí s enginem.
+  cheat_sheet_missing: "⚠️  %{path} chybí — stránka /markdown/ s taháčkem se nepostaví. Chodí s enginem; nejčastěji za to může nepovedený pull."
+  # Konec podpisu buildu, počítaný s popiskem jako všechno nad ním.
+  pruned: "Souborů, které už nic negeneruje a byly smazané: %{count}"
+
 post:
   reading_time: "Na čtení %{minutes} min"
   reading_minutes: "%{minutes} min"
@@ -165,6 +203,11 @@ cli:
   heic_convert_failed: "❌ %{file}: převod HEIC přes %{tool} selhal — nic se neuložilo a soubor zůstává, kde je. Převeď ručně: %{command}"
   media_too_large: "❌ %{files}: nad limitem %{limit} na soubor, který nejstriktnější cíl nasazení odmítne — nic se neuložilo a soubor zůstává, kde je. Zmenši ho, nebo ho z postu vynech a odkaž na něj."
   media_large: "⚠️  %{files}: blízko limitu %{limit} na soubor. Uloženo — ale ty bajty zaplatí každý čtenář, zvaž zmenšení."
+  # Soubor přichází do adresáře médií pod jménem, které je už obsazené.
+  # Ten, co stojí v cestě, se odsune stranou místo přepsání, a řekne se to
+  # nahlas — na cizím souboru není nic, co by říkalo, že se smí zahodit.
+  # Předpona „media:“ je adresář, ne slovo k překladu.
+  media_name_taken: "media: %{name} už bylo obsazené — soubor, který tam byl, je teď %{moved}"
   video_hevc: "⚠️  %{files}: natočeno v HEVC, což většina prohlížečů přehraje, ale ne všechny — zbytek čtenářů uvidí místo videa prázdný přehrávač. Uloženo tak jako tak. Překódování přehraje všude (potřebuje ffmpeg — na Macu `brew install ffmpeg`):\n     %{command}"
   video_quicktime: "⚠️  %{files}: kontejner QuickTime .mov. Video uvnitř je v pořádku, ale kontejner nebere každý prohlížeč; .mp4 berou všechny. Uloženo tak jako tak. Přebalení video jen přenese, nic se nepřekódovává (potřebuje ffmpeg):\n     %{command}"
   embed_lookup_working: "🔎 %{url}: ptám se služby, kde má přehrávač…"
@@ -221,6 +264,46 @@ cli:
   local_preview_hint: "Web zatím nikam neputuje — spusť ./blog.sh preview a otevři %{url} (výchozí port 8000)."
   template_body_placeholder: "Text prvního odstavce."
   deploy_backend_incomplete: "Cíl nasazení „%{name}“ nemá v env.sh vyplněné hodnoty — nahrávání přeskakuji. Sestavený web v public.nosync/ je hotový, ukáže ho ./blog.sh preview. Až ho budeš chtít nahrávat, doplň hodnoty do env.sh (vzor je v env.sh.example)."
+  deploy_args_fix: "Nejspíš v tom řádku v env.sh zůstala neuzavřená uvozovka. Přepínače se do něj píšou jako běžný text v uvozovkách, třeba \"-P 2022 -i /home/dan/.ssh/klic\"."
+  deploy_guard_shrink_files: "❌ Zastaveno: v public.nosync/ je %{have} souborů, ale podle %{source} jich mělo být %{expected}.\n   To je propad o %{percent} % — vypadá to na rozbitý build.\n   Podívej se na výstup buildu. Jestli je ten úbytek v pořádku (smazal jsi hodně postů), spusť to znovu s --force."
+  deploy_guard_shrink_bytes: "❌ Zastaveno: public.nosync/ má %{have}, ale podle %{source} mělo mít %{expected}.\n   Počet souborů přitom vypadá rozumně, takže obsah nemizí po stránkách, ale uvnitř nich.\n   Podívej se na výstup buildu. Jestli je ten úbytek v pořádku, spusť to znovu s --force."
+  deploy_guard_growth_files: "❌ Zastaveno: v public.nosync/ je %{have} souborů, podle %{source} jich mělo být jen %{expected}.\n   To je nárůst o %{percent} % — vypadá to na zdvojený nebo rozbitý build.\n   Podívej se na výstup buildu. Jestli je ten nárůst v pořádku (hromadný import nebo migrace), spusť to znovu s --force."
+  deploy_only_unknown: "❌ %{names}: v public.nosync/ nic takového není."
+  deploy_ref_baseline: "posledního přijatého buildu (%{at})"
+  deploy_ref_manifest: "manifestu (žádný přijatý build zatím není)"
+  deploy_state_unwritable: "Nahrávání proběhlo, jen se nepovedlo poznamenat si stav — nejspíš je plný disk. Příští běh proto nahraje všechno znovu; uvolni místo a je to bez následků."
+  # Zbytek toho, co scripts/deploy_web.rb říká nahlas. Počty jsou psané
+  # tak, aby žádný jazyk nepotřeboval množná čísla; jméno backendu a
+  # adresa cíle se dosazují tak, jak jsou — je to, jak si nástroj říká
+  # sám, a co se píše zpátky do env.sh.
+  deploy_header: "Nasazení webu -> %{backend}: %{target}"
+  deploy_public_missing: "❌ public.nosync/ neexistuje — spusť nejdřív build (ruby build/build_blog.rb)."
+  deploy_public_empty: "❌ Zastaveno: public.nosync/ je prázdný — spusť nejdřív build (ruby build/build_blog.rb)."
+  deploy_file_vanished: "❌ %{name} zmizel z public.nosync/ uprostřed nasazení — spusť build znovu."
+  deploy_manifest_foreign: "⚠️  %{path} se psal pro %{was}, tenhle běh ale nasazuje na %{now}.\n   Beru ho jako prázdný: nahraje se všechno a osiřelé soubory na novém cíli se odsud\n   najít nedají. To je ta bezpečnější polovina omylu; ta druhá by je mazala."
+  deploy_manifest_unreadable: "⚠️  %{path} se nedá přečíst (%{reason}) — beru ho jako prázdný.\n   Nahraje se znovu všechno. Soubory, které na cíli jsou a tenhle build je už nedělá,\n   se automaticky najít nedají; jestli jsi nedávno mazal posty, mrkni se na cíl."
+  deploy_baseline_unreadable: "⚠️  %{path} se nedá přečíst (%{reason}) — beru ho, jako by nebyl.\n   Pojistka proti nárůstu nemá pro tenhle jeden běh k čemu měřit; níž se zapisuje znovu."
+  deploy_files_too_large: "❌ Zastaveno: souborů nad limitem %{limit} na soubor: %{count}.\n%{list}\n   Limit platí pro každý backend, aby se web dal mezi nimi stěhovat — nejstriktnější\n   podporovaný cíl (git pages) nic většího nepřijme a --force to nezvedne: cíl by ten\n   soubor odmítl při každém běhu. Zmenši ho, nebo ho z postu vynech."
+  deploy_stale_too_large: "⚠️  %{files} na cíli už je, nad limitem %{limit} na soubor — tenhle web se na cíl, který limit vynucuje, přestěhovat nedá."
+  deploy_large_files: "⚠️  Velké soubory: %{files}%{more} — pod limitem %{limit}, ale ty bajty platí každý čtenář."
+  deploy_large_files_more: ", dalších souborů: %{count}"
+  deploy_growth_notice: "⚠️  Build vyrostl z %{was} na %{now} od %{source} — čekané, jestli jsi přidával média, jinak to stojí za pohled."
+  deploy_prev_outcome: "ℹ️  Předchozí nasazení (%{at}, %{backend}) skončilo jako '%{outcome}': nahráno %{uploaded}, selhalo %{failed}. Tenhle běh porovnává znovu proti manifestu; pojistky platí jako vždycky."
+  deploy_unfinished_streak: "⚠️  Nasazení po sobě, která nedoběhla: %{count} — něco se odmítá pokaždé (moc velký soubor, přihlašovací údaje, cíl). Pojistky jsou zapnuté; co selhalo, je vidět níž."
+  deploy_no_growth_reference: "ℹ️  Zatím není k čemu měřit nárůst — ta pojistka tenhle jeden běh stojí stranou (pojistka proti propadu měří dál proti manifestu)."
+  deploy_selection: "Vybraných souborů: %{files}, v buildu %{bytes}, nových nebo změněných: %{changed}, beze změny (přeskočeno): %{unchanged}"
+  deploy_orphans_delete: "Osiřelých souborů ke smazání: %{count}%{why}"
+  deploy_orphans_kept: "⚠️  Osiřelých souborů na cíli: %{count} — smaže je --prune"
+  deploy_orphans_why_prune: " (--prune)"
+  deploy_orphans_why_snapshot: " (nasazení snímkem)"
+  deploy_orphans_why_only: " (jmenované v --only, v buildu už nejsou)"
+  deploy_orphans_no_single_delete: "⚠️  %{names}: v buildu už nejsou, ale %{backend} neumí mazat jednotlivé soubory — spusť ./scripts/deploy-web.sh --prune a sundej je z cíle."
+  deploy_dry_delete: "smazat"
+  deploy_dry_orphan: "osiřelý"
+  deploy_delete_failed_kept: "❌ smazání selhalo, nechávám v manifestu: %{name}"
+  deploy_partial_landed: "Souborů, které se stihly nahrát a jsou zapsané: %{count} — příští běh naváže odtud"
+  deploy_outcome_unrecorded: "⚠️  Výsledek nasazení se nepodařilo zapsat do %{path}: %{error}"
+  deploy_done: "Hotovo: nahráno %{uploaded}, smazáno %{deleted}, selhalo %{failed}, beze změny %{unchanged}"
   surfer_unreachable: "❌ Surfer na %{url} neodpovídá (%{reason}) — appka je nejspíš vypnutá, nebo SURFER_URL v env.sh míří jinam, než kde běží. Sestavený web čeká v public.nosync/; až server poběží (nebo adresu opravíš), nahraje ho ./blog.sh rebuild."
   what_next_prompt: "Co dál? [d] nechat draftem  [e] upravit  [p] publikovat  [s] naplánovat  [x] smazat: "
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
@@ -249,6 +332,12 @@ cli:
   queue_carried: "Přeneseno: '%{slug}' je ve frontě %{position}. a publikuje se %{date}."
   queue_compact_prompt: "Posunout zbytek fronty (%{count}) o slot dopředu? [a/N] "
   queue_compacted: "Fronta posunuta: každý následující post převzal dřívější slot."
+  queue_move_failed: "Zápis se ve frontě zastavil v půli — cesty níže oprav ručně, než příště naběhne cron:"
+  queue_move_moved: "přesunut na %{date}"
+  queue_move_stayed: "zůstal na %{date}"
+  queue_move_see_below: "viz níže"
+  queue_move_stranded: "zachráněn v %{temp}; přejmenuj ho ručně zpátky na %{home}"
+  queue_move_blocked: "kopie je zachráněná v %{temp} a %{home} je obsazený — obojí ručně porovnej, než něco přesuneš nebo smažeš, protože přejmenovat tuhle přes to, co tam je, znamená přepsat post"
   menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
   menu_hint_plain: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · Esc zrušit"
   wizard_menu_hint: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · Esc konec"
@@ -256,6 +345,7 @@ cli:
   qr_hint: "Naskenuj telefonem a náhled se otevře."
   announcing: "Oznamuji"
   preview_serving: "Servíruji public.nosync na %{url} — Ctrl-C ukončí."
+  preview_bad_port: "❌ „%{value}“ není číslo portu. Napiš třeba `./blog.sh preview 8000`, nebo port vynech."
   preview_missing_public: "public.nosync ještě neexistuje — nejdřív ho sestav (ruby build/build_blog.rb)."
   schedule_date_invalid: "Tohle datum neumím přečíst — čekám např. 2026-08-15 09:00."
   schedule_date_not_future: "Datum publikace musí být v budoucnosti."
@@ -314,6 +404,10 @@ cli:
 
   nothing_in_trash: "V koši nic pro '%{slug}' není.\n\n"
   post_already_exists: "Post '%{slug}' už existuje (%{path}) a pokračováním bych ho přepsal — vyřeš ručně.\n\n"
+  restore_media_count: "souborů: %{count}"
+  restore_media_pick: "Který? (číslo, cokoli jiného zruší): "
+  restored_media: "Vráceno zpět do %{path}: %{count} soubor(ů)."
+  restore_media_kept: "V koši zůstaly, protože soubor toho jména je teď v archivu: %{files}"
   restored_label: "Obnoveno: %{path}"
 
   post_count: "\nPostů: %{count}%{drafts_suffix}"
@@ -321,6 +415,7 @@ cli:
 
   enter_number_or_slug: "Zadej číslo nebo slug: "
   ambiguous_slug: "Slug '%{slug}' existuje ve %{count} různých letech — který post myslíš?"
+  ambiguous_one_readable: "Slug '%{slug}' nese ještě jeden post, jehož soubor nešlo přečíst, takže se použije tenhle. Nečitelnou kopii oprav nebo smaž -- ./blog.sh check ji pojmenuje."
   enter_number: "Číslo (cokoliv jiného zruší): "
   cancelled_empty: "Zrušeno.\n\n"
   no_posts_to_pick: "Žádné posty k výběru."
@@ -359,7 +454,10 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře post
       ./blog.sh doctor [--online] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
-      ./blog.sh check                projde archiv a řekne, co je v něm rozbité
+      ./blog.sh check [--online] [--json] [--repair]
+                                     projde archiv a řekne, co je v něm rozbité;
+                                     --json vypíše všechny nálezy jako data, bez stropu;
+                                     --repair u každého nálezu nabídne tu jedinou opravu, kterou dovoluje
       ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
                                      zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
       ./blog.sh stats [--json]       spočítá archiv — posty, roky, slova, štítky, média, odkud to je
@@ -435,10 +533,7 @@ cli:
   versions_unknown: "Verze s tímhle číslem není."
   versions_confirm: "Současný text se taky odloží jako verze, takže je to vratné. Obnovit? [a/N] "
   versions_restored: "Obnoveno: %{path}"
-  props_unknown_draft: "Nerozumím, zkus p / s / r / x."
-  props_unknown_scheduled: "Nerozumím, zkus p / s / n / r / x."
-  props_unknown_published: "Nerozumím, zkus u / t / c / r / a / x."
-  props_unknown_published_plain: "Nerozumím, zkus u / c / r / a / x."
+  props_unknown: "Nerozumím, zkus %{keys}."
   props_addresses_count: "stále platných přesměrování: %{count}"
   addresses_heading: "Adresy přesměrovávající na tenhle post (%{count}):"
   addresses_menu_hint: "↑↓ pohyb · Enter zrušit adresu · Esc zpět"
@@ -453,6 +548,7 @@ cli:
   pin_off: "Odepnuto — po příštím sestavení zpátky v běžném chronologickém pořadí."
   pin_other: "Pozn.: připnutý je i „%{slug}“ — nahoře bude novější z nich, dokud ho neodepneš."
   rename_taken: "Slug „%{slug}“ už patří jinému postu — zvol jiný."
+  rename_unreadable: "Slug „%{slug}“ nemůžu použít: na téhle adrese leží soubor, který se nedá přečíst (%{path}). Dokud nebude čitelný, nevím, komu patří — zvol jiný slug, nebo ten soubor oprav."
   rename_prompt: "Nový slug (prázdné = zrušit): "
   rename_unusable: "Ze „%{input}“ po slugifikaci nic použitelného nezbylo — nic se nepřejmenovalo."
   rename_too_long: "Ten slug je příliš dlouhý na název souboru — zkrať ho a zkus znovu. Nic se nepřejmenovalo."
@@ -473,12 +569,35 @@ poster:
   no_bluesky_password_post: "BLUESKY_APP_PASSWORD není nastavené, oznámení na Bluesky se neodeslalo."
   no_bluesky_password_delete: "BLUESKY_APP_PASSWORD není nastavené, oznámení na Bluesky se nesmazalo."
   stats_fetch_failed: "Načtení statistik selhalo (%{key}): %{message}"
+  # Zbytek toho, co oba posílače řeknou, když je síť odmítne. Každá věta
+  # obaluje diagnostiku, která zůstává tak, jak ji napsal server nebo Ruby:
+  # %{error} je text výjimky, %{code} stavový kód HTTP, %{body} samotná
+  # odpověď. Věta kolem je to, co čte člověk; co je uvnitř, to pošle dál
+  # tomu, kdo se na to má podívat.
+  mastodon_api_error: "Mastodon API vrátilo %{code}: %{body}"
+  mastodon_api_error_delete: "Mastodon API vrátilo při mazání tootu %{code}: %{body}"
+  mastodon_post_failed: "Odeslání na Mastodon selhalo: %{error}"
+  mastodon_delete_failed: "Smazání tootu selhalo: %{error}"
+  mastodon_id_unreadable: "Z adresy %{url} se nedá vyčíst id tootu, smazaný nebyl."
+  bluesky_post_failed: "Odeslání na Bluesky selhalo: %{error}"
+  bluesky_no_record_address: "Odeslání na Bluesky selhalo: server odpověděl bez použitelné adresy záznamu (%{answer})"
+  bluesky_delete_failed: "Smazání oznámení na Bluesky selhalo: %{error}"
+  bluesky_uri_unreadable: "Adresa at:// %{uri} se nedá přečíst, oznámení se nesmazalo."
+  bluesky_check_failed: "Na Bluesky se nepodařilo ověřit, jestli oznámení už není odeslané: %{error}"
 
 redirect:
   moved: "Tenhle příspěvek se přestěhoval:"
 
 cron:
+  commits_instance_bad: "`instance` u widgetu commits není adresa serveru (%{value}), takže se žádné commity nestáhly."
   no_scheduled_due: "Žádný naplánovaný post není na řadě."
+  sidebar_unreadable: "⚠️  %{name} se nedá přečíst (%{reason}) — beru ho jako prázdný a píšu nový. Co v něm bylo pro posty, které tenhle běh nestahuje, je pryč; vrátí to ./scripts/refresh-sidebar.sh --full."
+  sidebar_gaps: "⚠️  Souborů postů, které se nepodařilo přečíst: %{count}. comments.json a stats.json si proto tenhle běh nechávají všechny záznamy — nedá se poznat, které posty jsou pořád publikované."
+  sidebar_empty_pass: "⚠️  Úplný průchod nestáhl vůbec nic, takže se nezapisuje jako hotový — příští běh to zkusí znovu místo aby čekal týden."
+  sidebar_stats_full: "stats.json: aktualizováno postů: %{updated} (celkem %{total}) [úplný průchod]"
+  sidebar_stats_recent: "stats.json: aktualizováno postů: %{updated} (celkem %{total}) [jen posledních ~90 dní]"
+  sidebar_comments_removed: "comments.json: smazán (comments.approval je vypnuté)"
+  sidebar_comments: "comments.json: aktualizovaných vláken: %{threads}, schválených komentářů celkem: %{comments}"
   published_scheduled: "Publikován naplánovaný post '%{slug}' (datum %{date})."
   unlisted_not_announced: "Post '%{slug}' je nezalistovaný, oznámení se neposílalo."
   already_announced: "Post '%{slug}' už jednou oznámený byl, takže se neoznamoval znovu — původní vlákno i s odpověďmi zůstává to, na které post odkazuje. Druhé oznámení se nepošle, dokud post nese adresu prvního; kdybys ho opravdu chtěl, smaž nejdřív z JSON postu pole s adresou (mastodon_url, nebo bluesky_url + bluesky_uri)."
@@ -550,7 +669,10 @@ import:
   sample_slugs: "Prvních několik slugů:"
   skipped: "  přeskočeno (%{reason}): %{count}"
   media_failed: "Nestažených souborů médií: %{count} — jejich posty se zapsaly bez nich:"
+  media_failed_preview: "Nedostupných souborů médií: %{count} — v náhledu se nic nestahovalo; při ostrém běhu by jejich posty vznikly bez nich:"
   media_failed_skipped: "Nestažených souborů médií u přeskočených postů: %{count} — ty posty nevznikly:"
+  media_failed_skipped_preview: "Nedostupných souborů médií u postů, které by se přeskočily: %{count} — v náhledu se nic nestahovalo:"
+  items_failed: "Položek, které se nepodařilo zapsat: %{count}"
   nothing_to_import: "Není co importovat."
   confirm_prompt: "Zapsat vše (postů: %{count})? Potvrď napsáním %{count} (cokoli jiného ruší): "
   running: "Importuji %{label} — stahuji média, může to chvíli trvat…"
@@ -559,6 +681,10 @@ import:
   cancelled: "Zrušeno, nic se nezapsalo."
   interrupted: "Přerušeno. Dosud zapsané posty už jsou v content.nosync/ — opakovaný import je bezpečný, přepíše je na místě."
   source_died: "⚠️  Zdroj přestal odpovídat po %{count}. položce: %{error}. Čísla níže jsou částečný součet, ne celý zdroj. Už zapsané posty jsou uložené — opakované spuštění je bezpečné, párují se přes source id a nikdy se nezduplikují."
+  livejournal_http: "LiveJournal odpověděl HTTP %{code}"
+  wayback_too_many_redirects: "příliš mnoho přesměrování (%{url})"
+  wayback_http: "HTTP %{code} (%{url})"
+  wix_not_csv: "%{file} nejde přečíst jako CSV (%{reason}) — poškozený je soubor na disku, ne Wix"
   group:
     blogs: "Blog / publikační platforma"
     social: "Sociální síť"
@@ -617,6 +743,8 @@ import:
   note:
     pages_imported: "Stránek se přeneslo %{count} a leží na %{paths}. Zatím na ně nic na webu neodkazuje — menu se odvozuje z typů obsahu, dokud neřekneš jinak, takže je přidej pod `nav:` v config/site.yml, jestli tam patří."
     pages_and_more: " a dalších %{count}"
+    ssg_hugo_site_root: "Složka, na kterou import mířil, není strom postů, ale web postavený v Hugu — naimportovalo se z ní content/ a zbytek (layouts, archetypes, vygenerovaná kopie) zůstal stranou. Jestli něco, co chceš, leží mimo content/, namiř import rovnou na tu složku."
+    ssg_hugo_site_root_declined: "Složka, na kterou import mířil, má v sobě konfiguraci Huga, ale nahoře má i vlastní markdown (%{files}) — prošla se tedy celá místo čtení jako web a spolu s content/ přišly i layouts/ a archetypes/. Jestli tyhle soubory nejsou posty, namiř import rovnou na content/."
     ssg_images_freed: "Obrázků uvnitř řádku textu, kde je post neumí ukázat: %{count} — každý dostal vlastní řádek, a obrázek, který byl jen ozdobou odkazu, se stal jeho textem."
     ssg_liquid_links_dropped: "Odkazů adresovaných přes Liquid ({{ site.repository }}, {% link %}, {% post_url %}): %{count} — taková adresa mimo Jekyll nic neznamená. Slova zůstala, adresa šla pryč; lepší než odkaz mířící na stránku tohohle blogu, která tu nikdy nebyla."
     ssg_media_missing: "Obrázků, které jmenují soubor, jenž ve stromu není: %{count} — každý si v postu podržel místo, alt text i popisek a míří na chybějící jméno. Chybí jen samotný soubor; build to bude hlásit, dokud ho do složky médií postu nedodáš."
@@ -624,6 +752,7 @@ import:
     ssg_author_dropped: "Postů, které ve frontmatteru uvádějí autora: %{count} — tenhle engine je záměrně jednoautorský a pole pro autora nemá, jméno se tedy nepřeneslo. Jestli v archivu leží texty někoho jiného, uveď ho před publikací v textu."
     substack_paid: "Postů jen pro předplatitele Substacku: %{count} — naimportovány celé (export je tvůj) a označené štítkem „substack-paid“, ať je před publikací najdeš."
     facebook_crossposts: "Crosspostů z jiných platforem (Twitter, Posterous, …): %{count} — přeskočeny, ať nezdvojují importy těch platforem. FACEBOOK_CROSSPOSTS=1 je vezme."
+    facebook_untouched: "Export nese i věci mimo časovou osu, které tenhle import nebere: nezařazené fotky (%{photos}), alba (%{albums}) a videa (%{videos}). Zůstávají ve staženém exportu — album není post a dělat z každé fotky jeden by ti zavalil archiv."
     feed_ampersands_escaped: "Samostatných znaků „&“, kvůli kterým soubor nebyl platné XML: %{count} — doplněny na &amp;, aby šel vůbec přečíst. Text uvnitř CDATA, kde jsou těla postů, zůstal přesně tak, jak byl vyexportovaný."
     feed_controls_dropped: "Řídicích znaků, které XML nepřipouští: %{count} — vypuštěny, aby šel soubor přečíst."
     feed_unmapped: "Postů bez použitelné původní adresy: %{count} (holé permalinky „?p=123“ mají identitu v query stringu) — naimportovány bez přesměrování."
@@ -758,8 +887,11 @@ doctor:
   nav_ok: "Menu: položek %{count}, každá míří na něco existujícího."
   nav_tag_missing: "Položka menu „%{label}“ míří na štítek %{tag}, který nemá žádný post."
   nav_tag_missing_fix: "Jeho výpis se nestaví, takže je to 404 ve vlastním menu. Obvykle byl poslední post s tím štítkem stažen z webu nebo přeštítkován. Oprav štítek, nebo položku vyhoď."
+  nav_tag_display_form: "Položka menu „%{label}“ míří na štítek %{tag}, což je jeho jméno, ne slug, pod kterým se jeho výpis staví."
+  nav_tag_display_form_fix: "Posty i ten výpis existují, položka je jen adresuje ve špatném tvaru a je to 404 na každé stránce webu. Napiš slug: %{slug}"
   nav_url_missing: "Položka menu „%{label}“ míří na %{url}, kde tenhle web nic nevydává."
   nav_url_missing_fix: "Obvykle post, který se po napsání menu přejmenoval nebo smazal. Nasměruj ji tam, kde něco je, nebo ji vyhoď — adresy mimo tenhle web se tu neřeší, na ty je check --online."
+  nav_asset_missing_fix: "Adresa jmenuje soubor pod /assets/, který není ve zdrojích ani v postaveném webu. Nahraj ho tam, oprav překlep, nebo položku vyhoď — do té doby vrací 404 na každé stránce."
   nav_url_relative: "Položka menu „%{label}“ míří na %{url}, což není adresa, ale jméno, které se čte proti stránce, na které zrovna stojí."
   nav_url_relative_fix: "Z titulní strany to možná i funguje, z postu to skončí vedle postu. Napiš to s lomítky: %{url}"
   extra_css_remote: "site.extra_css jmenuje %{value}, což je na cizím serveru."
@@ -768,10 +900,30 @@ doctor:
   extra_css_missing_fix: "Stránka si o něj řekne, dostane 404 a vykreslí se bez něj — vypadá to přesně jako stylopis, který nic nedělá. Buď soubor dodej, nebo ten řádek vyhoď."
 
   widgets_ok: "Widgetů v postranním panelu: %{count}, všechny vyplněné."
+  text_shape: "`%{key}` není text."
+  text_shape_fix: "Tohle je text, který web ukazuje čtenáři — jeden řádek (Markdown je v pořádku). Zapsaný jako seznam nebo jako sekce nastavení se nevykreslí vůbec a stránka o něj tiše přijde."
+  map_shape: "`%{key}` není sekce nastavení."
+  map_shape_fix: "Tenhle klíč drží nastavení psaná jako řádky `jméno: hodnota` odsazené pod ním. Klíč, pod kterým nic není, znamená žádná — a to je v pořádku."
+  widget_unknown: "Postranní panel žádnou kartu %{name} nemá."
+  widget_unknown_fix: "Karty jsou toots, pixelfed, commits, bluesky a rss. Jméno mimo ten výčet nekreslí nic — a když je to jediný zapsaný widget, zmizí sloupec ze všech stránek."
+  nav_item_shape: "Položka menu %{index} nemá popisek, nebo nemá kam vést."
+  nav_item_shape_fix: "Každá položka bere `label` a k tomu buď `tag` (slug štítku), nebo `url`. Položka bez jedné z těch půlek se přeskočí, místo aby se vykreslila prázdná."
+  sidebar_ok: "Postranní panel: karet %{count}."
+  sidebar_empty: "Postranní panel je zapnutý, ale nic by v něm nestálo."
+  sidebar_empty_fix: "Od 1.4 se sloupec kreslí, jen když je co do něj dát, takže se všechny stránky staví v plné šířce. Napiš text o sobě nebo widget — nebo to řekni naschvál přes layout.sidebar: false."
+  list_shape: "`%{key}` není seznam."
+  list_shape_fix: "Seznam se píše jako řádky začínající „- “ pod klíčem. Klíč, pod kterým nic není, znamená žádné položky, a to je v pořádku."
   widget_shape: "Widget %{name} není sada nastavení."
+  widget_shape_fix: "Widget je sada nastavení pod svým jménem — heading a co která karta potřebuje. Seznam nebo holá hodnota se nevykreslí nijak."
   widget_incomplete: "Widget %{name} nemá %{key}, takže nikdy nic nezobrazí."
   widget_account_id: "Widget s tooty chce API ID účtu a má %{value}."
   widget_account_id_fix: "Ne @jméno — ID: na Mastodonu číslo, na GoToSocial 26znakové ULID. Otevři https://instance/api/v1/accounts/lookup?acct=ty a opiš hodnotu „id“; ./setup.sh si ho dohledá sám."
+  widget_username: "`username` u widgetu commits není uživatelské jméno: %{value}."
+  widget_username_fix: "Jen jméno účtu tak, jak ho píše forge — písmena, číslice, tečka, pomlčka, podtržítko. Ne @handle, ne adresa profilu."
+  widget_instance_repo: "`instance` u widgetu commits má v sobě cestu: %{value}."
+  widget_instance_repo_fix: "Widget chce samotný server. Forge, který opravdu bydlí pod cestou, je v pořádku — jenže stejně vypadá i adresa profilu nebo repozitáře. Otevři si <instance>/api/v1/version v prohlížeči: forge odpoví verzí, cokoli jiného ne."
+  widget_instance: "`instance` u widgetu commits není adresa serveru: %{value}."
+  widget_instance_fix: "Napiš samotný server, jen schéma a host — „https://codeberg.org“, „https://git.example.org“ — ne handle, ne repozitář a ne holé jméno hostu. Pro GitHub klíč vůbec neuváděj."
   widget_heading: "Widget %{name} nemá nadpis, takže se zobrazí bez titulku."
   widget_limit: "Limit widgetu %{name} je %{value}; musí to být celé číslo větší než nula."
 
@@ -782,6 +934,10 @@ doctor:
   scheduler_ok: "Ve frontě čeká postů: %{count}, a naposledy ji něco spustilo před %{ago}."
   scheduler_never: "Ve frontě čeká postů: %{count}, ale tady ji nikdy nic nespustilo — samy se nezveřejní."
   scheduler_stale: "Frontu už %{ago} nic nespustilo a čeká v ní postů: %{count} — přitom má běžet každých patnáct minut."
+  scheduler_overdue: "Plánovač běží (naposled před %{ago}), ale %{count} post(ů) má termín za sebou a pořád nevyšlo."
+  scheduler_overdue_fix: "Něco na těch postech padá při každém tiku. Pusť `ruby scripts/publish_scheduled.rb` ručně a přečti, co řekne — vydávání se opakuje, dokud to nespravíš."
+  deploy_pending: "Web dluží nasazení (od %{ago}): něco se publikovalo, ale nahrání neproběhlo."
+  deploy_pending_fix: "Spusť `./blog.sh rebuild`. Když máš nastavený cron plánovače, dluh dožene sám při dalším tiku."
   scheduler_fix: "Naplánuj scripts/publish-scheduled.sh — každých patnáct minut, s tím počítají časy z průvodce (*/15 * * * * /cesta/k/blogu/scripts/publish-scheduled.sh). Na hostingu k tomu slouží sekce cron v panelu; zkontroluj, že cesta míří na TENHLE blog, ne na jiný."
   age_minutes: "%{count} min"
   age_hours: "%{count} h"
@@ -812,6 +968,10 @@ doctor:
   token_invalid_fix: "Od chvíle, kdy přestal fungovat, se nic neoznámilo a nic se neoznámí, dokud ho nevyměníš. Vytvoř nový a vlož ho do env.sh."
   token_invalid_bluesky_fix: "Vytvoř na Bluesky nové heslo aplikace (Nastavení → Soukromí a zabezpečení → Hesla aplikací) a zapiš ho do env.sh jako BLUESKY_APP_PASSWORD."
   token_unchecked: "Token se proti %{instance} nepodařilo ověřit (%{code})."
+  thread_public: "%{instance} pouští čtení vlákna i bez přihlášení — živé komentáře si prohlížeč načte sám."
+  thread_closed: "%{instance} nepustí návštěvníkův prohlížeč ke čtení vlákna (odpovídá 401/403)."
+  thread_closed_fix: "Živé komentáře tady fungovat nemůžou — token se do prohlížeče poslat nedá. Zapni `comments.approval: fav` v config/site.yml: vlákno pak čte cron s tokenem (scope read:statuses) a na web jdou jen odpovědi, které jsi označil hvězdou. Tak to má GoToSocial a Mastodon v secure mode."
+  thread_unchecked: "%{instance}: nepodařilo se ověřit, jestli pustí čtení vlákna bez přihlášení (%{code})."
 
 # ./setup.sh — průvodce základním nastavením (scripts/setup.rb). Prompt je
 # popisek, pod ním nápověda a předvyplněná hodnota. Nápověda říká, co to
@@ -826,7 +986,23 @@ check:
   link_gone: "%{slug}: %{url} je pryč (%{reason})."
   link_gone_fix: "Hlásí se jen hostitelé, kteří už neexistují, a stránky s 404/410 — timeout nebo 5xx znamená „teď ne“ a nechává se být. Oprav odkaz, vyhoď ho, nebo ho namiř do archivu Wayback Machine."
   reason_no_host: "takový hostitel neexistuje"
-  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, nic jiného."
+  repair_nothing: "Není co spravovat — archiv je v pořádku."
+  repair_heading: "Kontrola archivu; ke každému nálezu pak nabídnu opravu"
+  repair_no_offer: "Tady nemám co nabídnout: tohle je rozhodnutí na tobě."
+  repair_no_offer_draft: "Jediný post toho jména je rozepsaný, a draft na webu zatím žádnou adresu nemá — jakmile ho vydáš, odkaz se spraví sám."
+  repair_no_offer_duplicate: "Ten slug nesou dva posty v různých letech, takže nepojmenovává ani jeden. Tady musí rozhodnout člověk."
+  repair_add_redirect: "Zapsat %{origin} do redirect_from postu %{slug} (%{to}) — jeden přidaný řádek, a odpoví se na všechny odkazy na starou adresu včetně těch zvenčí."
+  repair_rewrite_link: "Přepsat odkaz v postu %{slug}: %{from} -> %{to}"
+  repair_rename_media_ref: "Zapsat do postu %{slug} jméno, které adresář opravdu používá: %{from} -> %{to} (soubor samotný se nedotýká)."
+  repair_trash: "Přesunout %{path} do koše (dá se vrátit, nemaže se)."
+  repair_prompt: "Provést? [a] ano  [s] přeskočit  [q] konec"
+  repair_applied: "Hotovo."
+  repair_failed: "Nepovedlo se — nic se nezměnilo."
+  repair_busy: "Do instalace teď zapisuje něco jiného, takže se nic nezměnilo. Zkus to za chvíli."
+  repair_summary_failed: "Odmítnuto nebo neprovedeno: %{count}. U těch se nic nezměnilo."
+  repair_summary: "Provedeno: %{applied}, přeskočeno: %{skipped}, bez nabídky: %{no_offer}."
+  repair_rebuild: "Spusť ./blog.sh rebuild, ať se změny dostanou na web."
+  unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, --json a --repair, nic jiného."
   heading: "Kontrola archivu"
   progress: "Čtu posty: %{done}/%{total}"
   no_posts: "Zatím tu není co kontrolovat, archiv je prázdný."
@@ -834,6 +1010,11 @@ check:
   series_similar: "Série „%{a}“ (postů: %{count_a}) a „%{b}“ (postů: %{count_b}) se liší jen o pár znaků — překlep?"
   series_similar_fix: "Jestli jde o tutéž sérii, sjednoť zápis `series:` v postech — rozdílný zápis zakládá dvě série a dělí díly mezi ně."
   media_missing: "%{slug}: soubor %{file} v adresáři médií chybí."
+  media_unusable: "Post '%{slug}': %{file} na místě je, ale číst nejde — %{cause}."
+  media_cause_dir: "je to složka, ne soubor"
+  media_cause_unreadable: "chybí právo ke čtení"
+  media_cause_empty: "má nula bajtů"
+  media_unusable_fix: "Přerušené stahování, chybějící právo ke čtení, nebo složka pod jménem obrázku. Nahraj tam skutečnou kopii souboru; do té doby stránka ukazuje rozbitý obrázek."
   media_missing_fix: "Post si o něj říká a na stránce zůstane díra. Obvykle import, kterému selhalo stahování — buď soubor dodej, nebo ho z postu vyhoď."
   image_degenerate: "%{slug}: obrázek %{file} má %{width}x%{height} a vůbec se nevykreslí."
   image_degenerate_fix: "Cokoli 1px a menší se bere jako sledovací pixel a zahodí se I S POPISKEM, takže stránka tiše přijde o obojí. Vyměň obrázek, nebo blok smaž."
@@ -843,8 +1024,28 @@ check:
   link_relative_fix: "Tři tvary, tři různé opravy: odkaz na jiný post tohohle webu (přepiš na /posts/<rok>/<slug>/), holý název hostu, kterému chybí jen protokol (adresa je napsaná správně — doplň https://), a absolutní adresa se zbloudilým znakem vepředu (\" nebo :). Všechny tři se vyhodnotí uvnitř URL toho postu, a dotaz za otazníkem statický hosting ignoruje — vrátí 200 a tutéž stránku, na které čtenář stojí. Nic se nerozbije a nikdo nikam nedojde. Jestli cíl ještě odpovídá, je otázka pro check --online."
   media_orphan: "K adresáři médií %{dir} nepatří žádný post."
   media_orphan_fix: "Zbytek po smazaném nebo přejmenovaném postu, případně po importu, který běžel dvakrát. Nic na něj neodkazuje; smaž si ho sám, až se na něj podíváš."
+  media_misnamed: "%{slug}: jmenuje soubor %{file}, ale adresář médií ho drží jako %{actual}."
+  media_misnamed_form: "%{slug}: jmenuje soubor %{file} v jiné unicode podobě, než v jaké ho drží adresář médií."
+  media_misnamed_fix: "Bajty jsou v pořádku, liší se jen zápis jména v postu. Na souborovém systému, kterému nezáleží na velikosti písmen (macOS), se stránka pořád vykreslí a je to úklid; na tom, kterému záleží (většina serverů), obrázek už teď chybí. `./blog.sh check --repair` nabídne zapsat jméno, které adresář opravdu používá."
   media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
   media_stray_fix: "Zbylo po obrázku, který zdroj mezi importy odebral nebo přejmenoval. Post na něj neodkazuje; až se podíváš, smaž ho sám."
+  address_duplicate: "Na adrese /posts/%{year}/%{slug}/ by se servíroval víc než jeden post (%{count})."
+  post_unreadable: "Soubor %{file} se nepodařilo přečíst (%{reason})."
+  json_and_repair: "❌ --json a --repair naráz nejdou: --json je popis archivu, jak vypadá teď, kdežto --repair ho mění. Pusť napřed `check --repair` a pak `check --json`."
+  post_unreadable_fix: "Build v tomhle stavu vůbec neproběhne. Oprav ten soubor, nebo ho odlož stranou — dokud tam takhle leží, kontrola nad ním nic neví a web se nepostaví."
+  post_content_unreadable: "Post %{file} má text v něčem, co není seznam bloků (%{value})."
+  post_bad_slug: "%{file} má slug, který není jedním segmentem cesty (%{slug})."
+  post_bad_slug_fix: "Slug se stává adresou postu, jednu složku hluboko. Lomítko nebo `..` v něm způsobí, že build zapíše mimo své místo, nebo skončí. Přejmenuj post: ./blog.sh props <slug> -> [r]."
+  parked_leftover: "Přerušený přesun ve frontě nechal %{file} odstavený pod pracovním jménem."
+  parked_leftover_fix: "Ten soubor (nebo složka) je post, jeho média nebo historie úprav, jedno přejmenování od místa, kam patří: umaž úvodní tečku a příponu .queue-move a je zpátky."
+  parked_leftover_fix_stale: "Tentýž post je v archivu v %{live}, tohle je tedy kopie, kterou po sobě nechal přerušený přesun. Porovnej obojí a tenhle zbytek smaž, až ověříš, že živý je celý. Nepřejmenovávej ho zpátky: archiv by pak ten post měl dvakrát."
+  parked_leftover_fix_blocked: "%{home} drží JINÝ post a tenhle není nikde jinde v archivu — takže tenhle soubor může být jeho jediná kopie. Nepřejmenovávej ho přes to, co tam je, a nemaž ho: obojí porovnej a tenhle vrať pod jméno, které je volné (rok určuje jeho datum)."
+  post_content_unreadable_fix: "Obsah postu je seznam, jeden záznam na blok. Na čemkoli jiném build skončí chybou. Otevři ho přes ./blog.sh edit, nebo obnov starší verzi přes props [v]."
+  post_date_unreadable: "Post %{file} nemá datum, se kterým by se dalo pracovat (%{value})."
+  post_date_unreadable_fix: "Datum je to, podle čeho se určuje adresa i pořadí, takže build na něm skončí chybou. Doplň ho ve tvaru 2026-08-22T10:00:00+02:00."
+  address_duplicate_fix: "Build v tomhle stavu vůbec neproběhne — jeden post by přepsal druhý a jejich média by se smíchala. Dej jednomu z nich jiný slug (`./blog.sh props` → adresa), nebo datum v jiném roce."
+  address_duplicate_page: "Na adrese /%{slug}/ by se servírovala víc než jedna stránka (%{count})."
+  address_duplicate_page_fix: "Stránka nemá v adrese rok, takže je nerozdělí ani jiné datum. Web se postaví, ale servírovat se bude jen jedna z nich — ta druhá zůstane v mapě webu i ve vyhledávání a povede na cizí obsah. Dej jedné z nich jiný slug (`./blog.sh props` → adresa)."
   redirect_collision: "Na adresu %{origin} si dělá nárok víc postů: %{slugs}."
   redirect_collision_fix: "Vyhraje ten, který se vysází později, a čtenáři ostatních skončí u něj. Nech ten záznam jen u jednoho postu."
   and_more: "...a dalších %{count} téhož druhu, nevypsaných."
@@ -859,6 +1060,14 @@ stats:
   no_mastodon_token: "comments.approval je zapnuté, ale MASTODON_ACCESS_TOKEN není nastavený — bez něj API nikdy neřekne, kterým odpovědím jsi dal hvězdu."
   no_bluesky_password: "comments.approval je zapnuté, ale BLUESKY_APP_PASSWORD není nastavené — bez něj API nikdy neřekne, které odpovědi se ti líbí."
   blind_answer: "comments.approval je zapnuté, ale odpověď ze sítě %{network} neřekla, které posty jsou označené hvězdou — požadavek nebyl přihlášený, nebo tokenu chybí read:statuses. Odmítám to místo toho, abych přes už schválené komentáře zapsal prázdné vlákno."
+  # Proč se načtení ani sonda na schvalování nedají provést vůbec, a to ze
+  # stejného důvodu jako tři věty nad tím: fetch_one je cituje do varování,
+  # které jmenuje post, a doctor je celé vloží do %{message} v
+  # approval_probe_failed. Každá na jeden řádek — doctor cituje první řádek
+  # a nic za ním.
+  probe_unreadable_url: "mastodon_url %{url} není adresa, kterou tenhle engine umí přečíst — čeká se https://instance/@uzivatel/123 nebo https://instance/users/uzivatel/statuses/123, takže se pro ten post nedají načíst ani ohlasy, ani komentáře."
+  probe_foreign_instance: "poslední oznámení leží na %{instance}, což není instance z config/site.yml — token se kvůli testu na cizí server neposílá, takže se odtud viditelnost hvězd ověřit nedá."
+  probe_no_thread: "oznámení %{key} se ze sítě nevrátilo — je smazané, zablokované nebo chvíli nedostupné, takže nebylo na čem heslo aplikace vyzkoušet."
   unknown_option: "Neznámý přepínač: %{option}. stats bere jen --json, nic jiného."
   no_posts: "Zatím není co počítat."
   heading_archive: "Archiv"
@@ -1011,11 +1220,14 @@ wizard:
   choice_prompt: "Volba: "
   menu_hint: "↑↓ pohyb · Enter vybrat · 1-%{count} rychlá volba · Esc nechat současné"
   interrupted: "Zastaveno. Nic se nezapsalo — konfigurace je přesně taková, jaká byla."
+  template_missing: "%{path} tady není a konfigurace se píše vyplňováním téhle šablony — takže není na co se ptát. Se strojem se dodává: obnov ji (git checkout %{path}) a spusť to znovu."
   nothing_changed: "Nic se nezměnilo — každá odpověď sedla s tím, co už tam bylo."
   q_write: "Zapsat tyhle změny? [a/N] "
   cancelled: "Nic se nezapsalo."
   write_failed: "Výsledek se nenačetl zpátky tak, jak byl zadaný, takže se nic nezměnilo: %{message}"
-  write_denied: "Nic se nezapsalo: %{message}. Záloha (.bak) se píše dřív než samotný soubor, takže ta po jiném uživateli blokuje zápis stejně spolehlivě jako soubor sám — zkontroluj, komu patří obojí."
+  write_denied: "Nic se nezapsalo: %{message}."
+  write_denied_backup: "Nic se nezapsalo: do %{path} se nedá zapisovat. Záloha (.bak) se dělá dřív než samotný soubor, takže ta po jiném uživateli blokuje zápis stejně spolehlivě jako soubor sám — zkontroluj, komu patří obojí."
+  write_denied_dir: "Nic se nezapsalo: do %{path} se nedá zapisovat. Nový text se píše vedle souboru a teprve pak se přesune na místo, takže zapisovat musí jít do ADRESÁŘE, ne jen do souboru — zkontroluj, komu patří."
   section_review: "Co by se změnilo"
   done: "Hotovo — projít a zapsat"
   menu_hint_exit: "↑↓ pohyb · Enter vybrat · 1-%{count} rychlá volba · Esc dokončit"
@@ -1089,11 +1301,12 @@ style:
   h_banner_src: "Enter nechá současné. Podle vybraného souboru by to bylo %{suggested} — jméno je volba (banner.src), ne dané pravidlo."
   h_banner_file: "Dej ho do incoming/ a napiš jen jméno. PNG, JPEG, GIF nebo WebP. Dělej ho zhruba dvakrát širší, než se zobrazuje — jde přes celou šířku a na hustém displeji by byl jinak měkký; dodávaný má 1880x600."
   banner_not_found: "%{path} není soubor, hlavička zůstala beze změny."
-  banner_copied: "✅ Zkopírováno do %{path}."
   banner_pending: "✅ Nainstaluje se jako %{path}, až zápis potvrdíš."
   banner_missing: "%{path} tam není, takže nebylo co změřit."
   banner_unmeasurable: "Rozměry obrázku nejde přečíst, šířka a výška zůstaly, jak byly. PNG, JPEG, GIF a WebP se čtou vždycky."
   banner_measured: "✅ Změřeno: %{width}x%{height}. Přesně to rezervuje místo, než se obrázek načte."
+  review_banner: "obrázek hlavičky: %{name} — zkopíruje se jako %{path}"
+  review_file: "%{name} — zkopíruje se jako %{path}"
   q_banner_alt: "Alternativní text hlavičky"
   h_banner_alt: "Co místo obrázku přečte odečítač obrazovky nevidomému čtenáři. Třeba: Podzimní les v mlze."
   q_show_title: "Vypsat krátký název webu přes hlavičku? [A/n] "
@@ -1128,9 +1341,11 @@ style:
 
   widgets_current: "Widgety v postranním panelu teď: %{list}"
   q_widget: "Který widget chceš nastavit?"
+  q_widget_remove: "Odebrat widget"
+  q_widget_which_remove: "Který widget odebrat?"
   widget_toots: "Poslední tooty z účtu na Mastodonu"
   widget_pixelfed: "Poslední příspěvky z Pixelfedu"
-  widget_commits: "Poslední commity z GitHubu"
+  widget_commits: "Poslední commity z účtu na GitHubu, Gitee nebo Forgejo"
   widget_bluesky: "Poslední příspěvky z Bluesky"
   widget_rss: "Cokoli, co má RSS nebo Atom feed"
   widget_heading_toots: "Poslední tooty"
@@ -1141,8 +1356,12 @@ style:
   q_widget_heading: "Nadpis nad widgetem"
   q_widget_account_id: "ID účtu"
   h_widget_account_id: "ID, ne @jméno — číslo na Mastodonu, ULID na GoToSocial. Najde ho ./setup.sh s tokenem, nebo otevři https://tvoje-instance/api/v1/accounts/lookup?acct=tvojejmeno a opiš „id“."
-  q_widget_username: "Uživatelské jméno na GitHubu"
-  h_widget_username: "Jen jméno, tak jak je v adrese tvého profilu."
+  q_widget_username: "Uživatelské jméno na forge"
+  h_widget_username: "Jen jméno, jak stojí v adrese tvého profilu."
+  q_widget_instance: "Adresa forge (prázdné = GitHub)"
+  h_widget_instance: "Třeba https://codeberg.org. Nech prázdné, když je účet na GitHubu."
+  e_widget_instance: "Tohle neumím přečíst jako adresu serveru — čekám třeba https://codeberg.org."
+  e_widget_instance_repo: "Tohle je odkaz na jeden repozitář. Sem patří jen adresa serveru, bez cesty za ní."
   q_widget_feed_url: "Adresa feedu"
   h_widget_feed_url: "Jakýkoli RSS 2.0 nebo Atom feed: jiný blog, kanál na YouTube, podcast."
   q_widget_limit: "Kolik položek zobrazovat"
@@ -1151,8 +1370,9 @@ style:
   e_account_id: "Tohle musí být ID účtu, ne @jméno — na Mastodonu číslo, na GoToSocial ULID. Se jménem widget tiše nezobrazí nic."
   e_feed_url: "Tohle musí být URL začínající na http:// nebo https://."
   widget_set: "✅ Widget %{name} je nastavený. Naplní ho ./scripts/refresh-sidebar.sh; pouštěj ho z cronu, ať je aktuální."
+  widget_removed: "✅ Widget %{name} je odebraný. V configu zůstal zakomentovaný, takže se dá kdykoli zapnout zpátky."
 
-  fonts_intro: "Písmo se tady nastavuje jen dvěma řádkům na hlavičce — názvu a popisu; písmo zbytku webu je dané enginem. Vlastní soubor s písmem patří do assets/fonts/ a zapisuje se ručně do config/site.yml pod fonts.faces."
+  fonts_intro: "Písma nastavená tady platí jen pro dva řádky v hlavičce -- název a popis; zbytek typografie webu přichází s enginem. Vlastní soubor písma dej do assets/fonts/ a otázky níže ho za tebe zapíšou do config/site.yml pod fonts.faces."
   q_font_title: "Písmo názvu webu na hlavičce"
   h_font_banner_title: "Seznam písem, jak ho bere CSS — použije se první, které má čtenář v systému. Třeba: \"Iowan Old Style\", Palatino, Georgia, serif"
   q_font_title_size: "Velikost názvu"
@@ -1206,6 +1426,7 @@ style:
   q_css_anyway: "Přidat ho přesto?"
   file_will_go: "Uloží se jako %{path}."
   file_copied: "Zkopírováno do %{path}."
+  file_in_place: "Už je na místě jako %{path} — není co kopírovat."
   incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je na místě, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně."
   q_banner_claim: "Vlastní text přetisku pod bannerem"
   h_banner_claim: "Enter nechá současný. Prázdné = použije se popis webu. Tady smí být <br> pro zalomení, což popis webu nesmí (jde i do meta a RSS)."

@@ -5,6 +5,7 @@ require 'json'
 require 'time'
 require_relative '../i18n'
 require_relative '../slug'
+require_relative '../path_glob'
 require_relative 'html_blocks'
 require_relative 'meta_html'
 require_relative 'meta_text'
@@ -59,7 +60,7 @@ module Import
       extensions = format ? format.to_s : '{json,html}'
       [File.join(dir, 'posts'),
        File.join(dir, 'your_facebook_activity', 'posts'),
-       dir].find { |candidate| !Dir.glob(File.join(candidate, "your_posts*.#{extensions}")).empty? }
+       dir].find { |candidate| !PathGlob.under(candidate, "your_posts*.#{extensions}").empty? }
     end
 
     # What the wizard and the script check before building anything: is
@@ -133,9 +134,56 @@ module Import
     end
 
     def postscript
-      return nil if @crossposts.zero?
+      notes = []
+      notes << I18n.t('import.note.facebook_crossposts', count: @crossposts) if @crossposts.positive?
+      notes << untouched_note
+      notes.compact!
+      notes.empty? ? nil : notes.join("\n  ")
+    end
 
-      I18n.t('import.note.facebook_crossposts', count: @crossposts)
+    # An export carries more than the timeline: albums, the photos that
+    # never made it into one, and videos. This adapter reads your_posts*
+    # and nothing else -- which is a decision, not an oversight (an album
+    # is not a post, and inventing one per photo would bury a timeline).
+    # Saying so is not optional though: the export lists these files at the
+    # top level, the archive plainly does not contain them afterwards, and
+    # a summary that never mentions them leaves the person to discover the
+    # gap themselves, months later, by missing a picture.
+    def untouched_note
+      photos = countable(@posts_dir, 'your_uncategorized_photos.*')
+      # One file per album, in the format this export was downloaded in --
+      # the same choice that decided the reader, so it is known here. A
+      # bare *.json glob found none of an HTML export's albums and the
+      # sentence said "albums (0)" over an archive that had a shelf of
+      # them, which is worse than not mentioning albums at all: it is an
+      # answer, and it is wrong.
+      albums = PathGlob.under(@posts_dir, 'album', "*.#{@format}").size
+      videos = countable(@posts_dir, 'your_videos.*')
+      return nil if photos.zero? && albums.zero? && videos.zero?
+
+      I18n.t('import.note.facebook_untouched', photos: photos, albums: albums, videos: videos)
+    end
+
+    # How many entries a side file holds, without pretending to parse the
+    # HTML variant: there the count is the number of media entries, and one
+    # unreadable file must not take the sentence down with it.
+    #
+    # The directory arrives separately from the name so it stays a
+    # directory: pasted together, an export unpacked into "meta [1]" makes
+    # its own path part of the pattern and the count silently becomes 0.
+    def countable(dir, name)
+      PathGlob.under(dir, name).sum do |path|
+        body = File.read(path, encoding: 'utf-8')
+        if path.end_with?('.json')
+          data = JSON.parse(body)
+          list = data.is_a?(Hash) ? (data['photos'] || data['videos_v2'] || data.values.find { |v| v.is_a?(Array) }) : data
+          Array(list).size
+        else
+          body.scan(/<img|<video/i).size
+        end
+      rescue StandardError
+        0
+      end
     end
 
     private
@@ -215,7 +263,7 @@ module Import
     # order. Both formats split the same way.
     module PostsFiles
       def posts_files(extension)
-        Dir.glob(File.join(@posts_dir, "your_posts*.#{extension}"))
+        PathGlob.under(@posts_dir, "your_posts*.#{extension}")
            .sort_by { |path| File.basename(path)[/\d+/].to_i }
       end
     end

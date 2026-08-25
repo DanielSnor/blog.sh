@@ -68,12 +68,29 @@ duplicated.
   match would destroy a post you can't get back.
 
   The other exception is about WHERE the export sits. Several sources have
-  no account name anywhere in their files (Facebook, Threads, Jekyll, Wix,
-  Movable Type, Substack), so the identity borrows the export's own
-  directory or file name. Unpack the next export into a folder named after
-  its date and every post in it is a new post: the archive imports a second
-  time, slugs and all. Import from the same path each time -- or rename the
-  new export to the old name -- and matching works as described.
+  no account name anywhere in their files (Facebook, Threads, Wix, Movable
+  Type, Substack), so the identity borrows the export's own directory or
+  file name. Unpack the next export into a folder named after its date and
+  every post in it is a new post: the archive imports a second time, slugs
+  and all. Import from the same path each time -- or rename the new export
+  to the old name -- and matching works as described.
+
+  A markdown tree is the one source that can do better, because a site
+  built by Hugo or Jekyll writes its own name down. The identity is that
+  name -- `baseURL` or `title` out of `hugo.toml` (or `config/_default/`),
+  `url` or `title` out of `_config.yml` -- so such a tree can be moved,
+  renamed, restored somewhere else or unpacked on a second machine and a
+  re-import still finds its own posts. A tree that declares nothing falls
+  back to the full path it was imported from, and that is the case to know
+  about: a bare `content/` directory, a folder of `_posts/` with no
+  `_config.yml` beside them, or anything a converter produced matches only
+  while it stays where it was. Point the import at the site root rather
+  than at the content directory where you can -- that is where the
+  configuration is. A skeleton nobody has edited yet (`hugo new site`
+  leaves `baseURL` at example.org, `jekyll new` leaves the title at "Your
+  awesome title") counts as declaring nothing, on purpose: two untouched
+  skeletons would otherwise claim the same identity and the second import
+  would land on top of the first.
 - **Origin becomes a tag.** Every imported post is tagged with its platform
   (`tumblr`, `wordpress`, ...; for a plain feed, the site's domain), so
   `/tag/tumblr/` is the whole of one old blog. Deduplicated
@@ -133,7 +150,8 @@ count swung wildly" shape it watches for. Check the numbers, then re-run
 ruby scripts/migrate_beehiiv.rb <posts.csv>
 ```
 
-In beehiiv: **Settings → Exports**, the posts CSV. One file, no media:
+In beehiiv: **Settings → Export Data → Export Posts → Export All
+Posts**, the posts CSV. One file, no media:
 each row carries the entire EMAIL as HTML, and most of the import is
 undoing that -- slicing out the real content, dropping template
 variables, tracking pixels and the unsubscribe footer, turning the
@@ -195,8 +213,9 @@ post gets its poster frame as an image -- better in an archive than a
 ruby scripts/migrate_facebook.rb <path-to-unpacked-export>
 ```
 
-In Facebook: **Accounts Centre → Your information and permissions →
-Download your information**. Either format -- **HTML and JSON are both
+In Facebook: **Accounts Center (or Meta Account settings -- Meta is
+renaming it, and you may see either) → Your information and permissions
+→ Export your information → Create export**. Either format -- **HTML and JSON are both
 read**, and the export says which one it is, so there is nothing to
 choose here. Unpack the ZIP and point the script at the directory;
 photos and videos come from the archive itself, no network. Where you
@@ -228,8 +247,7 @@ across re-exports.
 ruby scripts/migrate_ghost.rb <export.json> <https://old-site.example>
 ```
 
-In Ghost Admin: **Settings → Advanced → Import/Export → Export your
-content**. The JSON file is the whole database -- posts, pages, tags --
+In Ghost Admin: **Settings → Advanced → Import/Export → Export**. The JSON file is the whole database -- posts, pages, tags --
 but **not the images**: they appear only as `__GHOST_URL__/...`
 references, and the files themselves exist only on the live site. That is
 why the site URL is a required second argument, and why the import has to
@@ -256,8 +274,9 @@ labels, and are dropped.
 ruby scripts/migrate_instagram.rb <path-to-unpacked-export>
 ```
 
-In Instagram: **Accounts Centre → Your information and permissions →
-Download your information**. Ask for either format -- **HTML and JSON are
+In Instagram: **Accounts Center (or Meta Account settings -- Meta is
+renaming it, and you may see either) → Your information and permissions
+→ Export your information → Create export**. Ask for either format -- **HTML and JSON are
 both read**, and the export says which one it is, so there is nothing to
 choose here. Unpack the zip and point the script at the directory itself;
 the photos and videos are in there, so this needs no network and no token.
@@ -352,6 +371,24 @@ Pages count too: markdown in the root of the tree (`about.md`,
 `colophon.md` -- where Jekyll keeps its pages) is read alongside
 `_posts/` and `_drafts/`, minus the names that are never a page
 (`index`, `404`, `feed`, `sitemap` and friends).
+
+**A Hugo site root works as well as its `content/`.** Point the import
+at the folder holding `hugo.toml` and `content/` and it reads the
+content directory, leaving `layouts/`, `archetypes/` and the built copy
+alone -- and says so in the summary, so nothing you keep outside
+`content/` goes missing without a word. It holds whether or not the site
+ever made a section: with a flat `content/`, the top of it is pages, the
+same as with a dozen sections below. If you keep markdown of your own at
+the top of the site folder (a `TODO.md`, a `NOTES.md`), the whole folder
+is walked instead -- that file may be the tree you meant -- and the
+summary names the file that decided it.
+
+Hugo's section listings (`_index.md`, one per section, wherever they sit)
+are the site's own furniture rather than posts, and are counted among the
+skipped. A branch bundle is the exception the name cannot show: a
+directory whose only markdown is its `_index.md` and which carries prose
+or files of its own is a page written that way (`about/_index.md` with
+its pictures beside it), and it is imported under the directory's name.
 
 **A tree written by `./blog.sh export` comes back whole.** Its front
 matter carries a `blogsh:` block -- the post's identity and everything
@@ -531,7 +568,7 @@ printed into a `<title>` is the Squarespace case it was written for.
 ruby scripts/migrate_substack.rb <path-to-unpacked-export> [site-url]
 ```
 
-In Substack: **Settings → Exports → Export your data**. Unpack the ZIP
+In Substack: **Settings → Exports → Create new export**. Unpack the ZIP
 and point the script at the directory itself -- the one holding
 `posts.csv` and `posts/`. The site URL is optional: the `/p/<slug>`
 paths that redirects need come straight out of the export, the domain
@@ -556,7 +593,10 @@ tag), and the newest posts sometimes ship as CSV rows with no HTML body
 ruby scripts/migrate_threads.rb <path-to-unpacked-export>
 ```
 
-In Threads: **Settings → Account → Download your information**. Either
+In Threads: **Accounts Center → Your information and permissions →
+Export your information**, and note that Meta does not offer this on a
+computer at all -- it has to be done in the mobile app or a mobile
+browser, which is where people get stuck without being told why. Either
 format -- **HTML and JSON are both read**, and the export says which
 one it is. Unpack the ZIP and point the script at the directory. Your
 own standalone posts import with their media from the archive;
@@ -647,6 +687,14 @@ still need `POST_PATTERN`. `WAYBACK_MODE=pages` skips the feed attempt
 outright. Pages that refuse to parse as posts are skipped and counted
 (`unparsed`); posts whose page names no date carry their capture date,
 also counted.
+
+Every one of these variables works for `./import.sh` too, not only for
+the script: the wizard reads the same environment, so advice a run prints
+about `WAYBACK_DELAY` or `POST_PATTERN` can be followed by starting the
+wizard again with the variable set. The one exception is `KEEP_PERMALINKS`
+below -- the wizard asks that as a question and the question's answer
+wins, because recording the dead blog's paths is irreversible in a way a
+pace or a pattern is not.
 
 Kept permalinks (`KEEP_PERMALINKS=1`, or the wizard's question) record
 the dead blog's own paths -- the feed item's link in feed mode, the

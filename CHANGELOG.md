@@ -10,6 +10,613 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.4 -- 2026-08-25
+
+The widest release since 1.0, and the most thoroughly tested one. Three
+things arrived: the commits widget reads Gitea and Forgejo (the release's
+reason to exist -- most of the Fediverse hosts its code there), comments
+work on GoToSocial with the same favourite-moderation Mastodon has, and
+the whole engine now speaks the site's language everywhere -- deploy,
+build warnings, announcement failures, import errors, all of it, in en,
+cs and de alike. Underneath sits a long audit over real archives: one
+address guard that publish, edit, scheduling, restore and re-import all
+ask before writing anywhere; a queue that can swap two same-slug posts
+across years with their media and edit history riding along; deploy
+backends that survive hostile filenames, rerouted targets and unreadable
+manifests; and a check that never again calls an archive sound when the
+build would refuse it. Nothing to migrate -- `git pull`, rebuild, deploy.
+
+### Added
+
+- **The commits widget reads Gitea and Forgejo, not just GitHub.** Asked
+  for by one of the first people outside this project to run the engine:
+  most of the
+  Fediverse hosts its code on Codeberg or its own Forgejo, and the
+  workaround was to mirror to GitHub for the sake of one sidebar card.
+  `widgets.commits.instance` takes the server's address and that is the
+  whole configuration -- an address already answers which kind of host it
+  is, so there is no second key to keep in agreement with it. Without the
+  key nothing changes. The forge path costs **one** request where GitHub
+  costs one per commit, because a Gitea activity item carries the commits
+  it is about, message and timestamp included; `doctor` refuses a handle and a bare
+  host name outright, and flags an address with a path after it (a profile,
+  a repository -- but also a forge that genuinely lives under one) as worth
+  checking rather than wrong, pointing at `<instance>/api/v1/version` to
+  settle it. Either way the answer arrives before the card turns out empty
+  and indistinguishable from "has not pushed lately".
+  Verified against two live servers before it was written.
+- **Media are read from the year the post's FILE lives in.** A post whose
+  date was corrected across a year boundary keeps its file (and its media)
+  where they were, while its address follows the date -- and the build was
+  the one place that looked media up by the date. It served the page with
+  a hole in it and said "MISSING media", while `check`, which looks where
+  the file is, called the archive sound. They agree now, and on the first
+  build after this upgrade such a picture is copied for the first time.
+  This one predates 1.4 by a long way; the repair pass is only what made
+  it visible.
+- **Letter case and unicode form of a filename no longer cost you the
+  picture.** `File.exist?` asks the volume, and on macOS the volume
+  resolves both -- so a post naming IMG_2043.JPG found img_2043.jpg and
+  rendered, while anything comparing the strings called the same file a
+  leftover. The engine now asks the directory what it actually writes: at
+  build time (the copy is renamed rather than left for the prune to
+  delete), in the markdown editor (the name from the disk is what gets
+  written into the post), and at deploy time (an "orphan" that is only the
+  old spelling of a file the build still has is not deleted). If your
+  archive has such a pair, `check` now says so and `--repair` offers to
+  write the name the directory uses.
+- **The deploy manifest knows which target it describes.** Pointing the
+  same backend at another target used to inherit the old manifest, which
+  says everything is already there -- so the new target stayed empty and
+  the run reported success. A manifest written for another target is now
+  thrown away out loud. What counts as "another target" ignores the things
+  that cannot move a connection: the order the switches are written in, and
+  `-v` or `-q` added to watch a run. Reformatting a line in `env.sh` is not
+  a move, and treating it as one would throw away the only record of what
+  stands on the far end -- for `sftp` that record is what finds the files
+  you have deleted since. Only a digest of those switches is stored, so the
+  key path and jump host in `env.sh` stay in `env.sh`.
+- **`./style.sh` can take a sidebar widget away again.** Adding one was the
+  only direction on offer, so a widget switched on by mistake -- or one
+  whose account no longer exists -- could be got rid of only by editing
+  `config/site.yml` by hand. The widget menu offers the removal whenever
+  something is switched on, and what it writes is the block commented out
+  rather than deleted: the heading, the account id and the template's own
+  prose stay in the file, so switching the widget back on later is one
+  answer instead of typing it all again.
+
+### Changed
+
+- **`check` has a ninth kind of finding: two posts that would be served at
+  one address.** The build refuses to run in that state -- one post would
+  be written over the other and their media mixed -- so a check that
+  called such an archive sound was telling you the opposite of what you
+  were about to find out. It is an error, so `check` can now exit 1 where
+  it used to say nothing.
+- **`doctor` fails on a config the engine cannot use.** It knew about
+  three list keys; it now reports the same set of complaints the build
+  warns about -- a widget name nothing draws (which takes the whole
+  sidebar off every page), a section written in a shape it cannot hold,
+  a menu item with no label or no target, and prose written as a list.
+  Configs that were quietly wrong will start saying so.
+- **Renaming a post writes its redirect from the address the site actually
+  served.** For a post whose date was corrected across a year, and for
+  every page (which has no year in its address at all), the old address
+  was derived from the folder -- so the redirect pointed at an address
+  that never existed, and the build refused it with a warning nobody could
+  act on. Editing, publishing, unpublishing and re-importing now answer
+  that question in the same one place, which is what made the next entry
+  visible.
+- **Two pages sharing a slug stop being a silent loss.** A page is served
+  at the root, so two of them with one slug collide however far apart
+  their dates are -- and the build wrote both and served whichever came
+  last, with nothing said anywhere. The build now names both files on
+  every run, `check` calls it an error and reports it at `/slug/` rather
+  than at an address with a year in it that no page ever had, and the
+  paths that write a post refuse to create the pair in the first place.
+  The build warns rather than stops on purpose: publishing runs from cron,
+  where nobody is at the keyboard to read an abort, and a site that
+  already has such a pair should keep being served while its author
+  decides which page keeps the address.
+
+- **`./blog.sh check --repair`: the checker's other half.** Until now
+  `check` could say what was wrong with an archive and nothing more, so
+  acting on it meant a hand-written script that re-derived what the checker
+  already knew -- which is exactly what the sean.cz cleanup in August was.
+  `--repair` walks the findings and offers, one at a time, the single
+  repair each one allows; nothing is applied without a key press. Three
+  rules hold throughout: **add rather than rewrite** (a dead link is
+  repaired on the target post's `redirect_from`, one added line, the
+  author's own text untouched, and every link to that address answered at
+  once -- including the ones from outside that no check can see);
+  **never delete** (an unreferenced file goes to the trash `restore` reads);
+  and **nothing twice** (a repaired archive proposes nothing on the next
+  run). Where the answer is a matter of judgement -- a collision between two
+  posts, an image somebody has to look at, a link to something the archive
+  never had -- it says so and passes over rather than guessing. Behind it,
+  the same lookup that made the August cleanup possible: an exact slug, or
+  a prefix when an import truncated one, and no proposal at all when two
+  posts could both be meant.
+- **`./blog.sh check --json`: the findings themselves, all of them.** A
+  finding used to be a finished sentence and nothing else, and the lists
+  were capped at twenty of a kind by the time anyone saw them -- so the
+  rest was not merely unprinted but never built. Findings now carry the
+  kind they are (`link_dead`, `media_stray`, `series_similar`...) and the
+  data they are about (the post's slug, the address, the file), the cap
+  belongs to the screen, and `--json` prints the whole list. This is what
+  makes acting on a check possible at all: the archive cleanup that took a
+  hand-written script over sean.cz in August could have read this instead.
+  The screen is unchanged, built from the same objects, and the exit code
+  is the same in both modes.
+- **Icons for Gitea, Forgejo, Codeberg and GitLab** in the footer's set, so
+  a site that hosts its code outside GitHub can say so with the same row of
+  icons everything else uses.
+
+
+- **A key that is written down speaks for itself.** `nav:` left standing
+  with nothing under it used to fall back to the menu the engine picks,
+  while the same emptiness under `links:` meant no links -- one editing
+  accident, two opposite answers, and the one that looked unchanged was the
+  menu. An empty `nav:` now means no menu, the way an empty `links:` has
+  always meant no links. **Upgrading:** a site that deleted its menu entries
+  but kept the key gets no menu now; write the entries back, or delete the
+  key to ask the engine for its own menu again. A site without a `nav:` key
+  is unaffected, which is every site that never set one.
+- **The sidebar column goes with its last card.** A site with no about text
+  and no widgets kept an empty `<aside>`, and the grid kept the 260px beside
+  it: the article sat in a narrowed column with a blank strip alongside,
+  space held for furniture that was never coming. The column is now drawn
+  when there is something to put in it -- `layout.sidebar: false` still
+  turns it off outright, and a site with an about text or a single widget
+  renders exactly as before.
+
+- **The whole engine speaks the site's language.** The wizards and the
+  everyday commands were translated; the narration around them was not --
+  a Czech or German site watched its own deploy, its build warnings, its
+  announcement failures and its import errors go by in English, one line
+  above a translated sentence. Sixty-odd sentences moved into the
+  locales: the deploy's progress and closing tally, all eleven build
+  warnings, every Bluesky and Mastodon failure, the import errors that
+  surface through the interrupted-source report, the queue's repair
+  instructions. What a server sent back (an HTTP code, a raw answer)
+  stays as it arrived; the sentence around it is the site's. Counted
+  lines are written label-then-number, so no language has to decline
+  "1 posts".
+
+### Fixed
+
+- **Comments work on GoToSocial.** Two separate things were in the way,
+  and the site they were found on -- arch-linux.cz, the install that
+  prompted 1.3.2 -- had never shown a single comment under any post,
+  silently. First, the address: GoToSocial writes a status as
+  `/@user/statuses/<ULID>` and the engine knew only Mastodon's
+  `/@user/<digits>`, so nothing was ever fetched. (The obvious repair is a
+  trap: widening the Mastodon pattern alone makes it match first and read
+  the literal word "statuses" as the status id, which turns an honest
+  nothing into a request for a status that cannot exist. The patterns are
+  ordered most-specific-first now, in the Ruby and in the browser alike.)
+  Second, and worse: GoToSocial requires a token on every read of a
+  thread, so the live mode -- where the visitor's own browser fetches the
+  replies -- cannot work there at all, whatever the address looks like.
+  `comments.approval: fav`, where a cron reads the thread with a token and
+  only the replies you star reach the page, is the whole of what is
+  available; `doctor --online` now asks the server whether an anonymous
+  reader gets a thread and says which of the two you have. A Mastodon in
+  secure mode is in exactly the same position, which is why the check asks
+  about the capability rather than about the name of the software. An
+  address the browser cannot read at all now leaves the "reply" link
+  standing instead of an empty space.
+- **An install in a folder called `blog [1]` no longer publishes an empty
+  site.** Every listing the engine makes -- the archive, the built pages,
+  the media, an unpacked export -- was built by pasting the directory's own
+  absolute path in front of a pattern, and a path is not a pattern: `[1]`,
+  which is what a second copy of a download gets called, reads as "one
+  character, and it is `1`". The listing then described a directory named
+  `blog 1`, nothing was there, and nothing said so. `build` reported 0
+  posts over a full archive and wrote a site with nothing in it, `deploy`
+  refused with "public.nosync/ is empty" -- and refusing was the lucky
+  ending, because a backend that commits whatever it is handed would have
+  pushed that emptiness live -- while `check` called the archive sound,
+  since it could not see the posts either. An export unpacked into
+  `Takeout [1]` was read as no export at all, for the same reason; `{`, `}`,
+  `*` and `?` in a folder name did the same thing more quietly, and `*` did
+  it while matching the WRONG directory rather than none. Directory names
+  are read as names now, everywhere, and the import wizard's Tab completion
+  offers such a folder instead of going silent over it. **Upgrading:**
+  nothing to do -- if this was your install, the first build after the
+  upgrade finds your archive again.
+- **A post whose slug carries `[`, `{`, `*` or `?` is no longer invisible
+  to the commands.** The other half of the same join: the post's own name
+  went into the pattern. A post called `foto[1]` was published by `build`,
+  shown by `list` and passed by `check` -- while `props` and `delete` said
+  "post not found" over it, `restore` called the trash empty with its files
+  sitting in there, and the guard that asks whether an address is taken
+  reported it free, which is the answer that lets a new post be written
+  over a live one. `--repair` was in the same position and could have set
+  aside a picture the post was using. A `*` did worse than vanish: it
+  matched the posts NEXT to it, so a command asked about `star*` offered
+  `starec` as though the two were one name. The engine's own slugs are
+  `[a-z0-9-]` and never carry any of this -- a file edited by hand does, an
+  archive written by something else does, and so does an old address an
+  import writes down, spelled the way the old site served it.
+- **A bracket in an alt text no longer destroys the picture.** `![[es]
+  W-ZERO3](...)` -- a real caption on a real photograph -- was a line the
+  markdown reader could not parse, so the next `edit` turned the image
+  block into a paragraph of literal markdown, the file was pruned as
+  unreferenced a moment later, and the page then printed the author's
+  absolute disk path as text. `check` said nothing about any of it, and the
+  post could not be edited back into shape either.
+- **`--prune` deletes what the deploy named, and nothing else.** On the
+  `rsync` and `rclone` backends it did not prune, it MIRRORED: everything
+  on the far end this build had not produced went with it -- the ACME
+  challenge a certificate renewal was standing in, an old blog kept in a
+  subdirectory, a hand-written robots.txt -- while the run reported
+  "deleted 2", because two is what the manifest knew about. A static site
+  generator is a guest on that directory, not its owner.
+- **An interrupted sftp transfer resumes.** A run killed at file 48 of 159
+  recorded nothing, so the next one started again from the first -- and on
+  a slow line a deploy that always restarts is a deploy that never
+  finishes. What landed is written down now, whether or not the run
+  finished, and the summary says so.
+- **A full disk ends a deploy with a sentence.** It used to be a raw
+  traceback out of the state file's write, with nothing said about what had
+  or had not been uploaded.
+- **Announcing a page linked to an address the site does not answer at.**
+  The toot (or Bluesky post) for a new page carried `/posts/<year>/<slug>/`
+  -- and that same URL is what finds the announcement again later, to
+  update or withdraw it.
+- **A post taken back down keeps its discussion off the site.** `comments.json`
+  and `stats.json` were merged and never narrowed, so a withdrawn -- or
+  deleted -- post kept its whole approved discussion readable at a public
+  URL, which is exactly what taking a post down is meant to prevent.
+- **An import that loses an item says which one, and exits 1.** "1 skipped
+  (error)" in a run that scrolled past a hundred lines of progress named
+  neither the item nor the reason, and the exit code was 0, so a cron or a
+  CI step saw a clean run. The sentence about pages that came across is
+  also built from what was WRITTEN now: it used to announce a page the
+  write had refused, and point the reader at somebody else's.
+- **The Twitter import stopped leaving `&lt;` and `&amp;` in the text** --
+  and, worse, in twelve permanent addresses, as `-gt-` and `-amp-`. The
+  entities are decoded after the offsets that need them, so every link
+  still lands on its own words.
+- **The Facebook import says what it does not take.** Albums, uncategorised
+  photos and videos sit beside the timeline in the export and this adapter
+  reads none of them -- which is a decision, not an oversight, and one the
+  summary now states instead of leaving somebody to discover it months
+  later by missing a picture.
+- **`doctor` stopped ticking three things that were not fine**: a queue
+  whose posts are days past their date while the runner is alive and
+  failing on every tick, a site that owes a deploy nothing else was
+  reading, and a menu whose items lead to tag pages the build does not
+  make. `check` no longer counts a tag page into existence from a draft.
+- **The scheduler's quiet tick is quiet.** The documented crontab runs it
+  every fifteen minutes and almost every one of those has nothing to do;
+  saying so on stdout is ninety-six mails a day, which is how the ticks
+  that matter get ignored. It also writes down that a deploy is owed
+  BEFORE it publishes, so a run killed between the two -- a restart, a
+  `docker stop` -- no longer leaves a post published, announced and never
+  uploaded, with nothing anywhere saying so.
+- **`./style.sh` can point the commits widget at a forge.** The card reads
+  Gitea and Forgejo since this release, and the wizard went on asking for a
+  "GitHub username" with no way to say anything else. A palette that leaves
+  colours out no longer writes them as empty values (which took `doctor`
+  down with twelve complaints); and a banner file that is not there says so
+  out loud, instead of into a frame a piped run never paints and a terminal
+  cuts in half -- with a green "Measured: 1880x600", the OLD banner, right
+  underneath. A banner replaced by an image of the same name and the same
+  size is installed at last -- and so is a stylesheet or a font file put
+  back beside a `site.yml` that already names it: nothing in the config
+  moved, so the run ended on "nothing changed" and dropped the copy it had
+  promised a moment earlier, leaving the file in `incoming/`. Every file a
+  run would copy in is listed in the review as the change it is, confirmed
+  together with everything else, and copied in only after that -- nothing
+  reaches the install before you say yes. Answering the banner question
+  with the picture already installed, which is what you type to re-measure
+  artwork you replaced by hand, says so and copies nothing, instead of
+  ending the run on a Ruby backtrace.
+- **Turning a post into a page (or back) no longer loses its address.**
+  `type: page` typed into the frontmatter -- or deleted from it -- moves a
+  post between `/posts/2026/slug/` and `/slug/` without touching the date,
+  and nothing was recorded behind it: every existing link to the address it
+  left died, and `check` called the archive sound. The redirect is written
+  now, whichever direction the change goes, and a re-import that does the
+  same thing behaves the same way.
+- **The build and `check` read `unlisted` with one rule.** The build has
+  always taken the hand-written spellings -- `"no"`, `"false"`, `"0"` keep
+  a post IN the stream -- while the checker read bare truthiness, so the
+  two disagreed about which tags and series have a listing page, and
+  `check` reported a live page as a dead link, forever. One predicate now,
+  in one place, asked by the build, the checker and the publisher alike.
+- **A tag too long for a filename no longer stops the build.** The address
+  of its listing page would not fit (`mkdir` died with a raw
+  `ENAMETOOLONG`, partway through writing the site); such a tag now shows
+  on its posts -- as a pill that is not a link -- and the build says in one
+  sentence that no /tag/ page is made for it. A tag that is not text at
+  all (a number, a leftover object out of a hand-edited file) is rendered
+  as text instead of ending the build in `escapeHTML`. **Upgrading:** the
+  cap is 200 bytes of address, which is under the 255 a filename is usually
+  allowed -- so a tag between the two used to get its page and no longer
+  does. The first rebuild takes that page out of `public.nosync` and the
+  next deploy takes it off the server; a link to it from outside 404s from
+  then on, and the engine itself stopped writing one.
+- **The feed stopped naming categories nothing stands behind.** A tag that
+  folds away to nothing -- emoji-only, punctuation-only, the kind an
+  Instagram or Tumblr export hands over verbatim -- has no listing page and
+  is drawn as no pill, and was still written into every `<item>` as a
+  `<category>`. A reader that groups by category offered a subject this
+  site does not publish under and cannot be sent to. The pills, the tag
+  pages and the feed read one rule now.
+- **The search box folds a word the way the index folded it.** The Ruby
+  that writes `search-index.json` and the JavaScript that reads it had
+  drifted apart on what counts as whitespace: the browser collapsed
+  everything Unicode calls a space -- a no-break space, a line separator --
+  and the index only what ASCII does, so a title carrying one could not be
+  found by typing it out exactly. The browser now collapses what Ruby's
+  `\s` collapses and no more. Both sides also fold the Greek final sigma
+  `ς` onto `σ`, which is the same letter in the middle of a word: a query
+  and a title spelling it differently used to be two different words to the
+  search. The index is rewritten by the next build; no post file changes.
+- **A draft's tags no longer link to pages that do not exist.** Tag listings
+  are made from the stream, so a tag carried only by drafts, unlisted posts
+  or pages never gets one -- and the pill for it was a link into a 404. On
+  one real archive that was ten dead links across nine drafts, every one of
+  them written by the engine itself. Such a tag is still shown, because it
+  is what the post is about; it is simply not a link. Nothing changes for a
+  published post, whose every tag has a page by construction.
+- **Two posts sharing a slug in two years can trade places in the queue.**
+  The engine has always treated a slug repeated in another year as
+  ordinary. The queue did not: each half of the swap found the other
+  standing exactly where it was going, and the screen ended with "resolve
+  this manually" -- a thing there was nothing to resolve, since the two are
+  each other's obstacle and neither can move first. Both halves are still
+  checked before either is written, and a swap that would land two posts on
+  one address is still refused. Everything keyed by year and slug trades
+  together: the posts' pictures and their edit histories step aside with
+  the files and land in the year each post moves to -- treated as leftovers
+  of a move, one post ended with the other's picture on its page and the
+  other's history deleted outright. A failure partway puts both posts back
+  as they were found -- name and date together: the half that had already
+  landed used to keep its new date in its old folder, which for a pair
+  sharing a slug is the other post's address, so the recovery itself
+  handed back an archive the build refused to run on until somebody
+  repaired it by hand. Anything a hard crash still strands under a working
+  name is reported by `check`, which asks whether the post inside it is
+  still in the archive somewhere before it says what to do: a copy of a
+  post that landed is named as a leftover to remove, a parked file that is
+  the only copy of its post is named as exactly that, and neither is ever
+  advised over the top of a post standing at the same name. The list a
+  failure prints says what each post is really doing rather than sending
+  you to a "see below" with nothing below it.
+- **A media file nobody can read is now a finding, not a presence.**
+  `File.exist?` said yes and a reader said no -- to a file of zero bytes
+  (an interrupted download), to one without read permission, and to a
+  folder sitting under a picture's name. The page shows a broken picture
+  either way, and the copy to the server either carries the defect or
+  stops the build. `check` reports all three as their own kind of error,
+  with a sentence that says what is actually wrong -- not "missing from
+  its media directory" about a file somebody is looking straight at.
+- **The CSP for a Bandcamp player follows the stored player address.** The
+  policy used to name the bare `bandcamp.com` for every such block; the
+  engine's own lookup happens to store players on that host today, but the
+  engine accepts a stored address on any artist subdomain -- and for those
+  the fixed policy would have blocked the exact iframe the page had just
+  written. The policy now names whatever host the block's player is on,
+  and a block with no player asks the policy for nothing.
+- **The wizard writes the `env.sh` line the shell actually reads.** `env.sh`
+  is a shell script: every line runs, so a name written twice is decided by
+  the last one. `./setup.sh` rewrote the first, said it had saved, and left
+  the old value in force -- with the diff on screen to prove it had worked.
+- **The import wizard's advice about the Wayback Machine now applies to
+  itself.** `WAYBACK_DELAY` and `POST_PATTERN` -- which a run recommends by
+  name when the Archive throttles it or its paths cannot be told apart --
+  were read only by `scripts/migrate_wayback.rb`. Somebody followed the
+  advice, started `./import.sh` again and nothing changed; an archive that
+  needs `POST_PATTERN` had no way out of the wizard at all. Both paths read
+  the same variables from one place now -- and both refuse nonsense with a
+  sentence: a delay that is not a number used to mean *no* throttle at all
+  (set by somebody trying to be gentler), an empty pattern matched every
+  archived path, and an unusable one dumped a parser backtrace over the
+  wizard.
+- **A wizard import whose source died, or that failed to write items, ends
+  with a non-zero status.** The scripted importers have carried exactly
+  those two failures in the exit code since 1.2; `./import.sh`, which is
+  what people actually run, returned 0 for both. (A missing media file
+  alone stays exit 0 on every path, scripted and wizard alike: the posts
+  were written and the report says which files were not.) The preview also
+  claimed that media it could not fetch had had "their posts written
+  without them" -- a preview writes nothing.
+- **`check --repair` says whose archive it is and that it is working.** It
+  walked thousands of posts with nothing on screen at all: no header naming
+  the installation it was about to change, and no sign it was doing
+  anything, for minutes. It opens the way `check` does and counts as it
+  reads.
+- **The "not understood" line in `props` names the keys the row offers.**
+  The row grows `[v]` once a post has older versions and `[t]` on a site
+  with a network, while the refusal was a second, hand-kept list that never
+  learned either -- so the dialog offered a key and then denied knowing it.
+  The sentence is read off the row itself.
+- **A list key that held something else ended the build in a traceback.**
+  A string under `social:` (a URL pasted where a list of them belongs), or
+  anything but a list under `footer.links` or `nav:`, reached `.map` and
+  stopped the build with a `NoMethodError` naming a line in the engine --
+  while `doctor` called the same config healthy and exited 0. The build now
+  reads a wrong shape as empty and carries on, and `doctor` names the key
+  and fails the install, which is where a config mistake belongs. A key
+  with nothing under it stays what it has always been: none of them, and
+  no complaint.
+- **Two markdown trees no longer overwrite each other.** A tree import
+  identified its source by the name of the directory it was pointed at,
+  and "content" is what Hugo calls that directory on every site there is
+  (as `_posts` is for Jekyll). Import two blogs one after the other and
+  the second one did not arrive beside the first: it matched it, post by
+  post, and replaced it in place -- the same machinery that makes a
+  re-import an update rather than a duplicate, aimed at the wrong archive.
+  The identity is now the name the site gives itself -- `baseURL` or
+  `title` out of Hugo's configuration, `url` or `title` out of Jekyll's
+  `_config.yml` -- so two blogs are two, and the same one still recognises
+  itself after it has been moved, renamed or unpacked on another machine.
+  A tree that declares nothing (a bare `content/`, a converter's dump, a
+  skeleton nobody has edited) falls back to the path it was imported from,
+  which tells trees apart but only while each stays where it was;
+  docs/importing.md says which is which. One consequence worth knowing
+  before you upgrade: a tree imported under an earlier version and
+  imported again under this one is no longer recognised as the same source
+  and will come in a second time. Import first, upgrade after -- or expect
+  to delete one copy.
+- **A Hugo site root imports the site's content, not its machinery.**
+  Pointing at `~/mysite` rather than `~/mysite/content` is what a person
+  naturally does, and it went badly in a quiet way: with nothing at the
+  top level of what was walked, nothing could be recognised as a page and
+  nothing as the site's own furniture, so `content/_index.md` (the front
+  page), `content/about.md` and even a template out of `layouts/` all
+  arrived as articles dated the day of the import. A folder holding
+  Hugo's own configuration next to `content/` is now read as the site it
+  is -- content imported, the rest left alone, and the summary says so
+  rather than leaving anything you keep outside `content/` to go missing
+  without a word. It holds for a `content/` with no sections in it as
+  well, which is where the first attempt at this stopped short: a flat
+  one got the narrowed walk and none of the reading it is for. Without
+  that configuration nothing is guessed at and the named folder is walked
+  exactly as before -- and if the site folder keeps markdown of its own at
+  the top, that is what happens and the summary now names the file that
+  decided it, instead of leaving the whole decision unsaid. Separately, a
+  section listing (`_index.md`) is furniture wherever in the tree it sits:
+  one per section used to come in as a post called "index" whose body was
+  the section's blurb. A branch bundle is not one of them -- a directory
+  whose only markdown is its `_index.md`, carrying prose or files of its
+  own, is the page somebody wrote that way, and it comes in under the
+  directory's name.
+- **The albums in a Facebook HTML export are counted.** The summary's
+  sentence about what an import does NOT take -- uncategorised photos,
+  albums, videos, all of which stay in the download -- counted albums by
+  looking for `.json` files, which an HTML export does not have. It
+  therefore said "albums (0)" over an export with a shelf of them, which
+  is worse than not mentioning albums at all: it is an answer, and it is
+  wrong. It counts in the format the export was actually downloaded in.
+
+- **A link imported with an active-content address is defused.** An
+  archive the author did not write -- a multi-author blog, a reblog, a
+  scraped source -- can carry `<a href="javascript:...">`, and escaping
+  quotes does nothing about the scheme: the link rendered live into every
+  page and the RSS feed. An href now passes an allowlist (http, https,
+  mailto, tel; no scheme at all is a relative link and always passes),
+  the same stance embeds have always taken, and anything else becomes a
+  dead anchor. The text of the link stays; only the trap is removed.
+- **A broken colour cannot take the stylesheet down.** Colour values were
+  written into `colors.css` verbatim, so a `;` or a comment marker in one
+  -- a hand-edit typo, an imported palette -- silently ended the file
+  mid-rule and the site rendered undressed. Colours now pass the same
+  guard the fonts already did: a value that cannot go into CSS is named
+  out loud and the shipped default stands in.
+- **The git backend ships the bytes the build produced.** A user's global
+  `core.autocrlf=true` rewrote the line endings of every text file on the
+  way into the snapshot commit -- a served file no longer matched its own
+  integrity hash, and a diff nobody made appeared on the site. The
+  snapshot commit now pins `autocrlf=false`, alongside the existing
+  defences against global ignore files.
+- **rsync and sftp carry a filename their own tools would misread.**
+  rsync reads a `--files-from` line starting with `#` or `;` as a
+  comment, and an `--include-from` line starting with `-` or `+` as a
+  rule -- so a file called `#draft.html` never uploaded (while the
+  manifest recorded it delivered), and an orphan called `- old.html` was
+  never pruned (while the manifest forgot it). sftp's own client read the
+  leading dash of `- old.html` as a flag, whatever the quoting. Names are
+  now written in forms the tools take literally -- `./` in front for the
+  lists, explicit `+ /` rules for the filter -- and everything lands, and
+  prunes, under its own name.
+- **Rerouting a deploy no longer inherits the old target's manifest.**
+  What `RSYNC_SSH` and `RCLONE_ARGS` carry -- a port, a key, an ssh
+  config, an rclone `--config` -- is part of where the files go, and a
+  manifest describing the old machine says everything is already there:
+  the new target stayed empty while the run reported success. Both now
+  fold their routing into the manifest identity, the same way sftp
+  already did; a changed route means a full upload, which is always the
+  safe direction.
+- **A manifest the process cannot read or write degrades, it does not
+  crash.** A manifest left root-owned by one sudo run -- the uid trap
+  this project keeps walking into on its own servers -- killed every
+  later deploy with a raw backtrace, and a full disk at the periodic
+  mid-upload save killed a working transfer at the 25th file. Both now
+  degrade with a sentence, the way the baseline always has: an unreadable
+  manifest costs one full re-upload, an unwritable one costs the
+  bookkeeping, and neither costs the deploy.
+- **`doctor --online` keeps the token at home.** The favourite-visibility
+  probe tested whatever announcement was newest -- and on an archive
+  carrying a legacy or imported one, that could be a host the site does
+  not run on, handing a foreign server a credential that can post as the
+  author. The probe now refuses a foreign host with a sentence (the
+  fetches always have), and doctor picks the newest announcement on the
+  configured instance to test against instead.
+- **`doctor` diagnoses a broken config in the site's language.** The one
+  scenario doctor exists for -- a `site.yml` that will not parse -- was
+  the one where it fell back to English, because reading the language
+  used the very parse that had just failed. The language is now dug out
+  of the raw file when parsing fails, so the syntax-error diagnosis
+  arrives in the language the site was written in.
+- **`check` refuses everything the build refuses.** Four ways an archive
+  could be unbuildable slipped past it: a post file that is not valid
+  UTF-8 (the build dies deep in the JSON parser, naming no post), a post
+  whose text is not a list of blocks, a slug that is not one path
+  segment (a `/` or a `..` in it walks the page out of the build tree),
+  and an archive whose every file is unreadable -- reported as "empty",
+  exit 0. All four are findings now, and check exits non-zero on each,
+  because an archive check calls sound must be one the build will run on.
+- **A crash in the middle of a queue move cannot cost a post.** The swap
+  writes were already checked and parked; what remained was the
+  aftermath. A recovery that ran after the second write failed could
+  restore the partner into a collision with the mover's new date -- two
+  posts on one address, build refused. And `check`'s advice about a
+  parked leftover asserted "the post it belongs to is back in place"
+  from the file's name alone -- when after a hard kill the parked file
+  can be the only copy of a post there is, and following the advice
+  destroyed it. The recovery now steps the finished mover back to its
+  original bytes when keeping the new date would collide; the crash
+  report lists what actually happened to every post; and check decides
+  stale-or-not on the parked post's own identity: proven-stale names
+  where the live copy sits, unproven says plainly this may be the only
+  copy -- compare, rename back under a free name, never delete.
+- **"Nothing was written" is true across both files.** setup writes
+  `site.yml` and `env.sh` in turn, and a refusal on the second left the
+  first already replaced -- the two out of step, under a message swearing
+  nothing had changed. Every file is checked for writability before the
+  first is written, the refusal names the actual obstacle (the directory,
+  the file, or a genuinely present `.bak` -- not a `.bak` that is not
+  there), and a refused or rolled-back write ends the wizard with a
+  non-zero exit instead of a quiet success.
+- **An answer of "y" means yes in every language, in every dialog.** The
+  import wizard's keep-permalinks question compared the key against the
+  localized yes-character alone, so on a Czech install -- whose prompt
+  reads `[a/N]` -- a reader pressing `y` out of habit got "no" silently
+  and lost every old address the flag exists to keep. Two dialogs in
+  `props` did the same and were missed the first time round: renaming a
+  slug answered "Cancelled" to anything but the local character, and so
+  did dropping an old address, so on an English or German install the
+  habit of pressing `a` read as a refusal. `y`, `j` and `a` all mean yes
+  now, everywhere, out of one definition rather than four. And `FACEBOOK_CROSSPOSTS=yes` -- the obvious
+  guess -- aborts with a sentence instead of silently meaning "no", the
+  same guard `KEEP_PERMALINKS` already had.
+- **Enter backs out of "add one" everywhere, and a pending copy is a
+  listed change.** Answering nothing to a social icon crashed the whole
+  style run with a backtrace (and every answer of the session with it);
+  answering nothing to a footer link wrote an empty `<li>` onto every
+  page. Both read as "never mind" now, like their sibling sections
+  always did. And a banner -- or a stylesheet, or a font -- replaced by
+  a file of the same size no longer vanishes into "Nothing changed":
+  every pending copy is a line in the review, confirmed and installed
+  with the rest, or dropped untouched on a "no".
+- **Two examples in the markdown cheat sheet had stopped playing.** The
+  audio one named a SoundCloud track that is gone, and SoundCloud answers
+  a missing track with its app shell and a straight-faced 200 -- the same
+  false success the Wayback importer already counts; the PeerTube video
+  was gone as well, and its id still had the valid 22-character shape. So
+  neither line looked wrong until somebody pasted it and got an empty
+  player, which is the worst way for a cheat sheet to fail: it is where a
+  reader goes to find out the gesture works at all. Both were replaced
+  with addresses checked against the services rather than guessed at, and
+  the Vimeo, Spotify and YouTube examples were checked the same way and
+  are all still playing. **Upgrading:** `/markdown/` is built on every
+  site, so this page is one of the files your next deploy carries.
+
 ## 1.3.2 -- 2026-08-21
 
 A GoToSocial release, both fixes reported from the first blog.sh site

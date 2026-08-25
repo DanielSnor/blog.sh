@@ -37,9 +37,13 @@ require_relative '../lib/checker'
 # user that external links had been checked when nothing had left the
 # machine -- worse than not offering the switch at all.
 online = false
+as_json = false
+repair = false
 ARGV.each do |arg|
   case arg
   when '--online' then online = true
+  when '--json' then as_json = true
+  when '--repair' then repair = true
   else
     warn(I18n.t('check.unknown_option', option: arg))
     exit 2
@@ -54,10 +58,37 @@ def paint_level(level)
   end
 end
 
-puts SiteHeader.render
-puts
-puts Tui.paint(I18n.t('check.heading'), :bold)
-puts
+# --json prints the findings themselves rather than a screenful of them:
+# every finding, uncapped, each with the kind it is and the data it is
+# about. The screen shows twenty of a kind and totals the rest, which is
+# right for reading and useless for anything that wants to act -- a script
+# that adds redirect_from for dead links cannot work from "...and 23 more".
+# Progress goes to stderr here, so stdout stays a document.
+# Two modes, one run: --json is a document about the archive as it stands,
+# --repair changes the archive. Asked for together, the repair used to be
+# swallowed without a word and the person walked away believing the
+# archive had been fixed.
+if as_json && repair
+  warn I18n.t('check.json_and_repair')
+  exit 2
+end
+
+if as_json
+  require 'json'
+  progress = nil
+  findings = Checker.run(root: ROOT, online: online, cap: nil)
+  errors = findings.select(&:error?).sum(&:count)
+  warnings = findings.select(&:warn?).sum(&:count)
+  puts JSON.pretty_generate(
+    'errors' => errors,
+    'warnings' => warnings,
+    'findings' => findings.map do |f|
+      { 'level' => f.level.to_s, 'kind' => f.kind&.to_s, 'data' => f.data,
+        'text' => f.text, 'fix' => f.fix }.compact
+    end
+  )
+  exit(errors.zero? ? 0 : 1)
+end
 
 # One line per hundred posts on a pipe, a repainted counter on a terminal:
 # a log full of counters is unreadable, and a terminal with no counter is
@@ -76,6 +107,96 @@ online_progress = lambda do |done, total|
   line = I18n.t('check.progress_online', done: done, total: total)
   tty ? print("\r#{line}\e[K") : puts(line)
 end
+
+# --repair walks the findings and offers, for each one, the single repair
+# that finding allows: the old address written into the target post's
+# redirect_from, a relative link rewritten to the address it means, a file
+# nobody references moved to the trash. Nothing is applied without a key
+# press, nothing is deleted, and a kind with no obvious answer -- a
+# collision between two posts, an image the author has to look at -- is
+# shown and passed over rather than guessed at.
+if repair
+  require_relative '../lib/repair'
+  require_relative '../lib/run_lock'
+
+  # The lock is held around each WRITE, not around the reading and the
+  # deciding. A pass through a hundred findings is a conversation that can
+  # last minutes; holding the whole installation for it would mean a
+  # scheduled publish waits for somebody to finish reading, and the queue's
+  # own tick is the thing that must not be blocked.
+  # The same opening the plain check has, and the same counter. Without
+  # them --repair spent minutes walking thousands of posts with nothing on
+  # screen at all: no header naming the site it was about to change, and
+  # no sign it was doing anything.
+  puts SiteHeader.render
+  puts
+  puts Tui.paint(I18n.t('check.repair_heading'), :bold)
+  puts
+  puts Tui.paint(I18n.t('check.running_online'), :dim) if online
+  findings = Checker.run(root: ROOT, progress: progress, online: online,
+                         online_progress: online_progress, cap: nil)
+  print("\r\e[K") if tty
+  puts unless tty
+  actionable = findings.reject { |f| f.level == :ok }
+  if actionable.empty?
+    puts Tui.paint(I18n.t('check.repair_nothing'), :green)
+    exit 0
+  end
+
+  idx = Repair.index(Checker.load_posts(ROOT))
+  applied = 0
+  skipped = 0
+  no_offer = 0
+  failed = 0
+  actionable.each do |finding|
+    proposal = Repair.propose(finding, idx)
+    puts
+    puts "#{paint_level(finding.level)} #{finding.text}"
+    if proposal.nil?
+      no_offer += 1
+      # Two of the refusals are worth a sentence, because the tool DID find
+      # something and turned it down on purpose. Without this they read as
+      # "the tool cannot do this", which is a different thing.
+      reason = Repair.why_not(finding, idx)
+      key = reason ? "check.repair_no_offer_#{reason}" : 'check.repair_no_offer'
+      puts Tui.paint("   #{I18n.t(key)}", :dim)
+      next
+    end
+
+    puts Tui.paint("   #{I18n.t("check.repair_#{proposal.action}", **proposal.data.transform_keys(&:to_sym))}", :bold)
+    answer = Tui.key_choice("   #{I18n.t('check.repair_prompt')} ")
+    case answer
+    when 'q' then break
+    when 'a', 'y', 'j' then
+      done = RunLock.hold(ROOT, label: 'check --repair') { Repair.apply!(proposal, ROOT) }
+      if done == RunLock::BUSY
+        failed += 1
+        puts Tui.paint("   #{I18n.t('check.repair_busy')}", :red)
+      elsif done
+        applied += 1
+        puts Tui.paint("   #{I18n.t('check.repair_applied')}", :green)
+      else
+        # Counted, not just said: a run that changed nothing and a run whose
+        # changes were refused must not add up to the same summary.
+        failed += 1
+        puts Tui.paint("   #{I18n.t('check.repair_failed')}", :red)
+      end
+    else
+      skipped += 1
+    end
+  end
+
+  puts
+  puts I18n.t('check.repair_summary', applied: applied, skipped: skipped, no_offer: no_offer)
+  puts Tui.paint(I18n.t('check.repair_summary_failed', count: failed), :red) if failed.positive?
+  puts Tui.paint(I18n.t('check.repair_rebuild'), :bold) if applied.positive?
+  exit 0
+end
+
+puts SiteHeader.render
+puts
+puts Tui.paint(I18n.t('check.heading'), :bold)
+puts
 
 puts Tui.paint(I18n.t('check.running_online'), :dim) if online
 

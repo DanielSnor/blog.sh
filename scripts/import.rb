@@ -46,6 +46,7 @@ require_relative '../lib/import/jekyll'
 require_relative '../lib/import/livejournal'
 require_relative '../lib/import/squarespace'
 require_relative '../lib/import/substack'
+require_relative '../lib/import/pages_note'
 
 def t(key, **vars)
   I18n.t(key, **vars)
@@ -337,7 +338,12 @@ def build_facebook
   return nil unless dir
 
   dir = File.expand_path(dir)
-  return Import::Facebook.new(dir) if Import::Facebook.posts_dir(dir)
+  # The wizard prints the sentence telling people to set this, so the
+  # wizard has to read it: with it set, the scripted path took the
+  # crossposts and the wizard produced a byte-identical run without them,
+  # and the advice under the count was the only thing that changed.
+  crossposts = %w[1 true yes].include?(ENV['FACEBOOK_CROSSPOSTS'].to_s.strip.downcase)
+  return Import::Facebook.new(dir, include_crossposts: crossposts) if Import::Facebook.posts_dir(dir)
 
   puts t('import.facebook_dir_invalid', dir: dir)
   nil
@@ -436,7 +442,10 @@ def build_wayback
     return nil
   end
 
-  Import::Wayback.new(url)
+  # Same environment variables as scripts/migrate_wayback.rb: the advice
+  # the run prints ("raise WAYBACK_DELAY", "pass POST_PATTERN") has to
+  # work for the person who followed it and started the wizard again.
+  Import::Wayback.from_env(url)
 end
 
 def build_wix
@@ -584,6 +593,22 @@ def report(result, dry_run:)
     puts t('import.skipped', count: count, reason: reason_label(reason))
   end
 
+  # Pages arrive out of the listings, out of the archive and out of the
+  # feed -- which is what they are for, and also means nothing on the site
+  # links to them. This sentence is the only thing that says so, and the
+  # wizard lost it when the note moved out of the adapters: Cli.report got
+  # it, and the wizard has a report of its own.
+  pages_note = Import.pages_note(Array(result.respond_to?(:pages) ? result.pages : nil))
+  puts Tui.paint(pages_note, :cyan) if pages_note
+
+  # An item that failed is a loss, not a category of skip -- and the count
+  # alone leaves the reader to guess which of five thousand it was.
+  errors = Array(result.respond_to?(:errors) ? result.errors : nil)
+  unless errors.empty?
+    puts Tui.paint(t('import.items_failed', count: errors.size), :yellow)
+    errors.first(3).each { |line| puts "  #{line}" }
+  end
+
   return if result.media_failures.empty?
 
   # Two different losses, said separately: a file missing from a post that
@@ -601,11 +626,18 @@ def report(result, dry_run:)
     from_written.delete_at(i) if i
   end
   unless from_written.empty?
-    puts Tui.paint(t('import.media_failed', count: from_written.size), :yellow)
+    # A preview downloads nothing and writes nothing, so the sentence about
+    # posts that "were written without them" is not available to it -- it
+    # says what the real run would do instead.
+    puts Tui.paint(t(dry_run ? 'import.media_failed_preview' : 'import.media_failed',
+                     count: from_written.size), :yellow)
     from_written.first(3).each { |url| puts "  #{url}" }
   end
   unless skipped_failures.empty?
-    puts Tui.paint(t('import.media_failed_skipped', count: skipped_failures.size), :yellow)
+    # The same honesty as its sibling above: a preview downloads nothing,
+    # so nothing "could not be downloaded" in it.
+    puts Tui.paint(t(dry_run ? 'import.media_failed_skipped_preview' : 'import.media_failed_skipped',
+                     count: skipped_failures.size), :yellow)
     skipped_failures.first(3).each { |url| puts "  #{url}" }
   end
   return
@@ -650,7 +682,11 @@ def run_import(adapter)
   # re-import (source-id matched, so safe) can add back later.
   if adapter.respond_to?(:keep_permalinks=)
     puts
-    adapter.keep_permalinks = Tui.key_choice(t('import.keep_permalinks_prompt')) == t('cli.confirm_yes_char')
+    # Tui.yes?, not a bare compare against the localized yes-char: the
+    # Czech prompt reads [a/N], but a reader who presses 'y' out of habit
+    # would otherwise get "no" silently and lose every old address. yes?
+    # accepts y / j / a and the localized character alike.
+    adapter.keep_permalinks = Tui.yes?(Tui.key_choice(t('import.keep_permalinks_prompt')))
   end
 
   puts
@@ -688,6 +724,12 @@ def run_import(adapter)
   on_post = ->(written, post, _scanned) { puts "  #{written}/#{target} #{post['slug']}" }
   result = Import::Run.new(adapter, on_post: on_post).call
   report(result, dry_run: false)
+  # Whatever the run lost, the exit code has to carry -- scripts/*.rb have
+  # done this since 1.2 (lib/import/cli.rb), and the wizard, which is what
+  # people actually run, ended 0 on a source that died halfway and on every
+  # item it failed to write. The status is set here and acted on at the very
+  # end, so the offer to rebuild still happens.
+  @lost = result.interrupted || Array(result.respond_to?(:errors) ? result.errors : nil).any?
 
   puts
   rebuild = Tui.key_choice(t('import.rebuild_prompt'))
@@ -730,6 +772,7 @@ end
 
 begin
   run_import(adapter)
+  exit 1 if @lost
 rescue Interrupt
   # Ctrl-C during an hours-long run: say what state things are in, because
   # a half-finished import leaves real posts on disk.

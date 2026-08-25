@@ -376,7 +376,10 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
-./blog.sh check                # walks the archive and says what is broken in it
+./blog.sh check [--online] [--json] [--repair]
+                               # walks the archive and says what is broken in it;
+                               # --json prints every finding as data instead of a screenful;
+                               # --repair offers, per finding, the one repair that finding allows
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                # writes the whole archive out as a tree of markdown files
 ./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources
@@ -552,7 +555,7 @@ A second, optional job powers `./blog.sh schedule` -- it publishes
 scheduled drafts whose date has arrived (and does nothing otherwise):
 
 ```
-*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh
+*/15 * * * * /path/to/blog.sh/scripts/publish-scheduled.sh >/dev/null
 ```
 
 ## Roadmap
@@ -633,3 +636,9 @@ deployment in hands other than the author's -- the planning blog of the
 *Elegant Lich* magazine. Its owner's first-install feedback is already
 in the engine: an announcement that cannot happen now says why, and the
 example config explains its own comment conventions.
+
+[arch-linux.cz](https://arch-linux.cz) is the community blog of the Czech
+Arch Linux user group -- a skinned deployment (the stock engine under its
+own stylesheet, no template edits) and the first site to pair the engine
+with GoToSocial. Both of 1.3.2's fixes and this release's GoToSocial
+comments were found on it.

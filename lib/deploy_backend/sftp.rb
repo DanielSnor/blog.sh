@@ -3,6 +3,7 @@
 require 'open3'
 require 'tempfile'
 require 'shellwords'
+require 'digest'
 
 module DeployBackend
   # Plain SFTP for hosts that offer neither rsync nor git -- openssh's
@@ -29,12 +30,152 @@ module DeployBackend
       !target.empty?
     end
 
+    # Where to connect. This value is also the last argument handed to
+    # `sftp`, and openssh reads "user@host:path" as "start in path" -- so
+    # putting the remote directory in here made the batch's own `cd` land a
+    # second time and the whole site went to public_html/public_html.
     def target
       ENV['SFTP_TARGET'].to_s
     end
 
+    # WHICH target this is, for the deploy manifest only. The same server
+    # with two directories on it is two targets, and a manifest describing
+    # the other one says everything is already uploaded -- so the new
+    # directory stays empty while the run reports success. Kept apart from
+    # `target` because one is an identity and the other is an address.
+    def identity
+      dir = ENV['SFTP_REMOTE_DIR'].to_s.gsub(%r{/+\z}, '')
+      base = dir.empty? ? target : "#{target}:#{dir}"
+      # SFTP_ARGS too: a different port, key or ssh-config host is a
+      # different server behind the same user@host, and a manifest that
+      # describes the other one says everything is already uploaded.
+      print = args_fingerprint
+      print ? "#{base} ##{print}" : base
+    end
+
+    # Switches that cannot move a connection anywhere: how loud it is, how
+    # it copies, how much of the line it uses. `-v` is written `-vv` and
+    # `-vvv` too, which a literal list of strings missed -- and missing it
+    # is not harmless, because a switch that stays in the identity makes a
+    # second target out of one server and throws away the manifest.
+    CHATTER = /\A-(?:v+|q|C|4|6|a|p|r)\z/
+    # Tuning, not routing: buffer size, requests in flight, bandwidth cap.
+    # `-D` is NOT here -- it names the sftp server program on the far end,
+    # which is as much a part of "where this goes" as the host is.
+    TUNING = %w[-B -R -l].freeze
+    TAKES_VALUE = %w[-P -i -F -o -J -c -S -b -D -B -R -l].freeze
+
+    # SFTP_ARGS is a LIST of switches, not a string.
+    #
+    # The same switches in another order are the same server: openssh reads
+    # -P/-i/-F/-o/-J whichever way round they come, env.sh is a hand-edited
+    # file people reformat, and adding -vv to watch a failing deploy is not
+    # moving to another host. Compared as a string, every such edit read as
+    # a new target -- and a new target throws the manifest away, which is
+    # the only record of what stands on the far end. The re-upload is the
+    # cheap half of that: the orphans the manifest knew about become
+    # unreachable, so a post deleted at home goes on being served forever
+    # and no switch exists that would find it again.
+    #
+    # A switch nobody here recognises stays IN. That costs a needless
+    # re-upload when it turns out to be harmless -- but the other mistake,
+    # dropping something that does move the connection, reports success
+    # while the new target sits empty, and a silently wrong site is worse
+    # than a slow deploy. Everything dropped above is dropped because it
+    # provably cannot change where the bytes land.
+    #
+    # A digest rather than the switches themselves, because the manifest is
+    # a 0644 file the docs call disposable while env.sh -- where -i names a
+    # private key and -J names a bastion -- is the file they tell you to
+    # keep at 600. Identity is only ever asked whether two of them are
+    # equal, so hashing costs nothing.
+    def args_fingerprint
+      kept = normalised_args
+      return nil if kept.empty?
+
+      Digest::SHA256.hexdigest(kept.join(' '))[0, 12]
+    end
+
+    def normalised_args
+      tokens = split_args(ENV['SFTP_ARGS'].to_s.strip)
+      pairs = []
+      until tokens.empty?
+        token = tokens.shift
+        next if token.match?(CHATTER)
+
+        key, glued = unglue(token)
+        # A bare word is the value of a switch this code does not know
+        # takes one. It rides along with its key rather than becoming an
+        # entry of its own, so that sorting can never part the two and seat
+        # two different servers on one fingerprint. The previous attempt
+        # answered this by switching sorting OFF for the whole line, which
+        # made tidying up an unrelated switch into a new target -- the very
+        # thing the sorting is there to prevent.
+        if !key.start_with?('-') && !pairs.empty?
+          pairs.last[1] = "#{pairs.last[1]} #{key}"
+          next
+        end
+
+        value = glued || (TAKES_VALUE.include?(key) && !tokens.empty? ? tokens.shift : nil)
+        next if value && TUNING.include?(key)
+
+        pairs << [key, value ? "#{key} #{value}" : key]
+      end
+
+      # Sorted by KEY, with the original position as the tiebreaker. Two
+      # lines that differ only in the order of their switches come out the
+      # same, while a repeated -o keeps the order it was written in --
+      # openssh takes the first value of those, so swapping them really is
+      # a second configuration.
+      pairs.each_with_index.sort_by { |(key, _), index| [key, index] }.map { |(_, text), _| text }
+    end
+
+    # "-P2022" and "-P 2022" are one switch written two ways, and so are
+    # "-oPort=2022" and "-o Port=2022". Reading them as different strings
+    # made a second target out of a line somebody merely tidied up.
+    def unglue(token)
+      return [token, nil] unless token.length > 2 && token.start_with?('-')
+
+      key = token[0, 2]
+      TAKES_VALUE.include?(key) ? [key, token[2..]] : [token, nil]
+    end
+
+    # Identity must never be the thing that raises: an unmatched quote is
+    # a typo, not a reason to lose the manifest. `problem` is where that
+    # typo gets named, before the run touches anything.
+    def split_args(raw)
+      Shellwords.split(raw)
+    rescue ArgumentError
+      raw.split
+    end
+
+    # Asked once, before the deploy writes its baseline. Without it the
+    # same typo surfaced as a raw Shellwords backtrace from the middle of
+    # the run -- past every guard, with the baseline already on disk and
+    # the run counted as started and never finished.
+    def problem
+      Shellwords.split(ENV['SFTP_ARGS'].to_s)
+      nil
+    rescue ArgumentError => e
+      "SFTP_ARGS: #{e.message}"
+    end
+
     def manifest_suffix
       '.sftp'
+    end
+
+    # Deletion here is by NAME, one orphan at a time, so it composes with
+    # --only: asking for two files and taking one down is a coherent run.
+    # Backends that could only mirror had to refuse that combination.
+    def deletes_by_name?
+      true
+    end
+
+    # What the last sync got onto the target, whether or not the whole run
+    # succeeded. deploy_web.rb records these even after a failure, so an
+    # interrupted transfer resumes instead of starting over.
+    def uploaded
+      @uploaded ||= []
     end
 
     # only: and force: are unused on purpose -- files: already reflects
@@ -42,6 +183,7 @@ module DeployBackend
     # with every file listed), so the batch just executes the list.
     def sync(public_dir:, files:, orphans:, only: nil, prune: false, force: false, logger: nil)
       @failed_orphans = []
+      @uploaded = []
       return true if files.empty? && !(prune && orphans.any?)
 
       Tempfile.create('blog-sh-sftp') do |f|
@@ -52,6 +194,7 @@ module DeployBackend
         output, status = Open3.capture2e(*full)
         print output
         ok = status.success?
+        @uploaded = landed(output, files, ok)
         @failed_orphans = failed_deletes(output, orphans) if prune
         logger&.call(ok ? '  ✅ sftp finished' : '  ❌ sftp failed')
         ok
@@ -84,26 +227,53 @@ module DeployBackend
       Array(@failed_orphans)
     end
 
+    # Which files actually landed. `sftp -b` echoes every command it runs
+    # and stops at the first one that fails, so the puts it echoed are the
+    # puts it did -- minus the last one when the run ended badly, which is
+    # the one that broke.
+    #
+    # Without this a transfer interrupted at file 48 of 159 recorded
+    # nothing at all: the next run uploaded all 159 again, and on a slow
+    # line that is the difference between a deploy that finishes and one
+    # that never does. The list is used the way failed_orphans already is
+    # -- deploy_web.rb writes down what is genuinely on the far end.
+    def landed(output, files, ok)
+      wanted = Array(files)
+      remote = wanted.to_h { |name| [name, true] }
+      done = output.lines.filter_map do |line|
+        next unless line =~ /(?:^|sftp> )put\s+(?:"[^"]*"|\S+)\s+(?:"([^"]*)"|(\S+))/
+
+        # The destination is written with a leading './' now (remote()), so
+        # a name that starts with '-' is not read as a flag. Strip it back
+        # off before matching what was ASKED for -- the manifest is keyed on
+        # the plain relative path, not the addressing form.
+        name = (Regexp.last_match(1) || Regexp.last_match(2)).sub(%r{\A\./}, '')
+        name if remote[name]
+      end
+      done.pop unless ok || done.empty?
+      done
+    end
+
     def batch_commands(public_dir, files, orphans, prune)
       cmds = []
       dir = ENV['SFTP_REMOTE_DIR'].to_s.gsub(%r{/+\z}, '')
       unless dir.empty?
-        cmds << "-mkdir #{quote(dir)}"
-        cmds << "cd #{quote(dir)}"
+        cmds << "-mkdir #{remote(dir)}"
+        cmds << "cd #{remote(dir)}"
       end
 
       # Parents before children, each -mkdir tolerant of already existing.
       files.flat_map { |f| ancestors(File.dirname(f)) }.uniq.sort.each do |d|
-        cmds << "-mkdir #{quote(d)}"
+        cmds << "-mkdir #{remote(d)}"
       end
-      files.each { |f| cmds << "put #{quote(File.join(public_dir, f))} #{quote(f)}" }
+      files.each { |f| cmds << "put #{quote(File.join(public_dir, f))} #{remote(f)}" }
 
       if prune
-        orphans.each { |f| cmds << "-rm #{quote(f)}" }
+        orphans.each { |f| cmds << "-rm #{remote(f)}" }
         # Deepest first, so emptied trees collapse -- -rmdir quietly skips
         # any directory that still has files in it.
         orphans.flat_map { |f| ancestors(File.dirname(f)) }.uniq
-               .sort_by { |d| -d.count('/') }.each { |d| cmds << "-rmdir #{quote(d)}" }
+               .sort_by { |d| -d.count('/') }.each { |d| cmds << "-rmdir #{remote(d)}" }
       end
       cmds
     end
@@ -115,8 +285,29 @@ module DeployBackend
       (1..parts.length).map { |i| parts.first(i).join('/') }
     end
 
+    # Backslash first, quote second -- the other order escapes the quote and
+    # then escapes its own escape, so a name with a backslash in it walked
+    # out of its quotes and took the rest of the batch with it. A newline
+    # is refused outright: the batch file is one command per line, so a
+    # name containing one would BE a second command.
     def quote(path)
-      %("#{path.gsub('"', '\"')}")
+      raise "sftp cannot address a name with a newline in it: #{path.inspect}" if path.to_s.include?("\n")
+
+      %("#{path.to_s.gsub('\\', '\\\\\\\\').gsub('"', '\\"')}")
+    end
+
+    # A REMOTE path, quoted, and made safe to sit where the sftp client's
+    # rm/mkdir/rmdir getopt-parse their first argument: a name that starts
+    # with '-' ("- old.html", the kind a Wix or Tumblr export leaves) is
+    # read as a flag ("rm: Invalid flag") no matter how it is quoted, so it
+    # was never deleted and the manifest forgot it. A leading './' makes the
+    # first character a slash and resolves to the same file (verified against
+    # OpenSSH sftp). Absolute paths and ones already dot-anchored are left
+    # as they are.
+    def remote(path)
+      p = path.to_s
+      p = "./#{p}" unless p.start_with?('/', './')
+      quote(p)
     end
   end
 end

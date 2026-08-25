@@ -395,7 +395,16 @@ module Tui
   def complete_path(str)
     typed = str.to_s
     home = Dir.home
-    pattern = typed.empty? ? '*' : "#{typed.sub(/\A~/, home)}*"
+    # The typed part is a NAME as far as brackets and braces go. "Takeout
+    # [1]" is what a second download of an export is called, and read as a
+    # character class it completes to nothing -- which, with no append
+    # character, looks exactly like "there is nothing there" and leaves the
+    # author guessing whether the path is wrong. A "*" or a "?" is left
+    # live: those somebody types on purpose, the way they would at a shell
+    # prompt. (PathGlob.literal is the full-strength sibling, for patterns
+    # where nothing at all is meant as a wildcard.)
+    escaped = typed.sub(/\A~/, home).gsub(/[\[\]{}]/) { |char| "\\#{char}" }
+    pattern = typed.empty? ? '*' : "#{escaped}*"
     Dir.glob(pattern).map do |hit|
       shown = typed.start_with?('~') ? hit.sub(/\A#{Regexp.escape(home)}/, '~') : hit
       File.directory?(hit) ? "#{shown}/" : shown
@@ -524,8 +533,15 @@ module Tui
         # Counted from row_window, not window: with a context line under the
         # cursor one fewer row is shown, and the counter has to say so.
         shown = [row_window, items.size - offset].min
-        text = items.size > row_window ? "#{hint} · #{offset + 1}-#{offset + shown}/#{items.size}" : hint
-        rows << paint(truncate_to_width(text, term_width), :dim)
+        counted = items.size > row_window ? "#{hint} · #{offset + 1}-#{offset + shown}/#{items.size}" : hint
+        # The counter goes first when the row will not fit, and after that
+        # fit_keys drops whole keys from the MIDDLE rather than cutting the
+        # line wherever the width runs out. A German hint is long enough
+        # that a plain cut took "Esc" with it -- the way out of the menu,
+        # missing from the one row that lists the ways out. Knowing which
+        # page you are on is worth less than knowing how to leave.
+        text = display_width(counted) <= term_width ? counted : fit_keys(hint, term_width)
+        rows << paint(text, :dim)
       end
       print "\e[?25l"
       frame(rows, keep_last: hint ? 2 : 0)

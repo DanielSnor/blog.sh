@@ -127,8 +127,7 @@ module Import
       # it swallows every following row, and no parser can guess where
       # the cell was meant to end. Name the file and keep the line
       # number, so the reader looks at their CSV rather than at Wix.
-      raise "#{File.basename(@path)} is not readable as CSV (#{e.message.strip}) -- " \
-            'the damage is in the file on disk, not at Wix'
+      raise I18n.t('import.wix_not_csv', file: File.basename(@path), reason: e.message.strip)
     end
 
     # Tags and Categories are JSON arrays serialized INTO a CSV cell --

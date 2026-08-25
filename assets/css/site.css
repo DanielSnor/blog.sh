@@ -1057,7 +1057,11 @@ blockquote {
   margin: 0 0.3rem 0.3rem 0;
   transition: 0.3s ease-in-out;
 }
-.tag-pill:hover { background: var(--accent); color: #ffffff; }
+a.tag-pill:hover { background: var(--accent); color: #ffffff; }
+/* A tag with no listing page of its own -- drafts, unlisted posts and
+   pages are outside the stream that makes those pages. It says what the
+   post is about without pretending to be a way somewhere. */
+.tag-pill-flat { opacity: 0.75; cursor: default; }
 
 /* line-height is written out because this heading used to be an h2 and took
    the 1.25 from that rule with it. As an h1 it would fall back to the

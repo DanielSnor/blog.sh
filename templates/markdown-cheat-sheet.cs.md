@@ -300,7 +300,7 @@ jediná chvíle, kdy psaní postu potřebuje síť.)
 ```
 !![Popisek nahrávky](/cesta/k/nahravce.mp3)
 !![Popisek nahrávky](https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT)
-!![Popisek nahrávky](https://soundcloud.com/nasa/apollo-11-onboard-recorder)
+!![Popisek nahrávky](https://soundcloud.com/nasa/sputnik-beep)
 ```
 
 ## Přílohy

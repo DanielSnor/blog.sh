@@ -247,7 +247,8 @@ colors:
 # An empty list (nav: []) is an answer too: the entries and the button
 # that opens them are gone. That is how a site turns the menu off -- there
 # is no second key for it. The bar itself stays, because the search field
-# is rendered inside it.
+# is rendered inside it. A bare `nav:` with nothing under it means the same
+# thing; delete the key itself to get the engine's own menu back.
 #
 # `./style.sh` writes this for you and offers the tags and pages you
 # actually have; `./blog.sh doctor` says so when an entry stops pointing
@@ -298,6 +299,10 @@ about:
 #     heading: "Recent commits"
 #     username: "yourname"
 #     limit: 3
+#     # GitHub unless you say otherwise. For a Gitea or Forgejo server --
+#     # Codeberg, your own git -- give its address here and the widget
+#     # reads that instead; the address is the whole configuration.
+#     # instance: "https://codeberg.org"
 #   bluesky:
 #     heading: "Recent Bluesky posts"
 #     # handle is optional -- it falls back to bluesky.handle below, so set
@@ -338,7 +343,8 @@ footer:
   social_heading: "Find me on"
 
 # icon = a name from the built-in set: mastodon, pixelfed, linkedin,
-# github, bluesky, instagram, threads, facebook, x, youtube, rss, email.
+# github, gitea, forgejo, codeberg, gitlab, bluesky, instagram, threads,
+# facebook, x, youtube, rss, email.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is

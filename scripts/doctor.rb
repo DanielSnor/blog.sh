@@ -23,11 +23,23 @@ require_relative '../lib/site_config'
 
 ROOT = File.expand_path('..', __dir__)
 
+# The language, dug out of the file the way doctor promises -- tolerating
+# failure, because the one scenario doctor exists for is a config that
+# will not parse, and a full YamlCompat.load_file fails on exactly that,
+# forcing English over the cs/de diagnosis of the very syntax error it is
+# about to report. So the parse is tried first (it reads a quoted value
+# faithfully), and a raw scan of the `lang:` line is the fallback.
+site_yml = File.join(ROOT, 'config', 'site.yml')
 lang = begin
-  data = YamlCompat.load_file(File.join(ROOT, 'config', 'site.yml'))
+  data = YamlCompat.load_file(site_yml)
   data.is_a?(Hash) ? data.dig('site', 'lang') : nil
 rescue StandardError
   nil
+end
+if lang.to_s.empty? && File.exist?(site_yml)
+  raw = File.read(site_yml, encoding: 'utf-8') rescue ''
+  m = raw[/^\s*lang:\s*["']?([A-Za-z]{2,8})/, 1]
+  lang = m if m
 end
 
 require_relative '../lib/i18n'

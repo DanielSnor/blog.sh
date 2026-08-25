@@ -66,6 +66,7 @@ require_relative '../lib/wizard'
 require_relative '../lib/version'
 require_relative '../lib/site_header'
 require_relative '../lib/publish_slots'
+require_relative '../lib/path_glob'
 
 def t(key, **vars)
   I18n.t("setup.#{key}", **vars)
@@ -135,7 +136,7 @@ end
 LOCALE_FOR = { 'en' => 'en_US', 'cs' => 'cs_CZ', 'de' => 'de_DE' }.freeze
 
 def available_languages
-  Dir.glob(File.join(ROOT, 'locales', '*.yml')).map { |f| File.basename(f, '.yml') }.sort
+  PathGlob.under(ROOT, 'locales', '*.yml').map { |f| File.basename(f, '.yml') }.sort
 end
 
 # --- network checks --------------------------------------------------
@@ -345,7 +346,12 @@ def tell_about_scheduler(site, current)
   say('')
   say(t('section_scheduler_intro'))
   say('')
-  say("  */15 * * * * #{File.join(ROOT, 'scripts', 'publish-scheduled.sh')}", :green)
+  # Quoted, and stdout thrown away. The path is the install's own -- and
+  # a path with a space in it (an iCloud "Mobile Documents" folder, say)
+  # makes an unquoted schedule line run only the part before the space,
+  # and fail in silence every fifteen minutes. The redirect keeps a tick with nothing to do
+  # from mailing; errors still go to stderr, which cron does mail.
+  say("  */15 * * * * \"#{File.join(ROOT, 'scripts', 'publish-scheduled.sh')}\" >/dev/null", :green)
   say('')
   say(t('scheduler_note'), :dim)
   say('')
@@ -572,6 +578,11 @@ end
 
 def review_and_write(site, env)
   outcome = Wizard.review_and_write([[relative(SITE_YML), site], [relative(ENV_SH), env]])
+  # A write the filesystem refused, or one verify! rolled back, is a
+  # failure the exit code has to carry -- a scripted or CI setup that only
+  # checks the status saw a clean 0 while nothing was saved. A cancel
+  # (the user declined at the diff) stays 0: that is a choice, not a fault.
+  exit 1 if outcome == :failed
   return unless outcome == :written
 
   # env.sh was read by the SHELL that started this process, so everything

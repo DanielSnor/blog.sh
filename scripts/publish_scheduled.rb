@@ -22,6 +22,7 @@ require_relative '../lib/publishing'
 require_relative '../lib/atomic_write'
 require_relative '../lib/i18n'
 require_relative '../lib/site_config'
+require_relative '../lib/path_glob'
 
 # Cron mail reads stdout and stderr as one stream, and a block-buffered
 # stdout lets every warning overtake the lines it belongs after.
@@ -46,7 +47,7 @@ RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0)
 # marker too now -- two copies of the same path is how they drift apart.
 DEPLOY_PENDING = Publishing::DEPLOY_PENDING
 
-due = Dir.glob(File.join(Publishing::CONTENT_DIR, '*', '*.json')).filter_map do |path|
+due = PathGlob.under(Publishing::CONTENT_DIR, '*', '*.json').filter_map do |path|
   begin
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
     raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
@@ -87,9 +88,26 @@ due.sort_by! { |_path, _post, date| date }
 Publishing.mark_scheduler_alive
 
 if due.empty? && !File.exist?(DEPLOY_PENDING)
-  puts I18n.t('cron.no_scheduled_due')
+  # Said to a PERSON, and to nobody else. The documented crontab runs this
+  # every fifteen minutes and the overwhelming majority of those ticks
+  # have nothing to do; cron mails whatever the job writes, so one
+  # sentence per tick is ninety-six mails a day and the ones that matter
+  # drown in them. Moving it to stderr was not enough -- the documented
+  # line pipes both streams together, which is how the mails kept coming.
+  # A hand-run tick still answers "did it look?", because then there is a
+  # terminal on the other end.
+  warn I18n.t('cron.no_scheduled_due') if $stdout.tty?
   exit 0
 end
+
+# Written BEFORE anything is published, not after the deploy fails. A run
+# killed between publishing and deploying -- docker stop, a Cloudron
+# restart, systemctl -- left the post published and announced, the site
+# not rebuilt, and nothing anywhere saying a deploy was owed: the next
+# tick found nothing due and went back to sleep, and the page never
+# appeared. The marker means "this run owes the site a deploy", which is
+# true from the moment there is something to publish.
+Publishing.mark_deploy_pending unless due.empty?
 
 failures = 0
 due.each do |path, post, date|

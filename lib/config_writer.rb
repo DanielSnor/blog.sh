@@ -51,6 +51,22 @@ module ConfigWriter
   # paste" rather than letting it reach the user as a backtrace.
   class MissingKey < StandardError; end
 
+  # Raised when the shipped template a file would be seeded from is not on
+  # disk. A MissingKey by inheritance, because that is what it is -- but
+  # its own class, because the answer is not "your config is missing a
+  # setting" but "config/site.yml.example is gone, put it back". Without
+  # it, a tree whose template had been deleted met both wizards with a
+  # five-line Ruby backtrace out of the constructor, before either had
+  # asked a single question.
+  class TemplateMissing < MissingKey
+    attr_reader :path
+
+    def initialize(path)
+      @path = path
+      super("no template at #{path}")
+    end
+  end
+
   # Raised when the file we just wrote doesn't parse back to the values we
   # put in it. The file is restored before this is raised -- see save!.
   class VerificationFailed < StandardError; end
@@ -134,6 +150,38 @@ module ConfigWriter
     when nil then ''
     else JSON.generate(value.to_s)
     end
+  end
+
+  # What would stop save! from replacing this path, as a path to name --
+  # the directory that will hold the atomic temp, or the .bak if one would
+  # be made -- and nil when nothing would. Read-only, so review_and_write
+  # can ask about EVERY file before it writes the first: the whole point of
+  # the wizard's "nothing was written" is that it is true, and it stopped
+  # being true the day two files were written in turn and the second was
+  # refused.
+  #
+  # It answers for exactly what save! does and not one check more. A
+  # refusal here ends the run on exit 1, so a check save! does not make is
+  # not caution, it is a wizard that dead-ends where it used to recover:
+  #
+  #   * The file itself is deliberately NOT consulted. AtomicWrite writes a
+  #     sibling temp and renames it over the target, which needs the
+  #     DIRECTORY, not the file -- a root-made config the app user cannot
+  #     open for writing is replaced perfectly well, and refusing it left
+  #     both wizards dead on a `docker exec` leftover they used to survive.
+  #   * The .bak matters only when there is a file to copy into it, which
+  #     is save!'s own `had_file` (EnvFile.save! makes the same test). With
+  #     no config yet -- delete the mangled one and re-run the wizard, the
+  #     most ordinary recovery there is -- no backup is made, and a
+  #     leftover one is not in the way of anything.
+  def self.write_blocker(path, backup: true)
+    dir = File.dirname(path)
+    return dir unless File.writable?(dir)
+
+    bak = "#{path}.bak"
+    return bak if backup && File.exist?(path) && File.exist?(bak) && !File.writable?(bak)
+
+    nil
   end
 
   # Strips one level of commenting: the first '#' and at most one space
@@ -252,6 +300,31 @@ module ConfigWriter
       found
     end
 
+    # The value a COMMENTED key carries -- what ./style.sh's widget removal
+    # leaves behind, kept precisely so switching the widget back on is one
+    # answer rather than a re-typing. Only a singly-commented key answers:
+    # a doubly-commented one is the template's way of shipping a key
+    # deliberately OFF inside an optional block, and its value is prose,
+    # not somebody's answer. The caller still has to filter out the
+    # template's own placeholders; this method cannot tell an answer from
+    # an example, only an inactive line from a deliberately hidden one.
+    def inactive_value(key_path)
+      line_no = locate(key_path)
+      return nil if line_no.nil?
+
+      line = @lines[line_no]
+      return nil unless ConfigWriter.comment?(line)
+
+      bare = ConfigWriter.uncomment(line)
+      return nil if ConfigWriter.comment?(bare)
+
+      scalar = bare.sub(/\A\s*[A-Za-z_][A-Za-z0-9_-]*:/, '').sub(/\s#.*$/, '')
+      value = YAML.safe_load("v:#{scalar}")
+      value && value['v']
+    rescue StandardError
+      nil
+    end
+
     # A section as text: its declaration, its body, and the run of prose
     # comments documenting it directly above. Used to graft a section one
     # config is missing out of the template that has it -- which is how a
@@ -276,6 +349,71 @@ module ConfigWriter
       end
       @lines[start..value_extent(decl)].join
     end
+
+    # A leaf key's template text -- its line and the run of prose directly
+    # above it -- located tolerantly, because the template ships an
+    # optional key double-commented (`#     # instance:`) so uncommenting
+    # its section wholesale leaves it off. locate/declares? strip one
+    # comment level and miss it; this strips as many as it takes.
+    # declares?, but seeing through ANY number of leading '#': the
+    # template ships an optional key double-commented, and a whole section
+    # commented once on top of that.
+    def tolerant_declares?(line, key, indent)
+      bare = line
+      bare = ConfigWriter.uncomment(bare) while ConfigWriter.comment?(bare)
+      bare.match?(/\A {#{indent}}#{Regexp.escape(key)}:(\s|\z)/)
+    end
+
+    # value_extent measured on the fully-uncommented indentation, so a
+    # commented template block has a measurable body.
+    def tolerant_extent(line_no)
+      strip = lambda do |l|
+        b = l
+        b = ConfigWriter.uncomment(b) while ConfigWriter.comment?(b)
+        ConfigWriter.blank?(b) ? nil : b[/\A */].length
+      end
+      indent = strip.call(@lines[line_no])
+      last = line_no
+      ((line_no + 1)...@lines.size).each do |i|
+        li = strip.call(@lines[i])
+        next if li.nil?
+        break if li <= indent
+
+        last = i
+      end
+      last
+    end
+
+    def leaf_block(key_path)
+      # Bounded to the parent's own block, walked segment by segment --
+      # otherwise a finder for `instance:` matches the `#   # instance:`
+      # EXAMPLE in the file's "how to read the # lines" header long before
+      # the real one inside commits:, and grafts the whole header instead.
+      range = (0...@lines.size)
+      key_path.each_with_index do |seg, depth|
+        indent = depth * ConfigWriter::INDENT
+        hit = range.find { |i| tolerant_declares?(@lines[i], seg, indent) }
+        return nil unless hit
+
+        range = depth == key_path.size - 1 ? (hit..hit) : (hit + 1..tolerant_extent(hit))
+      end
+      decl = range.first
+
+      start = decl
+      while start.positive?
+        above = @lines[start - 1]
+        break unless ConfigWriter.comment?(above) && !ConfigWriter.blank?(above)
+        break if structure?(above)
+
+        start -= 1
+      end
+      # A little sibling object over just this slice, so its .lines is the
+      # leaf's block -- graft_leaf normalises and activates it.
+      block = self.class.allocate
+      block.instance_variable_set(:@lines, @lines[start..decl])
+      block
+    end
+
 
     # What save! would change. Built here rather than shelled out to
     # diff(1): the wizard shows this before asking for confirmation, and
@@ -384,23 +522,33 @@ module ConfigWriter
       self
     end
 
-    # Comments a top-level section back out, with its whole body. This is
-    # what makes "mastodon OR bluesky, never both" enforceable: picking
-    # one network deactivates the other rather than leaving a config the
-    # build refuses to load (SiteConfig.comment_network aborts on both).
+    # Comments a section back out, with its whole body. This is what makes
+    # "mastodon OR bluesky, never both" enforceable: picking one network
+    # deactivates the other rather than leaving a config the build refuses
+    # to load (SiteConfig.comment_network aborts on both). A nested path
+    # works too -- that is how ./style.sh switches a single sidebar widget
+    # off -- and commenting rather than deleting is deliberate: the
+    # heading, the account id and the template's prose all stay, so
+    # switching the widget back on is one answer instead of a re-typing.
     def deactivate(key_path)
-      raise ArgumentError, 'only top-level sections can be deactivated' unless key_path.size == 1
-
       line_no = active_index[key_path]
-      return self unless line_no # already off -- nothing to do
+      return self unless line_no # already off, or never there -- nothing to do
 
       extent = value_extent(line_no)
       (line_no..extent).each do |i|
         next if ConfigWriter.blank?(@lines[i])
 
-        @lines[i] = "# #{@lines[i]}"
+        # A whole top-level block goes off the way the template writes an
+        # optional one, with the '#' at column 0; a key INSIDE an active
+        # block keeps its indentation and takes the '#' after it, which is
+        # how the same file writes its own inactive keys.
+        @lines[i] = if key_path.size == 1
+                      "# #{@lines[i]}"
+                    else
+                      "#{@lines[i][/\A */]}# #{@lines[i].lstrip}"
+                    end
       end
-      @intended.delete(key_path)
+      @intended.delete_if { |path, _| path[0, key_path.size] == key_path }
       self
     end
 
@@ -451,7 +599,10 @@ module ConfigWriter
     # file behind.
     def read_or_seed
       return File.read(@path) if File.exist?(@path)
-      raise MissingKey, "no #{@path} and no template to seed it from" unless @template && File.exist?(@template)
+      # The path when there is no template to name: a writer opened over
+      # the example itself (style.rb reads the shipped defaults out of it)
+      # has none, and the file the sentence has to name is that one.
+      raise TemplateMissing, (@template || @path).to_s unless @template && File.exist?(@template)
 
       File.read(@template)
     end
@@ -488,12 +639,24 @@ module ConfigWriter
         begin
           activate(prefix)
         rescue MissingKey
-          raise unless graft(prefix)
-          # The template may carry the section active (mastodon:) or
-          # commented (bluesky:, widgets:); only the latter needs turning on.
-          next if active_index[prefix]
+          # A whole section the file lacks is grafted from the template.
+          # A single LEAF the file lacks -- widgets.commits.instance on a
+          # config written before 1.4 added it, the exact case the forge
+          # widget was built for -- is not a missing section: its parent
+          # is active and present, only this one key never existed in the
+          # file. Graft that one line (with its documentation) from the
+          # template into the parent's body, then activate it.
+          if graft(prefix)
+            # The template may carry the section active (mastodon:) or
+            # commented (bluesky:, widgets:); only the latter needs turning on.
+            next if active_index[prefix]
 
-          activate(prefix)
+            activate(prefix)
+          elsif depth.positive? && active_index[key_path[0...depth]] && graft_leaf(prefix)
+            next
+          else
+            raise
+          end
         end
       end
       active_index[key_path] || raise(MissingKey, "#{key_path.join('.')} is not in #{@path}")
@@ -532,11 +695,53 @@ module ConfigWriter
       true
     end
 
+    # Copies a SINGLE leaf key out of the template into an active parent
+    # section the file already has -- the counterpart of graft, which
+    # copies a whole missing section. widgets.commits.instance is why this
+    # exists: 1.4 added the key, so every config written before it has an
+    # active `commits:` block with no `instance` line in any form, and the
+    # forge question -- the release's headline feature, aimed at exactly
+    # those sites -- died on it. The template's line (with the prose above
+    # it) is grafted in, activated, and left for the caller to give a value.
+    def graft_leaf(key_path)
+      return false unless @template && File.exist?(@template)
+
+      block = self.class.new(@template).leaf_block(key_path)
+      return false unless block
+
+      parent = key_path[0..-2]
+      parent_line = locate(parent)
+      return false unless parent_line
+
+      body = block.instance_variable_get(:@lines).map { |l| ConfigWriter.normalize_comment(l) }
+      # The key line itself active, the prose above it left as comments.
+      body[-1] = ConfigWriter.uncomment(body[-1]) while ConfigWriter.comment?(body[-1])
+      @lines.insert(value_extent(parent_line) + 1, *body)
+      true
+    end
+
     # Is this line YAML structure (a key or a sequence entry) rather than
     # prose? Measured on the activated form, so a commented key counts.
+    #
+    # A sentence can open with a word and a colon, and "key: value" alone
+    # cannot tell the two apart: `# Optional: posts per listing page` sits
+    # directly above `# page_size: 10` in the shipped template, read as a
+    # key, and stopped the walk in the middle of its own paragraph -- so a
+    # config that asked for page_size got the second and third lines of
+    # the explanation and not the first, opening mid-sentence. What
+    # separates them is the VALUE: a setting carries one scalar (quoted, a
+    # number, a flow collection, a block scalar) or nothing at all, while
+    # prose carries a run of bare words.
     def structure?(line)
-      effective = ConfigWriter.comment?(line) ? ConfigWriter.uncomment(line) : line
-      effective.match?(/\A\s*(-\s|[A-Za-z_][A-Za-z0-9_-]*:(\s|\z))/)
+      effective = (ConfigWriter.comment?(line) ? ConfigWriter.uncomment(line) : line).chomp
+      return true if effective.match?(/\A\s*-\s/)
+
+      declaration = effective.match(/\A\s*[A-Za-z_][A-Za-z0-9_-]*:(?:\s+(?<value>.*))?\z/)
+      return false unless declaration
+
+      value = declaration[:value].to_s.strip
+      value.empty? || value.start_with?('"', "'", '[', '{', '|', '>', '#', '&', '*') ||
+        !value.match?(/\S\s+\S/)
     end
 
     # Turns ONE commented line into active YAML. Anchored on the key name
@@ -563,9 +768,25 @@ module ConfigWriter
       line_no = range.find do |i|
         ConfigWriter.comment?(@lines[i]) && ConfigWriter.declares?(@lines[i], key, indent)
       end
-      raise MissingKey, "#{key_path.join('.')} is not in #{@path}, active or commented" unless line_no
+      if line_no
+        @lines[line_no] = ConfigWriter.uncomment(@lines[line_no])
+        return
+      end
 
-      @lines[line_no] = ConfigWriter.uncomment(@lines[line_no])
+      # A key the template deliberately keeps switched OFF -- written with
+      # two '#' so that uncommenting its section wholesale leaves it alone
+      # -- is still a key somebody can ask for by name. widgets.commits.
+      # instance is the case that found this: the wizard asked the question,
+      # the person answered it, and the write died on a key the template
+      # was hiding on their behalf. Asking for it by name IS the switch.
+      double = range.find do |i|
+        ConfigWriter.comment?(@lines[i]) &&
+          ConfigWriter.comment?(ConfigWriter.uncomment(@lines[i])) &&
+          ConfigWriter.declares?(ConfigWriter.uncomment(@lines[i]), key, indent)
+      end
+      raise MissingKey, "#{key_path.join('.')} is not in #{@path}, active or commented" unless double
+
+      @lines[double] = ConfigWriter.uncomment(ConfigWriter.uncomment(@lines[double]))
     end
 
     # Where a key may legitimately be found: inside its parent's body, or
@@ -587,6 +808,18 @@ module ConfigWriter
     def value_extent(line_no)
       indent = ConfigWriter.indent_of(@lines[line_no])
       last = line_no
+      # Have we passed a comment at or above the key's own indent since the
+      # last real line? If so, we have left the key's body -- what follows
+      # is a sibling, or a commented-out SECTION after the key (its
+      # `# bluesky:` head sat at the key's indent), or the prose between two
+      # sections -- and their own deeper-indented lines (`#   handle:`, a
+      # hanging-indented paragraph) must not be mistaken for the key's
+      # children and swallowed. A commented child of the key itself
+      # (`# page_size: 10` right under `base_url`, with no shallower comment
+      # before it) is reached with this still false, so it stays findable
+      # inside the block. Getting this wrong deleted ~100 documented lines
+      # from site.yml on the first setup write.
+      saw_shallow_comment = false
       ((line_no + 1)...@lines.size).each do |i|
         line_indent = ConfigWriter.indent_of(@lines[i])
         if line_indent.nil? # blank -- may be interior, decided by what follows
@@ -605,11 +838,39 @@ module ConfigWriter
         # ending it.
         if line_indent == indent && ConfigWriter.uncomment(@lines[i]).lstrip.match?(/\A-(\s|\z)/)
           last = i
+          saw_shallow_comment = false
           next
         end
+        # A comment is decided by what FOLLOWS it, the way a blank line is:
+        #   * at or above the key's indent -- passed over, never counted as
+        #     the end of the body, and it arms saw_shallow_comment so what
+        #     lies below cannot be annexed. With ONE exception: a line that
+        #     is still a comment after one '#' is stripped is not the file
+        #     talking, it is a line of a block that is already switched off.
+        #     Removing a widget comments the template's own flush-left prose
+        #     a second time ("# #     # instance is optional ..."), which
+        #     lands at column 0 INSIDE the block -- armed there, it hid every
+        #     answer below it, and a widget switched off forgot its account
+        #     id and its limit instead of offering them back.
+        #   * deeper than the key -- a child. A genuine trailing child of
+        #     the key (`# page_size` under `site:`) commits, so it stays in
+        #     the block and remains findable; the body of a following
+        #     commented section, and the hanging indent of the paragraph
+        #     documenting it, are reached only after a shallower comment and
+        #     do not.
+        if ConfigWriter.comment?(@lines[i])
+          if line_indent <= indent
+            saw_shallow_comment = true unless ConfigWriter.comment?(ConfigWriter.uncomment(@lines[i]))
+          elsif !saw_shallow_comment
+            last = i
+          end
+          next
+        end
+
         break if line_indent <= indent
 
         last = i
+        saw_shallow_comment = false
       end
       last
     end
@@ -766,12 +1027,21 @@ module ConfigWriter
 
     # A setting the user declined: commented out rather than emptied, so
     # the template's explanation of it stays visible for later.
+    # EVERY active assignment goes, not one of them. `set` may pick the
+    # last line because the shell reads the last value -- but switching a
+    # name OFF by commenting one line out of two just promotes the other:
+    # "no deploy target" left the site deploying, with the diff on screen
+    # showing a line duly commented out.
     def unset(name)
-      line_no = find_line(name)
-      return self unless line_no
+      hit = false
+      @lines.each_index do |i|
+        next unless @lines[i].match?(/\A\s*export\s+#{Regexp.escape(name)}=/)
 
-      @lines[line_no] = "# #{@lines[line_no]}" unless ConfigWriter.comment?(@lines[line_no])
+        @lines[i] = "# #{@lines[i]}"
+        hit = true
+      end
       @intended.delete(name)
+      hit
       self
     end
 
@@ -811,7 +1081,10 @@ module ConfigWriter
 
     def read_or_seed
       return File.read(@path) if File.exist?(@path)
-      raise MissingKey, "no #{@path} and no template to seed it from" unless @template && File.exist?(@template)
+      # The path when there is no template to name: a writer opened over
+      # the example itself (style.rb reads the shipped defaults out of it)
+      # has none, and the file the sentence has to name is that one.
+      raise TemplateMissing, (@template || @path).to_s unless @template && File.exist?(@template)
 
       File.read(@template)
     end
@@ -820,8 +1093,13 @@ module ConfigWriter
     # every optional backend ships -- "# export RSYNC_TARGET=..."), so
     # setting one activates the documented line in place instead of
     # appending a duplicate at the bottom.
+    # The LAST active assignment, not the first. env.sh is a shell script:
+    # every line runs, so a name written twice ends up with the value from
+    # the bottom -- while the wizard rewrote the top one, reported success,
+    # and left the old value in force. A file with one assignment (all of
+    # them, in practice) is unaffected.
     def find_line(name)
-      active = @lines.index { |l| l.match?(/\A\s*export\s+#{Regexp.escape(name)}=/) }
+      active = @lines.rindex { |l| l.match?(/\A\s*export\s+#{Regexp.escape(name)}=/) }
       return active if active
 
       @lines.index { |l| l.match?(/\A\s*#\s*export\s+#{Regexp.escape(name)}=/) }

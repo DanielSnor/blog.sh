@@ -58,6 +58,8 @@ require_relative '../lib/slug'
 # again here, so that all three agree about what a menu item can point
 # at.
 require_relative '../lib/checker'
+require_relative '../lib/post_address'
+require_relative '../lib/forge_address'
 
 def t(key, **vars)
   I18n.t("style.#{key}", **vars)
@@ -68,7 +70,23 @@ HEX = /\A#(\h{3}|\h{6})\z/.freeze
 
 # The icons the build already knows how to draw. Anything else needs
 # icon_svg, which is markup and belongs in the file rather than a prompt.
-ICONS = %w[mastodon pixelfed linkedin github bluesky instagram threads facebook x youtube rss email].freeze
+# Kept in step with SOCIAL_ICONS in build/build_blog.rb -- an icon the
+# engine can draw and the wizard never offers is one nobody finds.
+ICONS = %w[mastodon pixelfed linkedin github gitea forgejo codeberg gitlab
+           bluesky instagram threads facebook x youtube rss email].freeze
+
+# current.dig blows up the moment a key holds something other than a
+# mapping -- a hand-edited config with `widgets:` as a list, say -- and
+# this is a tool people open BECAUSE their config is wrong.
+def at(*keys)
+  node = current
+  keys.each do |key|
+    return nil unless node.is_a?(Hash)
+
+    node = node[key]
+  end
+  node
+end
 
 def current
   @current ||= begin
@@ -98,7 +116,7 @@ def template_values
 end
 
 def template?(*keys)
-  value = current.dig(*keys)
+  value = at(*keys)
   !value.nil? && value == template_values.dig(*keys)
 end
 
@@ -147,7 +165,7 @@ end
 def current_palette
   palettes.find do |_, data|
     %w[light dark].all? do |mode|
-      COLOR_KEYS.all? { |k| current.dig('colors', mode, k) == data.dig(mode, k) }
+      COLOR_KEYS.all? { |k| at('colors', mode, k) == data.dig(mode, k) }
     end
   end&.first
 end
@@ -168,7 +186,19 @@ def section_palette
   return unless data
 
   %w[light dark].each do |mode|
-    COLOR_KEYS.each { |key| site.set(['colors', mode, key], data[mode][key]) }
+    # Only the colours the palette actually names. A palette may leave keys
+    # out -- docs/install.md says so in as many words, and the engine falls
+    # back to its own blue for whatever is missing -- but writing them out
+    # as empty values does not leave them out, it sets them to nothing:
+    # `text:` with no value after it, twelve times, and then doctor
+    # refusing the config it was just handed. What is absent has to stay
+    # absent.
+    COLOR_KEYS.each do |key|
+      value = data[mode][key]
+      next if value.to_s.strip.empty?
+
+      site.set(['colors', mode, key], value)
+    end
   end
   # Into the frame (Wizard.say): the preview question follows immediately
   # and repaints the screen, and what it asks about is exactly these rows.
@@ -191,12 +221,12 @@ def section_colors_by_hand
     Wizard.say(t("colors_#{mode}"), :bold)
     Wizard.say('')
     COLOR_KEYS.each do |key|
-      value = Wizard.ask_valid("colors.#{mode}.#{key}", current.dig('colors', mode, key),
+      value = Wizard.ask_valid("colors.#{mode}.#{key}", at('colors', mode, key),
                                hint: t("color_#{key}")) do |answer|
         t('e_hex') unless answer.match?(HEX)
       end
       site.set(['colors', mode, key], value) if value
-      candidate[mode][key] = value || current.dig('colors', mode, key)
+      candidate[mode][key] = value || at('colors', mode, key)
     end
   end
   offer_palette_preview(candidate, t('pv_custom_name'))
@@ -252,7 +282,7 @@ def preview_site_url
   require_relative '../lib/deploy_backend'
   return nil unless DeployBackend.pick.configured?
 
-  base = (ENV['SITE_BASE_URL'] || current.dig('site', 'base_url')).to_s.chomp('/')
+  base = (ENV['SITE_BASE_URL'] || at('site', 'base_url')).to_s.chomp('/')
   # The template's own placeholder is not this site's address: printing
   # (and QR-encoding) https://example.com/... pointed the user at a
   # domain they do not own while the upload went to the real target.
@@ -290,9 +320,14 @@ def show_preview_online(url, local_fallback)
   # photographed the QR one evening and found it dead the next morning.
   Wizard.say(t('pv_temporary'), :dim)
   if Tui.interactive? && (qr = QrCode.render(url))
-    puts
-    puts qr
-    puts Tui.paint(I18n.t('cli.qr_hint'), :dim)
+    # Into the frame, one row at a time, and NOT through Wizard.say: say
+    # wraps to the terminal width, and a wrapped QR code is a picture of
+    # nothing. Printed straight to the screen the code lasted until the
+    # menu repainted over it -- which is immediately -- so what the person
+    # was meant to photograph was gone before they reached for the phone.
+    Wizard.remember('')
+    qr.to_s.lines.each { |line| Wizard.remember(line.chomp) }
+    Wizard.remember(Tui.paint(I18n.t('cli.qr_hint'), :dim))
   end
   open_in_browser(url)
 end
@@ -314,7 +349,7 @@ end
 # today, and a wrong pair makes every page jump. Nobody should have to
 # read the dimensions off their own file.
 def section_banner
-  src = current.dig('banner', 'src') || '/assets/images/header.png'
+  src = at('banner', 'src') || '/assets/images/header.png'
   # Into the frame, not onto the screen. Wizard.ask repaints from the top
   # of the viewport, so a `puts` here was erased by the very question it
   # was there to inform -- and this line names the file currently in place,
@@ -340,9 +375,20 @@ def section_banner
       # The one that says the file was not found matters most -- it is the
       # answer to "why did nothing happen?", and it was the row most
       # reliably erased.
-      Wizard.remember(Tui.paint(t('banner_pending', path: src), :green))
+      #
+      # Answering with the file already in place promises no copy, because
+      # there will not be one -- the measurement is the whole point of that
+      # answer, and it has just been taken.
+      Wizard.remember(Tui.paint(in_place?(path, src) ? "✅ #{t('file_in_place', path: src)}"
+                                                     : t('banner_pending', path: src), :green))
     else
-      Wizard.remember(Tui.paint("⚠️  #{t('banner_not_found', path: path)}", :yellow))
+      # Said, not remembered. `remember` puts a row in the frame, which a
+      # piped run never paints at all and a terminal cuts at its width --
+      # so the one sentence that answers "why did nothing happen?" was
+      # invisible in a script and half-visible on screen, with a green
+      # "✅ Measured: 1880x600" (the OLD banner, still installed) directly
+      # underneath it, reading like success.
+      Wizard.say(Tui.paint("⚠️  #{t('banner_not_found', path: path)}", :yellow))
     end
   end
 
@@ -351,7 +397,7 @@ def section_banner
   # the copy would have recorded the OLD image's dimensions for the new one.
   measure_banner(src, @pending_banner)
 
-  alt = Wizard.ask(t('q_banner_alt'), current.dig('banner', 'alt'), hint: t('h_banner_alt'),
+  alt = Wizard.ask(t('q_banner_alt'), at('banner', 'alt'), hint: t('h_banner_alt'),
                    suggested: template?('banner', 'alt'))
   site.set(%w[banner alt], alt) if alt
 
@@ -359,9 +405,9 @@ def section_banner
   # ON, the engine's own default (BANNER_SHOW_TITLE/_CLAIM in
   # build_blog.rb). Asking with a bare [y/N] meant a run through the banner
   # section turned both overlays off for anyone who pressed Enter.
-  show_title = Wizard.confirm(t('q_show_title'), default: current.dig('banner', 'show_title') != false)
+  show_title = Wizard.confirm(t('q_show_title'), default: at('banner', 'show_title') != false)
   site.set(%w[banner show_title], show_title)
-  show_claim = Wizard.confirm(t('q_show_claim'), default: current.dig('banner', 'show_claim') != false)
+  show_claim = Wizard.confirm(t('q_show_claim'), default: at('banner', 'show_claim') != false)
   site.set(%w[banner show_claim], show_claim)
 
   # Only where it can be seen. The claim's text is site.description unless
@@ -375,7 +421,7 @@ def section_banner
 end
 
 def ask_banner_claim
-  now = current.dig('banner', 'claim')
+  now = at('banner', 'claim')
   answer = Wizard.ask(t('q_banner_claim'), now, hint: t('h_banner_claim')).to_s
   return if answer.strip.empty? || answer == now.to_s
 
@@ -419,6 +465,11 @@ def resolve_source(answer)
   path = answer.to_s.strip.gsub(/\A['"]|['"]\z/, '')
   return nil if path.empty?
 
+  # Dragging a file from Finder into a terminal writes the spaces escaped
+  # ("~/Mobile\ Documents/…"). Typed by nobody, produced by the most
+  # natural gesture there is -- and refused as "no such file".
+  path = path.gsub(/\\(.)/, '\1') if !File.exist?(path) && path.include?('\\')
+
   return File.expand_path(path) unless File.dirname(path) == '.'
 
   in_incoming = File.join(INCOMING_DIR, path)
@@ -434,17 +485,62 @@ def queue_file(source, href)
   href
 end
 
+# Where the pending banner would land: whatever this run chose, else
+# whatever the config already says. Asked in two places now -- the review
+# lists the copy as a change, and the install carries it out.
+def pending_banner_target
+  site.intended[%w[banner src]] || at('banner', 'src') || '/assets/images/header.png'
+end
+
+# An answer that names the file already installed -- what you type to
+# re-measure artwork you replaced by hand or dropped in from Finder --
+# resolves to the target itself. There is nothing to copy, and FileUtils
+# answers a copy onto itself with "same file" and a backtrace.
+def in_place?(source, href)
+  target = File.join(ROOT, href.to_s.sub(%r{\A/}, ''))
+  File.file?(target) && File.identical?(source, target)
+end
+
+# The changes these wizards make that are not lines in a file, in the shape
+# review_and_write lists changes in: the banner picture, and every
+# stylesheet and font file the other sections queued. Without them a run
+# whose only change is a file -- an image replaced by one of the same name
+# and the same dimensions moves nothing in site.yml, and putting back a
+# skin.css the config already names moves nothing either -- ended on
+# "nothing changed", and the copies, which wait for a confirmed write, were
+# dropped with it: the wizard said the file would be installed, then said
+# nothing had changed, and left it sitting in incoming/.
+#
+# A copy that would land where it came from is left out: it is not a
+# change, and listing it would promise something the install then does not
+# do.
+def pending_review
+  copies = Array(@pending_files).dup
+  copies.unshift([@pending_banner, pending_banner_target, :banner]) if @pending_banner
+  copies.filter_map do |source, href, banner|
+    next if in_place?(source, href)
+
+    Tui.paint(t(banner ? 'review_banner' : 'review_file',
+                name: File.basename(source), path: href), :green)
+  end
+end
+
 # Runs after review_and_write reports :written -- never before it.
 def install_pending_files
   require 'fileutils'
-  if @pending_banner
-    src = site.intended[%w[banner src]] || current.dig('banner', 'src') || '/assets/images/header.png'
-    queue_file(@pending_banner, src)
-  end
+  queue_file(@pending_banner, pending_banner_target) if @pending_banner
   return if @pending_files.nil? || @pending_files.empty?
 
   left = []
   @pending_files.each do |source, href|
+    if in_place?(source, href)
+      # Said out loud rather than skipped in silence: the answer was
+      # accepted, and the reason nothing was copied is that nothing had to
+      # be. Never dropped from incoming/ either -- the source IS the
+      # installed file.
+      puts Tui.paint(t('file_in_place', path: href), :green)
+      next
+    end
     target = File.join(ROOT, href.sub(%r{\A/}, ''))
     FileUtils.mkdir_p(File.dirname(target))
     FileUtils.cp(source, target)
@@ -514,10 +610,10 @@ end
 # changes nothing, which is the rule the menu section had to learn the
 # hard way.
 def section_layout
-  sidebar = Wizard.confirm(t('q_layout_sidebar'), default: current.dig('layout', 'sidebar') != false)
+  sidebar = Wizard.confirm(t('q_layout_sidebar'), default: at('layout', 'sidebar') != false)
   site.set(%w[layout sidebar], sidebar)
 
-  hero = Wizard.confirm(t('q_layout_hero'), default: current.dig('layout', 'hero') == true)
+  hero = Wizard.confirm(t('q_layout_hero'), default: at('layout', 'hero') == true)
   site.set(%w[layout hero], hero)
 
   puts
@@ -528,7 +624,7 @@ end
 # the engine's own -- which is what lets a site look like something else
 # without editing a template and losing the edit to the next git pull.
 def section_extra_css
-  entries = current.dig('site', 'extra_css')
+  entries = at('site', 'extra_css')
   entries = [] unless entries.is_a?(Array)
   entries = entries.map(&:to_s)
   touched = false
@@ -552,7 +648,7 @@ def section_extra_css
       entry = ask_css_entry
       next unless entry
 
-      entries << entry
+      entries << entry if entry
       touched = true
     when 'remove'
       entries = remove_from(entries) { |e| e }
@@ -612,28 +708,28 @@ def ask_css_entry
 end
 
 def section_about
-  heading = Wizard.ask(t('q_about_heading'), current.dig('about', 'heading'), hint: t('h_about_heading'),
+  heading = Wizard.ask(t('q_about_heading'), at('about', 'heading'), hint: t('h_about_heading'),
                        suggested: template?('about', 'heading'))
   site.set(%w[about heading], heading) if heading
 
-  html = Wizard.ask_text(t('q_about_html'), current.dig('about', 'html'),
+  html = Wizard.ask_text(t('q_about_html'), at('about', 'html'),
                          hint: t('h_about_html'), comment: t('c_about_html'))
-  site.set_text(%w[about html], html) if html && html != current.dig('about', 'html')
+  site.set_text(%w[about html], html) if html && html != at('about', 'html')
   puts
 end
 
 def section_footer
   %w[links_heading note_heading social_heading copyright].each do |key|
-    value = Wizard.ask(t("q_footer_#{key}"), current.dig('footer', key), hint: t("h_footer_#{key}"),
+    value = Wizard.ask(t("q_footer_#{key}"), at('footer', key), hint: t("h_footer_#{key}"),
                        suggested: template?('footer', key))
     site.set(['footer', key], value) if value
   end
 
-  note = Wizard.ask_text(t('q_footer_note'), current.dig('footer', 'note_html'),
+  note = Wizard.ask_text(t('q_footer_note'), at('footer', 'note_html'),
                          hint: t('h_footer_note'), comment: t('c_footer_note'))
-  site.set_text(%w[footer note_html], note) if note && note != current.dig('footer', 'note_html')
+  site.set_text(%w[footer note_html], note) if note && note != at('footer', 'note_html')
 
-  links = edit_list(current.dig('footer', 'links'), %w[title url]) do |item|
+  links = edit_list(at('footer', 'links'), %w[title url]) do |item|
     "#{item['title']} -> #{item['url']}"
   end
   site.set_list(%w[footer links], links) if links
@@ -641,7 +737,7 @@ def section_footer
 end
 
 def section_social
-  entries = current['social']
+  entries = SiteConfig::Chrome.list(current, 'social')
   entries = [] unless entries.is_a?(Array)
 
   loop do
@@ -659,7 +755,18 @@ def section_social
                              ['keep', t('list_keep')]
                            ], current_index: 2, note: state)
     case action
-    when 'add' then entries << ask_social_entry
+    when 'add'
+      # The same guard the other three list sections have (nav, extra CSS,
+      # font faces). Without it, backing out of "add one" -- pressing Enter
+      # past the name, which is this wizard's documented way to say never
+      # mind -- pushed nil into the list, and the next repaint of the rows
+      # dereferenced it: a Ruby backtrace, and every answer given anywhere
+      # in the session thrown away, because nothing is written until the
+      # review at the end.
+      entry = ask_social_entry
+      next unless entry
+
+      entries << entry
     when 'remove' then entries = remove_from(entries) { |e| "#{e['name']} #{e['url']}" }
     else break
     end
@@ -685,9 +792,12 @@ end
 # person is still the one who can say whether it is a typo or a post they
 # have not written yet.
 def section_nav
-  entries = current['nav']
-  derived = !entries.is_a?(Array)
-  entries = [] unless entries.is_a?(Array)
+  # The same question the build asks (SiteConfig::Chrome.written?), not a
+  # different one: since 1.4 a `nav:` key with nothing under it means "no
+  # menu", so describing that config as "the engine derives the menu" told
+  # the author the opposite of what their own site was doing.
+  derived = !SiteConfig::Chrome.written?(current, 'nav')
+  entries = SiteConfig::Chrome.list(current, 'nav')
   touched = false
 
   loop do
@@ -839,7 +949,9 @@ def nav_known
 end
 
 def nav_pages
-  @nav_pages ||= nav_posts.select { |p| p['page'] }.map { |p| "/#{p['slug']}/" }.sort
+  # Asked of PostAddress, because "page: No" is true to Ruby and false to
+  # the build: the menu offered an address the site does not answer at.
+  @nav_pages ||= nav_posts.select { |p| PostAddress.page?(p) }.map { |p| "/#{p['slug']}/" }.sort
 end
 
 # The tags worth putting in a menu are the ones with posts behind them, so
@@ -851,6 +963,11 @@ end
 def ask_social_entry
   name = Wizard.ask(t('q_social_name'), '')
   url = Wizard.ask(t('q_social_url'), '', hint: t('h_social_url'))
+  # Answering nothing means "never mind", not "add an icon with no name
+  # that links nowhere" -- which is what it used to write into the footer
+  # of every page on the site.
+  return nil if name.to_s.strip.empty? || url.to_s.strip.empty?
+
   icon = Wizard.choose(t('q_social_icon'), ICONS.map { |i| [i, i] }, current_index: 0)
   entry = { 'name' => name, 'url' => url, 'icon' => icon }
   # rel="me" is what earns the verification tick on a Mastodon profile,
@@ -869,30 +986,70 @@ end
 WIDGETS = {
   'toots' => %w[account_id limit],
   'pixelfed' => %w[feed_url limit],
-  'commits' => %w[username limit],
+  # `instance` is what 1.4 added: the same card reads Gitea and Forgejo,
+  # and without a question here the only way to set it was editing
+  # site.yml by hand -- while the wizard went on asking for a "GitHub
+  # username" on a site pointed at Codeberg.
+  'commits' => %w[username instance limit],
   'bluesky' => %w[limit],
   'rss' => %w[feed_url limit]
 }.freeze
 
 def section_widgets
   loop do
-    active = (current['widgets'] || {}).keys
+    # Refreshed on every pass: `current` alone is the file as it was when
+    # the run started, so a widget configured a moment ago -- in this very
+    # loop -- was missing from its own state line. Minus what this run has
+    # switched off, which no merge of pending SETS can know about.
+    refresh_current
+    active = SiteConfig::Chrome.map(current, 'widgets').keys - removed_widgets.to_a
     state = [Tui.paint(t('widgets_current', list: active.empty? ? t('list_empty') : active.join(', ')), :dim)]
-    options = WIDGETS.keys.map { |name| [name, t("widget_#{name}")] } + [['keep', t('list_keep')]]
+    options = WIDGETS.keys.map { |name| [name, t("widget_#{name}")] }
+    # Adding one was the only thing on offer; a widget switched on by
+    # mistake -- or one whose account no longer exists -- could only be
+    # got rid of by editing site.yml by hand.
+    options << ['remove', t('q_widget_remove')] if active.any?
+    options << ['keep', t('list_keep')]
     chosen = Wizard.choose(t('q_widget'), options, current_index: options.size - 1, note: state)
     break if chosen == 'keep'
 
-    configure_widget(chosen)
+    chosen == 'remove' ? remove_widget(active) : configure_widget(chosen)
   end
   puts
 end
 
+def remove_widget(active)
+  # A hand-written widget key the wizard has no name for is still one
+  # somebody may want gone -- it goes in the list under its own key
+  # rather than aborting the run on a missing translation.
+  options = active.map { |name| [name, WIDGETS.key?(name) ? t("widget_#{name}") : name] }
+  options << ['keep', t('list_keep')]
+  name = Wizard.choose(t('q_widget_which_remove'), options, current_index: options.size - 1)
+  return if name == 'keep'
+
+  site.deactivate(['widgets', name])
+  removed_widgets << name
+  # Commented out, not deleted: the heading and the account id stay in the
+  # file, so switching the widget back on later is one answer rather than
+  # a re-typing.
+  Wizard.say(t('widget_removed', name: name), :green)
+  Wizard.say('')
+end
+
+def removed_widgets
+  @removed_widgets ||= []
+end
+
 def configure_widget(name)
-  heading = Wizard.ask(t('q_widget_heading'), current.dig('widgets', name, 'heading') || t("widget_heading_#{name}"))
+  # Setting one up again is the undo for having removed it.
+  removed_widgets.delete(name)
+  heading = Wizard.ask(t('q_widget_heading'),
+                       at('widgets', name, 'heading') || inactive_default(name, 'heading') || t("widget_heading_#{name}"))
   site.set(['widgets', name, 'heading'], heading) if heading
 
   WIDGETS[name].each do |key|
-    value = Wizard.ask_valid(t("q_widget_#{key}"), current.dig('widgets', name, key) || default_for(key),
+    value = Wizard.ask_valid(t("q_widget_#{key}"),
+                             at('widgets', name, key) || inactive_default(name, key) || default_for(key),
                              hint: t("h_widget_#{key}")) do |answer|
       if key == 'limit'
         t('e_limit') unless answer.to_s.match?(/\A[1-9]\d*\z/)
@@ -904,9 +1061,26 @@ def configure_widget(name)
         t('e_account_id') unless AccountId.plausible?(answer)
       elsif key == 'feed_url'
         t('e_feed_url') unless answer.to_s.match?(%r{\Ahttps?://})
+      elsif key == 'instance'
+        # Empty means GitHub, which is the answer most people want and the
+        # behaviour without the key. Anything else is checked the way
+        # doctor checks it, so a typo is caught here rather than becoming
+        # an empty card nobody can tell from "has not pushed lately".
+        next if answer.to_s.strip.empty?
+
+        if ForgeAddress.base(answer).nil?
+          t('e_widget_instance')
+        elsif ForgeAddress.path_under_host?(answer)
+          t('e_widget_instance_repo')
+        end
       end
     end
     next unless value
+
+    # An empty instance is not a value, it is the default: writing
+    # `instance: ""` would leave doctor complaining about a key the person
+    # deliberately left blank.
+    next if key == 'instance' && value.to_s.strip.empty?
 
     site.set(['widgets', name, key], key == 'limit' ? value.to_i : value)
   end
@@ -920,6 +1094,23 @@ def default_for(key)
   key == 'limit' ? 3 : nil
 end
 
+# The answer a removal left commented in the config -- the other half of
+# the promise "switching it back on is one answer". The template's own
+# placeholder is not an answer somebody gave: offered as a default, an
+# Enter-through would write account_id "000000000000000000" into a live
+# widget, so anything equal to the example's value at the same path is
+# treated as no answer at all.
+def inactive_default(name, key)
+  value = site.inactive_value(['widgets', name, key.to_s])
+  return nil if value.nil?
+
+  value == example_config.inactive_value(['widgets', name, key.to_s]) ? nil : value
+end
+
+def example_config
+  @example_config ||= ConfigWriter::YamlFile.new(SITE_YML_EXAMPLE)
+end
+
 # --- fonts and analytics ---------------------------------------------
 
 def section_fonts
@@ -929,7 +1120,7 @@ def section_fonts
     'banner_title' => t('q_font_title'), 'banner_title_size' => t('q_font_title_size'),
     'banner_claim' => t('q_font_claim'), 'banner_claim_size' => t('q_font_claim_size')
   }.each do |key, label|
-    value = Wizard.ask(label, current.dig('fonts', key), hint: t("h_font_#{key}"))
+    value = Wizard.ask(label, at('fonts', key), hint: t("h_font_#{key}"))
     site.set(['fonts', key], value) if value
   end
   puts
@@ -941,7 +1132,7 @@ end
 # silently falls back, and the banner then looks like the setting simply
 # did not work.
 def section_font_faces
-  entries = current.dig('fonts', 'faces')
+  entries = at('fonts', 'faces')
   entries = [] unless entries.is_a?(Array)
   entries = entries.select { |e| e.is_a?(Hash) }
   touched = false
@@ -1020,7 +1211,7 @@ def ask_font_face
 end
 
 def section_analytics
-  src = Wizard.ask(t('q_analytics_src'), current.dig('analytics', 'src'), hint: t('h_analytics_src'))
+  src = Wizard.ask(t('q_analytics_src'), at('analytics', 'src'), hint: t('h_analytics_src'))
   if src.to_s.empty?
     Wizard.say(t('analytics_skipped'), :dim)
     Wizard.say('')
@@ -1028,7 +1219,7 @@ def section_analytics
   end
 
   site.set(%w[analytics src], src)
-  id = Wizard.ask(t('q_analytics_id'), current.dig('analytics', 'website_id'), hint: t('h_analytics_id'))
+  id = Wizard.ask(t('q_analytics_id'), at('analytics', 'website_id'), hint: t('h_analytics_id'))
   site.set(%w[analytics website_id], id) if id
   puts
 end
@@ -1054,7 +1245,11 @@ def edit_list(entries, fields)
     when 'add'
       entry = {}
       fields.each { |f| entry[f] = Wizard.ask(t("q_list_#{f}"), '') }
-      entries << entry
+      # Answering nothing to every field means "never mind", not "add an
+      # empty row" -- a footer link with no title and no address rendered
+      # as a bare <li></li> on every page. Pressing Enter past the
+      # questions is the wizard's documented way to back out.
+      entries << entry unless entry.values.all? { |v| v.to_s.strip.empty? }
     when 'remove'
       entries = remove_from(entries) { |e| yield(e) }
     else
@@ -1068,6 +1263,13 @@ def remove_from(entries)
 
   options = entries.each_with_index.map { |e, i| [i, yield(e)] }
   index = Wizard.choose(t('q_list_which'), options, current_index: 0)
+  # Esc gives nil, and nil is not an index: rejecting "the entry whose
+  # position equals nil" matched nothing, so the list came back one item
+  # shorter -- the FIRST one, which on a default site is the Mastodon link
+  # carrying rel="me". Backing out of a question must leave the answer
+  # exactly as it was.
+  return entries if index.nil?
+
   entries.reject.with_index { |_, i| i == index }
 end
 
@@ -1119,7 +1321,10 @@ def run
   # the run's whole verdict arrived glued to the bottom edge of the menu:
   # "…· Esc dokončit" and under it, touching, "Nic se nezměnilo".
   puts
-  outcome = Wizard.review_and_write([[relative(SITE_YML), site]])
+  outcome = Wizard.review_and_write([[relative(SITE_YML), site]], also: pending_review)
+  # A refused or rolled-back write is exit 1 (a cancel at the diff stays 0
+  # -- that is the user's choice, not a fault).
+  exit 1 if outcome == :failed
   return unless outcome == :written
 
   install_pending_files
@@ -1132,7 +1337,13 @@ def refresh_current
   merged = current
   site.intended.each do |path, value|
     node = merged
-    path[0..-2].each { |k| node = (node[k] ||= {}) }
+    # The same tolerance `at` has, for the same reason: this is a tool
+    # people open BECAUSE their config is wrong, and a `widgets:` written
+    # as a list ended the run here with the answers already given.
+    path[0..-2].each do |k|
+      node[k] = {} unless node[k].is_a?(Hash)
+      node = node[k]
+    end
     node[path.last] = value
   end
   @current = merged

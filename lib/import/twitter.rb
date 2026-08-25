@@ -4,6 +4,7 @@ require 'json'
 require 'time'
 require 'uri'
 require_relative '../slug'
+require_relative 'html_blocks'
 
 module Import
   # Imports a Twitter/X "download your archive" export. Standalone tweets
@@ -146,12 +147,55 @@ module Import
       end
       new_text << text[cursor..].to_s
 
+      new_text, formatting = decode_entities_in(new_text, formatting)
+
       leading = new_text[/\A\s*/].length
       new_text = new_text.strip
       formatting.each { |f| f['start'] -= leading; f['end'] -= leading }
       formatting.reject! { |f| f['start'].negative? || f['start'] >= f['end'] }
 
       [new_text, formatting]
+    end
+
+    # Twitter escapes <, > and & in full_text and never says so, so a tweet
+    # about being "(jsem <38)" arrived as "(jsem &lt;38)" -- rendered as
+    # &lt;38 on the page, and baked into twelve permanent addresses as
+    # "-gt-" and "-amp-".
+    #
+    # Decoded HERE and not sooner, which is the whole difficulty: the entity
+    # indices count the ESCAPED string. Checked against the real archive --
+    # slicing the escaped text at a URL's indices returns the URL exactly,
+    # slicing the decoded text returns it shifted by the entities in front
+    # of it. Decoding first, which is the obvious fix, would walk every link
+    # in the archive off its own words. So the ops run on the text as
+    # delivered and the spans are moved afterwards, by however much the text
+    # shrank ahead of them.
+    def decode_entities_in(text, formatting)
+      moved = Array.new(text.length + 1)
+      decoded = +''
+      index = 0
+      while index < text.length
+        moved[index] = decoded.length
+        match = text[index..].match(/\A&(?:#x?[0-9a-fA-F]+|\w+);/)
+        replacement = match && HtmlBlocks.decode_entities(match[0])
+        if match && replacement != match[0]
+          decoded << replacement
+          # An index that lands INSIDE an entity has no character of its own
+          # to point at; it belongs after the letter the entity became.
+          (1...match[0].length).each { |offset| moved[index + offset] = decoded.length }
+          index += match[0].length
+        else
+          decoded << text[index]
+          index += 1
+        end
+      end
+      moved[text.length] = decoded.length
+
+      formatting.each do |span|
+        span['start'] = moved[span['start']] || span['start']
+        span['end'] = moved[span['end']] || span['end']
+      end
+      [decoded, formatting]
     end
 
     def content_blocks(tweet, media)

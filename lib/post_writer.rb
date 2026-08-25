@@ -4,10 +4,14 @@ require 'securerandom'
 require 'digest'
 require 'time'
 require_relative 'atomic_write'
+require_relative 'post_address'
+require_relative 'address_guard'
 require_relative 'post_versions'
 require_relative 'exif_location'
 require_relative 'media_dimensions'
 require_relative 'site_config'
+require_relative 'i18n'
+require_relative 'path_glob'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
@@ -59,10 +63,31 @@ module PostWriter
     rescue StandardError
       nil
     end
+    path = File.join(dir, "#{slug}.json")
+    # unique_slug settles the FILE name; it says nothing about the address.
+    # An imported page is served at the root, where a page already standing
+    # there has no year to be told apart by -- so the import wrote both,
+    # reported success, and left an archive whose two pages share one
+    # address. Raised, not aborted: the per-item rescue counts it, names it,
+    # and the rest of the import goes on.
+    #
+    # Asked BEFORE a single file is copied. Refusing after the media were
+    # already on disk left an orphaned directory behind, which unique_slug
+    # then counted as an occupied name -- so running the very same import
+    # again put the post somewhere else. An import that is refused has to
+    # leave the archive exactly as it found it, or it is not repeatable.
+    taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug,
+                                  except: path, path: path)
+    if taken
+      raise "cannot write '#{slug}': a different post is already served at that address " \
+            "(#{File.join(File.basename(File.dirname(taken)), File.basename(taken))}) -- " \
+            'resolve the slug clash by hand'
+    end
+
     media_files = reconcile_media_names(post, previous, year, slug, media_files)
     copy_media(media_files, year, slug)
     sync_media_dimensions(post, year, slug, previous: previous)
-    path = File.join(dir, "#{slug}.json")
+
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
     path
@@ -620,7 +645,7 @@ module PostWriter
     # that already have one import behind them. Only the post's own current
     # address: a former slug redirecting to the page is exactly what
     # former_slugs is for.
-    merged -= ["/#{slug}/"] if post['page']
+    merged -= ["/#{slug}/"] if PostAddress.page?(post)
     merged.empty? ? post.delete('redirect_from') : post['redirect_from'] = merged
     # hero, toc and unlisted need presence rather than truth, and that
     # distinction is the whole point of them: `hero: false` is a post saying
@@ -655,10 +680,13 @@ module PostWriter
     # marker survived forever, and after unpublish -> rename -> re-import
     # the old address 404'd while a marker for it sat in the JSON. Spent
     # here for the same reason and in the same way.
-    if post['state'] != 'draft' && post['unpublished_from']
-      vacated = post.delete('unpublished_from')
-      former = (Array(post['former_slugs']).map(&:to_s) + [vacated].compact).uniq - ["#{year}/#{slug}"]
-      former.empty? ? post.delete('former_slugs') : post['former_slugs'] = former
+    # The sweep runs for every published post, not only for one carrying a
+    # marker: a post that went published -> draft -> published through the
+    # source can come back holding a redirect from the address it is served
+    # at again, and only this call can clear it. Left in, the build
+    # complains on every run and nothing the author does makes it stop.
+    if post['state'] != 'draft'
+      PostAddress.spend_vacated(post, post.delete('unpublished_from'), slug: slug)
     end
 
     new_dir = File.join(CONTENT_DIR, year)
@@ -681,30 +709,39 @@ module PostWriter
     # here has been moved or deleted yet. Hoisted ABOVE the version keep:
     # a re-import about to be refused must refuse with no side effects,
     # and it used to leave one spare version behind on its way out.
-    if File.expand_path(new_path) != File.expand_path(existing_path) && File.exist?(new_path)
-      raise "cannot move '#{slug}' into #{year}: a different post already owns " \
-            "#{new_path} -- resolve the slug clash by hand"
+    taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug,
+                                  except: existing_path, path: new_path)
+    if taken
+      raise "cannot write '#{slug}' into #{year}: a different post is already served " \
+            "at that address (#{taken}) -- resolve the slug clash by hand"
     end
 
     PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
 
+    # A re-import that moves where a post is served vacates the address it
+    # had, and the redirect has to be recorded here exactly as edit_post
+    # records it: a source that starts reporting its dates in another
+    # timezone is enough to move a post across a New Year, and every link
+    # to it died with no stub behind it.
+    #
+    # Asked of PostAddress on both sides, and asked OUTSIDE the "did the
+    # file move" branch, because the file is not what decides this. The old
+    # three lines took the year off the FOLDER -- which parts company with
+    # the address the moment a date is corrected -- and never asked whether
+    # either side was a page, so a source that started marking a post as a
+    # page moved it from /posts/2019/slug/ to /slug/ with the file sitting
+    # exactly where it was, and nothing was recorded at all.
+    #
+    # Read from the OLD file: `post` is what the import built, and the
+    # state that decides whether there is a public address to keep is the
+    # state the post is in now.
+    if old.is_a?(Hash) && old['state'] != 'draft'
+      was = PostAddress.vacated_marker(old, slug: old['slug'] || slug)
+      now = post['state'] == 'draft' ? nil : PostAddress.vacated_marker(post, slug: slug)
+      PostAddress.spend_vacated(post, was == now ? nil : was, slug: slug)
+    end
+
     if File.expand_path(new_path) != File.expand_path(existing_path)
-
-      # A published post that moves years vacates its public address, and
-      # the redirect for it has to be recorded here exactly as edit_post
-      # records it -- a re-import from a source that started reporting its
-      # dates in another timezone is enough to move a post across a New
-      # Year, and every link to it died with no stub behind it.
-      #
-      # Read from the OLD file: `post` is what the import built, and the
-      # state that decides whether there is a public address to keep is the
-      # state the post is in now.
-      if old && old['state'] != 'draft'
-        vacated = "#{old_year}/#{slug}"
-        former = (Array(post['former_slugs']).map(&:to_s) + [vacated]).uniq - ["#{year}/#{slug}"]
-        post['former_slugs'] = former unless former.empty?
-      end
-
       FileUtils.mkdir_p(new_dir)
       move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
       # The edit history is keyed by year/slug exactly like the media, and
@@ -765,7 +802,8 @@ module PostWriter
           n = 1
           n += 1 while File.exist?("#{aside}#{n}")
           FileUtils.mv(dest, "#{aside}#{n}")
-          warn "media: #{File.basename(to)}/#{f} was already taken -- the file that was there is now #{File.basename("#{aside}#{n}")}"
+          warn I18n.t('cli.media_name_taken', name: "#{File.basename(to)}/#{f}",
+                                              moved: File.basename("#{aside}#{n}"))
         end
         FileUtils.mv(File.join(from, f), dest)
       end
@@ -807,7 +845,7 @@ module PostWriter
   def self.each_post(content_dir: CONTENT_DIR)
     building = @index.nil?
     acc = {}
-    Dir.glob(File.join(content_dir, '*', '*.json')).each do |file|
+    PathGlob.under(content_dir, '*', '*.json').each do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
       next unless post.is_a?(Hash)
 

@@ -4,6 +4,7 @@ require 'json'
 require 'time'
 require_relative '../slug'
 require_relative '../media_dimensions'
+require_relative '../path_glob'
 require_relative 'html_blocks'
 require_relative 'meta_html'
 
@@ -51,7 +52,7 @@ module Import
     # and deserves the ordinary message.
     def self.format_of(export_dir)
       CONTENT_DIRS.each_key do |format|
-        next if Dir[File.join(content_dir(export_dir, format), "posts_*.#{format}")].empty?
+        next if PathGlob.under(content_dir(export_dir, format), "posts_*.#{format}").empty?
 
         return format
       end
@@ -242,7 +243,7 @@ module Import
       # to leave archived posts alone.
       def content_files
         @content_files ||= begin
-          posts = Dir[File.join(content_dir, "posts_*.#{format}")]
+          posts = PathGlob.under(content_dir, "posts_*.#{format}")
                   .sort_by { |path| File.basename(path)[/\d+/].to_i }
           igtv = File.join(content_dir, "igtv_videos.#{format}")
           posts + (File.exist?(igtv) ? [igtv] : [])

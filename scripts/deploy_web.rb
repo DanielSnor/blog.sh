@@ -43,6 +43,7 @@ require 'time'
 require_relative '../lib/deploy_backend'
 require_relative '../lib/atomic_write'
 require_relative '../lib/file_size'
+require_relative '../lib/path_glob'
 # This script talks to the author too (an unconfigured target below says
 # so out loud), and until 1.3.1 it said it in English on a Czech install
 # -- the only entry point that did. i18n arrives the way scripts/doctor.rb
@@ -126,10 +127,55 @@ def log(msg)
   $stdout.flush
 end
 
+# What the manifest is about: the same backend can be pointed at another
+# target (a second site, a staging directory), and a manifest describing
+# the OLD one says every file is already there -- so the new target stays
+# empty while the run reports success. The target is written into the file
+# and checked on the way in; a mismatch throws the manifest away out loud,
+# which is the same thing a missing manifest does and is always safe.
+def manifest_target
+  # `identity` where a backend has one (sftp: the same server with two
+  # directories is two targets), `target` otherwise. Never the connection
+  # string itself -- that one has to stay exactly what the tool expects.
+  raw = if BACKEND.respond_to?(:identity)
+          BACKEND.identity.to_s
+        elsif BACKEND.respond_to?(:target)
+          BACKEND.target.to_s
+        else
+          ''
+        end
+  settle_target(raw)
+end
+
+# Two spellings of one place are one target. A trailing slash, a doubled
+# one, `./` in front, `..` in the middle, a relative path where an
+# absolute one stood -- none of them moves the site anywhere, and all of
+# them used to throw the manifest away and re-upload everything (losing
+# the orphan list with it, which is the expensive half). A remote address
+# keeps its shape: only the path part after the colon is tidied, because
+# `user@host:` is the tool's syntax, not ours.
+def settle_target(raw)
+  return raw if raw.empty?
+
+  head, sep, tail = raw.rpartition(':')
+  path = sep.empty? ? raw : tail
+  return raw if path.empty? || path.start_with?('#')
+
+  settled = path.start_with?('/') ? File.expand_path(path) : path.squeeze('/').chomp('/')
+  settled = settled.sub(%r{\A\./}, '')
+  sep.empty? ? settled : "#{head}#{sep}#{settled}"
+end
+
 def load_manifest
   return {} unless File.exist?(MANIFEST_PATH)
 
   data = JSON.parse(File.read(MANIFEST_PATH))
+  if data.is_a?(Hash) && data.key?('_target') && data['_target'].to_s != manifest_target
+    warn I18n.t('cli.deploy_manifest_foreign', path: MANIFEST_PATH,
+                                               was: data['_target'], now: manifest_target)
+    return {}
+  end
+  data = data.reject { |key, _| key == '_target' } if data.is_a?(Hash)
   # Valid JSON of the wrong shape (a bare array, a number) is as unusable
   # as unparseable text, and left alone it crashes much later on
   # `stored[name]` with a bare TypeError -- exactly the place "deleting a
@@ -138,16 +184,19 @@ def load_manifest
   return data if data.is_a?(Hash)
 
   raise JSON::ParserError, "not an object (#{data.class})"
-rescue JSON::ParserError => e
+rescue JSON::ParserError, SystemCallError => e
   # Treating this as "nothing was ever uploaded" silently is how orphans
   # become permanently unprunable: the target keeps files this side no
   # longer knows about. Say it out loud. The guards are unaffected either
   # way -- their reference is the accepted build, not this file -- so an
   # unreadable manifest now costs a full re-upload and the orphan list,
-  # nothing more.
-  warn "⚠️  #{MANIFEST_PATH} is unreadable (#{e.message.lines.first.to_s.strip[0, 60]}) -- treating it as empty."
-  warn '   Everything will be re-uploaded. Files already on the target that this build no longer generates'
-  warn '   can no longer be found automatically; check the target if you have deleted posts recently.'
+  # nothing more. SystemCallError as well as a parse error: a manifest left
+  # root-owned by one sudo run (the uid trap this project keeps hitting on
+  # its own servers) raised a raw EACCES here and killed every deploy,
+  # while load_state twenty lines down already degraded gracefully on the
+  # very same class.
+  warn I18n.t('cli.deploy_manifest_unreadable', path: MANIFEST_PATH,
+                                                reason: e.message.lines.first.to_s.strip[0, 60])
   {}
 end
 
@@ -155,8 +204,31 @@ end
 # previous manifest survives a write that dies halfway (a full disk, a
 # killed container), instead of being truncated into the unreadable file
 # the branch above has to apologise for.
+
+# Case and unicode form removed, and nothing else: used only to ask whether
+# two names could be one file on a folding filesystem.
+def fold_deploy_name(name)
+  name.to_s.scrub.unicode_normalize(:nfc).downcase
+rescue ArgumentError, Encoding::CompatibilityError
+  name.to_s.scrub.downcase
+end
+
 def save_manifest(manifest)
+  manifest = manifest.merge('_target' => manifest_target)
   AtomicWrite.write_json(MANIFEST_PATH, manifest)
+  true
+rescue SystemCallError => e
+  # The manifest is bookkeeping, exactly like the baseline save_state
+  # writes -- and save_state has always refused to let bookkeeping become
+  # the error the author sees. save_manifest did not: a full disk (or a
+  # read-only root) at the periodic mid-upload save, or in the ensure
+  # block, killed a working transfer at the 25th file with a raw backtrace
+  # and left the run's own outcome record unwritten. Losing the manifest
+  # costs one full re-upload next time, which is worth a sentence and not
+  # worth dying over.
+  warn "⚠️  #{MANIFEST_PATH}: #{e.message.lines.first.to_s.strip}"
+  warn "   #{I18n.t('cli.deploy_state_unwritable')}"
+  false
 end
 
 def load_state
@@ -176,8 +248,8 @@ rescue JSON::ParserError, SystemCallError => e
   # gets said rather than absorbed. The run continues -- the drop guard
   # still has the manifest as a floor, and the next run records a fresh
   # baseline.
-  warn "⚠️  #{BASELINE_PATH} is unreadable (#{e.message.lines.first.to_s.strip[0, 60]}) -- treating it as absent."
-  warn '   The growth guard has no reference for this one run; it is recorded again below.'
+  warn I18n.t('cli.deploy_baseline_unreadable', path: BASELINE_PATH,
+                                                reason: e.message.lines.first.to_s.strip[0, 60])
   {}
 end
 
@@ -185,6 +257,15 @@ end
 # be indistinguishable from a deliberate one, and the guards would trust it.
 def save_state(state)
   AtomicWrite.write_json(BASELINE_PATH, state)
+rescue SystemCallError => e
+  # A full disk is the ordinary way this fails, and it used to end the run
+  # in a raw backtrace out of File#initialize -- no sentence, nothing said
+  # about what had or had not been uploaded. The state file is bookkeeping:
+  # losing it costs one full re-upload next time, which is worth saying and
+  # not worth dying over.
+  warn "⚠️  #{BASELINE_PATH}: #{e.message.lines.first.to_s.strip}"
+  warn "   #{I18n.t('cli.deploy_state_unwritable')}"
+  false
 end
 
 # Older manifests (before this extension) have a bare hash string as the
@@ -210,7 +291,7 @@ def swing?(now, was, limit, floor, direction)
   direction == :down ? now < was * (1 - limit) : now > was * (1 + limit)
 end
 
-abort('❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb).') unless Dir.exist?(PUBLIC_DIR)
+abort(I18n.t('cli.deploy_public_missing')) unless Dir.exist?(PUBLIC_DIR)
 
 # An unconfigured target skips the upload rather than failing: install.md
 # promises that an unedited env.sh is enough to try everything locally,
@@ -239,12 +320,21 @@ unless DRY || BACKEND.configured?
   exit 0
 end
 
+# Asked before anything is written. A typo in the backend's extra switches
+# used to surface as a raw Shellwords backtrace from the middle of the run:
+# past every guard, with the baseline already on disk and the run recorded
+# as started and never finished, which is what feeds the "unfinished" streak
+# the header reports.
+if BACKEND.respond_to?(:problem) && (args_problem = BACKEND.problem)
+  abort "❌ #{args_problem}\n   #{I18n.t('cli.deploy_args_fix')}"
+end
+
 # Read before anything writes it, because the write below happens mid-run
 # and the header would otherwise report this run back to itself.
 STATE = load_state
 PREV = STATE['last_run'].is_a?(Hash) ? STATE['last_run'] : {}
 
-files = Dir.glob(File.join(PUBLIC_DIR, '**', '*'))
+files = PathGlob.under(PUBLIC_DIR, '**', '*')
             .select { |f| File.file?(f) }
             .map { |f| f.delete_prefix("#{PUBLIC_DIR}/") }
             .sort
@@ -253,7 +343,7 @@ all_files = files
 # The one case no percentage can express: with an empty manifest too,
 # `0 < 0 * 0.8` is false, so a build that produced nothing at all used to
 # sail through and (under --prune) take the live site with it.
-abort('❌ Stopped: public.nosync/ is empty -- run the build first (ruby build/build_blog.rb).') if all_files.empty?
+abort(I18n.t('cli.deploy_public_empty')) if all_files.empty?
 
 # The manifest is always loaded, even with --force: --force only forces
 # re-uploading everything, but the list of previously uploaded files is
@@ -290,7 +380,7 @@ if ONLY
   present = ONLY & all_files
   gone = (ONLY & stored.keys) - all_files
   unknown = ONLY - all_files - stored.keys
-  abort("❌ #{unknown.join(', ')}: not found in public.nosync/.") if present.empty? && gone.empty?
+  abort(I18n.t('cli.deploy_only_unknown', names: unknown.join(', '))) if present.empty? && gone.empty?
 
   files = present
 end
@@ -320,7 +410,7 @@ end
 hashes = {}
 files.each do |name|
   path = File.join(PUBLIC_DIR, name)
-  stat = stats[name] || abort("❌ #{name} disappeared from public.nosync/ mid-deploy -- run the build again.")
+  stat = stats[name] || abort(I18n.t('cli.deploy_file_vanished', name: name))
 
   prev = stored[name]
   # Fast path: both size and mtime match what was stored from the last
@@ -347,6 +437,25 @@ skipped = files.size - to_upload.size
 # there the list is the whole one even under --only.
 orphan_source = ONLY && !SNAPSHOT ? ONLY & stored.keys : stored.keys
 orphans = (orphan_source - all_files).sort
+
+# An "orphan" that is only the OLD SPELLING of a file the build still has --
+# IMG_2043.JPG against img_2043.jpg -- is not an orphan. On a target whose
+# filesystem folds case or unicode form, the upload lands in that very
+# entry, so deleting it takes the picture with it. This is measured against
+# the WHOLE build, not against what this run happens to upload: measured
+# against the upload list it only held for one run, and the next deploy
+# (which uploads nothing) deleted the file after all. The manifest loses
+# the old key too, or the same orphan is re-derived on every future run.
+built_folded = all_files.to_h { |name| [fold_deploy_name(name), true] }
+folded_away, orphans = orphans.partition { |name| built_folded[fold_deploy_name(name)] }
+# Out of BOTH: `manifest` is a copy taken before this line, so deleting
+# from `stored` alone left the old spelling in the file that gets written
+# -- for good, since the next run compares against a name the build no
+# longer produces and nothing ever takes it out.
+folded_away.each do |name|
+  stored.delete(name)
+  manifest.delete(name)
+end
 
 # --- what the guards measure against ------------------------------------
 #
@@ -413,19 +522,22 @@ end
 # Where the numbers in an abort came from. Without this the author reads
 # "5000 files were expected" and goes looking in the manifest, which may
 # not be what was compared at all.
-ref_source = BASE ? "the last accepted build (#{BASE['at']})" : 'the manifest (no accepted build recorded yet)'
+ref_source = BASE ? I18n.t('cli.deploy_ref_baseline', at: BASE['at']) : I18n.t('cli.deploy_ref_manifest')
 notices = []
 
-# A batch backend can only express deletion as "mirror the whole tree"
-# (rsync --delete, rclone sync), which under --only would mirror a
-# two-file transfer over the entire target -- so those backends refuse the
-# combination, and the named file stays live. That has to be said: the
-# alternative is dropping it from the manifest as though it had been
-# deleted, after which nothing on this side knows the target still serves
-# it and no later --prune can find it.
-if ONLY && !SNAPSHOT && orphans.any? && BACKEND.respond_to?(:sync)
-  notices << "⚠️  #{orphans.join(', ')}: no longer in the build, but #{BACKEND.label} cannot delete " \
-             'single files -- run ./scripts/deploy-web.sh --prune to take them off the target.'
+# This refusal was written when deletion on a batch backend meant "mirror
+# the whole tree" (rsync --delete, rclone sync), which under --only would
+# have mirrored a two-file transfer over the entire target. Since those
+# backends delete the orphans BY NAME, the reason is gone -- and the cost
+# of keeping the refusal was not theoretical: refresh-sidebar.sh runs
+# --only=comments.json every half hour, so a comments.json full of
+# rejected comments stayed publicly readable while the cron announced the
+# fact twice an hour and nothing ever took it down.
+#
+# --prune still has to be asked for; --only alone changes nothing. What is
+# fixed here is that asking for both now works instead of being refused.
+if ONLY && !SNAPSHOT && orphans.any? && BACKEND.respond_to?(:sync) && !BACKEND.respond_to?(:deletes_by_name?)
+  notices << I18n.t('cli.deploy_orphans_no_single_delete', names: orphans.join(', '), backend: BACKEND.label)
   orphans = []
 end
 
@@ -448,13 +560,9 @@ described = ->(list) { list.map { |(name, bytes)| "#{name} (#{FileSize.human(byt
 
 too_large = sized.call(shipped).select { |(_, bytes)| FileSize.classify(bytes) == :hard }
 if too_large.any?
-  abort(<<~MSG)
-    ❌ Stopped: #{too_large.size} file(s) are over the #{FileSize.human(FileSize::HARD_LIMIT)} per-file limit.
-    #{described.call(too_large).map { |line| "     #{line}" }.join("\n")}
-       One limit applies to every backend, so the site stays portable between them -- the strictest
-       supported target (git pages) refuses anything larger, and --force does not lift this: the
-       target would refuse the file on every run. Shrink it, or take it out of the post.
-  MSG
+  abort(I18n.t('cli.deploy_files_too_large', count: too_large.size,
+                                             limit: FileSize.human(FileSize::HARD_LIMIT),
+                                             list: described.call(too_large).map { |line| "     #{line}" }.join("\n")))
 end
 
 # Already on the target: refusing now would strand a site that accepted such
@@ -462,9 +570,8 @@ end
 # portability it costs is the actual news.
 stale_large = sized.call(all_files - shipped).select { |(_, bytes)| FileSize.classify(bytes) == :hard }
 if stale_large.any?
-  notices << "⚠️  #{described.call(stale_large).join(', ')} already on the target, over the " \
-             "#{FileSize.human(FileSize::HARD_LIMIT)} per-file limit -- this site can no longer be moved " \
-             'to a target that enforces it.'
+  notices << I18n.t('cli.deploy_stale_too_large', files: described.call(stale_large).join(', '),
+                                                  limit: FileSize.human(FileSize::HARD_LIMIT))
 end
 
 # Suppressed under --only so a 60 MB video doesn't post the same line into
@@ -473,9 +580,9 @@ unless ONLY
   soft_large = sized.call(shipped).select { |(_, bytes)| FileSize.classify(bytes) == :soft }
   if soft_large.any?
     shown = described.call(soft_large.first(5)).join(', ')
-    more = soft_large.size > 5 ? " and #{soft_large.size - 5} more" : ''
-    notices << "⚠️  Large file(s): #{shown}#{more} -- under the " \
-               "#{FileSize.human(FileSize::HARD_LIMIT)} limit, but every reader pays for those bytes."
+    more = soft_large.size > 5 ? I18n.t('cli.deploy_large_files_more', count: soft_large.size - 5) : ''
+    notices << I18n.t('cli.deploy_large_files', files: shown, more: more,
+                                                limit: FileSize.human(FileSize::HARD_LIMIT))
   end
 end
 
@@ -506,21 +613,17 @@ SHRINK_MIN_BYTES = 25_000_000
 # SNAPSHOT test, as the per-file size limit above.
 
 if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
-  abort(<<~MSG)
-    ❌ Stopped: public.nosync/ has #{build_files} files, but #{shrink_files} were expected from #{ref_source}.
-       That's a #{(100 - (build_files * 100.0 / shrink_files)).round}% drop -- looks like a broken build.
-       Check the build output. If the drop is expected (you deleted a lot of posts), run again with --force.
-  MSG
+  abort(I18n.t('cli.deploy_guard_shrink_files', have: build_files, expected: shrink_files,
+                                                source: ref_source,
+                                                percent: (100 - (build_files * 100.0 / shrink_files)).round))
 end
 
 # What the counts cannot see: the same number of files, each of them nearly
 # empty. A broken template or a lost media prefix does exactly that.
 if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
-  abort(<<~MSG)
-    ❌ Stopped: public.nosync/ holds #{FileSize.human(build_bytes)}, but #{FileSize.human(shrink_bytes)} were expected from #{ref_source}.
-       The file count looks reasonable, so this is content going missing inside the pages rather than pages going missing.
-       Check the build output. If the drop is expected, run again with --force.
-  MSG
+  abort(I18n.t('cli.deploy_guard_shrink_bytes', have: FileSize.human(build_bytes),
+                                                expected: FileSize.human(shrink_bytes),
+                                                source: ref_source))
 end
 
 # Typically duplicate posts (build_blog.rb has its own safeguard against a
@@ -528,11 +631,9 @@ end
 # badly merged import, or an accidentally copied tree. Normal growth is a
 # handful of files per published post.
 if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
-  abort(<<~MSG)
-    ❌ Stopped: public.nosync/ has #{build_files} files, only #{growth_files} were expected from #{ref_source}.
-       That's a #{((build_files * 100.0 / growth_files) - 100).round}% increase -- looks like a duplicated or broken build.
-       Check the build output. If the increase is expected (a bulk import/migration), run again with --force.
-  MSG
+  abort(I18n.t('cli.deploy_guard_growth_files', have: build_files, expected: growth_files,
+                                                source: ref_source,
+                                                percent: ((build_files * 100.0 / growth_files) - 100).round))
 end
 
 # A notice, not an abort: adding a video IS authoring, not a malfunction,
@@ -541,49 +642,46 @@ end
 # just recreate the dead end this whole change removes, in the flows that
 # cannot pass --force.
 if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, growth_bytes, BYTES_GROWTH_NOTICE, 0, :up)
-  notices << "⚠️  The build grew from #{FileSize.human(growth_bytes)} to #{FileSize.human(build_bytes)} " \
-             "since #{ref_source} -- expected if you added media, worth a look if you didn't."
+  notices << I18n.t('cli.deploy_growth_notice', was: FileSize.human(growth_bytes),
+                                                now: FileSize.human(build_bytes), source: ref_source)
 end
 
 log('')
-log("Deploy web -> #{BACKEND.label}: #{BACKEND.target}#{DRY ? '  [DRY-RUN]' : ''}")
+log("#{I18n.t('cli.deploy_header', backend: BACKEND.label, target: BACKEND.target)}#{DRY ? '  [DRY-RUN]' : ''}")
 # What the marker used to switch off is now simply reported. The previous
 # run's outcome is the diagnosis the old dead end never gave: a deploy that
 # keeps failing says so, every time, instead of quietly standing the guards
 # down and looking healthy.
 if PREV['outcome'] && PREV['outcome'] != 'ok'
-  log("  ℹ️  Previous deploy (#{PREV['at']}, #{PREV['backend']}) ended as '#{PREV['outcome']}': " \
-      "uploaded #{PREV['uploaded'].to_i}, failed #{PREV['failed'].to_i}. " \
-      'This run re-diffs against the manifest; the guards apply as normal.')
+  log("  #{I18n.t('cli.deploy_prev_outcome', at: PREV['at'], backend: PREV['backend'],
+                                             outcome: PREV['outcome'], uploaded: PREV['uploaded'].to_i,
+                                             failed: PREV['failed'].to_i)}")
 end
 # Deliberately a warning and not an abort, however high the streak gets:
 # stopping after N attempts would rebuild the dead end from the other side.
 if PREV['unfinished_streak'].to_i >= 3
-  log("  ⚠️  #{PREV['unfinished_streak']} deploys in a row have not finished -- something is being refused every " \
-      'time (an oversized file, credentials, the target). The guards are on; the failures below say what.')
+  log("  #{I18n.t('cli.deploy_unfinished_streak', count: PREV['unfinished_streak'])}")
 end
 notices.each { |n| log("  #{n}") }
 # Keyed on the reference actually in hand, not on BASE: with no baseline
 # but a manifest the migration above trusts, the growth guard DOES run --
 # saying otherwise would be a comforting lie about which check is live.
-if growth_files.zero?
-  log('  ℹ️  Nothing to measure growth against yet -- that guard stands down for this one run ' \
-      '(the drop guard still measures against the manifest).')
-end
-log("  #{files.size} file(s) selected, #{FileSize.human(build_bytes)} in the build, " \
-    "#{to_upload.size} new/changed, #{skipped} unchanged (skipped)")
+log("  #{I18n.t('cli.deploy_no_growth_reference')}") if growth_files.zero?
+log("  #{I18n.t('cli.deploy_selection', files: files.size, bytes: FileSize.human(build_bytes),
+                                        changed: to_upload.size, unchanged: skipped)}")
 if orphans.any?
-  why = if PRUNE then ' (--prune)'
-        elsif SNAPSHOT then ' (snapshot deploy)'
-        else ' (named in --only, no longer in the build)'
+  why = if PRUNE then I18n.t('cli.deploy_orphans_why_prune')
+        elsif SNAPSHOT then I18n.t('cli.deploy_orphans_why_snapshot')
+        else I18n.t('cli.deploy_orphans_why_only')
         end
-  log(PRUNES ? "  #{orphans.size} orphan(s) to delete#{why}" \
-             : "  ⚠️  #{orphans.size} orphaned file(s) on the target -- delete them with --prune")
+  log(PRUNES ? "  #{I18n.t('cli.deploy_orphans_delete', count: orphans.size, why: why)}" \
+             : "  #{I18n.t('cli.deploy_orphans_kept', count: orphans.size)}")
 end
 
 if DRY
   to_upload.each { |name| log("  [dry] #{name} (#{File.size(File.join(PUBLIC_DIR, name))} B)") }
-  orphans.each { |name| log("  [dry] #{PRUNES ? 'delete' : 'orphan'} #{name}") }
+  dry_word = I18n.t(PRUNES ? 'cli.deploy_dry_delete' : 'cli.deploy_dry_orphan')
+  orphans.each { |name| log("  [dry] #{dry_word} #{name}") }
   exit 0
 end
 
@@ -635,10 +733,29 @@ begin
         orphans.each { |name| manifest.delete(name) unless kept.include?(name) }
         deleted = orphans.size - kept.size
         failed += kept.size
-        kept.each { |name| log("  ❌ delete failed, kept in manifest: #{name}") }
+        kept.each { |name| log("  #{I18n.t('cli.deploy_delete_failed_kept', name: name)}") }
       end
     else
       failed = 1
+      # A batch backend that can say WHICH files landed before it stopped
+      # (sftp) has them written down, exactly as failed_orphans are: an
+      # upload interrupted at file 48 of 159 used to record nothing, so the
+      # next run began again from the first one -- and on a slow line a
+      # deploy that always restarts is a deploy that never finishes.
+      landed = BACKEND.respond_to?(:uploaded) ? BACKEND.uploaded : []
+      landed.each do |name|
+        next unless hashes[name]
+
+        manifest[name] = { 'hash' => hashes[name], 'size' => stats[name]['size'],
+                           'mtime' => stats[name]['mtime'] }
+      end
+      ok = landed.size
+      # What did NOT land, so uploaded + failed + unchanged adds up to the
+      # number of files the run set out with. "failed 1" for a batch of
+      # twenty-nine was a count of failed BATCHES, printed in a line that
+      # says files.
+      failed = to_upload.size - landed.size
+      log("  #{I18n.t('cli.deploy_partial_landed', count: landed.size)}") if landed.any?
     end
   else
     BACKEND.session do |session|
@@ -695,12 +812,13 @@ ensure
     rescue StandardError => e
       # Bookkeeping must not become the error the author sees: without this
       # a dropped SSH session would surface as a JSON write failure.
-      warn "⚠️  Could not record the deploy outcome in #{BASELINE_PATH}: #{e.class}: #{e.message.lines.first.to_s.strip}"
+      warn I18n.t('cli.deploy_outcome_unrecorded', path: BASELINE_PATH,
+                                                   error: "#{e.class}: #{e.message.lines.first.to_s.strip}")
     end
   end
 end
 
 log('')
-log("Done: uploaded #{ok}, deleted #{deleted}, failed #{failed}, unchanged #{skipped}")
+log(I18n.t('cli.deploy_done', uploaded: ok, deleted: deleted, failed: failed, unchanged: skipped))
 log('')
 exit(failed.zero? ? 0 : 1)

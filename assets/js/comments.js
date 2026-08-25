@@ -22,9 +22,17 @@
   // Both paths render the same markup, so everything below the fetch is
   // shared.
 
+  // The same three patterns as lib/post_stats.rb, in the same order, and
+  // they have to stay identical character for character -- they are one
+  // rule written in two languages and they would drift in silence.
+  //
+  // Order is the fix: GoToSocial writes /@user/statuses/<ULID>, so the
+  // loose Mastodon pattern must come LAST or it captures the word
+  // "statuses" as the id.
   function parseTootUrl(url) {
-    var m = url.match(/^https?:\/\/([^/]+)\/@[^/]+\/(\d+)/) ||
-            url.match(/^https?:\/\/([^/]+)\/users\/[^/]+\/statuses\/(\d+)/);
+    var m = url.match(/^https?:\/\/([^/]+)\/@[^/]+\/statuses\/([A-Za-z0-9]+)/) ||
+            url.match(/^https?:\/\/([^/]+)\/users\/[^/]+\/statuses\/([A-Za-z0-9]+)/) ||
+            url.match(/^https?:\/\/([^/]+)\/@[^/]+\/([A-Za-z0-9]+)/);
     return m ? { instance: m[1], id: m[2] } : null;
   }
 
@@ -177,9 +185,17 @@
 
   function loadMastodonThread(container, tootUrl) {
     var parsed = parseTootUrl(tootUrl);
-    if (!parsed) return;
-
     var replyLink = replyLinkHtml(tootUrl, i18n.reply_on_mastodon);
+    // An address in a shape this cannot read -- a typo in the config, a
+    // server whose permalinks look different again -- used to leave the
+    // container completely empty: no comments, no explanation, and not
+    // even the way to answer the post. The same thing a failed fetch
+    // leaves behind is left here too.
+    if (!parsed) {
+      container.innerHTML = replyLink;
+      return;
+    }
+
     var apiUrl = 'https://' + parsed.instance + '/api/v1/statuses/' + parsed.id + '/context';
 
     fetch(apiUrl)

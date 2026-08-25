@@ -13,13 +13,19 @@
   var FOLD_MAP = {
     'ß': 'ss', 'æ': 'ae', 'œ': 'oe', 'ø': 'o', 'đ': 'd',
     'ð': 'd', 'þ': 'th', 'ł': 'l', 'ħ': 'h', 'ŧ': 't',
-    'ŋ': 'n', 'ı': 'i'
+    'ŋ': 'n', 'ı': 'i',
+    // Same table as lib/slug.rb, and it has to stay the same: a final
+    // sigma is the same letter as the one in the middle of a word.
+    'ς': 'σ'
   };
 
   function fold(s) {
     return (s || '').normalize('NFKD').replace(/\p{Mn}/gu, '').toLowerCase()
-      .replace(/[ßæœøđðþłħŧŋı]/g, function (ch) { return FOLD_MAP[ch]; })
-      .replace(/\s+/g, ' ').trim();
+      .replace(/[ßæœøđðþłħŧŋıς]/g, function (ch) { return FOLD_MAP[ch]; })
+      // ASCII whitespace only, the way Ruby's \s is: a zero-width no-break
+      // space or a line separator inside a title would otherwise collapse
+      // here and not there, and the two folds would disagree again.
+      .replace(/[ \t\n\r\f\v]+/g, ' ').trim();
   }
 
   // Text in "quotes" (including typographic ones) = one phrase, otherwise a

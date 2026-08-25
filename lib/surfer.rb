@@ -148,7 +148,16 @@ module_function
     end
 
     def api_uri(remote, extra_params = {})
-      remote_enc = remote.split('/').map { |s| URI.encode_www_form_component(s) }.join('/')
+      # Path segments, not form fields. encode_www_form_component writes a
+      # space as "+", which is form syntax: in a path a "+" is a literal
+      # plus, so a banner called "muj banner.png" was uploaded as
+      # "muj+banner.png" while every page linked to "muj%20banner.png" --
+      # and the delete that should have taken it down named the third
+      # spelling. One helper builds both requests, so both were wrong in
+      # the same direction and nothing ever noticed.
+      remote_enc = remote.split('/')
+                         .map { |s| URI.encode_www_form_component(s).gsub('+', '%20') }
+                         .join('/')
       params = { 'access_token' => ENV['SURFER_TOKEN'].to_s }.merge(extra_params)
       URI("#{ENV['SURFER_URL'].to_s.chomp('/')}/api/files/#{remote_enc}?#{URI.encode_www_form(params)}")
     end
