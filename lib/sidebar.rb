@@ -61,9 +61,16 @@ module Sidebar
   end
 
   def write_all(public_dir, previous = {})
-    # Nothing fetched, nothing written -- and nothing reported as an
-    # outage either, since not asking is not a failure.
-    return FEEDS.to_h { |name, _| [name, false] } unless enabled?
+    # Nothing fetched, nothing written -- and nothing REPORTED either, since
+    # not asking is not a failure. It used to return false for every feed,
+    # and false is already this module's marker for something else entirely:
+    # summary turns it into "emptied (config cannot work)". An author who
+    # switched the column off while keeping their widget settings therefore
+    # got a half-hourly cron mail asserting their config was broken, when it
+    # was fine and nothing had been emptied -- the exact opposite of what
+    # the switch was added for. An empty result says nothing at all, which
+    # is what "not asked" means.
+    return {} unless enabled?
 
     FEEDS.to_h do |name, fetcher|
       path = File.join(public_dir, name)

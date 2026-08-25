@@ -3903,7 +3903,12 @@ def restore_media(slug, dirs)
     # The same rule as everywhere else in this file: never guess between
     # two years, show both and ask.
     dirs.each_with_index do |candidate, i|
-      count = Dir.children(candidate).reject { |f| f.start_with?('.') }.size
+      # SYSTEM_CRUFT, the same filter the restore itself uses. This is the
+      # number a person reads while choosing which trashed year to bring
+      # back, so counting by a rule the restore no longer follows offered
+      # "(0 file(s))" for a directory holding two pictures -- and then
+      # restored both of them.
+      count = Dir.children(candidate).reject { |f| SYSTEM_CRUFT.match?(f) }.size
       puts format('%2d.  %s  (%s)', i + 1, candidate.sub("#{ROOT}/", ''),
                   t('cli.restore_media_count', count: count))
     end
@@ -4571,7 +4576,11 @@ def trash_summary
     next if File.exist?(File.join(File.dirname(dir), 'post.json'))
     next if posts.any? { |p| p[:slug] == slug }
 
-    count = Dir.children(dir).reject { |f| f.start_with?('.') }.size
+    # Same filter, and here it decides more than a number: a directory
+    # whose files all begin with a dot counted as zero and was dropped
+    # from the picker entirely -- hidden from the only undo the engine
+    # has, rather than merely mislabelled.
+    count = Dir.children(dir).reject { |f| SYSTEM_CRUFT.match?(f) }.size
     next if count.zero?
 
     # A date Time.parse can read: the row that draws this list parses it,

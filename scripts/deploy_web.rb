@@ -426,6 +426,26 @@ end
 to_upload = ONLY || FORCE ? files : files.select { |name| manifest_hash(manifest[name]) != hashes[name] }
 skipped = files.size - to_upload.size
 
+# A file whose CONTENT still matches what was uploaded, but whose size or
+# mtime has moved since -- a rebuild that rewrote it byte for byte, a
+# re-copy, a restored backup -- kept its old size and mtime here, because
+# only an upload ever refreshed them. The fast path above then missed on
+# that file on every deploy from then on and read it in full to hash it,
+# for ever, with nothing to show for it: on an archive with gigabytes of
+# media that is minutes per deploy. One sweep that touched the whole tree
+# was enough to disarm it permanently.
+#
+# Safe to record even if the upload of other files fails afterwards: the
+# hash is unchanged and the content matches it, so this is simply where
+# that content now sits.
+(files - to_upload).each do |name|
+  entry = manifest[name]
+  next unless entry.is_a?(Hash)
+
+  entry['size'] = stats[name]['size']
+  entry['mtime'] = stats[name]['mtime']
+end
+
 # Orphans = uploaded at some point, but no longer in public.nosync/ (a
 # deleted post, renumbered pages). Under --only the scan is narrowed to
 # the named files, and that narrowing is the whole safety of it: a run

@@ -1689,9 +1689,7 @@ end
 # The first link block that has a title lends it to the post. The block then
 # renders without it (see render_block), or the page would say it twice.
 def link_title_block(post)
-  return nil if post['title']
-
-  (post['content'] || []).find { |b| b['type'] == 'link' && !b['title'].to_s.empty? }
+  PostText.link_title_block(post)
 end
 
 def post_title_for(post)
@@ -2253,7 +2251,18 @@ def emit(path, content)
   # bytes matched and the build had nothing else to look at.
   if File.exist?(path)
     stat = File.stat(path)
-    return if File.binread(path) == bytes && world_readable?(path, stat)
+    if File.binread(path) == bytes
+      # The bytes are already right, so there is nothing to write and only
+      # the mode can be wrong -- and make_readable is both the thing that
+      # fixes it and the thing that forgives a file we do not own. Falling
+      # through to binwrite here performed an UNRESCUED write purely to
+      # carry a chmod, so a file we could not chmod (a foreign owner, uchg)
+      # killed the build mid-loop with an Errno backtrace: no sitemap, no
+      # sidebar, no search index, no prune, exit 1 -- on a rebuild that had
+      # nothing to write in the first place.
+      make_readable(path) unless world_readable?(path, stat)
+      return
+    end
   end
 
   File.binwrite(path, bytes)
@@ -2519,7 +2528,12 @@ end
 # another post. Without a tiebreaker their relative order shifts between
 # builds, which silently changes the contents of dozens of pages and forces
 # a content-hash-based deploy to re-upload them even though nothing was edited.
-posts.sort_by! { |p| [p['date'], p['slug']] }
+# By the INSTANT, not by the stored string. A lexical compare puts a post
+# stored as 2026-06-08T06:00:00Z after one stored as
+# 2026-06-08T07:00:00+02:00, though the second happened first -- and an
+# archive that mixes offsets is every archive that was imported, since
+# the importers store UTC and the CLI writes the site's own offset.
+posts.sort_by! { |p| [post_time(p), p['slug']] }
 posts.reverse!
 
 # From here on, `posts` means only published posts -- listings, tags, types,
@@ -3037,13 +3051,31 @@ end
 # not changed since new year's eve 2014 and never will, so a deploy that
 # compares content has nothing to upload for it.
 ARCHIVE_PATH = '/archive/'
+# Longer than any blog, shorter than a typo. 200 years of empty rows is
+# already nonsense to look at; 18,000 is a page nobody can open.
+ARCHIVE_SPAN_MAX = 200
 archive_by_year = posts.group_by { |post| post_time(post).year }
 
 unless archive_by_year.empty?
   # Every year between the first and the last, including the ones with
   # nothing in them -- sean.cz has a silent 2025 between 2024 and 2026, and
   # a map that skipped it would draw an axis that lies about the gap.
-  archive_span = archive_by_year.keys.max.downto(archive_by_year.keys.min).to_a
+  #
+  # ...up to a point. The span was unbounded, and one mistyped year is all
+  # it takes: 20226 for 2026 parses, gives the post a real address, and
+  # draws 18,201 rows -- a 12.8 MB page that hangs a browser and that
+  # deploy then uploads, while the build's summary says "posts: 2" and both
+  # check and doctor call the archive sound. Past the bound the map falls
+  # back to the years that actually hold something, so a typo costs the
+  # empty-year axis rather than the whole page, and it is said out loud.
+  span_from = archive_by_year.keys.min
+  span_to = archive_by_year.keys.max
+  archive_span = if span_to - span_from >= ARCHIVE_SPAN_MAX
+                   warn t('build.archive_span_absurd', from: span_from, to: span_to)
+                   archive_by_year.keys.sort.reverse
+                 else
+                   span_to.downto(span_from).to_a
+                 end
 
   month_cells = lambda do |year, by_month|
     (1..12).map do |m|
@@ -3097,7 +3129,9 @@ unless archive_by_year.empty?
       # of the three shipped languages spell months with digits anyway, and
       # spelling them out would mean thirty-six new translations for the
       # one language that does not.
-      lines = in_month.sort_by { |post| [post['date'], post['slug']] }.map do |post|
+      # Its own copy of the key above, and it has to say the same thing:
+      # the year page's stated contract is date order inside the month.
+      lines = in_month.sort_by { |post| [post_time(post), post['slug']] }.map do |post|
         %(<li><time datetime="#{h(post_time(post).strftime('%Y-%m-%d'))}">) +
           %(#{post_display_time(post).day}.</time> ) +
           %(<a href="#{h(post_path(post))}">#{h(post_title_for(post))}</a></li>)

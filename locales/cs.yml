@@ -46,6 +46,7 @@ build:
   draft_no_token: "⚠️  Draft „%{slug}“ nemá draft_token — náhled by byl na uhodnutelné adrese, takže se nestaví. Ulož ho znovu přes ./blog.sh edit."
   pinned_more_than_one: "⚠️  Připnutý je víc než jeden post; použije se ten nejnovější (%{slug})."
   tag_too_long: "⚠️  Štítek „%{name}…“ je na adresu výpisové stránky moc dlouhý — na svých postech se ukazuje, ale stránka /tag/ se pro něj nestaví."
+  archive_span_absurd: "⚠️  Archiv sahá od roku %{from} do %{to} — to skoro jistě není datum, ale překlep. Mapa archivu proto ukáže jen roky, ve kterých něco je; oprav to datum a vrátí se i prázdné roky."
   former_slug_unusable: "⚠️  %{slug}: nepoužitelná položka former_slugs %{entry} — čeká se tvar „rok/slug“."
   former_slug_taken: "⚠️  %{slug}: přesměrování z %{former} přeskočeno — ta adresa je už obsazená (živá stránka, nebo přesměrování dřívějšího postu)."
   redirect_from_unusable: "⚠️  %{slug}: nepoužitelná položka redirect_from %{entry} — čeká se cesta od kořene webu, třeba „/stary-post/“."

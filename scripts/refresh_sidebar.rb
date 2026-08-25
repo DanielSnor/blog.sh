@@ -38,7 +38,11 @@ RunLock.acquire!(ROOT, label: 'sidebar', busy_exit: 3)
 
 abort('❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb).') unless Dir.exist?(PUBLIC_DIR)
 
-puts Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))
+# Printed only when there is something to say. A switched-off sidebar
+# returns nothing, and this line runs under cron, where every line is
+# mail: a blank one every half hour is still a half-hourly mail.
+sidebar_line = Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))
+puts sidebar_line unless sidebar_line.strip.empty?
 
 # Stats for tooted posts are only fetched here, not on every build.
 #

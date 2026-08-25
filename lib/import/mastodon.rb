@@ -142,8 +142,14 @@ module Import
                else 'image'
                end
         block = { 'type' => kind, 'media' => [entry] }
-        alt = presence(att['name'])
-        block['alt_text'] = alt if alt
+        # alt_text belongs to an image and to nothing else: the build reads
+        # it only in the image branch and PostText.plain indexes it only
+        # there, so a description the author wrote on a VIDEO was written
+        # into the JSON and then existed nowhere a reader or the search box
+        # could reach it. A video's human text is `caption` -- which is
+        # what Facebook, Threads and Ghost have always written.
+        text = presence(att['name'])
+        block[kind == 'image' ? 'alt_text' : 'caption'] = text if text
         block
       end
     end

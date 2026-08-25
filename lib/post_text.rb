@@ -63,6 +63,21 @@ module PostText
   # begins, and this is the only place that decides.
   #
   # Returns nil for a post that names itself -- there is no cut to make.
+  # The first link block carrying a title, on a post that has none of its
+  # own. The build lends that title to the post as its <h1>, so it is the
+  # post's name -- and the announcement, which had its own idea (none at
+  # all), went out as a bare address while the page it pointed at had a
+  # real headline and a real description. Kept here rather than in the
+  # build because both need it and neither should own it.
+  def link_title_block(post)
+    return nil unless post.is_a?(Hash)
+    return nil if post['title']
+
+    Array(post['content']).find do |b|
+      b.is_a?(Hash) && b['type'] == 'link' && !b['title'].to_s.empty?
+    end
+  end
+
   # The text of a run of blocks, as one line.
   def joined_text(blocks)
     Array(blocks).select { |b| b.is_a?(Hash) && b['type'] == 'text' }

@@ -318,18 +318,45 @@ module Publishing
   # published the post, swallowed the failure, exited 0, and left no trace
   # on disk that an announcement was ever owed. Nothing retried it, and
   # nobody found out.
+  # What an announcement says about a post, decided in one place because it
+  # is a decision rather than a formatting detail -- and because it was
+  # wrong, quietly, for a whole class of post.
+  #
+  # A post that never named itself is named from its own opening, and the
+  # preview then has to pick up where that name stopped, or the
+  # announcement says the same sentence twice: once as the headline and
+  # once again underneath. So the blocks handed on are the REST of the
+  # text, not the whole of it. They add back up -- nothing between the two
+  # is dropped, including the short word the name may have shed.
+  #
+  # And a post whose content is a LINK block -- what the feed and Ghost
+  # importers produce -- has neither a title of its own nor text to be
+  # named from, so this used to hand on nothing: the announcement went out
+  # as the address and the hashtags and not one word more, while the page
+  # it points at renders the link's title as its heading and the link's
+  # description underneath. The one action that cannot be taken back was
+  # the one saying least.
+  def announcement_parts(post)
+    name, rest = PostText.name_and_rest(post)
+    link = PostText.link_title_block(post)
+    link_name = link && link['title'].to_s.strip
+    title = post['title'] || name || (link_name unless link_name.to_s.empty?)
+    blocks = if name
+               [{ 'type' => 'text', 'text' => rest }]
+             elsif link && !link['description'].to_s.strip.empty?
+               # The build renders a lent title without repeating it and
+               # leaves the description; the announcement says the same.
+               [{ 'type' => 'text', 'text' => link['description'].to_s }]
+             else
+               post['content']
+             end
+    [title, blocks]
+  end
+
   def announce(post, year:)
     slug = post['slug']
     tags = post['tags'] || []
-    # A post that never named itself is named from its own opening -- and
-    # the preview then has to pick up where that name stopped, or the
-    # announcement says the same sentence twice: once as the headline and
-    # once again underneath. So the blocks handed on are the REST of the
-    # text, not the whole of it. They add back up: nothing between the two
-    # is dropped, including the short word the name may have shed.
-    name, rest = PostText.name_and_rest(post)
-    title = post['title'] || name
-    blocks = name ? [{ 'type' => 'text', 'text' => rest }] : post['content']
+    title, blocks = announcement_parts(post)
 
     case SiteConfig.comment_network
     when :mastodon

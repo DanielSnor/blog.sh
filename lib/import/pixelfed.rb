@@ -102,9 +102,12 @@ module Import
         entry = { 'url' => filename }
         entry['width'] = original['width'] if original['width']
         entry['height'] = original['height'] if original['height']
-        block = { 'type' => att['type'].to_s == 'video' ? 'video' : 'image', 'media' => [entry] }
-        alt = att['description'].to_s.strip
-        block['alt_text'] = alt unless alt.empty?
+        kind = att['type'].to_s == 'video' ? 'video' : 'image'
+        block = { 'type' => kind, 'media' => [entry] }
+        # See mastodon.rb: alt_text is an image field, and a video's
+        # description put there is text nothing renders and nothing indexes.
+        text = att['description'].to_s.strip
+        block[kind == 'image' ? 'alt_text' : 'caption'] = text unless text.empty?
         block
       end
     end

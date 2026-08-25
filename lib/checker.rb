@@ -362,10 +362,19 @@ module Checker
     File.join(File.dirname(path), "#{m[1]}#{m[2]}")
   end
 
+  # A String, and then a parseable one. The `.to_s` used to do both jobs and
+  # hid the first: a post file whose date is a JSON NUMBER -- 20260608
+  # rather than "2026-06-08", which is what a hand-edited or externally
+  # generated file gets -- parsed happily here and was blessed, while the
+  # build calls Time.parse(post['date']) with no coercion and dies on it.
+  # check said "the archive is sound" and exited 0, the very next build
+  # exited 1 with a TypeError naming no post at all. check_unbuildable
+  # exists precisely so that cannot happen.
   def parseable_date?(value)
-    return false if value.to_s.strip.empty?
+    return false unless value.is_a?(String)
+    return false if value.strip.empty?
 
-    Time.parse(value.to_s)
+    Time.parse(value)
     true
   rescue StandardError
     false
