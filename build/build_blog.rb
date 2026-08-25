@@ -1407,8 +1407,14 @@ def post_description(post)
   # there. Otherwise the card reads the same sentence twice -- which did not
   # happen while the title was a slug, and would have arrived with this
   # release as a new defect rather than a fix.
+  # ...but only while there IS something after the name. A post short enough
+  # to be named in full leaves nothing behind it, and taking that emptiness
+  # at face value cost 286 posts on one real archive their own description
+  # and gave them the site's instead -- a card that stopped saying what the
+  # post is and started saying what the site is. Repeating the text under
+  # the title is the lesser of the two: it still describes this post.
   name, rest = PostText.name_and_rest(post)
-  text = if name
+  text = if name && !rest.to_s.strip.empty?
            rest
          else
            teaser = PostText.teaser_blocks(post['content'])
@@ -2858,12 +2864,16 @@ def search_index_entry(post)
   # after it. `folded` is untouched on purpose -- that is what queries are
   # matched against, and an index that stopped at the title would quietly
   # stop finding every word below it.
+  # Same rule as the description, and for the same reason: a post named in
+  # full has nothing after the name, and an empty excerpt in a result list
+  # is a row that says its title twice and nothing else.
   name, rest = PostText.name_and_rest(post)
+  after = name && !rest.to_s.strip.empty? ? rest : text
   {
     url: post_path(post),
     title: post['title'] || name,
     date: post_display_time(post).strftime(t('date_format')),
-    excerpt: truncate_excerpt(name ? rest : text),
+    excerpt: truncate_excerpt(after),
     folded: PostText.searchable(post, text)
   }
 end
