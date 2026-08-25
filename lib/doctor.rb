@@ -705,6 +705,13 @@ module Doctor
     !url.start_with?('mailto:', 'tel:')
   end
 
+  # Where the toots widget would ask, given the config as written -- the
+  # same fallback the fetcher uses (lib/mastodon_fetcher.rb), so doctor and
+  # the fetcher cannot disagree about whether a site has an instance.
+  def instance_for_toots(data, conf)
+    (conf['instance'] || dig(data, 'mastodon', 'instance')).to_s.strip
+  end
+
   # Each widget needs the one value that identifies what it should show.
   # Without it the refresh writes an empty file and the sidebar silently
   # shows nothing -- a failure with no symptom anywhere else.
@@ -772,6 +779,20 @@ module Doctor
         # as an id (Mastodon numbers, GoToSocial ULIDs, Pleroma flakes)
         # lives in lib/account_id.rb, shared with the style wizard.
         findings << error(t('widget_account_id', value: conf['account_id'].inspect), t('widget_account_id_fix'))
+      end
+
+      # Asked separately rather than as another branch above: WHO and WHERE
+      # are two different mistakes and a config can make both at once. As an
+      # elsif this hid the @handle error behind the missing instance, which
+      # is a report that fixes one thing and then surprises you with the
+      # next -- and the reason a test caught it here is that it had one.
+      if name == 'toots' && instance_for_toots(data, conf).empty?
+        # The account id alone does not say WHERE to ask. The fetcher takes
+        # widgets.toots.instance and falls back to mastodon.instance, so a
+        # site with neither has a widget that can never fill itself -- and
+        # the only symptom is an empty card, which looks exactly like an
+        # author who has not posted lately.
+        findings << error(t('widget_toots_instance'), t('widget_toots_instance_fix'))
       end
 
       # The commits widget's own two settings, checked by the same rules the
@@ -1031,6 +1052,24 @@ module Doctor
     end
     src = dig(data, 'analytics', 'src')
     urls[t('analytics_label')] = src if src
+
+    # The commits widget identifies itself by instance + username rather
+    # than by a feed_url, so the loop above never saw it -- the one widget
+    # 1.4 added was the one --online did not reach. Its address is built the
+    # way the fetcher builds it (lib/commits_fetcher.rb), not by a second
+    # copy of the rule, and only for a forge: GitHub is the default and
+    # answers whether or not the username exists, so asking it proves
+    # nothing a config check has not already proven.
+    commits = dig(data, 'widgets', 'commits')
+    if commits.is_a?(Hash)
+      instance = commits['instance'].to_s.strip
+      user = ForgeAddress.username(commits['username'])
+      base = instance.empty? ? nil : ForgeAddress.base(instance)
+      if base && user
+        urls[t('widget_label', name: 'commits')] =
+          "#{base}/api/v1/users/#{user}/activities/feeds?only-performed-by=true&limit=1"
+      end
+    end
 
     urls.each do |label, url|
       FeedHttp.get(url)

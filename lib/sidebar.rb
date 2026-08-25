@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
+require_relative 'site_config'
 require_relative 'pixelfed_fetcher'
 require_relative 'mastodon_fetcher'
 require_relative 'commits_fetcher'
@@ -48,7 +49,21 @@ module Sidebar
   # always means a network error, not that the account has no posts -- and
   # publishing an empty widget because of a one-minute outage is worse than
   # briefly stale data.
+  # Whether the site draws a sidebar at all. Read here rather than only in
+  # the build, because this is the half that leaves the machine: a site with
+  # `layout: sidebar: false` was still asking Mastodon, Pixelfed, an RSS
+  # host and a forge for data on every cron tick, and then writing it into
+  # files no page would ever include. Wasteful, but mainly it is four
+  # third-party contacts the author had already switched off.
+  def enabled?
+    SiteConfig.get('layout', 'sidebar', default: true) != false
+  end
+
   def write_all(public_dir, previous = {})
+    # Nothing fetched, nothing written -- and nothing reported as an
+    # outage either, since not asking is not a failure.
+    return FEEDS.to_h { |name, _| [name, false] } unless enabled?
+
     FEEDS.to_h do |name, fetcher|
       path = File.join(public_dir, name)
       begin

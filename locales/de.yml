@@ -435,6 +435,7 @@ cli:
   restore_media_count: "%{count} Datei(en)"
   restore_media_pick: "Welches? (eine Zahl, alles andere bricht ab): "
   restored_media: "%{count} Datei(en) nach %{path} zurückgelegt."
+  restore_media_left: "Im Papierkorb geblieben: %{files}"
   restore_media_kept: "Im Papierkorb geblieben, weil eine Datei dieses Namens jetzt im Archiv liegt: %{files}"
   restored_label: "Wiederhergestellt: %{path}"
 
@@ -945,6 +946,8 @@ doctor:
   widget_shape_fix: "Ein Widget ist eine Sammlung von Einstellungen unter seinem Namen -- heading und was die Karte sonst braucht. Eine Liste oder ein blanker Wert wird von nichts gezeichnet."
   widget_incomplete: "Dem Widget %{name} fehlt %{key}, also kann es nie etwas anzeigen."
   widget_account_id: "Das Toots-Widget will die API-ID des Kontos und hat %{value}."
+  widget_toots_instance: "Das Toots-Widget hat keine Instanz -- weder widgets.toots.instance noch mastodon.instance."
+  widget_toots_instance_fix: "Trage mastodon.instance ein (z. B. mastodon.social) oder widgets.toots.instance, wenn das Widget ein anderes Konto zeigen soll."
   widget_account_id_fix: "Nicht den @Namen -- die ID: auf Mastodon eine Nummer, auf GoToSocial eine 26-stellige ULID. Öffne https://instanz/api/v1/accounts/lookup?acct=du und übernimm \"id\"; ./setup.sh sucht sie selbst heraus."
   widget_username: "`username` des Commits-Widgets ist kein Benutzername: %{value}."
   widget_username_fix: "Nur der Kontoname, wie die Forge ihn schreibt -- Buchstaben, Ziffern, Punkt, Bindestrich, Unterstrich. Kein @Handle, keine Profil-URL."

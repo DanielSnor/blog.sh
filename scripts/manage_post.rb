@@ -3879,6 +3879,11 @@ def trashed_media_dirs(slug)
   PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) }.sort
 end
 
+# Files a filesystem leaves behind rather than files anybody wrote. Kept out
+# of a restore because returning them is noise, and kept out of the "still
+# in the trash" warning for the same reason.
+SYSTEM_CRUFT = /\A(?:\.DS_Store\z|\._|Thumbs\.db\z|desktop\.ini\z)/i
+
 def restore_media(slug, dirs)
   dir = dirs.first
   if dirs.size > 1
@@ -3901,7 +3906,14 @@ def restore_media(slug, dirs)
   FileUtils.mkdir_p(target)
   returned = []
   kept = []
-  Dir.children(dir).reject { |f| f.start_with?('.') }.sort.each do |name|
+  # Everything the trash holds, not everything whose name looks ordinary.
+  # This used to skip every dotfile, which was aimed at .DS_Store and hit
+  # real media with it: a picture called ".hidden.jpg" stayed in the trash,
+  # was not counted, was not named among the kept, and the line below then
+  # reported a number that did not describe what had happened. Restoring
+  # something and saying nothing about the rest is the one thing a restore
+  # must not do.
+  Dir.children(dir).reject { |f| SYSTEM_CRUFT.match?(f) }.sort.each do |name|
     destination = File.join(target, name)
     # Never over the top of a file that is there now: the archive it would
     # replace is the one thing this command exists to protect.
@@ -3916,7 +3928,12 @@ def restore_media(slug, dirs)
   FileUtils.rmdir(dir) if Dir.children(dir).empty?
   FileUtils.rmdir(File.dirname(dir)) if Dir.exist?(File.dirname(dir)) && Dir.children(File.dirname(dir)).empty?
 
+  # What is still in the trash after all that -- system cruft aside, since
+  # nobody put it there on purpose and nobody wants it back.
+  left = Dir.children(dir).reject { |f| SYSTEM_CRUFT.match?(f) }.sort if Dir.exist?(dir)
+
   puts t('cli.restored_media', count: returned.size, path: target.sub("#{ROOT}/", ''))
+  warn t('cli.restore_media_left', files: (left - kept).join(', ')) if left && !(left - kept).empty?
   warn t('cli.restore_media_kept', files: kept.join(', ')) unless kept.empty?
 end
 

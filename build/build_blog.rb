@@ -2674,8 +2674,25 @@ NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 # And a name is not a path: "../" in it walks out of the post's directory,
 # both when the page links it and when the build copies it. The name is
 # taken as a basename, so a crafted one lands beside the post or nowhere.
+# A media file's own name, ready to be put in an attribute -- and to be
+# read back as a path by a browser, which is where this used to stop.
+#
+# h() escapes the markup, so a name could not break out of the attribute;
+# nothing escaped the URL, so a name could break out of the PATH. A picture
+# called "foto #1.jpg" produced src="…/foto #1.jpg", where a browser reads
+# "…/foto " and takes "#1.jpg" as a fragment: no request, no picture, no
+# error anywhere. A "%" did the same by starting an escape sequence of its
+# own, and a "?" by starting a query.
+#
+# Only the characters that actually change how a path is read are encoded.
+# Letters with diacritics are left alone deliberately: browsers handle them,
+# every existing site already has them in its markup, and encoding them
+# would rewrite pages that have nothing wrong with them.
+URL_UNSAFE_IN_PATH = /[#%?"'<>\s\\^`{|}]/.freeze
+
 def media_src(prefix, name)
-  "#{prefix}#{h(File.basename(name.to_s))}"
+  escaped = File.basename(name.to_s).gsub(URL_UNSAFE_IN_PATH) { |c| format('%%%02X', c.ord) }
+  "#{prefix}#{h(escaped)}"
 end
 
 # "]]>" cannot appear inside a CDATA section at all -- the only escape is

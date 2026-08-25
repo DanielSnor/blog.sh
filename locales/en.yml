@@ -444,6 +444,7 @@ cli:
   restore_media_count: "%{count} file(s)"
   restore_media_pick: "Which one? (a number, anything else cancels): "
   restored_media: "Put %{count} file(s) back into %{path}."
+  restore_media_left: "Still in the trash: %{files}"
   restore_media_kept: "Left in the trash, because a file of that name is in the archive now: %{files}"
   restored_label: "Restored: %{path}"
 
@@ -963,6 +964,8 @@ doctor:
   widget_shape_fix: "A widget is a set of settings written under its name -- heading, and whatever else that card needs. A list or a bare value there is drawn by nothing."
   widget_incomplete: "The %{name} widget has no %{key}, so it can never show anything."
   widget_account_id: "The toots widget wants the account's API id and has %{value}."
+  widget_toots_instance: "The toots widget has no instance -- neither widgets.toots.instance nor mastodon.instance."
+  widget_toots_instance_fix: "Set mastodon.instance (e.g. mastodon.social), or widgets.toots.instance if the widget should show a different account."
   widget_account_id_fix: "Not the @handle -- the id: a number on Mastodon, a 26-character ULID on GoToSocial. Open https://instance/api/v1/accounts/lookup?acct=you and copy \"id\"; ./setup.sh looks it up for you."
   widget_username: "The commits widget's `username` is not a username: %{value}."
   widget_username_fix: "Just the account name as the forge writes it -- letters, digits, dot, dash, underscore. Not an @handle, not a profile URL."
