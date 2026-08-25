@@ -17,6 +17,24 @@ require_relative 'slug'
 module PostText
   module_function
 
+  # The blocks above the teaser marker, or nil when the post carries none.
+  #
+  # nil rather than an empty array, because the two mean different things: a
+  # post with no marker falls back to a machine-cut opening, while a marker
+  # on the very first line is an author saying "announce this with the title
+  # and the link alone" -- an explicit act, and one worth honouring rather
+  # than second-guessing back into a cut.
+  #
+  # Lives here rather than in the build or in Publishing because both of
+  # them need it and neither should own it: the same blocks feed the toot,
+  # the link card and the listing, and those three must not disagree about
+  # where a post's invitation ends.
+  def teaser_blocks(blocks)
+    list = Array(blocks)
+    index = list.index { |b| b.is_a?(Hash) && b['type'] == 'teaser_end' }
+    index && list[0...index]
+  end
+
   # Deliberately not every string in the post: a URL, a slug or an embed
   # provider is not something anyone searches for in prose, and dropping
   # them keeps the index from matching a word that appears nowhere on the

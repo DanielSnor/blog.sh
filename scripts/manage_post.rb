@@ -635,6 +635,15 @@ def strip_editor_notes(text)
       in_comment = true unless line.include?('-->')
       next
     end
+    # The one line starting with // that is content rather than an
+    # instruction: it marks where the teaser stops and the body begins, so
+    # the rule that keeps notes out of posts must not eat it. Matched
+    # against the parser's own pattern rather than a second copy of the
+    # string -- two definitions of the same marker is one too many.
+    if MarkdownParser::TEASER_END_RE.match?(line.strip)
+      kept << line
+      next
+    end
     next if line.start_with?('//')
 
     kept << line

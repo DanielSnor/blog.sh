@@ -562,6 +562,11 @@ def render_config_block(block)
     "<#{tag}>#{items}</#{tag}>"
   when 'hr'
     '<hr>'
+  when 'teaser_end'
+    # Where the teaser stops. The post's own page shows everything, so the
+    # marker itself renders as nothing; it exists for the toot, the link
+    # card and the listing, which is where a post has to introduce itself.
+    ''
   when 'code'
     # The one place in the chrome that keeps escaping: a code block exists to
     # show markup as text, so passing it through raw would render the very
@@ -805,6 +810,11 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
     render_table(block)
   when 'hr'
     '<hr>'
+  when 'teaser_end'
+    # Where the teaser stops. The post's own page shows everything, so the
+    # marker itself renders as nothing; it exists for the toot, the link
+    # card and the listing, which is where a post has to introduce itself.
+    ''
   when 'code'
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
     %(<pre><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
@@ -1331,10 +1341,23 @@ end
 
 def build_list_item(post, pinned: false)
   prefix = post_path(post)
-  content = post_content_html(post)
-  excerpt = excerpt?(post)
+  # A post that wrote its own teaser shows exactly that here, and nothing
+  # below it: the listing is where the site invites, and an author who wrote
+  # the invitation should not have it padded with the first 500px of the
+  # article. The CSS clip is dropped with it -- there is nothing left to
+  # clip, and a fade over a finished sentence reads as damage. "Read more"
+  # stays, because the post does continue.
+  #
+  # An empty teaser is honoured in the toot but not here: a card with a
+  # heading and no words looks like a build that went wrong, and nobody
+  # asking for a quiet announcement is asking for that.
+  teaser = PostText.teaser_blocks(post['content'])
+  teaser = nil unless teaser&.any?
+  content = teaser ? render_content(teaser, prefix) : post_content_html(post)
+  excerpt = teaser ? false : excerpt?(post)
   content_class = excerpt ? 'content excerpt' : 'content'
-  read_more = excerpt ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
+  more = teaser || excerpt
+  read_more = more ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
   title = post_heading_html(post, 'h2', prefix)
   stats = post_meta_html(post, reading_labels(post))
   <<~HTML
@@ -1370,7 +1393,15 @@ def post_og_image(post)
 end
 
 def post_description(post)
-  text = plain_text_for_search(post)
+  # A teaser the author wrote is what the post says about itself, so it wins
+  # over the cut here too. The empty teaser is the one place this parts ways
+  # with the toot: there, "marker on the first line" means "announce with the
+  # title and link alone" and an empty perex honours it. A description is not
+  # a message but standing metadata -- it is what a search engine quotes
+  # months later -- so an empty one would cost the post something without
+  # anybody having asked for that, and the cut stands in.
+  teaser = PostText.teaser_blocks(post['content'])
+  text = teaser&.any? ? PostText.plain('content' => teaser) : plain_text_for_search(post)
   text = post['title'].to_s if text.strip.empty?
   text = SITE_DESCRIPTION if text.strip.empty?
   truncate_excerpt(text, META_DESCRIPTION_LENGTH)

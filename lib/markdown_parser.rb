@@ -239,6 +239,16 @@ module MarkdownParser
   VIDEO_RE = /\A!!\[(.*)\]\(([^)"]+?)\)\z/
   HEADING_RE = /\A(\#{1,6})\s+(.+)\z/
   HR_RE = /\A(?:-{3,}|_{3,}|\*[ \t]*\*[ \t]*\*[ \t*]*)\z/
+  # Where the teaser ends: everything above this line is the post's own
+  # invitation, everything below is the body. Deliberately NOT a horizontal
+  # rule, which would have been the obvious reading of "put a divider there":
+  # rules are already in use as rules, and their first one usually sits deep
+  # in the post -- eleven posts across the three sites the engine runs, with
+  # first rules at block 17, 19, 27 and 36 -- so "the first rule ends the
+  # teaser" would have silently handed those a teaser half a page long.
+  # Strict on purpose: a looser pattern would let an ordinary note like
+  # "// more below //" split somebody's post without saying so.
+  TEASER_END_RE = %r{\A//--more--//\z}
   UL_ITEM_RE = /\A[-*]\s+(.+)\z/
   OL_ITEM_RE = /\A\d+[.)]\s+(.+)\z/
   BLOCKQUOTE_LINE_RE = /\A>[ \t]?(.*)\z/
@@ -840,6 +850,8 @@ module MarkdownParser
       abort "Both images and videos must be on their own line, separated by blank lines. The problem is here:\n#{para}"
     elsif !para.include?("\n") && HR_RE.match?(para)
       return [{ 'type' => 'hr' }, counter]
+    elsif !para.include?("\n") && TEASER_END_RE.match?(para)
+      return [{ 'type' => 'teaser_end' }, counter]
     elsif !para.include?("\n") && (m = HEADING_RE.match(para))
       text, formatting = parse_inline(m[2])
       # A heading line whose whole content was a label-less anchor has no

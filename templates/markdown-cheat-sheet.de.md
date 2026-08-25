@@ -217,6 +217,24 @@ Eine Zeile aus drei oder mehr Bindestrichen, für sich allein.
 
 ---
 
+## Anrisstext
+
+Eine Zeile `//--more--//`, für sich allein, teilt den Beitrag in zwei Teile. Was darüber steht, ist der Anrisstext: genau das erscheint in der Übersicht auf der Startseite, in der Ankündigung im sozialen Netzwerk und auf der Linkkarte. Was darunter steht, liest, wer den Beitrag öffnet.
+
+Ohne diese Zeile schneidet die Engine den Anrisstext selbst vom Textanfang ab -- und ein maschineller Schnitt endet selten dort, wo er sollte.
+
+Genau so schreiben, ohne Leerzeichen und klein. Anders geschrieben ist die Zeile eine gewöhnliche Notiz und verschwindet beim Speichern.
+
+```
+Der erste Absatz, der neugierig machen soll.
+
+//--more--//
+
+Der Rest des Beitrags, den die Übersicht nicht zeigt.
+```
+
+---
+
 ## Codeblöcke
 
 Code steht zwischen Zeilen aus drei Backticks — \`\`\`. Nach dem ersten Dreier kann eine Sprache folgen; sie ist rein kosmetisch und ändert am Rendern nichts. Im Block wird nichts formatiert, Sternchen und ähnliche Zeichen bleiben, wie sie sind.

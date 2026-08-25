@@ -75,6 +75,8 @@ module MarkdownWriter
         list_to_markdown(b)
       when 'hr'
         '---'
+      when 'teaser_end'
+        '//--more--//'
       when 'chat'
         body = (b['lines'] || []).map { |l| l['name'] ? "#{l['name']}: #{l['text']}" : l['text'].to_s }.join("\n")
         fence = fence_for(body)

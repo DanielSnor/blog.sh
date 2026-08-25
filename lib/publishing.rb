@@ -7,6 +7,7 @@ require 'time'
 # tells "the lock was busy" from "it broke", and $? does not read as either.
 require 'English'
 require_relative 'post_address'
+require_relative 'post_text'
 require_relative 'address_guard'
 require_relative 'site_config'
 require_relative 'atomic_write'
@@ -140,6 +141,11 @@ module Publishing
   # internal whitespace collapses to single spaces first.
   def perex_for(blocks, max_length = PEREX_LENGTH)
     limit = [max_length, PEREX_LENGTH].min
+    # A teaser the author wrote replaces the cut entirely -- that is the
+    # whole point of writing one. An empty teaser (the marker on the first
+    # line) therefore yields an empty perex rather than falling back, which
+    # is the author asking for title and link alone.
+    blocks = PostText.teaser_blocks(blocks) || blocks
     plain = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'] }.join(' ').gsub(/\s+/, ' ').strip
     return plain if plain.length <= limit
     return '' if limit <= 0
@@ -192,6 +198,11 @@ module Publishing
   # one-plus bytes or codepoints).
   def perex_by_graphemes(blocks, max_graphemes)
     limit = [max_graphemes, PEREX_LENGTH].min
+    # Same rule as perex_for, and here for the same reason its word-boundary
+    # trimming had to be copied: these two are structural twins, and every
+    # time one of them learned something the other did not, the difference
+    # showed up as a broken announcement on one network only.
+    blocks = PostText.teaser_blocks(blocks) || blocks
     plain = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'] }.join(' ').gsub(/\s+/, ' ').strip
     return plain if grapheme_length(plain) <= limit
     return '' if limit <= 0
