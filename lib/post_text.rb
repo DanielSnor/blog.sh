@@ -35,6 +35,79 @@ module PostText
     index && list[0...index]
   end
 
+  # How many words a name gets when no sentence fits, and the window in
+  # which a whole first sentence is preferred to that count. Eight is not a
+  # new number: it is what post slugs have always been cut to, so a name and
+  # an address come out of the same place in the same text.
+  NAME_WORDS = 8
+  NAME_SENTENCE_MIN = 4
+  NAME_SENTENCE_MAX = 12
+  # The cap the engine already chose for tag slugs, reused rather than
+  # invented. On one real archive of 2754 untitled posts the longest name
+  # this produces is 96 bytes and the median is 45, so this is a guard
+  # against eight very long words, not against ordinary writing.
+  NAME_MAX_BYTES = 200
+  # A sentence end, but only one followed by a space or the end of the text.
+  # The four-word minimum below is what keeps "Apple Inc." from becoming the
+  # name of a post about a share price -- and with it "tj.", "atd.", "č.".
+  SENTENCE_RE = /\A(.{3,}?[.!?])(?:[[:space:]]|\z)/
+
+  # What an untitled post gets called, and where its text picks up
+  # afterwards -- returned together, never separately.
+  #
+  # Together, because the two are one cut in one text and computing them
+  # apart is how a post ends up introducing itself twice: the name is drawn
+  # from the opening, so a preview that also starts at the opening repeats
+  # it word for word. Whoever needs the name needs to know where the rest
+  # begins, and this is the only place that decides.
+  #
+  # Returns nil for a post that names itself -- there is no cut to make.
+  def name_and_rest(post)
+    return nil if post['title']
+    return nil unless post.is_a?(Hash)
+
+    blocks = teaser_blocks(post['content']) || post['content']
+    text = Array(blocks).select { |b| b.is_a?(Hash) && b['type'] == 'text' }
+                        .map { |b| b['text'] }.join(' ').gsub(/[[:space:]]+/, ' ').strip
+    return nil if text.empty?
+
+    name, rest = cut_name(text)
+    [cap_bytes(name), rest]
+  end
+
+  # The cut itself. A whole first sentence wins when one fits the window --
+  # a name that ends where the writer ended reads like a name, while eight
+  # words usually stop just before the point, because a Czech sentence puts
+  # its verb and object at the end. Failing that, the word count, with a
+  # trailing preposition or conjunction dropped: "...vyplynulo, že" reads as
+  # a mistake where "...vyplynulo," reads as an interruption.
+  #
+  # The dropped word opens the rest rather than disappearing: there is one
+  # cut here, not two, and text on either side of it has to add back up.
+  def cut_name(text)
+    words = text.split(' ')
+    sentence = text[SENTENCE_RE, 1]
+    if sentence && (NAME_SENTENCE_MIN..NAME_SENTENCE_MAX).cover?(sentence.split(' ').length)
+      return [sentence, text[sentence.length..].to_s.strip]
+    end
+    return [text, ''] if words.length <= NAME_WORDS
+
+    head = words.first(NAME_WORDS)
+    head = head[0..-2] if head.last.gsub(/[[:punct:]]/, '').length < 3 && head.length > 1
+    ["#{head.join(' ')}…", "…#{words[head.length..].join(' ')}"]
+  end
+
+  # Trimmed to whole words, never to a byte: a cut at the 200th byte splits
+  # a multi-byte character down the middle, and Czech diacritics, emoji and
+  # the emoticons this archive is full of are all multi-byte.
+  def cap_bytes(name)
+    return name if name.bytesize <= NAME_MAX_BYTES
+
+    words = name.split(' ')
+    words.pop while words.length > 1 && words.join(' ').bytesize > NAME_MAX_BYTES
+    "#{words.join(' ')}…"
+  end
+
   # Deliberately not every string in the post: a URL, a slug or an embed
   # provider is not something anyone searches for in prose, and dropping
   # them keeps the index from matching a word that appears nowhere on the

@@ -1400,9 +1400,19 @@ def post_description(post)
   # a message but standing metadata -- it is what a search engine quotes
   # months later -- so an empty one would cost the post something without
   # anybody having asked for that, and the cut stands in.
-  teaser = PostText.teaser_blocks(post['content'])
-  text = teaser&.any? ? PostText.plain('content' => teaser) : plain_text_for_search(post)
-  text = post['title'].to_s if text.strip.empty?
+  # A link card shows the title above the description, so when the title was
+  # taken from the post's own opening the description has to carry on from
+  # there. Otherwise the card reads the same sentence twice -- which did not
+  # happen while the title was a slug, and would have arrived with this
+  # release as a new defect rather than a fix.
+  name, rest = PostText.name_and_rest(post)
+  text = if name
+           rest
+         else
+           teaser = PostText.teaser_blocks(post['content'])
+           teaser&.any? ? PostText.plain('content' => teaser) : plain_text_for_search(post)
+         end
+  text = post['title'].to_s if text.to_s.strip.empty?
   text = SITE_DESCRIPTION if text.strip.empty?
   truncate_excerpt(text, META_DESCRIPTION_LENGTH)
 end
@@ -1652,7 +1662,16 @@ def post_title_for(post)
   return post['title'].to_s if post['title']
 
   block = link_title_block(post)
-  (block ? block['title'] : post['slug']).to_s
+  return block['title'].to_s if block
+
+  # The slug used to stand in here, which meant the same post was called two
+  # different things: a date in its own heading and
+  # "burtiky-opekame-hipstamatic-oggl-jane" in the browser tab, the link card
+  # and the feed. A slug is an address, made by machine out of the words --
+  # so the words themselves are the better name, and the post's own heading
+  # stays the date it has been since 1.3.
+  name, = PostText.name_and_rest(post)
+  name || post['slug'].to_s
 end
 
 # The heading itself. A post's own title links to the post in a listing and
@@ -2761,11 +2780,17 @@ end
 
 def search_index_entry(post)
   text = plain_text_for_search(post)
+  # A result shows the title with the excerpt under it, so the same rule as
+  # the link card: a title taken from the opening means the excerpt starts
+  # after it. `folded` is untouched on purpose -- that is what queries are
+  # matched against, and an index that stopped at the title would quietly
+  # stop finding every word below it.
+  name, rest = PostText.name_and_rest(post)
   {
     url: post_path(post),
-    title: post['title'],
+    title: post['title'] || name,
     date: post_display_time(post).strftime(t('date_format')),
-    excerpt: truncate_excerpt(text),
+    excerpt: truncate_excerpt(name ? rest : text),
     folded: PostText.searchable(post, text)
   }
 end

@@ -319,10 +319,17 @@ module Publishing
   # on disk that an announcement was ever owed. Nothing retried it, and
   # nobody found out.
   def announce(post, year:)
-    title = post['title']
     slug = post['slug']
-    blocks = post['content']
     tags = post['tags'] || []
+    # A post that never named itself is named from its own opening -- and
+    # the preview then has to pick up where that name stopped, or the
+    # announcement says the same sentence twice: once as the headline and
+    # once again underneath. So the blocks handed on are the REST of the
+    # text, not the whole of it. They add back up: nothing between the two
+    # is dropped, including the short word the name may have shed.
+    name, rest = PostText.name_and_rest(post)
+    title = post['title'] || name
+    blocks = name ? [{ 'type' => 'text', 'text' => rest }] : post['content']
 
     case SiteConfig.comment_network
     when :mastodon
