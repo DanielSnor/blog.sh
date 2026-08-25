@@ -614,16 +614,29 @@ end
 # accident.
 def strip_editor_notes(text)
   kept = []
-  in_fence = false
+  # The LENGTH of the run that opened the current block, or nil outside one.
+  # This used to be a boolean flipped by any line starting with ```, which
+  # counts parity rather than matching CommonMark's rule that a fence closes
+  # only on a run at least as long as the one that opened it. MarkdownWriter
+  # relies on that rule -- fence_for wraps a sample containing ``` in a
+  # four-backtick fence -- so the two inner ``` lines of a perfectly
+  # ordinary post about markdown flipped the tracker back to "outside", and
+  # every // line between them was deleted as an author's note. Which is
+  # exactly what the comment above says this function exists to prevent.
+  fence = nil
   in_comment = false
 
   text.each_line do |line|
-    if line.lstrip.start_with?('```')
-      in_fence = !in_fence
+    run = line.lstrip[/\A`{3,}/]&.length
+    if fence
+      # A closing fence carries nothing after it; an opening one may carry
+      # an info string (```js), which is why the tail is checked here only.
+      fence = nil if run && run >= fence && line.lstrip[run..].to_s.strip.empty?
       kept << line
       next
     end
-    if in_fence
+    if run
+      fence = run
       kept << line
       next
     end
