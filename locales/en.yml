@@ -745,6 +745,7 @@ import:
   wayback_too_many_redirects: "too many redirects (%{url})"
   wayback_http: "HTTP %{code} (%{url})"
   wix_not_csv: "%{file} is not readable as CSV (%{reason}) -- the damage is in the file on disk, not at Wix"
+  wix_not_export: "%{file} is a CSV, but not a Wix blog export -- it has no %{columns} column. The columns it does have: %{found}…"
   group:
     blogs: "Blog / publishing platform"
     social: "Social network"
@@ -826,6 +827,7 @@ import:
     duplicate_ids: "%{count} item(s) in the source carried an id another item had already used. Each is written as a post of its own rather than over the first one -- look at them and delete whichever is the copy."
     feed_linked_images: "%{count} picture(s) were wrapped in a link, which an image block cannot carry -- the pictures arrived, the addresses they pointed at did not."
     ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
+    ghost_members: "%{count} post(s) were members-only in Ghost -- imported as drafts tagged ghost-members; decide yourself which of them the public archive gets."
     livejournal_nonpublic: "%{count} entr(y/ies) were friends-only or private -- imported as drafts, they were never public."
     medium_responses: "%{count} post(s) looked like responses to other people's articles -- imported as drafts for review."
     medium_untagged: "%{count} published post(s) came without tags."

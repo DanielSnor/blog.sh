@@ -274,7 +274,14 @@ post's first paragraph, the feature image its first image. YouTube
 embeds become the same video blocks a hand-written post gets; any other
 embedded player becomes a link to the embedded page, which outlives the
 player. Ghost's internal `#hashtag` tags are routing config, not
-labels, and are dropped.
+labels, and are dropped. The caption and the alt text written under a
+feature image come over with it.
+
+Members-only and paid posts import in full -- the export is yours, and
+Ghost's paywall is applied when a page is served, never in the file --
+but each one arrives as a **draft** tagged `ghost-members` rather than
+published, and the summary says how many there were. Nothing your
+members paid for goes onto the open web without you deciding it should.
 
 ### Instagram
 

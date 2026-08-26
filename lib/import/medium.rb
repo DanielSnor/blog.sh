@@ -91,7 +91,7 @@ module Import
         'content' => summary_block + blocks,
         'source' => {
           'platform' => 'medium',
-          'account' => account_of(html),
+          'account' => account_of(html) || export_account,
           'post_url' => canonical.empty? ? nil : canonical,
           'original_id' => hash
         }.compact
@@ -185,6 +185,23 @@ module Import
       nil
     end
 
+    # The handle this whole export belongs to. A DRAFT carries no author
+    # anchor -- Medium writes one only on a published post -- so `account`
+    # fell out of its source record, and PostWriter.source_key is nil
+    # without one: re-running the identical command over the identical
+    # export wrote slug-2, slug-3, slug-4, against the promise the tool
+    # prints itself ("posts are matched on their source id, never
+    # duplicated"). An export is one person's, so the handle its published
+    # posts carry is its drafts' too. Read once, from the first file that
+    # names it, in the same order every run.
+    def export_account
+      return @export_account if defined?(@export_account)
+
+      @export_account = PathGlob.under(@dir, 'posts', '*.html').sort.lazy.filter_map do |path|
+        account_of(File.read(path, encoding: 'utf-8'))
+      end.first
+    end
+
     def account_of(html)
       href = anchor_href(html, 'p-author')
       href[%r{/(@[^/"]+)}, 1] || href[%r{https?://([^/"]+)}, 1]
@@ -225,14 +242,26 @@ module Import
     # cards (mixtapeEmbed) keep their durable part, the link. Code blocks
     # arrive as pre with the lines as <br> and the language, if any, in a
     # data attribute -- normalized to what HtmlBlocks already reads.
+    # Both shapes Medium has written it in, in one pattern.
+    DIVIDER = %r{<div[^>]*class="[^"]*section-divider[^"]*"[^>]*>\s*<hr[^>]*/?>\s*</div>|
+                 <hr[^>]*class="[^"]*section-divider[^"]*"[^>]*/?>}xm.freeze
+
     def preprocess(body, title, summary)
       body = body.gsub(%r{<div[^>]*class="[^"]*graf--mixtapeEmbed[^"]*"[^>]*>.*?</div>}m) do |card|
         url = card[%r{<a[^>]*href="([^"]+)"}, 1].to_s
         label = text_of(card[%r{<strong[^>]*class="[^"]*markup--strong[^"]*"[^>]*>(.*?)</strong>}m, 1])
         url.empty? ? '' : %(<p><a href="#{CGI.escapeHTML(url)}">#{CGI.escapeHTML(label.empty? ? url : label)}</a></p>)
       end
-      body = body.gsub(%r{<hr[^>]*class="[^"]*section-divider[^"]*"[^>]*/?>}, '')
-                 .gsub(%r{<div[^>]*class="[^"]*section-divider[^"]*"[^>]*>\s*<hr[^>]*/?>\s*</div>}m, '')
+      # Medium writes a section-divider at the head of EVERY
+      # <section class="section section--body">. The one opening
+      # section--first is the decorative rule under the title; each later
+      # one is the break the author typed as "---" in the editor. Removing
+      # them all took those breaks with it, so an essay in parts imported
+      # as one undivided run of paragraphs, with nothing in the summary to
+      # say so (an hr is not an element HtmlBlocks counts as dropped).
+      # Ghost's own mg-medium-export scopes its removal the same way.
+      body = body.gsub(/(<section[^>]*class="[^"]*section--first[^"]*"[^>]*>\s*)#{DIVIDER}/m) { Regexp.last_match(1) }
+      body = body.gsub(DIVIDER, '<hr>')
       body = body.gsub(%r{<(h[1-6]|blockquote)[^>]*>(.*?)</\1>}m) do |match|
         same_text?(text_of(Regexp.last_match(2)), title) || same_text?(text_of(Regexp.last_match(2)), summary) ? '' : match
       end

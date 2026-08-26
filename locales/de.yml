@@ -726,6 +726,7 @@ import:
   wayback_too_many_redirects: "zu viele Weiterleitungen (%{url})"
   wayback_http: "HTTP %{code} (%{url})"
   wix_not_csv: "%{file} ist nicht als CSV lesbar (%{reason}) -- der Schaden steckt in der Datei auf der Platte, nicht bei Wix"
+  wix_not_export: "%{file} ist eine CSV, aber kein Wix-Blog-Export -- die Spalte %{columns} fehlt. Vorhandene Spalten: %{found}…"
   group:
     blogs: "Blog / Publishing-Plattform"
     social: "Soziales Netzwerk"
@@ -807,6 +808,7 @@ import:
     duplicate_ids: "%{count} Einträge der Quelle trugen eine id, die ein anderer Eintrag schon benutzt hatte. Jeder wird als eigener Beitrag geschrieben statt über den ersten -- sieh sie dir an und lösche den, der die Kopie ist."
     feed_linked_images: "%{count} Bild(er) waren in einen Link gehüllt, den ein Bildblock nicht tragen kann -- die Bilder kamen an, die Adressen, auf die sie zeigten, nicht."
     ghost_scheduled: "%{count} Beitrag/Beiträge waren in Ghost geplant -- als Entwürfe importiert; plane sie hier, wenn du so weit bist."
+    ghost_members: "%{count} Beitrag/Beiträge waren in Ghost nur für Mitglieder -- als Entwürfe mit dem Schlagwort ghost-members importiert; entscheide selbst, welche davon ins öffentliche Archiv kommen."
     livejournal_nonpublic: "%{count} Eintrag/Einträge waren nur für Freunde oder privat -- als Entwürfe importiert, öffentlich waren sie nie."
     medium_responses: "%{count} Beitrag/Beiträge sahen aus wie Antworten unter fremden Artikeln -- zur Durchsicht als Entwürfe importiert."
     medium_untagged: "%{count} veröffentlichte(r) Beitrag/Beiträge kamen ohne Tags."

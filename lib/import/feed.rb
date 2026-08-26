@@ -154,7 +154,18 @@ module Import
       # name. Its block still goes first, where the old site showed it.
       featured = featured_image(item, media, parsed.blocks)
       blocks.unshift(featured) if featured
-      return :empty if blocks.empty?
+      # A subclass may have a picture of its own to put at the head, which
+      # it adds after this method returns -- Squarespace keeps the feature
+      # image in the entry AFTER the post. Asked here, and only asked:
+      # fetching it here would number it before the body's own audio and
+      # move every media file in every such post, and a re-import then
+      # finds somebody else's bytes under the new name. What the emptiness
+      # test needed was the question, not the file. Without it a photo
+      # post whose body parses to nothing was refused as :empty together
+      # with the one picture it had, and the summary counted a skipped
+      # post and a skipped attachment without ever saying they were the
+      # same post.
+      return :empty if blocks.empty? && !extra_leading?(item)
 
       date = item_date(item)
       state = item_state(item)
@@ -716,6 +727,19 @@ module Import
     # put the whole post in it, and slugifying that produced 400-character
     # URLs. A WordPress export's own post_name is trusted as-is -- that's
     # the slug the site already published under.
+    # Nothing for a plain feed or a WordPress export; see Squarespace.
+    def extra_leading?(_item)
+      false
+    end
+
+    # The title as the slug fallback should read it. Squarespace escapes
+    # its titles TWICE, so "&" is still "&amp;" at this point and the
+    # draft was filed under skillman-amp-hackett -- that adapter decodes
+    # here rather than after the post is built.
+    def slug_title(item)
+      text_of(item, 'title')
+    end
+
     def item_slug(item)
       # Guarded like the two fallbacks below it: a post_name that folds to
       # nothing (raw non-ASCII or punctuation only -- WordPress itself
@@ -726,7 +750,7 @@ module Import
       name = Slug.slugify(text_of(item, 'wp:post_name'))
       return name unless name.empty?
 
-      slug = Slug.slugify(text_of(item, 'title').split(/\s+/).first(10).join(' '))
+      slug = Slug.slugify(slug_title(item).split(/\s+/).first(10).join(' '))
       return slug unless slug.empty?
 
       # A title-less feed entry still needs a stable slug, and the id is

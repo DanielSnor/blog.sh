@@ -104,7 +104,17 @@ module Import
     # months later. So the row is skipped by name and the run says how
     # many -- the author can open the file at that row and fix the quote.
     def misaligned?(row)
-      row.respond_to?(:headers) && row.headers.any?(&:nil?)
+      return false unless row.respond_to?(:headers)
+
+      # The question is about THIS ROW, and a nil header is a property of
+      # the header LINE: when the header itself ends in an empty column --
+      # what Excel and Numbers write into a file as soon as any one line
+      # in it has a field too many, and this file rarely reaches an import
+      # untouched -- every row in the export carries that nil header, so
+      # every post was refused and the run named a defect that was not
+      # there ("Done. 0 post(s) written"). What marks a row as slid out of
+      # line is a VALUE sitting under a header that does not exist.
+      row.any? { |header, value| header.nil? && !value.to_s.strip.empty? }
     end
 
     # liberal_parsing, because one odd cell must not cost the whole
@@ -121,13 +131,33 @@ module Import
     # substack.rb): every way in loads site_config, which pins
     # default_external to UTF-8 before this file is required.
     def rows
-      CSV.read(@path, headers: true, liberal_parsing: true)
+      table = CSV.read(@path, headers: true, liberal_parsing: true)
+      refuse_foreign_csv(table)
+      table
     rescue CSV::MalformedCSVError => e
       # A quote opened and never closed still ends here, and rightly so:
       # it swallows every following row, and no parser can guess where
       # the cell was meant to end. Name the file and keep the line
       # number, so the reader looks at their CSV rather than at Wix.
       raise I18n.t('import.wix_not_csv', file: File.basename(@path), reason: e.message.strip)
+    end
+
+    # The body of a Wix post is in one of two columns, and no other CSV
+    # anyone keeps in the same Downloads folder names them that way. A
+    # Substack posts.csv parsed happily here: every row mapped to :empty,
+    # and the run finished "Done. 0 post(s) written" with exit 0, so
+    # somebody who mistyped a filename was told their blog holds nothing
+    # importable. Feed says outright when it is handed XML that is not a
+    # feed (feed.rb); this says it when handed a CSV that is not an export.
+    BODY_COLUMNS = ['Rich Content', 'Plain Content'].freeze
+
+    def refuse_foreign_csv(table)
+      headers = table.headers.compact.map { |header| header.to_s.strip }
+      return if BODY_COLUMNS.any? { |column| headers.include?(column) }
+
+      raise I18n.t('import.wix_not_export', file: File.basename(@path),
+                                            columns: BODY_COLUMNS.join(', '),
+                                            found: headers.first(6).join(', '))
     end
 
     # Tags and Categories are JSON arrays serialized INTO a CSV cell --
@@ -215,12 +245,18 @@ module Import
           block
         when 'HEADING'
           # Bold inside a heading is dropped -- a heading is already bold
-          # all by itself.
-          text, = rich_text(node['nodes'])
+          # all by itself. Nothing else is: throwing the whole formatting
+          # array away took the LINKS with it, so a heading that pointed
+          # somewhere arrived as plain words with the destination gone,
+          # while the very same heading imported from HTML kept it.
+          text, formatting = rich_text(node['nodes'])
           return nil if text.strip.empty?
 
           level = node.dig('headingData', 'level').to_i.clamp(1, 6)
-          { 'type' => 'text', 'subtype' => "heading#{level}", 'text' => text }
+          formatting = formatting.reject { |span| span['type'] == 'bold' }
+          block = { 'type' => 'text', 'subtype' => "heading#{level}", 'text' => text }
+          block['formatting'] = formatting unless formatting.empty?
+          block
         when 'BULLETED_LIST', 'ORDERED_LIST'
           { 'type' => 'list',
             'style' => node['type'] == 'ORDERED_LIST' ? 'ol' : 'ul',
@@ -377,13 +413,52 @@ module Import
         end
       end
 
+      # A cell holds BLOCKS: Ricos wraps even one sentence in a PARAGRAPH,
+      # and a cell may just as well hold a list, a heading or several
+      # paragraphs. Only the direct children's TEXT nodes used to be read,
+      # so a cell whose words sat one level deeper -- a list, most often --
+      # came out empty while the table kept its shape, and the @unknown
+      # ledger the summary prints never heard of it. HtmlBlocks, fed the
+      # same table as HTML, keeps those words; so does this. They are
+      # joined with a space, which is what Inline.render does at a block
+      # boundary and what the two paragraphs of one cell used to be
+      # missing entirely.
       def table_cells(row)
         (row['nodes'] || []).map do |cell|
-          text, formatting = rich_text((cell['nodes'] || []).flat_map { |p| p['nodes'] || [] })
+          text, formatting = joined_runs(text_runs(cell))
           cell_entry = { 'text' => text }
           cell_entry['formatting'] = formatting unless formatting.empty?
           cell_entry
         end
+      end
+
+      # Every run of TEXT nodes under NODE, in document order: one entry
+      # per line the source wrote.
+      def text_runs(node)
+        own = (node['nodes'] || []).select { |child| child['type'] == 'TEXT' }
+        nested = (node['nodes'] || []).reject { |child| child['type'] == 'TEXT' }
+                                      .flat_map { |child| text_runs(child) }
+        own.empty? ? nested : [own] + nested
+      end
+
+      # rich_text over each run, kept as one string -- with the spans moved
+      # to where their words ended up.
+      def joined_runs(runs)
+        text = +''
+        spans = []
+        runs.each do |nodes|
+          chunk, chunk_spans = rich_text(nodes)
+          next if chunk.strip.empty?
+
+          text << ' ' unless text.empty?
+          offset = text.length
+          text << chunk
+          chunk_spans.each do |span|
+            spans << span.merge('start' => span['start'] + offset,
+                                'end' => span['end'] + offset)
+          end
+        end
+        [text, spans]
       end
 
       def safe_href?(url)

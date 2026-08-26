@@ -715,6 +715,7 @@ import:
   wayback_too_many_redirects: "příliš mnoho přesměrování (%{url})"
   wayback_http: "HTTP %{code} (%{url})"
   wix_not_csv: "%{file} nejde přečíst jako CSV (%{reason}) — poškozený je soubor na disku, ne Wix"
+  wix_not_export: "%{file} je CSV, ale ne export blogu z Wixu — chybí sloupec %{columns}. Nalezené sloupce: %{found}…"
   group:
     blogs: "Blog / publikační platforma"
     social: "Sociální síť"
@@ -796,6 +797,7 @@ import:
     duplicate_ids: "%{count} položek zdroje neslo id, které už jiná položka použila. Každá se zapsala jako vlastní post, ne přes tu první — projdi je a smaž tu, která je kopie."
     feed_linked_images: "Obrázků obalených odkazem, který obrázkový blok neunese: %{count} — obrázky dorazily, adresy, kam mířily, ne."
     ghost_scheduled: "Postů naplánovaných v Ghostu: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
+    ghost_members: "Postů jen pro předplatitele: %{count} — dorazily jako drafty se štítkem ghost-members; co z nich pustíš na web, rozhodni sám."
     livejournal_nonpublic: "Zápisků jen pro přátele nebo soukromých: %{count} — dorazily jako drafty, veřejné nikdy nebyly."
     medium_responses: "Postů vypadajících jako reakce pod cizími články: %{count} — dorazily jako drafty k revizi."
     medium_untagged: "Publikovaných postů bez štítků: %{count}."
