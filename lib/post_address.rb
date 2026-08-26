@@ -126,7 +126,14 @@ module PostAddress
     return :unusable if parts.empty?
     return :unusable if parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
     return :unusable if parts.any? { |p| p.bytesize > REDIRECT_SEGMENT_MAX_BYTES }
-    return :reserved if REDIRECT_RESERVED.include?(parts.first)
+    # Folded, because the volume folds. `/Tag/pokus/` and `/Search/` sailed
+    # past a byte-exact comparison and then landed on
+    # public.nosync/tag/pokus/ and public.nosync/search/ on macOS,
+    # replacing the real tag listing and the real search page with
+    # redirect stubs. Refused on a case-sensitive volume too: the list is
+    # about the segments the engine owns, and an imported address that
+    # only differs from one by letter case is not an address anybody meant.
+    return :reserved if REDIRECT_RESERVED.include?(parts.first.to_s.downcase)
 
     nil
   end

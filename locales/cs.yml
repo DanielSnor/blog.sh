@@ -396,6 +396,7 @@ cli:
   backdated_note: "Zpětně datovaný post se řadí podle svého data — úvodní stránku a RSS tak může minout a skončit rovnou v archivu."
 
   post_not_found: "Post '%{slug}' nenalezen.\n\n"
+  post_date_unreadable: "❌ %{slug}: datum tohohle postu není nic, s čím by se dalo pracovat (%{value}). Oprav ho přímo v souboru postu — 2026-08-22T10:00:00+02:00 — a zkus to znovu. `./blog.sh check` vyjmenuje všechny posty v tomhle stavu."
   still_draft_toot: "Post '%{slug}' je pořád draft — nejdřív publikuj (./blog.sh publish %{slug}), teprve pak má toot na co odkazovat."
   toot_failed: "Toot se nepodařilo poslat (viz výš)."
   no_network_toot: "Nic se neoznámilo: config/site.yml nemá sekci mastodon: ani bluesky:, takže tenhle web nikam neoznamuje. Jestli jsi ji chtěl nastavit, zkontroluj, že hlavička sekce je živý řádek, a ne komentář — klíče pod zakomentovanou hlavičkou patří tomu, co bylo před ní. Samotný token patří do env.sh."

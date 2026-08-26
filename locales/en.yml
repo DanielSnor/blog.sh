@@ -417,6 +417,7 @@ cli:
   backdated_note: "A backdated post is ordered by its date -- it can skip the homepage and RSS and land straight in the archive."
 
   post_not_found: "Post '%{slug}' not found.\n\n"
+  post_date_unreadable: "❌ %{slug}: the date on this post is not one anything can work with (%{value}). Put it right in the post file -- 2026-08-22T10:00:00+02:00 -- and try again. `./blog.sh check` names every post in this state."
   still_draft_toot: "Post '%{slug}' is still a draft -- publish it first (./blog.sh publish %{slug}); only then does a toot have something to link to."
   toot_failed: "Failed to send the toot (see above)."
   no_network_toot: "Nothing was announced: config/site.yml has no mastodon: or bluesky: section, so this site announces nowhere. If you meant to set one up, check that the section header is a live line rather than a comment -- keys under a commented-out header belong to whatever came before it. The token itself goes in env.sh."

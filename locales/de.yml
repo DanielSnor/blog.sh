@@ -408,6 +408,7 @@ cli:
   backdated_note: "Ein rückdatierter Beitrag wird nach seinem Datum einsortiert -- Startseite und RSS kann er dadurch überspringen und direkt im Archiv landen."
 
   post_not_found: "Beitrag '%{slug}' nicht gefunden.\n\n"
+  post_date_unreadable: "❌ %{slug}: das Datum dieses Beitrags ist keines, mit dem sich arbeiten lässt (%{value}). Korrigiere es in der Beitragsdatei -- 2026-08-22T10:00:00+02:00 -- und versuche es erneut. `./blog.sh check` nennt jeden Beitrag in diesem Zustand."
   still_draft_toot: "Beitrag '%{slug}' ist noch ein Entwurf -- veröffentliche ihn zuerst (./blog.sh publish %{slug}); erst dann hat ein Toot etwas zu verlinken."
   toot_failed: "Der Toot ließ sich nicht verschicken (siehe oben)."
   no_network_toot: "Es wurde nichts angekündigt: config/site.yml hat weder einen mastodon:- noch einen bluesky:-Abschnitt, diese Website kündigt also nirgends an. Wolltest du einen einrichten, prüfe, ob der Abschnittskopf eine echte Zeile ist und kein Kommentar -- Schlüssel unter einem auskommentierten Kopf gehören zu dem, was davor stand. Das Token selbst gehört in env.sh."

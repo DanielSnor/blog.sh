@@ -715,6 +715,54 @@ def frontmatter_type_and_page(meta)
   [type.empty? ? nil : type, PostAddress.flag?(meta['page'])]
 end
 
+# The tag list as one frontmatter line, and back off it.
+#
+# The comma is both the separator and a character a tag may legitimately
+# contain, so a tag with one in it came back as TWO tags on the next save
+# -- no warning, no confirmation, and no way back through the CLI. Six
+# posts in the author's own live archive carry such a tag.
+#
+# Quoted on the way out only when it has to be: the line is a thing people
+# edit by hand, and `tags: kolo, vylety` must stay that. On the way in a
+# quoted run is one tag whatever is inside it, and everything else splits
+# on commas exactly as before.
+def tags_to_frontmatter(tags)
+  Array(tags).map do |tag|
+    text = tag.to_s.strip
+    text.include?(',') ? %("#{text.gsub('"', '\\"')}") : text
+  end.join(', ')
+end
+
+def tags_from_frontmatter(value)
+  text = value.to_s
+  tags = []
+  current = +''
+  in_quotes = false
+  i = 0
+  # Walked rather than split on a regex: with an alternation, `[^,]+`
+  # matches from the space before an opening quote and the quoted branch
+  # never gets a look in. A dozen lines that are obviously right beat
+  # three that are nearly.
+  while i < text.length
+    char = text[i]
+    if in_quotes && char == '\\' && text[i + 1] == '"'
+      current << '"'
+      i += 2
+      next
+    elsif char == '"'
+      in_quotes = !in_quotes
+    elsif char == ',' && !in_quotes
+      tags << current.strip
+      current = +''
+    else
+      current << char
+    end
+    i += 1
+  end
+  tags << current.strip
+  tags.reject(&:empty?)
+end
+
 def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
                       unlisted: nil, series: nil, series_part: nil, toc: nil)
   lines = ['---']
@@ -849,7 +897,7 @@ def cmd_add
 
   date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'])
   title = meta['title'].to_s.empty? ? nil : meta['title']
-  tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
+  tags = tags_from_frontmatter(meta['tags'])
   type, page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
@@ -1285,7 +1333,7 @@ def publish_draft(slug, path: nil)
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   unless draft?(post)
-    puts t('cli.already_published', slug: slug, url: published_url(slug, Time.parse(post['date']).year))
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year))
     puts
     return
   end
@@ -1302,9 +1350,9 @@ def publish_draft(slug, path: nil)
   # calls it "backdated" while doing it. Covers both the still-scheduled
   # draft and one whose schedule was just cancelled with [n], which keeps
   # the date the schedule gave it.
-  future = Time.parse(post['date']) > Time.now
+  future = post_time!(post) > Time.now
   untouched = future || (post['created_at'] && post['date'] == post['created_at'])
-  date = untouched ? Time.now : Time.parse(post['date'])
+  date = untouched ? Time.now : post_time!(post)
   puts(untouched ? t('cli.publish_date_now', date: date.strftime(t('date_time_format')))
                  : t('cli.publish_date_kept', date: date.strftime(t('date_time_format'))))
 
@@ -1443,7 +1491,7 @@ def cmd_toot(slug)
   # so in half a dozen comments -- and the announcement is public and
   # cannot be edited afterwards, so getting it from the folder meant a
   # permanent link into nothing.
-  date = Time.parse(post['date'])
+  date = post_time!(post)
   year = PostAddress.date_year(post)
   fields = announce_on_publish(post, year, date)
   # false means the network was asked and said no -- the poster has already
@@ -1501,7 +1549,7 @@ def cmd_bluesky(slug)
 
   # The address year again, not the folder's: what goes out in a toot is
   # public and cannot be corrected afterwards.
-  date = Time.parse(post['date'])
+  date = post_time!(post)
   year = PostAddress.date_year(post)
 
   # Before sending: is one already out there? This command runs precisely
@@ -1551,7 +1599,7 @@ def cmd_publish(slug)
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   unless draft?(post)
-    puts t('cli.already_published', slug: slug, url: published_url(slug, Time.parse(post['date']).year))
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year))
     puts
     return
   end
@@ -2718,9 +2766,9 @@ def props_frame_lines(post, path, slug, year)
     # No created/date line for a plain draft, on purpose: a draft has no
     # time -- its date is set by publishing or scheduling, and showing
     # anything earlier would suggest it means something.
-    lines << props_line('scheduled', post['scheduled'] ? Time.parse(post['date']).getlocal.strftime(t('date_time_format')) : nil)
+    lines << props_line('scheduled', post['scheduled'] ? post_time!(post).getlocal.strftime(t('date_time_format')) : nil)
   else
-    lines << props_line('state', t('cli.props_state_published', date: Time.parse(post['date']).getlocal.strftime(t('date_time_format'))))
+    lines << props_line('state', t('cli.props_state_published', date: post_time!(post).getlocal.strftime(t('date_time_format'))))
   end
   lines << props_line('type', ContentType.dominant(post))
   lines << props_line('tags', (post['tags'] || []).join(', '))
@@ -3444,6 +3492,23 @@ def cmd_edit(slug)
   draft_decision_loop(slug, path: path) if draft?(JSON.parse(File.read(path, encoding: 'utf-8')))
 end
 
+# The date of the post a command is about, or a sentence and an exit.
+#
+# `check` names an unparseable date cleanly, and `check --repair` says
+# outright that putting it right is the author's decision -- and then the
+# two commands that would let them do it, `props` and `edit`, died on a raw
+# Ruby backtrace out of Time.parse. A day/month swap (2026-31-06) is an
+# ordinary typo for anyone used to DD-MM, and hand-editing a post's JSON is
+# a documented workflow.
+#
+# The listings that walk every post keep their own `rescue next`: one
+# unreadable file must not hide the rest of the archive from its owner.
+def post_time!(post)
+  Time.parse(post['date'].to_s)
+rescue ArgumentError, TypeError
+  abort t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect)
+end
+
 def edit_post(slug, path: nil)
   path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
@@ -3459,10 +3524,10 @@ def edit_post(slug, path: nil)
   year = File.basename(File.dirname(path))
   media_dir = File.join(MEDIA_DIR, year, slug)
 
-  date = Time.parse(post['date'])
+  date = post_time!(post)
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
-    tags: (post['tags'] || []).join(', '),
+    tags: tags_to_frontmatter(post['tags']),
     type: post['type'],
     # Shown with its current value so the author can see the state, not
     # just set it -- and only for a published post: pinning a draft that
@@ -3517,7 +3582,7 @@ def edit_post(slug, path: nil)
 
   new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
-  new_tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
+  new_tags = tags_from_frontmatter(meta['tags'])
   new_type, new_page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
@@ -4005,7 +4070,7 @@ def cmd_restore(slug)
   trash_dir = File.dirname(trash_json)
 
   post = JSON.parse(File.read(trash_json, encoding: 'utf-8'))
-  year = Time.parse(post['date']).year.to_s
+  year = post_time!(post).year.to_s
   new_dir = File.join(CONTENT_DIR, year)
   new_path = File.join(new_dir, "#{slug}.json")
   taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug, path: new_path)
