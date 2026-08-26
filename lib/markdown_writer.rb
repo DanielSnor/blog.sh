@@ -67,7 +67,15 @@ module MarkdownWriter
         # A newline stored in a paragraph is a hard break and writes back as
         # the visible backslash marker -- without this, re-saving would
         # collapse it into a space via the parser's prose-wrapping rule.
-        else escape_block_starts(rendered).gsub("\n", "\\\n")
+        # A line whose rendered form already ends with a backslash cannot
+        # take the backslash marker: "\\\\" is an escaped backslash and the
+        # break has nothing left to be written with, so it was lost and
+        # the text came back with a space in its place. Markdown's other
+        # hard break -- two trailing spaces -- says the same thing and
+        # does not collide with anything.
+        else escape_block_starts(rendered).gsub(/(\\*)\n/) do
+          (Regexp.last_match(1).length.odd? ? "#{Regexp.last_match(1)}  \n" : "#{Regexp.last_match(1)}\\\n")
+        end
         end
       when 'table'
         table_to_markdown(b)
@@ -152,6 +160,26 @@ module MarkdownWriter
   # the content would turn into markup on the next edit. The backslash and
   # exclamation mark are only escaped where they'd actually mean something --
   # so `d8-\` and an ordinary "Hi!" stay readable.
+  # A code span, fenced by however many backticks it takes.
+  #
+  # The content used to be handed to the ordinary escaper when it held a
+  # backtick of its own, which put a BACKSLASH inside the span -- and
+  # markdown honours no escapes in there, so the text came back with the
+  # backslash visible and the span cut short at the inner backtick. The
+  # rule markdown does have for this is a longer fence, which is what the
+  # code BLOCK writer already uses (see fence_for).
+  #
+  # The padding space is the other half of that rule: a span whose content
+  # begins or ends with a backtick needs one, or the fence and the content
+  # run together. Markdown drops a single leading and trailing space when
+  # reading a code span back, so it costs nothing.
+  def code_span(content)
+    text = content.to_s
+    fence = '`' * ([text.scan(/`+/).map(&:length).max.to_i + 1, 1].max)
+    pad = text.start_with?('`') || text.end_with?('`') ? ' ' : ''
+    "#{fence}#{pad}#{text}#{pad}#{fence}"
+  end
+
   def escape_markdown(raw)
     raw.gsub(/\\(?=[#{Regexp.escape(ESCAPABLE)}])|!(?=\[)|[*`~\[\]]/) { |c| "\\#{c}" }
   end
@@ -309,8 +337,8 @@ module MarkdownWriter
       # demonstrating markdown ("`**tučně**`") grew a new layer of
       # backslashes with every edit. Raw, unless the content itself has a
       # backtick, which the fence could not hold.
-      wrapped = if e['type'] == 'code' && !text[e['start']...e['end']].include?('`')
-                  "`#{text[e['start']...e['end']]}`"
+      wrapped = if e['type'] == 'code'
+                  code_span(text[e['start']...e['end']])
                 else
                   wrap_markdown(render_markdown_range(text, inner, e['start'], e['end']), e)
                 end
