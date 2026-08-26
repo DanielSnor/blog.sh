@@ -68,6 +68,7 @@ build:
   pruned: "Dateien, die nichts mehr erzeugt, entfernt: %{count}"
 
 post:
+  series_nav_label: "Teile dieser Serie"
   reading_time: "%{minutes} Min. Lesezeit"
   reading_minutes: "%{minutes} Min."
   # Alles unter der Länge, ab der die Engine einen Beitrag nicht mehr Foto
@@ -92,6 +93,7 @@ post:
   draft_banner_notice: "Nirgendwo im Blog sichtbar und nur über diese URL erreichbar:"
 
 pagination:
+  nav_label: "Seiten"
   newer: "← Neuere"
   older: "Ältere →"
   latest: "neueste"
@@ -164,6 +166,7 @@ markdown_page:
   description: "Leitfaden zur Syntax, mit der dieses Blog geschrieben wird."
 
 ui:
+  site_nav_label: "Website"
   scroll_top: "Nach oben"
   # Beschriftung des Erscheinungsbild-Umschalters. Wird zweimal gelesen: das
   # Layout setzt sie auf die Seite, assets/js/theme-toggle.js schreibt sie bei
@@ -181,6 +184,7 @@ js:
   reply_on_mastodon: "Auf Mastodon antworten"
   reply_on_bluesky: "Auf Bluesky antworten"
   comments_moderated: "Vom Autor ausgewählte Kommentare. Die ganze Diskussion steht im Netzwerk."
+  comment_picture: "Bild"
   results_one: "Treffer"
   results_few: "Treffer"
   results_many: "Treffer"
@@ -296,6 +300,7 @@ cli:
   local_preview_hint: "Die Website geht noch nirgendwohin -- starte ./blog.sh preview und öffne %{url} (Standardport 8000)."
   template_body_placeholder: "Text des ersten Absatzes."
   deploy_backend_incomplete: "Das Deploy-Backend %{name} ist nicht konfiguriert -- der Upload wird übersprungen. Der Build in public.nosync/ ist vollständig; ./blog.sh preview zeigt ihn. Setze DEPLOY_BACKEND und seine Werte in env.sh (siehe env.sh.example), um wirklich zu deployen."
+  deploy_target_relative: "DEPLOY_TARGET_DIR ist %{dir}, ein relativer Pfad -- die ganze Website landete in einem Verzeichnis dieses Namens innerhalb der Installation. env.sh.example und docs/install.md zeigen beide einen absoluten (/var/www/meineseite)."
   deploy_args_fix: "In dieser Zeile in env.sh fehlt vermutlich ein schließendes Anführungszeichen. Schalter werden dort als normaler Text in Anführungszeichen geschrieben, zum Beispiel \"-P 2022 -i /home/dan/.ssh/key\"."
   deploy_guard_shrink_files: "❌ Angehalten: public.nosync/ hat %{have} Dateien, laut %{source} sollten es %{expected} sein.\n   Das ist ein Rückgang um %{percent} % -- das sieht nach einem kaputten Build aus.\n   Sieh dir die Build-Ausgabe an. Wenn der Rückgang so gewollt ist (viele Beiträge gelöscht), führe es erneut mit --force aus."
   deploy_guard_shrink_bytes: "❌ Angehalten: public.nosync/ umfasst %{have}, laut %{source} sollten es %{expected} sein.\n   Die Dateizahl wirkt dabei plausibel -- es fehlt also Inhalt INNERHALB der Seiten, nicht die Seiten selbst.\n   Sieh dir die Build-Ausgabe an. Wenn der Rückgang so gewollt ist, führe es erneut mit --force aus."
@@ -869,6 +874,8 @@ doctor:
   base_url_slash: "Die Adresse (%{value}) endet mit einem Schrägstrich, was in erzeugten Links doppelte Schrägstriche ergibt."
   base_url_slash_fix: "Entferne den Schrägstrich am Ende."
   page_size: "site.page_size ist %{value}; es muss eine ganze Zahl größer als null sein."
+  locale_mismatch: "site.locale ist %{locale}, die Website ist aber in %{lang} geschrieben -- jede Seite meldet og:locale=\"%{locale}\" an alles, was es liest. Absicht (en_GB bei lang en) ist in Ordnung; sonst bring site.locale mit site.lang in Einklang."
+  locale_mismatch_fix: "Absicht ist in Ordnung -- en_GB bei lang en ist eine echte Antwort. Sonst bring site.locale mit site.lang in Einklang; der Assistent schreibt beide zusammen."
 
   placeholders: "Immer noch der Text aus der Vorlage: %{keys}."
   placeholders_fix: "Lokal harmlos, aber genau das würden Besucher lesen. Nach Bio, Fußzeile und Links fragt ./style.sh."
@@ -1193,7 +1200,7 @@ setup:
 
   section_network_intro: "blog.sh hat keine eigene Kommentarfunktion. Stattdessen wird jeder neue Beitrag auf deinem Konto in einem sozialen Netzwerk angekündigt, und Antworten auf diese Ankündigung erscheinen unter dem Beitrag als seine Kommentare. Du wählst also das Netzwerk, auf dem du schon ein Konto hast (oder eines anlegst)."
   q_network: "Welches Netzwerk trägt die Kommentare?"
-  network_mastodon: "Mastodon -- jeder Beitrag wird dort angekündigt, die Antworten sind seine Kommentare"
+  network_mastodon: "Mastodon -- jeder Beitrag wird angekündigt, die Antworten sind Kommentare"
   network_bluesky: "Bluesky -- dieselbe Anordnung, auf Bluesky"
   network_none: "Keines -- keine Ankündigungen, keine Kommentare, keine Beitragsstatistik"
   network_off: "Kein Netzwerk. Beiträge werden veröffentlicht, aber nirgends angekündigt."
@@ -1234,7 +1241,7 @@ setup:
   q_backend: "Wohin soll die gebaute Website?"
   backend_none: "Noch nirgendwo -- lokal schreiben und ansehen, später entscheiden"
   backend_surfer: "Cloudron Surfer -- du betreibst ein eigenes Cloudron mit der Surfer-App darauf"
-  backend_local: "Ein Verzeichnis auf diesem Rechner -- ein Webserver (nginx, Caddy ...) läuft direkt hier"
+  backend_local: "Ein Verzeichnis hier -- ein Webserver (nginx, Caddy) läuft direkt darauf"
   backend_rsync: "rsync -- dein eigener Server, auf dem du dich per SSH anmeldest"
   backend_git: "GitHub/GitLab/Codeberg Pages -- der Git-Host liefert die Website kostenlos aus"
   backend_rclone: "rclone -- Cloud-Speicher wie S3, R2, B2 oder WebDAV"

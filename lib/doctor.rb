@@ -257,6 +257,19 @@ module Doctor
     size = dig(data, 'site', 'page_size')
     findings << error(t('page_size', value: size.inspect)) if size && !(size.is_a?(Integer) && size.positive?)
 
+    # site.locale is a SECOND language switch, independent of site.lang,
+    # and only ./setup.sh ever kept the two in step. A site localized by
+    # hand -- or one whose language was changed in the file afterwards --
+    # announces og:locale on every page to everything that reads one, and
+    # nothing anywhere said so. A warning, not an error: en_GB under lang
+    # en is a deliberate and correct thing to write.
+    locale = dig(data, 'site', 'locale').to_s
+    lang = dig(data, 'site', 'lang').to_s
+    if !locale.empty? && !lang.empty? &&
+       locale.split(/[_-]/).first.to_s.downcase != lang.downcase
+      findings << warn(t('locale_mismatch', locale: locale, lang: lang), t('locale_mismatch_fix'))
+    end
+
     findings << ok(t('identity_ok')) if findings.empty?
     findings
   end

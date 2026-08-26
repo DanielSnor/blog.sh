@@ -17,6 +17,17 @@ module DeployBackend
       !dir.empty?
     end
 
+    # env.sh.example and docs/install.md both show an absolute path, and
+    # this is a hand-edited file: drop the leading slash -- the same shape
+    # an unmounted mountpoint has -- and the whole site was deployed into
+    # a directory of that name INSIDE the installation, quietly and
+    # successfully. A relative target is not a target anybody meant.
+    def problem
+      return nil if dir.empty? || dir.start_with?('/')
+
+      I18n.t('cli.deploy_target_relative', dir: dir)
+    end
+
     def dir
       ENV['DEPLOY_TARGET_DIR'].to_s
     end

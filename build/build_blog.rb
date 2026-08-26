@@ -186,7 +186,23 @@ def fediverse_creator_meta
 end
 
 SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
-SITE_LOCALE = SiteConfig.get('site', 'locale', default: 'en_US')
+# locale is a SECOND language switch, independent of site.lang, and only
+# ./setup.sh ever kept the two in step. A site localized by hand -- or one
+# whose language was changed in the file afterwards -- shipped
+# og:locale="en_US" on every page of a Czech or German blog, and nothing
+# anywhere said so.
+#
+# It is NOT overridden here: a site that wants en_GB, or pt_BR under lang
+# en, says so on purpose and the engine has no business guessing against
+# it. What was missing is the sentence, and it belongs to doctor rather
+# than to the build -- "your config could be better" is doctor's subject,
+# and an upgrade that starts printing a new warning on every build of
+# every existing site is the noise tests/test_upgrade_from_12.rb refuses.
+# The default follows the language, because a site that never named a
+# locale has not chosen one.
+LOCALE_FOR_LANG = { 'cs' => 'cs_CZ', 'de' => 'de_DE', 'en' => 'en_US' }.freeze
+SITE_LOCALE = SiteConfig.get('site', 'locale',
+                             default: LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US'))
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
 # site that just doesn't want the overlay) can drop either line without
@@ -291,6 +307,7 @@ def client_i18n_json
     reply_on_mastodon: t('js.reply_on_mastodon'),
     reply_on_bluesky: t('js.reply_on_bluesky'),
     comments_moderated: t('js.comments_moderated'),
+    comment_picture: t('js.comment_picture'),
     results_one: t('js.results_one'),
     results_few: t('js.results_few'),
     results_many: t('js.results_many'),
@@ -1425,6 +1442,14 @@ def build_list_item(post, pinned: false)
             else
               post_content_html(post)
             end
+  # Heading anchors belong to the post's own page. A listing stacks ten
+  # posts' bodies into ONE document, so two posts that both have a
+  # "Co dal?" section put id="co-dal" on the page twice -- 105 pages of a
+  # real archive carried duplicate ids, which makes the document invalid
+  # and sends any same-page anchor to whichever came first. heading_id
+  # de-duplicates within a post; nothing could de-duplicate across them,
+  # because each post's HTML is rendered (and cached) on its own.
+  content = content.gsub(%r{<(h[1-6])([^>]*) id="[^"]*"}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2)}" }
   excerpt = teaser ? false : excerpt?(post)
   content_class = excerpt ? 'content excerpt' : 'content'
   more = teaser || excerpt
@@ -1745,7 +1770,11 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   links = []
   links << %(<a class="series-prev" href="#{h(post_path(prev_post))}">#{h(t('post.series_previous', title: post_title_for(prev_post)))}</a>) if prev_post
   links << %(<a class="series-next" href="#{h(post_path(next_post))}">#{h(t('post.series_next', title: post_title_for(next_post)))}</a>) if next_post
-  %(<nav class="series-nav">#{links.join}</nav>\n                )
+  # Named, like the table of contents is. A screen reader lists the
+  # landmarks on a page, and a post can carry three <nav>s -- the site
+  # bar, this one and the pagination -- of which only the toc had a name.
+  # Three entries reading "navigation" are three guesses.
+  %(<nav class="series-nav" aria-label="#{h(t('post.series_nav_label'))}">#{links.join}</nav>\n                )
 end
 
 # A link post carries no title of its own -- what the reader takes for its
@@ -2030,7 +2059,7 @@ def pagination_html(number, fixed, base_path = '')
   newer = number <= fixed ? %(<a href="#{page_url(number + 1, fixed, base_path)}">#{h(t('pagination.newer'))}</a>) : ''
   older = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path)}">#{h(t('pagination.older'))}</a>) : ''
   label = number > fixed ? t('pagination.latest') : t('pagination.page', number: number)
-  %(<nav class="pagination">#{newer}<span>#{h(label)}</span>#{older}</nav>)
+  %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{newer}<span>#{h(label)}</span>#{older}</nav>)
 end
 
 # Templates only contain their own <main>; the header, nav, sidebar and
@@ -2596,6 +2625,14 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # such a post separately, so this is the second line of defence rather
   # than a licence to write one.
   parsed['content'] = parsed['content'].is_a?(Array) ? parsed['content'].select { |b| b.is_a?(Hash) } : []
+  # And `title`, for the same reason and at the same door. The engine's
+  # contract for an untitled post is `title: nil` -- then the date becomes
+  # the heading, <title> falls back to the post's first sentence, and a
+  # listing link carries that sentence as its text. An empty STRING is
+  # what the feed, WordPress and Squarespace importers write for an item
+  # with no title, and it is truthy: the page shipped a blank <title>, an
+  # empty <h1> and archive links with nothing to click.
+  parsed['title'] = nil if parsed['title'].to_s.strip.empty?
   parsed['__year'] = File.basename(File.dirname(f))
   # The file this came out of. The duplicate message below names it,
   # because an address does not find a file: two pages collide on a slug

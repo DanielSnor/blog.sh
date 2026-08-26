@@ -1,4 +1,4 @@
-<% if NAV_ITEMS.any? || search %><nav>
+<% if NAV_ITEMS.any? || search %><nav aria-label="<%= h(t('ui.site_nav_label')) %>">
 <%# The items come from NAV_ITEMS in build_blog.rb -- either the site's own
     `nav:` list or, with no such key, All plus the content types the site
     has. Rendering them through one loop means the default menu comes out

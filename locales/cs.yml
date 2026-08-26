@@ -66,6 +66,7 @@ build:
   pruned: "Souborů, které už nic negeneruje a byly smazané: %{count}"
 
 post:
+  series_nav_label: "Díly téhle série"
   reading_time: "Na čtení %{minutes} min"
   reading_minutes: "%{minutes} min"
   # Cokoli pod hranicí, od které engine přestává postu říkat fotka
@@ -90,6 +91,7 @@ post:
   draft_banner_notice: "Není nikde na blogu vidět a jinak než přes toto URL jej nelze zobrazit:"
 
 pagination:
+  nav_label: "Stránky"
   newer: "← Novější"
   older: "Starší →"
   latest: "nejnovější"
@@ -160,6 +162,7 @@ markdown_page:
   description: "Návod na syntaxi, kterou tenhle blog používá pro psaní příspěvků."
 
 ui:
+  site_nav_label: "Web"
   scroll_top: "Nahoru"
   # Popisek přepínače vzhledu. Čte se dvakrát: šablona ho vloží do stránky a
   # assets/js/theme-toggle.js ho přepisuje při každém kliknutí, takže se sem
@@ -176,6 +179,7 @@ js:
   reply_on_mastodon: "Reagovat na Mastodonu"
   reply_on_bluesky: "Reagovat na Bluesky"
   comments_moderated: "Komentáře, které autor vybral. Celá diskuse je na síti."
+  comment_picture: "Obrázek"
   results_one: "výsledek"
   results_few: "výsledky"
   results_many: "výsledků"
@@ -284,6 +288,7 @@ cli:
   local_preview_hint: "Web zatím nikam neputuje — spusť ./blog.sh preview a otevři %{url} (výchozí port 8000)."
   template_body_placeholder: "Text prvního odstavce."
   deploy_backend_incomplete: "Cíl nasazení „%{name}“ nemá v env.sh vyplněné hodnoty — nahrávání přeskakuji. Sestavený web v public.nosync/ je hotový, ukáže ho ./blog.sh preview. Až ho budeš chtít nahrávat, doplň hodnoty do env.sh (vzor je v env.sh.example)."
+  deploy_target_relative: "DEPLOY_TARGET_DIR je %{dir}, což je relativní cesta — celý web by skončil v adresáři toho jména uvnitř instalace. env.sh.example i docs/install.md ukazují absolutní (/var/www/mujweb)."
   deploy_args_fix: "Nejspíš v tom řádku v env.sh zůstala neuzavřená uvozovka. Přepínače se do něj píšou jako běžný text v uvozovkách, třeba \"-P 2022 -i /home/dan/.ssh/klic\"."
   deploy_guard_shrink_files: "❌ Zastaveno: v public.nosync/ je %{have} souborů, ale podle %{source} jich mělo být %{expected}.\n   To je propad o %{percent} % — vypadá to na rozbitý build.\n   Podívej se na výstup buildu. Jestli je ten úbytek v pořádku (smazal jsi hodně postů), spusť to znovu s --force."
   deploy_guard_shrink_bytes: "❌ Zastaveno: public.nosync/ má %{have}, ale podle %{source} mělo mít %{expected}.\n   Počet souborů přitom vypadá rozumně, takže obsah nemizí po stránkách, ale uvnitř nich.\n   Podívej se na výstup buildu. Jestli je ten úbytek v pořádku, spusť to znovu s --force."
@@ -857,6 +862,8 @@ doctor:
   base_url_slash: "Adresa webu (%{value}) končí lomítkem, takže v generovaných odkazech vzniknou dvojitá lomítka."
   base_url_slash_fix: "Smaž koncové lomítko."
   page_size: "site.page_size je %{value}; musí to být celé číslo větší než nula."
+  locale_mismatch: "site.locale je %{locale}, ale web je psaný v %{lang} — každá stránka hlásí og:locale=\"%{locale}\" všemu, co to čte. Když je to záměr (en_GB při lang en), nech to být; jinak srovnej site.locale se site.lang."
+  locale_mismatch_fix: "Když je to záměr, nech to být — en_GB při lang en je poctivá odpověď. Jinak srovnej site.locale se site.lang; průvodce je píše spolu."
 
   placeholders: "Pořád je tam text ze šablony: %{keys}."
   placeholders_fix: "Lokálně to nevadí, ale tohle by četli návštěvníci. Na bio, patičku a odkazy se zeptá ./style.sh."

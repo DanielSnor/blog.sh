@@ -67,6 +67,7 @@ build:
   pruned: "Files that nothing generates any more, removed: %{count}"
 
 post:
+  series_nav_label: "Parts of this series"
   reading_time: "%{minutes} min read"
   reading_minutes: "%{minutes} min"
   # Anything under the length at which the engine stops calling a post a
@@ -91,6 +92,7 @@ post:
   draft_banner_notice: "Not visible anywhere on the blog and can't be reached except through this URL:"
 
 pagination:
+  nav_label: "Pages"
   newer: "← Newer"
   older: "Older →"
   latest: "latest"
@@ -161,6 +163,7 @@ markdown_page:
   description: "Guide to the syntax this blog uses for writing posts."
 
 ui:
+  site_nav_label: "Site"
   scroll_top: "Up"
   # Label for the appearance toggle. Read twice: the layout puts it on the
   # page, and assets/js/theme-toggle.js rewrites it on every click -- which is
@@ -181,6 +184,7 @@ js:
   reply_on_mastodon: "Reply on Mastodon"
   reply_on_bluesky: "Reply on Bluesky"
   comments_moderated: "Comments the author picked out. The whole discussion is on the network."
+  comment_picture: "Picture"
   results_one: "result"
   results_few: "results"
   results_many: "results"
@@ -301,6 +305,7 @@ cli:
   local_preview_hint: "The site goes nowhere yet -- run ./blog.sh preview and open %{url} (port 8000 by default)."
   template_body_placeholder: "First paragraph's text."
   deploy_backend_incomplete: "The %{name} deploy backend is not configured -- skipping the upload. The build in public.nosync/ is complete; view it with ./blog.sh preview. To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example)."
+  deploy_target_relative: "DEPLOY_TARGET_DIR is %{dir}, which is a relative path -- the whole site would go into a directory of that name inside the installation. env.sh.example and docs/install.md both show an absolute one (/var/www/mysite)."
   deploy_args_fix: "That line in env.sh most likely has an unmatched quote in it. Switches are written into it as plain text in quotes, for example \"-P 2022 -i /home/dan/.ssh/key\"."
   deploy_guard_shrink_files: "❌ Stopped: public.nosync/ has %{have} files, but %{expected} were expected from %{source}.\n   That is a %{percent}% drop -- looks like a broken build.\n   Check the build output. If the drop is expected (you deleted a lot of posts), run again with --force."
   deploy_guard_shrink_bytes: "❌ Stopped: public.nosync/ holds %{have}, but %{expected} were expected from %{source}.\n   The file count looks reasonable, so this is content going missing inside the pages rather than pages going missing.\n   Check the build output. If the drop is expected, run again with --force."
@@ -887,6 +892,8 @@ doctor:
   base_url_slash: "The site's address (%{value}) ends with a slash, which produces doubled slashes in generated links."
   base_url_slash_fix: "Drop the trailing slash."
   page_size: "site.page_size is %{value}; it has to be a whole number greater than zero."
+  locale_mismatch: "site.locale is %{locale} but the site is written in %{lang} -- every page announces og:locale=\"%{locale}\" to anything that reads it. Deliberate (en_GB under lang en) is fine; otherwise put site.locale in step with site.lang."
+  locale_mismatch_fix: "Deliberate is fine -- en_GB under lang en is a real answer. Otherwise put site.locale in step with site.lang; the wizard writes both together."
 
   placeholders: "Still the example's text: %{keys}."
   placeholders_fix: "Harmless locally, but this is what visitors would read. ./style.sh asks for the bio, the footer and the links."

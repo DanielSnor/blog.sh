@@ -217,8 +217,17 @@ module Checker
     found = posts.filter_map do |post|
       next if draft?(post)
 
+      # The TITLE too, and a link block's title and description. The whole
+      # point of this finding is archives imported before 1.4, and a
+      # Twitter or Ghost import puts `journalists &amp; writers` in a
+      # post's title as readily as in its body -- where it is worse,
+      # because that string is the heading, the browser tab, the feed
+      # item and the link card. It was neither reported nor repairable.
       texts = Array(post['content']).select { |b| b.is_a?(Hash) && b['type'] == 'text' }
       hits = texts.filter_map { |b| b['text'].to_s[EntityText::ANY_ENTITY] if EntityText.entities?(b['text']) }
+      links = Array(post['content']).select { |b| b.is_a?(Hash) && b['type'] == 'link' }
+      hits += ([post['title']] + links.flat_map { |b| [b['title'], b['description']] })
+              .filter_map { |v| v.to_s[EntityText::ANY_ENTITY] if EntityText.entities?(v) }
       next if hits.empty?
 
       [post, hits.uniq]

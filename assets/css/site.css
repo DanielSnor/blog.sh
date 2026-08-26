@@ -578,7 +578,13 @@ nav a[aria-current="page"]:hover {
   .search-form input[type="search"] { height: 40px; }
   .search-form button { width: 40px; height: 40px; }
 
-  nav li { float: none; margin-left: 0; line-height: normal; }
+  /* height too. The desktop bar fixes the row at 60px so a hovered link
+     can paint over the bar's frame; stacked on a narrow screen that
+     leaves every 40px link floating in a 60px row, with the divider
+     under it in mid-gap rather than under the text. The rest of this
+     block already undoes the desktop row metrics -- this was the one
+     property left behind. */
+  nav li { float: none; margin-left: 0; line-height: normal; height: auto; }
 
   nav a {
     height: auto;
