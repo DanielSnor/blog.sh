@@ -43,9 +43,9 @@ module Repair
 
   # The first segments of a redirect_from that belong to the site itself --
   # the build refuses these with a warning, so proposing one would be
-  # proposing a change that quietly does nothing. Kept in step with
-  # REDIRECT_FROM_RESERVED in build/build_blog.rb.
-  RESERVED = %w[posts page tag type assets search markdown].freeze
+  # proposing a change that quietly does nothing. There were four copies of
+  # this list; it has one home now, and every reader borrows it from there.
+  RESERVED = PostAddress::REDIRECT_RESERVED
 
   module_function
 
@@ -164,11 +164,7 @@ module Repair
   # query string, a fragment and the site's own first segments, so a
   # proposal carrying one of those would be a promise the build breaks.
   def redirectable?(origin)
-    parts = origin.to_s.split('/').reject(&:empty?)
-    return false if parts.empty?
-    return false if parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
-
-    !RESERVED.include?(parts.first)
+    PostAddress.redirect_refusal(origin).nil?
   end
 
   # The one repair a finding allows, or nil when the answer is a person's
@@ -211,6 +207,11 @@ module Repair
     from = data['file'].to_s
     to = data['actual'].to_s
     return nil if from.empty? || to.empty? || from == to
+    # The comment above has promised this since it was written, and the
+    # code never asked: the refusal lived at apply time instead, so the
+    # rename was offered in full, the keypress was taken, and the answer
+    # was "could not be applied" with no reason given.
+    return nil if data['actual_in_use']
 
     Proposal.new(action: :rename_media_ref,
                  data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s,

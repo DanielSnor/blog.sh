@@ -140,10 +140,11 @@ module Checker
     findings.concat(check_relative_links(posts, cap))
     findings.concat(check_orphan_media(root, posts, cap))
     findings.concat(check_stray_media(root, posts, cap))
-    findings.concat(check_redirects(posts))
-    findings.concat(check_series_names(posts))
+    findings.concat(check_redirects(posts, cap))
+    findings.concat(check_redirect_entries(posts, cap))
+    findings.concat(check_series_names(posts, cap))
     findings.concat(check_duplicate_addresses(posts))
-    findings.concat(check_html_entities(posts))
+    findings.concat(check_html_entities(posts, cap))
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
 
@@ -212,7 +213,7 @@ module Checker
   # `capped`'s job, done once, and `--json` asks for all of them by passing
   # nil. Slicing here took that nil and died on it -- which took the whole
   # --json document with it, along with its count, its total and its kinds.
-  def check_html_entities(posts)
+  def check_html_entities(posts, cap = nil)
     found = posts.filter_map do |post|
       next if draft?(post)
 
@@ -223,7 +224,7 @@ module Checker
       [post, hits.uniq]
     end
 
-    found.map do |post, hits|
+    capped(found.map do |post, hits|
       warn(t('post_entities', slug: post['slug'], entities: hits.first(3).join(' ')),
            t('post_entities_fix'), kind: :post_entities,
            # file_year, not date_year: the repair opens this as a PATH,
@@ -232,7 +233,7 @@ module Checker
            # Every other finding in this file records __year already.
            data: { 'slug' => post['slug'].to_s, 'year' => PostAddress.file_year(post).to_s,
                    'entities' => hits })
-    end
+    end, cap)
   end
 
   def check_unbuildable(posts, cap = CAP)
@@ -486,7 +487,15 @@ module Checker
       # link to one pass as sound while the reader gets a 404.
       if in_stream || !draft?(post)
         Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
-        Array(post['redirect_from']).each { |origin| paths << origin.to_s }
+        # ...and only the ones the build will actually serve. It refuses a
+        # redirect_from whose first segment belongs to the site itself, or
+        # whose shape it cannot make a directory of, and says so once in
+        # the middle of a build log. Counting those among the addresses
+        # the site answers at passed every link to them as sound -- under
+        # a closing sentence that names redirects by name.
+        Array(post['redirect_from']).each do |origin|
+          paths << origin.to_s if PostAddress.redirect_refusal(origin).nil?
+        end
       end
     end
     # The map exists once one post is in the stream; the tag index once
@@ -630,7 +639,14 @@ module Checker
         elsif claim.nil?
           missing << [post['slug'], url, post['__year']]
         elsif claim.last != :exact
-          misnamed << [post['slug'], url, claim.first, claim.last, post['__year'], rel_dir]
+          # Whether this post ALSO refers to the correct spelling somewhere
+          # else. The repair pass refuses the rename in that case -- two
+          # blocks would end up sharing one url and which picture was lost
+          # is not a machine's question -- but it refused at apply time,
+          # after offering the rename in full and taking the keypress. The
+          # answer is known here, so the offer is never made.
+          misnamed << [post['slug'], url, claim.first, claim.last, post['__year'], rel_dir,
+                       urls.include?(claim.first)]
         end
       end
     end
@@ -652,14 +668,15 @@ module Checker
       # warning), where it does not the hole is already there (an error).
       # And when the two spellings look identical on screen -- NFC against
       # NFD -- the sentence has to say so, or it reads as nonsense.
-      capped(misnamed.map do |slug, url, actual, how, year, rel|
+      capped(misnamed.map do |slug, url, actual, how, year, rel, in_use|
         key = url.unicode_normalize(:nfc) == actual.unicode_normalize(:nfc) &&
               url.downcase != actual.downcase ? 'media_misnamed_form' : 'media_misnamed'
         text = t(key, slug: slug, file: url, actual: actual)
         data = { 'slug' => slug, 'file' => url, 'actual' => actual, 'year' => year,
-                 'match' => how.to_s, 'dir' => rel }
-        how == :fold ? error(text, t('media_misnamed_fix'), kind: :media_misnamed, data: data)
-                     : warn(text, t('media_misnamed_fix'), kind: :media_misnamed, data: data)
+                 'match' => how.to_s, 'dir' => rel, 'actual_in_use' => in_use }
+        fix = t(in_use ? 'media_misnamed_both_fix' : 'media_misnamed_fix')
+        how == :fold ? error(text, fix, kind: :media_misnamed, data: data)
+                     : warn(text, fix, kind: :media_misnamed, data: data)
       end, cap)
   end
 
@@ -888,7 +905,7 @@ module Checker
   # alone -- rok-2025 next to rok-2026 is two year-series, not a typo.
   # And a distance of two only counts when one side has a single post:
   # two established series that merely have similar names are not news.
-  def check_series_names(posts)
+  def check_series_names(posts, cap = nil)
     groups = posts.reject { |p| draft?(p) }
                   .group_by { |p| Slug.slugify(p['series'].to_s) }
                   .reject { |slug, _| slug.empty? }
@@ -908,7 +925,7 @@ module Checker
                        data: { 'a' => names[0], 'posts_a' => groups[a].size,
                                'b' => names[1], 'posts_b' => groups[b].size })
     end
-    findings
+    capped(findings, cap)
   end
 
   # What is left of a slug once its numbers are gone -- and once the
@@ -942,18 +959,39 @@ module Checker
     previous.last
   end
 
-  def check_redirects(posts)
+  # Every redirect_from the build will refuse to serve, said here instead
+  # of once in the middle of a build log nobody keeps. The two refusals are
+  # kept apart because they are different mistakes: a reserved first
+  # segment is a redirect somebody wrote by hand into the site's own
+  # namespace, an unusable one is a shape no directory can be made of.
+  def check_redirect_entries(posts, cap = nil)
+    findings = posts.flat_map do |post|
+      Array(post['redirect_from']).filter_map do |origin|
+        refusal = PostAddress.redirect_refusal(origin)
+        next if refusal.nil?
+
+        warn(t("redirect_from_#{refusal}", slug: post['slug'].to_s, entry: origin.to_s),
+             t("redirect_from_#{refusal}_fix"),
+             kind: :"redirect_from_#{refusal}",
+             data: { 'slug' => post['slug'].to_s, 'entry' => origin.to_s,
+                     'year' => PostAddress.file_year(post).to_s })
+      end
+    end
+    capped(findings, cap)
+  end
+
+  def check_redirects(posts, cap = nil)
     claims = Hash.new { |h, k| h[k] = [] }
     posts.each do |post|
       Array(post['redirect_from']).each { |origin| claims[origin.to_s] << post['slug'] }
       Array(post['former_slugs']).each { |former| claims["/posts/#{former}/"] << post['slug'] }
     end
-    claims.filter_map do |origin, slugs|
+    capped(claims.filter_map do |origin, slugs|
       next if slugs.uniq.size < 2
 
       error(t('redirect_collision', origin: origin, slugs: slugs.uniq.join(', ')), t('redirect_collision_fix'),
             kind: :redirect_collision, data: { 'origin' => origin, 'slugs' => slugs.uniq })
-    end
+    end, cap)
   end
 
   # --- the outside world (--online only) -----------------------------------

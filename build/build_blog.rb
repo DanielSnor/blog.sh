@@ -3429,19 +3429,20 @@ emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
 # are arbitrary, so unlike the former_slugs loop this one runs after
 # EVERYTHING real -- posts, listings, search, feeds, root files -- and a
 # stub yields to whatever the build already produced, out loud.
-REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
+# The list itself now lives in PostAddress, so the build, the checker and
+# the repair pass cannot drift apart about it.
+REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
 # Pages too, for the reason above -- and because a source like Substack
 # serves its pages under /p/<slug>, so the old address is a real one the
 # importer records and this loop is the only thing that answers it.
 (posts + pages + unlisted_posts).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
-    if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) } ||
-       parts.any? { |p| p.bytesize > NAME_MAX_BYTES }
+    case PostAddress.redirect_refusal(origin)
+    when :unusable
       warn t('build.redirect_from_unusable', slug: post['slug'], entry: origin.inspect)
       next
-    end
-    if REDIRECT_FROM_RESERVED.include?(parts.first)
+    when :reserved
       warn t('build.redirect_from_reserved', slug: post['slug'], entry: origin.inspect, segment: parts.first)
       next
     end

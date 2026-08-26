@@ -671,7 +671,19 @@ module Doctor
       end
       # Nothing to judge against on an archive with no posts in it yet.
       next if posts.empty?
-      next if known.include?(url) || known.include?("#{url}/")
+      # A menu address is a URL, not a path: `/o-mne/#kontakt` is an anchor
+      # on a page that exists and `/search/?q=foto` is a query the search
+      # page reads. Judged raw, both were reported as addresses the site
+      # does not answer at, the install failed, and the fix text sent the
+      # owner looking for a post that had been "renamed or deleted" -- a
+      # post that was never renamed. check has split these off before
+      # comparing since it was written; the /assets/ branch above does it
+      # too. This is the one place that did not.
+      path = url.split('#').first.to_s.split('?').first.to_s
+      # A bare "#kontakt" or "?q=x" is a same-page address: there is
+      # nothing left to look up and nothing wrong with it.
+      next if path.empty?
+      next if known.include?(path) || known.include?("#{path}/")
 
       findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
     end
@@ -1090,6 +1102,13 @@ module Doctor
   def check_online_approval(data)
     approval = dig(data, 'comments', 'approval').to_s.strip.downcase
     return [] unless %w[fav favourite favorite].include?(approval)
+
+    # The one require of lib/post_stats.rb used to sit inside
+    # check_online_thread_readable, behind its early returns -- so on a
+    # site where that check bows out, this one died on an uninitialized
+    # constant instead of answering the question it exists for. It is
+    # required here as well, where it is used.
+    require_relative 'post_stats'
 
     # The newest announcement the token can actually be tested against: a
     # Mastodon entry on the configured instance (a foreign one is refused

@@ -108,6 +108,29 @@ module PostAddress
     keys
   end
 
+  # Whether the build will serve an address as a redirect_from, and if not,
+  # why. Three places were answering this: the build refuses and warns, the
+  # repair pass refuses to PROPOSE one (Repair.redirectable?), and the
+  # checker did not ask at all -- so it counted a refused address among the
+  # ones the site answers at and called a link to it sound, in a sentence
+  # that names redirects specifically.
+  #
+  # nil means the build will serve it. :reserved and :unusable are the two
+  # refusals, kept apart because the build says a different sentence for
+  # each and the checker now says them too.
+  REDIRECT_RESERVED = %w[posts page tag type assets search markdown].freeze
+  REDIRECT_SEGMENT_MAX_BYTES = 255
+
+  def redirect_refusal(origin)
+    parts = origin.to_s.split('/').reject(&:empty?)
+    return :unusable if parts.empty?
+    return :unusable if parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
+    return :unusable if parts.any? { |p| p.bytesize > REDIRECT_SEGMENT_MAX_BYTES }
+    return :reserved if REDIRECT_RESERVED.include?(parts.first)
+
+    nil
+  end
+
   def draft?(post)
     post['state'].to_s == 'draft'
   end

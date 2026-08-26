@@ -337,7 +337,7 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Twelve questions, in one pass: files the checker cannot read at all, posts
+Thirteen questions, in one pass: files the checker cannot read at all, posts
 whose date nothing can parse, posts whose text is not a list of blocks, and
 posts whose slug is not one path segment -- all of them states the BUILD
 refuses to run on (or, for the slug, misplaces the page for), so a check that stayed
@@ -360,7 +360,10 @@ which is usually one series and a typo; one old address claimed by
 two posts, where whichever renders last wins and the others' readers land
 on it; and two posts that would be served at one address, which the build
 refuses to run on at all -- so an archive in that state used to be called
-sound by the one tool whose job is to say otherwise.
+sound by the one tool whose job is to say otherwise; and a `redirect_from`
+the build will refuse to serve, which it says once in the middle of a build
+log and which the checker used to count among the addresses this site
+answers at, so a link into one passed as sound.
 
 Two rules shape the plain run. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value

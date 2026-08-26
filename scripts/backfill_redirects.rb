@@ -25,13 +25,14 @@ require 'uri'
 require_relative '../lib/atomic_write'
 require_relative '../lib/import/permalinks'
 require_relative '../lib/path_glob'
+require_relative '../lib/post_address'
 
 ROOT = File.expand_path('..', __dir__)
 CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
 
 # Mirrors the build's REDIRECT_FROM_RESERVED: entries under these would be
 # refused there with a warning on every build -- better never written.
-RESERVED = %w[posts page tag type assets search markdown].freeze
+RESERVED = PostAddress::REDIRECT_RESERVED
 
 domain = ARGV[0] || abort('usage: backfill_redirects.rb <old-domain>   (WRITE=1 to apply)')
 domain = domain.sub(/\Awww\./, '').downcase
