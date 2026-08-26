@@ -305,13 +305,39 @@ module Repair
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
     changed = false
     Array(post['content']).each do |block|
-      next unless block.is_a?(Hash) && block['type'] == 'text' && EntityText.entities?(block['text'])
+      next unless block.is_a?(Hash)
 
-      decoded, = EntityText.decode(block['text'].to_s, block['formatting'] || [])
-      block['text'] = decoded
+      if block['type'] == 'text' && EntityText.entities?(block['text'])
+        decoded, = EntityText.decode(block['text'].to_s, block['formatting'] || [])
+        block['text'] = decoded
+        changed = true
+      end
+      # A link card's own words, which the check has looked at since 1.5:
+      # they are the card's headline and its blurb, and an entity there is
+      # as visible as one in a paragraph.
+      next unless block['type'] == 'link'
+
+      %w[title description].each do |key|
+        next unless EntityText.entities?(block[key])
+
+        block[key] = EntityText.decode(block[key].to_s, []).first
+        changed = true
+      end
+    end
+    # The TITLE. The check learned to look at it in 1.5 and this did not
+    # follow, so the two posts on one real archive whose entity is in the
+    # title were offered the repair, took the keypress, and were reported
+    # as done while nothing was written -- the same shape the bounty found
+    # in the media rename. No formatting to carry: a title has none.
+    if EntityText.entities?(post['title'])
+      post['title'] = EntityText.decode(post['title'].to_s, []).first
       changed = true
     end
-    return true unless changed
+    # Nothing to decode is a FAILURE here, not a quiet success. The repair
+    # is only ever offered against a finding that says there are entities;
+    # if none are found now, the post changed under the run, and a summary
+    # counting that as applied is a summary that lies.
+    return false unless changed
     return false unless keep_version(path, root)
 
     AtomicWrite.write_json(path, post)
