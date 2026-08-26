@@ -823,6 +823,7 @@ import:
     feed_pages_home: "%{count} page(s) already sit at the address they had on the old site, so they need no redirect -- moving to the same domain, their links keep working as they are."
     feed_pages_reserved: "%{count} page(s) came across on addresses this engine uses for itself (%{paths}) -- the build will not put them up until they are renamed, so do not list them under `nav:` as they stand."
     feed_dropped: "Content the block schema has no shape for was dropped from post bodies: %{listed}. Embeds and forms are the usual ones -- if a post needs its video, put the link back by hand."
+    duplicate_ids: "%{count} item(s) in the source carried an id another item had already used. Each is written as a post of its own rather than over the first one -- look at them and delete whichever is the copy."
     feed_linked_images: "%{count} picture(s) were wrapped in a link, which an image block cannot carry -- the pictures arrived, the addresses they pointed at did not."
     ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
     livejournal_nonpublic: "%{count} entr(y/ies) were friends-only or private -- imported as drafts, they were never public."

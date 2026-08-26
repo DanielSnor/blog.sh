@@ -793,6 +793,7 @@ import:
     feed_pages_home: "Stránek, které už leží na adrese, kterou měly na starém webu: %{count} — přesměrování nepotřebují, při stěhování na stejnou doménu jim odkazy fungují dál tak, jak jsou."
     feed_pages_reserved: "Stránek, které dorazily na adresy, které si engine drží pro sebe: %{count} (%{paths}) — dokud je nepřejmenuješ, build je nepostaví, takže je takhle nedávej do `nav:`."
     feed_dropped: "Z těl postů vypadl obsah, pro který schéma bloků nemá tvar: %{listed}. Obvykle jde o embedy a formuláře — jestli post to video potřebuje, vrať odkaz ručně."
+    duplicate_ids: "%{count} položek zdroje neslo id, které už jiná položka použila. Každá se zapsala jako vlastní post, ne přes tu první — projdi je a smaž tu, která je kopie."
     feed_linked_images: "Obrázků obalených odkazem, který obrázkový blok neunese: %{count} — obrázky dorazily, adresy, kam mířily, ne."
     ghost_scheduled: "Postů naplánovaných v Ghostu: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
     livejournal_nonpublic: "Zápisků jen pro přátele nebo soukromých: %{count} — dorazily jako drafty, veřejné nikdy nebyly."

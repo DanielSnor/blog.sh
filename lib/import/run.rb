@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'set'
 require 'tmpdir'
 require_relative '../post_writer'
 require_relative 'media'
@@ -53,6 +54,7 @@ module Import
     Result = Struct.new(:written, :scanned, :skipped, :media, :media_reused,
                         :media_failures, :skipped_media_failures, :samples, :interrupted,
                         :dropped_elements, :media_superseded, :pages, :errors,
+                        :duplicate_ids,
                         keyword_init: true)
 
     # `media_index` is what lets a re-import skip what it already has (see
@@ -98,6 +100,11 @@ module Import
       media_failures = []
       skipped_media_failures = []
       samples = []
+      # Identities this run has already written, so a source that hands
+      # out the same id twice cannot make the second item overwrite the
+      # first -- see the note by the check below.
+      @seen_ids = Set.new
+      duplicate_ids = []
       pages = []
       errors = []
 
@@ -157,6 +164,23 @@ module Import
               media_reused += media.reused
               media_failures.concat(media.failures)
 
+              # Two items in ONE run that claim the same identity are not
+              # a re-import, they are a source with a duplicate id -- two
+              # feed entries sharing a <guid>, which plenty of generators
+              # emit. Matched on it, the second overwrote the first IN
+              # PLACE and the summary still counted two written: one post
+              # destroyed, and a number that says nothing went wrong.
+              #
+              # The second one loses its identity instead. A duplicate is
+              # recoverable -- somebody deletes it -- where a wrong match
+              # destroys a post that cannot be got back, which is the rule
+              # PostWriter.source_key already states for the same reason.
+              key = PostWriter.source_key(post['source'])
+              if key && !@seen_ids.add?(key)
+                duplicate_ids << key
+                post = post.merge('source' => post['source'].reject { |k, _| k == 'original_id' })
+              end
+
               written_slug = post['slug']
               unless @dry_run
                 path = PostWriter.write(post, media_files: media.files)
@@ -209,6 +233,7 @@ module Import
                  skipped_media_failures: skipped_media_failures,
                  samples: samples, interrupted: interrupted,
                  dropped_elements: HtmlBlocks.dropped.dup,
+                 duplicate_ids: duplicate_ids,
                  media_superseded: PostWriter.superseded_downloads - superseded_before)
     end
 

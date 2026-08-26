@@ -144,6 +144,17 @@ module Import
       # docs/ is. Same shape, wider net, minus the machinery.
       swept = posts.empty? && drafts.empty?
 
+      # A folder with no markdown in it at all is not an empty blog, it is
+      # the wrong folder -- and "Done. 0 post(s) written", exit 0, reads as
+      # a successful import of nothing. Somebody who has just pointed the
+      # importer at their Downloads instead of the export inside it needs
+      # to hear that, not a tick.
+      if swept && wider_net.empty?
+        abort("❌ #{@dir} holds no markdown files, so there is nothing here to import. " \
+              'Point this at the folder that holds the posts -- in a Hugo site that is ' \
+              'usually content/, in a Jekyll one _posts/.')
+      end
+
       if swept
         root, nested = wider_net.partition { |path| File.dirname(path) == tree_root }
         # Whether a file in the root of a swept tree is a page or a post is
@@ -629,6 +640,16 @@ module Import
         [YAML.safe_load(m[1], permitted_classes: [Date, Time]) || {}, m.post_match]
       elsif (m = raw.match(/\A\+\+\+\s*\n(.*?)\n\+\+\+\s*\n?/m))
         [toml_subset(m[1]), m.post_match]
+      elsif (m = raw.match(/\A\{\s*\n(.*?)\n\}\s*\n?/m))
+        # Hugo's third dialect. Unrecognised, the whole block fell through
+        # as BODY: the title, the date, the tags and the draft flag were
+        # all lost, and the post was published with its own front matter
+        # printed at the top as text.
+        begin
+          [JSON.parse("{\n#{m[1]}\n}"), m.post_match]
+        rescue JSON::ParserError
+          [{}, raw]
+        end
       else
         [{}, raw]
       end
@@ -636,18 +657,90 @@ module Import
       [nil, nil]
     end
 
+    # A subset of TOML, deliberately -- but the value scanner was crude
+    # enough to be wrong about four ordinary things at once.
+    #
+    #   draft = true # nekdy pozdeji
+    # is not the string "true", so it fell through to the else branch and
+    # became a truthy STRING. Hugo's own `draft = true` with a note beside
+    # it therefore imported as PUBLISHED, and a post the author was still
+    # writing went onto the open web. That is the worst thing an importer
+    # can do, and the note is what people write on exactly that line.
+    #
+    #   tags = [
+    #     "kolo",
+    #   ]
+    # is how a list of any length is written. Read a line at a time, the
+    # first one gave the value "[" -- so every tag was lost and a junk tag
+    # named "[" took their place.
+    #
+    # And `.delete(%q{"'})` removed every apostrophe ANYWHERE in a value,
+    # so "Novy rok's" became "Novy roks", while a trailing comment stayed
+    # in the title.
     def toml_subset(text)
-      text.each_line.with_object({}) do |line, out|
-        next unless (m = line.match(/\A\s*([A-Za-z0-9_-]+)\s*=\s*(.+?)\s*\z/))
+      out = {}
+      pending_key = nil
+      pending = +''
+      text.each_line do |line|
+        if pending_key
+          pending << line
+          next unless pending.include?(']')
 
-        key, value = m[1], m[2]
+          out[pending_key] = toml_array(pending)
+          pending_key = nil
+          pending = +''
+          next
+        end
+        next unless (m = line.match(/\A\s*([A-Za-z0-9_-]+)\s*=\s*(.*?)\s*\z/))
+
+        key, value = m[1], strip_toml_comment(m[2])
+        if value.start_with?('[') && !value.end_with?(']')
+          pending_key = key
+          pending = value.dup
+          next
+        end
+
         out[key] = case value
-                   when /\A\[(.*)\]\z/ then Regexp.last_match(1).split(',').map { |v| v.strip.delete('"\'') }
+                   when /\A\[(.*)\]\z/ then toml_array(value)
                    when 'true' then true
                    when 'false' then false
-                   else value.delete('"\'')
+                   else unquote_toml(value)
                    end
       end
+      # A list left open at the end of the block is still the author's
+      # list: better a tag too many than a post with none.
+      out[pending_key] = toml_array(pending) if pending_key
+      out
+    end
+
+    # A '#' that starts a comment, rather than one inside a quoted value
+    # -- a title may hold one, and a colour certainly does.
+    def strip_toml_comment(value)
+      in_single = false
+      in_double = false
+      value.each_char.with_index do |c, i|
+        in_single = !in_single if c == "'" && !in_double
+        in_double = !in_double if c == '"' && !in_single
+        return value[0, i].rstrip if c == '#' && !in_single && !in_double
+      end
+      value
+    end
+
+    def toml_array(raw)
+      inner = raw[/\[(.*)\]/m, 1] || raw.sub(/\A\[/, '')
+      inner.split(',').map { |v| unquote_toml(v.strip) }.reject(&:empty?)
+    end
+
+    # The OUTER quotes only. Everything between them is what somebody
+    # wrote, apostrophes included.
+    def unquote_toml(value)
+      text = value.to_s.strip
+      return text[1..-2].to_s if text.length >= 2 && (
+        (text.start_with?('"') && text.end_with?('"')) ||
+        (text.start_with?("'") && text.end_with?("'"))
+      )
+
+      text
     end
 
     # Markdown is the native tongue, with three dialect notes: reference
@@ -1102,7 +1195,7 @@ module Import
           next entry unless entry.is_a?(Hash) && entry['url']
 
           src = entry['url'].to_s
-          local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, @dir)
+          local = src.start_with?('/') ? root_relative(src) : File.expand_path(src, @dir)
           name = media.from_file(local, src: entry['src'] || own_media_src(local))
           name ? entry.merge('url' => name) : nil
         end
@@ -1162,6 +1255,18 @@ module Import
     # A root-relative path is looked up in the tree, a relative one next
     # to the post, an absolute URL downloaded -- in that order of
     # likelihood for a static site's own images.
+    # Where a root-relative src actually lives. Hugo serves static/ AT the
+    # site root, so /images/foto.jpg in a Hugo tree is static/images/foto.jpg
+    # on disk -- looked for at the root it was reported missing while the
+    # file sat right there, and the post lost a picture the tree still had.
+    # Jekyll serves from the root itself, so both shapes have to be tried;
+    # whichever is there wins, and when neither is, the root path is what
+    # the miss is reported against, exactly as before.
+    def root_relative(src)
+      candidates = [File.join(@dir, 'static', src), File.join(@dir, src)]
+      candidates.find { |path| File.file?(path) } || candidates.last
+    end
+
     def image_block(src, alt, title, media, post_path)
       # A data: URI is the image itself, inline -- nothing to fetch,
       # nothing on disk, and no block form for inline bytes here. Dropped
@@ -1181,7 +1286,7 @@ module Import
       filename = if src.match?(/\A[A-Za-z][A-Za-z0-9+.-]*:/)
                    media.from_url(src)
                  else
-                   local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, File.dirname(post_path))
+                   local = src.start_with?('/') ? root_relative(src) : File.expand_path(src, File.dirname(post_path))
                    # Unconditionally: from_file spends the number and records
                    # the miss itself. Stat-ing here instead made numbering
                    # depend on which files happened to be present.

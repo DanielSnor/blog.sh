@@ -146,6 +146,14 @@ module Import
                         .map { |name, count| "#{name} (#{count})" }.join(', ')
         puts "  #{I18n.t('import.note.feed_dropped', listed: listed)}"
       end
+      # A source that handed out the same id twice. Said out loud, because
+      # the alternative is a duplicate post the operator never hears about
+      # -- and because the number that used to be printed was worse than
+      # silence: the second item overwrote the first and the run counted
+      # two written.
+      dupes = result.respond_to?(:duplicate_ids) ? Array(result.duplicate_ids) : []
+      puts "  #{I18n.t('import.note.duplicate_ids', count: dupes.size)}" unless dupes.empty?
+
       return if result.media_failures.empty?
 
       # Split, because these are two different losses: a written post

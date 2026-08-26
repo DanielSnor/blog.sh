@@ -633,6 +633,20 @@ module Import
                      %w[content:encoded description]
                    end
       candidates.each do |name|
+        # Atom's third content type holds MARKUP, not text:
+        # <content type="xhtml"><div>…</div></content>. text_of reads text
+        # children, of which such an element has none, so every entry in a
+        # feed written that way imported empty and was reported as
+        # "skipped (empty)" -- a whole blog counted and thrown away.
+        node = child_of(item, name)
+        if node && node.attributes['type'].to_s.downcase == 'xhtml'
+          markup = node.children.map(&:to_s).join.strip
+          # The wrapper <div> the format requires is scaffolding, not
+          # content: kept, it would wrap every post in a stray block.
+          markup = markup[%r{\A<div[^>]*>(.*)</div>\z}m, 1] || markup
+          return markup unless markup.strip.empty?
+        end
+
         text = text_of(item, name)
         return text unless text.empty?
       end

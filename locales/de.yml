@@ -804,6 +804,7 @@ import:
     feed_pages_home: "%{count} Seite(n) liegen bereits auf der Adresse, die sie auf der alten Website hatten, und brauchen keine Weiterleitung -- beim Umzug auf dieselbe Domain funktionieren ihre Links unverändert weiter."
     feed_pages_reserved: "%{count} Seite(n) kamen auf Adressen an, die diese Engine für sich selbst nutzt (%{paths}) -- der Build stellt sie erst online, wenn sie umbenannt sind; trage sie so nicht unter `nav:` ein."
     feed_dropped: "Inhalt, für den das Blockschema keine Form hat, wurde aus den Beitragstexten entfernt: %{listed}. Meist sind das Embeds und Formulare -- braucht ein Beitrag sein Video, setze den Link von Hand zurück."
+    duplicate_ids: "%{count} Einträge der Quelle trugen eine id, die ein anderer Eintrag schon benutzt hatte. Jeder wird als eigener Beitrag geschrieben statt über den ersten -- sieh sie dir an und lösche den, der die Kopie ist."
     feed_linked_images: "%{count} Bild(er) waren in einen Link gehüllt, den ein Bildblock nicht tragen kann -- die Bilder kamen an, die Adressen, auf die sie zeigten, nicht."
     ghost_scheduled: "%{count} Beitrag/Beiträge waren in Ghost geplant -- als Entwürfe importiert; plane sie hier, wenn du so weit bist."
     livejournal_nonpublic: "%{count} Eintrag/Einträge waren nur für Freunde oder privat -- als Entwürfe importiert, öffentlich waren sie nie."
