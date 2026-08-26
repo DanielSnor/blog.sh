@@ -338,6 +338,7 @@ cli:
   deploy_partial_landed: "Files that did land and are written down: %{count} -- the next run resumes from there"
   deploy_outcome_unrecorded: "⚠️  Could not record the deploy outcome in %{path}: %{error}"
   deploy_done: "Done: uploaded %{uploaded}, deleted %{deleted}, failed %{failed}, unchanged %{unchanged}"
+  announce_no_base_url: "⚠️  Not announcing: site.base_url is not set, so the toot would carry a bare path instead of a link -- and that cannot be taken back. Set site.base_url in config/site.yml (or SITE_BASE_URL in env.sh) and run ./blog.sh toot."
   surfer_unreachable: "❌ The Surfer at %{url} is not answering (%{reason}) -- the app may be stopped, or SURFER_URL in env.sh points somewhere it does not run. The finished build waits in public.nosync/; once the server is up (or the address fixed), ./blog.sh rebuild ships it."
   what_next_prompt: "What next? [d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"

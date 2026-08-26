@@ -321,6 +321,7 @@ cli:
   deploy_partial_landed: "Souborů, které se stihly nahrát a jsou zapsané: %{count} — příští běh naváže odtud"
   deploy_outcome_unrecorded: "⚠️  Výsledek nasazení se nepodařilo zapsat do %{path}: %{error}"
   deploy_done: "Hotovo: nahráno %{uploaded}, smazáno %{deleted}, selhalo %{failed}, beze změny %{unchanged}"
+  announce_no_base_url: "⚠️  Neoznamuje se: site.base_url není nastavená, takže by v tootu nebyl odkaz, ale holá cesta — a to už nevezmeš zpět. Doplň site.base_url v config/site.yml (nebo SITE_BASE_URL v env.sh) a pusť ./blog.sh toot."
   surfer_unreachable: "❌ Surfer na %{url} neodpovídá (%{reason}) — appka je nejspíš vypnutá, nebo SURFER_URL v env.sh míří jinam, než kde běží. Sestavený web čeká v public.nosync/; až server poběží (nebo adresu opravíš), nahraje ho ./blog.sh rebuild."
   what_next_prompt: "Co dál? [d] nechat draftem  [e] upravit  [p] publikovat  [s] naplánovat  [x] smazat: "
   left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"

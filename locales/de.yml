@@ -333,6 +333,7 @@ cli:
   deploy_partial_landed: "Dateien, die noch angekommen und vermerkt sind: %{count} -- der nächste Lauf setzt dort fort"
   deploy_outcome_unrecorded: "⚠️  Das Ergebnis des Deploys ließ sich nicht in %{path} vermerken: %{error}"
   deploy_done: "Fertig: hochgeladen %{uploaded}, gelöscht %{deleted}, fehlgeschlagen %{failed}, unverändert %{unchanged}"
+  announce_no_base_url: "⚠️  Keine Ankündigung: site.base_url ist nicht gesetzt, der Beitrag trüge also einen nackten Pfad statt eines Links -- und das lässt sich nicht zurücknehmen. Setze site.base_url in config/site.yml (oder SITE_BASE_URL in env.sh) und führe ./blog.sh toot aus."
   surfer_unreachable: "❌ Der Surfer unter %{url} antwortet nicht (%{reason}) -- die App ist wohl gestoppt, oder SURFER_URL in env.sh zeigt woandershin. Der fertige Build wartet in public.nosync/; sobald der Server läuft (oder die Adresse stimmt), lädt ./blog.sh rebuild ihn hoch."
   what_next_prompt: "Wie weiter? [d] Entwurf lassen  [e] bearbeiten  [p] veröffentlichen  [s] planen  [x] löschen: "
   left_as_draft: "Bleibt Entwurf. Später veröffentlichen: ./blog.sh publish %{slug}"

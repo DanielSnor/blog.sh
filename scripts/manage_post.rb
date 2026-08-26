@@ -145,6 +145,11 @@ def abort_on_unknown_frontmatter(meta)
   abort t('cli.unknown_frontmatter_key', keys: unknown.join(', '), known: FRONTMATTER_KEYS.join(', '))
 end
 
+# `unlisted` and `page` are NOT read with this: they decide whether a post
+# is exposed, and PostAddress.flag? is the loose rule the build judges them
+# by. Answering the same question two ways is how an edit turned a hidden
+# post public. `pinned`, `hero` and `toc` stay strict on purpose -- a typo
+# that fails to pin or fails to draw a table of contents costs nothing.
 # "true"/"yes"/"1" are all true, everything else false -- a frontmatter
 # value is text the author typed, not a YAML boolean.
 def truthy_frontmatter?(value)
@@ -707,7 +712,7 @@ def frontmatter_type_and_page(meta)
   type = meta['type'].to_s.strip
   return [nil, true] if type.casecmp(PAGE_TYPE).zero?
 
-  [type.empty? ? nil : type, truthy_frontmatter?(meta['page'])]
+  [type.empty? ? nil : type, PostAddress.flag?(meta['page'])]
 end
 
 def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
@@ -918,7 +923,7 @@ def cmd_add
   # one into existence, never by writing one.
   post['page'] = true if page
   post['pinned'] = true if truthy_frontmatter?(meta['pinned'])
-  post['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
+  post['unlisted'] = true if PostAddress.flag?(meta['unlisted'])
   # The same four keys edit_post persists, under the same rules -- the
   # editor template offers them here too, and a key the editor offers must
   # not vanish on the first save only to start working on the second. The
@@ -1304,6 +1309,16 @@ def publish_draft(slug, path: nil)
                  : t('cli.publish_date_kept', date: date.strftime(t('date_time_format'))))
 
   new_year = date.year.to_s
+  # Written BEFORE anything is published, the way scripts/publish_scheduled.rb
+  # has done it since 1.3 and for the same reason. This path used to write it
+  # only if the build or the deploy RETURNED a failure -- so a signal, an OOM
+  # kill or a closed SSH session during the build, which is minutes on a large
+  # archive, left the post published on disk, the toot live and unrecallable,
+  # the page never uploaded, and nothing anywhere recording the debt. The next
+  # tick found nothing due, no marker, and exited 0 in silence. The marker
+  # means "the site owes a deploy", which is true from the moment there is
+  # something to publish -- not from the moment something goes wrong.
+  Publishing.mark_deploy_pending
   new_path, updated = Publishing.publish(path, post, date: date)
 
   fields = announce_on_publish(updated, new_year, date)
@@ -3457,7 +3472,7 @@ def edit_post(slug, path: nil)
     # Offering it when set matters: without the line in the header, saving
     # would drop a pin the post had (unpublish keeps it).
     pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false'),
-    unlisted: (draft?(post) && !truthy_frontmatter?(post['unlisted'])) ? nil : truthy_frontmatter?(post['unlisted'] || 'false'),
+    unlisted: (draft?(post) && !PostAddress.flag?(post['unlisted'])) ? nil : PostAddress.flag?(post['unlisted']),
     # Shown on a site that uses heroes, or on a post that has already said
     # something of its own -- and it has to be shown in the second case
     # even when the site doesn't, because a header without the line saves
@@ -3468,7 +3483,7 @@ def edit_post(slug, path: nil)
     # its address, so it is not something to hand somebody as a checkbox
     # on every edit. Shown when set, so that saving cannot silently
     # un-page a page.
-    page: truthy_frontmatter?(post['page']) ? true : nil,
+    page: PostAddress.flag?(post['page']) ? true : nil,
     # Both shown only when set, for the reason the pin is: a key on every
     # new post suggests every post needs an answer, and almost none do.
     series: post['series'].to_s.strip.empty? ? nil : post['series'].to_s.strip,
@@ -3553,7 +3568,7 @@ def edit_post(slug, path: nil)
   }
   updated['type'] = new_type if new_type
   updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
-  updated['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
+  updated['unlisted'] = true if PostAddress.flag?(meta['unlisted'])
   # Stored only when it disagrees with the site, so an ordinary post stays
   # silent and follows layout.hero if that is ever flipped. Deleting the
   # line is therefore a way to say "no opinion", not a way to lose one.

@@ -354,6 +354,21 @@ module Publishing
   end
 
   def announce(post, year:)
+    # An announcement is the one act that cannot be taken back, and without
+    # a base URL it goes out carrying "/posts/2026/slug/" -- not a link at
+    # all on Mastodon, just text. Worse, the returned status URL is then
+    # stored on the post, so announced? is true for ever and every later
+    # attempt to send a correct one is refused.
+    #
+    # The interactive path has refused this since 1.2 and doctor calls a
+    # missing base_url an error -- but the guard sat in scripts/manage_post.rb,
+    # so the SCHEDULED path, the one nobody is watching, sent it anyway. The
+    # question belongs to whoever is about to press send.
+    if base_url.empty?
+      warn I18n.t('cli.announce_no_base_url')
+      return false
+    end
+
     slug = post['slug']
     tags = post['tags'] || []
     title, blocks = announcement_parts(post)
@@ -406,15 +421,47 @@ module Publishing
   end
 
   def mark_deploy_pending
-    File.write(DEPLOY_PENDING, Time.now.iso8601)
+    # Milliseconds, because clear_deploy_pending compares this against the
+    # instant a build started and whole seconds cannot separate two events
+    # inside the same one. A marker already on disk with second precision
+    # still parses; this only makes new ones answerable.
+    File.write(DEPLOY_PENDING, Time.now.iso8601(3))
   rescue StandardError
     nil
   end
 
-  def clear_deploy_pending
-    File.delete(DEPLOY_PENDING) if File.exist?(DEPLOY_PENDING)
+  # Cleared only when the marker is OLDER than the moment this run's build
+  # read the archive. It used to be cleared whenever a deploy succeeded, with
+  # no question about whose debt it was -- and the publishing cron holds the
+  # run lock for its whole run, so this is not a rare shape: an author who
+  # runs `./blog.sh publish` after the cron's build has already read the
+  # archive gets their post published AND announced, is refused the lock, and
+  # is told "the site is marked as owing a deploy, so the next scheduled run
+  # finishes it". The cron then finished ITS deploy -- which never saw that
+  # post -- and deleted the marker. The post was public, its toot was live,
+  # its page was on neither the disk nor the server, the next tick found
+  # nothing owed, and doctor called the site fine. The CLI's own promise was
+  # the thing that turned out to be false.
+  def clear_deploy_pending(written_before: nil)
+    return unless File.exist?(DEPLOY_PENDING)
+
+    if written_before && (stamp = deploy_pending_at) && stamp > written_before
+      return
+    end
+
+    File.delete(DEPLOY_PENDING)
   rescue StandardError
     nil
+  end
+
+  def deploy_pending_at
+    Time.parse(File.read(DEPLOY_PENDING).strip)
+  rescue StandardError
+    begin
+      File.mtime(DEPLOY_PENDING)
+    rescue StandardError
+      nil
+    end
   end
 
   # Build and deploy as one step (--prune included: after a delete or a
@@ -427,6 +474,9 @@ module Publishing
   # the return value.
   def rebuild_and_deploy(reason)
     @stopped_on_busy_lock = false
+    # Noted before the build reads a single file, so a marker written after
+    # this instant is somebody else's debt and survives our success.
+    started = Time.now
     puts
     puts "#{reason}…"
     unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
@@ -435,7 +485,7 @@ module Publishing
     end
 
     if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
-      clear_deploy_pending
+      clear_deploy_pending(written_before: started)
       return true
     end
 

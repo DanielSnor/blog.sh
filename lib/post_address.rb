@@ -117,6 +117,23 @@ module PostAddress
   # of them and an ordinary post to the other.
   #
   # It asks about `page` and nothing else. This used to fall back to
+  # The loose rule the two predicates below share, written once. Anything
+  # that is not a plain false/no/0 counts as set, because the two failures
+  # are not worth the same: a typo that HIDES a post is recoverable, a typo
+  # that exposes one somebody meant to keep out of the listings is not.
+  #
+  # scripts/manage_post.rb used to answer the same question with a STRICT
+  # test -- true/yes/1 and nothing else -- so a post carrying `unlisted: ano`
+  # (Czech for yes, and the CLI's own confirm word; a German site types "ja")
+  # was hidden by the build and read as public by the CLI, which then wrote
+  # the frontmatter back without the flag. One edit and the post was in the
+  # listings and in the sitemap, with nobody having asked for that.
+  def flag?(value)
+    return false if value.nil? || value == false
+
+    !%w[false no 0].include?(value.to_s.strip.downcase)
+  end
+
   # `type == 'page'` when the key was missing -- a rule no released engine
   # ever served by (1.3 and 1.3.2 both read `truthy?(post['page'])` and
   # nothing more), so honouring it here would have moved such a post from
@@ -127,10 +144,7 @@ module PostAddress
   # A rule that changes where published work is served has to arrive as an
   # edit somebody makes, not as a new opinion about an old file.
   def page?(post)
-    value = post['page']
-    return false if value.nil? || value == false
-
-    !%w[false no 0].include?(value.to_s.strip.downcase)
+    flag?(post['page'])
   end
 
   # Whether a post asked to stay out of the listings. Loose on purpose,
@@ -144,10 +158,7 @@ module PostAddress
   # build and check disagreed about which tags have a page, and check
   # reported a live listing as a dead link.
   def unlisted?(post)
-    value = post['unlisted']
-    return false if value.nil? || value == false
-
-    !%w[false no 0].include?(value.to_s.strip.downcase)
+    flag?(post['unlisted'])
   end
 
   # The year in the post's own date -- what the address is built from.
