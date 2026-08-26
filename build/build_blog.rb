@@ -726,7 +726,11 @@ def render_audio(block, media_prefix)
     # service with none for that address) still leaves the address, and a
     # link to it beats a dead end -- the same courtesy the video branch has
     # always shown.
-    %(<p class="audio-unavailable">#{h(t('post.audio_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
+    # safe_href, like the video fallback five lines of comment below --
+    # the address comes from an import or a hand-edited post, which is
+    # exactly the input a javascript: URL arrives in. The two branches are
+    # the same shape and only one of them was filtering.
+    %(<p class="audio-unavailable">#{h(t('post.audio_unavailable'))} <a href="#{h(safe_href(block['url']))}">#{h(block['url'])}</a></p>)
   else
     "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
   end
@@ -863,6 +867,11 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
     %(<pre><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
   when 'file'
     file = (block['media'] || []).first || {}
+    # Nothing attached: the card used to link the post's own directory
+    # with a `download` attribute on it, which downloads an HTML page
+    # named after the post. There is no file, so there is no card.
+    return '' if file['url'].to_s.empty?
+
     label = block['label'].to_s.empty? ? file['url'].to_s : block['label']
     ext = File.extname(file['url'].to_s).delete('.').upcase
     ext = 'FILE' if ext.empty?
@@ -877,6 +886,11 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
       '<path d="M5 21h14"/></svg></a>'
   when 'image'
     media = (block['media'] || []).first || {}
+    # An image block with no media at all renders <img src="/posts/2026/x/">
+    # -- the post's own directory -- which the browser fetches and draws as
+    # a broken picture, and check called the archive clean. There is
+    # nothing to show, so nothing is shown.
+    return '' if media['url'].to_s.empty?
     caption = block['caption'] ? "<figcaption>#{CGI.escapeHTML(block['caption'])}</figcaption>" : ''
     # Listing pages ship the full post and let CSS clip it at 500px, so most
     # images on them are never actually seen -- lazy loading is what keeps
@@ -919,7 +933,11 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
       %(<p class="link-block"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
     end
   else
-    "<pre>#{block.to_json}</pre>"
+    # Escaped. architecture.md promises an unknown type renders "as its
+    # raw JSON in a <pre> -- loud, not silent", and raw is what it was: a
+    # "<" anywhere in the block left the <pre> and became markup on the
+    # page. Loud is the point; live is not.
+    "<pre>#{h(block.to_json)}</pre>"
   end
 end
 
@@ -1782,7 +1800,19 @@ def render_post_html(post, template)
   # Rendered without the lifted block, or the same photo appears twice --
   # once as the lead and once where it was written. Only the hero path
   # pays for the extra render; every other post keeps the memoized one.
-  content_html = hero_block ? render_content(post['content'] - [hero_block], post_path(post)) : post_content_html(post)
+  # `lifted:` here too -- without it a link post with a hero printed the
+  # borrowed title twice, once as the h1 and again in full inside the
+  # link card.
+  #
+  # And the hero is dropped by IDENTITY, not by value: Array#- compares
+  # with ==, so a post showing the same photograph twice (same media, same
+  # caption) lost BOTH copies when hero_for lifted the first one.
+  content_html = if hero_block
+                   rest = post['content'].reject { |b| b.equal?(hero_block) }
+                   render_content(rest, post_path(post), lifted: link_title_block(post))
+                 else
+                   post_content_html(post)
+                 end
   draft_banner = draft?(post) ? draft_banner(post) : ''
   layout(template.result(binding),
          title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),

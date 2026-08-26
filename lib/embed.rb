@@ -28,7 +28,11 @@ module Embed
   # A single video/audio track's id is all that goes into the data. What
   # the id means per provider is written into each pattern below.
   VIMEO_RE = %r{\Ahttps?://(?:www\.)?vimeo\.com/(\d+)(?:/([0-9a-zA-Z]+))?}
-  VIMEO_PLAYER_RE = %r{\Ahttps?://player\.vimeo\.com/video/(\d+)}
+  # The hash comes as ?h= on this form, and it is the same second capture
+  # the /vimeo.com/ pattern takes from the path -- both feed one m[1]/m[2]
+  # extraction below. Without it the player answers 403 for an unlisted
+  # video, which is a broken embed rather than a degraded one.
+  VIMEO_PLAYER_RE = %r{\Ahttps?://player\.vimeo\.com/video/(\d+)(?:[^\s]*[?&]h=([0-9a-zA-Z]+))?}
   # intl-cs, intl-de ... is what a browser's address bar hands over today,
   # and it is exactly what the /embed/ path does not accept.
   SPOTIFY_RE = %r{\Ahttps?://open\.spotify\.com/(?:intl-[a-z-]+/)?(track|album|playlist|episode|show|artist)/([A-Za-z0-9]+)}
