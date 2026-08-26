@@ -48,6 +48,8 @@ build:
   draft_no_token: "⚠️  Der Entwurf „%{slug}“ hat kein draft_token -- seine Vorschau läge auf einer erratbaren Adresse und wird deshalb nicht gebaut. Speichere ihn mit ./blog.sh edit erneut."
   pinned_more_than_one: "⚠️  Mehr als ein Beitrag ist angeheftet; verwendet wird der neueste (%{slug})."
   tag_too_long: "⚠️  Das Schlagwort „%{name}…“ ist zu lang für die Adresse einer Listenseite -- an seinen Beiträgen steht es, eine /tag/-Seite wird dafür aber nicht gebaut."
+  series_too_long: "⚠️  Die Serie %{name} hat einen für eine Adresse zu langen Namen und bekommt daher keine Übersichtsseite. Alles andere an der Serie funktioniert; gib ihr einen kürzeren Namen, wenn du eine willst."
+  page_size_unusable: "⚠️  site.page_size ist %{value}, womit sich nicht blättern lässt -- gebraucht wird eine ganze Zahl größer als null. Gebaut wird mit 10; `./blog.sh doctor` sagt dasselbe dazu."
   archive_span_absurd: "⚠️  Das Archiv reicht von %{from} bis %{to} -- fast sicher ein Tippfehler und kein Datum. Die Übersicht zeigt daher nur Jahre mit Inhalt; korrigiere das Datum, dann kommen die leeren Jahre zurück."
   former_slug_unusable: "⚠️  %{slug}: unbrauchbarer former_slugs-Eintrag %{entry} -- erwartet wird „Jahr/Slug“."
   former_slug_taken: "⚠️  %{slug}: Weiterleitung von %{former} übersprungen -- diese Adresse ist schon belegt (eine lebende Seite oder die Weiterleitung eines früheren Beitrags)."

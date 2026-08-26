@@ -224,12 +224,30 @@ module Exporter
       unless HTML_ONLY.include?(type)
         rendered = MarkdownWriter.blocks_to_markdown([block], media_rel)
         next rendered unless rendered.strip.empty?
+
+        # An empty text block is a spacer: the build renders <p></p>, which
+        # shows nothing, so the writer producing nothing for it is the
+        # right answer rather than "markdown has no syntax for this". It
+        # went out as a VISIBLE <pre> box holding its own JSON, on a page
+        # where the author had asked for a gap -- and was counted in the
+        # summary among the blocks markdown could not express.
+        #
+        # The comment still goes, with no HTML under it: it costs one line
+        # every engine drops on the floor, and it is what brings the
+        # spacer home again on a re-import.
+        next block_comment(block, media_rel) if spacer?(block)
       end
 
       fallbacks[type] += 1
       "#{block_comment(block, media_rel)}\n#{html_fallback(block, media_rel)}"
     end
     [parts.reject { |p| p.to_s.empty? }.join("\n\n"), fallbacks]
+  end
+
+  # A text block with nothing in it -- what the author gets by leaving a
+  # blank line where a paragraph would be.
+  def spacer?(block)
+    block['type'].to_s == 'text' && block['text'].to_s.strip.empty?
   end
 
   # The block itself, in a comment above its HTML. Every engine drops an

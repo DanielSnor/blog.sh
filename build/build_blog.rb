@@ -62,7 +62,21 @@ RunLock.acquire!(ROOT, label: 'build', busy_exit: 3) unless ENV['BLOG_SH_PUBLIC_
 # a taste knob worth setting ONCE, before the first deploy: pagination is
 # anchored to the oldest post precisely so page contents never change,
 # and changing the size later renumbers every existing page.
-PAGE_SIZE = SiteConfig.get('site', 'page_size', default: 10)
+# doctor has owned this rule since it was written -- "a whole number
+# greater than zero" -- and the build never asked. config/site.yml is a
+# documented hand-edit surface, so `page_size: 10.5` is a typo somebody
+# can make: it built a site of /page/-1.0/ and /page/0.38095238095238093/
+# addresses and exited 0. A number nobody can page by is not a reason to
+# refuse to build; it is a reason to say so and use the default.
+PAGE_SIZE = begin
+  configured = SiteConfig.get('site', 'page_size', default: 10)
+  if configured.is_a?(Integer) && configured.positive?
+    configured
+  else
+    warn I18n.t('build.page_size_unusable', value: configured.inspect)
+    10
+  end
+end
 EXCERPT_TEXT_THRESHOLD = 400 # plain-text chars; CSS max-height does the actual visual clipping
 RSS_ITEM_LIMIT = 30
 META_DESCRIPTION_LENGTH = 160
@@ -1303,7 +1317,8 @@ end
 def plain_text_length(post)
   post['content'].sum do |b|
     case b['type']
-    when 'text' then b['text'].to_s.length
+    when 'text', 'code' then b['text'].to_s.length
+    when 'chat' then Array(b['lines']).sum { |l| l['text'].to_s.length }
     when 'list' then (b['items'] || []).sum { |it| it['text'].to_s.length }
     when 'table' then ((b['header'] || []) + (b['rows'] || []).flatten).sum { |c| c['text'].to_s.length }
     else 0
@@ -1382,7 +1397,16 @@ def build_list_item(post, pinned: false)
   # asking for a quiet announcement is asking for that.
   teaser = PostText.teaser_blocks(post['content'])
   teaser = nil unless teaser&.any?
-  content = teaser ? render_content(teaser, prefix) : post_content_html(post)
+  # `lifted:` on this branch too. A post's own page passes it so the link
+  # block renders WITHOUT the title the heading borrowed from it; the
+  # teaser branch did not, so a card printed the borrowed headline twice
+  # -- once as its <h2> and again in the body under it -- while the post's
+  # own page printed it once.
+  content = if teaser
+              render_content(teaser, prefix, lifted: link_title_block(post))
+            else
+              post_content_html(post)
+            end
   excerpt = teaser ? false : excerpt?(post)
   content_class = excerpt ? 'content excerpt' : 'content'
   more = teaser || excerpt
@@ -1814,7 +1838,12 @@ def render_rss(posts, path: '/rss.xml', title: SITE_TITLE, description: SITE_DES
   items = posts.first(RSS_ITEM_LIMIT).map { |post| rss_item(post) }.join
   # The newest post's date, not Time.now -- otherwise rss.xml differs on
   # every build and gets re-uploaded even when nothing changed.
-  last_build = post_time(posts.first).rfc2822 if posts.first
+  # RSS 2.0 wants an RFC-822 date-time here, and an empty element is not
+  # one: a site with nothing in the stream yet published
+  # <lastBuildDate></lastBuildDate>, which strict readers refuse along with
+  # the whole feed. The build's own clock is the honest answer to "when was
+  # this feed last built" when no post can answer it.
+  last_build = (posts.first ? post_time(posts.first) : Time.now).rfc2822
   <<~XML
     <?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -1848,15 +1877,35 @@ def render_sitemap(entries, tags_map, content_types, stream)
     urls << sitemap_url("#{SITE_BASE_URL}#{post_path(entry)}", post_time(entry).iso8601)
   end
 
+  # max_by post_time, not max_by the stored STRING. The comment on the post
+  # sort spells out why a lexical compare is wrong here: a post written
+  # "2026-08-22 10:00" sorts above one written "2026-08-22T09:00+02:00"
+  # because a space is below a T, and an offset moves an instant without
+  # moving its text. Three lastmods were picked that way -- so a crawler
+  # could be told a listing was last touched by the wrong post.
   tags_map.each do |slug, data|
-    latest = data[:posts].max_by { |p| p['date'] }
+    latest = data[:posts].max_by { |p| post_time(p) }
     urls << sitemap_url("#{SITE_BASE_URL}/tag/#{slug}/", latest && post_time(latest).iso8601)
   end
 
   content_types.each do |type|
-    type_posts = entries.select { |entry| dominant_content_type(entry) == type }
-    latest = type_posts.max_by { |p| p['date'] }
+    # From the stream, not from the combined list: /type/<t>/ shows posts
+    # and never pages, so a page could hand the listing a lastmod for
+    # something that listing does not contain. The archive block below was
+    # given `stream` for exactly this reason, and says so.
+    type_posts = stream.select { |entry| dominant_content_type(entry) == type }
+    latest = type_posts.max_by { |p| post_time(p) }
     urls << sitemap_url("#{SITE_BASE_URL}/type/#{type}/", latest && post_time(latest).iso8601)
+  end
+
+  # Every series listing, for the same reason as a tag's: the build writes
+  # it, every post in the series links to it, and the sitemap was the one
+  # place that had never heard of it.
+  SERIES_MAP.each do |slug, in_series|
+    next unless Slug.pageable?(slug)
+
+    latest = in_series.max_by { |p| post_time(p) }
+    urls << sitemap_url("#{SITE_BASE_URL}/series/#{slug}/", latest && post_time(latest).iso8601)
   end
 
   # The tag index: one entry, and only when there is at least one tag with a
@@ -1874,7 +1923,7 @@ def render_sitemap(entries, tags_map, content_types, stream)
   unless stream.empty?
     urls << sitemap_url("#{SITE_BASE_URL}/archive/", stream.first && post_time(stream.first).iso8601)
     stream.group_by { |post| post_time(post).year }.each do |year, in_year|
-      latest = in_year.max_by { |p| p['date'] }
+      latest = in_year.max_by { |p| post_time(p) }
       urls << sitemap_url("#{SITE_BASE_URL}/archive/#{year}/", latest && post_time(latest).iso8601)
     end
   end
@@ -1900,11 +1949,37 @@ end
 #
 # Returns [[number, posts], ...] newest first, plus the count of fixed
 # (already-final) pages.
-def anchored_pages(posts)
+# `oldest_first:` is for the one listing that is not a timeline. A series
+# reads from part one -- tests/test_post_page.rb has held that since it was
+# written -- and the anchoring below assumes the opposite: it takes the
+# flexible landing page off the FRONT and slices the fixed /page/N/ pages
+# off the TAIL, which is what makes "a page's contents never change once
+# written" true when new posts arrive at the front.
+#
+# Handed an oldest-first list it did the reverse of what it promises: the
+# fixed pages were cut from the NEWEST end, so every part added re-cut
+# every one of them, and "Older ->" led towards the newest.
+#
+# Mirrored rather than reversed. Reversing the list would have fixed the
+# paging by breaking the reading order; anchoring the fixed pages at the
+# FRONT -- where the parts that will never change again are -- keeps both,
+# and needs no new numbering and no new labels: page 1 is still the far
+# end of the walk and the landing page is still the flexible one.
+def anchored_pages(posts, oldest_first: false)
   fixed = posts.length < 2 * PAGE_SIZE ? 0 : (posts.length / PAGE_SIZE) - 1
-  newest_length = posts.length - fixed * PAGE_SIZE
-  pages = [[fixed + 1, posts.first(newest_length)]]
-  posts.drop(newest_length).each_slice(PAGE_SIZE).with_index do |slice, i|
+  flexible_length = posts.length - fixed * PAGE_SIZE
+  return [[[fixed + 1, posts]], fixed] if fixed.zero?
+
+  if oldest_first
+    pages = posts.first(fixed * PAGE_SIZE).each_slice(PAGE_SIZE).with_index.map do |slice, i|
+      [i + 1, slice]
+    end
+    pages << [fixed + 1, posts.last(flexible_length)]
+    return [pages, fixed]
+  end
+
+  pages = [[fixed + 1, posts.first(flexible_length)]]
+  posts.drop(flexible_length).each_slice(PAGE_SIZE).with_index do |slice, i|
     pages << [fixed - i, slice]
   end
   [pages, fixed]
@@ -2139,8 +2214,9 @@ LISTING_HEADING_ICONS = {
 
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   heading_kind: nil, heading_variant: nil, heading_icon: nil, feed_path: nil,
-                  title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
-  pages, fixed = anchored_pages(posts)
+                  title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil,
+                  oldest_first: false)
+  pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
     # The landing page shows the pinned post ONCE, at the top: when it
     # would otherwise appear further down that same page, it is lifted out
@@ -3098,7 +3174,20 @@ end
 # already guarantees -- a "series" of one is a post.
 SERIES_MAP.each do |slug, in_series|
   name = SERIES_NAMES[slug].to_s
+  # Read from part one, and paged from part one: see anchored_pages.
+  #
+  # An overlong name is refused the same way a tag's is (Slug.pageable?),
+  # because mkdir raises ENAMETOOLONG at the site's very last stage with a
+  # backtrace naming nothing -- and check and doctor both call the archive
+  # sound. The series still works everywhere else: only its listing page
+  # is skipped, and skipped out loud.
+  unless Slug.pageable?(slug)
+    warn t('build.series_too_long', name: name[0, 60])
+    next
+  end
+
   write_listing(in_series, index_template, File.join(PUBLIC_DIR, 'series', slug),
+                oldest_first: true,
                 base_path: "/series/#{slug}", heading: name,
                 heading_kind: t('series.kind'), heading_variant: 'series',
                 heading_icon: :series,

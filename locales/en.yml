@@ -47,6 +47,8 @@ build:
   draft_no_token: "⚠️  Draft '%{slug}' has no draft_token -- its preview would be at a guessable address, so it is not built. Re-save it with ./blog.sh edit."
   pinned_more_than_one: "⚠️  More than one post is pinned; using the newest (%{slug})."
   tag_too_long: "⚠️  Tag \"%{name}…\" is too long for a listing page's address -- it shows on its posts, but no /tag/ page is built for it."
+  series_too_long: "⚠️  The series %{name} has a name too long for an address, so it gets no listing page. Everything else about the series works; give it a shorter name if you want one."
+  page_size_unusable: "⚠️  site.page_size is %{value}, which nothing can page by -- a whole number greater than zero is what this needs. Building with 10; `./blog.sh doctor` says the same thing about it."
   archive_span_absurd: "⚠️  The archive runs from %{from} to %{to} -- almost certainly a typo rather than a date. The map therefore shows only the years that hold something; fix the date and the empty years come back."
   former_slug_unusable: "⚠️  %{slug}: unusable former_slugs entry %{entry} -- expected \"year/slug\"."
   former_slug_taken: "⚠️  %{slug}: redirect for %{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
