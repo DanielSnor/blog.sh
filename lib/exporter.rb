@@ -430,6 +430,15 @@ module Exporter
        state page].each do |key|
       keys[key] = post[key] unless post[key].nil?
     end
+    # Recorded because it CANNOT be, which is the whole point. The outer
+    # `title:` is flattened to '' for engines that have no concept of a post
+    # without one, and an importer then cannot tell "this post has no title"
+    # from "this tree came from an engine that writes none" -- so it does the
+    # sensible thing and substitutes the slug. On the archive this was measured
+    # against that is 2752 of 4367 pages coming home with a machine slug where
+    # their name used to be, undoing the naming outright. `unless nil?` above
+    # cannot say this; a flag can.
+    keys['untitled'] = true if post['title'].nil?
     sources = media_sources(post)
     keys['media_src'] = sources unless sources.empty?
     keys

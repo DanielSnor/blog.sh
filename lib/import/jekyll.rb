@@ -317,6 +317,11 @@ module Import
       # home. platform_tag asks this too.
       @own_post = own.is_a?(Hash)
 
+      # A post this engine exported as untitled comes home untitled. Without
+      # this the importer sees title: '' and substitutes the slug, which is
+      # right for a foreign tree and wrong for ours.
+      post['title'] = nil if @own_post && own['untitled']
+
       OWN_FLAT_KEYS.each do |key|
         value = meta[key]
         post[key] = value unless value.nil?
@@ -1217,6 +1222,15 @@ module Import
 
     def slug_of(meta, path)
       explicit = explicit_slug(meta)
+      # A slug that came out of ./blog.sh export is the address the site is
+      # serving TODAY, not a name to be tidied. Running slugify over it
+      # renamed every slug that was not already slugify-stable -- an
+      # underscore, a trailing dash -- and wrote no former_slugs, no
+      # redirect_from and no stub, so 25 live URLs on one real archive
+      # answered before the round trip and 404'd after it. Only OUR export
+      # is trusted this way: a tree from anywhere else has no blogsh: key
+      # and is tidied as before.
+      return explicit if explicit && meta['blogsh'].is_a?(Hash)
       return Slug.slugify(explicit) if explicit
 
       Slug.slugify(percent_decode(base_name(path)))

@@ -2908,6 +2908,48 @@ end
 # Pages are in here as well as posts: a renamed page owes its old
 # address exactly what a renamed post does. They are out of the
 # LISTINGS, not out of the engine's promises.
+# Whether this volume treats two names differing only in case or in unicode
+# form as one file. macOS APFS does both by default, and that is where this
+# matters: the stub loops below guard against clobbering the build's own
+# output with a byte-exact WRITTEN lookup, so `public/About/index.html` and
+# `public/about/index.html` -- one file on such a volume -- slipped past it.
+# emit then wrote the redirect stub straight over the page the build had
+# produced seconds earlier: the page's content gone, and the address serving
+# a meta-refresh to itself, which is an infinite loop for every visitor.
+#
+# Probed once rather than assumed, because the answer decides whether the
+# folded index below is consulted at all -- on a case-sensitive volume
+# /About/ and /about/ are two real addresses and refusing one would be
+# wrong.
+def case_folding_public?
+  return @case_folding_public unless @case_folding_public.nil?
+
+  FileUtils.mkdir_p(PUBLIC_DIR)
+  probe = File.join(PUBLIC_DIR, '.blogsh-case-probe')
+  File.binwrite(probe, '')
+  @case_folding_public = File.exist?(File.join(PUBLIC_DIR, '.BLOGSH-CASE-PROBE'))
+  File.delete(probe)
+  @case_folding_public
+rescue StandardError
+  @case_folding_public = false
+end
+
+def fold_path(path)
+  path.to_s.unicode_normalize(:nfc).downcase
+end
+
+# The same question WRITTEN answers, asked the way the volume will answer it.
+def written_already?(dest)
+  return true if WRITTEN[dest]
+  return false unless case_folding_public?
+
+  @written_folded ||= {}
+  if @written_folded.size != WRITTEN.size
+    @written_folded = WRITTEN.keys.to_h { |k| [fold_path(k), true] }
+  end
+  @written_folded.key?(fold_path(dest))
+end
+
 # The longest a single path segment may be. POSIX NAME_MAX is 255 bytes on
 # macOS and Linux alike, and mkdir_p raises ENAMETOOLONG past it -- which
 # killed the build at its very LAST stage, after the whole site had already
@@ -2933,7 +2975,7 @@ NAME_MAX_BYTES = 255
     end
 
     dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
-    if WRITTEN[dest]
+    if written_already?(dest)
       warn t('build.former_slug_taken', slug: post['slug'], former: former)
       next
     end
@@ -3414,8 +3456,8 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
     # ROOT FILE sitting where the path needs a directory (a stub at
     # "/rss.xml/whatever/" would need rss.xml to be one). Both end in the
     # same loud skip -- the build's own output always wins over a stub.
-    prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| WRITTEN[p] }
-    if WRITTEN[dest] || prefix_file
+    prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| written_already?(p) }
+    if written_already?(dest) || prefix_file
       warn t('build.redirect_from_taken', slug: post['slug'], origin: origin)
       next
     end
