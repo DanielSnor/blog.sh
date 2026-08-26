@@ -70,6 +70,16 @@ module Import
 
     def initialize(url, delay: 1.0, post_pattern: nil, mode: :auto, keep_permalinks: false, pack: nil,
                    from: nil, to: nil)
+      # A web.archive.org address is the Archive's copy of a page, not the
+      # site. Pasted here -- which is exactly what somebody who has just
+      # been LOOKING at the old site in the Archive will do -- every
+      # candidate asked the Archive about itself, every answer was empty,
+      # and the run ended saying the site had never been captured.
+      if url.to_s.match?(%r{\Ahttps?://web\.archive\.org/}i)
+        abort("❌ That is the Archive's own address for a copy of a page. Give the ORIGINAL " \
+              "address of the site instead -- the part after the timestamp in that URL.")
+      end
+
       @url = url.sub(%r{/+\z}, '')
       @from = stamp(from, 'WAYBACK_FROM')
       @to = stamp(to, 'WAYBACK_TO')
@@ -110,6 +120,9 @@ module Import
       # the blog -- see refuse_unanswered.
       @cdx_failures = []
       @cdx_truncated = []
+      # The snapshot files, so the run can take them away after itself --
+      # see snapshot_feed.
+      @tempfiles = []
       @pack =
         if @pack_name
           PACKS.find { |p| p.key == @pack_name } ||
@@ -143,6 +156,18 @@ module Import
     # every archived post page, newest capture of each, read one by one.
     def each_item(&block)
       probe_images
+      begin
+        walk_source(&block)
+      ensure
+        # A rescue reads thousands of captures, each through a temp file,
+        # on a disk it has just filled with media. `ensure`, so an
+        # interrupted run cleans up after itself too.
+        @tempfiles.each { |path| File.delete(path) rescue nil }
+        @tempfiles.clear
+      end
+    end
+
+    def walk_source(&block)
       unless @mode == :pages
         asked = @cdx_failures.size
         captures = discover
@@ -342,7 +367,11 @@ module Import
                         ts[8, 2].to_i, ts[10, 2].to_i, ts[12, 2].to_i).getlocal
       end
 
-      slug = Slug.slugify(File.basename(page[:path]))
+      # Without the extension the permalink happened to carry: a decade of
+      # blogs served /2009/06/first-post.html, and slugifying that whole
+      # made "first-post-html" -- an address with a word in it nobody
+      # wrote, on every post of the site.
+      slug = Slug.slugify(File.basename(page[:path], '.*'))
       slug = Slug.slugify(parsed[:title].to_s.split(/\s+/).first(10).join(' ')) if slug.empty?
 
       post = {
@@ -388,7 +417,13 @@ module Import
     def to_utf8(raw)
       declared = raw.b[/charset=["']?([A-Za-z0-9_-]+)/, 1]
       utf8 = raw.dup.force_encoding('UTF-8')
-      return utf8 if utf8.valid_encoding? && (declared.nil? || declared.match?(/\Autf-?8\z/i))
+      # The BYTES decide. A declaration is a claim, and a page rebuilt in
+      # UTF-8 whose old <meta> still says windows-1250 -- which is most of
+      # what a CMS migration leaves behind -- was re-decoded from a claim
+      # that had stopped being true, turning every accented letter into
+      # mojibake. Valid UTF-8 is not an accident: a windows-1250 page with
+      # accents in it is not valid UTF-8.
+      return utf8 if utf8.valid_encoding?
 
       source = declared && !declared.match?(/\Autf-?8\z/i) ? declared : 'windows-1250'
       raw.dup.force_encoding(source).encode('UTF-8', invalid: :replace, undef: :replace)
@@ -400,8 +435,16 @@ module Import
     # against the original host, then asked of the Archive at this
     # page's own moment -- it redirects to the nearest copy it holds.
     def reroute_images(body, page)
-      body.gsub(/(<img[^>]*\ssrc=")([^"]+)(")/i) do
-        prefix, src, suffix = Regexp.last_match(1), Regexp.last_match(2), Regexp.last_match(3)
+      # Single quotes and bare values as well. Matching only src="…" left
+      # <img src='…'> pointing at a host that is gone -- dropped from the
+      # post by the fetch that follows, and counted nowhere, so the
+      # postscript said no images had been lost.
+      body.gsub(/(<img[^>]*\ssrc=)(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i) do
+        prefix = Regexp.last_match(1)
+        quote = Regexp.last_match(2) ? '"' : (Regexp.last_match(3) ? "'" : '')
+        src = Regexp.last_match(2) || Regexp.last_match(3) || Regexp.last_match(4)
+        prefix += quote
+        suffix = quote
         absolute = begin
           URI.join(page[:original], src).to_s
         rescue StandardError
@@ -419,10 +462,31 @@ module Import
     # modest. It reads what pages declare -- a heading, a time element
     # or article:published_time, an article container -- and gives up
     # loudly (an :unparsed count) rather than guessing at soup.
+    # Where a post stops and the page around it begins. Class and id names
+    # a decade of themes agree on, plus the two elements that can only be
+    # the furniture.
+    BODY_END = %r{<(?:footer|aside)\b|
+                  <div[^>]*\b(?:class|id)="[^"]*
+                  (?:comment|respond|disqus|sidebar|widget|related|share|
+                     post-?nav|entry-?meta|author-?bio|tags?-?list)
+                  [^"]*"}xi
+
     def generic_parse(html)
       body = html[%r{<article[^>]*>(.*?)</article>}m, 1] ||
              html[%r{<div[^>]*class="[^"]*(?:entry-content|post-content|article-content|articleText)[^"]*"[^>]*>(.*)}m, 1]
       return nil unless body
+
+      # `(.*)` on that second branch runs to the end of the DOCUMENT: a
+      # <div class="entry-content"> has no closing marker a regex can
+      # find, so the comment thread, the sidebar, the related-posts strip
+      # and the footer all arrived as part of the post. On a blog with
+      # comments that is more foreign text than the author's own.
+      #
+      # Cut at the first thing that announces the end of an article. Not
+      # exact -- a regex cannot balance divs -- but every one of these
+      # markers is text nobody wants inside a post, so cutting early on a
+      # false match costs a paragraph where not cutting costs the page.
+      body = body[0, body.index(BODY_END) || body.length] if body.match?(BODY_END)
 
       title = text_of(html[%r{<h1[^>]*>(.*?)</h1>}m, 1]) ||
               text_of(html[%r{<h2[^>]*>(.*?)</h2>}m, 1]) ||
@@ -627,7 +691,20 @@ module Import
     def stamp(value, name)
       return nil if value.nil? || value.to_s.strip.empty?
 
-      digits = value.to_s.gsub(/\D/, '')
+      # The SHAPE, not the digit count. "2013-1-5" is an ordinary way to
+      # write a date and its digits are "201315" -- six of them, even, so
+      # it passed as a year-month window of month 15, which the Archive
+      # reads as no captures at all. A window silently dropped reads as a
+      # blog nobody ever captured, which is the mistake this file has
+      # already made twice.
+      text = value.to_s.strip
+      unless text.match?(/\A\d{4}(-\d{2}(-\d{2}([ T]\d{2}(:\d{2}(:\d{2})?)?)?)?)?\z/) ||
+             text.match?(/\A\d{4}(\d{2}){0,5}\z/)
+        abort("❌ #{name} takes a year, year-month or date (2013, 2013-01, 2013-01-15) -- " \
+              "got #{value.inspect}")
+      end
+
+      digits = text.gsub(/\D/, '')
       return digits if digits.length.between?(4, 14) && digits.length.even?
 
       abort("❌ #{name} takes a year, year-month or date (2013, 2013-01, 2013-01-15) -- " \
@@ -666,6 +743,13 @@ module Import
       params = params.merge(window) if windowed
       query = URI.encode_www_form(params)
       body = http_get("#{CDX}?#{query}")
+      # An empty body is CDX saying "nothing for that address", which is
+      # an answer. JSON.parse raised on it, the rescue below filed it
+      # under "the Archive did not answer", and a run whose every
+      # candidate came back empty aborted with a network diagnosis --
+      # so page mode, which is what such a site needs, was unreachable.
+      return [] if body.to_s.strip.empty?
+
       rows = JSON.parse(body)
       header = rows.shift or return []
       ts = header.index('timestamp')
@@ -701,7 +785,12 @@ module Import
         return nil
       end
 
+      # Registered for cleanup: Tempfile.create without a block is never
+      # unlinked, and a rescue reads thousands of captures -- so a long run
+      # left a temp file per capture behind it, on a disk it had just
+      # filled with media.
       file = Tempfile.create(['wayback', '.xml'])
+      @tempfiles << file.path
       file.write(body)
       file.close
       SnapshotFeed.new(file.path, timestamp: capture[:timestamp], keep_permalinks: @keep_permalinks)

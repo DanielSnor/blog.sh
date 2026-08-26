@@ -724,6 +724,14 @@ def run_import(adapter)
   on_post = ->(written, post, _scanned) { puts "  #{written}/#{target} #{post['slug']}" }
   result = Import::Run.new(adapter, on_post: on_post).call
   report(result, dry_run: false)
+  # ...and again here, because several of these notes only have numbers
+  # in them AFTER the real run: the Wayback rescue counts the images the
+  # Archive never saved as it fetches them, so "N image(s) are lost" --
+  # the one line that says what the rescue actually cost -- could not be
+  # printed anywhere the operator would see it. The preview's copy is
+  # what changes the answer to the question above; this one is the
+  # record of what happened.
+  puts "  #{adapter.postscript}" if adapter.respond_to?(:postscript) && adapter.postscript
   # Whatever the run lost, the exit code has to carry -- scripts/*.rb have
   # done this since 1.2 (lib/import/cli.rb), and the wizard, which is what
   # people actually run, ended 0 on a source that died halfway and on every
