@@ -127,7 +127,12 @@ module Import
           failed_slug = nil
           begin
             Dir.mktmpdir do |tmpdir|
-              media = Media.new(tmpdir, dry_run: @dry_run, index: @media_index, refetch: @refetch)
+              # The export's root, so a path it names cannot walk out of it.
+              # Adapters that copy local files answer import_root; the rest do
+              # not touch the filesystem and have nothing to confine.
+              root = @adapter.respond_to?(:import_root) ? @adapter.import_root : nil
+              media = Media.new(tmpdir, dry_run: @dry_run, index: @media_index,
+                                refetch: @refetch, root: root)
               post = @adapter.map(item, media)
               failed_slug = post['slug'] if post.is_a?(Hash)
 

@@ -22,6 +22,14 @@ module Import
       @media_dir = File.join(@data_dir, 'tweets_media')
     end
 
+    # The directory this export lives in. Media#from_file refuses any path
+    # that resolves outside it -- an export naming a file on the importer's
+    # own disk got it copied into the archive and published.
+    def import_root
+      @export_dir
+    end
+
+
     def label
       "Twitter/X (@#{account})"
     end

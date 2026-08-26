@@ -58,8 +58,17 @@ module Import
     # has since died, and without the archive's own copy to fall back on it
     # took 419 media entries out of 118 posts while all 419 files lay
     # untouched on disk.
-    def initialize(tmpdir, dry_run: false, index: nil, refetch: false)
+    def initialize(tmpdir, dry_run: false, index: nil, refetch: false, root: nil)
       @tmpdir = tmpdir
+      # The export's own directory. Every path from_file is handed is built
+      # by joining strings the EXPORT supplied onto this, and nothing checked
+      # the result was still inside it -- so `![x](../../../../etc/passwd)` in
+      # a markdown file, or an attachment url of "/../../secret" in an
+      # outbox, named any file on the importer's machine. It was copied into
+      # media.nosync, the build copied it into public.nosync, and the next
+      # deploy put it on the web. The dry run called it "one more media file".
+      @root = root && File.expand_path(root.to_s)
+      @outside = []
       @dry_run = dry_run
       @index = index
       @refetch = refetch
@@ -329,6 +338,48 @@ module Import
     # per file. Nothing can re-derive it from the bytes, so a re-import that
     # dropped it would leave the archive unable to recognise its own files
     # the next time round.
+    # Whatever the export said, resolved -- symlinks included, since a link
+    # inside the export pointing out of it is the same escape wearing a hat.
+    # With no root given nothing is refused, which is what the callers that
+    # never touch the filesystem get.
+    def inside_export?(path)
+      return true if @root.nil?
+
+      root = resolved(@root)
+      real = resolved(path)
+      real == root || real.start_with?(root + File::SEPARATOR)
+    end
+
+    # realpath needs the file to exist, and half the paths this judges name a
+    # file the export is MISSING -- which still has to be judged, and judged
+    # as inside. So the deepest ancestor that does exist is resolved and the
+    # rest is appended.
+    #
+    # Resolving only one side is not enough either: on macOS a temp directory
+    # is /var/folders/... and /var is a symlink to /private/var, so a root
+    # resolved against a path that was not read as "outside the export" for
+    # every missing file in every test. Both sides, or neither.
+    def resolved(path)
+      full = File.expand_path(path.to_s)
+      head = full
+      tail = []
+      until File.exist?(head)
+        parent = File.dirname(head)
+        break if parent == head
+
+        tail.unshift(File.basename(head))
+        head = parent
+      end
+      File.join(File.realpath(head), *tail)
+    rescue StandardError
+      File.expand_path(path.to_s)
+    end
+
+    # Paths an export named outside itself. Reported, never copied.
+    def outside_export
+      @outside
+    end
+
     def from_file(path, src: nil)
       return nil if path.to_s.empty?
       return @by_source[path] if @by_source.key?(path)
@@ -351,6 +402,16 @@ module Import
       # summary still names what the archive is missing. Remembered as a
       # failure for the same reason from_url remembers one -- a second
       # reference to the same missing file must not count the loss twice.
+      # Refused before it is opened, and said out loud: an export naming a
+      # file outside itself is not a mistake to absorb quietly.
+      unless inside_export?(path)
+        warn "  refused (outside the export): #{path}"
+        @outside << path
+        @by_source[path] = nil
+        uncount
+        return nil
+      end
+
       unless File.exist?(path)
         @failures << path
         @by_source[path] = nil
