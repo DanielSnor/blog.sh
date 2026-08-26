@@ -226,6 +226,37 @@ module Embed
   # two: its widget URL answers with a redirect to player-widget.mixcloud.com,
   # and a CSP naming only the address in the src blocks the player the
   # moment it follows that redirect.
+  # An imported embed's HTML with the parts that execute taken out --
+  # <script>, on* handlers, javascript: addresses.
+  #
+  # NOT a sanitiser, and not pretending to be one: the site's CSP is what
+  # actually stops a script (`script-src 'self' <hash> <analytics>`, no
+  # unsafe-inline, and frame-src comes from the provider table above, not
+  # from this HTML). Measured before writing this: a crafted embed_html
+  # cannot run script, load one, frame a foreign site or post a form on a
+  # blog.sh page today.
+  #
+  # It is worth doing anyway for two reasons. The FEED has no CSP -- the
+  # same HTML goes into every item's description, and readers differ. And
+  # the page's safety should not rest on one meta tag that a themed
+  # template could soften.
+  #
+  # The cost is nothing that works: an embed built out of a script
+  # (Instagram, Twitter/X -- blockquote plus widgets.js) is already inert
+  # under that CSP, so what the reader sees does not change. Iframe embeds
+  # -- YouTube, Vimeo, Spotify -- never come through here; they are built
+  # from the provider and the id.
+  #
+  # At RENDER, never on the way in: the archive holds what it was given,
+  # and the page shows only what it will honour.
+  SCRIPT_RE = %r{<script\b[^>]*>.*?</script\s*>|</?script\b[^>]*>}mi
+  HANDLER_RE = /\s on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/ix
+  JS_URL_RE = /((?:href|src|xlink:href)\s*=\s*["']?)\s*javascript:[^"'>\s]*/i
+
+  def without_scripts(html)
+    html.to_s.gsub(SCRIPT_RE, '').gsub(HANDLER_RE, '').gsub(JS_URL_RE) { "#{Regexp.last_match(1)}#" }
+  end
+
   def frame_origins(block)
     case block['provider'].to_s
     when 'vimeo' then ['https://player.vimeo.com']

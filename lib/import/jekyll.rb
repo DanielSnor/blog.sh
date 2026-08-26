@@ -195,11 +195,18 @@ module Import
       # by silence: left out of the walk entirely, a root _index.md
       # holding real prose was missing from the totals, and the tree read
       # as imported in full when it was not.
-      return :site_furniture if @furniture&.include?(path)
-
       raw = File.read(path, encoding: 'utf-8')
       meta, body = front_matter(raw)
       return :bad_frontmatter if meta.nil?
+
+      # A tree WE wrote says so, and then the furniture list has no
+      # business judging it. The two lists never agreed: the build serves
+      # a page slugged `changelog`, `index` or `tags` perfectly happily,
+      # while the importer treated all sixteen of those names as a
+      # repository's own files -- so an export and a re-import came home
+      # short by every page that happened to be called one of them.
+      own_tree = meta['blogsh'].is_a?(Hash)
+      return :site_furniture if !own_tree && @furniture&.include?(path)
 
       # Read before the blocks are built, because localize is where each
       # file is registered and the address has to be in hand by then.
@@ -215,7 +222,13 @@ module Import
                end
       blocks = lead_image(meta, body) + blocks
       blocks = localize(blocks, media, path)
-      return :empty if blocks.empty?
+      # ...unless the tree is ours and the post really is empty. A post
+      # can be live, listed, tagged and titled with content: [] -- the
+      # build gives it a real page, and two such posts sit on the archive
+      # this was measured against. The exporter writes its front matter
+      # and an empty body; read back as "an empty file", both 404'd after
+      # a round trip.
+      return :empty if blocks.empty? && !own_tree
 
       draft = path.include?("#{File::SEPARATOR}_drafts#{File::SEPARATOR}") ||
               meta['published'] == false || meta['draft'] == true
@@ -266,6 +279,15 @@ module Import
         # because it never made a page.
         origin = nil if page && origin == "/#{slug}/"
         post['redirect_from'] = [origin] if origin && claim_origin(origin, path)
+
+        # A permalink of our own shape goes on former_slugs instead: see
+        # own_former_slug. apply_own_keys below may bring a former_slugs
+        # list back from the `blogsh:` key, so this adds rather than
+        # replaces, and only when the address is not already there.
+        former = own_former_slug(meta)
+        if former
+          post['former_slugs'] = (Array(post['former_slugs']) + [former]).uniq
+        end
       end
       apply_own_keys(post, meta)
       # After apply_own_keys on purpose: `type: page` in the front matter
@@ -1313,7 +1335,24 @@ module Import
     # a /:year/:month/:day/:title/ pattern gave kontakt a redirect from
     # /2021/12/11/kontakt/, an address the old site never served, and
     # the build wrote a stub on it.
+    # A permalink under /posts/ is where the post lived on THIS engine,
+    # which is what former_slugs records -- redirect_from is for addresses
+    # from somewhere else, and the build refuses any whose first segment
+    # is one of its own. Every post blog.sh exports carries
+    # permalink: /posts/<year>/<slug>/, so KEEP_PERMALINKS=1 -- the one
+    # thing an operator can do to save a renamed address -- wrote exactly
+    # the entry the build throws away, with a warning in the middle of a
+    # build log. Returned as nil here and handled as a former slug by the
+    # caller instead.
+    def own_former_slug(meta)
+      explicit = (meta['permalink'] || meta['url']).to_s
+      m = explicit.match(%r{\A/posts/(\d{4}/[^/]+)/?\z})
+      m && m[1]
+    end
+
     def origin_path(meta, slug, date, page: false)
+      return nil if own_former_slug(meta)
+
       explicit = meta['permalink'] || meta['url']
       return explicit.to_s if explicit && !explicit.to_s.empty?
       return nil if page || !@permalink

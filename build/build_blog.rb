@@ -737,7 +737,7 @@ def render_audio(block, media_prefix)
   elsif (src = Embed.src(block))
     embed_iframe(src, block)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
-    block['embed_html']
+    Embed.without_scripts(block['embed_html'])
   elsif block['url']
     # A player that could not be looked up (offline at save time, or a
     # service with none for that address) still leaves the address, and a
@@ -776,9 +776,9 @@ def render_video(block, media_prefix)
     # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
     # other providers (e.g. Instagram) ship their own responsive blockquote/script.
     if block['provider'] == 'youtube'
-      %(<div class="embed-responsive">#{block['embed_html']}</div>)
+      %(<div class="embed-responsive">#{Embed.without_scripts(block['embed_html'])}</div>)
     else
-      block['embed_html']
+      Embed.without_scripts(block['embed_html'])
     end
   elsif (id = block['youtube_id'])
     # Hand-written videos carry url + youtube_id, and the iframe is built
