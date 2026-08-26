@@ -3537,7 +3537,21 @@ def edit_post(slug, path: nil)
   # Checks for a drop in every block type, not just images: markdown can't
   # express a link card or a foreign embed (Instagram), so saving would
   # otherwise silently delete them.
-  counts = lambda { |list| list.each_with_object(Hash.new(0)) { |b, h| h[b['type']] += 1 } }
+  # ...and every formatting SPAN inside them. docs/architecture.md lists
+  # `small`, `mention` (carrying an account URL) and `color` (carrying a hex)
+  # as span types accepted from imports, and the build renders all three --
+  # a mention becomes a real link. MarkdownWriter has no markdown form for
+  # any of them, so wrap_markdown falls through to the bare text: the words
+  # survive and the span, with whatever it carried, is gone. The block
+  # stayed a text block, so counting block types alone said nothing had
+  # happened and no confirmation was asked for.
+  counts = lambda do |list|
+    list.each_with_object(Hash.new(0)) do |b, h|
+      h[b['type']] += 1
+      spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| Array(i['formatting']) }
+      spans.each { |f| h["#{f['type']} span"] += 1 }
+    end
+  end
   before = counts.call(post['content'])
   after = counts.call(blocks)
   lost = before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }

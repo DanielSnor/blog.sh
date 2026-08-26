@@ -225,7 +225,13 @@ module MarkdownWriter
     when 'code' then "`#{chunk}`"
     when 'link'
       url = link_url_for_markdown(f['url'].to_s)
-      f['title'] ? %([#{chunk}](#{url} "#{escape_title(f['title'])}")) : "[#{chunk}](#{url})"
+      # A label ending in a backslash escapes the "]" the writer is about to
+      # add, so the link came back with no label at all and its address was
+      # published as body text on the next edit. escape_markdown cannot see
+      # this: it escapes a backslash only before an escapable character, and
+      # the character that makes this one dangerous is added afterwards.
+      label = chunk.sub(/(\\+)\z/) { Regexp.last_match(1) * 2 }
+      f['title'] ? %([#{label}](#{url} "#{escape_title(f['title'])}")) : "[#{label}](#{url})"
     else chunk
     end
   end
@@ -237,6 +243,12 @@ module MarkdownWriter
   # truncated at its first ")" and the tail spilled into the visible
   # text.
   def link_url_for_markdown(url)
+    # A space is not legal in a URL and markdown has nowhere to put one:
+    # the parser's address pattern stops at whitespace, so `[x](/a b.html)`
+    # came back with the link gone and the address spilled into the visible
+    # text -- and the next edit published it as prose. %20 is what the
+    # address should have been, and it round-trips.
+    url = url.gsub(/[[:space:]]/) { |c| format('%%%02X', c.ord) }
     depth = 0
     balanced = url.each_char.all? do |ch|
       depth += 1 if ch == '('
