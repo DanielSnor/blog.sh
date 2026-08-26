@@ -1013,8 +1013,17 @@ module Doctor
     return nil if dirs.empty?
 
     dirs.flat_map do |dir|
-      PathGlob.under(dir, '**', '*.{jpg,jpeg,JPG,JPEG}').select do |path|
-        ExifLocation.present?(path)
+      # By the first two bytes, not by the name. Every other half of this
+      # feature is content-based -- ExifLocation.jpeg? tests the marker,
+      # PostWriter strips whatever the bytes say is a JPEG, and
+      # MediaDimensions::SYNONYMS lists .jpe and .jfif as spellings the
+      # engine keeps on purpose -- so a photograph filed under one of
+      # those was invisible to BOTH this report and its fixer, and doctor
+      # said "no photo carries where it was taken" about an archive that
+      # had some. Two bytes per file to ask; present? still reads its
+      # 256 kB only for the files that really are JPEGs.
+      PathGlob.under(dir, '**', '*').select do |path|
+        File.file?(path) && ExifLocation.jpeg?(path) && ExifLocation.present?(path)
       end
     end
   rescue StandardError

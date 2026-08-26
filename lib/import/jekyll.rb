@@ -1046,9 +1046,31 @@ module Import
     # (/assets/<year>/<slug>/01.mp4), and from_file copies it into this
     # archive under the number it gets here -- the same path an image
     # takes through image_block.
+    # The types `./blog.sh export` actually writes through this channel:
+    # the four it always renders as HTML, plus the ones MarkdownWriter has
+    # no form for. Anything else claiming to be one of ours is a block
+    # somebody typed into a markdown file, and the import wizard offers to
+    # read "any folder of markdown files a converter produced" -- trees
+    # nobody here wrote. The comment above OWN_BLOCK_RE assumed the marker
+    # was proof of where a block came from; it is not, and anyone can type
+    # it. This does not make the restored block trusted -- see the note in
+    # own_block -- it only stops the marker from being a way to invent
+    # block types the markdown path could never produce.
+    OWN_BLOCK_TYPES = %w[video audio link file chat code embed gallery].freeze
+
     def own_block(packed, media)
       block = JSON.parse(packed.unpack1('m'))
       return nil unless block.is_a?(Hash)
+      return nil unless OWN_BLOCK_TYPES.include?(block['type'].to_s)
+
+      # ⚠️ What this does NOT close: `embed_html` is rendered raw by the
+      # build (build/build_blog.rb, the video branch), so a crafted tree
+      # can still put markup on the page through a block that IS one of
+      # ours. That is not a Jekyll question -- Import::Tumblr passes an
+      # export's embed_html through the same way -- but a property of the
+      # whole import surface, and deciding it means deciding whether a
+      # legitimate Instagram or Twitter embed (blockquote plus script)
+      # still renders. Daniel's call, not one to make inside a bug fix.
 
       %w[media poster].each do |key|
         entries = block[key]

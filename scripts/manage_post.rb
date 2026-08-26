@@ -3700,7 +3700,11 @@ def edit_post(slug, path: nil)
 
   FileUtils.mkdir_p(new_media_dir) if media_files.any?
   media_files.each do |src, filename|
-    FileUtils.cp(src, File.join(new_media_dir, filename))
+    # Through PostWriter, not a bare cp: this is where a photograph
+    # attached during an edit loses the coordinates it was taken at.
+    # `replace: true` keeps what this path has always done -- a file
+    # attached under a name already in the folder replaces it.
+    PostWriter.copy_media_file(src, File.join(new_media_dir, filename), replace: true)
   end
 
   # Not just images: a video's file lives in the same directory, and some

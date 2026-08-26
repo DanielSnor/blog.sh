@@ -128,23 +128,46 @@ module PostWriter
       # every later run then skips, so the half-image publishes and no
       # amount of re-importing replaces it. A rename either happened or it
       # did not, so the only file under the real name is a complete one.
-      tmp = File.join(media_dir, ".#{filename}.part")
+      copy_media_file(src_path, dest)
+    end
+  end
+
+  # One file into the archive, the only way the archive accepts one.
+  #
+  # Split out of copy_media because `edit` had grown a bare FileUtils.cp
+  # of its own, so `./blog.sh add` published a phone photo with no
+  # coordinates in it and `./blog.sh edit` published the SAME photo with
+  # the author's back garden still in it -- the one thing the docs promise
+  # about media, broken on the path people use most. One promise wants one
+  # implementation.
+  #
+  # `replace:` is where the two callers genuinely differ. An import never
+  # replaces bytes the archive already holds (the paragraph above says
+  # why); a person attaching a file to their own post under a name that is
+  # already in the folder means to replace it, and always has.
+  def self.copy_media_file(src_path, dest, replace: false)
+    return if !replace && File.exist?(dest)
+
+    FileUtils.mkdir_p(File.dirname(dest))
+    # Copied beside the destination and renamed into place: a copy
+    # interrupted halfway leaves a .part nobody serves rather than a
+    # truncated picture under the real name.
+    tmp = File.join(File.dirname(dest), ".#{File.basename(dest)}.part")
+    begin
+      FileUtils.cp(src_path, tmp)
+      # On the copy, never on the author's own file: what sits in
+      # incoming/ or in a photo library is theirs, and the archive's
+      # copy is the one about to be published. Between the cp and the
+      # rename is the one moment the file is the engine's alone.
+      ExifLocation.strip_file(tmp) if strip_location?
+      File.rename(tmp, dest)
+    rescue StandardError
       begin
-        FileUtils.cp(src_path, tmp)
-        # On the copy, never on the author's own file: what sits in
-        # incoming/ or in a photo library is theirs, and the archive's
-        # copy is the one about to be published. Between the cp and the
-        # rename is the one moment the file is the engine's alone.
-        ExifLocation.strip_file(tmp) if strip_location?
-        File.rename(tmp, dest)
+        File.delete(tmp)
       rescue StandardError
-        begin
-          File.delete(tmp)
-        rescue StandardError
-          nil
-        end
-        raise
+        nil
       end
+      raise
     end
   end
 
