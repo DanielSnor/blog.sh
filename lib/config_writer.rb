@@ -58,6 +58,22 @@ module ConfigWriter
   # it, a tree whose template had been deleted met both wizards with a
   # five-line Ruby backtrace out of the constructor, before either had
   # asked a single question.
+  # A file that is there and cannot be opened -- a permission bit, a
+  # directory in its place, an unmounted volume. Its own class rather than
+  # a bare Errno, so Wizard.guard can say a sentence about it the way it
+  # already does for a missing template: both wizards died on a raw
+  # backtrace before the first question otherwise, and the guard's own
+  # comment says TemplateMissing exists precisely so that the one failure
+  # a fresh checkout can produce is a sentence.
+  class Unreadable < StandardError
+    attr_reader :path
+
+    def initialize(path, cause)
+      @path = path
+      super("#{path}: #{cause}")
+    end
+  end
+
   class TemplateMissing < MissingKey
     attr_reader :path
 
@@ -598,7 +614,13 @@ module ConfigWriter
     # in memory until save!, so a wizard that gets cancelled leaves no
     # file behind.
     def read_or_seed
-      return File.read(@path) if File.exist?(@path)
+      if File.exist?(@path)
+        begin
+          return File.read(@path)
+        rescue SystemCallError => e
+          raise Unreadable.new(@path, e.message)
+        end
+      end
       # The path when there is no template to name: a writer opened over
       # the example itself (style.rb reads the shipped defaults out of it)
       # has none, and the file the sentence has to name is that one.
@@ -837,6 +859,18 @@ module ConfigWriter
         # shows optional entries) stays INSIDE the key's body instead of
         # ending it.
         if line_indent == indent && ConfigWriter.uncomment(@lines[i]).lstrip.match?(/\A-(\s|\z)/)
+          # ...but only while we are still inside the key's own body. A
+          # COMMENTED entry reached after a shallower comment belongs to
+          # whatever that comment opened, and claiming it here also
+          # disarmed the guard, so everything below was annexed too:
+          # writing colors.dark.pill_bg -- the last active key in the
+          # colors section -- swallowed the 34 documented lines of the
+          # commented-out `fonts:` block, because `#     - family:` under
+          # `#   faces:` uncomments to indent 4, the same as a colour key.
+          # Choosing a palette in ./style.sh deleted them from the user's
+          # config, silently.
+          next if ConfigWriter.comment?(@lines[i]) && saw_shallow_comment
+
           last = i
           saw_shallow_comment = false
           next
@@ -1080,7 +1114,13 @@ module ConfigWriter
     private
 
     def read_or_seed
-      return File.read(@path) if File.exist?(@path)
+      if File.exist?(@path)
+        begin
+          return File.read(@path)
+        rescue SystemCallError => e
+          raise Unreadable.new(@path, e.message)
+        end
+      end
       # The path when there is no template to name: a writer opened over
       # the example itself (style.rb reads the shipped defaults out of it)
       # has none, and the file the sentence has to name is that one.

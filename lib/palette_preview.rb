@@ -105,6 +105,13 @@ module PalettePreview
     site_css = File.read(File.join(public_dir, 'assets', 'css', 'site.css'), encoding: 'utf-8')
     page = page.sub(%r{<link rel="stylesheet" href="/assets/css/site\.css[^"]*">}) { "<style>\n#{site_css}</style>" }
     page = page.gsub(%r{<script.*?</script>}m, '')
+    # ...and the page's own Content-Security-Policy with them. It allows
+    # no inline script, so the click-preventer appended below never ran --
+    # and clicking anything in the preview navigated away from it. Every
+    # script the built page carries has just been stripped, and this copy
+    # is a lone file in tmp/ that loads nothing from anywhere: there is
+    # no policy left to enforce.
+    page = page.gsub(%r{<meta http-equiv="Content-Security-Policy"[^>]*>}, '')
 
     # Hover states are half of what is being judged, so links stay live to
     # the mouse -- they just lead nowhere.

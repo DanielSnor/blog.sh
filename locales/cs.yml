@@ -1151,6 +1151,9 @@ setup:
   intro: "Zeptám se na nastavení, která web potřebuje k provozu, odpovědi cestou ověřím a zapíšu je do config/site.yml a env.sh."
   intro_skip: "Každou otázku jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."
   intro_expert: "(Kdo si YAML radši edituje sám: průvodce jen vyplňuje config/site.yml, jehož okomentovaná šablona je config/site.yml.example.)"
+  config_unreadable: "❌ %{path} se nepodařilo přečíst: %{error}"
+  network_unchanged: "Nic zadáno, nic změněno — web si nechává síť pro komentáře, kterou měl."
+  config_unreadable_stop: "Nic se nezměnilo. Každá otázka tady nabízí, co už v configu je, a Enter to nechává — když se soubor nedá přečíst, není co nechat a odpovídáním bys to, co v něm je, vyprázdnil. Oprav soubor (`./blog.sh doctor` řekne který řádek) a spusť to znovu."
 
   section_identity: "Čí ten web je"
   section_address: "Kde web bydlí"
@@ -1264,6 +1267,7 @@ wizard:
   menu_hint: "↑↓ pohyb · Enter vybrat · 1-%{count} rychlá volba · Esc nechat současné"
   interrupted: "Zastaveno. Nic se nezapsalo — konfigurace je přesně taková, jaká byla."
   template_missing: "%{path} tady není a konfigurace se píše vyplňováním téhle šablony — takže není na co se ptát. Se strojem se dodává: obnov ji (git checkout %{path}) a spusť to znovu."
+  config_unreadable_file: "%{path} tam je, ale nejde otevřít — %{error}. Nic se nezměnilo. Sprav práva (nebo připoj svazek, na kterém leží) a spusť to znovu."
   nothing_changed: "Nic se nezměnilo — každá odpověď sedla s tím, co už tam bylo."
   q_write: "Zapsat tyhle změny? [a/N] "
   cancelled: "Nic se nezapsalo."

@@ -50,6 +50,7 @@
 #   social      name, url, icon or icon_svg, (rel)
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
+#   comments    (approval)
 #   publishing  (slots)
 #   media       (convert_heic), (strip_location)
 #   seo         (block_ai_crawlers), (robots_extra)

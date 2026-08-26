@@ -193,6 +193,11 @@ def run
   site = ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
   env = ConfigWriter::EnvFile.new(ENV_SH, template: ENV_SH_EXAMPLE)
   current = current_values
+  # A config nobody could read is not a config to answer questions about:
+  # every prompt would offer "(not set)" and Enter -- documented as
+  # "keeps what is there" -- would blank the site's own title, name and
+  # author. Better to say so and stop than to quietly propose that.
+  abort(t('config_unreadable_stop')) if current == :unreadable
 
   # Address and deploy back to back on purpose: "where the site lives"
   # and "where the build goes" are one theme, and the comments network is
@@ -212,12 +217,21 @@ end
 # first run these are the template's own values, since that is what the
 # site would say if left alone.
 def current_values
+  path = File.exist?(SITE_YML) ? SITE_YML : SITE_YML_EXAMPLE
   data = begin
-    path = File.exist?(SITE_YML) ? SITE_YML : SITE_YML_EXAMPLE
     YamlCompat.load_file(path) || {}
-  rescue StandardError
-    {}
+  rescue StandardError => e
+    # NOT silently {}. The wizard documents Enter as "keeps what is
+    # there", and with an empty hash every prompt arrived saying "(not
+    # set)" -- so a single YAML typo anywhere in the file turned an
+    # Enter-through run into one that BLANKED site.title, short_name and
+    # author. The person could not have known: nothing on the screen said
+    # the file had not been read.
+    warn t('config_unreadable', path: path, error: e.message.lines.first.to_s.strip[0, 120])
+    :unreadable
   end
+  return :unreadable if data == :unreadable
+
   data.is_a?(Hash) ? data : {}
 end
 
@@ -263,7 +277,11 @@ def ask_language(site, current)
   I18n.force_lang(chosen)
   site.set(%w[site lang], chosen)
   locale = LOCALE_FOR[chosen]
-  site.set(%w[site locale], locale) if locale
+  # Only when the language actually moved. There is no locale question, so
+  # this was the only thing that ever wrote the key -- and it wrote it on
+  # every Enter-through run, turning a deliberately hand-set en_GB into
+  # en_US without asking and without saying so.
+  site.set(%w[site locale], locale) if locale && chosen != now
 end
 
 def ask_identity(site, current)
@@ -422,11 +440,20 @@ def ask_network(site, env, current)
 end
 
 def ask_mastodon(site, env, current)
-  site.deactivate(%w[bluesky])
-
   instance = ask_valid(t('q_instance'), current.dig('mastodon', 'instance'), hint: t('h_instance')) do |answer|
     t('e_instance') if answer.include?('/') || answer.include?(' ')
   end
+  # Nothing is switched until there is something to switch TO. Picking the
+  # network and then pressing Enter past the instance -- on a fresh config
+  # there is no current one to keep -- used to deactivate the section the
+  # site actually had and write an empty one in its place: a site that
+  # announced to Bluesky lost that and gained a valueless mastodon.
+  if instance.to_s.strip.empty?
+    say(t('network_unchanged'), :dim)
+    return
+  end
+
+  site.deactivate(%w[bluesky])
   site.set(%w[mastodon instance], instance)
 
   puts t('token_where', instance: instance)
@@ -476,11 +503,17 @@ def ask_toots_widget(site, current, account_id)
 end
 
 def ask_bluesky(site, env, current)
-  site.deactivate(%w[mastodon])
-
   handle = ask_valid(t('q_handle'), current.dig('bluesky', 'handle'), hint: t('h_handle')) do |answer|
     t('e_handle') if answer.start_with?('@') || answer.include?('/')
   end
+  # See ask_mastodon: nothing is switched until there is something to
+  # switch to.
+  if handle.to_s.strip.empty?
+    say(t('network_unchanged'), :dim)
+    return
+  end
+
+  site.deactivate(%w[mastodon])
   site.set(%w[bluesky handle], handle)
 
   password = Tui.password(t('q_app_password'))
@@ -566,7 +599,10 @@ def check_local_target(env)
   # the comments menu, whose repaint used to erase it -- and a warning
   # about a typo'd deploy path that nobody can read is precisely the
   # silent success it exists to prevent.
-  if File.directory?(dir)
+  # The same expansion the backend does (DeployBackend::Local#session), or
+  # a path typed with a leading ~ -- the ordinary way to write one -- was
+  # called missing by the wizard and then found by the deploy.
+  if File.directory?(File.expand_path(dir))
     say(t('target_ok', dir: dir), :green)
   else
     say("⚠️  #{t('target_missing', dir: dir)}", :yellow)

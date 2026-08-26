@@ -1165,6 +1165,9 @@ setup:
   intro: "Hier werden die Einstellungen abgefragt, die eine Website zum Laufen braucht. Die Antworten werden unterwegs geprüft und in config/site.yml und env.sh geschrieben."
   intro_skip: "Jede Frage lässt sich überspringen -- Enter übernimmt den darunter vorausgefüllten Wert. Nichts wird geschrieben, bevor du alle Änderungen zusammen gesehen und bestätigt hast."
   intro_expert: "(Lieber selbst YAML bearbeiten? Der Assistent füllt nur config/site.yml aus, dessen kommentierte Vorlage config/site.yml.example ist.)"
+  config_unreadable: "❌ %{path} konnte nicht gelesen werden: %{error}"
+  network_unchanged: "Nichts angegeben, nichts geändert -- die Website behält das Kommentar-Netzwerk, das sie hatte."
+  config_unreadable_stop: "Es wurde nichts geändert. Jede Frage hier bietet an, was in der Konfiguration steht, und Enter behält es -- ist die Datei unlesbar, gibt es nichts zu behalten, und Antworten hätte geleert, was darin steht. Bring die Datei in Ordnung (`./blog.sh doctor` nennt die Zeile) und starte erneut."
 
   section_identity: "Wem die Website gehört"
   section_address: "Wo die Website wohnt"
@@ -1278,6 +1281,7 @@ wizard:
   menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc aktuellen Wert behalten"
   interrupted: "Abgebrochen. Es wurde nichts geschrieben -- die Konfiguration ist genau wie vorher."
   template_missing: "%{path} ist nicht da, und eine Konfiguration entsteht, indem diese Vorlage ausgefüllt wird -- es gibt also noch nichts zu fragen. Sie gehört zum Lieferumfang: stelle sie wieder her (git checkout %{path}) und starte erneut."
+  config_unreadable_file: "%{path} ist da, lässt sich aber nicht öffnen -- %{error}. Es wurde nichts geändert. Bring die Rechte in Ordnung (oder hänge das Volume ein, auf dem sie liegt) und starte erneut."
   nothing_changed: "Nichts geändert -- jede Antwort entsprach dem, was schon da war."
   q_write: "Diese Änderungen schreiben? [j/N] "
   cancelled: "Nichts geschrieben."

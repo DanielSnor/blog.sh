@@ -1182,6 +1182,9 @@ setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
   intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."
   intro_expert: "(Rather edit YAML yourself? The wizard only fills in config/site.yml, whose commented template is config/site.yml.example.)"
+  config_unreadable: "❌ %{path} could not be read: %{error}"
+  network_unchanged: "Nothing given, so nothing changed -- the site keeps the comments network it had."
+  config_unreadable_stop: "Nothing was changed. Every question here offers what the config already says and Enter keeps it -- with the file unreadable there is nothing to keep, and answering would have blanked what is in it. Put the file right (`./blog.sh doctor` names the line) and run this again."
 
   section_identity: "Who the site is"
   section_address: "Where the site lives"
@@ -1295,6 +1298,7 @@ wizard:
   menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc keep current"
   interrupted: "Stopped. Nothing was written -- the config is exactly as it was."
   template_missing: "%{path} is not there, and a config is written by filling that template in -- so there is nothing to ask you about yet. It ships with the engine: restore it (git checkout %{path}) and start again."
+  config_unreadable_file: "%{path} is there but cannot be opened -- %{error}. Nothing was changed. Put the permissions right (or mount the volume it lives on) and run this again."
   nothing_changed: "Nothing changed -- every answer matched what was already there."
   q_write: "Write these changes? [y/N] "
   cancelled: "Nothing written."

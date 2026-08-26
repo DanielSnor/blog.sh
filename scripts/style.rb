@@ -132,7 +132,21 @@ def palettes
     # bare backtrace the moment the menu opened or the entry was chosen.
     # A malformed palette is named once and left out; the rest still work.
     loaded.select do |slug, data|
-      ok = data.is_a?(Hash) && %w[light dark].all? { |m| data[m].is_a?(Hash) }
+      # ...and every value in it has to be a colour. palettes.yml invites
+      # hand-editing in its own header, and the natural way to write one --
+      # `bg: #fafafa`, unquoted -- makes YAML read the '#' as a comment, so
+      # every key parsed as nil. The palette was offered, chosen,
+      # confirmed with a green tick, and changed nothing: the write loop
+      # skips empty values on purpose (what is absent stays absent), and
+      # the person was told it had been applied.
+      #
+      # The same rule the by-hand path enforces on every typed value, and
+      # the one doctor checks the config against -- three parts of the
+      # engine were answering "what is a valid colour?" differently.
+      ok = data.is_a?(Hash) && %w[light dark].all? do |m|
+        data[m].is_a?(Hash) && data[m].any? &&
+          data[m].values.all? { |v| v.to_s.match?(HEX) }
+      end
       palette_warnings << Tui.paint(t('palette_malformed', name: slug), :yellow) unless ok
       ok
     end
