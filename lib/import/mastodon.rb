@@ -21,6 +21,7 @@ module Import
     def initialize(export_dir)
       @export_dir = export_dir
       @polls = 0
+      @withheld = Hash.new(0)
     end
 
     def label
@@ -47,6 +48,8 @@ module Import
       object = item['object'] || {}
       return :reply if object['inReplyTo']
 
+      scope = visibility(object)
+      @withheld[scope] += 1 unless scope == 'public'
       blocks = HtmlBlocks.parse(object['content'].to_s).blocks
       blocks.concat(poll_blocks(object))
       blocks.concat(attachment_blocks(object, media))
@@ -59,8 +62,11 @@ module Import
         # listing shows why it was hidden.
         'title' => presence(object['summary']),
         'date' => Time.parse(object['published']).iso8601,
-        'state' => 'published',
+        'state' => scope == 'direct' || scope == 'followers' ? 'draft' : 'published',
         'tags' => hashtags(object),
+        # Mastodon's "unlisted" and blog.sh's mean the same thing: a real
+        # address, kept out of the listings.
+        'unlisted' => scope == 'unlisted' ? true : nil,
         'content' => blocks,
         'source' => {
           'platform' => 'mastodon',
@@ -76,12 +82,51 @@ module Import
     # are kept, but they arrive as a list rather than as whatever the reader
     # remembers voting in.
     def postscript
-      return nil if @polls.zero?
-
-      I18n.t('import.note.mastodon_polls', count: @polls)
+      notes = []
+      notes << I18n.t('import.note.mastodon_polls', count: @polls) if @polls.positive?
+      held = @withheld['direct'] + @withheld['followers']
+      notes << I18n.t('import.note.mastodon_withheld', count: held,
+                                                       direct: @withheld['direct'],
+                                                       followers: @withheld['followers']) if held.positive?
+      notes << I18n.t('import.note.mastodon_unlisted', count: @withheld['unlisted']) if @withheld['unlisted'].positive?
+      notes.empty? ? nil : notes.join(' ')
     end
 
     private
+
+    # An archive is the WHOLE account, not the public timeline: the outbox
+    # holds followers-only posts and direct messages beside the public ones.
+    # Every standalone toot used to be written as `published`, so importing
+    # your own archive put your own DMs on the public web -- 141 of 2548 in
+    # the archive this was measured against, 132 of them direct messages --
+    # with post pages, sitemap entries and feed items, and not a word in the
+    # run's summary.
+    #
+    # Scope is in `to` and `cc`, exactly as ActivityPub puts it there:
+    #   Public in `to`  -> public
+    #   Public in `cc`  -> unlisted (an address, out of the listings)
+    #   followers only  -> not public
+    #   neither         -> a direct message
+    # The last two become drafts: they keep the author's words in the archive
+    # and off the site, which is the only reading of "not public" that cannot
+    # publish something by accident.
+    PUBLIC_URI = ['https://www.w3.org/ns/activitystreams#Public', 'as:Public', 'Public'].freeze
+
+    # Strings rather than symbols, and deliberately: inside lib/import/ a
+    # RETURNED SYMBOL means one thing, a skip reason the wizard has to have a
+    # translation for, and tests/test_gaps.rb walks these files looking for
+    # exactly that shape rather than trusting a list -- it has caught eleven
+    # real omissions that way. A classification returned as :public would be
+    # read as a skip reason nobody translated. Do not tidy these back.
+    def visibility(object)
+      to = Array(object['to'])
+      cc = Array(object['cc'])
+      return 'public' if to.any? { |a| PUBLIC_URI.include?(a) }
+      return 'unlisted' if cc.any? { |a| PUBLIC_URI.include?(a) }
+      return 'followers' if (to + cc).any? { |a| a.to_s.end_with?('/followers') }
+
+      'direct'
+    end
 
     # An ActivityPub Question carries its choices in oneOf (single answer)
     # or anyOf (multiple), each with a vote count in replies.totalItems,

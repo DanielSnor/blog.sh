@@ -801,6 +801,7 @@ import:
     wayback_unreadable: "Snímků, které nebyly čitelné feedy: %{count} — přeskočeny."
     wayback_unanswered_captures: "Snímků, u kterých Archiv přestal odpovídat: %{count} — jejich posty chybí v tomhle běhu, ne na blogu. Opakovaný běh je dobere; větší WAYBACK_DELAY tomu předejde."
     wayback_unparsed: "Archivovaných stránek, které nešlo přečíst jako posty: %{count} — viz počty přeskočených."
+    wayback_cdx_truncated: "⚠️  Archiv vrátil přesně tolik záchytů, kolik je strop (%{limit}), takže jich skoro jistě má víc a zbytek se nečetl: %{list}. CDX odpovídá od nejstaršího, takže chybí KONEC blogu, ne začátek. Pusť import po obdobích přes --from/--to."
     wayback_dated_by_capture: "Postů s datem snímku: %{count} — stránka sama nic lepšího neřekla."
     wayback_lost_images: "Obrázků, které Archiv nikdy neuložil: %{count} — jejich posty dorazily bez nich."
     wayback_summary_only: "Položek feedu jen se souhrnem, ne celým postem: %{count} z %{seen} — ten blog publikoval výňatky, takže tyhle dorazí zkrácené, ať je snímků kolik chce."
@@ -809,6 +810,8 @@ import:
     wayback_unanswered: "Dotazů na Archiv bez odpovědi i po opakování: %{count} — cokoli držely, v tomhle běhu chybí. Opakovaný běh je bezpečný a dobere to."
     wix_dropped: "Uzly Rich Contentu bez ekvivalentu v blog.sh vypadly: %{listed}."
     mastodon_polls: "Anket převedených na seznam možností s počty hlasů: %{count}."
+    mastodon_withheld: "Neveřejných tootů se uložilo jako rozepsané, ne na web: %{count} (přímých zpráv %{direct}, jen pro sledující %{followers}). Archiv je celý účet, ne veřejná časová osa — projdi je a vydej jen to, co má být venku."
+    mastodon_unlisted: "Tootů označených jako neuvedené: %{count}. Mají vlastní adresu, ale ve výpisech nejsou — stejně jako je měl Mastodon."
 
 # ./blog.sh doctor — přečte konfiguraci na disku a řekne, co je s ní
 # špatně (lib/doctor.rb). Každý řádek s radou musí dávat smysl sám o sobě:

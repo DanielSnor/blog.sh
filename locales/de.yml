@@ -812,6 +812,7 @@ import:
     wayback_unreadable: "%{count} Schnappschuss/Schnappschüsse waren keine lesbaren Feeds -- übersprungen."
     wayback_unanswered_captures: "Bei %{count} Schnappschuss/Schnappschüssen hörte das Archiv auf zu antworten -- deren Beiträge fehlen in diesem Lauf, nicht im Blog. Ein neuer Lauf holt sie nach; ein größeres WAYBACK_DELAY verhindert es."
     wayback_unparsed: "%{count} archivierte Seiten ließen sich nicht als Beiträge lesen -- siehe die Zähler der Übersprungenen."
+    wayback_cdx_truncated: "⚠️  Das Archiv lieferte genau so viele Aufnahmen wie das Limit (%{limit}), es hat also fast sicher mehr und der Rest wurde nie gelesen: %{list}. CDX antwortet vom ältesten an, es fehlt also das ENDE des Blogs, nicht der Anfang. Importiere abschnittsweise mit --from/--to."
     wayback_dated_by_capture: "%{count} Beitrag/Beiträge tragen das Datum des Schnappschusses -- die Seite selbst wusste nichts Besseres."
     wayback_lost_images: "%{count} Bild(er) hat das Archiv nie gespeichert -- ihre Beiträge kamen ohne sie an."
     wayback_summary_only: "%{count} von %{seen} Feed-Einträgen trugen nur eine Zusammenfassung, nicht den ganzen Beitrag -- dieses Blog veröffentlichte Auszüge, also kommen sie gekürzt an, egal wie viele Schnappschüsse es gibt."
@@ -820,6 +821,8 @@ import:
     wayback_unanswered: "%{count} Archiv-Anfrage(n) blieben auch nach Wiederholung unbeantwortet -- was sie hielten, fehlt in diesem Lauf. Ein neuer Lauf ist sicher und holt es nach."
     wix_dropped: "Rich-Content-Knoten ohne blog.sh-Entsprechung sind entfallen: %{listed}."
     mastodon_polls: "In eine Liste mit Stimmenzahlen umgewandelte Umfragen: %{count}."
+    mastodon_withheld: "Nicht-öffentliche Beiträge als Entwürfe gespeichert statt veröffentlicht: %{count} (%{direct} Direktnachricht(en), %{followers} nur für Follower). Ein Archiv ist das ganze Konto, nicht die öffentliche Timeline -- sieh sie durch und veröffentliche nur, was nach außen gehört."
+    mastodon_unlisted: "Als nicht gelistet markierte Beiträge: %{count}. Sie haben eine eigene Adresse, bleiben aber aus den Listen heraus, genau wie bei Mastodon."
 
 # ./blog.sh doctor -- liest die Konfiguration auf der Platte und sagt, was
 # daran nicht stimmt (lib/doctor.rb). Jede Zeile mit einem Hinweis muss

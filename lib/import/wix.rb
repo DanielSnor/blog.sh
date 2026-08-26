@@ -365,8 +365,13 @@ module Import
           entry = { 'text' => text }
           entry['formatting'] = formatting unless formatting.empty?
           unless nested.empty?
+            # The whole list block, not its items. Handing on the bare array
+            # wrote a `children` no renderer could read: the build reached
+            # `case block['type']` with an Array and died with a TypeError,
+            # taking every page on the site with it, while check called the
+            # archive sound and edit refused to open the post.
             child = convert(nested.first, unknown)
-            entry['children'] = child['items'] if child
+            entry['children'] = child if child
           end
           entry
         end

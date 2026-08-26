@@ -553,7 +553,8 @@ def render_config_block(block)
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
-      nested = it['children'] ? render_config_block(it['children']) : ''
+      child = nested_list(it['children'])
+      nested = child ? render_config_block(child) : ''
       body = apply_formatting(it['text'], it['formatting'], escape: false)
       if it.key?('checked')
         box = %(<input type="checkbox" disabled#{it['checked'] ? ' checked' : ''}>)
@@ -781,6 +782,29 @@ def heading_id(text, seen)
   seen[base] > 1 ? "#{base}-#{seen[base]}" : base
 end
 
+# A list item's `children` is a nested list -- whatever shape the producer that
+# wrote it happened to use. Three have shipped and all three are in archives
+# now: markdown_parser writes a whole list block, html_blocks writes
+# {style, items} with no type at all, and wix wrote the bare items ARRAY.
+#
+# Only the first rendered. The second fell through `case block['type']` to the
+# unknown-type fallback, so a nested bullet imported from HTML -- Tumblr,
+# Ghost, WordPress, a feed, a rescued page -- printed as raw JSON in a <pre>
+# on the published page. The third reached `case` as an Array and took the
+# WHOLE BUILD down with a TypeError: not one page on the site regenerated,
+# `check` calling the archive sound, and `edit` refusing the post too, so the
+# archive was stuck.
+#
+# A nested list is a list. This is the one place that has to know it, and it
+# has to keep knowing it, because the two older shapes are already written.
+def nested_list(children)
+  return nil if children.nil?
+  return { 'type' => 'list', 'items' => children } if children.is_a?(Array)
+  return nil unless children.is_a?(Hash)
+
+  children['type'] ? children : children.merge('type' => 'list')
+end
+
 def render_block(block, media_prefix, seen = {}, title_lifted: false)
   case block['type']
   when 'text'
@@ -798,7 +822,8 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
-      nested = it['children'] ? render_block(it['children'], media_prefix, seen) : ''
+      child = nested_list(it['children'])
+      nested = child ? render_block(child, media_prefix, seen) : ''
       # A task item gets a real (disabled) checkbox and drops the bullet via
       # the class -- the checkbox is the bullet.
       if it.key?('checked')

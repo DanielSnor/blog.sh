@@ -370,7 +370,12 @@ module Import
         item['formatting'] = formatting unless formatting.empty?
         if nested
           children = nested.children.select { |c| c.name == 'li' }.filter_map { |c| list_item(c) }
-          item['children'] = { 'style' => nested.name, 'items' => children } unless children.empty?
+          # With 'type', like every other list block. Without it the renderer
+          # fell through to the unknown-type fallback and a nested bullet
+          # imported from HTML printed as raw JSON in a <pre> on the page.
+          unless children.empty?
+            item['children'] = { 'type' => 'list', 'style' => nested.name, 'items' => children }
+          end
         end
         item
       end

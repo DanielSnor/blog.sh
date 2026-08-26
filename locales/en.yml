@@ -831,6 +831,7 @@ import:
     wayback_unreadable: "%{count} capture(s) were not readable feeds and were skipped."
     wayback_unanswered_captures: "%{count} capture(s) the Archive stopped answering for -- their posts are missing from this run, not from the blog. Re-running picks them up; a larger WAYBACK_DELAY stops it happening."
     wayback_unparsed: "%{count} archived page(s) could not be read as posts -- see the skip counts."
+    wayback_cdx_truncated: "⚠️  The Archive returned exactly the limit (%{limit}) of captures, so it almost certainly holds more and the rest was never read: %{list}. CDX answers oldest first, so what is missing is the END of the blog, not its beginning. Run the import one span at a time with --from/--to."
     wayback_dated_by_capture: "%{count} post(s) carry the capture date -- the page itself said nothing better."
     wayback_lost_images: "%{count} image(s) the Archive never saved are lost -- their posts came over without them."
     wayback_summary_only: "%{count} of %{seen} feed item(s) carried a summary, not the whole post -- that blog published excerpts, so those arrive truncated however many captures exist."
@@ -839,6 +840,8 @@ import:
     wayback_unanswered: "%{count} Archive quer(y/ies) went unanswered even after retrying -- anything they held is missing from this run. Re-running is safe and picks it up."
     wix_dropped: "Rich Content nodes with no blog.sh equivalent were dropped: %{listed}."
     mastodon_polls: "Polls turned into a list of options with their vote counts: %{count}."
+    mastodon_withheld: "Non-public toots kept as drafts rather than published: %{count} (%{direct} direct message(s), %{followers} followers-only). An archive is the whole account, not the public timeline -- read them and publish only what belongs outside."
+    mastodon_unlisted: "Toots marked unlisted: %{count}. They have an address of their own but stay out of the listings, exactly as Mastodon had them."
 
 # ./blog.sh doctor -- reads the configuration on disk and reports what is
 # wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on

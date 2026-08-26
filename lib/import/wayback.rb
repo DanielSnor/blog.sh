@@ -109,6 +109,7 @@ module Import
       # came back empty, because only the second kind says anything about
       # the blog -- see refuse_unanswered.
       @cdx_failures = []
+      @cdx_truncated = []
       @pack =
         if @pack_name
           PACKS.find { |p| p.key == @pack_name } ||
@@ -194,6 +195,10 @@ module Import
       notes << I18n.t('import.note.wayback_unreadable', count: @unreadable) if @unreadable.positive?
       if @unanswered_captures.positive?
         notes << I18n.t('import.note.wayback_unanswered_captures', count: @unanswered_captures)
+      end
+      unless @cdx_truncated.empty?
+        notes << I18n.t('import.note.wayback_cdx_truncated',
+                        limit: CDX_LIMIT, list: @cdx_truncated.uniq.first(3).join(', '))
       end
       notes << I18n.t('import.note.wayback_unparsed', count: @unparsed) if @unparsed.positive?
       notes << I18n.t('import.note.wayback_dated_by_capture', count: @dated_by_capture) if @dated_by_capture.positive?
@@ -639,10 +644,25 @@ module Import
       { from: @from, to: @to }.compact
     end
 
+    # CDX answers oldest first, which is what makes overlapping captures merge
+    # correctly -- and what made a low limit lose the END of a blog rather than
+    # its beginning. The feed query asked for 1000 and never looked at whether
+    # it got exactly that many back, so a blog the Archive captured more often
+    # than that came over as its first 1000 captures and nothing after: the
+    # recent half simply missing, while the run reported "1000 feed capture(s)
+    # read" as though that were all there was.
+    #
+    # 1000 was also the odd one out -- the media query in this same method has
+    # always asked for 15_000. Both ask for that now, and a result that comes
+    # back exactly full is reported rather than trusted, because that is the
+    # one shape that means "there was more". The way past it is the window the
+    # importer already offers: --from/--to, one span at a time.
+    CDX_LIMIT = 15_000
+
     def cdx_rows(candidate, extra: nil, windowed: true)
-      params = { url: candidate, output: 'json', limit: 1000,
+      params = { url: candidate, output: 'json', limit: CDX_LIMIT,
                  filter: 'statuscode:200', collapse: 'digest' }
-      params = params.merge(limit: 15_000).merge(extra) if extra
+      params = params.merge(extra) if extra
       params = params.merge(window) if windowed
       query = URI.encode_www_form(params)
       body = http_get("#{CDX}?#{query}")
@@ -651,6 +671,7 @@ module Import
       ts = header.index('timestamp')
       original = header.index('original')
       mime = header.index('mimetype')
+      @cdx_truncated << candidate if rows.length >= CDX_LIMIT
       rows.map { |r| { timestamp: r[ts], original: r[original], mimetype: r[mime] } }
     rescue StandardError => e
       # Still [], because one unanswered candidate among nine must not

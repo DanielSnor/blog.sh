@@ -374,6 +374,20 @@ module MarkdownWriter
     spans
   end
 
+  # `children` in three shapes, because three producers each wrote their own:
+  # a whole list block (markdown_parser), {style, items} with no type
+  # (html_blocks), and the bare items array (wix). The last one arrived here as
+  # an Array and raised TypeError, so a post carrying one could not be OPENED --
+  # `edit` died on the way in, and with the build dying too there was no way
+  # back out of it. build_blog.rb keeps the same rule.
+  def nested_list(children)
+    return nil if children.nil?
+    return { 'type' => 'list', 'items' => children } if children.is_a?(Array)
+    return nil unless children.is_a?(Hash)
+
+    children['type'] ? children : children.merge('type' => 'list')
+  end
+
   # Renders a (possibly nested) list block back to markdown -- each level of
   # `children` adds two more spaces of indentation, mirroring what
   # parse_list_level expects on the way back in.
@@ -383,7 +397,8 @@ module MarkdownWriter
     (list['items'] || []).each_with_index.map do |it, idx|
       task = it.key?('checked') ? (it['checked'] ? '[x] ' : '[ ] ') : ''
       line = "#{pad}#{marker_for.call(idx)} #{task}#{render_text_markdown(it['text'], it['formatting'])}"
-      it['children'] ? "#{line}\n#{list_to_markdown(it['children'], indent + 1)}" : line
+      child = nested_list(it['children'])
+      child ? "#{line}\n#{list_to_markdown(child, indent + 1)}" : line
     end.join("\n")
   end
 
