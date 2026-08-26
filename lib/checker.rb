@@ -521,6 +521,13 @@ module Checker
   # named first.
   def unusable_media_cause(path)
     return 'dir' if File.directory?(path)
+    # A symlink whose target is gone answers File.readable? with false, so
+    # it was reported as a missing read permission and the fix text told the
+    # author to chmod a file that is not there. The advice cannot work, and
+    # following it teaches them the tool is wrong about something else too.
+    # Asked before readable? for the same reason `dir` is: the shapes shadow
+    # each other, so the more specific one has to be named first.
+    return 'broken_link' if File.symlink?(path) && !File.exist?(path)
     return 'unreadable' unless File.readable?(path)
 
     'empty'

@@ -806,7 +806,11 @@ module MarkdownParser
       end
 
       counter += 1
-      alt, path, caption = m[1], m[2], unescape_title(m[3])
+      # The label is unescaped like the title beside it: the writer escapes
+      # "[" and "]" so an alt text holding one cannot end the label early,
+      # and reading it back raw left the backslashes where the reader could
+      # see them -- and put them into the alt attribute on the page.
+      alt, path, caption = unescape_title(m[1]), m[2], unescape_title(m[3])
       # A single exclamation mark is for images only. A video with just one
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.

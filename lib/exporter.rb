@@ -376,7 +376,16 @@ module Exporter
     # _drafts/ directory means -- said twice on purpose, since a tree
     # flattened by a converter loses the directory but keeps the key.
     meta['published'] = false if draft?(post)
-    meta['type'] = 'page' if page?(post)
+    # `page` is a type in the front matter's vocabulary; any other type is a
+    # content-type override the author set by hand, and it is a DECISION
+    # rather than a description -- ContentType.dominant honours it above its
+    # own scan of the blocks. Left out, a post the author filed as a photo
+    # despite carrying mostly text came home a text post and moved to a
+    # different /type/ listing, silently, since nothing about it looked
+    # wrong. The importer has always read this key; only the export was
+    # quiet about it.
+    meta['type'] = page?(post) ? 'page' : post['type'].to_s.strip
+    meta.delete('type') if meta['type'].to_s.empty?
     meta['permalink'] = permalink(post)
 
     redirects = redirect_paths(post)

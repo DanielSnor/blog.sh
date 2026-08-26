@@ -1043,6 +1043,7 @@ check:
   media_cause_dir: "je to složka, ne soubor"
   media_cause_unreadable: "chybí právo ke čtení"
   media_cause_empty: "má nula bajtů"
+  media_cause_broken_link: "je to odkaz na soubor, který tam není"
   media_unusable_fix: "Přerušené stahování, chybějící právo ke čtení, nebo složka pod jménem obrázku. Nahraj tam skutečnou kopii souboru; do té doby stránka ukazuje rozbitý obrázek."
   media_missing_fix: "Post si o něj říká a na stránce zůstane díra. Obvykle import, kterému selhalo stahování — buď soubor dodej, nebo ho z postu vyhoď."
   image_degenerate: "%{slug}: obrázek %{file} má %{width}x%{height} a vůbec se nevykreslí."

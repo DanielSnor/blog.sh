@@ -1074,6 +1074,7 @@ check:
   media_cause_dir: "it is a folder, not a file"
   media_cause_unreadable: "the read permission is missing"
   media_cause_empty: "it is zero bytes"
+  media_cause_broken_link: "it is a link pointing at a file that is not there"
   media_unusable_fix: "An interrupted download, a permission bit or a folder under the picture's name. Put a real copy of the file there; the page shows a broken picture until then."
   media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
   image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."

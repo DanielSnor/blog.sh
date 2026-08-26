@@ -97,13 +97,17 @@ module MarkdownWriter
         # the parser's own sentinel. An image caption shares the alt text's
         # single line, so it shares the alt text's rule.
         cap = b['caption'] ? %( "#{escape_title(one_line(b['caption']))}") : ''
-        "![#{one_line(b['alt_text'])}](#{path}#{cap})"
+        # Brackets escaped: an alt text holding "[" or "]" closed the label
+        # early, so `![[es] W-ZERO3](...)` stopped being an image at all --
+        # the block came back as text, the alt text was gone and the file
+        # was pruned as an orphan on the next build.
+        "![#{escape_label(one_line(b['alt_text']))}](#{path}#{cap})"
       when 'file'
         file = (b['media'] || []).first
         # Round-trips as the link line it came from: a bare filename, so
         # re-saving an edited post keeps the attachment instead of
         # turning it into a dead link to a name that isn't a URL.
-        "[#{one_line(b['label'])}](#{File.join(media_dir, file['url'].to_s)})" if file
+        "[#{escape_label(one_line(b['label']))}](#{File.join(media_dir, file['url'].to_s)})" if file
       when 'audio'
         # Mirrors the video branch: a local file writes back as !![](file),
         # and so does a platform the engine can build a player for from the
@@ -186,6 +190,13 @@ module MarkdownWriter
   # author's absolute disk path was published as body text and the media
   # file was pruned as an orphan. A caption, a label or a title with a
   # newline in it does the same to its own line.
+  # A label sits between "[" and "]", so a bracket inside it has to say so.
+  # The parser reads \[ and \] as literals; unescaped, the first "]" ends
+  # the label and what follows is no longer a link or an image.
+  def escape_label(text)
+    text.to_s.gsub(/([\[\]])/) { "\\#{Regexp.last_match(1)}" }
+  end
+
   def one_line(text)
     text.to_s.gsub(/[[:space:]]+/, ' ').strip
   end

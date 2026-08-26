@@ -1057,6 +1057,7 @@ check:
   media_cause_dir: "es ist ein Ordner, keine Datei"
   media_cause_unreadable: "das Leserecht fehlt"
   media_cause_empty: "sie hat null Bytes"
+  media_cause_broken_link: "es ist ein Link auf eine Datei, die es nicht gibt"
   media_unusable_fix: "Ein abgebrochener Download, ein fehlendes Leserecht oder ein Ordner unter dem Namen des Bildes. Lege eine echte Kopie der Datei dorthin; bis dahin zeigt die Seite ein kaputtes Bild."
   media_missing_fix: "Der Beitrag fordert sie an, die Seite zeigt ein Loch. Meist ein Import mit fehlgeschlagenem Download -- lege die Datei dorthin oder nimm sie aus dem Beitrag heraus."
   image_degenerate: "%{slug}: Das Bild %{file} ist %{width}x%{height} und wird gar nicht gerendert."
