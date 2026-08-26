@@ -137,7 +137,7 @@ archive:
   description: "Alle Beiträge auf %{site_title}, nach Jahr und Monat."
   year_title: "Archiv %{year}"
   year_description: "Beiträge aus %{year} auf %{site_title}."
-  back: "Zurück zur Jahresübersicht"
+  back: "← Zurück zur Jahresübersicht"
 tags:
   # Das Schlagwortverzeichnis unter /tag/. Sortiert nach dem gefalteten
   # Namen statt nach Bytes, sonst landen Umlaute hinter dem z.

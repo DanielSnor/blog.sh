@@ -11,7 +11,13 @@
   // somewhere the year's worth of pages already disagrees with, and the two
   // orders differing between "before JS ran" and "after" is worse than
   // either order on its own.
-  var items = Array.prototype.slice.call(list.children);
+  // The alphabetical order is everything the build wrote, letters
+  // included; the count order is the tags alone. A letter above a run of
+  // names says nothing once the names are ordered by how many posts carry
+  // them, so the switch takes them out rather than leaving twenty-seven
+  // headings over a list they no longer describe.
+  var all = Array.prototype.slice.call(list.children);
+  var items = all.filter(function (el) { return el.className.indexOf('tag-index-item') !== -1; });
   var byCount = items.slice().sort(function (a, b) {
     var d = Number(b.getAttribute('data-count')) - Number(a.getAttribute('data-count'));
     // Ties keep the alphabetical order underneath, so the list does not
@@ -23,7 +29,8 @@
   // eye would see one order while a screen reader and the Tab key kept the
   // other, and a list of seven hundred links is exactly where that matters.
   function apply(order) {
-    var wanted = order === 'count' ? byCount : items;
+    var wanted = order === 'count' ? byCount : all;
+    while (list.firstChild) list.removeChild(list.firstChild);
     var frag = document.createDocumentFragment();
     for (var i = 0; i < wanted.length; i++) frag.appendChild(wanted[i]);
     list.appendChild(frag);

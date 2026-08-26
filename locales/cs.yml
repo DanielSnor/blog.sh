@@ -134,7 +134,7 @@ archive:
   description: "Všechny příspěvky na %{site_title} podle let a měsíců."
   year_title: "Archiv %{year}"
   year_description: "Příspěvky z roku %{year} na %{site_title}."
-  back: "Zpět na přehled let"
+  back: "← Zpět na přehled let"
 tags:
   # Rozcestník štítků na /tag/. Řadí se podle složeného názvu, ne podle
   # bajtů — jinak by štítky s diakritikou skončily až za „z".

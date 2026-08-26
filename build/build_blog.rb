@@ -2203,7 +2203,11 @@ end
 # post title, while the eight content-type labels are a closed set that
 # cannot be mistaken for one. That is why type listings pass no kind and
 # always did without one.
-def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil)
+# `value_href:` makes the heading itself the way back: a tag listing links
+# to the index of tags, a year to the map of years. The same address the
+# "back" link at the foot carries -- a reader who has scrolled to the top
+# of a long year should not have to scroll to the bottom to leave it.
+def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil, value_href: nil)
   value = value.to_s
   kind = kind.to_s
   return '' if value.empty? && kind.empty?
@@ -2214,7 +2218,8 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   parts << %(<span class="listing-heading__kind">#{h(kind)}</span>) unless kind.empty?
   parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
-  parts << %(<span class="listing-heading__value"#{id_attr}>#{h(value)}</span>)
+  inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
+  parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
   # h1, not h2. This is what the page is about -- the tag being listed, the
   # search being run -- and the posts under it are h2 already, so at h2 it
   # was a sibling of the things it introduces rather than their heading. A
@@ -2260,6 +2265,16 @@ LISTING_HEADING_ICONS = {
           '<path d="M17 3v3a1 1 0 0 0 1 1h3"/>' \
           '<path d="M6 7v12a2 2 0 0 0 2 2h9"/>' \
           '<path d="M3 11v8a2 2 0 0 0 2 2h8"/></svg>',
+  # A month grid rather than a single page: the archive map IS twelve cells
+  # a year, and a calendar drawn as one sheet says "date" where this page
+  # says "every date there is". The two rings are what make it read as a
+  # wall calendar at 20px, where a grid alone reads as a table.
+  calendar: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+            'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+            'stroke-linejoin="round" aria-hidden="true">' \
+            '<rect x="3" y="5" width="18" height="16" rx="2"/>' \
+            '<line x1="3" y1="10" x2="21" y2="10"/>' \
+            '<line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>',
   # The hole in the label is a circle rather than the zero-length line the
   # shape is usually drawn with: that trick renders only under a round
   # linecap, and one stylesheet override away it disappears without
@@ -2272,7 +2287,8 @@ LISTING_HEADING_ICONS = {
 }.freeze
 
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
-                  heading_kind: nil, heading_variant: nil, heading_icon: nil, feed_path: nil,
+                  heading_kind: nil, heading_variant: nil, heading_icon: nil,
+                  heading_href: nil, feed_path: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil,
                   oldest_first: false)
   pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
@@ -2294,7 +2310,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
-                                        icon: heading_icon)
+                                        icon: heading_icon, value_href: heading_href)
     # Tags, series and content types all name themselves; the landing page is
     # the only listing that arrives here with nothing, and it is the only one
     # that would otherwise have no h1 (see home_heading_html).
@@ -3195,6 +3211,10 @@ tags_map.each do |slug, data|
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
                 heading_kind: t('tag.kind'), heading_variant: 'tag', heading_icon: :tag,
+                # Only when there IS an index to go back to: a site whose
+                # tags all live on drafts builds no /tag/, and a heading
+                # linking there would be the dead menu item doctor refuses.
+                heading_href: (tags_map.empty? ? nil : '/tag/'),
                 feed_path: FEED_TAG_SLUGS.include?(slug) ? "/tag/#{slug}/rss.xml" : nil,
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
@@ -3220,16 +3240,35 @@ end
 unless tags_map.empty?
   tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
                            .sort_by { |_, name, _| [Slug.fold(name), name] }
-  items = tag_index_rows.map do |slug, name, count|
+  # A letter above each run of names, so seven hundred tags read as a
+  # dictionary rather than as a wall. Taken from the FOLDED name, because
+  # that is the order the list is in: `škola` belongs under S, where the
+  # reader looking between `sirky` and `sport` will be. Anything that is
+  # not a letter -- a tag that starts with a digit -- goes under `#`.
+  #
+  # Emitted as list items rather than as headings between lists: the
+  # column layout is one <ul>, and breaking it into twenty-seven of them
+  # would break the columns with it. The switch to count order takes them
+  # back out (see assets/js/tag-index.js).
+  last_letter = nil
+  items = tag_index_rows.flat_map do |slug, name, count|
+    letter = Slug.fold(name).to_s[0].to_s.upcase
+    letter = '#' unless letter.match?(/[A-Z]/)
+    head = if letter == last_letter
+             []
+           else
+             last_letter = letter
+             [%(<li class="tag-index-letter" aria-hidden="true">#{h(letter)}</li>)]
+           end
     # The count travels in an attribute as well as in the text: the switch
     # reorders these in the DOM, and reading a number back out of rendered
     # markup is how a sort starts depending on how a number is punctuated.
-    %(<li class="tag-index-item" data-count="#{count}"><a href="/tag/#{h(slug)}/">#{h(name)}</a>) +
-      %(<span class="tag-index-count">#{count}</span></li>)
+    head + [%(<li class="tag-index-item" data-count="#{count}"><a href="/tag/#{h(slug)}/">#{h(name)}</a>) +
+            %(<span class="tag-index-count">#{count}</span></li>)]
   end
   emit(File.join(PUBLIC_DIR, 'tag', 'index.html'),
-       layout(%(<h1 class="listing-heading">#{h(t('tags.title'))}</h1>\n) +
-              %(<ul class="tag-index" id="tag-index">\n#{items.join("\n")}\n</ul>),
+       layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
+              %(\n<ul class="tag-index" id="tag-index">\n#{items.join("\n")}\n</ul>),
               title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
               description: t('tags.description', site_title: SITE_TITLE),
               path: '/tag/'))
@@ -3377,8 +3416,8 @@ unless archive_by_year.empty?
   end
 
   emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
-       layout(%(<h1 class="listing-heading">#{h(t('archive.title'))}</h1>\n) +
-              %(<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
+       layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
+              %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
               title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
               description: t('archive.description', site_title: SITE_TITLE),
               path: ARCHIVE_PATH))
@@ -3407,9 +3446,15 @@ unless archive_by_year.empty?
     end
 
     emit(File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html'),
-         layout(%(<h1 class="listing-heading">#{h(t('archive.year_title', year: year))}</h1>\n) +
-                %(<p class="archive-back"><a href="#{ARCHIVE_PATH}">#{h(t('archive.back'))}</a></p>\n) +
-                sections.join("\n"),
+         layout(listing_heading_html(t('archive.year_title', year: year),
+                                     variant: 'archive', icon: :calendar,
+                                     value_href: ARCHIVE_PATH) + "\n" +
+                sections.join("\n") +
+                # Below the list and on the left, which is where a post's own
+                # "back" link has always sat. A way out belongs at the end of
+                # the thing you are reading, not above it.
+                %(\n<nav class="pagination back" aria-label="#{h(t('pagination.nav_label'))}">) +
+                %(<a href="#{ARCHIVE_PATH}">#{h(t('archive.back'))}</a></nav>),
                 title: "#{t('archive.year_title', year: year)} – #{SITE_SHORT_NAME}",
                 description: t('archive.year_description', year: year, site_title: SITE_TITLE),
                 path: "/archive/#{year}/"))
