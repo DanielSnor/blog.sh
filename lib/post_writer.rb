@@ -693,6 +693,18 @@ module PostWriter
     # state like the announcement URLs above, and minting a fresh one per
     # re-import would break every shared preview link.
     post['draft_token'] = old['draft_token'] if old && old['draft_token'] && post['state'] == 'draft' && !post['draft_token']
+    # ...and its place in the publish queue, for the same reason and with
+    # the same condition. `scheduled` is engine-side state no source has a
+    # notion of -- only scripts/manage_post.rb writes it -- and it was in
+    # neither carry-over list, so a re-import left the post a draft and
+    # quietly took it off the queue. Nothing said so, and the failure is
+    # invisible until the day the post does not appear: the cron looks for
+    # `state == draft && scheduled`, finds nothing due, and exits 0.
+    #
+    # Only while it is still a draft. If the source now says published,
+    # the post has gone out and a leftover queue flag would be a lie about
+    # where it stands.
+    post['scheduled'] = old['scheduled'] if old && old['scheduled'] && post['state'] == 'draft' && !post['scheduled']
     post = ensure_draft_token(post)
 
     # unpublished_from is a promise the engine owes the web: "this post
@@ -905,7 +917,27 @@ module PostWriter
     return nil if id.nil? || id.to_s.empty?
     return nil if account.nil? || account.to_s.empty?
 
-    [source['platform'], account.to_s, id.to_s]
+    # Folded, because the operator types this one. Several adapters take
+    # the old site's address on the command line -- Ghost's second
+    # argument is a required one -- and the host out of it IS half the
+    # post's identity, though the docs present it as "where the images
+    # live". Typing https://www.cynicky.blog on the second run where the
+    # first said https://cynicky.blog made every post a stranger: the
+    # archive doubled, every media file was fetched again into a second
+    # directory, and the summary said only that it had imported a lot.
+    #
+    # Here rather than in the adapter, so both sides of the comparison go
+    # through it: an archive that already carries the un-folded spelling
+    # keeps matching instead of duplicating on the very next run, which is
+    # the harm this is meant to prevent. Case folding is safe for every
+    # other kind of account too -- a Mastodon acct, a Twitter handle and a
+    # Tumblr blog name are all case-insensitive to the platforms that
+    # issue them.
+    [source['platform'], fold_account(account), id.to_s]
+  end
+
+  def self.fold_account(account)
+    account.to_s.strip.downcase.sub(%r{\A(?:https?://)?(?:www\.)}, '')
   end
 
   def self.find_by_source(source)

@@ -75,6 +75,14 @@ duplicated.
   and all. Import from the same path each time -- or rename the new export
   to the old name -- and matching works as described.
 
+  Ghost is a third shape, and this list left it out until 1.5.1: the
+  address you type as the second argument is presented as "where the
+  images live", and the host out of it is also half of every post's
+  identity. Case and a leading `www.` are folded away, so
+  `https://www.cynicky.blog` and `https://cynicky.blog` are the same site
+  on a re-import -- but a genuinely different host is a different site,
+  and typing one imports the archive a second time.
+
   A markdown tree is the one source that can do better, because a site
   built by Hugo or Jekyll writes its own name down. The identity is that
   name -- `baseURL` or `title` out of `hugo.toml` (or `config/_default/`),

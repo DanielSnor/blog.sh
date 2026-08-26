@@ -181,8 +181,13 @@ module Import
                  !Import::RESERVED_PAGE_SLUGS.include?(written_slug.to_s.downcase)
                 pages << PostAddress.path(post.merge('slug' => written_slug))
               end
-              samples << post['slug'] if samples.size < 5
-              @on_post&.call(written, post, scanned)
+              # The address the post LANDED at, not the one the source
+              # asked for. unique_slug may have handed it another name on
+              # the way in -- the pages sentence above learned that when it
+              # was written -- and a run that reports the source's slug
+              # sends the reader looking for a page that is not there.
+              samples << written_slug if samples.size < 5
+              @on_post&.call(written, post.merge('slug' => written_slug), scanned)
             end
           rescue StandardError => e
             skipped[:error] += 1
