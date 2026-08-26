@@ -15,10 +15,10 @@ prints what an installation is running.
 Two things happened here. The site learned to say what it holds -- a post
 names itself out of its own words instead of standing under its address,
 an archive of thousands gets a map, a site's subjects get a page -- and
-the engine underneath was taken apart and put back together over three
+the engine underneath was taken apart and put back together over four
 days of adversarial review: a fleet over the 1.5 work, then a bug bounty
-across thirty-six surfaces, 173 confirmed findings, every one outside the
-importers now closed and pinned by a test that fails on the old code.
+across thirty-six surfaces, 173 confirmed findings, every one of them now
+closed and pinned by a test that fails on the old code.
 
 The naming is the change a reader will notice. On the archive this was
 measured against, 2754 posts of 4418 -- 62% of the site -- had no title
@@ -183,6 +183,54 @@ upgrade:
   the stream published an empty `<lastBuildDate>`, where RSS 2.0 requires
   a date.
 
+- **The importers, all eleven adapters and the machinery under them.**
+  The bounty confirmed 55 defects there and every one is closed. What
+  they cost, worst first:
+
+  *Posts nobody meant to publish were published.* A Mastodon archive is
+  the whole account, not the public timeline: 141 of 2548 standalone
+  toots in the archive this was measured against -- 132 of them direct
+  messages -- were written as published posts, with pages, sitemap
+  entries and feed items. A Ghost export ships the full body of every
+  members-only and paid post, gated only when a page is served; they
+  arrived published, untagged and uncounted. And `draft: true # not yet`
+  -- a comment after the value -- made the flag a truthy STRING, so a
+  Jekyll post its author was still writing went onto the open web.
+
+  *Whole imports came to nothing, and said so as if it were the file's
+  fault.* One empty column in a Wix CSV header -- what Excel writes as
+  soon as any line in the file has a field too many -- marked every row
+  misaligned, so an export imported as zero posts under a message about
+  a quote that was never left open. A folder with no markdown in it, and
+  a CSV that was not a Wix export at all, both answered "Done. 0 post(s)
+  written" and exit 0.
+
+  *Posts overwrote each other, or arrived twice.* Two feed items sharing
+  a `<guid>` matched each other: the second overwrote the first in place
+  and the summary counted two written. A Medium draft, a beehiiv issue
+  that never went out, and a Pixelfed export in the newer wrapped shape
+  each lost the account half of their identity, so re-running the
+  identical command over the identical file wrote the archive a second
+  time -- against the promise the tool prints itself.
+
+  *And a long tail of quiet losses.* An Atom body written as
+  `type="xhtml"` imported empty and counted as skipped; a multi-line
+  TOML array turned every tag into `[`; Hugo's `static/` was looked for
+  in the wrong place, so images that were on disk were reported missing.
+  A Medium essay lost the section breaks its author typed; a Wix heading
+  lost its links and a Wix table cell its words; a Ghost lead photo lost
+  its caption. A Tumblr picture that would not download stayed behind as
+  `<img src="">`, which `check` cannot see, and an NPF block type with
+  no branch -- a poll, since 2023 -- vanished without a word. Facebook's
+  own `<br /> `, tag plus a literal space, collapsed 190 posts of 1603
+  into a single paragraph each. A permalink with one non-ASCII character
+  lost its redirect. Pointed at the wrong folder, the Twitter importer
+  answered with a Ruby backtrace where every sibling answers with a
+  sentence. And the wizard -- the door this tool's own header calls the
+  way in -- never printed what the HTML parser had thrown away, so a
+  blog full of embedded video imported as "Wrote N post(s)" and nothing
+  else.
+
 - **Smaller, and there were many.** A tag containing a comma became two
   tags on every save (six posts on one archive). `props` and `edit` died
   on a raw backtrace over a date `check` names cleanly. An unknown block
@@ -205,9 +253,6 @@ upgrade:
   too, and where the cut falls is CSS's to decide. The honest answer is a
   card that renders a real teaser, which is a design decision rather than
   a bug fix.
-
-- **The importers.** 55 confirmed findings are still open there and are
-  the subject of the next release. Nothing in them is new in 1.5.
 
 ## 1.4 -- 2026-08-25
 

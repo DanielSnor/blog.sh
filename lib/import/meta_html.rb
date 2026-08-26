@@ -140,8 +140,17 @@ module Import
     # newlines, tags go, entities decode last (an entity that spells a
     # bracket must not conjure a tag).
     def plain_text(fragment)
+      # Meta writes a line break as the SEVEN bytes "<br /> " -- the tag
+      # followed by a literal space. Turning the tag into a newline and
+      # leaving the space made every paragraph break "\n \n", which the
+      # paragraph splitter (/\n{2,}/) does not see as one, so a
+      # multi-paragraph post collapsed into a single block and every
+      # continuation line kept a stray leading space. 193 of the 1603
+      # posts in the export this was measured against; and because the
+      # post's id is a digest over its text, those posts also stopped
+      # matching their JSON-imported twins on re-import.
       HtmlBlocks.decode_entities(
-        fragment.gsub(%r{<br\s*/?>}i, "\n").gsub(/<[^>]*>/, '')
+        fragment.gsub(%r{<br\s*/?>[ \t]?}i, "\n").gsub(/<[^>]*>/, '')
       ).strip
     end
   end

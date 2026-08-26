@@ -686,7 +686,7 @@ import:
   substack_url_prompt: "URL, na které publikace běžela (volitelné, jen pro záznam — prázdné = přeskočit): "
   feed_source_invalid: "%{source} není ani existující soubor, ani http(s) adresa."
   twitter_dir_prompt: "Cesta k rozbalenému exportu z Twitteru/X (prázdné = zrušit): "
-  twitter_dir_invalid: "Pod %{dir} není data/tweets.js — nasměruj to na samotný rozbalený adresář exportu."
+  twitter_dir_invalid: "Pod %{dir} chybí %{missing} — nasměruj to na samotný rozbalený adresář exportu."
   bluesky_handle_prompt: "Bluesky handle (prázdné = zrušit): "
   scanned: "přečteno položek: %{count}…"
   dry_run_running: "Čtu %{label} — zatím se nic nezapisuje…"

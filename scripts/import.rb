@@ -25,6 +25,7 @@ require_relative '../lib/site_header'
 require_relative '../lib/i18n'
 require_relative '../lib/publishing'
 require_relative '../lib/import/run'
+require_relative '../lib/import/run_notes'
 require_relative '../lib/import/beehiiv'
 require_relative '../lib/import/blogger'
 require_relative '../lib/import/bluesky'
@@ -375,8 +376,14 @@ def build_twitter
   return nil unless dir
 
   dir = File.expand_path(dir)
-  unless File.exist?(File.join(dir, 'data', 'tweets.js'))
-    puts t('import.twitter_dir_invalid', dir: dir)
+  # Both files, not just the tweets: the adapter needs account.js for the
+  # handle, and checking only one of them meant the wizard accepted a path,
+  # printed "Reading Twitter/X (@" and died on the very next expression --
+  # its own validation was what promised to cope. Asked here, the person
+  # gets to type the path again.
+  missing = %w[tweets.js account.js].reject { |name| File.exist?(File.join(dir, 'data', name)) }
+  unless missing.empty?
+    puts t('import.twitter_dir_invalid', dir: dir, missing: missing.map { |n| "data/#{n}" }.join(', '))
     return nil
   end
 
@@ -600,6 +607,17 @@ def report(result, dry_run:)
   # it, and the wizard has a report of its own.
   pages_note = Import.pages_note(Array(result.respond_to?(:pages) ? result.pages : nil))
   puts Tui.paint(pages_note, :cyan) if pages_note
+
+  # What the HTML parser could not represent -- an iframe, a video, a form
+  # -- and a source that handed out the same id twice. Both were counted
+  # all along and printed only by the scripted door, so the wizard, which
+  # is the door most people use, reported an import full of holes as
+  # "Wrote N post(s)" and no more. Said in the preview too, where it can
+  # still change the answer to the confirmation below.
+  dropped_note = Import.dropped_note(result.respond_to?(:dropped_elements) ? result.dropped_elements : nil)
+  puts Tui.paint(dropped_note, :yellow) if dropped_note
+  dupes_note = Import.duplicate_ids_note(result.respond_to?(:duplicate_ids) ? Array(result.duplicate_ids) : [])
+  puts Tui.paint(dupes_note, :yellow) if dupes_note
 
   # An item that failed is a loss, not a category of skip -- and the count
   # alone leaves the reader to guess which of five thousand it was.

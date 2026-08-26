@@ -697,7 +697,7 @@ import:
   substack_url_prompt: "URL, unter der die Publikation lief (optional, nur fürs Protokoll -- leer = überspringen): "
   feed_source_invalid: "%{source} ist weder eine vorhandene Datei noch eine http(s)-Adresse."
   twitter_dir_prompt: "Pfad zum entpackten Twitter/X-Export (leer = abbrechen): "
-  twitter_dir_invalid: "Unter %{dir} liegt keine data/tweets.js -- gib das entpackte Exportverzeichnis selbst an."
+  twitter_dir_invalid: "Unter %{dir} fehlt %{missing} -- gib das entpackte Exportverzeichnis selbst an."
   bluesky_handle_prompt: "Bluesky-Handle (leer = abbrechen): "
   scanned: "%{count} Eintrag/Einträge gelesen…"
   dry_run_running: "Lese %{label} -- noch wird nichts geschrieben…"

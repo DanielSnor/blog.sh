@@ -39,6 +39,7 @@ module Import
     # before it starts, and worth naming HOW MANY files, since a split
     # archive read as one is the defect below.
     def preamble
+      refuse_unless_export
       paths = tweets_paths
       size = paths.sum { |p| File.size(p) } / 1_048_576.0
       where = paths.length > 1 ? "#{paths.length} files in #{@data_dir}" : paths.first.to_s
@@ -113,9 +114,32 @@ module Import
       end
     end
 
+    # Every sibling archive importer answers the commonest mistake with a
+    # sentence -- Facebook names your_posts*.json, Mastodon names
+    # outbox.json. This one read account.js with a bare File.read, so
+    # pointing it at the folder that CONTAINS the archive, at data/ itself,
+    # or at an archive whose account.js was taken out before it was handed
+    # over, produced a Ruby backtrace -- preceded by "Reading  (0.0 MB)…",
+    # which reads as "I found your archive".
+    def refuse_unless_export
+      missing = []
+      missing << 'data/account.js' unless File.exist?(account_path)
+      missing << 'data/tweets.js' if tweets_paths.empty?
+      return if missing.empty?
+
+      abort("❌ #{@export_dir} does not hold a Twitter/X export -- no #{missing.join(', ')} " \
+            'in it. Point this at the unpacked archive itself: the folder that HOLDS ' \
+            'data/, not data/ and not the folder above it.')
+    end
+
+    def account_path
+      File.join(@data_dir, 'account.js')
+    end
+
     def account
       @account ||= begin
-        raw = File.read(File.join(@data_dir, 'account.js'), encoding: 'utf-8')
+        refuse_unless_export
+        raw = File.read(account_path, encoding: 'utf-8')
         JSON.parse(raw.sub(/\A[^\[]*/, '')).first['account']['username']
       end
     end

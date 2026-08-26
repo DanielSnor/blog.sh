@@ -282,6 +282,8 @@ Ghost's paywall is applied when a page is served, never in the file --
 but each one arrives as a **draft** tagged `ghost-members` rather than
 published, and the summary says how many there were. Nothing your
 members paid for goes onto the open web without you deciding it should.
+Re-importing an archive that came over before this release moves those
+posts to drafts.
 
 ### Instagram
 
@@ -526,8 +528,10 @@ In Pixelfed: **Settings → Data Export**, take the *Statuses* JSON. Unlike
 Mastodon's archive it links to the CDN instead of shipping files, so photos
 are downloaded; real pixel sizes come from the export's metadata. Trailing
 hashtag-only lines are dropped from captions -- they are already the post's
-tags, and would otherwise render as a stack of one-word paragraphs. Replies
-and reblogs are skipped and counted.
+tags, and would otherwise render as a stack of one-word paragraphs. Where
+an export leaves the tags empty, which happens, those hashtags BECOME the
+post's tags rather than disappearing from it twice over. Replies and
+reblogs are skipped and counted.
 
 ### Podcast
 
@@ -758,7 +762,9 @@ id, so import while the old site is still up. A post with no published
 date is a draft (Wix has no explicit status column), and category cells
 that hold Wix's internal 24-hex ids instead of names are dropped: an id
 makes no tag anyone would click. Kept permalinks come straight from the
-export's own Post Page URL column.
+export's own Post Page URL column. A CSV that is not a Wix export -- the
+other file in the same Downloads folder -- is refused by name rather than
+imported as nothing.
 
 ### WordPress, or any RSS/Atom feed
 

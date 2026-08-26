@@ -3,6 +3,7 @@
 require_relative 'run'
 require_relative '../i18n'
 require_relative 'pages_note'
+require_relative 'run_notes'
 
 # Operator tools speak English on purpose: a migrate script is reached by
 # typing a path, not the authoring UI, and its output lands in cron logs.
@@ -139,20 +140,18 @@ module Import
       # One line for all eleven adapters that parse HTML bodies: what the
       # block schema could not hold. It used to be counted by exactly one
       # of them (feed.rb) and thrown away by the rest, while the header of
-      # migrate_feed.rb promised the counting on everyone's behalf.
-      dropped = result.respond_to?(:dropped_elements) ? result.dropped_elements : nil
-      if dropped && !dropped.empty?
-        listed = dropped.sort_by { |name, count| [-count, name] }
-                        .map { |name, count| "#{name} (#{count})" }.join(', ')
-        puts "  #{I18n.t('import.note.feed_dropped', listed: listed)}"
-      end
+      # migrate_feed.rb promised the counting on everyone's behalf. The
+      # sentence itself lives in run_notes.rb, because the wizard owes the
+      # reader the same one and printed neither.
+      dropped_note = Import.dropped_note(result.respond_to?(:dropped_elements) ? result.dropped_elements : nil)
+      puts "  #{dropped_note}" if dropped_note
       # A source that handed out the same id twice. Said out loud, because
       # the alternative is a duplicate post the operator never hears about
       # -- and because the number that used to be printed was worse than
       # silence: the second item overwrote the first and the run counted
       # two written.
-      dupes = result.respond_to?(:duplicate_ids) ? Array(result.duplicate_ids) : []
-      puts "  #{I18n.t('import.note.duplicate_ids', count: dupes.size)}" unless dupes.empty?
+      dupes_note = Import.duplicate_ids_note(result.respond_to?(:duplicate_ids) ? Array(result.duplicate_ids) : [])
+      puts "  #{dupes_note}" if dupes_note
 
       return if result.media_failures.empty?
 
