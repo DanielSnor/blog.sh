@@ -92,14 +92,18 @@ module MarkdownWriter
       when 'image'
         media = (b['media'] || []).first || {}
         path = File.join(media_dir, media['url'].to_s)
-        cap = b['caption'] ? %( "#{escape_title(b['caption'])}") : ''
-        "![#{b['alt_text']}](#{path}#{cap})"
+        # one_line here and not inside escape_title: that helper also writes a
+        # LINK title, where a hard break is supported and round-trips through
+        # the parser's own sentinel. An image caption shares the alt text's
+        # single line, so it shares the alt text's rule.
+        cap = b['caption'] ? %( "#{escape_title(one_line(b['caption']))}") : ''
+        "![#{one_line(b['alt_text'])}](#{path}#{cap})"
       when 'file'
         file = (b['media'] || []).first
         # Round-trips as the link line it came from: a bare filename, so
         # re-saving an edited post keeps the attachment instead of
         # turning it into a dead link to a name that isn't a URL.
-        "[#{b['label']}](#{File.join(media_dir, file['url'].to_s)})" if file
+        "[#{one_line(b['label'])}](#{File.join(media_dir, file['url'].to_s)})" if file
       when 'audio'
         # Mirrors the video branch: a local file writes back as !![](file),
         # and so does a platform the engine can build a player for from the
@@ -118,9 +122,9 @@ module MarkdownWriter
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
         if media
-          "!![#{caption.empty? ? 'Audio' : caption}](#{File.join(media_dir, media['url'].to_s)})"
+          "!![#{caption.empty? ? 'Audio' : one_line(caption)}](#{File.join(media_dir, media['url'].to_s)})"
         elsif Embed.src(b) || Embed.detect(b['url'].to_s)
-          "!![#{caption.empty? ? 'Audio' : caption}](#{b['url']})"
+          "!![#{caption.empty? ? 'Audio' : one_line(caption)}](#{b['url']})"
         end
       when 'video'
         # Without this, `edit` would silently drop the video -- filter_map
@@ -130,11 +134,11 @@ module MarkdownWriter
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
         if media
-          "!![#{caption.empty? ? 'Video' : caption}](#{File.join(media_dir, media['url'].to_s)})"
+          "!![#{caption.empty? ? 'Video' : one_line(caption)}](#{File.join(media_dir, media['url'].to_s)})"
         elsif youtube_playable?(b)
-          "!![#{caption.empty? ? 'YT Video' : caption}](#{b['url']})"
+          "!![#{caption.empty? ? 'YT Video' : one_line(caption)}](#{b['url']})"
         elsif Embed.src(b) || Embed.detect(b['url'].to_s)
-          "!![#{caption.empty? ? 'Video' : caption}](#{b['url']})"
+          "!![#{caption.empty? ? 'Video' : one_line(caption)}](#{b['url']})"
         end
       end
     end.join("\n\n")
@@ -170,6 +174,22 @@ module MarkdownWriter
   # broken and no escape form that would have worked. The link case was
   # worse for being silent -- the link was destroyed and its raw markdown
   # published as body text. The parser unescapes the same pair.
+  # Text that has to live on ONE line, because the construct it goes into is
+  # a single line and markdown offers no escape for a newline inside it.
+  #
+  # An alt text with a line break was interpolated raw, and IMAGE_RE is not
+  # /m, so the line no longer matched: with a bare newline the paragraph hit
+  # the mid-paragraph image guard and parse_body ABORTED, which means
+  # `blog.sh edit` refused to save and the post could never be edited again
+  # -- complaining about a rule the author never broke. With a blank line
+  # inside it the paragraph split in two, the image block vanished, the
+  # author's absolute disk path was published as body text and the media
+  # file was pruned as an orphan. A caption, a label or a title with a
+  # newline in it does the same to its own line.
+  def one_line(text)
+    text.to_s.gsub(/[[:space:]]+/, ' ').strip
+  end
+
   def escape_title(text)
     text.to_s.gsub(/([\\"])/) { "\\#{Regexp.last_match(1)}" }
   end
