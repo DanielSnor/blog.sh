@@ -1798,7 +1798,7 @@ def rss_item(post)
                                    .map { |t| "<category>#{h(t)}</category>" }.join
   <<~ITEM
     <item>
-      <title>#{title}</title>
+      <title>#{xml_text(title)}</title>
       <link>#{url}</link>
       <guid isPermaLink="true">#{url}</guid>
       <pubDate>#{pub_date}</pubDate>
@@ -1818,10 +1818,10 @@ def render_rss(posts, path: '/rss.xml', title: SITE_TITLE, description: SITE_DES
     <?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
       <channel>
-        <title>#{h(title)}</title>
+        <title>#{h(xml_text(title))}</title>
         <link>#{link}</link>
         <atom:link href="#{SITE_BASE_URL}#{path}" rel="self" type="application/rss+xml" />
-        <description>#{h(description)}</description>
+        <description>#{h(xml_text(description))}</description>
         <language>#{SITE_LANG}</language>
         <lastBuildDate>#{last_build}</lastBuildDate>
         #{items}
@@ -2478,6 +2478,17 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # looked up by the date, so the picture was never copied and the page was
   # served with a hole in it. check saw nothing wrong, because check looks
   # where the file actually is.
+  # `content` is a list of blocks, decided once, here. Eleven readers in
+  # this file reach for it and most of them wrapped it in Array() by hand;
+  # the ones that did not -- dominant_content_type and
+  # referenced_media_filenames -- died on a post with no `content` key, or
+  # with "content": null, or with a null entry among its blocks, and took
+  # the WHOLE build with them: a raw NoMethodError naming this file and no
+  # post, before a single page was written. Guarding each reader is a game
+  # nobody wins; the shape is settled at the door instead. check refuses
+  # such a post separately, so this is the second line of defence rather
+  # than a licence to write one.
+  parsed['content'] = parsed['content'].is_a?(Array) ? parsed['content'].select { |b| b.is_a?(Hash) } : []
   parsed['__year'] = File.basename(File.dirname(f))
   # The file this came out of. The duplicate message below names it,
   # because an address does not find a file: two pages collide on a slug
@@ -2784,10 +2795,25 @@ def media_src(prefix, name)
   "#{prefix}#{h(media_name_encoded(name))}"
 end
 
+# Characters XML 1.0 forbids ANYWHERE in a document -- CDATA included, which
+# is the part that caught this out. lib/import/xml_repair.rb strips them from
+# an export on the way in but leaves CDATA regions byte for byte on purpose,
+# and a WordPress post body IS inside CDATA, so one control character in an
+# old export landed in the post JSON and went straight into
+# <description><![CDATA[...]]></description>. libxml2 -- which is what most
+# feed readers are -- then refuses the WHOLE document, so one character in
+# one post takes every subscriber's feed away, and neither the build nor
+# check says a word. Tab, newline and carriage return are the three allowed.
+XML_FORBIDDEN = /[\x00-\x08\x0B\x0C\x0E-\x1F]/
+
+def xml_text(text)
+  text.to_s.gsub(XML_FORBIDDEN, '')
+end
+
 # "]]>" cannot appear inside a CDATA section at all -- the only escape is
 # to end the section and start another around the ">".
 def cdata_safe(text)
-  text.to_s.gsub(']]>', ']]]]><![CDATA[>')
+  xml_text(text).gsub(']]>', ']]]]><![CDATA[>')
 end
 
 
@@ -2882,6 +2908,17 @@ end
 # Pages are in here as well as posts: a renamed page owes its old
 # address exactly what a renamed post does. They are out of the
 # LISTINGS, not out of the engine's promises.
+# The longest a single path segment may be. POSIX NAME_MAX is 255 bytes on
+# macOS and Linux alike, and mkdir_p raises ENAMETOOLONG past it -- which
+# killed the build at its very LAST stage, after the whole site had already
+# been written, with a backtrace naming no post. An imported permalink is
+# where such a segment comes from: 36 Japanese characters percent-encode to
+# 333 bytes, and importers put the source URL's path straight into
+# redirect_from. The three collisions below are already guarded on the
+# stated grounds that one bad imported entry must not kill the build; a
+# name the filesystem refuses is the fourth.
+NAME_MAX_BYTES = 255
+
 (posts + pages + unlisted_posts).each do |post|
   Array(post['former_slugs']).each do |former|
     parts = former.to_s.split('/').reject(&:empty?)
@@ -2889,7 +2926,8 @@ end
     # emits them), but hand-edited JSON is exactly where this list lives
     # -- and a ".." here would write the stub outside posts/, up to and
     # including over the homepage or above public.nosync entirely.
-    unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' }
+    unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' } &&
+           parts.none? { |p| p.bytesize > NAME_MAX_BYTES }
       warn t('build.former_slug_unusable', slug: post['slug'], entry: former.inspect)
       next
     end
@@ -3351,7 +3389,8 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
 (posts + pages + unlisted_posts).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
-    if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
+    if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) } ||
+       parts.any? { |p| p.bytesize > NAME_MAX_BYTES }
       warn t('build.redirect_from_unusable', slug: post['slug'], entry: origin.inspect)
       next
     end

@@ -248,7 +248,16 @@ module Checker
       # the build dies on with a raw NoMethodError, which is the exact
       # thing check_unbuildable exists to prevent. Surviving it is not the
       # same as blessing it.
-      unless post['content'].nil? || post['content'].is_a?(Array)
+      # The `.nil?` exemption used to sit here, and it was the hole: a post
+      # with no `content` key at all -- or "content": null -- was waved
+      # through as sound and the build then died on it. A post the build
+      # cannot read is unbuildable whether the key is the wrong TYPE or
+      # missing altogether; surviving a file is not the same as blessing it.
+      # ...and every entry in it has to be a block. A null among them is
+      # dropped by the build now rather than killing it, but a post with a
+      # hole where a block should be is still a post somebody has to look
+      # at -- and this is the tool whose job is to say so.
+      unless post['content'].is_a?(Array) && post['content'].all? { |b| b.is_a?(Hash) }
         findings << error(t('post_content_unreadable', file: short_path(post['__path'].to_s),
                                                        value: post['content'].class.to_s),
                           t('post_content_unreadable_fix'), kind: :post_content_unreadable,
