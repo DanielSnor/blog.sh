@@ -36,7 +36,7 @@ SiteConfig.use_site_timezone!
 # the lock held leaves quietly: nothing has been published, and cron is
 # back in fifteen minutes (see lib/run_lock.rb).
 require_relative '../lib/run_lock'
-RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0)
+RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0, quiet_when_busy: true)
 
 # A post is announced before the site is rebuilt (so the toot's URL and the
 # comment thread exist in the same build), which means a failed deploy would
@@ -47,17 +47,24 @@ RunLock.acquire!(Publishing::ROOT, label: 'publish', busy_exit: 0)
 # marker too now -- two copies of the same path is how they drift apart.
 DEPLOY_PENDING = Publishing::DEPLOY_PENDING
 
+# What makes a post due, asked in one place. The scan below asks it, and
+# so does the loop at the moment it writes -- because between the two
+# there is a whole run: a build and a deploy on a large archive take
+# minutes, and the author is at their desk the whole time.
+DUE_NOW = lambda do |path|
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
+  return nil unless post['state'] == 'draft' && post['scheduled']
+
+  date = Time.parse(post['date'])
+  return nil if date > Time.now
+
+  [path, post, date]
+end
+
 due = PathGlob.under(Publishing::CONTENT_DIR, '*', '*.json').filter_map do |path|
   begin
-    post = JSON.parse(File.read(path, encoding: 'utf-8'))
-    raise JSON::ParserError, 'not a post object' unless post.is_a?(Hash)
-
-    next unless post['state'] == 'draft' && post['scheduled']
-
-    date = Time.parse(post['date'])
-    next if date > Time.now
-
-    [path, post, date]
+    DUE_NOW.call(path)
   rescue StandardError => e
     # Every failure this file can produce, not just an unparseable one: a
     # post whose `date` is malformed or missing raises from Time.parse, and
@@ -110,7 +117,24 @@ end
 Publishing.mark_deploy_pending unless due.empty?
 
 failures = 0
-due.each do |path, post, date|
+due.each do |path, _snapshot, _date|
+  # Re-read at the moment of writing rather than trusting the copy the
+  # scan took. The snapshot was written straight back, so an edit made
+  # while this run worked was silently overwritten with the older text --
+  # and a post DELETED in the meantime was recreated from the snapshot,
+  # published, and announced to a timeline that cannot be taken back.
+  # Anything that is no longer a due scheduled draft is simply left: it
+  # stopped being this run's business somewhere in the last few minutes.
+  fresh = begin
+    File.exist?(path) ? DUE_NOW.call(path) : nil
+  rescue StandardError => e
+    warn I18n.t('cron.unreadable_post', path: path,
+                                        error: "#{e.class}: #{e.message.lines.first.to_s.strip[0, 80]}")
+    nil
+  end
+  next if fresh.nil?
+
+  _, post, date = fresh
   # Per post, so one bad post can't strand the ones already published and
   # announced in this same run (they would stay off the site until a human
   # noticed, with their announcements already public).

@@ -340,13 +340,28 @@ module Publishing
     name, rest = PostText.name_and_rest(post)
     link = PostText.link_title_block(post)
     link_name = link && link['title'].to_s.strip
-    title = post['title'] || name || (link_name unless link_name.to_s.empty?)
-    blocks = if name
-               [{ 'type' => 'text', 'text' => rest }]
-             elsif link && !link['description'].to_s.strip.empty?
+    # The build's order, in post_title_for: an untitled post that carries a
+    # link block borrows ITS title, and only a post with no link to borrow
+    # from is named by its opening sentence. This had the two the other way
+    # round, so a post with both went out announced as one thing while its
+    # own <h1>, its tab, its feed item and its link card said another --
+    # the engine giving two answers to "what is this post called".
+    #
+    # link_title_block is nil whenever post['title'] is set, so a link here
+    # always means an untitled post with a title to lend.
+    title = post['title'] || (link ? link_name : name)
+    blocks = if link
                # The build renders a lent title without repeating it and
                # leaves the description; the announcement says the same.
-               [{ 'type' => 'text', 'text' => link['description'].to_s }]
+               # With no description the whole post goes -- the opening
+               # sentence included, because it did not become the name.
+               if link['description'].to_s.strip.empty?
+                 post['content']
+               else
+                 [{ 'type' => 'text', 'text' => link['description'].to_s }]
+               end
+             elsif name
+               [{ 'type' => 'text', 'text' => rest }]
              else
                post['content']
              end

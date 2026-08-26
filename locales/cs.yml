@@ -613,6 +613,8 @@ cron:
   no_scheduled_due: "Žádný naplánovaný post není na řadě."
   sidebar_unreadable: "⚠️  %{name} se nedá přečíst (%{reason}) — beru ho jako prázdný a píšu nový. Co v něm bylo pro posty, které tenhle běh nestahuje, je pryč; vrátí to ./scripts/refresh-sidebar.sh --full."
   sidebar_gaps: "⚠️  Souborů postů, které se nepodařilo přečíst: %{count}. comments.json a stats.json si proto tenhle běh nechávají všechny záznamy — nedá se poznat, které posty jsou pořád publikované."
+  sidebar_no_archive: "⚠️  %{dir} tam není (nebo v něm nic není) — comments.json a stats.json si tenhle běh nechávají všechny záznamy. Archiv, na který není vidět, není archiv, ve kterém někdo smazal všechny posty."
+  sidebar_not_built: "Zatím není co nahrávat (chybí public.nosync/) — nejdřív postav web: ruby build/build_blog.rb"
   sidebar_empty_pass: "⚠️  Úplný průchod nestáhl vůbec nic, takže se nezapisuje jako hotový — příští běh to zkusí znovu místo aby čekal týden."
   sidebar_stats_full: "stats.json: aktualizováno postů: %{updated} (celkem %{total}) [úplný průchod]"
   sidebar_stats_recent: "stats.json: aktualizováno postů: %{updated} (celkem %{total}) [jen posledních ~90 dní]"

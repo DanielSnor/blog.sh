@@ -724,6 +724,17 @@ module Doctor
     (conf['instance'] || dig(data, 'mastodon', 'instance')).to_s.strip
   end
 
+  # And who the Bluesky card would ask about. The fetcher takes
+  # widgets.bluesky.handle and falls back to bluesky.handle, because a site
+  # that announces to Bluesky has already said its handle once -- so a
+  # flat WIDGET_REQUIRED entry would have cried wolf on every site that
+  # fills it in the second way. Without either, the card is drawn on every
+  # page, never fetched and never filled, and doctor said the widgets were
+  # all in order.
+  def handle_for_bluesky(data, conf)
+    (conf['handle'] || dig(data, 'bluesky', 'handle')).to_s.strip
+  end
+
   # Each widget needs the one value that identifies what it should show.
   # Without it the refresh writes an empty file and the sidebar silently
   # shows nothing -- a failure with no symptom anywhere else.
@@ -798,6 +809,10 @@ module Doctor
       # elsif this hid the @handle error behind the missing instance, which
       # is a report that fixes one thing and then surprises you with the
       # next -- and the reason a test caught it here is that it had one.
+      if name == 'bluesky' && handle_for_bluesky(data, conf).empty?
+        findings << error(t('widget_incomplete', name: name, key: 'handle'))
+      end
+
       if name == 'toots' && instance_for_toots(data, conf).empty?
         # The account id alone does not say WHERE to ask. The fetcher takes
         # widgets.toots.instance and falls back to mastodon.instance, so a

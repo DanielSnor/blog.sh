@@ -638,6 +638,8 @@ cron:
   no_scheduled_due: "No scheduled post is due."
   sidebar_unreadable: "⚠️  %{name} is unreadable (%{reason}) -- ignoring it and writing a fresh one. Whatever it held for posts this run does not refetch is gone; ./scripts/refresh-sidebar.sh --full puts it back."
   sidebar_gaps: "⚠️  %{count} post file(s) could not be read -- comments.json and stats.json keep every entry this run, since there is no telling which of them are still published."
+  sidebar_no_archive: "⚠️  %{dir} is not there (or holds nothing) -- comments.json and stats.json keep every entry this run. An archive that cannot be seen is not an archive whose posts were all deleted."
+  sidebar_not_built: "Nothing built yet (no public.nosync/) -- run the build first: ruby build/build_blog.rb"
   sidebar_empty_pass: "⚠️  The full pass fetched nothing at all, so it is not recorded as done -- the next run will try again instead of waiting a week."
   sidebar_stats_full: "stats.json: %{updated} post(s) updated (%{total} total) [full refresh]"
   sidebar_stats_recent: "stats.json: %{updated} post(s) updated (%{total} total) [last ~90 days only]"

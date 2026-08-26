@@ -625,6 +625,8 @@ cron:
   no_scheduled_due: "Kein geplanter Beitrag ist fällig."
   sidebar_unreadable: "⚠️  %{name} ist nicht lesbar (%{reason}) -- wird als leer behandelt und neu geschrieben. Was darin für Beiträge stand, die dieser Lauf nicht neu holt, ist weg; ./scripts/refresh-sidebar.sh --full bringt es zurück."
   sidebar_gaps: "⚠️  %{count} Beitragsdatei(en) ließen sich nicht lesen -- comments.json und stats.json behalten in diesem Lauf jeden Eintrag, denn es ist nicht zu erkennen, welche davon noch veröffentlicht sind."
+  sidebar_no_archive: "⚠️  %{dir} ist nicht da (oder enthält nichts) -- comments.json und stats.json behalten in diesem Lauf jeden Eintrag. Ein Archiv, das nicht zu sehen ist, ist kein Archiv, dessen Beiträge alle gelöscht wurden."
+  sidebar_not_built: "Noch nichts gebaut (kein public.nosync/) -- baue zuerst die Website: ruby build/build_blog.rb"
   sidebar_empty_pass: "⚠️  Der vollständige Durchlauf hat gar nichts geholt und wird deshalb nicht als erledigt vermerkt -- der nächste Lauf versucht es erneut, statt eine Woche zu warten."
   sidebar_stats_full: "stats.json: %{updated} Beitrag/Beiträge aktualisiert (%{total} gesamt) [vollständig]"
   sidebar_stats_recent: "stats.json: %{updated} Beitrag/Beiträge aktualisiert (%{total} gesamt) [nur die letzten ~90 Tage]"
