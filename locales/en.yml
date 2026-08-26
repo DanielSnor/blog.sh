@@ -189,6 +189,7 @@ js:
   no_results_pending: "No results yet,"
   no_results_final: "No results."
   try_other_words: " Try different or more general words."
+  archive_unavailable: " (the older archive could not be loaded)"
   searching_archive: " (also searching the older archive…)"
   loading_index: "Loading index…"
   index_unavailable: "Search index unavailable."

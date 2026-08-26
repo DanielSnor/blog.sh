@@ -285,6 +285,7 @@ def client_i18n_json
     no_results_final: t('js.no_results_final'),
     try_other_words: t('js.try_other_words'),
     searching_archive: t('js.searching_archive'),
+    archive_unavailable: t('js.archive_unavailable'),
     search_prompt: t('search.prompt'),
     loading_index: t('js.loading_index'),
     index_unavailable: t('js.index_unavailable'),
@@ -3128,7 +3129,11 @@ def search_index_entry(post)
   after = name && !rest.to_s.strip.empty? ? rest : text
   {
     url: post_path(post),
-    title: post['title'] || name,
+    # A link post has no title of its own and no opening sentence to lift a
+    # name from, so this used to be nil: the page, the tab, the feed and the
+    # announcement all showed the borrowed link title and the search result
+    # showed a card with nothing to click. Same order as post_title_for.
+    title: post['title'] || link_title_block(post)&.[]('title') || name,
     date: post_display_time(post).strftime(t('date_format')),
     excerpt: truncate_excerpt(after),
     folded: PostText.searchable(post, text)

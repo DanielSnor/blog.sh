@@ -20,8 +20,22 @@
   // Anything else in storage (a stale value, someone poking at devtools) is
   // treated as "no choice" rather than written back into data-theme, where it
   // would match neither the light block nor the dark one.
+  // A browser may refuse storage outright -- Safari's private windows and
+  // any profile with site data blocked throw on the getter itself, not on
+  // the write. That threw out of `apply(saved())` at the bottom of this
+  // file, wire() never ran, and the appearance button was completely dead:
+  // no cycling, no symbol, nothing. The choice simply does not outlive the
+  // page there, which is the most a refusing browser allows.
+  function store(fn, fallback) {
+    try {
+      return fn();
+    } catch (e) {
+      return fallback;
+    }
+  }
+
   function saved() {
-    var v = localStorage.getItem('theme');
+    var v = store(function () { return localStorage.getItem('theme'); }, null);
     return v === 'light' || v === 'dark' ? v : null;
   }
 
@@ -41,13 +55,35 @@
   function apply(state) {
     if (state) {
       root.setAttribute('data-theme', state);
-      localStorage.setItem('theme', state);
+      store(function () { localStorage.setItem('theme', state); });
     } else {
       // The point of the whole cycle: without removing the key there is no way
       // back to following the system, short of clearing the site's data.
       root.removeAttribute('data-theme');
-      localStorage.removeItem('theme');
+      store(function () { localStorage.removeItem('theme'); });
     }
+    paintBrowserChrome(state);
+  }
+
+  // The page has two theme-color declarations, one per system setting, and
+  // the browser picks between them on prefers-color-scheme alone -- it has
+  // no idea data-theme just overrode that. So the address bar stayed light
+  // behind a dark page. An unmediated declaration wins over both, and
+  // taking it away hands the choice back to the pair.
+  function paintBrowserChrome(state) {
+    var override = document.querySelector('meta[name="theme-color"]:not([media])');
+    if (!state) {
+      if (override) override.parentNode.removeChild(override);
+      return;
+    }
+    var source = document.querySelector('meta[name="theme-color"][media*="' + state + '"]');
+    if (!source) return;
+    if (!override) {
+      override = document.createElement('meta');
+      override.setAttribute('name', 'theme-color');
+      document.head.appendChild(override);
+    }
+    override.setAttribute('content', source.getAttribute('content'));
   }
 
   function paint(btn, state) {
@@ -59,12 +95,22 @@
     }
   }
 
+  // Where the cycle carries on FROM is what the page is showing, not what
+  // storage remembers. The two agree whenever storage works -- apply()
+  // writes both -- but in a browser that refuses it, saved() answers null
+  // for ever, so every click computed the first step again and the button
+  // sat on dark no matter how often it was pressed.
+  function current() {
+    var v = root.getAttribute('data-theme');
+    return v === 'light' || v === 'dark' ? v : null;
+  }
+
   function wire() {
     var btn = document.getElementById('theme-toggle');
     if (!btn) return;
-    paint(btn, saved());
+    paint(btn, current());
     btn.addEventListener('click', function () {
-      var state = next(saved());
+      var state = next(current());
       apply(state);
       paint(btn, state);
     });

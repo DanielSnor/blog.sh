@@ -19,7 +19,12 @@ require_relative 'slug'
 # zpravobot finds Zprávobot.
 module SearchQuery
   # -?  optional exclusion, then either a quoted phrase or a bare word.
-  TOKEN_RE = /(-?)(?:["„“”]([^"„“”]+)["„“”]|(\S+))/.freeze
+  # [^[:space:]] rather than \S: Ruby's \S is ASCII-only, so a query typed
+  # with a non-breaking space (every Czech keyboard puts one after a
+  # one-letter preposition) stayed a single token here and split into two
+  # in the browser -- the terminal and the web page answered the same
+  # query differently. [[:space:]] is Unicode-aware and matches JS.
+  TOKEN_RE = /(-?)(?:["„“”]([^"„“”]+)["„“”]|([^[:space:]]+))/.freeze
 
   Token = Struct.new(:text, :negated, keyword_init: true)
 

@@ -181,6 +181,7 @@ js:
   no_results_pending: "Nic nenalezeno,"
   no_results_final: "Nic nenalezeno."
   try_other_words: " Zkus jiná / obecnější slova."
+  archive_unavailable: " (starší archiv se nepodařilo načíst)"
   searching_archive: " (hledám i ve starším archivu…)"
   loading_index: "Načítám index…"
   index_unavailable: "Vyhledávací index není k dispozici."

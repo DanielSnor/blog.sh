@@ -229,6 +229,32 @@ module PostText
   # build, which also cuts an excerpt from it) doesn't walk the blocks
   # twice.
   def searchable(post, text = nil)
-    Slug.fold([post['title'], text || plain(post), (post['tags'] || []).join(' ')].compact.join(' '))
+    Slug.fold([post['title'], text || plain(post), aside(post),
+               (post['tags'] || []).join(' ')].compact.join(' '))
+  end
+
+  # Words the reader can see on the page and could not find from the search
+  # box: a chat block is a conversation, a code block is often the only
+  # place a command name appears, and a caption or a label is the only text
+  # a video, a recording or an attachment has.
+  #
+  # Kept apart from `plain` rather than folded into it, because `plain` is
+  # also what the description on a card is cut from, what the reading time
+  # is measured on and what the word count in stats adds up. Widening it
+  # would have put a shell command in a page's <meta description>. This is
+  # about being findable, and only the two things that search -- the index
+  # and the terminal's browser -- read it.
+  def aside(post)
+    (post['content'] || []).flat_map do |block|
+      next [] unless block.is_a?(Hash)
+
+      case block['type']
+      when 'chat' then (block['lines'] || []).flat_map { |line| [line['name'], line['text']] }
+      when 'code' then [block['text']]
+      when 'video', 'audio' then [block['caption']]
+      when 'file' then [block['label']]
+      else []
+      end
+    end.compact.join(' ')
   end
 end

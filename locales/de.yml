@@ -186,6 +186,7 @@ js:
   no_results_pending: "Noch keine Treffer,"
   no_results_final: "Keine Treffer."
   try_other_words: " Versuch es mit anderen oder allgemeineren Wörtern."
+  archive_unavailable: " (das ältere Archiv konnte nicht geladen werden)"
   searching_archive: " (das ältere Archiv wird noch durchsucht…)"
   loading_index: "Index wird geladen…"
   index_unavailable: "Suchindex nicht verfügbar."
