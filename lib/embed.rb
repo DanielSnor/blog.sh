@@ -252,9 +252,33 @@ module Embed
   SCRIPT_RE = %r{<script\b[^>]*>.*?</script\s*>|</?script\b[^>]*>}mi
   HANDLER_RE = /\s on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/ix
   JS_URL_RE = /((?:href|src|xlink:href)\s*=\s*["']?)\s*javascript:[^"'>\s]*/i
+  # A style block is not a script, and it acts on the page just the same.
+  # The two Instagram embeds in this house's own archive carry
+  #
+  #   body > iframe { min-width: auto !important }
+  #
+  # -- a rule written for somebody else's page, reaching outside the
+  # embed to every iframe under this one's <body>, with !important on it.
+  # Nothing hostile; simply not this site's to decide. And unlike the
+  # scripts above, this one is NOT already inert: the page's own policy is
+  # `style-src 'self' 'unsafe-inline'`, which it has to be for a post's
+  # colour formatting, so an imported rule applies in full. In the feed
+  # there is no policy at all.
+  #
+  # <link> goes with it: a stylesheet by another spelling, plus the one
+  # element in a body fragment that exists to fetch something.
+  #
+  # The cost is the same as it was for scripts -- nothing that works. An
+  # embed's own styling is written for the site it came from, and what the
+  # reader sees on a blog.sh page is the same blockquote either way.
+  STYLE_RE = %r{<style\b[^>]*>.*?</style\s*>|</?style\b[^>]*>|<link\b[^>]*>}mi
 
   def without_scripts(html)
-    html.to_s.gsub(SCRIPT_RE, '').gsub(HANDLER_RE, '').gsub(JS_URL_RE) { "#{Regexp.last_match(1)}#" }
+    html.to_s
+        .gsub(SCRIPT_RE, '')
+        .gsub(STYLE_RE, '')
+        .gsub(HANDLER_RE, '')
+        .gsub(JS_URL_RE) { "#{Regexp.last_match(1)}#" }
   end
 
   def frame_origins(block)

@@ -185,11 +185,17 @@ upgrade:
   `KEEP_PERMALINKS=1`, the one thing that saves a renamed address, wrote
   exactly the redirect the build throws away.
 
-- **An imported embed's HTML is no longer rendered with its scripts.**
-  The site's CSP already stopped them from running, but the RSS feed
-  carries the same HTML and has no CSP -- and a page's safety should not
-  rest on one meta tag. Stripped at render, so the archive keeps what it
-  was given.
+- **An imported embed's HTML is no longer rendered with its scripts, its
+  style blocks or its stylesheet links.** The site's CSP already stopped
+  the scripts from running, but the RSS feed carries the same HTML and has
+  no CSP -- and a page's safety should not rest on one meta tag. The style
+  block is the half that was never inert: `style-src` has to carry
+  `'unsafe-inline'` for a post's own colour formatting, so an imported
+  rule applied in full. Both Instagram embeds in the archive this was
+  measured against carry `body > iframe { min-width: auto !important }` --
+  a rule written for somebody else's page, reaching outside the embed to
+  every iframe under this one's body. Stripped at render, so the archive
+  keeps what it was given.
 
 - **The sitemap and the feed describe the site as built.** A series
   listing was missing from the sitemap entirely; `lastmod` was chosen by
