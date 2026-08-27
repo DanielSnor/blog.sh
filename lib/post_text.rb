@@ -207,7 +207,16 @@ module PostText
   # them keeps the index from matching a word that appears nowhere on the
   # page. Nested list items are not walked, matching what the site's index
   # has always contained.
-  def plain(post)
+  # `separator` is for a SNIPPET, and only for one. Joined with a space --
+  # which is what everything else here wants -- the end of one paragraph
+  # and the start of the next read as a single broken sentence: "…v lese
+  # vlhko a listy Ranní mlha zrovna nezvala…". A search result is the one
+  # place a reader meets that text with no paragraphs to tell them apart,
+  # so it asks for a visible mark instead. Everything else keeps the space:
+  # the reading time counts these words, and `folded` is what a query is
+  # matched against -- a separator in it would stop "listy Ranní" finding
+  # the post it is in.
+  def plain(post, separator: ' ')
     parts = (post['content'] || []).flat_map do |block|
       case block['type']
       when 'text' then [block['text']]
@@ -218,7 +227,7 @@ module PostText
       else []
       end
     end
-    parts.compact.join(' ')
+    parts.compact.join(separator)
   end
 
   # Everything a query is matched against -- title, text and tags -- folded

@@ -130,6 +130,27 @@ name a config key it never mentioned (see **Changed**).
   shape this engine already uses for a tag everywhere else, so the index
   looks like what it indexes.
 
+- **The page is framed on all four sides, not two.** A heavy rule has
+  closed the content off at the top and the bottom since 1.3, but the
+  sides stayed open, so on a wide screen the text had an end and a
+  beginning and no shape. A one-pixel line now runs down each side, in
+  the colour the menu's own rule takes, so the four are one frame rather
+  than two decisions. Below 700 pixels it is off: on a
+  phone the column already reaches both edges, and a line there draws
+  the screen rather than the page. Tablets keep it.
+
+- **A search result marks where one paragraph ends and the next
+  begins.** A snippet is a post's text with the paragraphs taken out, so
+  the last words of one and the first of the next meet as a single broken
+  sentence -- "...v lese vlhko a listy Ranni mlha zrovna nezvala...". A
+  middle dot stands between them now, rather than an ellipsis: an
+  ellipsis already means "cut here" at the end of every snippet, and one
+  mark with two meanings is how a reader learns to trust neither. It is
+  in the snippet alone -- what a query is matched against keeps the plain
+  space, so a phrase spanning two paragraphs still finds its post. On the
+  archive this was measured against, 593 of the 1636 posts with a title
+  run past their first paragraph.
+
 - **An announcement budgets its link the way Mastodon charges for one.**
   Mastodon reserves a flat 23 characters for every link, whatever the link
   measures, and says so in its own API; the composer counted the address
