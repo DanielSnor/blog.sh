@@ -201,6 +201,7 @@ js:
   lightbox_next: "Weiter"
   lightbox_label: "Bildansicht"
   lightbox_open: "Bild öffnen"
+  copy_code: "Text kopieren"
 
 cli:
   cancel_word: "abbrechen"

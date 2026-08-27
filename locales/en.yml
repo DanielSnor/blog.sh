@@ -207,6 +207,7 @@ js:
   # text to be named by.
   lightbox_label: "Image viewer"
   lightbox_open: "Open image"
+  copy_code: "Copy text"
 
 # scripts/manage_post.rb (the ./blog.sh authoring CLI/wizard) and its
 # frontmatter-editor hint text. cancel_word is compared against user input

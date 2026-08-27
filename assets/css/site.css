@@ -132,6 +132,16 @@ nav a[aria-current="page"]:focus-visible { outline-color: #ffffff; }
   margin: 30px auto;
   border-top: 5px solid var(--nav-border);
   border-bottom: 5px solid var(--nav-border);
+  /* The sides close the frame the two rules above open. Thin where they
+     are thick, deliberately: the horizontal rules carry the weight --
+     they are what separates the site from the page around it -- while
+     these only have to say where the block ends. At the same 5px the
+     page reads as a picture in a mount, and it would cost 10 of the 940
+     the bar above measures its menu against.
+     Drawn in the bar's own line colour, which follows the theme: #767676
+     in light, #8c8c8c in dark. */
+  border-left: 1px solid var(--nav-border);
+  border-right: 1px solid var(--nav-border);
   border-radius: 6px;
 }
 
@@ -444,6 +454,12 @@ nav a[aria-current="page"]:hover {
    appearance toggle sits in the corner it starts from, and 65% is what has
    always kept it from running underneath. */
 @media (max-width: 700px) {
+  /* On a phone the block already runs to both edges of the screen, so a
+     frame has nothing to enclose -- and two more lines take two more
+     pixels from a column that has none to spare. A tablet keeps them:
+     there the page still sits on a background. */
+  .wrap { border-left: 0; border-right: 0; }
+
   .banner-overlay { padding: 10px 14px; }
   .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); max-width: 65%; }
   .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 100%; }
@@ -829,6 +845,46 @@ blockquote {
   padding: 0.85rem 1rem;
   margin: 1rem 0;
   overflow-x: auto;
+}
+/* The copy button sits in the block's own top-right corner, which is why
+   the block has to be a positioning context. Only the code blocks get one:
+   `position: relative` on every <pre> would move the fallback for an
+   unknown block type as well, and nothing is ever placed inside that one.
+
+   The button is BUILT BY copy-code.js and only where the clipboard can
+   actually be reached (a secure context), so a page that shows one can
+   always use it -- there is no disabled state to style. */
+.content pre.code-block, .chrome-text pre.code-block { position: relative; }
+.copy-code {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--meta-text);
+  cursor: pointer;
+  /* Always there rather than on hover: a phone has no hover, and a button
+     that appears only to a mouse is a button half the readers never get. */
+  opacity: 0.75;
+  transition: opacity 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+.copy-code:hover, .copy-code:focus-visible { opacity: 1; color: var(--text); }
+/* The whole of the feedback: the icon becomes a check for a moment. No
+   text appears and nothing moves -- a word in the corner of a code block
+   would push the code it belongs to. */
+.copy-code--done { color: var(--accent); opacity: 1; }
+/* A long first line would otherwise run under the button. The padding is
+   the button's width plus its offset, and only on the side it sits. */
+.content pre.code-block > code, .chrome-text pre.code-block > code { padding-right: 2.4rem; }
+@media (prefers-reduced-motion: reduce) {
+  .copy-code { transition: none; }
 }
 /* Inline `code` spans get a small pill look; .content pre code below
    resets that for the fenced-block case so the two don't double up. */

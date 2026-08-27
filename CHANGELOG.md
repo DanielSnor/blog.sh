@@ -71,6 +71,21 @@ name a config key it never mentioned (see **Changed**).
   answer. Every tag that has a page and no others, so the list never
   points at an address the build did not write.
 
+- **A code block carries a copy button.** Asked for by another operator of
+  the engine (issue #44) for a site full of terminal commands. It sits in
+  the block's own corner and is always there rather than on hover -- a
+  phone has no hover, and a button only a mouse can find is one half the
+  readers never get. Only code blocks: a chat is a `<dl>`, inline code is
+  a bare `<code>`, and the fallback for an unknown block type is a bare
+  `<pre>`; the button hangs on the block TYPE, not on the tag. No text on
+  it -- hovering gives "Copy text", which is also its name for a screen
+  reader -- and the whole of the feedback is the icon becoming a check
+  mark for a moment, because a word in the corner would push the code it
+  belongs to. It is drawn only where the clipboard can actually be
+  reached: on an `http://` install there is no button rather than a dead
+  one. And it copies what the block stores, not what the screen shows, so
+  a line that wrapped comes back as the one line it is.
+
 ### Changed
 
 - **Every listing of one kind of post says which kind, with an icon.**

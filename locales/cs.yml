@@ -196,6 +196,7 @@ js:
   lightbox_next: "Další"
   lightbox_label: "Prohlížeč obrázků"
   lightbox_open: "Zvětšit obrázek"
+  copy_code: "Zkopírovat text"
 
 cli:
   cancel_word: "zrušit"

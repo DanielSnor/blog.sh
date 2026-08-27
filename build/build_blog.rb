@@ -325,6 +325,7 @@ def client_i18n_json
     lightbox_next: t('js.lightbox_next'),
     lightbox_label: t('js.lightbox_label'),
     lightbox_open: t('js.lightbox_open'),
+    copy_code: t('js.copy_code'),
     theme_auto: t('ui.theme_auto'),
     theme_light: t('ui.theme_light'),
     theme_dark: t('ui.theme_dark')
@@ -608,7 +609,12 @@ def render_config_block(block)
     # show markup as text, so passing it through raw would render the very
     # thing the author was quoting.
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{h(block['lang'])}")
-    %(<pre><code#{lang_class}>#{h(block['text'].to_s)}</code></pre>)
+    # The class is what the copy button hangs on, and it hangs on the BLOCK
+    # TYPE rather than on the <pre>: a chat is a <dl>, but the fallback for
+    # a block type nothing here knows renders as a <pre> too, and offering
+    # to copy the engine's own error state is not the feature anybody asked
+    # for. Inline code is a <code> with no <pre> and is left alone.
+    %(<pre class="code-block"><code#{lang_class}>#{h(block['text'].to_s)}</code></pre>)
   else
     ''
   end
@@ -881,7 +887,9 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
     ''
   when 'code'
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
-    %(<pre><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
+    # Same class as the chrome's own code blocks render with, for the same
+    # reason -- see render_chrome_block.
+    %(<pre class="code-block"><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
   when 'file'
     file = (block['media'] || []).first || {}
     # Nothing attached: the card used to link the post's own directory
