@@ -274,6 +274,22 @@ upgrade:
   completed is said out loud. Reported by somebody rescuing a Drupal blog
   whose feed did exactly this.
 
+- **A picture was lost to the difference between a Hash and a
+  directory.** An importer keeps the source URL's extension exactly as it
+  was, case and all, so `01.JPG` is an ordinary name in a real archive --
+  Posterous served `IMG_2669.JPG`, and a decade of cameras wrote nothing
+  else. The name allocator then looked for a free name with a byte-exact
+  comparison and handed a newly arrived picture `01.jpg` believing it
+  free, while the copy asks the VOLUME whether the destination exists --
+  and on macOS, or any Windows share, `01.JPG` answers for `01.jpg`. The
+  copy was skipped, the new picture's bytes were never written anywhere,
+  and the post showed the OLD photograph under both names; `check`
+  reported a reassuring "misnamed" and said nothing about a loss. Names
+  are compared the way the filesystem compares them now, on every volume
+  rather than only where it bites: an archive is carried between
+  machines, and a name that is free on Linux and taken on macOS is a
+  picture that disappears when somebody moves their site.
+
 - **Smaller, and there were many.** A tag containing a comma became two
   tags on every save (six posts on one archive). `props` and `edit` died
   on a raw backtrace over a date `check` names cleanly. An unknown block

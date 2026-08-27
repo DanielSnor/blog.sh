@@ -188,6 +188,30 @@ module PostWriter
   # still has them (see reconcile_positional); only when the bytes answer
   # nothing does the positional name stand, because renaming on a guess
   # would mint fresh files on every run of a tree import.
+  # A set of media names that answers the way the FILESYSTEM answers, not
+  # the way a Hash does. Only ever asked "is this name spoken for?", so it
+  # keeps nothing but the folded spellings.
+  class FoldedNames
+    def initialize(names = [])
+      @names = {}
+      Array(names).each { |name| add(name) }
+    end
+
+    def key?(name)
+      @names.key?(name.to_s.downcase)
+    end
+
+    def add(name)
+      @names[name.to_s.downcase] = true
+    end
+
+    # `used[name] = true` reads better at the call sites than add(name),
+    # and this is the whole of what the callers ever store.
+    def []=(name, _value)
+      add(name)
+    end
+  end
+
   def self.reconcile_media_names(post, previous, year, slug, media_files)
     dir = File.join(MEDIA_DIR, year, slug)
     old_names = {}
@@ -279,7 +303,23 @@ module PostWriter
     end
     rename.merge!(moves)
 
-    used = (on_disk + rename.values + keeps).to_h { |n| [n, true] }
+    # Folded, because a directory is not a hash: `copy_media` asks the
+    # VOLUME whether the destination exists, and on macOS (and on any
+    # Windows share) 01.JPG answers for 01.jpg. Media#allocate keeps the
+    # source URL's extension exactly as it was, case and all, so 01.JPG is
+    # an ordinary name in a real archive -- Posterous served
+    # IMG_2669.JPG, and a decade of cameras wrote nothing else. A
+    # byte-exact lookup then handed a new picture the name 01.jpg
+    # believing it free, copy_media saw the folded name and skipped the
+    # copy, and the arrival's bytes were never written anywhere: the post
+    # showed the OLD picture twice and the new one was gone, with `check`
+    # reporting a reassuring "misnamed" and no loss.
+    #
+    # Folded on every volume, not only where it matters. An archive is
+    # copied between machines, and a name that is free on Linux and taken
+    # on macOS is a picture that disappears when somebody moves their
+    # site.
+    used = FoldedNames.new(on_disk + rename.values + keeps)
     arrivals.uniq.each do |name|
       # An arrival is not always a stranger: a picture dropped in one
       # re-import and brought back in the next arrives as a fresh
