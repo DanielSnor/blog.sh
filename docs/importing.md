@@ -686,6 +686,15 @@ matching merging the overlaps. Point it at the blog's old URL (the
 common feed paths are tried) or straight at its feed; images recover
 from the Archive the same way, rerouted to the nearest capture.
 
+A feed that carried only teasers -- what the blog's "read more" cut off
+-- is not the end of it: an item the rescue recognizes as truncated is
+completed from the post's **own archived page**, the newest capture of
+it, read by the same parser page mode uses. Title, date and tags stay
+the feed's, because those are structured there and guessed on a page,
+and a post whose page the Archive never kept (or whose page says less
+than the teaser did) arrives as the excerpt the feed sent. The summary
+says how many were completed and how many were not.
+
 A blog the Archive only ever saw as pages -- no feed captures -- falls
 through to **page mode**: every archived post page, the newest capture
 of each. Which paths are posts is the one thing pages cannot say about

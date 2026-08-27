@@ -113,6 +113,7 @@ module Import
       @unparsed = 0
       @dated_by_capture = 0
       @summary_only = 0
+      @summary_rescued = 0
       @full_bodied = 0
       @archived_images = nil
       # Queries the Archive never answered. Kept apart from queries that
@@ -233,6 +234,9 @@ module Import
       if @summary_only.positive?
         notes << I18n.t('import.note.wayback_summary_only', count: @summary_only, seen: @summary_only + @full_bodied)
       end
+      if @summary_rescued.positive?
+        notes << I18n.t('import.note.wayback_summary_rescued', count: @summary_rescued, seen: @summary_only)
+      end
       if @archived_images && @archived_images[:total].zero?
         notes << I18n.t('import.note.wayback_no_images', host: host)
       elsif @archived_images
@@ -252,7 +256,17 @@ module Import
       post = feed.map(item, media)
       return post unless post.is_a?(Hash)
 
-      summary_only?(item) ? @summary_only += 1 : @full_bodied += 1
+      if summary_only?(item)
+        @summary_only += 1
+        rescued = full_body_blocks(item, post, media)
+        if rescued
+          drop_unused_media(post['content'], rescued, media)
+          post['content'] = rescued
+          @summary_rescued += 1
+        end
+      else
+        @full_bodied += 1
+      end
 
       # The Archive sometimes answers an image URL with an HTML page and
       # a straight-faced 200 -- saved as 01.jpg it would render broken.
@@ -644,6 +658,75 @@ module Import
       # "Permalink" is the generator's word, not the blogger's, so the
       # literal match is not a language guess the way "read more" would be.
       !last[1].gsub(/<[^>]+>/, '').strip.match?(/\Apermalink\z/i)
+    end
+
+    # A teaser is what the FEED sent, not what the blog published -- and
+    # the Archive very often kept the post's own page beside the feed.
+    # The detection above did nothing with itself: the item was counted
+    # into a summary line and the cut-off text written as the post, while
+    # page mode -- which can read a whole page -- was only ever tried for
+    # a blog with NO feed capture at all, never for a single item this
+    # tool already knew was truncated.
+    #
+    # One CDX lookup for that one address, newest capture, read by the
+    # same pack/generic_parse page mode uses. Title, date and tags stay
+    # the FEED's: they are structured there and guessed on a page. Only
+    # the body is replaced, and only when the page really says more than
+    # the teaser did -- a page the Archive never kept, one no pack can
+    # read, or one that parses to less is left alone and the post keeps
+    # the teaser it had.
+    #
+    # Deliberately not windowed: WAYBACK_FROM/TO says which era of the
+    # blog to rescue, and that question was already answered by the feed
+    # capture this item came out of. What is wanted here is the best copy
+    # of THIS post, whenever the crawler happened to take it.
+    def full_body_blocks(item, post, media)
+      link = item_link(item)
+      return nil if link.empty?
+
+      row = newest_page_capture(link)
+      return nil unless row
+
+      html = to_utf8(http_get("https://web.archive.org/web/#{row[:timestamp]}id_/#{row[:original]}"))
+      sleep @delay
+      parsed = @pack&.parse(html) || generic_parse(html)
+      return nil if parsed.nil? || parsed[:body].to_s.strip.empty?
+
+      page = { timestamp: row[:timestamp], original: row[:original], path: link }
+      blocks = HtmlBlocks.parse(reroute_images(parsed[:body], page)).blocks
+      # Measured BEFORE any picture is registered: media are numbered in
+      # the order they are asked for, so registering a body that is then
+      # thrown away would move every file in every post after it -- and a
+      # re-import would find the old bytes under the new name.
+      return nil unless text_length(blocks) > text_length(post['content'])
+
+      localize_images(blocks, media)
+    rescue StandardError
+      # The teaser is a post; a failed rescue of it is not worth the run.
+      nil
+    end
+
+    def newest_page_capture(url)
+      rows = cdx_rows(url, extra: { 'filter' => %w[statuscode:200 mimetype:text/html] }, windowed: false)
+      rows.max_by { |row| row[:timestamp] }
+    end
+
+    def text_length(blocks)
+      Array(blocks).sum { |block| block['text'].to_s.length }
+    end
+
+    # A picture the teaser referenced and the full page does not: its
+    # bytes were fetched and numbered while the teaser was the post, and
+    # left behind they would sit in the archive with nothing pointing at
+    # them.
+    def drop_unused_media(old_blocks, new_blocks, media)
+      kept = Array(new_blocks).flat_map { |b| Array(b['media']).map { |m| m['url'] } }.compact
+      Array(old_blocks).each do |block|
+        Array(block['media']).each do |entry|
+          name = entry['url']
+          media.discard(name) if name && !kept.include?(name)
+        end
+      end
     end
 
     def item_link(item)

@@ -184,8 +184,23 @@ upgrade:
   a date.
 
 - **The importers, all eleven adapters and the machinery under them.**
-  The bounty confirmed 55 defects there and every one is closed. What
-  they cost, worst first:
+  The bounty confirmed 59 defects there and every one is closed, along
+  with one reported from outside. What they cost, worst first:
+
+  *WordPress, which is half of everything anyone migrates.* Titles and
+  category names live in CDATA, so entities WordPress stored in them
+  arrived verbatim while the BODY of the same post decoded them: on the
+  real export this was measured against, two posts were called
+  "#55: Reflection &amp; Mug" and a tag came out as "P&amp;S", pill,
+  archive index, sidebar and feed alike, under the address
+  /tag/p-amp-s/. A non-Latin blog fared worse: sanitize_title
+  percent-encodes those slugs, so every address on the imported archive
+  became hex -- "c4-8desk-c3-bd-titulek" -- matching no old address at
+  all. And post_content is stored WITHOUT `<p>` (wpautop adds them when
+  a page is rendered), so every post written in the classic editor --
+  2003 to 2018, the bulk of any old blog -- collapsed into one
+  paragraph, with the pictures that stood between the paragraphs
+  appended after all the prose.
 
   *Posts nobody meant to publish were published.* A Mastodon archive is
   the whole account, not the public timeline: 141 of 2548 standalone
@@ -229,7 +244,20 @@ upgrade:
   sentence. And the wizard -- the door this tool's own header calls the
   way in -- never printed what the HTML parser had thrown away, so a
   blog full of embedded video imported as "Wrote N post(s)" and nothing
-  else.
+  else. An address that answered 200 with an HTML page -- a parked
+  domain, a soft 404 -- was saved as a picture, counted as a media file
+  and called sound by `check`, leaving a permanently broken image on a
+  published page; one adapter had that defence and eight carried a
+  comment claiming it.
+
+  *And the rescue of last resort learned to finish a sentence.* A feed
+  that carried teasers was recognized as carrying teasers and the cut-off
+  text written anyway -- page mode, which reads a whole page, was only
+  ever tried for a blog with no feed capture at all. A truncated item is
+  now completed from the post's own archived page, the newest capture of
+  it, with the title, date and tags still the feed's; what could not be
+  completed is said out loud. Reported by somebody rescuing a Drupal blog
+  whose feed did exactly this.
 
 - **Smaller, and there were many.** A tag containing a comma became two
   tags on every save (six posts on one archive). `props` and `edit` died

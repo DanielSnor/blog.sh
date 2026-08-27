@@ -139,6 +139,7 @@ module Import
 
       html = body_html(item)
       html = expand_shortcodes(html) if wordpress?
+      html = autop(html) if wordpress?
       parsed = HtmlBlocks.parse(html)
       # HtmlBlocks names everything the block schema has no shape for
       # instead of dropping it quietly, and nothing read the tally -- so an
@@ -171,7 +172,7 @@ module Import
       state = item_state(item)
       post = {
         'slug' => item_slug(item),
-        'title' => text_of(item, 'title'),
+        'title' => item_title(item),
         'date' => date.iso8601,
         'state' => state,
         'tags' => item_tags(item),
@@ -664,6 +665,41 @@ module Import
       ''
     end
 
+    # --- the paragraphs WordPress does not store --------------------------
+
+    # WordPress keeps post_content WITHOUT <p>: wpautop puts them in when
+    # the page is rendered. So content:encoded for every post written in
+    # the classic editor -- 2003 to 2018, the bulk of any old blog -- is
+    # plain text with a blank line between paragraphs. Handed to
+    # HtmlBlocks, which has no notion of a blank line, the whole body
+    # collapsed into ONE text block: every paragraph break gone, and any
+    # <img> that stood between paragraphs hoisted out and appended after
+    # all the prose, so the pictures no longer sit where they were
+    # written. movable_type.rb has had `paragraphize` for the same reason
+    # since it was written.
+    #
+    # Only when the body has no <p> of its own: a Gutenberg body, or one
+    # any other tool has already run wpautop over, is left exactly alone.
+    HAS_PARAGRAPH = /<p[\s>]/i
+    # Wrapping one of these in <p> would be wrong -- they are block-level
+    # already, and a <p><div> is not what the author wrote.
+    OPENS_BLOCK = %r{\A\s*<\s*(?:p|div|h[1-6]|ul|ol|li|dl|table|blockquote|figure|figcaption|
+                    pre|hr|iframe|section|article|aside|nav|form|script|style)\b}xi
+
+    def autop(html)
+      return html if html.match?(HAS_PARAGRAPH) || !html.match?(/\n[ \t]*\n/)
+
+      html.split(/\n{2,}/).filter_map do |chunk|
+        text = chunk.strip
+        next if text.empty?
+        next text if text.match?(OPENS_BLOCK)
+
+        # A single newline inside a paragraph is a line break, which is
+        # what wpautop makes of it too.
+        "<p>#{text.gsub(/\n/, '<br>')}</p>"
+      end.join("\n")
+    end
+
     # --- shortcodes ------------------------------------------------------
 
     # Only a WXR needs this. What a feed carries is what the site RENDERED,
@@ -732,12 +768,25 @@ module Import
       false
     end
 
-    # The title as the slug fallback should read it. Squarespace escapes
-    # its titles TWICE, so "&" is still "&amp;" at this point and the
-    # draft was filed under skillman-amp-hackett -- that adapter decodes
-    # here rather than after the post is built.
+    # A WXR wraps the title and every category name in CDATA, so an entity
+    # WordPress stores in them arrives verbatim -- while the BODY of the
+    # same post goes through HtmlBlocks, which decodes. One item, two
+    # answers: on the real export this was measured against, two posts
+    # came out called "#55: Reflection &amp; Mug" and "#60: Coffee&amp;Tea"
+    # and the tag "P&S" arrived as "P&amp;S", which slugifies to
+    # /tag/p-amp-s/ and reads as "P&amp;S" in the pill, the archive index,
+    # the sidebar and the feed. `check` only looks at text blocks, so
+    # nothing said a word.
+    def item_title(item)
+      HtmlBlocks.decode_entities(text_of(item, 'title'))
+    end
+
+    # The title as the slug fallback should read it -- the same string the
+    # heading will say, or the address and the heading disagree. Squarespace
+    # escapes its titles TWICE, so one decode leaves an entity there and
+    # that adapter decodes once more.
     def slug_title(item)
-      text_of(item, 'title')
+      item_title(item)
     end
 
     def item_slug(item)
@@ -747,7 +796,7 @@ module Import
       # produced an empty slug, and PostWriter then wrote <year>/.json --
       # an invisible dotfile that every glob in the engine skips, with its
       # media dumped loose in the year directory.
-      name = Slug.slugify(text_of(item, 'wp:post_name'))
+      name = Slug.slugify(post_name(item))
       return name unless name.empty?
 
       slug = Slug.slugify(slug_title(item).split(/\s+/).first(10).join(' '))
@@ -756,6 +805,28 @@ module Import
       # A title-less feed entry still needs a stable slug, and the id is
       # the only thing guaranteed to be there.
       Slug.slugify(item_id(item).to_s.sub(%r{\Ahttps?://}, '')).slice(0, 60)
+    end
+
+    # WordPress's sanitize_title percent-encodes a non-ASCII slug, so
+    # post_name on a Czech, Russian, Greek or Japanese blog is stored as
+    # "%c4%8desk%c3%bd-titulek". Slugified as it stands, that is hex and
+    # punctuation and nothing else -- "c4-8desk-c3-bd-titulek" -- so every
+    # address on the imported archive became unreadable, matched no old
+    # address at all, and disagreed with the redirect_from written beside
+    # it, which holds the properly encoded path. docs/importing.md promises
+    # "the slug the site already published under is kept".
+    #
+    # Decoded only when it decodes to something: bytes that are not valid
+    # UTF-8 are left as they were rather than turned into replacement
+    # characters, and a name with no % in it never goes near the parser.
+    def post_name(item)
+      raw = text_of(item, 'wp:post_name')
+      return raw unless raw.include?('%')
+
+      decoded = ESCAPER.unescape(raw)
+      decoded.force_encoding('UTF-8').valid_encoding? ? decoded : raw
+    rescue StandardError
+      raw
     end
 
     # pubDate over wp:post_date on purpose: the wp: one has no offset, so
@@ -832,6 +903,11 @@ module Import
         next if !atom? && NOT_A_TAG_DOMAIN.include?(node.attribute('domain')&.value)
 
         value = atom? ? node.attribute('term')&.value : node.text
+        # Decoded for the same reason the title is: a WXR category is
+        # CDATA, so "P&S" reaches here as "P&amp;S" and would become a tag
+        # of that name, a pill reading "P&amp;S" and an address
+        # /tag/p-amp-s/.
+        value = HtmlBlocks.decode_entities(value) if value
         value&.strip
       end.reject(&:empty?).uniq { |t| t.downcase }
     end

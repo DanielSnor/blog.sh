@@ -192,6 +192,31 @@ module Import
         return nil
       end
 
+      # An address that answers 200 with an HTML PAGE is not a picture: a
+      # parked domain, a login wall, a CDN's own "not found" page. The
+      # bytes then land in the archive as NN.jpg, the run says "N media
+      # file(s)" with no loss reported, `check` finds a file that exists
+      # and is not empty and calls the archive sound -- and every reader
+      # gets a broken image on a published page, permanently, because the
+      # media index remembers the address as fetched. Two adapters carried
+      # a comment claiming this defence existed; only wayback.rb had one.
+      #
+      # Counted as a failure, so the summary names the address the way it
+      # names a fetch that never answered. An .html or .htm attachment is
+      # somebody asking for a page on purpose and is left alone.
+      if self.class.html_page?(body) && !filename.match?(/\.html?\z/i)
+        # Same rule as a fetch that failed one branch up: a page served
+        # where a picture should be is no reason to throw away the copy
+        # this archive already holds. Only REFETCH_MEDIA=1 gets here with
+        # a file on disk, and that copy is still the only copy there is.
+        return reuse(url, held, spent: filename) if held
+
+        @failures << url
+        @by_source[url] = nil
+        uncount
+        return nil
+      end
+
       path = File.join(@tmpdir, filename)
       File.binwrite(path, body)
       path, filename = retype(path, filename)
@@ -583,6 +608,19 @@ module Import
       # A rename that fails costs the file nothing: the bytes are still
       # under the name the post already believes in.
       [path, filename]
+    end
+
+    # The opening of an HTML document, whatever it claims to be. Deliberately
+    # narrow: an SVG is XML too (and legitimate media), so only <html>,
+    # <head> and a doctype naming html count, after an optional XML
+    # declaration and any leading whitespace.
+    HTML_PAGE = /\A\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--.*?-->\s*)?(?:<!doctype\s+html|<html[\s>]|<head[\s>])/im
+
+    def self.html_page?(body)
+      head = body.to_s.byteslice(0, 1024).to_s
+      HTML_PAGE.match?(head.force_encoding('BINARY'))
+    rescue StandardError
+      false
     end
 
     # Extension from the URL path, since that's all a CDN URL reliably
