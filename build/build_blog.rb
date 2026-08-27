@@ -21,6 +21,7 @@ require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 require_relative '../lib/colors_css'
 require_relative '../lib/post_text'
+require_relative '../lib/card_teaser'
 require_relative '../lib/path_glob'
 
 SiteConfig.use_site_timezone!
@@ -77,7 +78,6 @@ PAGE_SIZE = begin
     10
   end
 end
-EXCERPT_TEXT_THRESHOLD = 400 # plain-text chars; CSS max-height does the actual visual clipping
 RSS_ITEM_LIMIT = 30
 META_DESCRIPTION_LENGTH = 160
 # The search index splits in two: search-index.json (recent posts) loads on
@@ -1384,13 +1384,6 @@ def truncate_excerpt(text, len = 200)
   "#{text[0...len].rstrip}…"
 end
 
-# CSS max-height does the actual visual clipping (however tall that ends up
-# being onscreen); this is just a cheap build-time decision on whether a post
-# is worth wrapping in the excerpt treatment at all.
-def excerpt?(post)
-  plain_text_length(post) > EXCERPT_TEXT_THRESHOLD || post['content'].count { |b| %w[image video link].include?(b['type']) } > 1
-end
-
 # The stats row and the comments container carry whichever network the
 # post was announced on -- comments.js reads the data attribute to know
 # where the thread lives. The attributes come from the post's own stored
@@ -1445,10 +1438,19 @@ def build_list_item(post, pinned: false)
   # teaser branch did not, so a card printed the borrowed headline twice
   # -- once as its <h2> and again in the body under it -- while the post's
   # own page printed it once.
+  # Without a teaser of its own the card is cut HERE rather than by the
+  # stylesheet: blocks until the budget, never through one, and the first
+  # one always. See lib/card_teaser.rb for what that costs and why the
+  # budget is measured in height rather than in characters.
+  #
+  # A post that fits whole reuses the memoized render, so nothing about it
+  # changes -- 77% of this archive is in that case.
+  cut = false
   content = if teaser
               render_content(teaser, prefix, lifted: link_title_block(post))
             else
-              post_content_html(post)
+              kept, cut = CardTeaser.blocks(post['content'])
+              cut ? render_content(kept, prefix, lifted: link_title_block(post)) : post_content_html(post)
             end
   # Heading anchors belong to the post's own page. A listing stacks ten
   # posts' bodies into ONE document, so two posts that both have a
@@ -1458,10 +1460,11 @@ def build_list_item(post, pinned: false)
   # de-duplicates within a post; nothing could de-duplicate across them,
   # because each post's HTML is rendered (and cached) on its own.
   content = content.gsub(%r{<(h[1-6])([^>]*) id="[^"]*"}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2)}" }
-  excerpt = teaser ? false : excerpt?(post)
-  content_class = excerpt ? 'content excerpt' : 'content'
-  more = teaser || excerpt
-  read_more = more ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
+  # The link is there exactly when a block did not fit -- or when the
+  # author wrote a teaser, which says the same thing about the post. It
+  # used to follow a separate rule (400 characters, or more than one
+  # picture), so it could sit under a card that showed everything.
+  read_more = teaser || cut ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
   title = post_heading_html(post, 'h2', prefix)
   stats = post_meta_html(post, reading_labels(post))
   <<~HTML
@@ -1471,7 +1474,7 @@ def build_list_item(post, pinned: false)
         <div class="post-body">
           #{title}
           #{stats}
-          <div class="#{content_class}">
+          <div class="content">
             #{content}
           </div>
           #{read_more}

@@ -71,6 +71,28 @@ name a config key it never mentioned (see **Changed**).
   answer. Every tag that has a page and no others, so the list never
   points at an address the build did not write.
 
+- **A listing card is cut before it is written, not hidden afterwards.**
+  It used to render the whole post and let CSS clip it at 500px: on the
+  real front page that meant fourteen cards carrying between 794 and 2616
+  pixels of content and showing 500, with 33 of the page's 154 focusable
+  elements reachable by the keyboard while invisible on screen. The card
+  now takes blocks until an estimated height budget and stops -- at a
+  block boundary, never through one -- and the stylesheet hides nothing.
+  On that same page: 89,268 bytes of HTML became 41,155, the largest card
+  7,463 characters became 2,566, and "read more" now appears exactly when
+  something did not fit rather than under a card that shows everything.
+
+  The budget is in estimated HEIGHT rather than in characters, and that
+  took measuring to get right: a picture costs no characters and several
+  hundred pixels, so a character rule made 34% of this archive's cards
+  TALLER than the clip it replaced. A picture is never cropped -- the
+  first block is kept whatever its height, because the photograph IS the
+  post -- while a block made of ROWS (a hundred lines of shell, a long
+  conversation, a list, a table) is cut to the rows that fit, and a
+  paragraph that runs past the budget is cut on a word with its
+  formatting cut to match, so a link cannot end up pointing past the text
+  it decorates.
+
 - **A code block carries a copy button.** Asked for by another operator of
   the engine (issue #44) for a site full of terminal commands. It sits in
   the block's own corner and is always there rather than on hover -- a
@@ -345,14 +367,6 @@ upgrade:
   leaves a 40px link floating in a 60px row.
 
 ### Not fixed, on purpose
-
-- **A listing card renders the whole post and lets CSS clip it.** On one
-  real front page that is 49,312 of 50,659 characters inside the clip and
-  33 of 154 focusable elements reachable by keyboard but invisible on
-  screen. Nothing bounded fixes it -- `inert` would kill the visible half
-  too, and where the cut falls is CSS's to decide. The honest answer is a
-  card that renders a real teaser, which is a design decision rather than
-  a bug fix.
 
 ## 1.4 -- 2026-08-25
 

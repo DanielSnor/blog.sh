@@ -1220,14 +1220,14 @@ a.tag-pill:hover { background: var(--accent); color: #ffffff; }
 main .post-list-item { margin-bottom: 1.5rem; }
 main .post-list-item:last-child { margin-bottom: 0; }
 
-.content.excerpt { max-height: 500px; overflow: hidden; position: relative; }
-.content.excerpt::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 70px;
-  background: linear-gradient(to bottom, transparent, var(--card-bg));
-}
+/* A listing card used to render the whole post and hide the rest here, at
+   500px, under a fade. Measured on a real front page, that meant every one
+   of fourteen cards carried between 794 and 2616 pixels of content and
+   showed 500 -- and 33 of the page's 154 focusable elements were reachable
+   by the keyboard while invisible on screen. The card is cut at a block
+   boundary before it is written now (lib/card_teaser.rb), so there is
+   nothing left here to hide and no fade over a cut that no longer falls
+   mid-sentence. */
 .read-more { display: inline-block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 400; }
 
 .pagination {
