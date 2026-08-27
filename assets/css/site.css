@@ -1567,7 +1567,10 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
      pills fill whatever they are given, so fit-content would take the
      whole page back. */
   margin: 0 auto;
-  max-width: 44rem;
+  /* The width the two-column version had, now spent on one column: the
+     list never ran edge to edge and should not start now -- a wrapped
+     line of pills is easier to scan when the eye knows where it turns. */
+  max-width: 34rem;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1591,10 +1594,11 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 /* The first one opens the list, so it needs no room above it. */
 .tag-index-letter:first-child { margin-top: 0; }
 .tag-index-item { display: inline-flex; }
-/* Bigger than a pill under a post -- this page is nothing but pills, and
-   at 0.75rem seven hundred of them read as texture rather than as words.
-   The margin goes because the list has a gap of its own. */
-.tag-index-item > .tag-pill { margin: 0; font-size: 0.85rem; }
+/* The same size as a tag pill anywhere else on the site: this page is an
+   index OF those pills, and a tag that changes size depending on which
+   page it is on is a tag the reader has to recognise twice. The margin
+   goes because the list has a gap of its own. */
+.tag-index-item > .tag-pill { margin: 0; }
 /* The count rides inside the pill: one link, one target, and a number
    that cannot drift to the name after it when the line wraps. Smaller
    than the name it belongs to, and dimmed, so the pill still reads as
@@ -1610,7 +1614,7 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
-  max-width: 44rem;
+  max-width: 34rem;
   margin: 0 auto 1rem;
 }
 .tag-index-sort-button:first-child { justify-self: end; }
