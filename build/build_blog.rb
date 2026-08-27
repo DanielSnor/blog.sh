@@ -3246,10 +3246,11 @@ unless tags_map.empty?
   # reader looking between `sirky` and `sport` will be. Anything that is
   # not a letter -- a tag that starts with a digit -- goes under `#`.
   #
-  # Emitted as list items rather than as headings between lists: the
-  # column layout is one <ul>, and breaking it into twenty-seven of them
-  # would break the columns with it. The switch to count order takes them
-  # back out (see assets/js/tag-index.js).
+  # Emitted as list items rather than as headings between lists: the list
+  # is one <ul> and breaking it into twenty-seven of them would break the
+  # wrapping with it -- a band is a full-width item in the same flow, the
+  # way the archive's month is. The switch to count order takes them back
+  # out (see assets/js/tag-index.js).
   last_letter = nil
   items = tag_index_rows.flat_map do |slug, name, count|
     letter = Slug.fold(name).to_s[0].to_s.upcase
@@ -3263,8 +3264,15 @@ unless tags_map.empty?
     # The count travels in an attribute as well as in the text: the switch
     # reorders these in the DOM, and reading a number back out of rendered
     # markup is how a sort starts depending on how a number is punctuated.
-    head + [%(<li class="tag-index-item" data-count="#{count}"><a href="/tag/#{h(slug)}/">#{h(name)}</a>) +
-            %(<span class="tag-index-count">#{count}</span></li>)]
+    # Name and count in ONE pill, one link, one target: the count is what
+    # makes the index a diagnostic rather than a menu (`pacmam 1` beside
+    # `pacman 12` says on sight what a list of names alone never would),
+    # and hung outside the pill it detached from its own name -- with the
+    # list wrapped into lines, a number between two pills reads as easily
+    # for the one that follows it.
+    head + [%(<li class="tag-index-item" data-count="#{count}">) +
+            %(<a class="tag-pill" href="/tag/#{h(slug)}/">#{h(name)}) +
+            %(<sup class="tag-index-count">#{count}</sup></a></li>)]
   end
   emit(File.join(PUBLIC_DIR, 'tag', 'index.html'),
        layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +

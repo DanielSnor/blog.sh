@@ -1554,34 +1554,33 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   .archive-month { width: 1.35rem; font-size: 0.72rem; }
 }
 
-/* The tag index at /tag/. A plain list rather than a cloud: a cloud sizes
-   words by frequency and then asks the reader to compare type sizes, which
-   is a worse way of saying a number than the number is. Wide columns so a
-   long list stays scannable -- seven hundred tags is a page, not a wall. */
+/* The tag index at /tag/. Pills in long wrapped lines rather than a cloud:
+   a cloud sizes words by frequency and then asks the reader to compare type
+   sizes, which is a worse way of saying a number than the number is. Seven
+   hundred tags is a page, not a wall -- and a pill is the shape this engine
+   already uses for a tag everywhere else, so the index looks like what it
+   indexes. */
 .tag-index {
   list-style: none;
   padding: 0;
-  /* Centred like the archive map, and for the same reason. The width is
-     capped rather than fit-content: columns fill whatever they are given,
-     so fit-content would take the whole page back. */
+  /* Centred like the archive map, and capped rather than fit-content:
+     pills fill whatever they are given, so fit-content would take the
+     whole page back. */
   margin: 0 auto;
-  /* Narrower than the column it sits in, and centred: a name is a short
-     line, and columns as wide as the page leave a stripe of white between
-     each name and its count. */
-  max-width: 34rem;
-  columns: 3 14rem;
-  column-gap: 1.5rem;
+  max-width: 44rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
 }
-/* The archive's month band, at the width a column gives it -- which is
-   the whole difference: three columns of names want a label the width of
-   a name, not of the page. Not sticky: a year is one long column and a
-   heading that follows the reader down it earns its place, while
-   twenty-seven of them across three columns would be three labels stuck
-   over each other. */
+/* The archive's month band, at the width of the block rather than of a
+   name -- it labels the run under it, so it takes the line to itself.
+   Not sticky: a year is one long column and a heading that follows the
+   reader down it earns its place, while twenty-seven of them would spend
+   the page sticking over each other. */
 .tag-index-letter {
-  break-inside: avoid;
-  break-after: avoid;
-  margin: 0.9rem 0 0.35rem;
+  flex: 0 0 100%;
+  margin: 1rem 0 0.15rem;
   padding: 0.15rem 0.5rem;
   font-size: 0.95rem;
   font-weight: 600;
@@ -1591,38 +1590,27 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 }
 /* The first one opens the list, so it needs no room above it. */
 .tag-index-letter:first-child { margin-top: 0; }
-.tag-index-item {
-  break-inside: avoid;
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  padding: 0.15rem 0;
+.tag-index-item { display: inline-flex; }
+/* Bigger than a pill under a post -- this page is nothing but pills, and
+   at 0.75rem seven hundred of them read as texture rather than as words.
+   The margin goes because the list has a gap of its own. */
+.tag-index-item > .tag-pill { margin: 0; font-size: 0.85rem; }
+/* The count rides inside the pill: one link, one target, and a number
+   that cannot drift to the name after it when the line wraps. Smaller
+   than the name it belongs to, and dimmed, so the pill still reads as
+   its word first. */
+.tag-index-count {
+  font-size: 0.62em;
+  opacity: 0.75;
+  margin-left: 0.2em;
 }
-/* A flex item will not shrink below its content unless it is told it may,
-   so a long name ran past its own column and under the next one: measured
-   at 380px where the neighbouring column starts at 370. It wraps now
-   instead -- a two-line tag is a tag you can read, an overlapping one is
-   not. The count keeps its place at the end of the first line. */
-.tag-index-item > a { min-width: 0; overflow-wrap: anywhere; }
-/* The count is what makes the index a diagnostic rather than a menu:
-   `pacmam 1` beside `pacman 12` says on sight what a list of names alone
-   never would. */
-.tag-index-count { color: var(--meta-text); font-size: 0.8rem; }
-/* The pair straddles the gutter the two columns leave. The bar takes the
-   list's own width and gap and splits it in half, then the first button
-   is pushed to the end of its half and the second to the start of its
-   own -- so one finishes exactly where the left column finishes and the
-   other begins exactly where the right column begins, with the columns'
-   own 1.5rem between them.
-   
-   Always two columns at this width: the cap is 34rem and a column asks
-   for 14rem, so three never fit (3 x 14rem + 2 x 1.5rem is wider than
-   34rem). */
+/* Two buttons meeting in the middle of the block, with the list's own gap
+   between them. */
 .tag-index-sort {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
-  max-width: 34rem;
+  max-width: 44rem;
   margin: 0 auto 1rem;
 }
 .tag-index-sort-button:first-child { justify-self: end; }
@@ -1640,8 +1628,5 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 .tag-index-sort-button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 
 @media (max-width: 700px) {
-  .tag-index { columns: 2 9rem; column-gap: 1rem; }
-  /* ...and the bar follows the narrow-screen gap with it, or the buttons
-     stop meeting the columns they sit over. */
   .tag-index-sort { gap: 1rem; }
 }

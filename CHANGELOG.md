@@ -73,6 +73,16 @@ name a config key it never mentioned (see **Changed**).
 
 ### Changed
 
+- **`/tag/` shows its tags as pills in wrapped lines rather than in
+  columns.** Asked for by somebody else running the engine (issue #43),
+  who wanted the overview a tag page cannot give: every tag at once, with
+  the count beside each. The count now rides INSIDE the pill as a
+  superscript -- one link, one target, and a number that cannot drift to
+  the name after it when a line wraps -- and the letter band takes the
+  width of the block, the way the archive's month does. A pill is the
+  shape this engine already uses for a tag everywhere else, so the index
+  looks like what it indexes.
+
 - **An announcement budgets its link the way Mastodon charges for one.**
   Mastodon reserves a flat 23 characters for every link, whatever the link
   measures, and says so in its own API; the composer counted the address
