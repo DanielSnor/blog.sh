@@ -41,8 +41,25 @@ module Publishing
   # so mastodon.toot_length in config/site.yml can too; the perex budget
   # scales with it.
   TOOT_LENGTH = SiteConfig.get('mastodon', 'toot_length', default: 500)
+  # Mastodon charges every link a FLAT 23 characters, whatever it measures
+  # (`configuration.statuses.characters_reserved_per_url` in its own API,
+  # 23 since the day the field existed). Counting the address literally
+  # spent a budget nobody was charging for: on an address like
+  # https://example.com/posts/2026/some-slug/ that is some twenty
+  # characters of perex cut off every announcement for nothing.
+  #
+  # A constant, NOT a maximum: a link shorter than 23 costs 23 too, so
+  # [url.length, 23].max would trade this error for its mirror image.
+  #
+  # Configurable for the same reason toot_length is -- a server that
+  # counts differently says so in that field, and a site that has read it
+  # can write it down here.
+  LINK_LENGTH = SiteConfig.get('mastodon', 'link_length', default: 23)
   # Bluesky's limit is fixed by the AT Protocol and counted in GRAPHEMES,
-  # not characters -- hence the separate composition below.
+  # not characters -- hence the separate composition below. It charges an
+  # address what the address measures, so nothing like LINK_LENGTH belongs
+  # in the Bluesky composer: the two networks disagree, and copying this
+  # rule across would make every long-URL announcement one Bluesky refuses.
   BLUESKY_LENGTH = 300
 
   module_function
@@ -169,7 +186,11 @@ module Publishing
   def compose_toot(title:, slug:, year:, blocks:, tags:, page: false)
     url = post_url(slug, year, page: page)
     hashtags = hashtags_for(tags)
-    fixed_length = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length
+    parts = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }
+    # The separators come from the join; the address costs what the network
+    # charges for one, not what it measures. See LINK_LENGTH.
+    fixed_length = parts.join("\n\n").length
+    fixed_length += LINK_LENGTH - url.length unless url.to_s.strip.empty?
     budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
 
     [title, perex_for(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")

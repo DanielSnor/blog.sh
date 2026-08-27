@@ -73,6 +73,21 @@ name a config key it never mentioned (see **Changed**).
 
 ### Changed
 
+- **An announcement budgets its link the way Mastodon charges for one.**
+  Mastodon reserves a flat 23 characters for every link, whatever the link
+  measures, and says so in its own API; the composer counted the address
+  literally and spent a budget nobody was charging for. Honest about what
+  this changes: at the shipped 500-character limit, nothing -- the excerpt
+  is capped at 250 long before the budget binds, and that holds even for a
+  234-character address. It shows on a site whose instance limit is low
+  enough for the budget to bite first: at 300, with an 80-character
+  address, the excerpt was cut at 198 characters instead of 246. The
+  reserve is `mastodon.link_length` for a server that answers with a
+  different number, and `doctor` checks it like its sibling. Bluesky is
+  deliberately untouched: it charges an address what the address measures,
+  so the same change there would make every long-address announcement one
+  Bluesky refuses.
+
 - **`doctor` says when `site.locale` and `site.lang` disagree.**
   `locale` is a second language switch, independent of the first, and
   only `./setup.sh` ever kept the two in step -- so a site set up by hand,

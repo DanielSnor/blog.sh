@@ -935,6 +935,7 @@ doctor:
   mastodon_token_missing: "mastodon: is configured but MASTODON_ACCESS_TOKEN is empty, so nothing is ever announced."
   mastodon_token_missing_fix: "Create one on the instance under Preferences -> Development -> New application, scope write:statuses, and put it in env.sh."
   toot_length: "mastodon.toot_length is %{value}; it has to be a whole number greater than zero."
+  link_length: "mastodon.link_length is %{value}; it has to be a whole number, zero or more -- it is what your server charges for a link (23 on Mastodon)."
   bluesky_ok: "Announcing as %{handle}."
   bluesky_password_missing: "bluesky: is configured but BLUESKY_APP_PASSWORD is empty, so nothing is ever announced."
   bluesky_password_missing_fix: "Settings -> App Passwords on Bluesky. An APP password, never the account password. Put it in env.sh."

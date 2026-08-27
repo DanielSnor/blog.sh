@@ -379,6 +379,15 @@ module Doctor
       end
       length = dig(data, 'mastodon', 'toot_length')
       findings << error(t('toot_length', value: length.inspect)) if length && !(length.is_a?(Integer) && length.positive?)
+      # Same guard as its sibling, because the same kind of mistake is
+      # silent in the same way: this number is subtracted from the budget
+      # every announcement is composed against, so a string or a negative
+      # there cuts every perex short (or lets a toot overflow) with
+      # nothing on screen to say why.
+      reserved = dig(data, 'mastodon', 'link_length')
+      if reserved && !(reserved.is_a?(Integer) && !reserved.negative?)
+        findings << error(t('link_length', value: reserved.inspect))
+      end
     elsif bluesky
       if ENV['BLUESKY_APP_PASSWORD'].to_s.empty?
         findings << if moderated

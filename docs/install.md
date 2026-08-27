@@ -586,6 +586,10 @@ announcement (logged, not an error).
    default. Set it if yours differs -- the announcement's perex is
    budgeted against this number, so a limit set too high gets the post
    rejected at publish time and one set too low just wastes room.
+   `mastodon.link_length` is the other half of that arithmetic: Mastodon
+   charges every link a flat 23 characters whatever it measures, and says
+   so in its own API (`characters_reserved_per_url`). Leave it alone
+   unless your server answers with a different number.
 
 **Bluesky:**
 

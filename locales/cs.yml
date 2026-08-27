@@ -905,6 +905,7 @@ doctor:
   mastodon_token_missing: "mastodon: je nastavený, ale MASTODON_ACCESS_TOKEN je prázdný, takže se nikdy nic neoznámí."
   mastodon_token_missing_fix: "Vytvoř ho na instanci v Nastavení -> Pro vývojáře -> Nová aplikace, rozsah write:statuses, a vlož do env.sh."
   toot_length: "mastodon.toot_length je %{value}; musí to být celé číslo větší než nula."
+  link_length: "mastodon.link_length je %{value}; musí to být celé číslo nula nebo větší — je to délka, kterou si tvůj server účtuje za odkaz (na Mastodonu 23)."
   bluesky_ok: "Oznamuje se jako %{handle}."
   bluesky_password_missing: "bluesky: je nastavený, ale BLUESKY_APP_PASSWORD je prázdné, takže se nikdy nic neoznámí."
   bluesky_password_missing_fix: "Na Bluesky v Settings -> App Passwords. Heslo APLIKACE, nikdy heslo k účtu. Vlož do env.sh."

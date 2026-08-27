@@ -917,6 +917,7 @@ doctor:
   mastodon_token_missing: "mastodon: ist eingerichtet, aber MASTODON_ACCESS_TOKEN ist leer, also wird nie etwas angekündigt."
   mastodon_token_missing_fix: "Erstelle ihn auf der Instanz unter Einstellungen -> Entwicklung -> Neue Anwendung, Berechtigung write:statuses, und trage ihn in env.sh ein."
   toot_length: "mastodon.toot_length ist %{value}; es muss eine ganze Zahl größer als null sein."
+  link_length: "mastodon.link_length ist %{value}; es muss eine ganze Zahl ab null sein -- es ist die Länge, die dein Server für einen Link berechnet (auf Mastodon 23)."
   bluesky_ok: "Angekündigt wird als %{handle}."
   bluesky_password_missing: "bluesky: ist eingerichtet, aber BLUESKY_APP_PASSWORD ist leer, also wird nie etwas angekündigt."
   bluesky_password_missing_fix: "Auf Bluesky unter Settings -> App Passwords. Ein APP-Passwort, niemals das Kontopasswort. Trage es in env.sh ein."
