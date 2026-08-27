@@ -73,6 +73,16 @@ name a config key it never mentioned (see **Changed**).
 
 ### Changed
 
+- **Every listing of one kind of post says which kind, with an icon.**
+  The tag, archive, search and series listings gained one; the seven
+  listings by content type did not, which made them look unfinished
+  beside the others -- noticed on a live site rather than in the code.
+  There is one per content type now, drawn to the same rules as the four
+  that had one: a 24-unit box, stroked in currentColor, the plainest
+  shape that survives 20 pixels. The quotation mark is filled rather than
+  stroked, because outlined at that size the pair closed up into
+  something that read as the digits 99.
+
 - **`/tag/` shows its tags as pills in wrapped lines rather than in
   columns.** Asked for by somebody else running the engine (issue #43),
   who wanted the overview a tag page cannot give: every tag at once, with

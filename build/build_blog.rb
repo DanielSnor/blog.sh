@@ -2283,7 +2283,64 @@ LISTING_HEADING_ICONS = {
        'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
        'stroke-linejoin="round" aria-hidden="true">' \
        '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/>' \
-       '<circle cx="7" cy="7" r="1.2"/></svg>'
+       '<circle cx="7" cy="7" r="1.2"/></svg>',
+  # One per content type, because a listing of one kind of post is a page
+  # about that kind and the three pages that already had an icon made the
+  # other seven look unfinished beside them. Same drawing rules as those
+  # three: 24-unit box, stroked in currentColor at 2, round joins -- an
+  # icon here is a heading's companion, not an illustration.
+  #
+  # Each shape is the plainest thing that survives 20px. Lines for text
+  # (a paragraph seen from across the room), one big quotation mark for
+  # quotes, a bubble for chat, frame-and-horizon for images, a play mark
+  # for video, a note for audio, the chain for links and a single sheet
+  # for documents -- single, because `series` above is already the stack.
+  type_text: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+             'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+             'aria-hidden="true">' \
+             '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="11" x2="20" y2="11"/>' \
+             '<line x1="4" y1="16" x2="15" y2="16"/></svg>',
+  # The one drawn FILLED rather than stroked, and deliberately: a
+  # quotation mark is a typographic glyph, and outlined at 20px the pair
+  # closed up into something that read as the digits 99. Filled, it is the
+  # mark itself at any size.
+  type_quote: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="currentColor" aria-hidden="true">' \
+              '<path d="M10 5H6a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3h1.2c-.2 1.7-1.3 2.7-3.2 3.2V19' \
+              'c3.7-.6 6-3.2 6-6.9V5z"/>' \
+              '<path d="M21 5h-4a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3h1.2c-.2 1.7-1.3 2.7-3.2 3.2V19' \
+              'c3.7-.6 6-3.2 6-6.9V5z"/></svg>',
+  type_chat: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+             'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+             'stroke-linejoin="round" aria-hidden="true">' \
+             '<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.6-4.4A8 8 0 1 1 21 12z"/></svg>',
+  type_image: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+              'stroke-linejoin="round" aria-hidden="true">' \
+              '<rect x="3" y="4" width="18" height="16" rx="2"/>' \
+              '<circle cx="8.5" cy="9.5" r="1.6"/>' \
+              '<path d="M21 16l-5-5-6 6-2-2-5 5"/></svg>',
+  type_video: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+              'stroke-linejoin="round" aria-hidden="true">' \
+              '<rect x="3" y="5" width="18" height="14" rx="2"/>' \
+              '<path d="M10 8.5l5.5 3.5L10 15.5z"/></svg>',
+  type_audio: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+              'stroke-linejoin="round" aria-hidden="true">' \
+              '<path d="M9 18V5l11-2v13"/>' \
+              '<circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+  type_link: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+             'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+             'stroke-linejoin="round" aria-hidden="true">' \
+             '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>' \
+             '<path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
+  type_document: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+                 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+                 'stroke-linejoin="round" aria-hidden="true">' \
+                 '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>' \
+                 '<path d="M14 3v4a1 1 0 0 0 1 1h4"/>' \
+                 '<line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>'
 }.freeze
 
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
@@ -3314,6 +3371,7 @@ PRESENT_TYPES.each do |type|
   label = CONTENT_TYPE_LABELS[type]
   write_listing(type_posts, index_template, File.join(PUBLIC_DIR, 'type', type),
                 base_path: "/type/#{type}", heading: label, heading_variant: 'type',
+                heading_icon: :"type_#{type}",
                 title: t('type.title', label: label, short_name: SITE_SHORT_NAME),
                 description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
 end
