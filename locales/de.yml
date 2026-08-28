@@ -36,6 +36,8 @@ build:
   # irgendeiner Zahl immer falsch; Beschriftung und Doppelpunkt bei keiner.
   summary: "Gebaut nach %{dir} -- Beiträge: %{posts}, Listenseiten: %{pages}, Schlagwortseiten: %{tags}, dazu ein Suchindex, RSS-Feed und Sitemap"
   drafts: "Entwürfe in Arbeit (nur Vorschau, in keiner Liste): %{count}"
+  reused: "Seiten unverändert, nicht neu gebaut: %{count}"
+  full: "Vollständiger Build -- jede Seite gerendert und verglichen."
   two_pages: "⚠️  %{count} Beiträge werden unter /%{slug}/ ausgeliefert, tatsächlich aber nur einer:"
   two_pages_fix: "   Die Site wird weiterhin gebaut, die Adresse behält der ÄLTERE; der andere bleibt\n   in der Sitemap und in der Suche und führt Leser zu fremdem Text.\n   Gib einem von beiden einen anderen Slug (./blog.sh props -> Adresse)."
   # Was der Build über das sagt, was er nicht gebaut hat -- in der

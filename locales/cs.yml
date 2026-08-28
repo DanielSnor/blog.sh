@@ -35,6 +35,8 @@ build:
   # sedí u všech.
   summary: "Postaveno do %{dir} — postů: %{posts}, stránek výpisu: %{pages}, štítkových stránek: %{tags}, k tomu index hledání, RSS a mapa webu"
   drafts: "Rozepsané drafty (jen náhled, v žádném výpisu nejsou): %{count}"
+  reused: "Stránek beze změny, nepřestavěny: %{count}"
+  full: "Úplný build -- každá stránka vyrenderována a porovnána."
   two_pages: "⚠️  Na adrese /%{slug}/ se servíruje víc postů (%{count}), doopravdy ale jen jeden:"
   two_pages_fix: "   Web se postaví a adresu si nechá ten STARŠÍ; ten druhý zůstane v mapě webu\n   i ve vyhledávání a povede čtenáře na cizí text.\n   Dej jednomu z nich jiný slug (./blog.sh props → adresa)."
   # Co build říká o tom, co postavit odmítl, v pořadí, jak na to naráží.

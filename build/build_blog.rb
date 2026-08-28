@@ -23,6 +23,7 @@ require_relative '../lib/colors_css'
 require_relative '../lib/post_text'
 require_relative '../lib/card_teaser'
 require_relative '../lib/path_glob'
+require_relative '../lib/build_cache'
 
 SiteConfig.use_site_timezone!
 
@@ -53,6 +54,13 @@ require_relative '../lib/run_lock'
 # caller leaves a .deploy-pending marker behind or tells you to go
 # looking for an error that isn't there.
 RunLock.acquire!(ROOT, label: 'build', busy_exit: 3) unless ENV['BLOG_SH_PUBLIC_DIR']
+
+# Skip the work that would produce bytes already on disk (lib/build_cache.rb).
+# `--full` renders and compares everything the way the build always did --
+# the escape hatch when something looks stale, and the reference a cached
+# build is checked against.
+FULL_BUILD = ARGV.include?('--full') || ENV['BLOG_SH_FULL_BUILD'] == '1'
+BuildCache.setup!(root: ROOT, public_dir: PUBLIC_DIR, reuse: !FULL_BUILD)
 # No ?v= cache-buster on site.css on purpose: a static host that serves every
 # file with `Cache-Control: public, max-age=0` plus an ETag (e.g. Cloudron
 # Surfer) makes browsers revalidate on each load and pick up a changed
@@ -2361,6 +2369,31 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   oldest_first: false)
   pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
+    out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
+    dest = File.join(out_dir, 'index.html')
+    # A listing page is its slice of posts and the labels around it, and
+    # nothing else. Anchored pagination is what makes this worth doing: a
+    # post added at the top changes the landing page's slice and leaves
+    # every /page/N/ slice alone, so on an ordinary publish 438 of 439
+    # listing pages have identical inputs and none of them is rendered.
+    #
+    # Backdating is the case this does NOT rescue, and honestly cannot: a
+    # post dated 2003 shifts every slice between the landing page and where
+    # it lands, so those pages really did change and really do have to be
+    # rebuilt. Measured on one archive: 766 files for a post dated 2003
+    # against 12 for one dated today.
+    lifted = pinned && number > fixed ? pinned : nil
+    key = Digest::SHA256.hexdigest([
+      base_path, number, fixed, oldest_first, heading, heading_kind, heading_variant,
+      heading_icon, heading_href, feed_path, title, description,
+      lifted ? POST_DIGEST[lifted['__path']] : '',
+      page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
+    ].map(&:to_s).join('|'))
+    if BuildCache.page_fresh?(dest, key)
+      keep(dest)
+      next
+    end
+
     # The landing page shows the pinned post ONCE, at the top: when it
     # would otherwise appear further down that same page, it is lifted out
     # rather than duplicated. Anchored pagination is unaffected either
@@ -2374,7 +2407,6 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
       list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
     end
     pagination = pagination_html(number, fixed, base_path)
-    out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
@@ -2398,7 +2430,8 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # were announced on, hosts the page never actually contacts.
     shown = page_posts
     shown = ([pinned] + page_posts).uniq if pinned && number > fixed
-    emit(File.join(out_dir, 'index.html'),
+    BuildCache.remember_page(dest, key)
+    emit(dest,
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
                            # The landing page of a listing is the highest number and
@@ -2476,9 +2509,48 @@ def make_readable(path)
   PublicFile.make_readable(path)
 end
 
+# A page the build cache vouched for: kept, but not written.
+#
+# Everything emit() does BESIDES writing still has to happen, and the
+# permissions are the half that is easy to forget. A rebuild repairing a
+# public.nosync/ somebody chmod'ed shut is a promise made to a reporter
+# whose imported pictures were 600 and whose rebuild did nothing about it
+# -- "chmod, rebuild, nothing". A cache that skipped the repair along with
+# the write would have quietly taken that promise back on every page it
+# skipped, which is every page of an ordinary publish.
+#
+# Both halves, because they fail separately: a file at 644 behind a
+# directory at 744 is a file nobody can reach. make_traversable remembers
+# the directories it has already opened, so the walk up happens once per
+# directory rather than once per page.
+def keep(path)
+  WRITTEN[path] = true
+  make_traversable(File.dirname(path))
+  make_readable(path) unless world_readable?(path)
+end
+
 def emit(path, content)
   WRITTEN[path] = true
   bytes = content.to_s.b
+  digest = Digest::SHA256.hexdigest(bytes)
+
+  # What the last build left here, if it still is what it left. Hashing the
+  # bytes we already hold in memory is cheaper than reading the file back
+  # to compare it: on a 4,394-post archive the read-back was 2.81 s of an
+  # 11.2 s build, and every byte of it was read to find out nothing had
+  # changed. The record carries size and mtime as well as the digest, so a
+  # file edited outside the build falls through to the honest comparison
+  # below rather than being vouched for.
+  # Through keep(), not a bare return: the directory walk below sits before
+  # the old early return on purpose, and this return is earlier still. A
+  # file at the right bytes and the right mode behind a directory at 744 is
+  # a file nobody can fetch, and that is exactly the shape the walk was
+  # added for.
+  if BuildCache.written?(path, digest)
+    keep(path)
+    return
+  end
+
   dir = File.dirname(path)
   FileUtils.mkdir_p(dir)
   # Before the early return, not after. A file whose bytes AND mode are both
@@ -2506,12 +2578,40 @@ def emit(path, content)
       # sidebar, no search index, no prune, exit 1 -- on a rebuild that had
       # nothing to write in the first place.
       make_readable(path) unless world_readable?(path, stat)
+      BuildCache.record(path, digest)
       return
     end
   end
 
   File.binwrite(path, bytes)
   make_readable(path)
+  BuildCache.record(path, digest)
+end
+
+# The same bargain as a post page, for the outputs made out of the whole
+# archive rather than out of one post: the feed, the sitemap, the search
+# index, the archive map. Their inputs are a list of posts, so their key is
+# the digests of that list -- and when it has not moved, the block is never
+# called and the work inside it never happens.
+#
+# The block matters as much as the key. Building the search index costs
+# half a second of reading every post's text; passing the finished bytes in
+# and then deciding not to write them would have spent all of it.
+def cached_emit(dest, key)
+  if BuildCache.page_fresh?(dest, key)
+    keep(dest)
+    return
+  end
+
+  BuildCache.remember_page(dest, key)
+  emit(dest, yield)
+end
+
+# The identity of a list of posts, in order. Order is part of it: the feed
+# and the archive both say something different when the same posts are
+# arranged differently.
+def posts_digest(list)
+  Digest::SHA256.hexdigest(list.map { |post| POST_DIGEST[post['__path']] }.join(','))
 end
 
 FAVICON_PNG = File.join(ROOT, 'assets', 'images', 'favicon.png')
@@ -2684,8 +2784,16 @@ index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'
 # thousand files it was, and every listing command failed the same way, so
 # there was no way to find it from inside the tool.
 unreadable = []
+# What each post file said, by path. The build cache asks "is this post
+# still the post it was", and the honest answer is the bytes on disk --
+# not the date, which a correction moves without changing anything else,
+# and not mtime, which a cloud sync or a restore moves without changing
+# anything at all.
+POST_DIGEST = {}
 posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
-  parsed = JSON.parse(File.read(f, encoding: 'utf-8'))
+  raw = File.read(f, encoding: 'utf-8')
+  parsed = JSON.parse(raw)
+  POST_DIGEST[f] = Digest::SHA256.hexdigest(raw) if parsed.is_a?(Hash)
   # Valid JSON of the wrong shape ("[1,2,3]", "null", a bare string) used to
   # sail past this and die much later with a TypeError that named no file --
   # same blindness as an unparseable file, different exception.
@@ -2982,6 +3090,19 @@ end
 NAV_ITEMS = (configured_nav_items || ([['/', t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
+# Everything a page's bytes can depend on that is not the page's own
+# content: the engine and the templates (read off disk), plus the handful
+# of facts the build works out from the archive itself. The menu is the one
+# that matters in practice -- a site publishing its first video grows a
+# menu item on every page it has, and the cache has to know that.
+#
+# From here on a page whose key still matches is not rendered at all. Every
+# emit BEFORE this line -- the assets, the generated stylesheet -- ran
+# without a cache to consult and compared bytes the old way. There are a
+# few dozen of them and they are not what a publish is spent on.
+BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
+                 SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT)
+
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
 # somebody else's archive rather than through anything the author typed.
@@ -3062,6 +3183,39 @@ def referenced_media_filenames(post)
   end.compact
 end
 
+# What a post's own page is built from, beyond the post file itself.
+#
+# Three things reach into a post page from outside it, and all three change
+# without the post changing:
+#
+#   the series -- "part 3 of 7" and the links either side are facts about
+#     the set, so a sibling joining or leaving rewrites this post's page;
+#     so does somebody spelling the series name differently.
+#   its tags -- a tag pill is a link when the tag has a listing page and a
+#     flat pill when it does not, and whether it has one depends on the
+#     OTHER posts carrying it.
+#   its media -- a picture replaced in place changes the page's width and
+#     height attributes without changing a byte of the post.
+#
+# Anything else that could reach in is in the fingerprint already. The
+# media stat is the only cost here, and the loop below stats those same
+# files anyway.
+def post_page_key(post, source_media_dir)
+  slug, in_series, = series_context(post)
+  series_bit = slug ? "#{slug}/#{SERIES_NAMES[slug]}:#{in_series.map { |p| p['slug'] }.join(',')}" : ''
+  tag_bit = Array(post['tags']).map { |tag| "#{tag_slug(tag)}=#{TAG_PAGES[tag_slug(tag)] ? 1 : 0}" }.join(',')
+  media_bit = referenced_media_filenames(post).map do |name|
+    file = File.join(source_media_dir, File.basename(name.to_s))
+    stat = begin
+      File.stat(file)
+    rescue SystemCallError
+      nil
+    end
+    "#{File.basename(name.to_s)}:#{stat ? "#{stat.size}:#{stat.mtime.to_i}" : '-'}"
+  end.join(',')
+  Digest::SHA256.hexdigest([POST_DIGEST[post['__path']], series_bit, tag_bit, media_bit].join('|'))
+end
+
 (posts + pages + unlisted_posts + drafts).each do |post|
   year = post_time(post).year
   dir = output_dir(post)
@@ -3096,7 +3250,18 @@ end
     end
   end
 
-  emit(File.join(dir, 'index.html'), render_post_html(post, post_template))
+  dest = File.join(dir, 'index.html')
+  key = post_page_key(post, source_media_dir)
+  if BuildCache.page_fresh?(dest, key)
+    # Not rendered, not compared, not written -- the file on disk was built
+    # from these exact inputs by this exact engine and is still untouched.
+    # This is what makes publishing cost the size of the CHANGE rather than
+    # the size of the archive.
+    keep(dest)
+  else
+    emit(dest, render_post_html(post, post_template))
+    BuildCache.remember_page(dest, key)
+  end
 end
 
 # A tiny self-contained page, deliberately not layout(): a reader spends a
@@ -3308,6 +3473,9 @@ end
 unless tags_map.empty?
   tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
                            .sort_by { |_, name, _| [Slug.fold(name), name] }
+  # Names and counts are the whole page, so that is the whole key.
+  tag_index_dest = File.join(PUBLIC_DIR, 'tag', 'index.html')
+  tag_index_key = Digest::SHA256.hexdigest(tag_index_rows.map { |row| row.join(':') }.join(','))
   # A letter above each run of names, so seven hundred tags read as a
   # dictionary rather than as a wall. Taken from the FOLDED name, because
   # that is the order the list is in: `škola` belongs under S, where the
@@ -3320,7 +3488,8 @@ unless tags_map.empty?
   # way the archive's month is. The switch to count order takes them back
   # out (see assets/js/tag-index.js).
   last_letter = nil
-  items = tag_index_rows.flat_map do |slug, name, count|
+  build_tag_index_items = lambda do
+    tag_index_rows.flat_map do |slug, name, count|
     letter = Slug.fold(name).to_s[0].to_s.upcase
     letter = '#' unless letter.match?(/[A-Z]/)
     head = if letter == last_letter
@@ -3341,13 +3510,15 @@ unless tags_map.empty?
     head + [%(<li class="tag-index-item" data-count="#{count}">) +
             %(<a class="tag-pill" href="/tag/#{h(slug)}/">#{h(name)}) +
             %(<sup class="tag-index-count">#{count}</sup></a></li>)]
+    end
   end
-  emit(File.join(PUBLIC_DIR, 'tag', 'index.html'),
-       layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
-              %(\n<ul class="tag-index" id="tag-index">\n#{items.join("\n")}\n</ul>),
-              title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
-              description: t('tags.description', site_title: SITE_TITLE),
-              path: '/tag/'))
+  cached_emit(tag_index_dest, tag_index_key) do
+    layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
+           %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
+           title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
+           description: t('tags.description', site_title: SITE_TITLE),
+           path: '/tag/')
+  end
 end
 
 # A series gets a listing of its own, in series order rather than newest
@@ -3509,12 +3680,20 @@ unless archive_by_year.empty?
       %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
   end
 
-  emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
-       layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
-              %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
-              title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
-              description: t('archive.description', site_title: SITE_TITLE),
-              path: ARCHIVE_PATH))
+  # The map is years and counts, so it moves whenever a year's count does
+  # -- which is any publish at all. The YEAR pages below are the ones this
+  # buys something on: 2014 has not changed since new year's eve 2014 and
+  # never will.
+  cached_emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
+              Digest::SHA256.hexdigest(archive_span.map do |year|
+                "#{year}:#{(archive_by_year[year] || []).length}"
+              end.join(','))) do
+    layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
+           %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
+           title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
+           description: t('archive.description', site_title: SITE_TITLE),
+           path: ARCHIVE_PATH)
+  end
 
   archive_span.each do |year|
     in_year = archive_by_year[year] || []
@@ -3522,6 +3701,13 @@ unless archive_by_year.empty?
     # there is nothing to put on it, and an empty page is an invitation to
     # a dead end.
     next if in_year.empty?
+
+    year_dest = File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html')
+    year_key = posts_digest(in_year)
+    if BuildCache.page_fresh?(year_dest, year_key)
+      keep(year_dest)
+      next
+    end
 
     sections = in_year.group_by { |post| post_time(post).month }.sort.map do |month, in_month|
       # The month heading is a number, the way this site writes dates: two
@@ -3539,7 +3725,8 @@ unless archive_by_year.empty?
         %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
     end
 
-    emit(File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html'),
+    BuildCache.remember_page(year_dest, year_key)
+    emit(year_dest,
          layout(listing_heading_html(t('archive.year_title', year: year),
                                      variant: 'archive', icon: :calendar,
                                      value_href: ARCHIVE_PATH) + "\n" +
@@ -3563,10 +3750,14 @@ end
 # eagerly-loaded half regardless of age -- there are a handful of them,
 # and burying them in the lazy archive would defeat the point.
 searchable = pages + posts
-recent_search_index = searchable.first(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
-archive_search_index = searchable.drop(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
-emit(File.join(PUBLIC_DIR, 'search-index.json'), recent_search_index.to_json)
-emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), archive_search_index.to_json)
+recent_searchable = searchable.first(SEARCH_INDEX_RECENT_LIMIT)
+archive_searchable = searchable.drop(SEARCH_INDEX_RECENT_LIMIT)
+cached_emit(File.join(PUBLIC_DIR, 'search-index.json'), posts_digest(recent_searchable)) do
+  recent_searchable.map { |post| search_index_entry(post) }.to_json
+end
+cached_emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), posts_digest(archive_searchable)) do
+  archive_searchable.map { |post| search_index_entry(post) }.to_json
+end
 
 search_template = ERB.new(File.read(File.join(ROOT, 'templates', 'search.html.erb'), encoding: 'utf-8'))
 emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
@@ -3676,11 +3867,22 @@ WRITTEN[STATS_PATH] = true
 COMMENTS_PATH = File.join(PUBLIC_DIR, 'comments.json')
 WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
 
-emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
+# Only the newest RSS_ITEM_LIMIT posts reach the feed, and its stated
+# <lastBuildDate> is the newest post's own date rather than the clock --
+# so a post dated 2003 changes nothing here, and the feed is not rewritten
+# for readers who would have been handed the same bytes.
+cached_emit(File.join(PUBLIC_DIR, 'rss.xml'), posts_digest(posts.first(RSS_ITEM_LIMIT))) do
+  render_rss(posts)
+end
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts))
+cached_emit(File.join(PUBLIC_DIR, 'sitemap.xml'),
+            Digest::SHA256.hexdigest([posts_digest(posts + pages),
+                                      tags_map.keys.join(','),
+                                      PRESENT_TYPES.join(',')].join('|'))) do
+  render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts)
+end
 # The crawlers that collect text to train on, as of this release. A list in
 # the engine goes stale, which is why the free-text key below exists beside
 # it -- but a list nobody has to research is the difference between a site
@@ -3776,10 +3978,33 @@ REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
   end
 end
 
-removed = prune_public
+# Prune walks all 16,000 entries of a large public.nosync/ looking for what
+# the build no longer produces -- a second of every publish, and on an
+# ordinary publish it finds nothing, because an ordinary publish adds pages
+# and drops none.
+#
+# So it is asked first whether anything COULD have been orphaned: is every
+# file the last build wrote still being written now? When the answer is
+# yes there is no orphan to find and the walk is skipped. Any doubt --
+# a first build, a thrown-away cache, --full -- answers no and walks, so
+# the sweep still happens on exactly the builds that can need it.
+removed = BuildCache.outputs_dropped?(WRITTEN) ? prune_public : 0
+
+# Written here and nowhere else: at the end, on the way out of a build that
+# reached the end. An at_exit hook would save this state after a build that
+# died halfway through writing the site, and the next build would then skip
+# the half that never got written -- a site permanently missing pages, with
+# nothing saying so.
+BuildCache.save!
 
 puts
 puts t('build.summary', posts: posts.size, pages: page_count, dir: PUBLIC_DIR, tags: tags_map.size)
+# Said out loud, because a cache nobody can see is a cache nobody can
+# check. When a build takes longer than it should, this line is the first
+# thing to look at: a zero here after an ordinary publish means the cache
+# was thrown away, and the reason is always a fingerprint that moved.
+puts t('build.reused', count: BuildCache.skipped) if BuildCache.skipped.positive?
+puts t('build.full') if FULL_BUILD
 if drafts.any?
   puts
   puts t('build.drafts', count: drafts.size)

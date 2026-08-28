@@ -36,6 +36,8 @@ build:
   # at some number; a label and a colon reads right at all of them.
   summary: "Built into %{dir} -- posts: %{posts}, listing pages: %{pages}, tag pages: %{tags}, plus a search index, RSS feed and sitemap"
   drafts: "Drafts in progress (preview only, not in any listing): %{count}"
+  reused: "Pages already up to date, not rebuilt: %{count}"
+  full: "Full build -- every page rendered and compared."
   two_pages: "⚠️  %{count} posts are served at /%{slug}/ -- only one of them is:"
   two_pages_fix: "   The site still builds and the OLDER one keeps the address; the other stays\n   in the sitemap and in search, pointing readers at text that is not its own.\n   Give one of them another slug (./blog.sh props -> address)."
   # What the build says about the things it refused to build, in the order
