@@ -642,3 +642,17 @@ Arch Linux user group -- a skinned deployment (the stock engine under its
 own stylesheet, no template edits) and the first site to pair the engine
 with GoToSocial. Both of 1.3.2's fixes and this release's GoToSocial
 comments were found on it.
+
+[blog.oscloud.cz](https://blog.oscloud.cz) is the news and how-to blog of
+OSCloud, a Czech community self-hosting platform, run by the same two
+operators as arch-linux.cz -- skinned the same way, and the first
+deployment here that is a product's blog rather than a person's. Both
+features this release
+added on request came from them: the tag index and the copy button on code
+blocks, which a blog of terminal how-tos wanted first.
+
+[archive.bierfaristo.com](https://archive.bierfaristo.com) is the largest
+archive we know of running this engine -- some 13,700 posts, a working
+answer to "does it scale". Its owner has reported more than anyone else
+outside: media that imported unreadable under a strict umask, and the
+`//--more--//` marker this release added, which was his request.
