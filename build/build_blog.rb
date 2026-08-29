@@ -326,6 +326,8 @@ def client_i18n_json
     lightbox_label: t('js.lightbox_label'),
     lightbox_open: t('js.lightbox_open'),
     copy_code: t('js.copy_code'),
+    copy_code_done: t('js.copied'),
+    copy_code_failed: t('js.copy_failed'),
     theme_auto: t('ui.theme_auto'),
     theme_light: t('ui.theme_light'),
     theme_dark: t('ui.theme_dark')
@@ -888,8 +890,14 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
   when 'code'
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
     # Same class as the chrome's own code blocks render with, for the same
-    # reason -- see render_chrome_block.
-    %(<pre class="code-block"><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
+    # reason -- see render_chrome_block. But NOT when this copy was cut to
+    # fit a listing card: the button copies what the block holds, and what
+    # a cut block holds is the truncation. A reader lifting a shell script
+    # off the front page would get the first lines of it, run them, and
+    # never be told the rest existed. With no class there is no button,
+    # and the card's "read more" is what leads to the whole thing.
+    cls = block['cut'] ? '' : ' class="code-block"'
+    %(<pre#{cls}><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
   when 'file'
     file = (block['media'] || []).first || {}
     # Nothing attached: the card used to link the post's own directory

@@ -83,7 +83,9 @@ module CardTeaser
       room = [(budget - GAP) / 20, 1].max
       return block if lines.length <= room
 
-      return block.merge('text' => lines.first(room).join("\n"))
+      # `cut` travels with the block so the renderer knows this copy is
+      # not the whole thing. A card must not offer to copy half a script.
+      return block.merge('text' => lines.first(room).join("\n"), 'cut' => true)
     end
 
     key = ROW_KEYS[block['type']]
@@ -91,7 +93,7 @@ module CardTeaser
     room = [(budget - GAP) / LINE, 1].max
     return block if rows.length <= room
 
-    block.merge(key => rows.first(room))
+    block.merge(key => rows.first(room), 'cut' => true)
   end
 
   # Roughly what this block will take on screen. Every branch is the
