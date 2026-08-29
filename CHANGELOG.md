@@ -69,7 +69,11 @@ name a config key it never mentioned (see **Changed**).
   accented tag after z: a reader looking for `škola` between `sirky` and
   `sport` would not find it. `stats` folds now too -- one question, one
   answer. Every tag that has a page and no others, so the list never
-  points at an address the build did not write.
+  points at an address the build did not write. A reader can switch the
+  order to by-count and it is remembered for next time; the page is
+  BUILT alphabetically, so a reader whose browser never runs the script
+  gets the order the markup already holds rather than a control that
+  does nothing.
 
 - **A listing card is cut before it is written, not hidden afterwards.**
   It used to render the whole post and let CSS clip it at 500px: on the
@@ -191,6 +195,17 @@ name a config key it never mentioned (see **Changed**).
   A series long enough to paginate will have its `/page/N/` contents
   redistributed once.
 
+- **Posts are ordered by the moment they happened, not by the text of
+  their timestamp.** A post stored as `2026-06-08T06:00:00Z` sorted
+  after one stored as `2026-06-08T07:00:00+02:00`, though the second
+  happened an hour earlier -- and an archive that mixes offsets is every
+  archive that was imported, since the importers store UTC while the CLI
+  writes the site's own offset. On the archive this was measured
+  against, 26 posts change position and three of them move across a
+  `/page/N/` boundary, so a handful of pagination pages hold a slightly
+  different set than before. Addresses are unaffected: not one post
+  changed where it lives.
+
 - **A listing page no longer carries the posts' heading anchors.** A
   listing stacks ten posts' bodies into one document, so two posts with a
   section of the same name put the same `id` on the page twice -- 105
@@ -202,6 +217,17 @@ name a config key it never mentioned (see **Changed**).
 Three days of adversarial review, most of it over real archives rather
 than fixtures. The findings that matter to somebody deciding whether to
 upgrade:
+
+- **The appearance button was dead in a browser that refuses storage.**
+  Safari's private windows -- and any profile with site data blocked --
+  throw when `localStorage` is merely READ, not only when it is written.
+  That threw out of the line at the bottom of `theme-toggle.js` that
+  applies the saved choice, so the code wiring the button up never ran:
+  no cycling, no symbol, nothing. Reading and writing the choice is now
+  guarded on both sides, the cycle asks the page which theme it is
+  showing rather than the storage it may not have, and the choice simply
+  does not outlive the page where a browser refuses to keep it -- which
+  is the most such a browser allows.
 
 - **`./blog.sh edit` published the coordinates a photograph was taken
   at.** `add` stripped them, as the documentation promises; `edit` -- the
@@ -388,6 +414,22 @@ upgrade:
   leaves a 40px link floating in a 60px row.
 
 ### Not fixed, on purpose
+
+- **Wayback's CDX paging.** The cap on how many captures are asked for
+  went up, and the importer now says so when the answer comes back
+  exactly full -- but following `resumeKey` through a second request
+  was not written. It cannot be tested without calling archive.org, and
+  an unverified conversation with somebody else's service is not what a
+  release should carry.
+
+- **The shortened link in an announcement.** Bluesky charges for a link
+  by its length while Mastodon charges a flat rate, so a long address
+  eats into what a Bluesky post can say -- measured at 26 to 50
+  characters on this archive's slugs. Showing a short form while linking
+  the full address is what the official client does, and it stays
+  undone: the facets are built by scanning the text, and the guard
+  against announcing twice looks for the address IN that text, so both
+  would have to be rewritten at once.
 
 ## 1.4 -- 2026-08-25
 

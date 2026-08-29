@@ -640,8 +640,8 @@ example config explains its own comment conventions.
 [arch-linux.cz](https://arch-linux.cz) is the community blog of the Czech
 Arch Linux user group -- a skinned deployment (the stock engine under its
 own stylesheet, no template edits) and the first site to pair the engine
-with GoToSocial. Both of 1.3.2's fixes and this release's GoToSocial
-comments were found on it.
+with GoToSocial. Both of 1.3.2's fixes and the GoToSocial comments that
+arrived in 1.4 were found on it.
 
 [blog.oscloud.cz](https://blog.oscloud.cz) is the news and how-to blog of
 OSCloud, a Czech community self-hosting platform, run by the same two

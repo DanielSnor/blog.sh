@@ -58,7 +58,7 @@ dedup by `source`).
 | `slug` | string, required | URL segment; `Slug.slugify` output |
 | `date` | string, required | ISO 8601 with offset |
 | `content` | array, required | blocks, see below |
-| `title` | string | optional. A post without one borrows the title of its first `link` block -- that is where a link post keeps what the reader takes for its title, and it becomes the heading (an `h1` on the post's page, an `h2` in a listing, both pointing where the link points), the `<title>`, the feed item and the structured data. With neither, the slug stands in |
+| `title` | string | optional. A post without one borrows the title of its first `link` block -- that is where a link post keeps what the reader takes for its title, and it becomes the heading (an `h1` on the post's page, an `h2` in a listing, both pointing where the link points), the `<title>`, the feed item and the structured data. With neither, the post is named from its own opening words (see `PostText.name_and_rest`), and only a post with no words at all falls back to the slug |
 | `tags` | array of strings | rendered as pills, slugified for tag URLs |
 | `state` | `"published"` \| `"draft"` | absent = published |
 | `draft_token` | string | drafts only -- the hidden preview URL segment |
@@ -670,6 +670,15 @@ wrote. Then, in load order:
   kept inside it, the arrows walking the group the image belongs to, and
   focus handed back to the picture it was opened from. Its labels come
   from `window.BLOG_I18N` like every other string the client draws.
+- **The tag index** (`tag-index.js`) reorders `/tag/` between alphabetical
+  and by-count, and remembers which the reader chose. The page is built
+  alphabetically, so a reader without the script gets the order the
+  markup already has rather than a control that does nothing.
+- **Copy** (`copy-code.js`) puts a copy button on every `code` block --
+  built in the script rather than in the markup, so a page whose script
+  never runs shows no button instead of a dead one. It refuses to appear
+  at all where the clipboard is unavailable: an insecure origin, or a
+  browser without `navigator.clipboard.writeText`.
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.
