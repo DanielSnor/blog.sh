@@ -3295,16 +3295,45 @@ NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 # the zone is whatever the process was started with -- which a cron entry
 # and a login shell routinely disagree about.
 #
-# The zone is named by its RULES rather than by the moment: the offset at
-# a fixed winter instant and a fixed summer one. That tells UTC from
-# Prague from Kiritimati, and unlike Time.now.zone it does not move at a
-# DST transition, which would otherwise throw the whole cache away twice a
-# year to render the identical site.
-TZ_PROBE_WINTER = 1_579_046_400 # 2020-01-15Z
-TZ_PROBE_SUMMER = 1_594_771_200 # 2020-07-15Z
-TIMEZONE_FACT = [ENV['TZ'].to_s,
-                 Time.at(TZ_PROBE_WINTER).utc_offset,
-                 Time.at(TZ_PROBE_SUMMER).utc_offset].join(':')
+# The zone is named by its RULES rather than by the moment -- Time.now.zone
+# would throw the whole cache away twice a year at a DST transition, to
+# render the identical site.
+#
+# The rules are the zoneinfo FILE, hashed. Naming them by what they do at
+# a couple of fixed instants was the first answer and it was too small: the
+# tz database never rewrites the past, so probes standing in 2020 cannot
+# see a rule that changed for 2023. That is not a hypothetical -- Egypt,
+# Chile, Mexico, Iran, Jordan, Greenland and Paraguay have all had theirs
+# rewritten since, and Palestine has one most years. The operator takes
+# the system update, publishes, and every page the cache skips keeps the
+# old times on it.
+#
+# Where there is no zoneinfo to read, the offsets stand in -- but at
+# instants spread across the whole span an archive can hold, and fixed, so
+# that the turn of a year does not buy a full build on its own.
+def timezone_fact
+  zone = ENV['TZ'].to_s.sub(/\A:/, '')
+  # TZ takes three shapes and all three are ordinary: empty (the machine's
+  # own zone), a name from the database, and -- with the leading colon --
+  # a path to a zoneinfo file of one's own.
+  path = if zone.empty? then '/etc/localtime'
+         elsif zone.start_with?('/') then zone
+         else File.join('/usr/share/zoneinfo', zone)
+         end
+  rules = begin
+    File.file?(path) ? Digest::SHA256.file(path).hexdigest : nil
+  rescue SystemCallError
+    nil
+  end
+  # Time.at, not Time.utc: an instant in UTC has an offset of zero whatever
+  # the zone is, so probes built that way measure nothing at all.
+  rules ||= (1970..2035).step(5).flat_map do |year|
+    [Time.at(Time.utc(year, 1, 15).to_i).utc_offset,
+     Time.at(Time.utc(year, 7, 15).to_i).utc_offset]
+  end.join(',')
+  [zone, rules].join(':')
+end
+TIMEZONE_FACT = timezone_fact
 BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
                  SITE_BASE_URL, TIMEZONE_FACT)

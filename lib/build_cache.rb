@@ -268,6 +268,13 @@ module BuildCache
 
       seen[real] = true
       Dir.children(dir).sort.flat_map do |name|
+        # Dot-names are not the engine. The glob this replaced skipped them
+        # by default and nothing in six trees has ever been called one --
+        # but a Finder window opened over assets/images/ leaves a .DS_Store
+        # behind, and counting it threw the whole cache away on a machine
+        # whose owner had merely LOOKED at their own artwork.
+        next [] if name.start_with?('.')
+
         path = File.join(dir, name)
         if File.directory?(path) then engine_files(path, seen)
         elsif File.file?(path) then [path]
