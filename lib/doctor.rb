@@ -1103,12 +1103,20 @@ module Doctor
     dir = File.join(root, 'trash')
     return [] unless Dir.exist?(dir)
 
-    posts = (PathGlob.under(dir, '*', '*', 'post.json') +
-             PathGlob.under(dir, '*', 'post.json')).uniq
-    return [] if posts.empty?
+    # By directory rather than by post.json: `check --repair` sets a stray
+    # media file aside in here, without a post beside it, and doctor said
+    # nothing at all about a trash holding only those.
+    held = Dir.children(dir).sort.flat_map do |name|
+      path = File.join(dir, name)
+      next [] unless File.directory?(path)
+      next [path] unless name.match?(/\A\d{4}\z/)
+
+      Dir.children(path).map { |slug| File.join(path, slug) }.select { |d| File.directory?(d) }
+    end
+    return [] if held.empty?
 
     bytes = PathGlob.under(dir, '**', '*').sum { |f| File.file?(f) ? File.size(f) : 0 }
-    [warn(I18n.t('doctor.trash_holds', count: posts.length, size: FileSize.human(bytes)))]
+    [warn(I18n.t('doctor.trash_holds', count: held.length, size: FileSize.human(bytes)))]
   end
 
   def check_deploy

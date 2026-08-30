@@ -4900,15 +4900,29 @@ def dir_size(path)
   PathGlob.under(path, '**', '*').sum { |f| File.file?(f) ? File.size(f) : 0 }
 end
 
-# Every trashed post, in both shapes: today's trash/<year>/<slug>/ and the
-# flat trash/<slug>/ an installation from before the trash grew years left
-# behind. `restore` reads both, so `empty` has to delete both -- otherwise
-# half of it stays and the count somebody was shown was a lie.
+# Everything the trash holds, in both shapes: today's trash/<year>/<slug>/
+# and the flat trash/<slug>/ an installation from before the trash grew
+# years left behind. `restore` reads both, so `empty` has to delete both --
+# otherwise half of it stays and the count somebody was shown was a lie.
+#
+# Found by DIRECTORY, not by post.json. `check --repair` sets a stray media
+# file aside in here -- promising, correctly, that it can be brought back --
+# and it arrives without a post beside it. Looking only for post.json meant
+# `empty trash` announced an empty trash, exited 0 and deleted nothing,
+# while `restore` handed the same files straight back: the command and its
+# undo disagreeing about whether the trash existed. It is also the exact
+# sequence doctor points the author at.
 def trashed_dirs
   return [] unless Dir.exist?(TRASH_DIR)
 
-  (PathGlob.under(TRASH_DIR, '*', '*', 'post.json') +
-   PathGlob.under(TRASH_DIR, '*', 'post.json')).map { |f| File.dirname(f) }.uniq.sort
+  Dir.children(TRASH_DIR).sort.flat_map do |name|
+    path = File.join(TRASH_DIR, name)
+    next [] unless File.directory?(path)
+    # A four-digit name is a year holding trashed things, not a thing.
+    next [path] unless name.match?(/\A\d{4}\z/)
+
+    Dir.children(path).sort.map { |slug| File.join(path, slug) }.select { |d| File.directory?(d) }
+  end
 end
 
 def cmd_empty_trash

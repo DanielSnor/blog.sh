@@ -456,9 +456,9 @@ cli:
 
   empty_trash_none: "The trash is empty."
 
-  empty_trash_confirm: "Delete %{count} post(s) from the trash for good, freeing %{size}? This cannot be undone. Type how many POSTS are being deleted to confirm: "
+  empty_trash_confirm: "Delete %{count} item(s) from the trash for good, freeing %{size}? This cannot be undone. Type how many ITEMS are being deleted to confirm: "
 
-  empty_trash_done: "Trash emptied: %{count} post(s), %{size} freed."
+  empty_trash_done: "Trash emptied: %{count} item(s), %{size} freed."
 
   empty_versions_none: "Every post already keeps just its last version."
 
@@ -898,7 +898,7 @@ doctor:
   tag_icon_unknown: "The tag \"%{tag}\" asks for the icon \"%{icon}\", which this engine does not have. The names it knows: %{known}. For anything else, give it an `icon_svg` of your own."
   tag_icon_not_svg: "The `icon_svg` of the tag \"%{tag}\" holds no <svg> element, so nothing will be drawn."
   tag_icon_scale: "The `icon_svg` of the tag \"%{tag}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked in a date badge."
-  trash_holds: "The trash holds %{count} post(s), %{size}. They are still restorable; `./blog.sh empty trash` deletes them for good."
+  trash_holds: "The trash holds %{count} item(s), %{size} -- trashed posts, and anything `check --repair` set aside. They are still restorable; `./blog.sh empty trash` deletes them for good."
   heading: "Checking this install"
   running_online: "Checking hosts and tokens too (--online)"
   summary: "%{errors} problem(s), %{warnings} worth a look, %{oks} fine."

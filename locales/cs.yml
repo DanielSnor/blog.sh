@@ -435,9 +435,9 @@ cli:
 
   empty_trash_none: "Koš je prázdný."
 
-  empty_trash_confirm: "Vysypat koš nadobro — postů: %{count}, uvolní se %{size}? Tohle vzít zpět nejde. Pro potvrzení napiš, kolik postů se maže: "
+  empty_trash_confirm: "Vysypat koš nadobro — položek: %{count}, uvolní se %{size}? Tohle vzít zpět nejde. Pro potvrzení napiš, kolik položek se maže: "
 
-  empty_trash_done: "Koš vysypán: postů %{count}, uvolněno %{size}."
+  empty_trash_done: "Koš vysypán: položek %{count}, uvolněno %{size}."
 
   empty_versions_none: "Každý post už si drží jen svou poslední verzi."
 
@@ -868,7 +868,7 @@ doctor:
   tag_icon_unknown: "Štítek „%{tag}“ si říká o ikonu „%{icon}“, kterou engine nemá. Zná tyhle: %{known}. Na cokoli jiného použij vlastní `icon_svg`."
   tag_icon_not_svg: "`icon_svg` štítku „%{tag}“ neobsahuje prvek <svg>, takže se nevykreslí nic."
   tag_icon_scale: "`icon_svg` štítku „%{tag}“ není kreslené na mřížce 24 jednotek jako ostatní ikony (`viewBox=\"0 0 24 24\"`), takže bude v datovém razítku nakřivo."
-  trash_holds: "V koši leží postů: %{count}, celkem %{size}. Pořád se dají vrátit; `./blog.sh empty trash` je smaže nadobro."
+  trash_holds: "V koši leží položek: %{count}, celkem %{size} — vyhozené posty a to, co odložil `check --repair`. Pořád se dají vrátit; `./blog.sh empty trash` je smaže nadobro."
   heading: "Kontrola této instalace"
   running_online: "Kontroluju i dostupnost serverů a platnost tokenu (--online)"
   summary: "Problémů: %{errors}, ke zvážení: %{warnings}, v pořádku: %{oks}."

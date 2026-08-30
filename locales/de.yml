@@ -447,9 +447,9 @@ cli:
 
   empty_trash_none: "Der Papierkorb ist leer."
 
-  empty_trash_confirm: "%{count} Beitrag/Beiträge endgültig aus dem Papierkorb löschen und %{size} freigeben? Das lässt sich nicht rückgängig machen. Zur Bestätigung eintippen, wie viele BEITRÄGE gelöscht werden: "
+  empty_trash_confirm: "%{count} Eintrag/Einträge endgültig aus dem Papierkorb löschen und %{size} freigeben? Das lässt sich nicht rückgängig machen. Zur Bestätigung eintippen, wie viele EINTRÄGE gelöscht werden: "
 
-  empty_trash_done: "Papierkorb geleert: %{count} Beitrag/Beiträge, %{size} frei."
+  empty_trash_done: "Papierkorb geleert: %{count} Eintrag/Einträge, %{size} frei."
 
   empty_versions_none: "Jeder Beitrag behält bereits nur seine letzte Fassung."
 
@@ -880,7 +880,7 @@ doctor:
   tag_icon_unknown: "Das Schlagwort „%{tag}“ verlangt das Symbol „%{icon}“, das diese Engine nicht hat. Bekannt sind: %{known}. Für alles andere nimm ein eigenes `icon_svg`."
   tag_icon_not_svg: "Das `icon_svg` des Schlagworts „%{tag}“ enthält kein <svg>-Element, es wird also nichts gezeichnet."
   tag_icon_scale: "Das `icon_svg` des Schlagworts „%{tag}“ ist nicht auf dem 24er-Raster der übrigen Symbole gezeichnet (`viewBox=\"0 0 24 24\"`) und sitzt im Datumsschild schief."
-  trash_holds: "Im Papierkorb liegen %{count} Beitrag/Beiträge, %{size}. Sie lassen sich noch zurückholen; `./blog.sh empty trash` löscht sie endgültig."
+  trash_holds: "Im Papierkorb liegen %{count} Eintrag/Einträge, %{size} — gelöschte Beiträge und alles, was `check --repair` beiseitegelegt hat. Sie lassen sich noch zurückholen; `./blog.sh empty trash` löscht sie endgültig."
   heading: "Prüfung dieser Installation"
   running_online: "Prüft auch, ob Server und Zugriffstoken noch antworten (--online)"
   summary: "%{errors} Problem(e), %{warnings} zum Nachsehen, %{oks} in Ordnung."
