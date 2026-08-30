@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.5 -- 2026-08-26
+## 1.5 -- 2026-08-30
 
 Two things happened here. The site learned to say what it holds -- a post
 names itself out of its own words instead of standing under its address,
