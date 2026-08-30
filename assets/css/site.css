@@ -905,7 +905,12 @@ blockquote {
   white-space: pre;
 }
 
-.video-unavailable { color: var(--meta-text); font-style: italic; }
+.video-unavailable, .audio-unavailable { color: var(--meta-text); font-style: italic; }
+/* The note search.js draws when the archive index will not load. Its twin
+   -- the line shown while the index is still coming -- has always been
+   styled; this one was left plain, so the one message that says a SEARCH
+   IS INCOMPLETE looked like ordinary text. */
+.search-archive-failed { color: var(--meta-text); font-style: italic; }
 
 /* The link block is body text and stays body text. A link post's title is
    no longer in here -- it is the post's heading now, in an h1 or an h2 like
@@ -1575,7 +1580,6 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 .archive-month:hover { outline: 2px solid var(--text); outline-offset: 1px; }
 .archive-month.is-empty { background: transparent; border: 1px solid var(--border); color: var(--meta-text); }
 
-.archive-back { margin: 0 0 1.5rem; }
 .archive-section { margin: 0 0 1.75rem; }
 /* The month sticks while its own months' worth of posts scrolls past.
    A year here can be four hundred lines long, and a number left at the top
@@ -1650,7 +1654,12 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 }
 /* The first one opens the list, so it needs no room above it. */
 .tag-index-letter:first-child { margin-top: 0; }
-.tag-index-item { display: inline-flex; }
+/* A tag with no space in it -- an imported hashtag can be sixty
+   characters long -- made the pill wider than the page and put a
+   horizontal scrollbar under the whole document, not just under the
+   list. It wraps inside the pill instead. */
+.tag-index-item { display: inline-flex; max-width: 100%; }
+.tag-index-item > .tag-pill { overflow-wrap: anywhere; }
 /* The same size as a tag pill anywhere else on the site: this page is an
    index OF those pills, and a tag that changes size depending on which
    page it is on is a tag the reader has to recognise twice. The margin
