@@ -1132,6 +1132,8 @@ check:
   media_stray: "Post %{slug} no longer names the file %{file} in its media directory."
   media_stray_fix: "Left behind by a picture the source dropped or renamed between imports. The post does not reference it; delete it yourself once you have looked."
   address_duplicate: "%{count} posts would be served at /posts/%{year}/%{slug}/."
+  post_unknown_type: "The post \"%{slug}\" asks for `type: %{type}`, which this engine does not know -- it is stored and read by nobody, so the post gets no listing, no menu entry and no icon of its own."
+  post_unknown_type_fix: "The eight it knows are text, quote, chat, image, video, audio, link and document. For a section of your own, use a TAG and name it in `nav:` -- that gives a listing with its own pagination, a menu entry and an RSS feed, which a content type would not."
   page_reserved_slug: "The page \"%{slug}\" would sit at an address the engine writes itself (/%{slug}/), so the build refuses to write it -- the page is not on the site."
   page_reserved_slug_fix: "Rename the page to something else. The build says so on the terminal at every rebuild, but a scrolled-past warning is how a page stays missing for months."
   post_unreadable: "%{file} could not be read (%{reason})."

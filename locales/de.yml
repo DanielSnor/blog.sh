@@ -1115,6 +1115,8 @@ check:
   media_stray: "Beitrag %{slug} nennt die Datei %{file} in seinem Medienverzeichnis nicht mehr."
   media_stray_fix: "Übrig von einem Bild, das die Quelle zwischen Importen entfernt oder umbenannt hat. Der Beitrag verweist nicht darauf; sieh nach und lösche sie selbst."
   address_duplicate: "%{count} Beiträge würden unter /posts/%{year}/%{slug}/ ausgeliefert."
+  post_unknown_type: "Der Beitrag „%{slug}“ verlangt `type: %{type}`, den diese Engine nicht kennt -- er wird gespeichert und von niemandem gelesen, also bekommt der Beitrag keine eigene Liste, keinen Menüeintrag und kein Symbol."
+  post_unknown_type_fix: "Bekannt sind diese acht: text, quote, chat, image, video, audio, link, document. Für einen eigenen Bereich nimm ein SCHLAGWORT und nenne es in `nav:` -- das ergibt eine Liste mit eigener Seitennummerierung, einen Menüeintrag und einen RSS-Feed, was ein Inhaltstyp nicht gibt."
   page_reserved_slug: "Die Seite „%{slug}“ läge auf einer Adresse, die die Engine selbst schreibt (/%{slug}/), deshalb weigert sich der Build -- die Seite steht nicht auf der Website."
   page_reserved_slug_fix: "Benenne sie um. Der Build sagt es bei jedem Durchlauf, aber eine Warnung, die durchrollt, ist genau der Grund, warum eine Seite monatelang fehlt."
   post_unreadable: "%{file} ließ sich nicht lesen (%{reason})."

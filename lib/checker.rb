@@ -12,6 +12,7 @@ require_relative 'post_address'
 require_relative 'slug'
 require_relative 'i18n'
 require_relative 'path_glob'
+require_relative 'content_type'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -251,6 +252,25 @@ module Checker
             t('post_unreadable_fix'), kind: :post_unreadable,
             data: { 'file' => path, 'reason' => reason })
     end
+    # A `type:` the engine does not know is stored on the post and read by
+    # nobody: `ContentType.dominant` honours the eight it has and otherwise
+    # works the type out from the blocks, so somebody who wrote
+    # `type: story` gets no listing, no menu item, no icon -- and no word
+    # about why. Promised in issue #42 to the person who tried it.
+    #
+    # The fix line names the tag route rather than only the eight names: a
+    # tag in `nav:` gives a listing, pagination, a menu item and an RSS
+    # feed of its own, which is what somebody reaching for a new type is
+    # usually after.
+    posts.each do |post|
+      type = post['type'].to_s
+      next if type.empty? || ContentType::PRIORITY.include?(type)
+
+      findings << warn(t('post_unknown_type', slug: post['slug'], type: type),
+                          t('post_unknown_type_fix'), kind: :post_unknown_type,
+                          data: { 'slug' => post['slug'].to_s, 'type' => type })
+    end
+
     # A page whose slug is one of the addresses the engine writes itself.
     # The build refuses to write it and says so on the terminal -- but a
     # rebuild scrolls past, and this tool then called the archive sound
