@@ -169,28 +169,6 @@ module BuildCache
       @outputs[rel(path)] = [digest, stat.size, stat.mtime.to_i]
     end
 
-    # A file the build COPIED rather than rendered -- media, and the assets
-    # carried across beside them. Remembered by name, size and mtime, with
-    # no digest: hashing 1.8 GB of photographs on every build to learn
-    # something the NAME already answers would cost more than the walk this
-    # exists to skip.
-    #
-    # Without it, media were the one output the record could not see stop
-    # being produced. Take a photograph out of a post that keeps its slug
-    # and every PAGE is still written, so outputs_dropped? answered "none
-    # dropped", prune_public was skipped, and the orphan stayed in
-    # public.nosync/ -- and then on the site, because the deploy after a
-    # publish mirrors whatever is there.
-    #
-    # `written?` can never vouch for one of these: it is asked with a real
-    # digest, and nil equals none of them.
-    def note_copy(path)
-      stat = stat_of(path)
-      return unless stat
-
-      @outputs[rel(path)] = [nil, stat.size, stat.mtime.to_i]
-    end
-
     # --- what a page renderer asks ---------------------------------------
 
     # True when the page at `dest` was last built from exactly these inputs
@@ -230,26 +208,6 @@ module BuildCache
     # Record the inputs a page was built from, after building it.
     def remember_page(dest, key)
       @pages[rel(dest)] = key
-    end
-
-    # --- what prune asks --------------------------------------------------
-
-    # Whether anything the last build produced is missing from this one --
-    # the only circumstance in which prune_public has something to delete.
-    # When nothing was dropped there is no orphan to find, and walking
-    # 16,000 entries to confirm it is a second of every publish spent
-    # proving a negative.
-    #
-    # Unknown state answers true, so a first build, an invalidated cache and
-    # a --full run all walk the tree as they always did.
-    def outputs_dropped?(written)
-      return true unless @reuse
-      return true if @previous_outputs.empty?
-
-      @previous_outputs.each_key do |relative|
-        return true unless written.key?(File.join(@public_dir, relative))
-      end
-      false
     end
 
     # --- saving ------------------------------------------------------------

@@ -2796,14 +2796,8 @@ def emit_copy(src, dest, compare_content: false)
     # falls THROUGH here even when its copy is up to date, and is relinked
     # once -- otherwise it would keep paying twice for every file that
     # never changes, which for media is all of them.
-    if (File.identical?(src, dest) && world_readable?(dest)) ||
-       (links_impossible? && same && world_readable?(dest))
-      # Written down although nothing was written: what prune has to know
-      # is whether this build still produces the file, and one it skipped
-      # is one it still produces.
-      BuildCache.note_copy(dest)
-      return
-    end
+    return if File.identical?(src, dest) && world_readable?(dest)
+    return if links_impossible? && same && world_readable?(dest)
   end
 
   place_public(src, dest)
@@ -2812,7 +2806,6 @@ def emit_copy(src, dest, compare_content: false)
   # read is the bug this makes impossible, and an original that becomes
   # readable is what its owner was going to do by hand anyway.
   make_readable(dest)
-  BuildCache.note_copy(dest)
 end
 
 # The same bytes under two names, paid for once. Measured on one real
@@ -4170,11 +4163,22 @@ end
 # and drops none.
 #
 # So it is asked first whether anything COULD have been orphaned: is every
-# file the last build wrote still being written now? When the answer is
-# yes there is no orphan to find and the walk is skipped. Any doubt --
-# a first build, a thrown-away cache, --full -- answers no and walks, so
-# the sweep still happens on exactly the builds that can need it.
-removed = BuildCache.outputs_dropped?(WRITTEN) ? prune_public : 0
+# public.nosync/ is swept on every build, and the cache does not get a say.
+#
+# It used to: when no file the last build wrote had stopped being written,
+# the walk was skipped. That reasoning was sound about outputs and blind to
+# everything else, because a record can only miss what it once held. Three
+# things arrive in public.nosync/ without ever being in it -- the palette
+# preview the style wizard leaves behind (and promises the next build will
+# take down), whatever a build that died halfway had already written, and
+# anything a person or a script put there -- and all three then survived
+# every later build, and every deploy mirrored them onto the live site.
+#
+# The sweep costs 1.2 s on a 4,394-post archive, against 10.3 s that the
+# same publish cost before the cache existed. Correctness at a third of
+# what was saved is a trade worth making, and "the site holds exactly what
+# the archive says" is not a promise to make conditionally.
+removed = prune_public
 
 # Written here and nowhere else: at the end, on the way out of a build that
 # reached the end. An at_exit hook would save this state after a build that
