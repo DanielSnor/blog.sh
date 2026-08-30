@@ -1117,7 +1117,13 @@ TAG_ICONS = SiteConfig::Chrome.list(SiteConfig.data, 'tag_icons').filter_map do 
   next if svg.to_s.empty?
 
   [Slug.fold(tag), svg]
-end.to_h
+  # First entry wins, wholly. to_h keeps the LAST value at the FIRST key's
+  # position, so two entries folding to one tag -- "kolo" and "Kolo",
+  # "škola" and "skola" -- gave that tag the priority of the earlier line
+  # and the icon of the later one, which is neither of the things the file
+  # says. The order in the list is the priority, and the entry that holds
+  # a position is the entry that owns it.
+end.each_with_object({}) { |(tag, svg), acc| acc[tag] ||= svg }
 
 # The icon of the first tag in TAG_ICONS the post carries -- folded, so a
 # tag written two ways is one tag here as it is everywhere else.
@@ -2331,7 +2337,13 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   # A symbol names one of the icons the engine ships; a String IS one --
   # that is how a tag's own icon reaches its heading without a second
   # parameter and a second code path drawing the same thing.
-  icon_svg = icon.is_a?(String) ? icon : LISTING_HEADING_ICONS[icon]
+  #
+  # Dressed on the way through, because the two arrive differently: the
+  # engine's own carry the heading class and aria-hidden in their markup,
+  # and somebody's own SVG is whatever they pasted. Undressed it sat at
+  # its natural size instead of the heading's, and a screen reader read it
+  # out as a graphic nobody had named.
+  icon_svg = icon.is_a?(String) ? heading_icon_dress(icon) : LISTING_HEADING_ICONS[icon]
   parts << icon_svg unless icon_svg.to_s.empty?
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
@@ -2360,6 +2372,27 @@ end
 # it, so the glyph is hidden from assistive technology rather than given a
 # label that would then be read twice. Same magnifier the nav's search
 # button uses.
+# Somebody's own SVG, given the two things the engine's own icons carry:
+# the class the heading sizes them by, and aria-hidden, because the
+# heading says in words what the icon says in a picture. Added rather than
+# replaced -- an icon that already names its own classes keeps them.
+def heading_icon_dress(svg)
+  markup = svg.to_s
+  return markup unless markup.match?(/\A\s*<svg\b/i)
+
+  markup.sub(/\A(\s*<svg\b)([^>]*)>/i) do
+    head = Regexp.last_match(1)
+    attrs = Regexp.last_match(2)
+    attrs = if attrs.match?(/\bclass\s*=\s*"/i)
+              attrs.sub(/\bclass\s*=\s*"/i, 'class="listing-heading__icon ')
+            else
+              "#{attrs} class=\"listing-heading__icon\""
+            end
+    attrs += ' aria-hidden="true"' unless attrs.match?(/\baria-hidden\s*=/i)
+    "#{head}#{attrs}>"
+  end
+end
+
 LISTING_HEADING_ICONS = {
   search: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
           'fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' \
