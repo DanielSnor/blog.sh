@@ -43,9 +43,34 @@ module PublicFile
     nil
   end
 
+  # A file wearing more than one name is not ours to write THROUGH: the
+  # other name is somebody else's file, and an in-place write reaches it.
+  #
+  # Since 1.6 a published picture IS the archive's own file under a second
+  # name (emit_copy hardlinks instead of copying), so this is no longer
+  # hypothetical. A post with an attachment named index.html put a media
+  # file at exactly the path its own page is written to; the page was then
+  # written in place, straight through into media.nosync/, and the
+  # attachment the archive was keeping was gone -- 300 bytes replaced by
+  # 12 kB of HTML, with no build able to bring it back.
+  #
+  # Dropping OUR name and writing a new file leaves the other name holding
+  # the old contents, which is what every other name-holder is entitled to
+  # expect. Costs one stat on the writing path only, and nothing at all on
+  # the ordinary one where the file has a single name.
+  def unshare(path)
+    File.unlink(path) if File.exist?(path) && File.stat(path).nlink > 1
+  rescue SystemCallError
+    # Not ours to unlink either; the write below will fail loudly or the
+    # file will stay as it is. Either is better than aborting a build over
+    # a file we were only being careful about.
+    nil
+  end
+
   # File.write, then the mode -- in that order, because the mode of a file
   # that does not exist yet is not a thing that can be set.
   def write(path, content)
+    unshare(path)
     File.write(path, content)
     make_readable(path)
     path

@@ -2680,6 +2680,10 @@ def emit(path, content)
     end
   end
 
+  # Never THROUGH a second name -- see PublicFile.unshare. Media arrive in
+  # public.nosync/ as a link to the archive's own file, so an in-place write
+  # here is a write into media.nosync/.
+  PublicFile.unshare(path)
   File.binwrite(path, bytes)
   make_readable(path)
   BuildCache.record(path, digest)
