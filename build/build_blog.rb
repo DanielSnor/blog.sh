@@ -2636,11 +2636,51 @@ def emit_copy(src, dest, compare_content: false)
     # size nor mtime -- it moves ctime, which nothing here was reading -- so
     # a picture copied under a strict umask stayed unreadable through every
     # rebuild that followed.
-    return if same && world_readable?(dest)
+    #
+    # One inode under two names is the cheapest possible answer: nothing to
+    # compare and nothing to write. An archive built before this existed
+    # falls THROUGH here even when its copy is up to date, and is relinked
+    # once -- otherwise it would keep paying twice for every file that
+    # never changes, which for media is all of them.
+    return if File.identical?(src, dest) && world_readable?(dest)
+    return if links_impossible? && same && world_readable?(dest)
   end
 
-  FileUtils.cp(src, dest)
+  place_public(src, dest)
+  # On a link this changes the mode of the ORIGINAL too -- one inode has one
+  # mode. That is the intended direction: a media file the web server cannot
+  # read is the bug this makes impossible, and an original that becomes
+  # readable is what its owner was going to do by hand anyway.
   make_readable(dest)
+end
+
+# The same bytes under two names, paid for once. Measured on one real
+# archive: media.nosync and public.nosync held 1.8 GB each -- the same
+# 1.8 GB twice, and every import doubled again.
+#
+# Nothing in the build ever writes INTO a file under public.nosync: pages
+# are written whole by `emit`, and media arrives only through here. So the
+# two names cannot drift apart, and deleting one of them -- prune, or a
+# deploy with --prune -- only drops that name.
+def place_public(src, dest)
+  unless links_impossible?
+    begin
+      File.unlink(dest) if File.exist?(dest)
+      File.link(src, dest)
+      return
+    rescue SystemCallError
+      # A volume that refuses the first link will refuse the rest: a
+      # separate mount for public.nosync (EXDEV), a source somebody else
+      # owns (EPERM), a filesystem with a link limit (EMLINK). Asking again
+      # per file would copy the whole archive on every build.
+      @links_impossible = true
+    end
+  end
+  FileUtils.cp(src, dest)
+end
+
+def links_impossible?
+  @links_impossible == true
 end
 
 # Make the directory write the name we are about to record. Only ever a
