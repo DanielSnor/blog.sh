@@ -17,6 +17,7 @@ require_relative 'slug'
 require_relative 'account_id'
 require_relative 'forge_address'
 require_relative 'path_glob'
+require_relative 'file_size'
 # For the one thing doctor cannot answer from config alone: whether a
 # menu entry points at an address this archive produces. Sharing the
 # set with check rather than building a second one is the point --
@@ -159,6 +160,7 @@ module Doctor
     findings.concat(check_scheduler)
     findings.concat(check_deploy_pending)
     findings.concat(check_media_location(root))
+    findings.concat(check_trash(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
     findings
@@ -1053,6 +1055,24 @@ module Doctor
   end
 
   # --- deploy --------------------------------------------------------
+
+  # What is in the trash, said out loud once in a while. Not an error: a
+  # trash with posts in it is a trash doing its job, and `restore` is the
+  # reason it exists. But nothing on the site ever mentions it, so it grew
+  # for years on the installation this engine was built around and the only
+  # way to see that was `du` on the server. A note here is how somebody
+  # remembers the command exists.
+  def check_trash(root)
+    dir = File.join(root, 'trash')
+    return [] unless Dir.exist?(dir)
+
+    posts = (PathGlob.under(dir, '*', '*', 'post.json') +
+             PathGlob.under(dir, '*', 'post.json')).uniq
+    return [] if posts.empty?
+
+    bytes = PathGlob.under(dir, '**', '*').sum { |f| File.file?(f) ? File.size(f) : 0 }
+    [warn(I18n.t('doctor.trash_holds', count: posts.length, size: FileSize.human(bytes)))]
+  end
 
   def check_deploy
     name = ENV['DEPLOY_BACKEND'].to_s

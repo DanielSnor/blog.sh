@@ -511,6 +511,38 @@ address the build did not write.
 Neither page needs a menu item to work, but `nav:` in `site.yml` is where
 you would put one; see **Configuration** in the README.
 
+## Emptying the trash and the versions
+
+The engine keeps two things after you are done with them, and both have a
+way back: a deleted post waits in `trash/` for `./blog.sh restore`, and
+every save keeps the previous text of a post, offered by the version
+picker in `./blog.sh props`. Neither had a way OUT before 1.6 -- the only
+way to empty either was `rm` on the server.
+
+```bash
+./blog.sh empty trash       # deletes every trashed post for good
+./blog.sh empty versions    # keeps each post's newest version, removes the older ones
+```
+
+Both say how much they are about to delete and confirm by having you type
+that number -- the way `delete` has you type the slug. A trash has no slug
+to repeat back, and the count is the one number you have just been shown,
+so typing it means having read it. Anything else, including an empty
+answer, cancels and deletes nothing.
+
+`empty trash` takes the media of a trashed post with it, and covers both
+shapes the trash has had: today's `trash/<year>/<slug>/` and the flat
+`trash/<slug>/` of an installation older than that.
+
+`empty versions` deliberately keeps ONE version per post -- the newest.
+Versions exist to answer "give me back what I just overwrote", and that
+answer is the newest one; removing it too would take away the thing they
+are for.
+
+`doctor` mentions a trash that has anything in it, with its size. Not as a
+fault -- a trash with posts in it is a trash doing its job -- but because
+nothing else on the site ever says it is there.
+
 ## Checking the archive
 
 ```bash

@@ -428,6 +428,22 @@ cli:
 
   edited_label: "Upraveno: %{path}"
 
+  empty_trash_none: "Koš je prázdný."
+
+  empty_trash_confirm: "Vysypat koš nadobro — postů: %{count}, uvolní se %{size}? Tohle vzít zpět nejde. Pro potvrzení napiš, kolik postů se maže: "
+
+  empty_trash_done: "Koš vysypán: postů %{count}, uvolněno %{size}."
+
+  empty_versions_none: "Každý post už si drží jen svou poslední verzi."
+
+  empty_versions_confirm: "Smazat starší verze — souborů: %{count}, uvolní se %{size}? Nejnovější verze každého postu zůstane. Pro potvrzení napiš, kolik souborů se maže: "
+
+  empty_versions_done: "Starších verzí odstraněno: %{count}, uvolněno %{size}. Každý post si nechal tu nejnovější."
+
+  empty_cancelled: "Nic se nesmazalo."
+
+  empty_what: "Řekni, co vysypat: ./blog.sh empty trash, nebo ./blog.sh empty versions."
+
   confirm_delete: "Opravdu smazat '%{slug}'? Napiš slug pro potvrzení: "
   delete_takes_announcement: "Tenhle post byl oznámený na %{url} — smazáním zmizí i to oznámení a všechno, co se pod ním napsalo. Obnova vrátí post, vlákno už ne."
   deleted_label: "Smazáno (v koši, obnovíš přes ./blog.sh restore %{slug}): %{path}"
@@ -475,6 +491,8 @@ cli:
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
       ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
+      ./blog.sh empty trash          nadobro smaže všechno v koši; napřed řekne kolik toho je
+      ./blog.sh empty versions       nechá každému postu poslední verzi a starší smaže
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
       ./blog.sh rebuild              znovu sestaví a nasadí celý web, bez vazby na konkrétní post
@@ -837,6 +855,7 @@ import:
 # čte ho někdo, kdo neví, ve kterém souboru to nastavení bydlí, natož pod
 # kterým klíčem.
 doctor:
+  trash_holds: "V koši leží postů: %{count}, celkem %{size}. Pořád se dají vrátit; `./blog.sh empty trash` je smaže nadobro."
   heading: "Kontrola této instalace"
   running_online: "Kontroluju i dostupnost serverů a platnost tokenu (--online)"
   summary: "Problémů: %{errors}, ke zvážení: %{warnings}, v pořádku: %{oks}."

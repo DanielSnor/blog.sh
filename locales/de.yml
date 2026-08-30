@@ -440,6 +440,22 @@ cli:
 
   edited_label: "Bearbeitet: %{path}"
 
+  empty_trash_none: "Der Papierkorb ist leer."
+
+  empty_trash_confirm: "%{count} Beitrag/Beiträge endgültig aus dem Papierkorb löschen und %{size} freigeben? Das lässt sich nicht rückgängig machen. Zur Bestätigung eintippen, wie viele BEITRÄGE gelöscht werden: "
+
+  empty_trash_done: "Papierkorb geleert: %{count} Beitrag/Beiträge, %{size} frei."
+
+  empty_versions_none: "Jeder Beitrag behält bereits nur seine letzte Fassung."
+
+  empty_versions_confirm: "%{count} ältere Fassung(en) löschen und %{size} freigeben? Die neueste Fassung jedes Beitrags bleibt. Zur Bestätigung eintippen, wie viele DATEIEN gelöscht werden: "
+
+  empty_versions_done: "Ältere Fassungen entfernt: %{count}, %{size} frei. Jeder Beitrag behält seine neueste."
+
+  empty_cancelled: "Es wurde nichts gelöscht."
+
+  empty_what: "Sag, was geleert werden soll: ./blog.sh empty trash oder ./blog.sh empty versions."
+
   confirm_delete: "'%{slug}' wirklich löschen? Zur Bestätigung den Slug eintippen: "
   delete_takes_announcement: "Dieser Beitrag wurde unter %{url} angekündigt -- beim Löschen verschwindet auch die Ankündigung und alles, was darunter geschrieben wurde. Das Wiederherstellen bringt den Beitrag zurück, den Thread nicht."
   deleted_label: "Gelöscht (im Papierkorb, zurückholen mit ./blog.sh restore %{slug}): %{path}"
@@ -487,6 +503,8 @@ cli:
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
       ./blog.sh delete [<slug>]      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh restore [<slug>]     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt
+      ./blog.sh empty trash          löscht den Papierkorb endgültig; sagt vorher, wie viel darin ist
+      ./blog.sh empty versions       behält je Beitrag die neueste Fassung und entfernt die älteren
       ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
       ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
       ./blog.sh rebuild              baut und deployt die ganze Seite, unabhängig von einem Beitrag
@@ -849,6 +867,7 @@ import:
 # welcher Datei die Einstellung steht, geschweige denn unter welchem
 # Schlüssel.
 doctor:
+  trash_holds: "Im Papierkorb liegen %{count} Beitrag/Beiträge, %{size}. Sie lassen sich noch zurückholen; `./blog.sh empty trash` löscht sie endgültig."
   heading: "Prüfung dieser Installation"
   running_online: "Prüft auch, ob Server und Zugriffstoken noch antworten (--online)"
   summary: "%{errors} Problem(e), %{warnings} zum Nachsehen, %{oks} in Ordnung."
