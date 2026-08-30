@@ -3580,7 +3580,15 @@ unless archive_by_year.empty?
       # Its own copy of the key above, and it has to say the same thing:
       # the year page's stated contract is date order inside the month.
       lines = in_month.sort_by { |post| [post_time(post), post['slug']] }.map do |post|
-        %(<li><time datetime="#{h(post_time(post).strftime('%Y-%m-%d'))}">) +
+        # The attribute and the text are the same date said twice, one for
+        # a machine and one for a reader -- that is what <time> means. The
+        # attribute used to carry the STORED date while the text showed the
+        # local day, so a post filed at a year's turn read
+        # `<time datetime="2025-12-31">1.</time>`: a value and a rendering
+        # of it that disagree. Which year the post is FILED under is a
+        # separate decision and stays as it was -- the address year, so the
+        # page and /posts/<year>/ agree.
+        %(<li><time datetime="#{h(post_display_time(post).strftime('%Y-%m-%d'))}">) +
           %(#{post_display_time(post).day}.</time> ) +
           %(<a href="#{h(post_path(post))}">#{h(post_title_for(post))}</a></li>)
       end
