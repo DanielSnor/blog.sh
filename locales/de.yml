@@ -871,6 +871,7 @@ import:
 # Schlüssel.
 doctor:
   tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."
+  tag_icon_stripped: "Das `icon_svg` des Schlagworts „%{tag}“ enthält etwas, das die Engine vor dem Rendern entfernt — ein Skript, ein Style, einen Event-Handler oder eine javascript:-Adresse. Die Seiten sind sicher; das Symbol ist aber nicht mehr das, woher es kopiert wurde."
   tag_icon_shape: "Ein Eintrag unter `tag_icons` ist keine Zuordnung -- jeder braucht ein `tag` und dazu einen `icon`-Namen oder ein eigenes `icon_svg`."
   tag_icon_no_tag: "Ein Eintrag unter `tag_icons` hat kein `tag`, gehört also zu nichts und zeichnet nichts."
   tag_icon_unknown: "Das Schlagwort „%{tag}“ verlangt das Symbol „%{icon}“, das diese Engine nicht hat. Bekannt sind: %{known}. Für alles andere nimm ein eigenes `icon_svg`."

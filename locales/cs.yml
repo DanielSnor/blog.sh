@@ -859,6 +859,7 @@ import:
 # kterým klíčem.
 doctor:
   tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."
+  tag_icon_stripped: "`icon_svg` štítku „%{tag}“ nese něco, co engine před vykreslením odstraní — skript, styl, obsluhu události nebo adresu javascript:. Stránky jsou v pořádku; ikona ale není tím, odkud byla zkopírovaná, a jestli tomu zdroji věřit, rozhodne jen ten, kdo ji vkládal."
   tag_icon_shape: "Položka v `tag_icons` není mapa — každá potřebuje `tag` a k tomu buď jméno v `icon`, nebo vlastní `icon_svg`."
   tag_icon_no_tag: "Položka v `tag_icons` nemá `tag`, takže nepatří ničemu a nic nevykreslí."
   tag_icon_unknown: "Štítek „%{tag}“ si říká o ikonu „%{icon}“, kterou engine nemá. Zná tyhle: %{known}. Na cokoli jiného použij vlastní `icon_svg`."

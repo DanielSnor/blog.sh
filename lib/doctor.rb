@@ -12,6 +12,7 @@ require_relative 'site_config'
 require_relative 'i18n'
 require_relative 'media_dimensions'
 require_relative 'exif_location'
+require_relative 'embed'
 require_relative 'deploy_backend'
 require_relative 'slug'
 require_relative 'account_id'
@@ -1075,6 +1076,12 @@ module Doctor
         svg = entry['icon_svg'].to_s
         next warn(I18n.t('doctor.tag_icon_not_svg', tag: tag)) unless svg.include?('<svg')
         next warn(I18n.t('doctor.tag_icon_scale', tag: tag)) unless svg.match?(/viewBox\s*=\s*["\']0 0 24 24/)
+        # Said out loud rather than silently swallowed. The strip runs at
+        # render whatever doctor thinks, so the page is safe either way --
+        # but an icon that arrives carrying a handler is an icon somebody
+        # copied from somewhere, and its owner is the one person who can
+        # decide whether to keep using that source.
+        next warn(I18n.t('doctor.tag_icon_stripped', tag: tag)) if Embed.without_scripts(svg) != svg
       elsif !known.include?(entry['icon'].to_s)
         next warn(I18n.t('doctor.tag_icon_unknown', tag: tag, icon: entry['icon'].to_s,
                                                     known: known.join(', ')))
