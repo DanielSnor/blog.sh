@@ -62,6 +62,8 @@ build:
   # nemá. Každý import, co narazil na mrtvý obrázkový hosting, jich pár
   # zanechá.
   media_missing: "⚠️  %{slug}: jmenuje soubor médií, který ve své složce nemá — %{filename}. Stránka na něj pořád odkazuje, takže ta adresa bude 404, dokud soubor nedodáš."
+  name_not_ours: "⚠️  %{path} je jméno, které už nosí jiný soubor — odkaz, nebo symlink, co tam někdo nechal. Zápis by dosáhl na ten druhý soubor, takže jsme na něj nesáhli a tahle stránka nebo fotka na webu není. Přesuň nebo smaž to, co jméno drží, a spusť build znovu."
+  media_unplaceable: "⚠️  %{path} se nepodařilo umístit (%{reason}). Stránka na něj dál odkazuje, takže ta adresa zůstane 404, dokud zápis nepůjde."
   # Tohle už není věc archivu: taháček chodí s enginem.
   cheat_sheet_missing: "⚠️  %{path} chybí — stránka /markdown/ s taháčkem se nepostaví. Chodí s enginem; nejčastěji za to může nepovedený pull."
   # Konec podpisu buildu, počítaný s popiskem jako všechno nad ním.

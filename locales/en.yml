@@ -62,6 +62,8 @@ build:
   # still a literal in the build: a post naming a picture its media folder
   # does not hold. Every import that met a dead image host leaves some.
   media_missing: "⚠️  %{slug}: names a media file its folder does not hold -- %{filename}. The page still links it, so that address stays a 404 until the file arrives."
+  name_not_ours: "⚠️  %{path} is a name another file already wears -- a link, or a symlink somebody left there. Writing it would reach that other file, so it was left alone and this page or picture is not on the site. Move whatever holds the name, or delete it, and build again."
+  media_unplaceable: "⚠️  %{path} could not be placed (%{reason}). The page still links it, so that address stays a 404 until it can be written."
   # Not an archive's doing at all: the cheat sheet ships with the engine.
   cheat_sheet_missing: "⚠️  %{path} is missing -- the /markdown/ cheat sheet page is not built. It ships with the engine; a pull that went wrong is the usual reason."
   # The tail of the sign-off, counted the labelled way like everything

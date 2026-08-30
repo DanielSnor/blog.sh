@@ -2680,10 +2680,16 @@ def emit(path, content)
     end
   end
 
-  # Never THROUGH a second name -- see PublicFile.unshare. Media arrive in
+  # Never THROUGH a second name -- see PublicFile.claim. Media arrive in
   # public.nosync/ as a link to the archive's own file, so an in-place write
-  # here is a write into media.nosync/.
-  PublicFile.unshare(path)
+  # here is a write into media.nosync/. And when the name cannot be made
+  # ours, the answer is to leave it alone and say so: writing anyway is how
+  # an attachment in the archive became a rendered page.
+  unless PublicFile.claim(path)
+    warn t('build.name_not_ours', path: path)
+    return
+  end
+
   File.binwrite(path, bytes)
   make_readable(path)
   BuildCache.record(path, digest)
@@ -2817,9 +2823,19 @@ end
 # two names cannot drift apart, and deleting one of them -- prune, or a
 # deploy with --prune -- only drops that name.
 def place_public(src, dest)
+  # The name is dropped FIRST, and for both routes. It used to be dropped
+  # only on the way to a link, so once one file had failed to link -- one
+  # source owned by another uid, one immutable file, one media directory on
+  # its own mount -- every later media file took the copy route with the
+  # old name still in place. A copy onto an existing link reaches whatever
+  # else wears it; a copy onto the source ITSELF is not a copy at all, and
+  # FileUtils.cp answers that with an ArgumentError, which is not a
+  # SystemCallError and was caught by nothing: the build died where it
+  # stood, with the site half written, no prune and no cache saved.
+  ours = PublicFile.claim(dest)
   unless links_impossible?
     begin
-      File.unlink(dest) if File.exist?(dest)
+      File.unlink(dest) if ours && File.exist?(dest)
       File.link(src, dest)
       return
     rescue SystemCallError
@@ -2830,7 +2846,18 @@ def place_public(src, dest)
       @links_impossible = true
     end
   end
-  FileUtils.cp(src, dest)
+
+  unless ours
+    warn t('build.name_not_ours', path: dest)
+    return
+  end
+
+  FileUtils.cp(src, dest) unless File.identical?(src, dest)
+rescue ArgumentError, SystemCallError => e
+  # One picture that cannot be placed is one picture missing from one page.
+  # Saying so and carrying on is the proportionate answer; the alternative
+  # took the entire site down over it.
+  warn t('build.media_unplaceable', path: dest, reason: e.message)
 end
 
 def links_impossible?
