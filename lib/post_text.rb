@@ -264,8 +264,37 @@ module PostText
       when 'code' then [block['text']]
       when 'video', 'audio' then [block['caption']]
       when 'file' then [block['label']]
+      when 'list' then nested_items(block['items'])
       else []
       end
     end.compact.join(' ')
+  end
+
+  # The items UNDER an item. The page draws them as a list of their own, so
+  # a reader sees those words and could not find them: `plain` walks the
+  # top level only, and that is where the description, the reading time and
+  # the word count are cut from -- widening it would change all three to
+  # fix a search.
+  #
+  # Three shapes, because three are on disk. The renderer's own
+  # `nested_list` accepts an Array of items, a Hash carrying its own
+  # `type`, and a Hash of `{style, items}` -- which is what the archive
+  # this was measured on actually holds. Anything findable has to follow
+  # whatever the page drew, so the shapes are read here the same way.
+  def nested_items(items)
+    Array(items).flat_map { |item| item.is_a?(Hash) ? under(item['children']) : [] }
+  end
+
+  # Everything below one item: the children's own words and theirs in turn.
+  def under(children)
+    list = case children
+           when Array then children
+           when Hash then children['items']
+           end
+    Array(list).flat_map do |item|
+      next [] unless item.is_a?(Hash)
+
+      [item['text'], *under(item['children'])]
+    end
   end
 end
