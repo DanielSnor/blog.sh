@@ -84,6 +84,25 @@ module Import
       @on_scan = on_scan
     end
 
+    # The wizard runs an adapter TWICE -- a preview, then the real thing --
+    # and an adapter counts as it goes: snapshots read, items it could not
+    # parse, pictures the Archive never saved. Without putting the counters
+    # back between the two, the note printed after the real run reports
+    # both runs added together, so "N image(s) are lost" says twice what
+    # was lost. Only whole numbers are taken: those are the counters, and
+    # everything else an adapter holds -- its paths, its parsed export, its
+    # answers to the wizard's questions -- has to survive untouched.
+    def self.counter_snapshot(adapter)
+      adapter.instance_variables
+             .select { |name| adapter.instance_variable_get(name).is_a?(Integer) }
+             .to_h { |name| [name, adapter.instance_variable_get(name)] }
+    end
+
+    def self.restore_counters(adapter, snapshot)
+      snapshot.each { |name, value| adapter.instance_variable_set(name, value) }
+      adapter
+    end
+
     def call
       # A fresh ledger per run, or a second import in one process would
       # report the first one's losses again.

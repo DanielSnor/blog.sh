@@ -709,6 +709,14 @@ def run_import(adapter)
 
   puts
   puts t('import.dry_run_running', label: adapter.label)
+  # An adapter counts as it goes -- snapshots read, items it could not
+  # parse, pictures the Archive never saved -- and the wizard runs the SAME
+  # adapter twice: once for the preview, once for real. Without putting the
+  # counters back, the postscript after the real run reported both runs
+  # added together, so "N image(s) are lost" said twice what was lost. Only
+  # whole numbers are touched: those are the counters, and everything else
+  # an adapter holds -- its paths, its parsed export -- has to survive.
+  counters = Import::Run.counter_snapshot(adapter)
   preview = Import::Run.new(adapter, dry_run: true, on_scan: scan_reporter).call
   print "\r\e[2K" if Tui.interactive?
   report(preview, dry_run: true)
@@ -733,6 +741,10 @@ def run_import(adapter)
   end
 
   puts
+  # The preview is over; the adapter goes back to how it started so the
+  # numbers below are this run's, not both runs'.
+  Import::Run.restore_counters(adapter, counters)
+
   puts t('import.running', label: adapter.label)
   # Media is downloaded for real this time, so an archive of any size takes
   # a while -- a line per post is the progress report. The dry-run just

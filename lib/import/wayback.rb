@@ -719,12 +719,24 @@ module Import
     # bytes were fetched and numbered while the teaser was the post, and
     # left behind they would sit in the archive with nothing pointing at
     # them.
+    # The same picture, asked for twice. A rescued post is built from the
+    # full page, whose snapshot carries a different timestamp than the feed
+    # item's -- so the identical image arrives as a different URL, the
+    # teaser's copy looks unused, and it is thrown away and fetched again.
+    # The Archive is asked to serve one request a second, so that is a
+    # picture's worth of politeness spent on nothing; and when the second
+    # fetch does not come back, the copy already on disk is gone. Compared
+    # by the address the snapshot points AT, which is the same both times.
+    def original_of(url)
+      url.to_s.sub(%r{\Ahttps?://web\.archive\.org/web/\d+(?:id_)?/}, '')
+    end
+
     def drop_unused_media(old_blocks, new_blocks, media)
-      kept = Array(new_blocks).flat_map { |b| Array(b['media']).map { |m| m['url'] } }.compact
+      kept = Array(new_blocks).flat_map { |b| Array(b['media']).map { |m| original_of(m['url']) } }.compact
       Array(old_blocks).each do |block|
         Array(block['media']).each do |entry|
           name = entry['url']
-          media.discard(name) if name && !kept.include?(name)
+          media.discard(name) if name && !kept.include?(original_of(name))
         end
       end
     end
