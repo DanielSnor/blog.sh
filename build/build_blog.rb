@@ -2900,8 +2900,20 @@ def prune_public
     if File.directory?(path)
       dirs << path
     elsif !WRITTEN[path]
-      File.delete(path)
-      removed += 1
+      begin
+        File.delete(path)
+        removed += 1
+      rescue SystemCallError => e
+        # One file that will not go is one stale file on the site. It used
+        # not to be able to matter, because the sweep only ran on builds
+        # where something had dropped out of the record -- now it runs on
+        # every build, so a single unlinkable orphan (one Locked in the
+        # Finder, one left behind by a cron that ran as root in an install
+        # that otherwise builds as somebody else) would abort EVERY build
+        # from then on, mid-sweep, with the cache never saved. The rmdir
+        # twelve lines down has always rescued; this never did.
+        warn t('build.prune_failed', path: path, reason: e.message)
+      end
     end
   end
   # Nothing deleted means no directory could have been orphaned.
@@ -4072,8 +4084,14 @@ end
 # Sidebar.write_all writes its own files (and reads previous content itself
 # as a fallback), so they're only registered here to keep prune_public from
 # deleting them.
-Sidebar.write_all(PUBLIC_DIR)
-Sidebar::FEEDS.each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
+#
+# What it ACTUALLY wrote, not what it might have: write_all answers with an
+# empty hash when the column is switched off, and every key it does answer
+# with is a file it just wrote. Registering the whole FEEDS table instead
+# meant that an author who turned the sidebar off while leaving the widget
+# settings in place kept yesterday's widget JSON on the site for good --
+# protected from the sweep by a build that had not written it.
+Sidebar.write_all(PUBLIC_DIR).each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
 
 # Stats for tooted posts are filled in by cron (scripts/refresh_sidebar.rb) --
 # the build just registers the file so prune doesn't delete it, and creates

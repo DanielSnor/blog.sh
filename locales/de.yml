@@ -66,6 +66,7 @@ build:
   media_missing: "⚠️  %{slug}: nennt eine Mediendatei, die sein Ordner nicht hat -- %{filename}. Die Seite verlinkt sie weiterhin, diese Adresse bleibt also ein 404, bis die Datei da ist."
   name_not_ours: "⚠️  %{path} ist ein Name, den bereits eine andere Datei trägt — ein Link oder ein Symlink, den jemand dort gelassen hat. Ein Schreibvorgang würde diese andere Datei treffen, also blieb sie unberührt und diese Seite oder dieses Bild fehlt auf der Website."
   media_unplaceable: "⚠️  %{path} konnte nicht abgelegt werden (%{reason}). Die Seite verweist weiterhin darauf, diese Adresse bleibt also ein 404."
+  prune_failed: "⚠️  %{path} gehört nicht mehr zur Website, konnte aber nicht entfernt werden (%{reason}). Sie bleibt liegen und wird weiter veröffentlicht, solange etwas sie festhält."
   # Gar nicht die Schuld eines Archivs: der Spickzettel kommt mit der Engine.
   cheat_sheet_missing: "⚠️  %{path} fehlt -- die Spickzettel-Seite /markdown/ wird nicht gebaut. Sie kommt mit der Engine; meist steckt ein schiefgegangener Pull dahinter."
   # Der Schluss der Bilanz, gezählt mit Beschriftung wie alles darüber.
