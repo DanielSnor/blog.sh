@@ -161,6 +161,34 @@ changed files are written, and whatever the build didn't produce this run
 is removed afterwards.
 → [architecture.md → Build pipeline](docs/architecture.md#build-pipeline-buildbuild_blogrb)
 
+**Finding what is there.** `/archive/` is a map of the whole site in two
+levels: a row per year with a strip of twelve months, and a page per year
+listing every post by month -- an index, not another listing, with no
+excerpts and no pictures, because the point is to see the shape of twenty
+years at once. Pagination cannot show that: it is anchored to the oldest
+post, so `/page/128/` says nothing about which year it holds. `/tag/`
+is the other half: every tag the site has, as pills, with how often each
+was used, alphabetically or by count. A post's date badge links into the
+month it belongs to.
+→ [operations.md → Reading the archive](docs/operations.md#reading-the-archive)
+
+**What a listing card shows.** A card is cut before it is written rather
+than drawn in full and hidden with CSS: blocks are kept while they fit a
+budget of roughly five hundred pixels, the first one always, and nothing
+is ever half-shown. A post can decide for itself instead -- a line reading
+`//--more--//` splits it into what it says about itself and what it
+actually says, and then the card, the link card and the announcement take
+the first half. A "read more" link appears exactly when something did not
+fit.
+→ [markdown cheat sheet → Teaser](templates/markdown-cheat-sheet.en.md)
+
+**Code blocks carry a copy button.** Built by the page's own script, so a
+browser that runs no JavaScript shows no dead control, and never offered
+where the clipboard cannot be reached -- an `http://` install, or a
+browser without it. On a listing card, where the block may have been cut
+to fit, there is no button: half a script copied silently is worse than
+none.
+
 **Deploy.** `scripts/deploy-web.sh` over a pluggable backend: Cloudron
 Surfer, a local directory, rsync over SSH, a git-pages snapshot push, any
 rclone remote, or plain SFTP. A SHA-256 + size + mtime manifest means
