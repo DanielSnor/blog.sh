@@ -223,7 +223,7 @@ Eine Zeile `//--more--//`, für sich allein, teilt den Beitrag in zwei Teile. Wa
 
 Ohne diese Zeile schneidet die Engine den Anrisstext selbst vom Textanfang ab -- und ein maschineller Schnitt endet selten dort, wo er sollte.
 
-Genau so schreiben, ohne Leerzeichen und klein. Anders geschrieben ist die Zeile eine gewöhnliche Notiz und verschwindet beim Speichern.
+Genau so schreiben, ohne Leerzeichen und klein. Anders geschrieben ist die Zeile eine gewöhnliche Notiz und verschwindet beim Speichern. Leerzeilen darum herum sind nicht nötig — es genügt, dass sie allein auf der Zeile steht.
 
 ```
 Der erste Absatz, der neugierig machen soll.
