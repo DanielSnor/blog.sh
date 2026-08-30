@@ -867,6 +867,12 @@ import:
 # welcher Datei die Einstellung steht, geschweige denn unter welchem
 # Schlüssel.
 doctor:
+  tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."
+  tag_icon_shape: "Ein Eintrag unter `tag_icons` ist keine Zuordnung -- jeder braucht ein `tag` und dazu einen `icon`-Namen oder ein eigenes `icon_svg`."
+  tag_icon_no_tag: "Ein Eintrag unter `tag_icons` hat kein `tag`, gehört also zu nichts und zeichnet nichts."
+  tag_icon_unknown: "Das Schlagwort „%{tag}“ verlangt das Symbol „%{icon}“, das diese Engine nicht hat. Bekannt sind: %{known}. Für alles andere nimm ein eigenes `icon_svg`."
+  tag_icon_not_svg: "Das `icon_svg` des Schlagworts „%{tag}“ enthält kein <svg>-Element, es wird also nichts gezeichnet."
+  tag_icon_scale: "Das `icon_svg` des Schlagworts „%{tag}“ ist nicht auf dem 24er-Raster der übrigen Symbole gezeichnet (`viewBox=\"0 0 24 24\"`) und sitzt im Datumsschild schief."
   trash_holds: "Im Papierkorb liegen %{count} Beitrag/Beiträge, %{size}. Sie lassen sich noch zurückholen; `./blog.sh empty trash` löscht sie endgültig."
   heading: "Prüfung dieser Installation"
   running_online: "Prüft auch, ob Server und Zugriffstoken noch antworten (--online)"

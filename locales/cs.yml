@@ -855,6 +855,12 @@ import:
 # čte ho někdo, kdo neví, ve kterém souboru to nastavení bydlí, natož pod
 # kterým klíčem.
 doctor:
+  tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."
+  tag_icon_shape: "Položka v `tag_icons` není mapa — každá potřebuje `tag` a k tomu buď jméno v `icon`, nebo vlastní `icon_svg`."
+  tag_icon_no_tag: "Položka v `tag_icons` nemá `tag`, takže nepatří ničemu a nic nevykreslí."
+  tag_icon_unknown: "Štítek „%{tag}“ si říká o ikonu „%{icon}“, kterou engine nemá. Zná tyhle: %{known}. Na cokoli jiného použij vlastní `icon_svg`."
+  tag_icon_not_svg: "`icon_svg` štítku „%{tag}“ neobsahuje prvek <svg>, takže se nevykreslí nic."
+  tag_icon_scale: "`icon_svg` štítku „%{tag}“ není kreslené na mřížce 24 jednotek jako ostatní ikony (`viewBox=\"0 0 24 24\"`), takže bude v datovém razítku nakřivo."
   trash_holds: "V koši leží postů: %{count}, celkem %{size}. Pořád se dají vrátit; `./blog.sh empty trash` je smaže nadobro."
   heading: "Kontrola této instalace"
   running_online: "Kontroluju i dostupnost serverů a platnost tokenu (--online)"

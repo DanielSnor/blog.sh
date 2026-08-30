@@ -407,9 +407,22 @@ SOCIAL_ICONS = {
   'email' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>'
 }.freeze
 
-def social_icon(entry)
-  entry['icon_svg'] || SOCIAL_ICONS[entry['icon'].to_s] || ''
+# An icon somebody wrote in their own config, made safe to inline. The
+# same treatment an imported embed gets, and for the same reason: an SVG
+# can carry <script>, an on* handler or a javascript: href, and this one
+# is pasted into every page that draws it. Social icons went unguarded
+# until tag icons made the hole worth closing -- it was the same hole in
+# the footer all along, only nobody had asked about it.
+def own_icon_svg(svg)
+  Embed.without_scripts(svg.to_s)
 end
+
+def social_icon(entry)
+  return own_icon_svg(entry['icon_svg']) if entry['icon_svg']
+
+  SOCIAL_ICONS[entry['icon'].to_s] || ''
+end
+
 
 def social_links_html
   SOCIAL.map do |entry|
@@ -1080,6 +1093,33 @@ CONTENT_ICONS = {
   'chat' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
 }.freeze
 
+# What a tag may put on its own listing heading and on the date badge of
+# every post carrying it. A LIST rather than a map, because the order in
+# it is the priority: a post has more than one tag on 68% of the archive
+# this was measured against, and the tag it was given FIRST is usually the
+# platform tag an importer added -- `twitter` opens 1256 posts there. So
+# the site owner decides once, here, rather than post by post.
+TAG_ICONS = SiteConfig::Chrome.list(SiteConfig.data, 'tag_icons').filter_map do |entry|
+  next unless entry.is_a?(Hash)
+
+  tag = entry['tag'].to_s
+  next if tag.empty?
+
+  svg = entry['icon_svg'] ? own_icon_svg(entry['icon_svg']) : CONTENT_ICONS[entry['icon'].to_s]
+  next if svg.to_s.empty?
+
+  [Slug.fold(tag), svg]
+end.to_h
+
+# The icon of the first tag in TAG_ICONS the post carries -- folded, so a
+# tag written two ways is one tag here as it is everywhere else.
+def tag_icon_for(post)
+  return nil if TAG_ICONS.empty?
+
+  folded = (post['tags'] || []).map { |t| Slug.fold(t.to_s) }
+  TAG_ICONS.find { |tag, _| folded.include?(tag) }&.last
+end
+
 # Every post is rendered onto its own page, the index, its content-type
 # listing and each of its tag listings -- with a large enough tag count that
 # can mean rendering the same content several times over, and re-parsing its
@@ -1203,7 +1243,13 @@ end
 # listing the heading is the post title at h2 and the badge beside it is a
 # link to the post, which is a different job.
 def date_badge(post, link: nil, pinned: false, heading: false)
-  icon = CONTENT_ICONS[dominant_content_type(post)]
+  # A tag's icon REPLACES the content type's rather than joining it. The
+  # badge is a small tile carrying a date and one glyph, and the only
+  # thing that ever adds a second is a pinned post -- which earns it by
+  # being the single one on the site. Two glyphs on every tagged post
+  # would make that exception the rule, and on a listing page there are
+  # twenty badges under each other.
+  icon = tag_icon_for(post) || CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
   pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
   inner = "#{icon}<span>#{date}</span>"
@@ -2274,7 +2320,11 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   classes << "listing-heading--#{variant}" if variant
   parts = []
   parts << %(<span class="listing-heading__kind">#{h(kind)}</span>) unless kind.empty?
-  parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
+  # A symbol names one of the icons the engine ships; a String IS one --
+  # that is how a tag's own icon reaches its heading without a second
+  # parameter and a second code path drawing the same thing.
+  icon_svg = icon.is_a?(String) ? icon : LISTING_HEADING_ICONS[icon]
+  parts << icon_svg unless icon_svg.to_s.empty?
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
   parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
@@ -3364,7 +3414,8 @@ tags_map.each do |slug, data|
   end
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
-                heading_kind: t('tag.kind'), heading_variant: 'tag', heading_icon: :tag,
+                heading_kind: t('tag.kind'), heading_variant: 'tag',
+                heading_icon: TAG_ICONS[Slug.fold(data[:name].to_s)] || :tag,
                 # Only when there IS an index to go back to: a site whose
                 # tags all live on drafts builds no /tag/, and a heading
                 # linking there would be the dead menu item doctor refuses.

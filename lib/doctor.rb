@@ -160,6 +160,7 @@ module Doctor
     findings.concat(check_scheduler)
     findings.concat(check_deploy_pending)
     findings.concat(check_media_location(root))
+    findings.concat(check_tag_icons(data))
     findings.concat(check_trash(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
@@ -1055,6 +1056,35 @@ module Doctor
   end
 
   # --- deploy --------------------------------------------------------
+
+  # The icons tags may carry. Three ways to get this wrong, and all three
+  # are silent: a name the engine does not have draws nothing, an entry
+  # without a tag belongs to nobody, and an SVG written to another scale
+  # sits crooked in a badge the size of two lines of text.
+  def check_tag_icons(data)
+    entries = SiteConfig::Chrome.list(data, 'tag_icons')
+    return [] if entries.empty?
+
+    known = %w[text quote chat image video audio link document]
+    findings = entries.filter_map do |entry|
+      next warn(I18n.t('doctor.tag_icon_shape')) unless entry.is_a?(Hash)
+      next warn(I18n.t('doctor.tag_icon_no_tag')) if entry['tag'].to_s.strip.empty?
+
+      tag = entry['tag'].to_s
+      if entry['icon_svg']
+        svg = entry['icon_svg'].to_s
+        next warn(I18n.t('doctor.tag_icon_not_svg', tag: tag)) unless svg.include?('<svg')
+        next warn(I18n.t('doctor.tag_icon_scale', tag: tag)) unless svg.match?(/viewBox\s*=\s*["\']0 0 24 24/)
+      elsif !known.include?(entry['icon'].to_s)
+        next warn(I18n.t('doctor.tag_icon_unknown', tag: tag, icon: entry['icon'].to_s,
+                                                    known: known.join(', ')))
+      end
+      nil
+    end
+    return findings unless findings.empty?
+
+    [ok(I18n.t('doctor.tag_icons_ok', count: entries.length))]
+  end
 
   # What is in the trash, said out loud once in a while. Not an error: a
   # trash with posts in it is a trash doing its job, and `restore` is the

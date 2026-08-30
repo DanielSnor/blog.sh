@@ -885,6 +885,12 @@ import:
 # its own: it is read by someone who does not know which file the setting
 # lives in, let alone which key.
 doctor:
+  tag_icons_ok: "Tag icons: %{count}, all of them drawable."
+  tag_icon_shape: "An entry under `tag_icons` is not a mapping -- each one needs a `tag` and either an `icon` name or an `icon_svg`."
+  tag_icon_no_tag: "An entry under `tag_icons` has no `tag`, so it belongs to nothing and draws nothing."
+  tag_icon_unknown: "The tag \"%{tag}\" asks for the icon \"%{icon}\", which this engine does not have. The names it knows: %{known}. For anything else, give it an `icon_svg` of your own."
+  tag_icon_not_svg: "The `icon_svg` of the tag \"%{tag}\" holds no <svg> element, so nothing will be drawn."
+  tag_icon_scale: "The `icon_svg` of the tag \"%{tag}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked in a date badge."
   trash_holds: "The trash holds %{count} post(s), %{size}. They are still restorable; `./blog.sh empty trash` deletes them for good."
   heading: "Checking this install"
   running_online: "Checking hosts and tokens too (--online)"

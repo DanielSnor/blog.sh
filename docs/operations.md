@@ -511,6 +511,38 @@ address the build did not write.
 Neither page needs a menu item to work, but `nav:` in `site.yml` is where
 you would put one; see **Configuration** in the README.
 
+## Giving a tag its own icon
+
+A tag can carry an icon, and it shows up in two places: the heading of its
+`/tag/<name>/` listing, and the date badge of every post that has the tag,
+where it **replaces** the content-type icon rather than joining it.
+
+```yaml
+tag_icons:
+  - tag: "fotografie"
+    icon: "image"
+  - tag: "kolo"
+    icon_svg: '<svg viewBox="0 0 24 24" ...>...</svg>'
+```
+
+The order is the priority. Most posts carry more than one tag -- 68% of
+them on the archive this engine was built around -- and the tag a post was
+given FIRST is usually the one an importer added, not a subject: `twitter`
+opens 1256 posts there. So the first entry in this list that a post has is
+the one it wears, and the site owner decides once instead of post by post.
+
+`icon` names one of the eight the engine ships: text, quote, chat, image,
+video, audio, link, document. `icon_svg` is your own drawing, on the same
+24-unit grid (`viewBox="0 0 24 24"`) and stroked in `currentColor` so it
+follows the light and dark themes. Scripts, styles and event handlers are
+stripped out of it before it reaches a page -- the same treatment an
+imported embed gets, and for the same reason. `doctor` says when an icon
+name is one the engine does not have, when an `icon_svg` holds no `<svg>`,
+and when it is drawn to another scale.
+
+A tag with no entry here changes nothing: its listing keeps the generic
+tag icon and its posts keep the icon of their content type.
+
 ## Emptying the trash and the versions
 
 The engine keeps two things after you are done with them, and both have a
