@@ -58,8 +58,17 @@ module Import
     # has since died, and without the archive's own copy to fall back on it
     # took 419 media entries out of 118 posts while all 419 files lay
     # untouched on disk.
-    def initialize(tmpdir, dry_run: false, index: nil, refetch: false)
+    def initialize(tmpdir, dry_run: false, index: nil, refetch: false, root: nil)
       @tmpdir = tmpdir
+      # The export's own directory. Every path from_file is handed is built
+      # by joining strings the EXPORT supplied onto this, and nothing checked
+      # the result was still inside it -- so `![x](../../../../etc/passwd)` in
+      # a markdown file, or an attachment url of "/../../secret" in an
+      # outbox, named any file on the importer's machine. It was copied into
+      # media.nosync, the build copied it into public.nosync, and the next
+      # deploy put it on the web. The dry run called it "one more media file".
+      @root = root && File.expand_path(root.to_s)
+      @outside = []
       @dry_run = dry_run
       @index = index
       @refetch = refetch
@@ -178,6 +187,31 @@ module Import
         # Remembered as a failure, not forgotten: a second reference to
         # the same dead URL in this post answers nil at once instead of
         # re-burning the retries and double-counting the loss.
+        @by_source[url] = nil
+        uncount
+        return nil
+      end
+
+      # An address that answers 200 with an HTML PAGE is not a picture: a
+      # parked domain, a login wall, a CDN's own "not found" page. The
+      # bytes then land in the archive as NN.jpg, the run says "N media
+      # file(s)" with no loss reported, `check` finds a file that exists
+      # and is not empty and calls the archive sound -- and every reader
+      # gets a broken image on a published page, permanently, because the
+      # media index remembers the address as fetched. Two adapters carried
+      # a comment claiming this defence existed; only wayback.rb had one.
+      #
+      # Counted as a failure, so the summary names the address the way it
+      # names a fetch that never answered. An .html or .htm attachment is
+      # somebody asking for a page on purpose and is left alone.
+      if self.class.html_page?(body) && !filename.match?(/\.html?\z/i)
+        # Same rule as a fetch that failed one branch up: a page served
+        # where a picture should be is no reason to throw away the copy
+        # this archive already holds. Only REFETCH_MEDIA=1 gets here with
+        # a file on disk, and that copy is still the only copy there is.
+        return reuse(url, held, spent: filename) if held
+
+        @failures << url
         @by_source[url] = nil
         uncount
         return nil
@@ -329,6 +363,48 @@ module Import
     # per file. Nothing can re-derive it from the bytes, so a re-import that
     # dropped it would leave the archive unable to recognise its own files
     # the next time round.
+    # Whatever the export said, resolved -- symlinks included, since a link
+    # inside the export pointing out of it is the same escape wearing a hat.
+    # With no root given nothing is refused, which is what the callers that
+    # never touch the filesystem get.
+    def inside_export?(path)
+      return true if @root.nil?
+
+      root = resolved(@root)
+      real = resolved(path)
+      real == root || real.start_with?(root + File::SEPARATOR)
+    end
+
+    # realpath needs the file to exist, and half the paths this judges name a
+    # file the export is MISSING -- which still has to be judged, and judged
+    # as inside. So the deepest ancestor that does exist is resolved and the
+    # rest is appended.
+    #
+    # Resolving only one side is not enough either: on macOS a temp directory
+    # is /var/folders/... and /var is a symlink to /private/var, so a root
+    # resolved against a path that was not read as "outside the export" for
+    # every missing file in every test. Both sides, or neither.
+    def resolved(path)
+      full = File.expand_path(path.to_s)
+      head = full
+      tail = []
+      until File.exist?(head)
+        parent = File.dirname(head)
+        break if parent == head
+
+        tail.unshift(File.basename(head))
+        head = parent
+      end
+      File.join(File.realpath(head), *tail)
+    rescue StandardError
+      File.expand_path(path.to_s)
+    end
+
+    # Paths an export named outside itself. Reported, never copied.
+    def outside_export
+      @outside
+    end
+
     def from_file(path, src: nil)
       return nil if path.to_s.empty?
       return @by_source[path] if @by_source.key?(path)
@@ -351,6 +427,16 @@ module Import
       # summary still names what the archive is missing. Remembered as a
       # failure for the same reason from_url remembers one -- a second
       # reference to the same missing file must not count the loss twice.
+      # Refused before it is opened, and said out loud: an export naming a
+      # file outside itself is not a mistake to absorb quietly.
+      unless inside_export?(path)
+        warn "  refused (outside the export): #{path}"
+        @outside << path
+        @by_source[path] = nil
+        uncount
+        return nil
+      end
+
       unless File.exist?(path)
         @failures << path
         @by_source[path] = nil
@@ -522,6 +608,19 @@ module Import
       # A rename that fails costs the file nothing: the bytes are still
       # under the name the post already believes in.
       [path, filename]
+    end
+
+    # The opening of an HTML document, whatever it claims to be. Deliberately
+    # narrow: an SVG is XML too (and legitimate media), so only <html>,
+    # <head> and a doctype naming html count, after an optional XML
+    # declaration and any leading whitespace.
+    HTML_PAGE = /\A\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--.*?-->\s*)?(?:<!doctype\s+html|<html[\s>]|<head[\s>])/im
+
+    def self.html_page?(body)
+      head = body.to_s.byteslice(0, 1024).to_s
+      HTML_PAGE.match?(head.force_encoding('BINARY'))
+    rescue StandardError
+      false
     end
 
     # Extension from the URL path, since that's all a CDN URL reliably

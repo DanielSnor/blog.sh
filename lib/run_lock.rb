@@ -102,7 +102,14 @@ module RunLock
   # nothing was half-done, so it exits 0 and sends no mail. A run somebody
   # started at a terminal exits non-zero, because its caller (./blog.sh,
   # publishing) must not be told a deploy happened when it did not.
-  def acquire!(root, label: nil, busy_exit: 1)
+  # `quiet_when_busy:` is what makes the paragraph above true. Cron mails
+  # on OUTPUT, not on the exit code, and the busy message went to stderr
+  # unconditionally -- so the documented crontab (a publish every 15
+  # minutes, a sidebar refresh every 30) mailed on every collision at :00
+  # and :30, which is most of them: roughly forty-eight notes a day saying
+  # nothing is wrong. A holder that looks STUCK is still said out loud,
+  # because that one is not routine and the mail is the point.
+  def acquire!(root, label: nil, busy_exit: 1, quiet_when_busy: false)
     return true if ENV[ENV_MARKER] == '1'
 
     file = open_lock(root)
@@ -116,7 +123,7 @@ module RunLock
     end
 
     unless locked
-      warn(busy_message(file, label))
+      warn(busy_message(file, label)) unless quiet_when_busy && !stuck?(file)
       exit busy_exit
     end
 
@@ -171,6 +178,21 @@ module RunLock
     nil
   end
 
+  # Whether the run holding the lock has been holding it long enough to be
+  # worth waking somebody for. A routine collision is not; this is the one
+  # case where a cron tick still speaks.
+  def stuck?(file)
+    holder = begin
+      file.rewind
+      file.read.to_s.strip
+    rescue SystemCallError
+      ''
+    end
+    return false unless holder_alive?(holder)
+
+    !stuck_hint(holder).empty?
+  end
+
   def busy_message(file, label)
     holder = begin
       file.rewind
@@ -197,7 +219,24 @@ module RunLock
     # run's label only when the holder could not say who it is (a
     # read-only handle, the cron-as-root case).
     holder_label = holder_label(holder) || label
-    "ℹ️  Another #{holder_label ? "#{holder_label} " : ''}run is still going#{detail} -- " \
+    # Through i18n when it is loaded: this line is what cron mails to the
+    # operator, and a Czech or German site had it arrive in English. The
+    # fallback is the same sentence, because a lock message must never be
+    # the reason a run dies -- lib/ is used by scripts that do not load
+    # the locale files at all.
+    translated(holder_label, detail, stuck)
+  end
+
+  def translated(holder_label, detail, stuck)
+    who = holder_label ? "#{holder_label} " : ''
+    if defined?(I18n) && I18n.respond_to?(:t)
+      begin
+        return "ℹ️  #{I18n.t('lock.busy', who: who, detail: detail)}#{stuck}"
+      rescue StandardError
+        # ...and on to the English below.
+      end
+    end
+    "ℹ️  Another #{who}run is still going#{detail} -- " \
       "skipping this one. Nothing is broken; try again in a minute.#{stuck}"
   end
 

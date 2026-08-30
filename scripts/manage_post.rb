@@ -145,6 +145,11 @@ def abort_on_unknown_frontmatter(meta)
   abort t('cli.unknown_frontmatter_key', keys: unknown.join(', '), known: FRONTMATTER_KEYS.join(', '))
 end
 
+# `unlisted` and `page` are NOT read with this: they decide whether a post
+# is exposed, and PostAddress.flag? is the loose rule the build judges them
+# by. Answering the same question two ways is how an edit turned a hidden
+# post public. `pinned`, `hero` and `toc` stay strict on purpose -- a typo
+# that fails to pin or fails to draw a table of contents costs nothing.
 # "true"/"yes"/"1" are all true, everything else false -- a frontmatter
 # value is text the author typed, not a YAML boolean.
 def truthy_frontmatter?(value)
@@ -614,16 +619,29 @@ end
 # accident.
 def strip_editor_notes(text)
   kept = []
-  in_fence = false
+  # The LENGTH of the run that opened the current block, or nil outside one.
+  # This used to be a boolean flipped by any line starting with ```, which
+  # counts parity rather than matching CommonMark's rule that a fence closes
+  # only on a run at least as long as the one that opened it. MarkdownWriter
+  # relies on that rule -- fence_for wraps a sample containing ``` in a
+  # four-backtick fence -- so the two inner ``` lines of a perfectly
+  # ordinary post about markdown flipped the tracker back to "outside", and
+  # every // line between them was deleted as an author's note. Which is
+  # exactly what the comment above says this function exists to prevent.
+  fence = nil
   in_comment = false
 
   text.each_line do |line|
-    if line.lstrip.start_with?('```')
-      in_fence = !in_fence
+    run = line.lstrip[/\A`{3,}/]&.length
+    if fence
+      # A closing fence carries nothing after it; an opening one may carry
+      # an info string (```js), which is why the tail is checked here only.
+      fence = nil if run && run >= fence && line.lstrip[run..].to_s.strip.empty?
       kept << line
       next
     end
-    if in_fence
+    if run
+      fence = run
       kept << line
       next
     end
@@ -633,6 +651,15 @@ def strip_editor_notes(text)
     end
     if line.start_with?('<!--')
       in_comment = true unless line.include?('-->')
+      next
+    end
+    # The one line starting with // that is content rather than an
+    # instruction: it marks where the teaser stops and the body begins, so
+    # the rule that keeps notes out of posts must not eat it. Matched
+    # against the parser's own pattern rather than a second copy of the
+    # string -- two definitions of the same marker is one too many.
+    if MarkdownParser::TEASER_END_RE.match?(line.strip)
+      kept << line
       next
     end
     next if line.start_with?('//')
@@ -685,7 +712,55 @@ def frontmatter_type_and_page(meta)
   type = meta['type'].to_s.strip
   return [nil, true] if type.casecmp(PAGE_TYPE).zero?
 
-  [type.empty? ? nil : type, truthy_frontmatter?(meta['page'])]
+  [type.empty? ? nil : type, PostAddress.flag?(meta['page'])]
+end
+
+# The tag list as one frontmatter line, and back off it.
+#
+# The comma is both the separator and a character a tag may legitimately
+# contain, so a tag with one in it came back as TWO tags on the next save
+# -- no warning, no confirmation, and no way back through the CLI. Six
+# posts in the author's own live archive carry such a tag.
+#
+# Quoted on the way out only when it has to be: the line is a thing people
+# edit by hand, and `tags: kolo, vylety` must stay that. On the way in a
+# quoted run is one tag whatever is inside it, and everything else splits
+# on commas exactly as before.
+def tags_to_frontmatter(tags)
+  Array(tags).map do |tag|
+    text = tag.to_s.strip
+    text.include?(',') ? %("#{text.gsub('"', '\\"')}") : text
+  end.join(', ')
+end
+
+def tags_from_frontmatter(value)
+  text = value.to_s
+  tags = []
+  current = +''
+  in_quotes = false
+  i = 0
+  # Walked rather than split on a regex: with an alternation, `[^,]+`
+  # matches from the space before an opening quote and the quoted branch
+  # never gets a look in. A dozen lines that are obviously right beat
+  # three that are nearly.
+  while i < text.length
+    char = text[i]
+    if in_quotes && char == '\\' && text[i + 1] == '"'
+      current << '"'
+      i += 2
+      next
+    elsif char == '"'
+      in_quotes = !in_quotes
+    elsif char == ',' && !in_quotes
+      tags << current.strip
+      current = +''
+    else
+      current << char
+    end
+    i += 1
+  end
+  tags << current.strip
+  tags.reject(&:empty?)
 end
 
 def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
@@ -822,7 +897,7 @@ def cmd_add
 
   date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'])
   title = meta['title'].to_s.empty? ? nil : meta['title']
-  tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
+  tags = tags_from_frontmatter(meta['tags'])
   type, page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
@@ -896,7 +971,7 @@ def cmd_add
   # one into existence, never by writing one.
   post['page'] = true if page
   post['pinned'] = true if truthy_frontmatter?(meta['pinned'])
-  post['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
+  post['unlisted'] = true if PostAddress.flag?(meta['unlisted'])
   # The same four keys edit_post persists, under the same rules -- the
   # editor template offers them here too, and a key the editor offers must
   # not vanish on the first save only to start working on the second. The
@@ -1258,7 +1333,7 @@ def publish_draft(slug, path: nil)
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   unless draft?(post)
-    puts t('cli.already_published', slug: slug, url: published_url(slug, Time.parse(post['date']).year))
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year))
     puts
     return
   end
@@ -1275,13 +1350,23 @@ def publish_draft(slug, path: nil)
   # calls it "backdated" while doing it. Covers both the still-scheduled
   # draft and one whose schedule was just cancelled with [n], which keeps
   # the date the schedule gave it.
-  future = Time.parse(post['date']) > Time.now
+  future = post_time!(post) > Time.now
   untouched = future || (post['created_at'] && post['date'] == post['created_at'])
-  date = untouched ? Time.now : Time.parse(post['date'])
+  date = untouched ? Time.now : post_time!(post)
   puts(untouched ? t('cli.publish_date_now', date: date.strftime(t('date_time_format')))
                  : t('cli.publish_date_kept', date: date.strftime(t('date_time_format'))))
 
   new_year = date.year.to_s
+  # Written BEFORE anything is published, the way scripts/publish_scheduled.rb
+  # has done it since 1.3 and for the same reason. This path used to write it
+  # only if the build or the deploy RETURNED a failure -- so a signal, an OOM
+  # kill or a closed SSH session during the build, which is minutes on a large
+  # archive, left the post published on disk, the toot live and unrecallable,
+  # the page never uploaded, and nothing anywhere recording the debt. The next
+  # tick found nothing due, no marker, and exited 0 in silence. The marker
+  # means "the site owes a deploy", which is true from the moment there is
+  # something to publish -- not from the moment something goes wrong.
+  Publishing.mark_deploy_pending
   new_path, updated = Publishing.publish(path, post, date: date)
 
   fields = announce_on_publish(updated, new_year, date)
@@ -1406,7 +1491,7 @@ def cmd_toot(slug)
   # so in half a dozen comments -- and the announcement is public and
   # cannot be edited afterwards, so getting it from the folder meant a
   # permanent link into nothing.
-  date = Time.parse(post['date'])
+  date = post_time!(post)
   year = PostAddress.date_year(post)
   fields = announce_on_publish(post, year, date)
   # false means the network was asked and said no -- the poster has already
@@ -1464,7 +1549,7 @@ def cmd_bluesky(slug)
 
   # The address year again, not the folder's: what goes out in a toot is
   # public and cannot be corrected afterwards.
-  date = Time.parse(post['date'])
+  date = post_time!(post)
   year = PostAddress.date_year(post)
 
   # Before sending: is one already out there? This command runs precisely
@@ -1514,7 +1599,7 @@ def cmd_publish(slug)
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   unless draft?(post)
-    puts t('cli.already_published', slug: slug, url: published_url(slug, Time.parse(post['date']).year))
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year))
     puts
     return
   end
@@ -2681,9 +2766,9 @@ def props_frame_lines(post, path, slug, year)
     # No created/date line for a plain draft, on purpose: a draft has no
     # time -- its date is set by publishing or scheduling, and showing
     # anything earlier would suggest it means something.
-    lines << props_line('scheduled', post['scheduled'] ? Time.parse(post['date']).getlocal.strftime(t('date_time_format')) : nil)
+    lines << props_line('scheduled', post['scheduled'] ? post_time!(post).getlocal.strftime(t('date_time_format')) : nil)
   else
-    lines << props_line('state', t('cli.props_state_published', date: Time.parse(post['date']).getlocal.strftime(t('date_time_format'))))
+    lines << props_line('state', t('cli.props_state_published', date: post_time!(post).getlocal.strftime(t('date_time_format'))))
   end
   lines << props_line('type', ContentType.dominant(post))
   lines << props_line('tags', (post['tags'] || []).join(', '))
@@ -3407,6 +3492,23 @@ def cmd_edit(slug)
   draft_decision_loop(slug, path: path) if draft?(JSON.parse(File.read(path, encoding: 'utf-8')))
 end
 
+# The date of the post a command is about, or a sentence and an exit.
+#
+# `check` names an unparseable date cleanly, and `check --repair` says
+# outright that putting it right is the author's decision -- and then the
+# two commands that would let them do it, `props` and `edit`, died on a raw
+# Ruby backtrace out of Time.parse. A day/month swap (2026-31-06) is an
+# ordinary typo for anyone used to DD-MM, and hand-editing a post's JSON is
+# a documented workflow.
+#
+# The listings that walk every post keep their own `rescue next`: one
+# unreadable file must not hide the rest of the archive from its owner.
+def post_time!(post)
+  Time.parse(post['date'].to_s)
+rescue ArgumentError, TypeError
+  abort t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect)
+end
+
 def edit_post(slug, path: nil)
   path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
@@ -3422,10 +3524,10 @@ def edit_post(slug, path: nil)
   year = File.basename(File.dirname(path))
   media_dir = File.join(MEDIA_DIR, year, slug)
 
-  date = Time.parse(post['date'])
+  date = post_time!(post)
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
-    tags: (post['tags'] || []).join(', '),
+    tags: tags_to_frontmatter(post['tags']),
     type: post['type'],
     # Shown with its current value so the author can see the state, not
     # just set it -- and only for a published post: pinning a draft that
@@ -3435,7 +3537,7 @@ def edit_post(slug, path: nil)
     # Offering it when set matters: without the line in the header, saving
     # would drop a pin the post had (unpublish keeps it).
     pinned: (draft?(post) && !truthy_frontmatter?(post['pinned'])) ? nil : truthy_frontmatter?(post['pinned'] || 'false'),
-    unlisted: (draft?(post) && !truthy_frontmatter?(post['unlisted'])) ? nil : truthy_frontmatter?(post['unlisted'] || 'false'),
+    unlisted: (draft?(post) && !PostAddress.flag?(post['unlisted'])) ? nil : PostAddress.flag?(post['unlisted']),
     # Shown on a site that uses heroes, or on a post that has already said
     # something of its own -- and it has to be shown in the second case
     # even when the site doesn't, because a header without the line saves
@@ -3446,7 +3548,7 @@ def edit_post(slug, path: nil)
     # its address, so it is not something to hand somebody as a checkbox
     # on every edit. Shown when set, so that saving cannot silently
     # un-page a page.
-    page: truthy_frontmatter?(post['page']) ? true : nil,
+    page: PostAddress.flag?(post['page']) ? true : nil,
     # Both shown only when set, for the reason the pin is: a key on every
     # new post suggests every post needs an answer, and almost none do.
     series: post['series'].to_s.strip.empty? ? nil : post['series'].to_s.strip,
@@ -3480,7 +3582,7 @@ def edit_post(slug, path: nil)
 
   new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
-  new_tags = meta['tags'].to_s.split(',').map(&:strip).reject(&:empty?)
+  new_tags = tags_from_frontmatter(meta['tags'])
   new_type, new_page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
@@ -3500,7 +3602,21 @@ def edit_post(slug, path: nil)
   # Checks for a drop in every block type, not just images: markdown can't
   # express a link card or a foreign embed (Instagram), so saving would
   # otherwise silently delete them.
-  counts = lambda { |list| list.each_with_object(Hash.new(0)) { |b, h| h[b['type']] += 1 } }
+  # ...and every formatting SPAN inside them. docs/architecture.md lists
+  # `small`, `mention` (carrying an account URL) and `color` (carrying a hex)
+  # as span types accepted from imports, and the build renders all three --
+  # a mention becomes a real link. MarkdownWriter has no markdown form for
+  # any of them, so wrap_markdown falls through to the bare text: the words
+  # survive and the span, with whatever it carried, is gone. The block
+  # stayed a text block, so counting block types alone said nothing had
+  # happened and no confirmation was asked for.
+  counts = lambda do |list|
+    list.each_with_object(Hash.new(0)) do |b, h|
+      h[b['type']] += 1
+      spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| Array(i['formatting']) }
+      spans.each { |f| h["#{f['type']} span"] += 1 }
+    end
+  end
   before = counts.call(post['content'])
   after = counts.call(blocks)
   lost = before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
@@ -3531,7 +3647,7 @@ def edit_post(slug, path: nil)
   }
   updated['type'] = new_type if new_type
   updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
-  updated['unlisted'] = true if truthy_frontmatter?(meta['unlisted'])
+  updated['unlisted'] = true if PostAddress.flag?(meta['unlisted'])
   # Stored only when it disagrees with the site, so an ordinary post stays
   # silent and follows layout.hero if that is ever flipped. Deleting the
   # line is therefore a way to say "no opinion", not a way to lose one.
@@ -3649,7 +3765,11 @@ def edit_post(slug, path: nil)
 
   FileUtils.mkdir_p(new_media_dir) if media_files.any?
   media_files.each do |src, filename|
-    FileUtils.cp(src, File.join(new_media_dir, filename))
+    # Through PostWriter, not a bare cp: this is where a photograph
+    # attached during an edit loses the coordinates it was taken at.
+    # `replace: true` keeps what this path has always done -- a file
+    # attached under a name already in the folder replaces it.
+    PostWriter.copy_media_file(src, File.join(new_media_dir, filename), replace: true)
   end
 
   # Not just images: a video's file lives in the same directory, and some
@@ -3870,13 +3990,23 @@ def trashed_media_dirs(slug)
   PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) }.sort
 end
 
+# Files a filesystem leaves behind rather than files anybody wrote. Kept out
+# of a restore because returning them is noise, and kept out of the "still
+# in the trash" warning for the same reason.
+SYSTEM_CRUFT = /\A(?:\.DS_Store\z|\._|Thumbs\.db\z|desktop\.ini\z)/i
+
 def restore_media(slug, dirs)
   dir = dirs.first
   if dirs.size > 1
     # The same rule as everywhere else in this file: never guess between
     # two years, show both and ask.
     dirs.each_with_index do |candidate, i|
-      count = Dir.children(candidate).reject { |f| f.start_with?('.') }.size
+      # SYSTEM_CRUFT, the same filter the restore itself uses. This is the
+      # number a person reads while choosing which trashed year to bring
+      # back, so counting by a rule the restore no longer follows offered
+      # "(0 file(s))" for a directory holding two pictures -- and then
+      # restored both of them.
+      count = Dir.children(candidate).reject { |f| SYSTEM_CRUFT.match?(f) }.size
       puts format('%2d.  %s  (%s)', i + 1, candidate.sub("#{ROOT}/", ''),
                   t('cli.restore_media_count', count: count))
     end
@@ -3892,7 +4022,14 @@ def restore_media(slug, dirs)
   FileUtils.mkdir_p(target)
   returned = []
   kept = []
-  Dir.children(dir).reject { |f| f.start_with?('.') }.sort.each do |name|
+  # Everything the trash holds, not everything whose name looks ordinary.
+  # This used to skip every dotfile, which was aimed at .DS_Store and hit
+  # real media with it: a picture called ".hidden.jpg" stayed in the trash,
+  # was not counted, was not named among the kept, and the line below then
+  # reported a number that did not describe what had happened. Restoring
+  # something and saying nothing about the rest is the one thing a restore
+  # must not do.
+  Dir.children(dir).reject { |f| SYSTEM_CRUFT.match?(f) }.sort.each do |name|
     destination = File.join(target, name)
     # Never over the top of a file that is there now: the archive it would
     # replace is the one thing this command exists to protect.
@@ -3907,7 +4044,12 @@ def restore_media(slug, dirs)
   FileUtils.rmdir(dir) if Dir.children(dir).empty?
   FileUtils.rmdir(File.dirname(dir)) if Dir.exist?(File.dirname(dir)) && Dir.children(File.dirname(dir)).empty?
 
+  # What is still in the trash after all that -- system cruft aside, since
+  # nobody put it there on purpose and nobody wants it back.
+  left = Dir.children(dir).reject { |f| SYSTEM_CRUFT.match?(f) }.sort if Dir.exist?(dir)
+
   puts t('cli.restored_media', count: returned.size, path: target.sub("#{ROOT}/", ''))
+  warn t('cli.restore_media_left', files: (left - kept).join(', ')) if left && !(left - kept).empty?
   warn t('cli.restore_media_kept', files: kept.join(', ')) unless kept.empty?
 end
 
@@ -3928,7 +4070,7 @@ def cmd_restore(slug)
   trash_dir = File.dirname(trash_json)
 
   post = JSON.parse(File.read(trash_json, encoding: 'utf-8'))
-  year = Time.parse(post['date']).year.to_s
+  year = post_time!(post).year.to_s
   new_dir = File.join(CONTENT_DIR, year)
   new_path = File.join(new_dir, "#{slug}.json")
   taken = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: slug, path: new_path)
@@ -4532,7 +4674,11 @@ def trash_summary
     next if File.exist?(File.join(File.dirname(dir), 'post.json'))
     next if posts.any? { |p| p[:slug] == slug }
 
-    count = Dir.children(dir).reject { |f| f.start_with?('.') }.size
+    # Same filter, and here it decides more than a number: a directory
+    # whose files all begin with a dot counted as zero and was dropped
+    # from the picker entirely -- hidden from the only undo the engine
+    # has, rather than merely mislabelled.
+    count = Dir.children(dir).reject { |f| SYSTEM_CRUFT.match?(f) }.size
     next if count.zero?
 
     # A date Time.parse can read: the row that draws this list parses it,

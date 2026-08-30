@@ -220,8 +220,17 @@ module PreviewServer
     # refused: nothing about a missing page is forbidden -- the 404 branch
     # is the answer to it, and this used to turn every miss two levels
     # deep into a bare 403.
+    # The index.html is appended BEFORE the check, not after it. Appended
+    # after, the file actually served was the one file never examined:
+    # public.nosync/foo/index.html -> /etc/passwd was refused when asked
+    # for by name (/foo/index.html -> 403, this branch caught it) and
+    # served in full when asked for as a directory (/foo/ -> 200, the
+    # file's contents). The same leak, one shape over -- which is the
+    # shape the paragraph above was written about.
+    target = File.directory?(full) ? File.join(full, 'index.html') : full
+
     begin
-      probe = full
+      probe = target
       probe = File.dirname(probe) while !File.exist?(probe) && probe != File.dirname(probe)
       real = File.realpath(probe)
       root_real = File.realpath(root)
@@ -230,7 +239,7 @@ module PreviewServer
       return nil
     end
 
-    File.directory?(full) ? File.join(full, 'index.html') : full
+    target
   end
 
   def percent_decode(str)

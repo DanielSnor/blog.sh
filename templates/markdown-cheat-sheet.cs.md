@@ -215,6 +215,24 @@ Zapsáno jako:
 
 ---
 
+## Upoutávka
+
+Řádek `//--more--//`, sám o sobě, rozdělí příspěvek na dvě části. Co je nad ním, je upoutávka: přesně tohle se ukáže ve výpisu na titulní stránce, v oznámení na sociální síti a na kartě odkazu. Co je pod ním, si přečte, kdo příspěvek otevře.
+
+Bez tohoto řádku si engine upoutávku ustřihne ze začátku textu sám — a strojový řez zřídka skončí tam, kde by měl.
+
+Zapisuje se přesně takhle, bez mezer a malými písmeny. Jinak zapsaný řádek je obyčejná poznámka a při uložení zmizí. Prázdné řádky kolem nejsou potřeba — stačí, když je na řádku sama.
+
+```
+První odstavec, který má zaujmout.
+
+//--more--//
+
+Zbytek příspěvku, který ve výpisu vidět není.
+```
+
+---
+
 ## Blok kódu
 
 Kód se zabalí mezi řádky se třemi zpětnými apostrofy — \`\`\`. Za první trojici se dá napsat jazyk; je to jen kosmetika, na zobrazení to nemá vliv. Uvnitř bloku se nic neformátuje, hvězdičky a podobné znaky zůstanou doslova.

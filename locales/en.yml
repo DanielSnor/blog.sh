@@ -47,6 +47,9 @@ build:
   draft_no_token: "⚠️  Draft '%{slug}' has no draft_token -- its preview would be at a guessable address, so it is not built. Re-save it with ./blog.sh edit."
   pinned_more_than_one: "⚠️  More than one post is pinned; using the newest (%{slug})."
   tag_too_long: "⚠️  Tag \"%{name}…\" is too long for a listing page's address -- it shows on its posts, but no /tag/ page is built for it."
+  series_too_long: "⚠️  The series %{name} has a name too long for an address, so it gets no listing page. Everything else about the series works; give it a shorter name if you want one."
+  page_size_unusable: "⚠️  site.page_size is %{value}, which nothing can page by -- a whole number greater than zero is what this needs. Building with 10; `./blog.sh doctor` says the same thing about it."
+  archive_span_absurd: "⚠️  The archive runs from %{from} to %{to} -- almost certainly a typo rather than a date. The map therefore shows only the years that hold something; fix the date and the empty years come back."
   former_slug_unusable: "⚠️  %{slug}: unusable former_slugs entry %{entry} -- expected \"year/slug\"."
   former_slug_taken: "⚠️  %{slug}: redirect for %{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
   redirect_from_unusable: "⚠️  %{slug}: unusable redirect_from entry %{entry} -- expected a site-root path like \"/old-post/\"."
@@ -64,6 +67,7 @@ build:
   pruned: "Files that nothing generates any more, removed: %{count}"
 
 post:
+  series_nav_label: "Parts of this series"
   reading_time: "%{minutes} min read"
   reading_minutes: "%{minutes} min"
   # Anything under the length at which the engine stops calling a post a
@@ -88,6 +92,7 @@ post:
   draft_banner_notice: "Not visible anywhere on the blog and can't be reached except through this URL:"
 
 pagination:
+  nav_label: "Pages"
   newer: "← Newer"
   older: "Older →"
   latest: "latest"
@@ -122,6 +127,22 @@ type:
 index:
   empty: "No posts of this type yet."
 
+archive:
+  # The archive index: /archive/ is the map of years, /archive/<year>/ is
+  # that year's posts. Months are written as numbers, the way this site
+  # writes dates everywhere else.
+  title: "Archive"
+  description: "Every post on %{site_title}, by year and month."
+  year_title: "Archive %{year}"
+  year_description: "Posts from %{year} on %{site_title}."
+  back: "← Back to the years"
+tags:
+  # The tag index at /tag/. Sorted by the folded name rather than by bytes,
+  # or every accented tag would land after z.
+  title: "Tags"
+  description: "Every tag on %{site_title}."
+  sort_alpha: "A to Z"
+  sort_count: "Most used"
 search:
   # Doubles as the page's own heading when no query has been typed yet.
   kind: "Search"
@@ -142,6 +163,7 @@ markdown_page:
   description: "Guide to the syntax this blog uses for writing posts."
 
 ui:
+  site_nav_label: "Site"
   scroll_top: "Up"
   # Label for the appearance toggle. Read twice: the layout puts it on the
   # page, and assets/js/theme-toggle.js rewrites it on every click -- which is
@@ -162,6 +184,7 @@ js:
   reply_on_mastodon: "Reply on Mastodon"
   reply_on_bluesky: "Reply on Bluesky"
   comments_moderated: "Comments the author picked out. The whole discussion is on the network."
+  comment_picture: "Picture"
   results_one: "result"
   results_few: "results"
   results_many: "results"
@@ -172,6 +195,7 @@ js:
   no_results_pending: "No results yet,"
   no_results_final: "No results."
   try_other_words: " Try different or more general words."
+  archive_unavailable: " (the older archive could not be loaded)"
   searching_archive: " (also searching the older archive…)"
   loading_index: "Loading index…"
   index_unavailable: "Search index unavailable."
@@ -183,6 +207,9 @@ js:
   # text to be named by.
   lightbox_label: "Image viewer"
   lightbox_open: "Open image"
+  copy_code: "Copy text"
+  copied: "Copied"
+  copy_failed: "Could not copy"
 
 # scripts/manage_post.rb (the ./blog.sh authoring CLI/wizard) and its
 # frontmatter-editor hint text. cancel_word is compared against user input
@@ -281,6 +308,7 @@ cli:
   local_preview_hint: "The site goes nowhere yet -- run ./blog.sh preview and open %{url} (port 8000 by default)."
   template_body_placeholder: "First paragraph's text."
   deploy_backend_incomplete: "The %{name} deploy backend is not configured -- skipping the upload. The build in public.nosync/ is complete; view it with ./blog.sh preview. To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example)."
+  deploy_target_relative: "DEPLOY_TARGET_DIR is %{dir}, which is a relative path -- the whole site would go into a directory of that name inside the installation. env.sh.example and docs/install.md both show an absolute one (/var/www/mysite)."
   deploy_args_fix: "That line in env.sh most likely has an unmatched quote in it. Switches are written into it as plain text in quotes, for example \"-P 2022 -i /home/dan/.ssh/key\"."
   deploy_guard_shrink_files: "❌ Stopped: public.nosync/ has %{have} files, but %{expected} were expected from %{source}.\n   That is a %{percent}% drop -- looks like a broken build.\n   Check the build output. If the drop is expected (you deleted a lot of posts), run again with --force."
   deploy_guard_shrink_bytes: "❌ Stopped: public.nosync/ holds %{have}, but %{expected} were expected from %{source}.\n   The file count looks reasonable, so this is content going missing inside the pages rather than pages going missing.\n   Check the build output. If the drop is expected, run again with --force."
@@ -321,6 +349,7 @@ cli:
   deploy_partial_landed: "Files that did land and are written down: %{count} -- the next run resumes from there"
   deploy_outcome_unrecorded: "⚠️  Could not record the deploy outcome in %{path}: %{error}"
   deploy_done: "Done: uploaded %{uploaded}, deleted %{deleted}, failed %{failed}, unchanged %{unchanged}"
+  announce_no_base_url: "⚠️  Not announcing: site.base_url is not set, so the toot would carry a bare path instead of a link -- and that cannot be taken back. Set site.base_url in config/site.yml (or SITE_BASE_URL in env.sh) and run ./blog.sh toot."
   surfer_unreachable: "❌ The Surfer at %{url} is not answering (%{reason}) -- the app may be stopped, or SURFER_URL in env.sh points somewhere it does not run. The finished build waits in public.nosync/; once the server is up (or the address fixed), ./blog.sh rebuild ships it."
   what_next_prompt: "What next? [d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
@@ -398,6 +427,7 @@ cli:
   backdated_note: "A backdated post is ordered by its date -- it can skip the homepage and RSS and land straight in the archive."
 
   post_not_found: "Post '%{slug}' not found.\n\n"
+  post_date_unreadable: "❌ %{slug}: the date on this post is not one anything can work with (%{value}). Put it right in the post file -- 2026-08-22T10:00:00+02:00 -- and try again. `./blog.sh check` names every post in this state."
   still_draft_toot: "Post '%{slug}' is still a draft -- publish it first (./blog.sh publish %{slug}); only then does a toot have something to link to."
   toot_failed: "Failed to send the toot (see above)."
   no_network_toot: "Nothing was announced: config/site.yml has no mastodon: or bluesky: section, so this site announces nowhere. If you meant to set one up, check that the section header is a live line rather than a comment -- keys under a commented-out header belong to whatever came before it. The token itself goes in env.sh."
@@ -428,6 +458,7 @@ cli:
   restore_media_count: "%{count} file(s)"
   restore_media_pick: "Which one? (a number, anything else cancels): "
   restored_media: "Put %{count} file(s) back into %{path}."
+  restore_media_left: "Still in the trash: %{files}"
   restore_media_kept: "Left in the trash, because a file of that name is in the archive now: %{files}"
   restored_label: "Restored: %{path}"
 
@@ -618,6 +649,8 @@ cron:
   no_scheduled_due: "No scheduled post is due."
   sidebar_unreadable: "⚠️  %{name} is unreadable (%{reason}) -- ignoring it and writing a fresh one. Whatever it held for posts this run does not refetch is gone; ./scripts/refresh-sidebar.sh --full puts it back."
   sidebar_gaps: "⚠️  %{count} post file(s) could not be read -- comments.json and stats.json keep every entry this run, since there is no telling which of them are still published."
+  sidebar_no_archive: "⚠️  %{dir} is not there (or holds nothing) -- comments.json and stats.json keep every entry this run. An archive that cannot be seen is not an archive whose posts were all deleted."
+  sidebar_not_built: "Nothing built yet (no public.nosync/) -- run the build first: ruby build/build_blog.rb"
   sidebar_empty_pass: "⚠️  The full pass fetched nothing at all, so it is not recorded as done -- the next run will try again instead of waiting a week."
   sidebar_stats_full: "stats.json: %{updated} post(s) updated (%{total} total) [full refresh]"
   sidebar_stats_recent: "stats.json: %{updated} post(s) updated (%{total} total) [last ~90 days only]"
@@ -681,7 +714,7 @@ import:
   substack_url_prompt: "URL the publication ran at (optional, just for the record -- empty = skip): "
   feed_source_invalid: "%{source} is neither a file that exists nor an http(s) URL."
   twitter_dir_prompt: "Path to the extracted Twitter/X export (empty = cancel): "
-  twitter_dir_invalid: "No data/tweets.js under %{dir} -- point this at the extracted export directory itself."
+  twitter_dir_invalid: "No %{missing} under %{dir} -- point this at the extracted export directory itself."
   bluesky_handle_prompt: "Bluesky handle (empty = cancel): "
   scanned: "read %{count} item(s)…"
   dry_run_running: "Reading %{label} -- nothing is written yet…"
@@ -715,6 +748,7 @@ import:
   wayback_too_many_redirects: "too many redirects (%{url})"
   wayback_http: "HTTP %{code} (%{url})"
   wix_not_csv: "%{file} is not readable as CSV (%{reason}) -- the damage is in the file on disk, not at Wix"
+  wix_not_export: "%{file} is a CSV, but not a Wix blog export -- it has no %{columns} column. The columns it does have: %{found}…"
   group:
     blogs: "Blog / publishing platform"
     social: "Social network"
@@ -741,6 +775,9 @@ import:
     wix: "Wix (blog CSV export)"
     twitter: "Twitter/X (archive export)"
     feed: "WordPress export or RSS/Atom feed"
+  poll:
+    heading: "Poll (voters: %{voters})"
+    option: "%{name} -- %{votes}"
   reason:
     reply: "reply"
     repost: "repost"
@@ -790,8 +827,10 @@ import:
     feed_pages_home: "%{count} page(s) already sit at the address they had on the old site, so they need no redirect -- moving to the same domain, their links keep working as they are."
     feed_pages_reserved: "%{count} page(s) came across on addresses this engine uses for itself (%{paths}) -- the build will not put them up until they are renamed, so do not list them under `nav:` as they stand."
     feed_dropped: "Content the block schema has no shape for was dropped from post bodies: %{listed}. Embeds and forms are the usual ones -- if a post needs its video, put the link back by hand."
+    duplicate_ids: "%{count} item(s) in the source carried an id another item had already used. Each is written as a post of its own rather than over the first one -- look at them and delete whichever is the copy."
     feed_linked_images: "%{count} picture(s) were wrapped in a link, which an image block cannot carry -- the pictures arrived, the addresses they pointed at did not."
     ghost_scheduled: "%{count} post(s) were scheduled in Ghost -- imported as drafts; schedule them here when you're ready."
+    ghost_members: "%{count} post(s) were members-only in Ghost -- imported as drafts tagged ghost-members; decide yourself which of them the public archive gets."
     livejournal_nonpublic: "%{count} entr(y/ies) were friends-only or private -- imported as drafts, they were never public."
     medium_responses: "%{count} post(s) looked like responses to other people's articles -- imported as drafts for review."
     medium_untagged: "%{count} published post(s) came without tags."
@@ -810,13 +849,18 @@ import:
     wayback_unreadable: "%{count} capture(s) were not readable feeds and were skipped."
     wayback_unanswered_captures: "%{count} capture(s) the Archive stopped answering for -- their posts are missing from this run, not from the blog. Re-running picks them up; a larger WAYBACK_DELAY stops it happening."
     wayback_unparsed: "%{count} archived page(s) could not be read as posts -- see the skip counts."
+    wayback_cdx_truncated: "⚠️  The Archive returned exactly the limit (%{limit}) of captures, so it almost certainly holds more and the rest was never read: %{list}. CDX answers oldest first, so what is missing is the END of the blog, not its beginning. Run the import one span at a time with --from/--to."
     wayback_dated_by_capture: "%{count} post(s) carry the capture date -- the page itself said nothing better."
     wayback_lost_images: "%{count} image(s) the Archive never saved are lost -- their posts came over without them."
-    wayback_summary_only: "%{count} of %{seen} feed item(s) carried a summary, not the whole post -- that blog published excerpts, so those arrive truncated however many captures exist."
+    wayback_summary_only: "%{count} of %{seen} feed item(s) carried a summary, not the whole post -- that blog published excerpts."
+    wayback_summary_rescued: "%{count} of those %{seen} were completed from the post's own archived page; the rest arrive as the excerpt the feed sent."
     wayback_no_images: "The Archive holds no images at all for %{host}: every picture these posts point at is gone."
     wayback_images_spread: "The Archive holds %{count} image(s) of %{host} (%{spread}) -- pictures from years missing there cannot arrive, whatever the posts reference."
     wayback_unanswered: "%{count} Archive quer(y/ies) went unanswered even after retrying -- anything they held is missing from this run. Re-running is safe and picks it up."
     wix_dropped: "Rich Content nodes with no blog.sh equivalent were dropped: %{listed}."
+    mastodon_polls: "Polls turned into a list of options with their vote counts: %{count}."
+    mastodon_withheld: "Non-public toots kept as drafts rather than published: %{count} (%{direct} direct message(s), %{followers} followers-only). An archive is the whole account, not the public timeline -- read them and publish only what belongs outside."
+    mastodon_unlisted: "Toots marked unlisted: %{count}. They have an address of their own but stay out of the listings, exactly as Mastodon had them."
 
 # ./blog.sh doctor -- reads the configuration on disk and reports what is
 # wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on
@@ -855,6 +899,8 @@ doctor:
   base_url_slash: "The site's address (%{value}) ends with a slash, which produces doubled slashes in generated links."
   base_url_slash_fix: "Drop the trailing slash."
   page_size: "site.page_size is %{value}; it has to be a whole number greater than zero."
+  locale_mismatch: "site.locale is %{locale} but the site is written in %{lang} -- every page announces og:locale=\"%{locale}\" to anything that reads it. Deliberate (en_GB under lang en) is fine; otherwise put site.locale in step with site.lang."
+  locale_mismatch_fix: "Deliberate is fine -- en_GB under lang en is a real answer. Otherwise put site.locale in step with site.lang; the wizard writes both together."
 
   placeholders: "Still the example's text: %{keys}."
   placeholders_fix: "Harmless locally, but this is what visitors would read. ./style.sh asks for the bio, the footer and the links."
@@ -892,6 +938,7 @@ doctor:
   mastodon_token_missing: "mastodon: is configured but MASTODON_ACCESS_TOKEN is empty, so nothing is ever announced."
   mastodon_token_missing_fix: "Create one on the instance under Preferences -> Development -> New application, scope write:statuses, and put it in env.sh."
   toot_length: "mastodon.toot_length is %{value}; it has to be a whole number greater than zero."
+  link_length: "mastodon.link_length is %{value}; it has to be a whole number, zero or more -- it is what your server charges for a link (23 on Mastodon)."
   bluesky_ok: "Announcing as %{handle}."
   bluesky_password_missing: "bluesky: is configured but BLUESKY_APP_PASSWORD is empty, so nothing is ever announced."
   bluesky_password_missing_fix: "Settings -> App Passwords on Bluesky. An APP password, never the account password. Put it in env.sh."
@@ -947,6 +994,8 @@ doctor:
   widget_shape_fix: "A widget is a set of settings written under its name -- heading, and whatever else that card needs. A list or a bare value there is drawn by nothing."
   widget_incomplete: "The %{name} widget has no %{key}, so it can never show anything."
   widget_account_id: "The toots widget wants the account's API id and has %{value}."
+  widget_toots_instance: "The toots widget has no instance -- neither widgets.toots.instance nor mastodon.instance."
+  widget_toots_instance_fix: "Set mastodon.instance (e.g. mastodon.social), or widgets.toots.instance if the widget should show a different account."
   widget_account_id_fix: "Not the @handle -- the id: a number on Mastodon, a 26-character ULID on GoToSocial. Open https://instance/api/v1/accounts/lookup?acct=you and copy \"id\"; ./setup.sh looks it up for you."
   widget_username: "The commits widget's `username` is not a username: %{value}."
   widget_username_fix: "Just the account name as the forge writes it -- letters, digits, dot, dash, underscore. Not an @handle, not a profile URL."
@@ -1024,6 +1073,7 @@ check:
   repair_no_offer_duplicate: "Two posts carry that slug, in different years, so it names neither of them. This one needs a person."
   repair_add_redirect: "Write %{origin} into the redirect_from of %{slug} (%{to}) -- one added line, every link to the old address answered, including the ones from outside."
   repair_rewrite_link: "Rewrite the link in %{slug}: %{from} -> %{to}"
+  repair_decode_entities: "Rewrite the entity codes in %{slug} as the characters they stand for: &amp; to &, &lt; to <. The previous version of the post is kept in its history."
   repair_rename_media_ref: "Write the name the directory actually uses into %{slug}: %{from} -> %{to} (the file itself is not touched)."
   repair_trash: "Move %{path} to the trash (restorable, never deleted)."
   repair_prompt: "Apply? [a] apply  [s] skip  [q] stop"
@@ -1045,6 +1095,7 @@ check:
   media_cause_dir: "it is a folder, not a file"
   media_cause_unreadable: "the read permission is missing"
   media_cause_empty: "it is zero bytes"
+  media_cause_broken_link: "it is a link pointing at a file that is not there"
   media_unusable_fix: "An interrupted download, a permission bit or a folder under the picture's name. Put a real copy of the file there; the page shows a broken picture until then."
   media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
   image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."
@@ -1058,15 +1109,20 @@ check:
   media_misnamed: "%{slug}: names the file %{file}, but its media directory holds it as %{actual}."
   media_misnamed_form: "%{slug}: names the file %{file} in a different unicode form than the one its media directory holds."
   media_misnamed_fix: "The bytes are fine; only the spelling in the post differs. On a filesystem that ignores case (macOS) the page still renders and this is housekeeping; on one that does not (most servers) the picture is already missing. `./blog.sh check --repair` offers to write the name the directory actually uses."
+  media_misnamed_both_fix: "This post already refers to the correct spelling somewhere else, so no rename is offered: writing it here too would leave two blocks pointing at one picture and the other one lost. Look at the post and decide which block should carry which file."
   media_stray: "Post %{slug} no longer names the file %{file} in its media directory."
   media_stray_fix: "Left behind by a picture the source dropped or renamed between imports. The post does not reference it; delete it yourself once you have looked."
   address_duplicate: "%{count} posts would be served at /posts/%{year}/%{slug}/."
+  page_reserved_slug: "The page \"%{slug}\" would sit at an address the engine writes itself (/%{slug}/), so the build refuses to write it -- the page is not on the site."
+  page_reserved_slug_fix: "Rename the page to something else. The build says so on the terminal at every rebuild, but a scrolled-past warning is how a page stays missing for months."
   post_unreadable: "%{file} could not be read (%{reason})."
   json_and_repair: "❌ --json and --repair cannot run together: --json is a document about the archive as it stands, --repair changes it. Run `check --repair` first, then `check --json`."
   post_unreadable_fix: "The build refuses to run in this state. Repair the file or move it aside -- while it sits there like this, check knows nothing about it and the site will not build."
   post_content_unreadable: "%{file} has its text in something that is not a list of blocks (%{value})."
   post_bad_slug: "%{file} has a slug that is not a single path segment (%{slug})."
   post_bad_slug_fix: "A slug becomes the post's address, one folder deep. A slash or a `..` in it makes the build write outside where it should, or stop. Rename the post: ./blog.sh props <slug> -> [r]."
+  post_entities: "%{slug}: the text carries HTML entities (%{entities}) instead of the characters they stand for."
+  post_entities_fix: "Comes from an archive that escaped them (Twitter does this to &, < and >); the engine has decoded them since 1.4, older imports did not. `check --repair` offers to convert them. If you wrote the entities on purpose, leave them."
   parked_leftover: "An interrupted queue move left %{file} parked under a working name."
   parked_leftover_fix: "The file (or folder) is a post, its media or its edit history, one rename away from where it belongs: strip the leading dot and the .queue-move suffix to put it back."
   parked_leftover_fix_stale: "The same post is in the archive at %{live}, so this is the copy the interrupted move left behind. Compare the two, and delete this leftover once you have confirmed the live one is whole. Do NOT rename it back: the archive would then hold the post twice."
@@ -1079,6 +1135,10 @@ check:
   address_duplicate_page_fix: "A page has no year in its address, so another date will not separate them. The site still builds, but only one of the two is served -- the other stays in the sitemap and in search, leading to somebody else's text. Give one of them another slug (`./blog.sh props` -> address)."
   redirect_collision: "%{origin} is claimed by more than one post: %{slugs}."
   redirect_collision_fix: "Whichever renders last wins and the others' readers land on it. Leave the entry on one post only."
+  redirect_from_reserved: "%{slug}: the redirect_from %{entry} will not be served -- its first segment belongs to the site itself."
+  redirect_from_reserved_fix: "The build refuses it and says so once, in the middle of a log nobody keeps, so the old address quietly 404s. Point it somewhere outside the site's own namespace (posts, page, tag, type, assets, search, markdown), or take the entry out."
+  redirect_from_unusable: "%{slug}: the redirect_from %{entry} will not be served -- the build can make no directory of that shape."
+  redirect_from_unusable_fix: "A query, a fragment, a . or .. segment, or a segment too long for a filename. Expected a site-root path like \"/old-post/\". Correct it, or take the entry out."
   and_more: "...and %{count} more of the same kind, not listed."
   summary: "%{errors} problem(s), %{warnings} thing(s) worth a look."
   summary_clean: "The archive is sound."
@@ -1139,6 +1199,9 @@ setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
   intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."
   intro_expert: "(Rather edit YAML yourself? The wizard only fills in config/site.yml, whose commented template is config/site.yml.example.)"
+  config_unreadable: "❌ %{path} could not be read: %{error}"
+  network_unchanged: "Nothing given, so nothing changed -- the site keeps the comments network it had."
+  config_unreadable_stop: "Nothing was changed. Every question here offers what the config already says and Enter keeps it -- with the file unreadable there is nothing to keep, and answering would have blanked what is in it. Put the file right (`./blog.sh doctor` names the line) and run this again."
 
   section_identity: "Who the site is"
   section_address: "Where the site lives"
@@ -1252,6 +1315,7 @@ wizard:
   menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc keep current"
   interrupted: "Stopped. Nothing was written -- the config is exactly as it was."
   template_missing: "%{path} is not there, and a config is written by filling that template in -- so there is nothing to ask you about yet. It ships with the engine: restore it (git checkout %{path}) and start again."
+  config_unreadable_file: "%{path} is there but cannot be opened -- %{error}. Nothing was changed. Put the permissions right (or mount the volume it lives on) and run this again."
   nothing_changed: "Nothing changed -- every answer matched what was already there."
   q_write: "Write these changes? [y/N] "
   cancelled: "Nothing written."
@@ -1486,3 +1550,6 @@ style:
   rebuilt: "✅ Built. ./blog.sh preview serves it at http://localhost:8000/, and ./blog.sh rebuild deploys it."
   rebuild_failed: "The build did not finish -- the lines above say why. Your config was written either way."
   rebuild_busy: "Another run holds the lock, so the site was not rebuilt. Nothing is broken and your config was written -- try again in a minute."
+
+lock:
+  busy: "Another %{who}run is still going%{detail} -- skipping this one. Nothing is broken; try again in a minute."

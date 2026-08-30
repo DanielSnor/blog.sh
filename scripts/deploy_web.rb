@@ -426,6 +426,26 @@ end
 to_upload = ONLY || FORCE ? files : files.select { |name| manifest_hash(manifest[name]) != hashes[name] }
 skipped = files.size - to_upload.size
 
+# A file whose CONTENT still matches what was uploaded, but whose size or
+# mtime has moved since -- a rebuild that rewrote it byte for byte, a
+# re-copy, a restored backup -- kept its old size and mtime here, because
+# only an upload ever refreshed them. The fast path above then missed on
+# that file on every deploy from then on and read it in full to hash it,
+# for ever, with nothing to show for it: on an archive with gigabytes of
+# media that is minutes per deploy. One sweep that touched the whole tree
+# was enough to disarm it permanently.
+#
+# Safe to record even if the upload of other files fails afterwards: the
+# hash is unchanged and the content matches it, so this is simply where
+# that content now sits.
+(files - to_upload).each do |name|
+  entry = manifest[name]
+  next unless entry.is_a?(Hash)
+
+  entry['size'] = stats[name]['size']
+  entry['mtime'] = stats[name]['mtime']
+end
+
 # Orphans = uploaded at some point, but no longer in public.nosync/ (a
 # deleted post, renumbered pages). Under --only the scan is narrowed to
 # the named files, and that narrowing is the whole safety of it: a run
@@ -568,7 +588,14 @@ end
 # Already on the target: refusing now would strand a site that accepted such
 # a file before this limit existed, so it is named rather than fatal. The
 # portability it costs is the actual news.
-stale_large = sized.call(all_files - shipped).select { |(_, bytes)| FileSize.classify(bytes) == :hard }
+# ...and only for files the manifest has actually seen. Under --only,
+# `shipped` is the one or two named files, so everything else in the build
+# fell in here -- including files that have never been uploaded at all,
+# announced as sitting on the target with a portability conclusion drawn
+# from it. The neighbouring soft-limit notice is suppressed under --only
+# for the same reason: refresh-sidebar.sh fires one every 30 minutes.
+stale_large = sized.call((all_files - shipped).select { |name| manifest.key?(name) })
+               .select { |(_, bytes)| FileSize.classify(bytes) == :hard }
 if stale_large.any?
   notices << I18n.t('cli.deploy_stale_too_large', files: described.call(stale_large).join(', '),
                                                   limit: FileSize.human(FileSize::HARD_LIMIT))
@@ -754,7 +781,14 @@ begin
       # number of files the run set out with. "failed 1" for a batch of
       # twenty-nine was a count of failed BATCHES, printed in a line that
       # says files.
-      failed = to_upload.size - landed.size
+      # ...but never fewer than one. The backend said it failed, and on a
+      # backend that cannot name what landed (rsync, rclone) this
+      # subtraction is 0 - 0 whenever nothing needed uploading -- the
+      # ordinary shape of "I removed one unused asset and redeployed".
+      # The run then recorded itself as ok, reset the unfinished streak,
+      # printed "uploaded 0, deleted 0, failed 0" and exited 0, with the
+      # backend's own failure line sitting in the middle of the log.
+      failed = [to_upload.size - landed.size, 1].max
       log("  #{I18n.t('cli.deploy_partial_landed', count: landed.size)}") if landed.any?
     end
   else

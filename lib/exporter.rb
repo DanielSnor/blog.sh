@@ -221,15 +221,41 @@ module Exporter
     fallbacks = Hash.new(0)
     parts = Array(blocks).map do |block|
       type = block['type'].to_s
+      # Where the teaser stops is a real idea on the destination too, and
+      # both Jekyll and Hugo spell it `<!--more-->`. `//--more--//` is this
+      # engine's own spelling and nobody else's: written out as it stands,
+      # every such post arrives on the new site with a line of punctuation
+      # in the middle of it. Translated rather than dropped, because the
+      # author drew that line on purpose.
+      next '<!--more-->' if type == 'teaser_end'
+
       unless HTML_ONLY.include?(type)
         rendered = MarkdownWriter.blocks_to_markdown([block], media_rel)
         next rendered unless rendered.strip.empty?
+
+        # An empty text block is a spacer: the build renders <p></p>, which
+        # shows nothing, so the writer producing nothing for it is the
+        # right answer rather than "markdown has no syntax for this". It
+        # went out as a VISIBLE <pre> box holding its own JSON, on a page
+        # where the author had asked for a gap -- and was counted in the
+        # summary among the blocks markdown could not express.
+        #
+        # The comment still goes, with no HTML under it: it costs one line
+        # every engine drops on the floor, and it is what brings the
+        # spacer home again on a re-import.
+        next block_comment(block, media_rel) if spacer?(block)
       end
 
       fallbacks[type] += 1
       "#{block_comment(block, media_rel)}\n#{html_fallback(block, media_rel)}"
     end
     [parts.reject { |p| p.to_s.empty? }.join("\n\n"), fallbacks]
+  end
+
+  # A text block with nothing in it -- what the author gets by leaving a
+  # blank line where a paragraph would be.
+  def spacer?(block)
+    block['type'].to_s == 'text' && block['text'].to_s.strip.empty?
   end
 
   # The block itself, in a comment above its HTML. Every engine drops an
@@ -376,7 +402,16 @@ module Exporter
     # _drafts/ directory means -- said twice on purpose, since a tree
     # flattened by a converter loses the directory but keeps the key.
     meta['published'] = false if draft?(post)
-    meta['type'] = 'page' if page?(post)
+    # `page` is a type in the front matter's vocabulary; any other type is a
+    # content-type override the author set by hand, and it is a DECISION
+    # rather than a description -- ContentType.dominant honours it above its
+    # own scan of the blocks. Left out, a post the author filed as a photo
+    # despite carrying mostly text came home a text post and moved to a
+    # different /type/ listing, silently, since nothing about it looked
+    # wrong. The importer has always read this key; only the export was
+    # quiet about it.
+    meta['type'] = page?(post) ? 'page' : post['type'].to_s.strip
+    meta.delete('type') if meta['type'].to_s.empty?
     meta['permalink'] = permalink(post)
 
     redirects = redirect_paths(post)
@@ -430,6 +465,15 @@ module Exporter
        state page].each do |key|
       keys[key] = post[key] unless post[key].nil?
     end
+    # Recorded because it CANNOT be, which is the whole point. The outer
+    # `title:` is flattened to '' for engines that have no concept of a post
+    # without one, and an importer then cannot tell "this post has no title"
+    # from "this tree came from an engine that writes none" -- so it does the
+    # sensible thing and substitutes the slug. On the archive this was measured
+    # against that is 2752 of 4367 pages coming home with a machine slug where
+    # their name used to be, undoing the naming outright. `unless nil?` above
+    # cannot say this; a flag can.
+    keys['untitled'] = true if post['title'].nil?
     sources = media_sources(post)
     keys['media_src'] = sources unless sources.empty?
     keys

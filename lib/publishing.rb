@@ -7,6 +7,7 @@ require 'time'
 # tells "the lock was busy" from "it broke", and $? does not read as either.
 require 'English'
 require_relative 'post_address'
+require_relative 'post_text'
 require_relative 'address_guard'
 require_relative 'site_config'
 require_relative 'atomic_write'
@@ -40,8 +41,25 @@ module Publishing
   # so mastodon.toot_length in config/site.yml can too; the perex budget
   # scales with it.
   TOOT_LENGTH = SiteConfig.get('mastodon', 'toot_length', default: 500)
+  # Mastodon charges every link a FLAT 23 characters, whatever it measures
+  # (`configuration.statuses.characters_reserved_per_url` in its own API,
+  # 23 since the day the field existed). Counting the address literally
+  # spent a budget nobody was charging for: on an address like
+  # https://example.com/posts/2026/some-slug/ that is some twenty
+  # characters of perex cut off every announcement for nothing.
+  #
+  # A constant, NOT a maximum: a link shorter than 23 costs 23 too, so
+  # [url.length, 23].max would trade this error for its mirror image.
+  #
+  # Configurable for the same reason toot_length is -- a server that
+  # counts differently says so in that field, and a site that has read it
+  # can write it down here.
+  LINK_LENGTH = SiteConfig.get('mastodon', 'link_length', default: 23)
   # Bluesky's limit is fixed by the AT Protocol and counted in GRAPHEMES,
-  # not characters -- hence the separate composition below.
+  # not characters -- hence the separate composition below. It charges an
+  # address what the address measures, so nothing like LINK_LENGTH belongs
+  # in the Bluesky composer: the two networks disagree, and copying this
+  # rule across would make every long-URL announcement one Bluesky refuses.
   BLUESKY_LENGTH = 300
 
   module_function
@@ -140,6 +158,11 @@ module Publishing
   # internal whitespace collapses to single spaces first.
   def perex_for(blocks, max_length = PEREX_LENGTH)
     limit = [max_length, PEREX_LENGTH].min
+    # A teaser the author wrote replaces the cut entirely -- that is the
+    # whole point of writing one. An empty teaser (the marker on the first
+    # line) therefore yields an empty perex rather than falling back, which
+    # is the author asking for title and link alone.
+    blocks = PostText.teaser_blocks(blocks) || blocks
     plain = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'] }.join(' ').gsub(/\s+/, ' ').strip
     return plain if plain.length <= limit
     return '' if limit <= 0
@@ -163,7 +186,11 @@ module Publishing
   def compose_toot(title:, slug:, year:, blocks:, tags:, page: false)
     url = post_url(slug, year, page: page)
     hashtags = hashtags_for(tags)
-    fixed_length = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length
+    parts = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }
+    # The separators come from the join; the address costs what the network
+    # charges for one, not what it measures. See LINK_LENGTH.
+    fixed_length = parts.join("\n\n").length
+    fixed_length += LINK_LENGTH - url.length unless url.to_s.strip.empty?
     budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
 
     [title, perex_for(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
@@ -192,6 +219,11 @@ module Publishing
   # one-plus bytes or codepoints).
   def perex_by_graphemes(blocks, max_graphemes)
     limit = [max_graphemes, PEREX_LENGTH].min
+    # Same rule as perex_for, and here for the same reason its word-boundary
+    # trimming had to be copied: these two are structural twins, and every
+    # time one of them learned something the other did not, the difference
+    # showed up as a broken announcement on one network only.
+    blocks = PostText.teaser_blocks(blocks) || blocks
     plain = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'] }.join(' ').gsub(/\s+/, ' ').strip
     return plain if grapheme_length(plain) <= limit
     return '' if limit <= 0
@@ -307,11 +339,75 @@ module Publishing
   # published the post, swallowed the failure, exited 0, and left no trace
   # on disk that an announcement was ever owed. Nothing retried it, and
   # nobody found out.
+  # What an announcement says about a post, decided in one place because it
+  # is a decision rather than a formatting detail -- and because it was
+  # wrong, quietly, for a whole class of post.
+  #
+  # A post that never named itself is named from its own opening, and the
+  # preview then has to pick up where that name stopped, or the
+  # announcement says the same sentence twice: once as the headline and
+  # once again underneath. So the blocks handed on are the REST of the
+  # text, not the whole of it. They add back up -- nothing between the two
+  # is dropped, including the short word the name may have shed.
+  #
+  # And a post whose content is a LINK block -- what the feed and Ghost
+  # importers produce -- has neither a title of its own nor text to be
+  # named from, so this used to hand on nothing: the announcement went out
+  # as the address and the hashtags and not one word more, while the page
+  # it points at renders the link's title as its heading and the link's
+  # description underneath. The one action that cannot be taken back was
+  # the one saying least.
+  def announcement_parts(post)
+    name, rest = PostText.name_and_rest(post)
+    link = PostText.link_title_block(post)
+    link_name = link && link['title'].to_s.strip
+    # The build's order, in post_title_for: an untitled post that carries a
+    # link block borrows ITS title, and only a post with no link to borrow
+    # from is named by its opening sentence. This had the two the other way
+    # round, so a post with both went out announced as one thing while its
+    # own <h1>, its tab, its feed item and its link card said another --
+    # the engine giving two answers to "what is this post called".
+    #
+    # link_title_block is nil whenever post['title'] is set, so a link here
+    # always means an untitled post with a title to lend.
+    title = post['title'] || (link ? link_name : name)
+    blocks = if link
+               # The build renders a lent title without repeating it and
+               # leaves the description; the announcement says the same.
+               # With no description the whole post goes -- the opening
+               # sentence included, because it did not become the name.
+               if link['description'].to_s.strip.empty?
+                 post['content']
+               else
+                 [{ 'type' => 'text', 'text' => link['description'].to_s }]
+               end
+             elsif name
+               [{ 'type' => 'text', 'text' => rest }]
+             else
+               post['content']
+             end
+    [title, blocks]
+  end
+
   def announce(post, year:)
-    title = post['title']
+    # An announcement is the one act that cannot be taken back, and without
+    # a base URL it goes out carrying "/posts/2026/slug/" -- not a link at
+    # all on Mastodon, just text. Worse, the returned status URL is then
+    # stored on the post, so announced? is true for ever and every later
+    # attempt to send a correct one is refused.
+    #
+    # The interactive path has refused this since 1.2 and doctor calls a
+    # missing base_url an error -- but the guard sat in scripts/manage_post.rb,
+    # so the SCHEDULED path, the one nobody is watching, sent it anyway. The
+    # question belongs to whoever is about to press send.
+    if base_url.empty?
+      warn I18n.t('cli.announce_no_base_url')
+      return false
+    end
+
     slug = post['slug']
-    blocks = post['content']
     tags = post['tags'] || []
+    title, blocks = announcement_parts(post)
 
     case SiteConfig.comment_network
     when :mastodon
@@ -361,15 +457,47 @@ module Publishing
   end
 
   def mark_deploy_pending
-    File.write(DEPLOY_PENDING, Time.now.iso8601)
+    # Milliseconds, because clear_deploy_pending compares this against the
+    # instant a build started and whole seconds cannot separate two events
+    # inside the same one. A marker already on disk with second precision
+    # still parses; this only makes new ones answerable.
+    File.write(DEPLOY_PENDING, Time.now.iso8601(3))
   rescue StandardError
     nil
   end
 
-  def clear_deploy_pending
-    File.delete(DEPLOY_PENDING) if File.exist?(DEPLOY_PENDING)
+  # Cleared only when the marker is OLDER than the moment this run's build
+  # read the archive. It used to be cleared whenever a deploy succeeded, with
+  # no question about whose debt it was -- and the publishing cron holds the
+  # run lock for its whole run, so this is not a rare shape: an author who
+  # runs `./blog.sh publish` after the cron's build has already read the
+  # archive gets their post published AND announced, is refused the lock, and
+  # is told "the site is marked as owing a deploy, so the next scheduled run
+  # finishes it". The cron then finished ITS deploy -- which never saw that
+  # post -- and deleted the marker. The post was public, its toot was live,
+  # its page was on neither the disk nor the server, the next tick found
+  # nothing owed, and doctor called the site fine. The CLI's own promise was
+  # the thing that turned out to be false.
+  def clear_deploy_pending(written_before: nil)
+    return unless File.exist?(DEPLOY_PENDING)
+
+    if written_before && (stamp = deploy_pending_at) && stamp > written_before
+      return
+    end
+
+    File.delete(DEPLOY_PENDING)
   rescue StandardError
     nil
+  end
+
+  def deploy_pending_at
+    Time.parse(File.read(DEPLOY_PENDING).strip)
+  rescue StandardError
+    begin
+      File.mtime(DEPLOY_PENDING)
+    rescue StandardError
+      nil
+    end
   end
 
   # Build and deploy as one step (--prune included: after a delete or a
@@ -382,6 +510,9 @@ module Publishing
   # the return value.
   def rebuild_and_deploy(reason)
     @stopped_on_busy_lock = false
+    # Noted before the build reads a single file, so a marker written after
+    # this instant is somebody else's debt and survives our success.
+    started = Time.now
     puts
     puts "#{reason}…"
     unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
@@ -390,7 +521,7 @@ module Publishing
     end
 
     if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
-      clear_deploy_pending
+      clear_deploy_pending(written_before: started)
       return true
     end
 

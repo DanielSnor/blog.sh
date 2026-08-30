@@ -10,6 +10,427 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.5 -- 2026-08-30
+
+Two things happened here. The site learned to say what it holds -- a post
+names itself out of its own words instead of standing under its address,
+an archive of thousands gets a map, a site's subjects get a page -- and
+the engine underneath was taken apart and put back together over four
+days of adversarial review: a fleet over the 1.5 work, then a bug bounty
+across thirty-six surfaces, 173 confirmed findings, every one of them now
+closed and pinned by a test that fails on the old code.
+
+The naming is the change a reader will notice. On the archive this was
+measured against, 2754 posts of 4418 -- 62% of the site -- had no title
+and were called by their slug: a date in the heading and
+`burtiky-opekame-hipstamatic-oggl-jane` in the browser tab, on the link
+card and in every feed item. A slug is an address, made by machine out of
+the words; the words are the better name.
+
+Nothing to migrate -- `git pull`, rebuild, deploy. Two things will look
+different on an existing site the first time: posts that never had a
+title now have one everywhere except their own heading, and `doctor` may
+name a config key it never mentioned (see **Changed**).
+
+### Added
+
+- **A post that never said what it is called gets named from its own
+  words.** Until now the slug stood in, so one post had two names: the
+  date in its heading and a machine's address everywhere else. It takes a
+  whole first sentence when one fits in four to twelve words -- a Czech
+  sentence puts its verb and object at the end, and eight words stop just
+  before the point -- and otherwise the first eight, which is what slugs
+  have always been cut to, so a name and an address stay recognisably the
+  same post. The heading is still the date it has been since 1.3.
+
+- **A post can write its own invitation.** Asked for in issue #35 by
+  somebody else running the engine: an announcement used to cut the
+  opening off a post and put the title above it, and a machine cut rarely
+  lands on a good sentence. A line reading `//--more--//` splits a post
+  into what it says about itself and what it actually says. The listing
+  card, the link card and the toot take the first half; the post's own
+  page shows everything.
+
+- **`/archive/` -- a map of the archive.** Nothing on the site could show
+  the shape of one. Pagination is anchored from the oldest post, so
+  `/page/128/` says nothing about whether it is 2009 or 2014, and the only
+  complete list of anything lived in the terminal. `/archive/` is a row
+  per year with a strip of twelve months; `/archive/<year>/` is one line
+  per post, by month. An index, not another listing: no excerpts and no
+  pictures. Two levels and no more -- a third would be some 280 month
+  pages nobody asked for. Cheap by construction: a new post rewrites the
+  map and the current year and nothing else, so a deploy that compares
+  content has nothing to upload for 2014 and never will again.
+
+- **`/tag/` -- every subject the site has.** The site built a listing per
+  tag and nothing that showed them all, so a site's own list of its
+  subjects lived in `browse` or in the top eight of `stats`. Sorted by the
+  folded name, because Ruby sorts strings by bytes and that puts every
+  accented tag after z: a reader looking for `škola` between `sirky` and
+  `sport` would not find it. `stats` folds now too -- one question, one
+  answer. Every tag that has a page and no others, so the list never
+  points at an address the build did not write. A reader can switch the
+  order to by-count and it is remembered for next time; the page is
+  BUILT alphabetically, so a reader whose browser never runs the script
+  gets the order the markup already holds rather than a control that
+  does nothing.
+
+- **A listing card is cut before it is written, not hidden afterwards.**
+  It used to render the whole post and let CSS clip it at 500px: on the
+  real front page that meant fourteen cards carrying between 794 and 2616
+  pixels of content and showing 500, with 33 of the page's 154 focusable
+  elements reachable by the keyboard while invisible on screen. The card
+  now takes blocks until an estimated height budget and stops -- at a
+  block boundary, never through one -- and the stylesheet hides nothing.
+  On that same page: 89,268 bytes of HTML became 41,155, the largest card
+  7,463 characters became 2,566, and "read more" now appears exactly when
+  something did not fit rather than under a card that shows everything.
+
+  The budget is in estimated HEIGHT rather than in characters, and that
+  took measuring to get right: a picture costs no characters and several
+  hundred pixels, so a character rule made 34% of this archive's cards
+  TALLER than the clip it replaced. A picture is never cropped -- the
+  first block is kept whatever its height, because the photograph IS the
+  post -- while a block made of ROWS (a hundred lines of shell, a long
+  conversation, a list, a table) is cut to the rows that fit, and a
+  paragraph that runs past the budget is cut on a word with its
+  formatting cut to match, so a link cannot end up pointing past the text
+  it decorates.
+
+- **A code block carries a copy button.** Asked for by another operator of
+  the engine (issue #44) for a site full of terminal commands. It sits in
+  the block's own corner and is always there rather than on hover -- a
+  phone has no hover, and a button only a mouse can find is one half the
+  readers never get. Only code blocks: a chat is a `<dl>`, inline code is
+  a bare `<code>`, and the fallback for an unknown block type is a bare
+  `<pre>`; the button hangs on the block TYPE, not on the tag. No text on
+  it -- hovering gives "Copy text", which is also its name for a screen
+  reader -- and the whole of the feedback is the icon becoming a check
+  mark for a moment, because a word in the corner would push the code it
+  belongs to. It is drawn only where the clipboard can actually be
+  reached: on an `http://` install there is no button rather than a dead
+  one. And it copies what the block stores, not what the screen shows, so
+  a line that wrapped comes back as the one line it is.
+
+### Changed
+
+- **Every listing of one kind of post says which kind, with an icon.**
+  The tag, archive, search and series listings gained one; the seven
+  listings by content type did not, which made them look unfinished
+  beside the others -- noticed on a live site rather than in the code.
+  There is one per content type now, drawn to the same rules as the four
+  that had one: a 24-unit box, stroked in currentColor, the plainest
+  shape that survives 20 pixels. The quotation mark is filled rather than
+  stroked, because outlined at that size the pair closed up into
+  something that read as the digits 99.
+
+- **`/tag/` shows its tags as pills in wrapped lines rather than in
+  columns.** Asked for by somebody else running the engine (issue #43),
+  who wanted the overview a tag page cannot give: every tag at once, with
+  the count beside each. The count now rides INSIDE the pill as a
+  superscript -- one link, one target, and a number that cannot drift to
+  the name after it when a line wraps -- and the letter band takes the
+  width of the block, the way the archive's month does. A pill is the
+  shape this engine already uses for a tag everywhere else, so the index
+  looks like what it indexes.
+
+- **The page is framed on all four sides, not two.** A heavy rule has
+  closed the content off at the top and the bottom since 1.3, but the
+  sides stayed open, so on a wide screen the text had an end and a
+  beginning and no shape. A one-pixel line now runs down each side, in
+  the colour the menu's own rule takes, so the four are one frame rather
+  than two decisions. Below 700 pixels it is off: on a
+  phone the column already reaches both edges, and a line there draws
+  the screen rather than the page. Tablets keep it.
+
+- **A search result marks where one paragraph ends and the next
+  begins.** A snippet is a post's text with the paragraphs taken out, so
+  the last words of one and the first of the next meet as a single broken
+  sentence -- "...v lese vlhko a listy Ranni mlha zrovna nezvala...". A
+  middle dot stands between them now, rather than an ellipsis: an
+  ellipsis already means "cut here" at the end of every snippet, and one
+  mark with two meanings is how a reader learns to trust neither. It is
+  in the snippet alone -- what a query is matched against keeps the plain
+  space, so a phrase spanning two paragraphs still finds its post. On the
+  archive this was measured against, 593 of the 1636 posts with a title
+  run past their first paragraph.
+
+- **An announcement budgets its link the way Mastodon charges for one.**
+  Mastodon reserves a flat 23 characters for every link, whatever the link
+  measures, and says so in its own API; the composer counted the address
+  literally and spent a budget nobody was charging for. Honest about what
+  this changes: at the shipped 500-character limit, nothing -- the excerpt
+  is capped at 250 long before the budget binds, and that holds even for a
+  234-character address. It shows on a site whose instance limit is low
+  enough for the budget to bite first: at 300, with an 80-character
+  address, the excerpt was cut at 198 characters instead of 246. The
+  reserve is `mastodon.link_length` for a server that answers with a
+  different number, and `doctor` checks it like its sibling. Bluesky is
+  deliberately untouched: it charges an address what the address measures,
+  so the same change there would make every long-address announcement one
+  Bluesky refuses.
+
+- **`doctor` says when `site.locale` and `site.lang` disagree.**
+  `locale` is a second language switch, independent of the first, and
+  only `./setup.sh` ever kept the two in step -- so a site set up by hand,
+  or one whose language was changed in the file afterwards, announced
+  `og:locale="en_US"` on every page of a Czech or German blog to
+  everything that reads one, and nothing said so. It is a warning rather
+  than an error and the value is NOT overridden: `en_GB` under `lang: en`
+  is a real answer somebody wrote on purpose. **An upgraded install whose
+  two disagree will hear one new sentence from `doctor`.**
+
+- **`check` has two more things to say.** A `redirect_from` the build
+  refuses to serve -- one whose first segment belongs to the site itself,
+  or whose shape no directory can be made of -- is now a finding rather
+  than one warning in the middle of a build log; and HTML entities are
+  looked for in a post's TITLE and a link card's text, not only in the
+  body, which is where an archive imported before 1.4 carries them and
+  where they are worst. **An existing archive may report findings it did
+  not report before.** They were always there.
+
+- **A series listing pages from the part that will never change again.**
+  The fixed `/page/N/` pages are cut from the front of a series rather
+  than the back, so adding a part no longer re-cuts every page under it.
+  A series long enough to paginate will have its `/page/N/` contents
+  redistributed once.
+
+- **Posts are ordered by the moment they happened, not by the text of
+  their timestamp.** A post stored as `2026-06-08T06:00:00Z` sorted
+  after one stored as `2026-06-08T07:00:00+02:00`, though the second
+  happened an hour earlier -- and an archive that mixes offsets is every
+  archive that was imported, since the importers store UTC while the CLI
+  writes the site's own offset. On the archive this was measured
+  against, 26 posts change position and three of them move across a
+  `/page/N/` boundary, so a handful of pagination pages hold a slightly
+  different set than before. Addresses are unaffected: not one post
+  changed where it lives.
+
+- **A listing page no longer carries the posts' heading anchors.** A
+  listing stacks ten posts' bodies into one document, so two posts with a
+  section of the same name put the same `id` on the page twice -- 105
+  pages of one real archive. The anchors stay on each post's own page,
+  where they mean something.
+
+### Fixed
+
+Three days of adversarial review, most of it over real archives rather
+than fixtures. The findings that matter to somebody deciding whether to
+upgrade:
+
+- **The appearance button was dead in a browser that refuses storage.**
+  Safari's private windows -- and any profile with site data blocked --
+  throw when `localStorage` is merely READ, not only when it is written.
+  That threw out of the line at the bottom of `theme-toggle.js` that
+  applies the saved choice, so the code wiring the button up never ran:
+  no cycling, no symbol, nothing. Reading and writing the choice is now
+  guarded on both sides, the cycle asks the page which theme it is
+  showing rather than the storage it may not have, and the choice simply
+  does not outlive the page where a browser refuses to keep it -- which
+  is the most such a browser allows.
+
+- **`./blog.sh edit` published the coordinates a photograph was taken
+  at.** `add` stripped them, as the documentation promises; `edit` -- the
+  path people use far more -- had grown a bare copy of its own and did
+  not. The safe copy lives in one place now and both callers use it.
+
+- **Choosing a palette in `./style.sh` deleted 34 documented lines from
+  `config/site.yml`.** The last colour key is the last active key in its
+  section, and the commented-out `fonts:` block underneath contains a
+  line that uncomments to the same indentation as a colour -- so the
+  writer claimed it and everything below it. The config was rewritten
+  without them and the wizard reported success.
+
+- **One cron tick with the archive out of reach blanked the live site's
+  comments and counters.** `content.nosync` on a volume that had not
+  mounted answers with an empty list and no error, which read as "every
+  announced post was deleted": both public files were narrowed to nothing
+  and uploaded. Exit 0, nothing said. An archive that cannot be seen is
+  not an archive whose posts were deleted.
+
+- **The scheduled-publish cron wrote back a snapshot taken before the
+  run.** An edit made while it worked was silently overwritten with the
+  older text, and a post deleted in the meantime was recreated from the
+  snapshot, published, and announced to a timeline that cannot be
+  recalled. Each post is re-read at the moment it is written now.
+
+- **A `--prune` whose deletion failed was reported as a completely clean
+  deploy** -- exit 0, "failed 0" -- whenever nothing needed uploading,
+  which is the ordinary shape of "I removed one unused asset and
+  redeployed". And `DEPLOY_TARGET_DIR` without a leading slash deployed
+  the whole site into a directory of that name inside the installation.
+
+- **`doctor` failed an install over a menu item that works.** A `url` with
+  a `#fragment` or a `?query` was compared as a path, so an anchor on a
+  page that exists was called dead and the fix text sent the owner looking
+  for a post that was never renamed.
+
+- **`check` vouched for a link whose only backing is a redirect the build
+  refuses**, under a closing sentence that names redirects specifically.
+  The same refusal was written out in four places and missing from the
+  fifth; it has one home now.
+
+- **Markdown stopped losing text it has no form for.** A code span holding
+  a backtick came back with a visible backslash and its text cut short; a
+  hard break was lost when the line before it ended with a backslash; a
+  tree written on Windows stored a carriage return inside every paragraph;
+  and a flat list indented by one to three spaces was read as a one-item
+  list with everything else nested under it.
+
+- **A post whose `title` is an empty string** -- what the feed, WordPress
+  and Squarespace importers write for an item with no title -- **shipped a
+  blank browser tab, an empty heading and archive links with nothing to
+  click.** An empty string is truthy; the engine's word for untitled is
+  nothing at all.
+
+- **The export/re-import round trip lost posts.** A page slugged
+  `changelog`, `index` or `tags` was dropped as a repository's own file; a
+  post with an empty body was read back as an empty file and skipped; and
+  `KEEP_PERMALINKS=1`, the one thing that saves a renamed address, wrote
+  exactly the redirect the build throws away.
+
+- **An imported embed's HTML is no longer rendered with its scripts, its
+  style blocks or its stylesheet links.** The site's CSP already stopped
+  the scripts from running, but the RSS feed carries the same HTML and has
+  no CSP -- and a page's safety should not rest on one meta tag. The style
+  block is the half that was never inert: `style-src` has to carry
+  `'unsafe-inline'` for a post's own colour formatting, so an imported
+  rule applied in full. Both Instagram embeds in the archive this was
+  measured against carry `body > iframe { min-width: auto !important }` --
+  a rule written for somebody else's page, reaching outside the embed to
+  every iframe under this one's body. Stripped at render, so the archive
+  keeps what it was given.
+
+- **The sitemap and the feed describe the site as built.** A series
+  listing was missing from the sitemap entirely; `lastmod` was chosen by
+  comparing date STRINGS, which puts a post written "2026-08-22 10:00"
+  above one written "2026-08-22T09:00+02:00"; and a site with nothing in
+  the stream published an empty `<lastBuildDate>`, where RSS 2.0 requires
+  a date.
+
+- **The importers, all eleven adapters and the machinery under them.**
+  The bounty confirmed 59 defects there and every one is closed, along
+  with one reported from outside. What they cost, worst first:
+
+  *WordPress, which is half of everything anyone migrates.* Titles and
+  category names live in CDATA, so entities WordPress stored in them
+  arrived verbatim while the BODY of the same post decoded them: on the
+  real export this was measured against, two posts were called
+  "#55: Reflection &amp; Mug" and a tag came out as "P&amp;S", pill,
+  archive index, sidebar and feed alike, under the address
+  /tag/p-amp-s/. A non-Latin blog fared worse: sanitize_title
+  percent-encodes those slugs, so every address on the imported archive
+  became hex -- "c4-8desk-c3-bd-titulek" -- matching no old address at
+  all. And post_content is stored WITHOUT `<p>` (wpautop adds them when
+  a page is rendered), so every post written in the classic editor --
+  2003 to 2018, the bulk of any old blog -- collapsed into one
+  paragraph, with the pictures that stood between the paragraphs
+  appended after all the prose.
+
+  *Posts nobody meant to publish were published.* A Mastodon archive is
+  the whole account, not the public timeline: 141 of 2548 standalone
+  toots in the archive this was measured against -- 132 of them direct
+  messages -- were written as published posts, with pages, sitemap
+  entries and feed items. A Ghost export ships the full body of every
+  members-only and paid post, gated only when a page is served; they
+  arrived published, untagged and uncounted. And `draft: true # not yet`
+  -- a comment after the value -- made the flag a truthy STRING, so a
+  Jekyll post its author was still writing went onto the open web.
+
+  *Whole imports came to nothing, and said so as if it were the file's
+  fault.* One empty column in a Wix CSV header -- what Excel writes as
+  soon as any line in the file has a field too many -- marked every row
+  misaligned, so an export imported as zero posts under a message about
+  a quote that was never left open. A folder with no markdown in it, and
+  a CSV that was not a Wix export at all, both answered "Done. 0 post(s)
+  written" and exit 0.
+
+  *Posts overwrote each other, or arrived twice.* Two feed items sharing
+  a `<guid>` matched each other: the second overwrote the first in place
+  and the summary counted two written. A Medium draft, a beehiiv issue
+  that never went out, and a Pixelfed export in the newer wrapped shape
+  each lost the account half of their identity, so re-running the
+  identical command over the identical file wrote the archive a second
+  time -- against the promise the tool prints itself.
+
+  *And a long tail of quiet losses.* An Atom body written as
+  `type="xhtml"` imported empty and counted as skipped; a multi-line
+  TOML array turned every tag into `[`; Hugo's `static/` was looked for
+  in the wrong place, so images that were on disk were reported missing.
+  A Medium essay lost the section breaks its author typed; a Wix heading
+  lost its links and a Wix table cell its words; a Ghost lead photo lost
+  its caption. A Tumblr picture that would not download stayed behind as
+  `<img src="">`, which `check` cannot see, and an NPF block type with
+  no branch -- a poll, since 2023 -- vanished without a word. Facebook's
+  own `<br /> `, tag plus a literal space, collapsed 190 posts of 1603
+  into a single paragraph each. A permalink with one non-ASCII character
+  lost its redirect. Pointed at the wrong folder, the Twitter importer
+  answered with a Ruby backtrace where every sibling answers with a
+  sentence. And the wizard -- the door this tool's own header calls the
+  way in -- never printed what the HTML parser had thrown away, so a
+  blog full of embedded video imported as "Wrote N post(s)" and nothing
+  else. An address that answered 200 with an HTML page -- a parked
+  domain, a soft 404 -- was saved as a picture, counted as a media file
+  and called sound by `check`, leaving a permanently broken image on a
+  published page; one adapter had that defence and eight carried a
+  comment claiming it.
+
+  *And the rescue of last resort learned to finish a sentence.* A feed
+  that carried teasers was recognized as carrying teasers and the cut-off
+  text written anyway -- page mode, which reads a whole page, was only
+  ever tried for a blog with no feed capture at all. A truncated item is
+  now completed from the post's own archived page, the newest capture of
+  it, with the title, date and tags still the feed's; what could not be
+  completed is said out loud. Reported by somebody rescuing a Drupal blog
+  whose feed did exactly this.
+
+- **A picture was lost to the difference between a Hash and a
+  directory.** An importer keeps the source URL's extension exactly as it
+  was, case and all, so `01.JPG` is an ordinary name in a real archive --
+  Posterous served `IMG_2669.JPG`, and a decade of cameras wrote nothing
+  else. The name allocator then looked for a free name with a byte-exact
+  comparison and handed a newly arrived picture `01.jpg` believing it
+  free, while the copy asks the VOLUME whether the destination exists --
+  and on macOS, or any Windows share, `01.JPG` answers for `01.jpg`. The
+  copy was skipped, the new picture's bytes were never written anywhere,
+  and the post showed the OLD photograph under both names; `check`
+  reported a reassuring "misnamed" and said nothing about a loss. Names
+  are compared the way the filesystem compares them now, on every volume
+  rather than only where it bites: an archive is carried between
+  machines, and a name that is free on Linux and taken on macOS is a
+  picture that disappears when somebody moves their site.
+
+- **Smaller, and there were many.** A tag containing a comma became two
+  tags on every save (six posts on one archive). `props` and `edit` died
+  on a raw backtrace over a date `check` names cleanly. An unknown block
+  type wrote raw JSON into the page and escaped its own `<pre>`. A post
+  with a hero printed a link's borrowed title twice, and lifting that hero
+  removed every block equal to it, so a post showing one photograph twice
+  lost both. A post made of code or chat escaped the excerpt clip and was
+  dumped whole onto the front page. A non-integer `page_size` built
+  addresses like `/page/0.38095238095238093/` and exited 0. A comment's
+  picture with no description was a link with no accessible name. Every
+  `<nav>` on a page has a name now, and the narrow-screen menu no longer
+  leaves a 40px link floating in a 60px row.
+
+### Not fixed, on purpose
+
+- **Wayback's CDX paging.** The cap on how many captures are asked for
+  went up, and the importer now says so when the answer comes back
+  exactly full -- but following `resumeKey` through a second request
+  was not written. It cannot be tested without calling archive.org, and
+  an unverified conversation with somebody else's service is not what a
+  release should carry.
+
+- **The shortened link in an announcement.** Bluesky charges for a link
+  by its length while Mastodon charges a flat rate, so a long address
+  eats into what a Bluesky post can say -- measured at 26 to 50
+  characters on this archive's slugs. Showing a short form while linking
+  the full address is what the official client does, and it stays
+  undone: the facets are built by scanning the text, and the guard
+  against announcing twice looks for the address IN that text, so both
+  would have to be rewritten at once.
+
 ## 1.4 -- 2026-08-25
 
 The widest release since 1.0, and the most thoroughly tested one. Three

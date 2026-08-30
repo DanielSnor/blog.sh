@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require 'json'
+require_relative 'site_config'
+require_relative 'public_file'
 require_relative 'pixelfed_fetcher'
 require_relative 'mastodon_fetcher'
 require_relative 'commits_fetcher'
@@ -48,7 +50,28 @@ module Sidebar
   # always means a network error, not that the account has no posts -- and
   # publishing an empty widget because of a one-minute outage is worse than
   # briefly stale data.
+  # Whether the site draws a sidebar at all. Read here rather than only in
+  # the build, because this is the half that leaves the machine: a site with
+  # `layout: sidebar: false` was still asking Mastodon, Pixelfed, an RSS
+  # host and a forge for data on every cron tick, and then writing it into
+  # files no page would ever include. Wasteful, but mainly it is four
+  # third-party contacts the author had already switched off.
+  def enabled?
+    SiteConfig.get('layout', 'sidebar', default: true) != false
+  end
+
   def write_all(public_dir, previous = {})
+    # Nothing fetched, nothing written -- and nothing REPORTED either, since
+    # not asking is not a failure. It used to return false for every feed,
+    # and false is already this module's marker for something else entirely:
+    # summary turns it into "emptied (config cannot work)". An author who
+    # switched the column off while keeping their widget settings therefore
+    # got a half-hourly cron mail asserting their config was broken, when it
+    # was fine and nothing had been emptied -- the exact opposite of what
+    # the switch was added for. An empty result says nothing at all, which
+    # is what "not asked" means.
+    return {} unless enabled?
+
     FEEDS.to_h do |name, fetcher|
       path = File.join(public_dir, name)
       begin
@@ -59,17 +82,17 @@ module Sidebar
         # empties instead, and an empty card is not drawn -- which is how
         # somebody finds out, on the site rather than in cron mail.
         warn "#{name}: #{e.message}"
-        File.write(path, '[]')
+        PublicFile.write(path, '[]')
         next [name, false]
       end
       fallback = items.empty? ? (previous[name] || read(path)) : nil
 
       if fallback
         warn "#{name}: fetch returned nothing, keeping last known content"
-        File.write(path, fallback)
+        PublicFile.write(path, fallback)
         [name, nil]
       else
-        File.write(path, items.to_json)
+        PublicFile.write(path, items.to_json)
         [name, items.size]
       end
     end

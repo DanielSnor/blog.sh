@@ -75,6 +75,14 @@ duplicated.
   and all. Import from the same path each time -- or rename the new export
   to the old name -- and matching works as described.
 
+  Ghost is a third shape, and this list left it out until 1.5.1: the
+  address you type as the second argument is presented as "where the
+  images live", and the host out of it is also half of every post's
+  identity. Case and a leading `www.` are folded away, so
+  `https://www.cynicky.blog` and `https://cynicky.blog` are the same site
+  on a re-import -- but a genuinely different host is a different site,
+  and typing one imports the archive a second time.
+
   A markdown tree is the one source that can do better, because a site
   built by Hugo or Jekyll writes its own name down. The identity is that
   name -- `baseURL` or `title` out of `hugo.toml` (or `config/_default/`),
@@ -266,7 +274,16 @@ post's first paragraph, the feature image its first image. YouTube
 embeds become the same video blocks a hand-written post gets; any other
 embedded player becomes a link to the embedded page, which outlives the
 player. Ghost's internal `#hashtag` tags are routing config, not
-labels, and are dropped.
+labels, and are dropped. The caption and the alt text written under a
+feature image come over with it.
+
+Members-only and paid posts import in full -- the export is yours, and
+Ghost's paywall is applied when a page is served, never in the file --
+but each one arrives as a **draft** tagged `ghost-members` rather than
+published, and the summary says how many there were. Nothing your
+members paid for goes onto the open web without you deciding it should.
+Re-importing an archive that came over before this release moves those
+posts to drafts.
 
 ### Instagram
 
@@ -511,8 +528,10 @@ In Pixelfed: **Settings → Data Export**, take the *Statuses* JSON. Unlike
 Mastodon's archive it links to the CDN instead of shipping files, so photos
 are downloaded; real pixel sizes come from the export's metadata. Trailing
 hashtag-only lines are dropped from captions -- they are already the post's
-tags, and would otherwise render as a stack of one-word paragraphs. Replies
-and reblogs are skipped and counted.
+tags, and would otherwise render as a stack of one-word paragraphs. Where
+an export leaves the tags empty, which happens, those hashtags BECOME the
+post's tags rather than disappearing from it twice over. Replies and
+reblogs are skipped and counted.
 
 ### Podcast
 
@@ -667,6 +686,15 @@ matching merging the overlaps. Point it at the blog's old URL (the
 common feed paths are tried) or straight at its feed; images recover
 from the Archive the same way, rerouted to the nearest capture.
 
+A feed that carried only teasers -- what the blog's "read more" cut off
+-- is not the end of it: an item the rescue recognizes as truncated is
+completed from the post's **own archived page**, the newest capture of
+it, read by the same parser page mode uses. Title, date and tags stay
+the feed's, because those are structured there and guessed on a page,
+and a post whose page the Archive never kept (or whose page says less
+than the teaser did) arrives as the excerpt the feed sent. The summary
+says how many were completed and how many were not.
+
 A blog the Archive only ever saw as pages -- no feed captures -- falls
 through to **page mode**: every archived post page, the newest capture
 of each. Which paths are posts is the one thing pages cannot say about
@@ -743,7 +771,9 @@ id, so import while the old site is still up. A post with no published
 date is a draft (Wix has no explicit status column), and category cells
 that hold Wix's internal 24-hex ids instead of names are dropped: an id
 makes no tag anyone would click. Kept permalinks come straight from the
-export's own Post Page URL column.
+export's own Post Page URL column. A CSV that is not a Wix export -- the
+other file in the same Downloads folder -- is refused by name rather than
+imported as nothing.
 
 ### WordPress, or any RSS/Atom feed
 

@@ -3,7 +3,9 @@
 require 'json'
 require 'time'
 require 'uri'
+require_relative '../entity_text'
 require_relative '../slug'
+require_relative '../path_glob'
 require_relative 'html_blocks'
 
 module Import
@@ -20,16 +22,28 @@ module Import
       @media_dir = File.join(@data_dir, 'tweets_media')
     end
 
+    # The directory this export lives in. Media#from_file refuses any path
+    # that resolves outside it -- an export naming a file on the importer's
+    # own disk got it copied into the archive and published.
+    def import_root
+      @export_dir
+    end
+
+
     def label
       "Twitter/X (@#{account})"
     end
 
-    # tweets.js runs to tens of megabytes on a full archive, and reading plus
-    # parsing it is a silent minute or more -- worth saying out loud before
-    # it starts.
+    # These run to tens of megabytes on a full archive, and reading plus
+    # parsing them is a silent minute or more -- worth saying out loud
+    # before it starts, and worth naming HOW MANY files, since a split
+    # archive read as one is the defect below.
     def preamble
-      size = File.size(tweets_path) / 1_048_576.0
-      "Reading #{tweets_path} (#{size.round(1)} MB)…"
+      refuse_unless_export
+      paths = tweets_paths
+      size = paths.sum { |p| File.size(p) } / 1_048_576.0
+      where = paths.length > 1 ? "#{paths.length} files in #{@data_dir}" : paths.first.to_s
+      "Reading #{where} (#{size.round(1)} MB)…"
     end
 
     def total
@@ -72,20 +86,60 @@ module Import
 
     private
 
-    def tweets_path
-      File.join(@data_dir, 'tweets.js')
+    # The archive's own data/manifest.js declares tweets as a LIST of files
+    # with globalName "YTD.tweets.part0": X splits a large export into
+    # data/tweets.js, tweets-part1.js, tweets-part2.js and so on. Only the
+    # first was ever opened, and the loss was completely quiet -- no error,
+    # no line in the summary, exit 0, and the "N item(s) in the source"
+    # header counted part0 alone, so even the number looked self-consistent.
+    # facebook.rb and instagram.rb have globbed their numbered series from
+    # the start; this is the same shape and now gets the same treatment.
+    #
+    # Matched exactly rather than with a bare tweets*.js, so a file the
+    # archive gains later cannot be parsed as tweets by accident.
+    TWEETS_FILE = /\Atweets(-part\d+)?\.js\z/
+
+    def tweets_paths
+      PathGlob.under(@data_dir, 'tweets*.js')
+              .select { |p| File.basename(p).match?(TWEETS_FILE) }
+              .sort_by { |p| File.basename(p)[/\d+/].to_i }
     end
 
-    # Both files are JavaScript assignments wrapping a JSON array, so the
+    # Each file is a JavaScript assignment wrapping a JSON array, so the
     # prefix up to the opening bracket is dropped before parsing.
     def load_tweets
-      raw = File.read(tweets_path, encoding: 'utf-8')
-      JSON.parse(raw.sub(/\A[^\[]*/, '')).map { |t| t['tweet'] }
+      tweets_paths.flat_map do |path|
+        raw = File.read(path, encoding: 'utf-8')
+        JSON.parse(raw.sub(/\A[^\[]*/, '')).map { |t| t['tweet'] }
+      end
+    end
+
+    # Every sibling archive importer answers the commonest mistake with a
+    # sentence -- Facebook names your_posts*.json, Mastodon names
+    # outbox.json. This one read account.js with a bare File.read, so
+    # pointing it at the folder that CONTAINS the archive, at data/ itself,
+    # or at an archive whose account.js was taken out before it was handed
+    # over, produced a Ruby backtrace -- preceded by "Reading  (0.0 MB)…",
+    # which reads as "I found your archive".
+    def refuse_unless_export
+      missing = []
+      missing << 'data/account.js' unless File.exist?(account_path)
+      missing << 'data/tweets.js' if tweets_paths.empty?
+      return if missing.empty?
+
+      abort("❌ #{@export_dir} does not hold a Twitter/X export -- no #{missing.join(', ')} " \
+            'in it. Point this at the unpacked archive itself: the folder that HOLDS ' \
+            'data/, not data/ and not the folder above it.')
+    end
+
+    def account_path
+      File.join(@data_dir, 'account.js')
     end
 
     def account
       @account ||= begin
-        raw = File.read(File.join(@data_dir, 'account.js'), encoding: 'utf-8')
+        refuse_unless_export
+        raw = File.read(account_path, encoding: 'utf-8')
         JSON.parse(raw.sub(/\A[^\[]*/, '')).first['account']['username']
       end
     end
@@ -171,31 +225,7 @@ module Import
     # delivered and the spans are moved afterwards, by however much the text
     # shrank ahead of them.
     def decode_entities_in(text, formatting)
-      moved = Array.new(text.length + 1)
-      decoded = +''
-      index = 0
-      while index < text.length
-        moved[index] = decoded.length
-        match = text[index..].match(/\A&(?:#x?[0-9a-fA-F]+|\w+);/)
-        replacement = match && HtmlBlocks.decode_entities(match[0])
-        if match && replacement != match[0]
-          decoded << replacement
-          # An index that lands INSIDE an entity has no character of its own
-          # to point at; it belongs after the letter the entity became.
-          (1...match[0].length).each { |offset| moved[index + offset] = decoded.length }
-          index += match[0].length
-        else
-          decoded << text[index]
-          index += 1
-        end
-      end
-      moved[text.length] = decoded.length
-
-      formatting.each do |span|
-        span['start'] = moved[span['start']] || span['start']
-        span['end'] = moved[span['end']] || span['end']
-      end
-      [decoded, formatting]
+      EntityText.decode(text, formatting)
     end
 
     def content_blocks(tweet, media)

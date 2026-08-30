@@ -108,6 +108,44 @@ module PostAddress
     keys
   end
 
+  # Whether the build will serve an address as a redirect_from, and if not,
+  # why. Three places were answering this: the build refuses and warns, the
+  # repair pass refuses to PROPOSE one (Repair.redirectable?), and the
+  # checker did not ask at all -- so it counted a refused address among the
+  # ones the site answers at and called a link to it sound, in a sentence
+  # that names redirects specifically.
+  #
+  # nil means the build will serve it. :reserved and :unusable are the two
+  # refusals, kept apart because the build says a different sentence for
+  # each and the checker now says them too.
+  REDIRECT_RESERVED = %w[posts page tag type assets search markdown].freeze
+  # Every first segment the build writes itself. A PAGE lives at /<slug>/,
+  # so a page slugged like one of these would sit where the engine's own
+  # output goes -- the build refuses to write it and says so. The list
+  # lives here rather than in the build because `check` has to refuse the
+  # same names: two copies of it is how a page ends up unbuilt on a site
+  # whose check calls the archive sound.
+  RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page
+                              rss.xml sitemap.xml robots.txt 404 favicon.ico].freeze
+  REDIRECT_SEGMENT_MAX_BYTES = 255
+
+  def redirect_refusal(origin)
+    parts = origin.to_s.split('/').reject(&:empty?)
+    return :unusable if parts.empty?
+    return :unusable if parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
+    return :unusable if parts.any? { |p| p.bytesize > REDIRECT_SEGMENT_MAX_BYTES }
+    # Folded, because the volume folds. `/Tag/pokus/` and `/Search/` sailed
+    # past a byte-exact comparison and then landed on
+    # public.nosync/tag/pokus/ and public.nosync/search/ on macOS,
+    # replacing the real tag listing and the real search page with
+    # redirect stubs. Refused on a case-sensitive volume too: the list is
+    # about the segments the engine owns, and an imported address that
+    # only differs from one by letter case is not an address anybody meant.
+    return :reserved if REDIRECT_RESERVED.include?(parts.first.to_s.downcase)
+
+    nil
+  end
+
   def draft?(post)
     post['state'].to_s == 'draft'
   end
@@ -117,6 +155,23 @@ module PostAddress
   # of them and an ordinary post to the other.
   #
   # It asks about `page` and nothing else. This used to fall back to
+  # The loose rule the two predicates below share, written once. Anything
+  # that is not a plain false/no/0 counts as set, because the two failures
+  # are not worth the same: a typo that HIDES a post is recoverable, a typo
+  # that exposes one somebody meant to keep out of the listings is not.
+  #
+  # scripts/manage_post.rb used to answer the same question with a STRICT
+  # test -- true/yes/1 and nothing else -- so a post carrying `unlisted: ano`
+  # (Czech for yes, and the CLI's own confirm word; a German site types "ja")
+  # was hidden by the build and read as public by the CLI, which then wrote
+  # the frontmatter back without the flag. One edit and the post was in the
+  # listings and in the sitemap, with nobody having asked for that.
+  def flag?(value)
+    return false if value.nil? || value == false
+
+    !%w[false no 0].include?(value.to_s.strip.downcase)
+  end
+
   # `type == 'page'` when the key was missing -- a rule no released engine
   # ever served by (1.3 and 1.3.2 both read `truthy?(post['page'])` and
   # nothing more), so honouring it here would have moved such a post from
@@ -127,10 +182,7 @@ module PostAddress
   # A rule that changes where published work is served has to arrive as an
   # edit somebody makes, not as a new opinion about an old file.
   def page?(post)
-    value = post['page']
-    return false if value.nil? || value == false
-
-    !%w[false no 0].include?(value.to_s.strip.downcase)
+    flag?(post['page'])
   end
 
   # Whether a post asked to stay out of the listings. Loose on purpose,
@@ -144,10 +196,7 @@ module PostAddress
   # build and check disagreed about which tags have a page, and check
   # reported a live listing as a dead link.
   def unlisted?(post)
-    value = post['unlisted']
-    return false if value.nil? || value == false
-
-    !%w[false no 0].include?(value.to_s.strip.downcase)
+    flag?(post['unlisted'])
   end
 
   # The year in the post's own date -- what the address is built from.

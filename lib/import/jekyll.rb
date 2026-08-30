@@ -89,6 +89,14 @@ module Import
       @missing_media = {}
     end
 
+    # The directory this export lives in. Media#from_file refuses any path
+    # that resolves outside it -- an export naming a file on the importer's
+    # own disk got it copied into the archive and published.
+    def import_root
+      @dir
+    end
+
+
     # Said out loud when the run rearranged anything -- see
     # free_inline_images. An import may transform, but not quietly.
     def postscript
@@ -135,6 +143,17 @@ module Import
       # (_docs, _tutorials), which Jekyll allows and jekyll/jekyll's own
       # docs/ is. Same shape, wider net, minus the machinery.
       swept = posts.empty? && drafts.empty?
+
+      # A folder with no markdown in it at all is not an empty blog, it is
+      # the wrong folder -- and "Done. 0 post(s) written", exit 0, reads as
+      # a successful import of nothing. Somebody who has just pointed the
+      # importer at their Downloads instead of the export inside it needs
+      # to hear that, not a tick.
+      if swept && wider_net.empty?
+        abort("❌ #{@dir} holds no markdown files, so there is nothing here to import. " \
+              'Point this at the folder that holds the posts -- in a Hugo site that is ' \
+              'usually content/, in a Jekyll one _posts/.')
+      end
 
       if swept
         root, nested = wider_net.partition { |path| File.dirname(path) == tree_root }
@@ -187,11 +206,18 @@ module Import
       # by silence: left out of the walk entirely, a root _index.md
       # holding real prose was missing from the totals, and the tree read
       # as imported in full when it was not.
-      return :site_furniture if @furniture&.include?(path)
-
       raw = File.read(path, encoding: 'utf-8')
       meta, body = front_matter(raw)
       return :bad_frontmatter if meta.nil?
+
+      # A tree WE wrote says so, and then the furniture list has no
+      # business judging it. The two lists never agreed: the build serves
+      # a page slugged `changelog`, `index` or `tags` perfectly happily,
+      # while the importer treated all sixteen of those names as a
+      # repository's own files -- so an export and a re-import came home
+      # short by every page that happened to be called one of them.
+      own_tree = meta['blogsh'].is_a?(Hash)
+      return :site_furniture if !own_tree && @furniture&.include?(path)
 
       # Read before the blocks are built, because localize is where each
       # file is registered and the address has to be in hand by then.
@@ -207,7 +233,13 @@ module Import
                end
       blocks = lead_image(meta, body) + blocks
       blocks = localize(blocks, media, path)
-      return :empty if blocks.empty?
+      # ...unless the tree is ours and the post really is empty. A post
+      # can be live, listed, tagged and titled with content: [] -- the
+      # build gives it a real page, and two such posts sit on the archive
+      # this was measured against. The exporter writes its front matter
+      # and an empty body; read back as "an empty file", both 404'd after
+      # a round trip.
+      return :empty if blocks.empty? && !own_tree
 
       draft = path.include?("#{File::SEPARATOR}_drafts#{File::SEPARATOR}") ||
               meta['published'] == false || meta['draft'] == true
@@ -258,6 +290,15 @@ module Import
         # because it never made a page.
         origin = nil if page && origin == "/#{slug}/"
         post['redirect_from'] = [origin] if origin && claim_origin(origin, path)
+
+        # A permalink of our own shape goes on former_slugs instead: see
+        # own_former_slug. apply_own_keys below may bring a former_slugs
+        # list back from the `blogsh:` key, so this adds rather than
+        # replaces, and only when the address is not already there.
+        former = own_former_slug(meta)
+        if former
+          post['former_slugs'] = (Array(post['former_slugs']) + [former]).uniq
+        end
       end
       apply_own_keys(post, meta)
       # After apply_own_keys on purpose: `type: page` in the front matter
@@ -308,6 +349,11 @@ module Import
       # that carry their own history should be treated as returning
       # home. platform_tag asks this too.
       @own_post = own.is_a?(Hash)
+
+      # A post this engine exported as untitled comes home untitled. Without
+      # this the importer sees title: '' and substitutes the slug, which is
+      # right for a foreign tree and wrong for ours.
+      post['title'] = nil if @own_post && own['untitled']
 
       OWN_FLAT_KEYS.each do |key|
         value = meta[key]
@@ -594,6 +640,16 @@ module Import
         [YAML.safe_load(m[1], permitted_classes: [Date, Time]) || {}, m.post_match]
       elsif (m = raw.match(/\A\+\+\+\s*\n(.*?)\n\+\+\+\s*\n?/m))
         [toml_subset(m[1]), m.post_match]
+      elsif (m = raw.match(/\A\{\s*\n(.*?)\n\}\s*\n?/m))
+        # Hugo's third dialect. Unrecognised, the whole block fell through
+        # as BODY: the title, the date, the tags and the draft flag were
+        # all lost, and the post was published with its own front matter
+        # printed at the top as text.
+        begin
+          [JSON.parse("{\n#{m[1]}\n}"), m.post_match]
+        rescue JSON::ParserError
+          [{}, raw]
+        end
       else
         [{}, raw]
       end
@@ -601,18 +657,101 @@ module Import
       [nil, nil]
     end
 
+    # A subset of TOML, deliberately -- but the value scanner was crude
+    # enough to be wrong about four ordinary things at once.
+    #
+    #   draft = true # nekdy pozdeji
+    # is not the string "true", so it fell through to the else branch and
+    # became a truthy STRING. Hugo's own `draft = true` with a note beside
+    # it therefore imported as PUBLISHED, and a post the author was still
+    # writing went onto the open web. That is the worst thing an importer
+    # can do, and the note is what people write on exactly that line.
+    #
+    #   tags = [
+    #     "kolo",
+    #   ]
+    # is how a list of any length is written. Read a line at a time, the
+    # first one gave the value "[" -- so every tag was lost and a junk tag
+    # named "[" took their place.
+    #
+    # And `.delete(%q{"'})` removed every apostrophe ANYWHERE in a value,
+    # so "Novy rok's" became "Novy roks", while a trailing comment stayed
+    # in the title.
     def toml_subset(text)
-      text.each_line.with_object({}) do |line, out|
-        next unless (m = line.match(/\A\s*([A-Za-z0-9_-]+)\s*=\s*(.+?)\s*\z/))
+      out = {}
+      pending_key = nil
+      pending = +''
+      text.each_line do |line|
+        if pending_key
+          pending << line
+          next unless pending.include?(']')
 
-        key, value = m[1], m[2]
+          out[pending_key] = toml_array(pending)
+          pending_key = nil
+          pending = +''
+          next
+        end
+        next unless (m = line.match(/\A\s*([A-Za-z0-9_-]+)\s*=\s*(.*?)\s*\z/))
+
+        key, value = m[1], strip_toml_comment(m[2])
+        if value.start_with?('[') && !value.end_with?(']')
+          pending_key = key
+          pending = value.dup
+          next
+        end
+
         out[key] = case value
-                   when /\A\[(.*)\]\z/ then Regexp.last_match(1).split(',').map { |v| v.strip.delete('"\'') }
+                   when /\A\[(.*)\]\z/ then toml_array(value)
                    when 'true' then true
                    when 'false' then false
-                   else value.delete('"\'')
+                   else unquote_toml(value)
                    end
       end
+      # A list left open at the end of the block is still the author's
+      # list: better a tag too many than a post with none.
+      out[pending_key] = toml_array(pending) if pending_key
+      out
+    end
+
+    # A '#' that starts a comment, rather than one inside a quoted value
+    # -- a title may hold one, and a colour certainly does.
+    def strip_toml_comment(value)
+      in_single = false
+      in_double = false
+      value.each_char.with_index do |c, i|
+        in_single = !in_single if c == "'" && !in_double
+        in_double = !in_double if c == '"' && !in_single
+        return value[0, i].rstrip if c == '#' && !in_single && !in_double
+      end
+      value
+    end
+
+    def toml_array(raw)
+      inner = raw[/\[(.*)\]/m, 1] || raw.sub(/\A\[/, '')
+      # A comment inside a multi-line array belongs to the line it sits on,
+      # not to the value after it. Splitting first and unquoting second ate
+      # the next tag whole: `"a", # note\n "b",` handed `# note\n "b"` to
+      # the unquoter, which found no matching quotes around it and kept the
+      # comment, the newline and the tag as one string. Hugo's own exports
+      # write arrays like that, so the tag became a line of punctuation on
+      # every post that had one.
+      # Per LINE, because a comment ends at the end of its line: stripping
+      # it from the whole array text would take everything after it,
+      # including the values on the lines below.
+      cleaned = inner.lines.map { |line| strip_toml_comment(line) }.join("\n")
+      cleaned.split(',').map { |v| unquote_toml(v.strip) }.reject(&:empty?)
+    end
+
+    # The OUTER quotes only. Everything between them is what somebody
+    # wrote, apostrophes included.
+    def unquote_toml(value)
+      text = value.to_s.strip
+      return text[1..-2].to_s if text.length >= 2 && (
+        (text.start_with?('"') && text.end_with?('"')) ||
+        (text.start_with?("'") && text.end_with?("'"))
+      )
+
+      text
     end
 
     # Markdown is the native tongue, with three dialect notes: reference
@@ -1033,9 +1172,31 @@ module Import
     # (/assets/<year>/<slug>/01.mp4), and from_file copies it into this
     # archive under the number it gets here -- the same path an image
     # takes through image_block.
+    # The types `./blog.sh export` actually writes through this channel:
+    # the four it always renders as HTML, plus the ones MarkdownWriter has
+    # no form for. Anything else claiming to be one of ours is a block
+    # somebody typed into a markdown file, and the import wizard offers to
+    # read "any folder of markdown files a converter produced" -- trees
+    # nobody here wrote. The comment above OWN_BLOCK_RE assumed the marker
+    # was proof of where a block came from; it is not, and anyone can type
+    # it. This does not make the restored block trusted -- see the note in
+    # own_block -- it only stops the marker from being a way to invent
+    # block types the markdown path could never produce.
+    OWN_BLOCK_TYPES = %w[video audio link file chat code embed gallery].freeze
+
     def own_block(packed, media)
       block = JSON.parse(packed.unpack1('m'))
       return nil unless block.is_a?(Hash)
+      return nil unless OWN_BLOCK_TYPES.include?(block['type'].to_s)
+
+      # ⚠️ What this does NOT close: `embed_html` is rendered raw by the
+      # build (build/build_blog.rb, the video branch), so a crafted tree
+      # can still put markup on the page through a block that IS one of
+      # ours. That is not a Jekyll question -- Import::Tumblr passes an
+      # export's embed_html through the same way -- but a property of the
+      # whole import surface, and deciding it means deciding whether a
+      # legitimate Instagram or Twitter embed (blockquote plus script)
+      # still renders. Daniel's call, not one to make inside a bug fix.
 
       %w[media poster].each do |key|
         entries = block[key]
@@ -1045,7 +1206,7 @@ module Import
           next entry unless entry.is_a?(Hash) && entry['url']
 
           src = entry['url'].to_s
-          local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, @dir)
+          local = src.start_with?('/') ? root_relative(src) : File.expand_path(src, @dir)
           name = media.from_file(local, src: entry['src'] || own_media_src(local))
           name ? entry.merge('url' => name) : nil
         end
@@ -1105,6 +1266,18 @@ module Import
     # A root-relative path is looked up in the tree, a relative one next
     # to the post, an absolute URL downloaded -- in that order of
     # likelihood for a static site's own images.
+    # Where a root-relative src actually lives. Hugo serves static/ AT the
+    # site root, so /images/foto.jpg in a Hugo tree is static/images/foto.jpg
+    # on disk -- looked for at the root it was reported missing while the
+    # file sat right there, and the post lost a picture the tree still had.
+    # Jekyll serves from the root itself, so both shapes have to be tried;
+    # whichever is there wins, and when neither is, the root path is what
+    # the miss is reported against, exactly as before.
+    def root_relative(src)
+      candidates = [File.join(@dir, 'static', src), File.join(@dir, src)]
+      candidates.find { |path| File.file?(path) } || candidates.last
+    end
+
     def image_block(src, alt, title, media, post_path)
       # A data: URI is the image itself, inline -- nothing to fetch,
       # nothing on disk, and no block form for inline bytes here. Dropped
@@ -1124,7 +1297,7 @@ module Import
       filename = if src.match?(/\A[A-Za-z][A-Za-z0-9+.-]*:/)
                    media.from_url(src)
                  else
-                   local = src.start_with?('/') ? File.join(@dir, src) : File.expand_path(src, File.dirname(post_path))
+                   local = src.start_with?('/') ? root_relative(src) : File.expand_path(src, File.dirname(post_path))
                    # Unconditionally: from_file spends the number and records
                    # the miss itself. Stat-ing here instead made numbering
                    # depend on which files happened to be present.
@@ -1209,6 +1382,15 @@ module Import
 
     def slug_of(meta, path)
       explicit = explicit_slug(meta)
+      # A slug that came out of ./blog.sh export is the address the site is
+      # serving TODAY, not a name to be tidied. Running slugify over it
+      # renamed every slug that was not already slugify-stable -- an
+      # underscore, a trailing dash -- and wrote no former_slugs, no
+      # redirect_from and no stub, so 25 live URLs on one real archive
+      # answered before the round trip and 404'd after it. Only OUR export
+      # is trusted this way: a tree from anywhere else has no blogsh: key
+      # and is tidied as before.
+      return explicit if explicit && meta['blogsh'].is_a?(Hash)
       return Slug.slugify(explicit) if explicit
 
       Slug.slugify(percent_decode(base_name(path)))
@@ -1269,7 +1451,24 @@ module Import
     # a /:year/:month/:day/:title/ pattern gave kontakt a redirect from
     # /2021/12/11/kontakt/, an address the old site never served, and
     # the build wrote a stub on it.
+    # A permalink under /posts/ is where the post lived on THIS engine,
+    # which is what former_slugs records -- redirect_from is for addresses
+    # from somewhere else, and the build refuses any whose first segment
+    # is one of its own. Every post blog.sh exports carries
+    # permalink: /posts/<year>/<slug>/, so KEEP_PERMALINKS=1 -- the one
+    # thing an operator can do to save a renamed address -- wrote exactly
+    # the entry the build throws away, with a warning in the middle of a
+    # build log. Returned as nil here and handled as a former slug by the
+    # caller instead.
+    def own_former_slug(meta)
+      explicit = (meta['permalink'] || meta['url']).to_s
+      m = explicit.match(%r{\A/posts/(\d{4}/[^/]+)/?\z})
+      m && m[1]
+    end
+
     def origin_path(meta, slug, date, page: false)
+      return nil if own_former_slug(meta)
+
       explicit = meta['permalink'] || meta['url']
       return explicit.to_s if explicit && !explicit.to_s.empty?
       return nil if page || !@permalink

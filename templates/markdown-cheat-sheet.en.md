@@ -216,6 +216,24 @@ A line of three or more dashes, on its own.
 
 ---
 
+## Teaser
+
+A line reading `//--more--//`, on its own, splits the post in two. What is above it is the teaser: exactly that shows up in the listing on the front page, in the announcement on your social network, and on the link card. What is below it is read by whoever opens the post.
+
+Without this line the engine cuts a teaser off the start of the text itself -- and a machine cut rarely lands where it should.
+
+Write it exactly like that, no inner spaces and in lower case. Written any other way it is an ordinary note and disappears when the post is saved. Blank lines around it are not required -- a line holding nothing else is enough.
+
+```
+The opening paragraph, the one meant to catch the eye.
+
+//--more--//
+
+The rest of the post, which the listing does not show.
+```
+
+---
+
 ## Code blocks
 
 Code is wrapped between lines of three backticks — \`\`\`. A language can follow the first triple; it's cosmetic only, it doesn't change the rendering. Nothing inside the block is formatted, asterisks and similar characters stay literal.

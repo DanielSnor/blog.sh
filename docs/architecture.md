@@ -58,7 +58,7 @@ dedup by `source`).
 | `slug` | string, required | URL segment; `Slug.slugify` output |
 | `date` | string, required | ISO 8601 with offset |
 | `content` | array, required | blocks, see below |
-| `title` | string | optional. A post without one borrows the title of its first `link` block -- that is where a link post keeps what the reader takes for its title, and it becomes the heading (an `h1` on the post's page, an `h2` in a listing, both pointing where the link points), the `<title>`, the feed item and the structured data. With neither, the slug stands in |
+| `title` | string | optional. A post without one borrows the title of its first `link` block -- that is where a link post keeps what the reader takes for its title, and it becomes the heading (an `h1` on the post's page, an `h2` in a listing, both pointing where the link points), the `<title>`, the feed item and the structured data. With neither, the post is named from its own opening words (see `PostText.name_and_rest`), and only a post with no words at all falls back to the slug |
 | `tags` | array of strings | rendered as pills, slugified for tag URLs |
 | `state` | `"published"` \| `"draft"` | absent = published |
 | `draft_token` | string | drafts only -- the hidden preview URL segment |
@@ -102,10 +102,14 @@ not silent.
 **`media`** is an array whose first entry is used: `{url, width,
 height}`. `url` is a bare filename inside the post's
 `media.nosync/<year>/<slug>/` directory; `width`/`height` reserve
-layout space and are effectively **required for images** -- an image
-whose dimensions are missing or <= 1 px is treated as degenerate and
-dropped from rendering (the CLI reads them from PNG/JPEG/MP4 headers;
-an importer must supply them too).
+layout space and should be there for every image -- without them the
+browser has nothing to hold the space with and the page jumps as the
+picture arrives. Only a real 1x1 is treated as degenerate and dropped
+from rendering: that is the tracking pixel the rule exists for, and an
+image of unknown size is shown rather than thrown away, because a
+picture somebody put in a post is not the engine's to discard over a
+missing number. The CLI reads the dimensions from PNG/JPEG/MP4 headers,
+and an importer should supply them too.
 
 **`formatting`** is a flat array of `{type, start, end}` spans over the
 block's plain `text` -- offsets are **Unicode codepoints** (Ruby string
@@ -228,7 +232,8 @@ published under). It takes the date from `pubDate` rather than
 `wp:post_date`, which carries no offset and would otherwise be read in
 site.timezone and shift by hours. Images referenced in the markup are
 downloaded and then *measured*: HTML rarely states dimensions, and a block
-without them is dropped at build time by `degenerate_image?`.
+without them renders with nothing reserving its place, so the page jumps as
+each picture lands.
 
 An adapter judges items rather than pre-filtering them: `map` returns the
 reason as a Symbol -- `:reply`, `:retweet`, `:quote`, `:empty` and their kin;
@@ -337,7 +342,7 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Eleven questions, in one pass: files the checker cannot read at all, posts
+Thirteen questions, in one pass: files the checker cannot read at all, posts
 whose date nothing can parse, posts whose text is not a list of blocks, and
 posts whose slug is not one path segment -- all of them states the BUILD
 refuses to run on (or, for the slug, misplaces the page for), so a check that stayed
@@ -360,7 +365,10 @@ which is usually one series and a typo; one old address claimed by
 two posts, where whichever renders last wins and the others' readers land
 on it; and two posts that would be served at one address, which the build
 refuses to run on at all -- so an archive in that state used to be called
-sound by the one tool whose job is to say otherwise.
+sound by the one tool whose job is to say otherwise; and a `redirect_from`
+the build will refuse to serve, which it says once in the middle of a build
+log and which the checker used to count among the addresses this site
+answers at, so a link into one passed as sound.
 
 Two rules shape the plain run. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value
@@ -662,6 +670,15 @@ wrote. Then, in load order:
   kept inside it, the arrows walking the group the image belongs to, and
   focus handed back to the picture it was opened from. Its labels come
   from `window.BLOG_I18N` like every other string the client draws.
+- **The tag index** (`tag-index.js`) reorders `/tag/` between alphabetical
+  and by-count, and remembers which the reader chose. The page is built
+  alphabetically, so a reader without the script gets the order the
+  markup already has rather than a control that does nothing.
+- **Copy** (`copy-code.js`) puts a copy button on every `code` block --
+  built in the script rather than in the markup, so a page whose script
+  never runs shows no button instead of a dead one. It refuses to appear
+  at all where the clipboard is unavailable: an insecure origin, or a
+  browser without `navigator.clipboard.writeText`.
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.

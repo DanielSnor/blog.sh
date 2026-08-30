@@ -128,23 +128,46 @@ module PostWriter
       # every later run then skips, so the half-image publishes and no
       # amount of re-importing replaces it. A rename either happened or it
       # did not, so the only file under the real name is a complete one.
-      tmp = File.join(media_dir, ".#{filename}.part")
+      copy_media_file(src_path, dest)
+    end
+  end
+
+  # One file into the archive, the only way the archive accepts one.
+  #
+  # Split out of copy_media because `edit` had grown a bare FileUtils.cp
+  # of its own, so `./blog.sh add` published a phone photo with no
+  # coordinates in it and `./blog.sh edit` published the SAME photo with
+  # the author's back garden still in it -- the one thing the docs promise
+  # about media, broken on the path people use most. One promise wants one
+  # implementation.
+  #
+  # `replace:` is where the two callers genuinely differ. An import never
+  # replaces bytes the archive already holds (the paragraph above says
+  # why); a person attaching a file to their own post under a name that is
+  # already in the folder means to replace it, and always has.
+  def self.copy_media_file(src_path, dest, replace: false)
+    return if !replace && File.exist?(dest)
+
+    FileUtils.mkdir_p(File.dirname(dest))
+    # Copied beside the destination and renamed into place: a copy
+    # interrupted halfway leaves a .part nobody serves rather than a
+    # truncated picture under the real name.
+    tmp = File.join(File.dirname(dest), ".#{File.basename(dest)}.part")
+    begin
+      FileUtils.cp(src_path, tmp)
+      # On the copy, never on the author's own file: what sits in
+      # incoming/ or in a photo library is theirs, and the archive's
+      # copy is the one about to be published. Between the cp and the
+      # rename is the one moment the file is the engine's alone.
+      ExifLocation.strip_file(tmp) if strip_location?
+      File.rename(tmp, dest)
+    rescue StandardError
       begin
-        FileUtils.cp(src_path, tmp)
-        # On the copy, never on the author's own file: what sits in
-        # incoming/ or in a photo library is theirs, and the archive's
-        # copy is the one about to be published. Between the cp and the
-        # rename is the one moment the file is the engine's alone.
-        ExifLocation.strip_file(tmp) if strip_location?
-        File.rename(tmp, dest)
+        File.delete(tmp)
       rescue StandardError
-        begin
-          File.delete(tmp)
-        rescue StandardError
-          nil
-        end
-        raise
+        nil
       end
+      raise
     end
   end
 
@@ -165,6 +188,30 @@ module PostWriter
   # still has them (see reconcile_positional); only when the bytes answer
   # nothing does the positional name stand, because renaming on a guess
   # would mint fresh files on every run of a tree import.
+  # A set of media names that answers the way the FILESYSTEM answers, not
+  # the way a Hash does. Only ever asked "is this name spoken for?", so it
+  # keeps nothing but the folded spellings.
+  class FoldedNames
+    def initialize(names = [])
+      @names = {}
+      Array(names).each { |name| add(name) }
+    end
+
+    def key?(name)
+      @names.key?(name.to_s.downcase)
+    end
+
+    def add(name)
+      @names[name.to_s.downcase] = true
+    end
+
+    # `used[name] = true` reads better at the call sites than add(name),
+    # and this is the whole of what the callers ever store.
+    def []=(name, _value)
+      add(name)
+    end
+  end
+
   def self.reconcile_media_names(post, previous, year, slug, media_files)
     dir = File.join(MEDIA_DIR, year, slug)
     old_names = {}
@@ -256,7 +303,23 @@ module PostWriter
     end
     rename.merge!(moves)
 
-    used = (on_disk + rename.values + keeps).to_h { |n| [n, true] }
+    # Folded, because a directory is not a hash: `copy_media` asks the
+    # VOLUME whether the destination exists, and on macOS (and on any
+    # Windows share) 01.JPG answers for 01.jpg. Media#allocate keeps the
+    # source URL's extension exactly as it was, case and all, so 01.JPG is
+    # an ordinary name in a real archive -- Posterous served
+    # IMG_2669.JPG, and a decade of cameras wrote nothing else. A
+    # byte-exact lookup then handed a new picture the name 01.jpg
+    # believing it free, copy_media saw the folded name and skipped the
+    # copy, and the arrival's bytes were never written anywhere: the post
+    # showed the OLD picture twice and the new one was gone, with `check`
+    # reporting a reassuring "misnamed" and no loss.
+    #
+    # Folded on every volume, not only where it matters. An archive is
+    # copied between machines, and a name that is free on Linux and taken
+    # on macOS is a picture that disappears when somebody moves their
+    # site.
+    used = FoldedNames.new(on_disk + rename.values + keeps)
     arrivals.uniq.each do |name|
       # An arrival is not always a stranger: a picture dropped in one
       # re-import and brought back in the next arrives as a fresh
@@ -670,6 +733,18 @@ module PostWriter
     # state like the announcement URLs above, and minting a fresh one per
     # re-import would break every shared preview link.
     post['draft_token'] = old['draft_token'] if old && old['draft_token'] && post['state'] == 'draft' && !post['draft_token']
+    # ...and its place in the publish queue, for the same reason and with
+    # the same condition. `scheduled` is engine-side state no source has a
+    # notion of -- only scripts/manage_post.rb writes it -- and it was in
+    # neither carry-over list, so a re-import left the post a draft and
+    # quietly took it off the queue. Nothing said so, and the failure is
+    # invisible until the day the post does not appear: the cron looks for
+    # `state == draft && scheduled`, finds nothing due, and exits 0.
+    #
+    # Only while it is still a draft. If the source now says published,
+    # the post has gone out and a leftover queue flag would be a lie about
+    # where it stands.
+    post['scheduled'] = old['scheduled'] if old && old['scheduled'] && post['state'] == 'draft' && !post['scheduled']
     post = ensure_draft_token(post)
 
     # unpublished_from is a promise the engine owes the web: "this post
@@ -882,7 +957,27 @@ module PostWriter
     return nil if id.nil? || id.to_s.empty?
     return nil if account.nil? || account.to_s.empty?
 
-    [source['platform'], account.to_s, id.to_s]
+    # Folded, because the operator types this one. Several adapters take
+    # the old site's address on the command line -- Ghost's second
+    # argument is a required one -- and the host out of it IS half the
+    # post's identity, though the docs present it as "where the images
+    # live". Typing https://www.cynicky.blog on the second run where the
+    # first said https://cynicky.blog made every post a stranger: the
+    # archive doubled, every media file was fetched again into a second
+    # directory, and the summary said only that it had imported a lot.
+    #
+    # Here rather than in the adapter, so both sides of the comparison go
+    # through it: an archive that already carries the un-folded spelling
+    # keeps matching instead of duplicating on the very next run, which is
+    # the harm this is meant to prevent. Case folding is safe for every
+    # other kind of account too -- a Mastodon acct, a Twitter handle and a
+    # Tumblr blog name are all case-insensitive to the platforms that
+    # issue them.
+    [source['platform'], fold_account(account), id.to_s]
+  end
+
+  def self.fold_account(account)
+    account.to_s.strip.downcase.sub(%r{\A(?:https?://)?(?:www\.)}, '')
   end
 
   def self.find_by_source(source)

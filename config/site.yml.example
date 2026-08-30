@@ -50,6 +50,7 @@
 #   social      name, url, icon or icon_svg, (rel)
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
+#   comments    (approval)
 #   publishing  (slots)
 #   media       (convert_heic), (strip_location)
 #   seo         (block_ai_crawlers), (robots_extra)
@@ -390,6 +391,11 @@ social:
 #   # Optional: your instance's status character limit (default 500).
 #   # Instances routinely raise it -- the auto-toot's excerpt grows to fit.
 #   # toot_length: 500
+#   # Optional: what your server charges for a link, whatever the link
+#   # measures. Mastodon reserves 23 characters for every one of them and
+#   # says so in its own API (characters_reserved_per_url); set this only
+#   # if your server answers with something else.
+#   # link_length: 23
 # --- end of mastodon ---
 
 # The Bluesky alternative, same shape:

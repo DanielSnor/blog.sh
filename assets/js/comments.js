@@ -104,8 +104,17 @@
     return (
       '<div class="comment-media">' +
       media.map(function (m) {
-        return '<a href="' + esc(m.href) + '" target="_blank" rel="noopener">' +
-          '<img src="' + esc(m.src) + '" alt="' + esc(m.alt || '') + '" loading="lazy">' +
+        // Most Fediverse replies carry no description, so alt is "" and
+        // the anchor had no text, no title and no label -- a link a
+        // screen reader announces as its URL, or as nothing. The
+        // description is the accessible name when there is one, and a
+        // plain "picture" when there is not: a name somebody can hear
+        // beats a name that is technically absent.
+        var name = (m.alt || '').trim();
+        var label = name || (i18n.comment_picture || 'Picture');
+        return '<a href="' + esc(m.href) + '" target="_blank" rel="noopener"' +
+          ' aria-label="' + esc(label) + '">' +
+          '<img src="' + esc(m.src) + '" alt="' + esc(name) + '" loading="lazy">' +
         '</a>';
       }).join('') +
       '</div>'
@@ -124,7 +133,13 @@
         // 40x40 is what .comment-avatar is in the stylesheet, said here too
         // so the row is its right height before the picture arrives -- a
         // thread of twenty replies used to shuffle downwards as they landed.
-        '<img class="comment-avatar" src="' + esc(comment.avatar) + '" alt="" width="40" height="40" loading="lazy">' +
+        // A commenter with no picture used to get src="", which the browser
+        // resolves to the page itself: it re-fetches the whole HTML document
+        // and draws a broken-image icon in the avatar slot. An empty div
+        // holds the same 40x40 without asking for anything.
+        (comment.avatar
+          ? '<img class="comment-avatar" src="' + esc(comment.avatar) + '" alt="" width="40" height="40" loading="lazy">'
+          : '<div class="comment-avatar" aria-hidden="true"></div>') +
         '<div class="comment-body">' +
           '<div class="comment-meta">' +
             '<a href="' + esc(comment.author_url) + '" target="_blank" rel="noopener">' + esc(comment.author) + '</a>' +

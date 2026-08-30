@@ -112,12 +112,13 @@
     return i18n.results_many;
   }
 
-  function renderResults(container, hits, query, archivePending) {
+  function renderResults(container, hits, query, archivePending, archiveFailed) {
     if (!query.trim()) {
       container.innerHTML = '<p class="search-status">' + escapeHtml(i18n.search_prompt || '') + '</p>';
       return;
     }
     var archiveNote = archivePending ? ' <span class="search-archive-pending">' + i18n.searching_archive + '</span>' : '';
+    if (archiveFailed) archiveNote = ' <span class="search-archive-failed">' + escapeHtml(i18n.archive_unavailable) + '</span>';
     if (!hits.length) {
       var noResults = archivePending
         ? i18n.no_results_pending + archiveNote
@@ -141,7 +142,14 @@
     var html = '<p class="search-status">' + hits.length + ' ' + resultsUnit(hits.length) +
                capNote + archiveNote + '</p>';
     html += hits.slice(0, RESULT_LIMIT).map(function (p) {
-      var title = p.title || (p.excerpt.length > 60 ? p.excerpt.slice(0, 60) + '…' : p.excerpt);
+      // Array.from, not slice: slice counts UTF-16 units, so a cut that
+      // landed inside an emoji ended the heading with a replacement
+      // character. And a post with neither title nor text used to render a
+      // card whose heading was the empty string -- a date with nothing to
+      // click. Its date is the name it is known by everywhere else.
+      var chars = Array.from(p.excerpt || '');
+      var fromText = chars.length > 60 ? chars.slice(0, 60).join('') + '…' : chars.join('');
+      var title = p.title || fromText || p.date;
       return (
         '<div class="card post-list-item search-result">' +
           '<p class="meta">' + escapeHtml(p.date) + '</p>' +
@@ -202,7 +210,13 @@
           archiveState = 'loaded';
           run();
         })
-        .catch(function () { archiveState = 'failed'; });
+        // A failed fetch used to be swallowed here. On a real archive the
+        // recent index is a ninth of the whole, so search went on answering
+        // from 11% of the site with a count that read as final -- the reader
+        // was told "3 results" for a word with thirty. It says so now, and
+        // the next keystroke tries again rather than giving up for the life
+        // of the page.
+        .catch(function () { archiveState = 'failed'; run(); });
     }
 
     // The address follows the query. ?q= was read on the way in and never
@@ -233,7 +247,10 @@
       syncAddress(query);
       var tokens = parseQueryTokens(query);
       var hits = rankHits(searchMatches(combinedIndex(), tokens), tokens);
-      renderResults(results, hits, query, archiveState === 'loading');
+      renderResults(results, hits, query, archiveState === 'loading', archiveState === 'failed');
+      // One retry per query: 'failed' would otherwise stop
+      // loadArchiveIfNeeded from ever asking again.
+      if (archiveState === 'failed') archiveState = 'idle';
     }
 
     results.innerHTML = '<p class="search-status">' + escapeHtml(i18n.loading_index) + '</p>';

@@ -43,16 +43,25 @@ module Import
       return :reblog if item['reblog']
       return :reply if item['in_reply_to_id']
 
-      blocks = strip_trailing_hashtags(HtmlBlocks.parse(item['content'].to_s).blocks)
+      blocks, harvested = strip_trailing_hashtags(HtmlBlocks.parse(item['content'].to_s).blocks)
       blocks.concat(image_blocks(item, media))
       return :empty if blocks.empty?
+
+      tags = (item['tags'] || []).filter_map { |t| t['name'] }
+      # The strip below is justified by the tags standing in their place --
+      # "they are already the post's tags" is what the docs promise too.
+      # Real exports do not always fill `tags` in, and then the strip was
+      # the only thing that touched those hashtags: gone from the text,
+      # absent from the tags, and the post off every tag page it belonged
+      # on. When the export names none, the words taken out ARE the tags.
+      tags = harvested if tags.empty?
 
       {
         'slug' => build_slug(item, blocks),
         'title' => nil,
         'date' => Time.parse(item['created_at']).iso8601,
         'state' => 'published',
-        'tags' => (item['tags'] || []).filter_map { |t| t['name'] }.uniq { |t| t.downcase },
+        'tags' => tags.uniq { |t| t.downcase },
         'content' => blocks,
         'source' => {
           'platform' => 'pixelfed',
@@ -67,7 +76,17 @@ module Import
 
     def account
       @account ||= begin
-        first = JSON.parse(File.read(@path, encoding: 'utf-8')).first || {}
+        parsed = JSON.parse(File.read(@path, encoding: 'utf-8'))
+        # The wrapped shape ({"data": [...]}) is what a newer export is,
+        # and each_item already knows it -- this did not: `.first` on a
+        # Hash hands back the PAIR ["data", [...]], dig raises TypeError,
+        # the rescue below swallowed it, and the FILE NAME became the
+        # account on every post. source_key is [platform, account, id], so
+        # the archive's whole identity then hung on a name the browser
+        # changes to "... (1).json" the moment a fresh copy is downloaded,
+        # and the second import wrote every post again.
+        items = parsed.is_a?(Hash) ? parsed['data'] : parsed
+        first = (items || []).first || {}
         acct = first.dig('account', 'acct') || first.dig('account', 'username')
         acct.to_s.empty? ? File.basename(@path, '.json') : acct
       rescue StandardError
@@ -83,10 +102,18 @@ module Import
     # someone writing, not tagging.
     HASHTAG_LINE = /\A(?:#[[:word:]]+[[:space:]]*)+\z/
 
+    # Hands back what is left AND the words taken out, so the caller can
+    # put them where the strip claims they already are.
     def strip_trailing_hashtags(blocks)
-      blocks.pop while blocks.last && blocks.last['type'] == 'text' &&
-                      blocks.last['text'].to_s.match?(HASHTAG_LINE)
-      blocks
+      harvested = []
+      # unshift, not concat: the blocks come off the END of the post, so
+      # each one belongs in FRONT of what was taken before it -- while the
+      # words inside one block keep the order they were written in.
+      while blocks.last && blocks.last['type'] == 'text' &&
+            blocks.last['text'].to_s.match?(HASHTAG_LINE)
+        harvested.unshift(*blocks.pop['text'].to_s.scan(/#([[:word:]]+)/).flatten)
+      end
+      [blocks, harvested]
     end
 
     # The export links to the CDN rather than shipping the files, so these
@@ -102,9 +129,12 @@ module Import
         entry = { 'url' => filename }
         entry['width'] = original['width'] if original['width']
         entry['height'] = original['height'] if original['height']
-        block = { 'type' => att['type'].to_s == 'video' ? 'video' : 'image', 'media' => [entry] }
-        alt = att['description'].to_s.strip
-        block['alt_text'] = alt unless alt.empty?
+        kind = att['type'].to_s == 'video' ? 'video' : 'image'
+        block = { 'type' => kind, 'media' => [entry] }
+        # See mastodon.rb: alt_text is an image field, and a video's
+        # description put there is text nothing renders and nothing indexes.
+        text = att['description'].to_s.strip
+        block[kind == 'image' ? 'alt_text' : 'caption'] = text unless text.empty?
         block
       end
     end

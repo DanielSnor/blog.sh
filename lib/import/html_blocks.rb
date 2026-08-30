@@ -71,6 +71,16 @@ module Import
     def parse(html)
       doc = Tree.build(Tokenizer.tokenize(html.to_s))
       builder = Builder.new
+      # Counted over the whole tree BEFORE walking it, and not from the
+      # walk's own `when *DROPPED` branch: that branch is only reached for
+      # an element the walk visits as a block, and an <iframe> wrapped in
+      # a <div> or a <p> -- which is how every CMS on earth writes one --
+      # is inline content to the paragraph around it. Inline.render drops
+      # it without a word, so a post whose only video was in a wrapper
+      # imported as a post with no video and a ledger that said nothing
+      # had been dropped. The ledger is what tells the author to go and
+      # look; it has to see all of them.
+      builder.note_dropped(doc)
       builder.walk(doc)
       builder.warnings.each { |name, count| dropped[name] += count }
       Result.new(blocks: builder.blocks, warnings: builder.warnings)
@@ -150,13 +160,43 @@ module Import
           tokens << if m[1]
                       [:close, name]
                     else
-                      [:open, name, attributes(m[3].to_s), VOID.include?(name) || m[3].to_s.rstrip.end_with?('/')]
+                      # The trailing "/" only closes the tag when it is not
+                      # part of an attribute's own value: <a data-id=7/> is
+                      # an id of "7/" to every browser, and read as
+                      # self-closing here the </a> matched nothing and the
+                      # link was lost with its label. Quoted values cannot
+                      # end a tag, so only a bare one at the very end counts.
+                      [:open, name, attributes(m[3].to_s), VOID.include?(name) || self_closing?(m[3].to_s)]
                     end
           pos = m.end(0)
         end
         rest = html[pos..]
         tokens << [:text, rest] unless rest.nil? || rest.empty?
         tokens
+      end
+
+      # A "/" that ends the tag rather than an unquoted attribute value.
+      # Everything up to it is scanned for quotes: inside a quoted value
+      # the slash is content, and a bare value that merely CONTAINS one
+      # (a path, a date) is not the end of the tag either -- only a slash
+      # with nothing but whitespace after it is.
+      def self_closing?(raw)
+        rest = raw.rstrip
+        return false unless rest.end_with?('/')
+
+        in_single = false
+        in_double = false
+        rest[0..-2].each_char do |c|
+          in_single = !in_single if c == "'" && !in_double
+          in_double = !in_double if c == '"' && !in_single
+        end
+        return false if in_single || in_double
+
+        # Directly after a bare value with no space is that value's own
+        # last character: `data-id=7/`. A tag written `<br />` or `<img/>`
+        # has whitespace or a quote in front of it.
+        before = rest[-2]
+        before.nil? || before.match?(/[\s"']/)
       end
 
       def attributes(raw)
@@ -202,6 +242,16 @@ module Import
       def initialize
         @blocks = []
         @warnings = Hash.new(0)
+      end
+
+      # Every dropped element in the tree, wherever it sits.
+      def note_dropped(node)
+        node.children.each do |child|
+          next if child.text?
+
+          @warnings[child.name] += 1 if DROPPED.include?(child.name)
+          note_dropped(child)
+        end
       end
 
       # Not every body has blocks in it. Classic Blogger writes none at
@@ -277,7 +327,10 @@ module Import
         when 'figure'
           class_names(node).include?(BOOKMARK_CARD) ? emit_bookmark(node) : emit_figure(node)
         when 'br' then nil
-        when *DROPPED then @warnings[node.name] += 1
+        # Counted already, by note_dropped over the whole tree -- see
+        # HtmlBlocks.parse. Reached here only to keep it out of the
+        # wrapper branch below, which would render it as a paragraph.
+        when *DROPPED then nil
         else
           # An unknown element holding nothing but inline content is a
           # paragraph in all but name -- <div>Shoot with: <strong>x</strong>
@@ -336,6 +389,13 @@ module Import
       def emit_quote(node)
         paragraphs = node.children.select { |c| c.name == 'p' }
         sources = paragraphs.empty? ? [node] : paragraphs
+        # ...and everything else the quote holds, once the paragraphs have
+        # had their turn. Selecting only <p> threw away the rest whenever
+        # there was at least one: the <cite> or <footer> naming who said
+        # it, a list inside the quotation, a heading. A pull quote from
+        # WordPress is <p> plus <cite> as a matter of course, so the
+        # attribution went every time.
+        rest = paragraphs.empty? ? [] : node.children.reject { |c| c.name == 'p' || c.text? }
         sources.each do |source|
           text, formatting = Inline.render(source)
           next if text.strip.empty?
@@ -350,14 +410,38 @@ module Import
         # the block was dropped and no image ever took its place).
         # emit_paragraph and emit_figure have always collected images;
         # this branch was simply forgotten.
+        # The attribution and anything else beside the paragraphs, as
+        # quote blocks of their own -- the schema has one shape for a
+        # quote, and a <cite> is part of the quotation rather than a
+        # paragraph of the post.
+        rest.each do |source|
+          text, formatting = Inline.render(source)
+          next if text.strip.empty?
+
+          block = text_block(text, formatting)
+          block['subtype'] = 'quote'
+          @blocks << block
+        end
         collect(node, 'img').each { |img| emit_image(img) }
       end
 
       def emit_list(node)
-        items = node.children.select { |c| c.name == 'li' }.filter_map { |li| list_item(li) }
-        return if items.empty?
+        lis = node.children.select { |c| c.name == 'li' }
+        items = lis.filter_map { |li| list_item(li) }
+        @blocks << { 'type' => 'list', 'style' => node.name, 'items' => items } unless items.empty?
 
-        @blocks << { 'type' => 'list', 'style' => node.name, 'items' => items }
+        # The pictures inside the items. A list has no place to put one, so
+        # each becomes its own block after the list -- which is what
+        # emit_paragraph has always done. Dropped here, they were not even
+        # registered with the media ledger: the file was never fetched, and
+        # nothing anywhere said a picture had gone.
+        lis.each { |li| collect(li, 'img').each { |img| emit_image(img) } }
+
+        # A <ul> whose content was never wrapped in <li> -- which no
+        # browser minds and plenty of hand-written HTML does -- had its
+        # content dropped whole. It is not a list, but it is still words
+        # somebody wrote.
+        walk(prune(node, lis)) if node.children.any? { |c| !lis.include?(c) }
       end
 
       def list_item(li)
@@ -370,7 +454,12 @@ module Import
         item['formatting'] = formatting unless formatting.empty?
         if nested
           children = nested.children.select { |c| c.name == 'li' }.filter_map { |c| list_item(c) }
-          item['children'] = { 'style' => nested.name, 'items' => children } unless children.empty?
+          # With 'type', like every other list block. Without it the renderer
+          # fell through to the unknown-type fallback and a nested bullet
+          # imported from HTML printed as raw JSON in a <pre> on the page.
+          unless children.empty?
+            item['children'] = { 'type' => 'list', 'style' => nested.name, 'items' => children }
+          end
         end
         item
       end
@@ -441,6 +530,12 @@ module Import
         block['header'] = rows.shift if headed
         block['rows'] = rows
         @blocks << block
+
+        # The pictures inside the cells, for the same reason as in a list:
+        # a table cell is text, so a picture in one had nowhere to go and
+        # was dropped before the ledger ever heard of it. The file was
+        # never fetched and nothing said so.
+        collect(node, 'img').each { |img| emit_image(img) }
       end
 
       # An image's dimensions are required by the build (missing or <= 1px
@@ -506,6 +601,19 @@ module Import
       end
 
       def emit_figure(node)
+        # A gallery is figures inside a figure, each with its own picture
+        # and its own caption. Swept for images from the top, every one of
+        # them was given the FIRST figcaption in the tree -- a dozen photos
+        # all captioned "Sunrise over the bay". Each inner figure answers
+        # for itself; what the outer one holds besides them (an intro, a
+        # caption for the set) is walked after.
+        nested = node.children.select { |c| c.name == 'figure' }
+        unless nested.empty?
+          nested.each { |child| visit(child) }
+          walk(prune(node, nested))
+          return
+        end
+
         images = collect(node, 'img')
         caption_node = collect(node, 'figcaption').first
         caption = caption_node && normalize(Inline.render(caption_node).first)
@@ -513,7 +621,25 @@ module Import
           emit_image(img)
           @blocks.last['caption'] = caption if caption && !caption.empty? && @blocks.last['type'] == 'image'
         end
-        walk(node) if images.empty?
+        # ...and the prose a figure may hold beside its picture. `walk if
+        # images.empty?` dropped it whenever there WAS one, which is the
+        # ordinary case: a figure is a picture AND what somebody wrote
+        # about it. Walked with the pictures and the caption taken out, so
+        # nothing lands twice.
+        walk(prune(node, images + [caption_node].compact))
+      end
+
+      # The node without the given descendants -- a copy, so the tree the
+      # caller was handed is left as it is.
+      def prune(node, drop)
+        ids = drop.map(&:object_id)
+        rebuild = lambda do |current|
+          return current if current.text?
+
+          kids = current.children.reject { |c| ids.include?(c.object_id) }.map { |c| rebuild.call(c) }
+          Node.new(name: current.name, attrs: current.attrs, children: kids)
+        end
+        rebuild.call(node)
       end
 
       def text_block(text, formatting)
@@ -630,8 +756,17 @@ module Import
           else
             span_type = HtmlBlocks::INLINE_SPANS[child.name]
             start = text.length
+            # A block-level child flattened in here needs the space its own
+            # markup stood for. inline_only? looks at DIRECT children only,
+            # so a card written <a><h2>Title</h2><p>Blurb</p></a> -- the
+            # shape of every themed listing -- arrives as one paragraph and
+            # came out "TitleBlurb", two facts welded into one word.
+            if HtmlBlocks::Builder::BLOCK_LEVEL.include?(child.name) && !text.empty? &&
+               !text.end_with?(' ')
+              text << ' '
+            end
             collect(child, text, spans, skip)
-            spans << { 'type' => span_type, 'start' => start, 'end' => text.length } if span_type
+            spans << { 'type' => span_type, 'start' => start + (text[start] == ' ' ? 1 : 0), 'end' => text.length } if span_type
           end
         end
       end

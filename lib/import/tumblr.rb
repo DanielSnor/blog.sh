@@ -7,6 +7,7 @@ require 'uri'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative 'permalinks'
+require_relative 'html_blocks'
 
 module Import
   # Imports a Tumblr blog through the API in NPF format. Every post the
@@ -253,6 +254,18 @@ module Import
       when 'audio' then audio_block(block, media)
       when 'link' then link_block(block, media)
       when 'paywall' then paywall_block(block)
+      else
+        # A block type nobody wrote a branch for used to vanish whole: not
+        # in the post, not in the summary, not visible to `check`. Tumblr
+        # has served `poll` blocks since 2023, so a poll post imported as
+        # whatever prose surrounded it and the reader had no way to tell a
+        # question was ever asked. This is the failure the `paywall` branch
+        # was added to fix, and it was fixed one type wide. Counted where
+        # every other thing the schema cannot hold is counted: the run's
+        # "what the block schema could not hold" line.
+        kind = block['type'].to_s.strip
+        HtmlBlocks.dropped[kind] += 1 unless kind.empty?
+        nil
       end
     end
 
@@ -266,6 +279,17 @@ module Import
     def image_block(block, media)
       largest = (block['media'] || []).max_by { |m| m['width'].to_i }
       filename = largest && media.from_url(largest['url'])
+      # Every sibling adapter drops the block when the picture could not be
+      # fetched -- a dead 64.media.tumblr.com address, a 404, a geo-block,
+      # all routine in an archive of old posts -- and medium.rb states the
+      # contract: download, measure, or lose the one image rather than the
+      # post. Kept, the entry carried url: null, which the build renders as
+      # <img src=""> (the browser resolves that to the post's own page, so
+      # a published page shows a permanently broken picture) while `check`
+      # skips an empty url and calls the archive sound. Media#failures
+      # counts it, and the summary names the address that would not come.
+      return nil unless filename
+
       {
         'type' => 'image',
         'media' => [{ 'url' => filename, 'width' => largest && largest['width'], 'height' => largest && largest['height'] }],

@@ -101,7 +101,7 @@ module Import
         'content' => blocks,
         'source' => {
           'platform' => 'beehiiv',
-          'account' => (URI.parse(url).host rescue nil),
+          'account' => host_of(url) || publication_host,
           'post_url' => url.empty? ? nil : url,
           'original_id' => item['id']
         }.compact
@@ -119,6 +119,29 @@ module Import
     # and drafting it would hold back most of a normal archive.
     PREMIUM_AUDIENCES = ['premium', 'all premium subscribers', 'all paid subscribers'].freeze
     PREMIUM_TAG = 'beehiiv-premium'
+
+    # The publication these issues belong to. An issue that was never
+    # published carries no `url`, so `account` fell out of its source
+    # record -- and PostWriter.source_key is nil without one, so the
+    # writer could not match what the previous run had written: re-running
+    # the identical command over the identical CSV added slug-2, slug-3,
+    # slug-4, against the promise the tool prints itself. Every row in the
+    # file belongs to one publication, so the host its published issues
+    # carry is the unpublished ones' too.
+    def publication_host
+      return @publication_host if defined?(@publication_host)
+
+      @publication_host = CSV.read(@path, headers: true).lazy
+                             .filter_map { |row| host_of(row['url']) }.first
+    end
+
+    def host_of(url)
+      return nil if url.to_s.strip.empty?
+
+      URI.parse(url.to_s).host
+    rescue StandardError
+      nil
+    end
 
     def premium?(item)
       audience = item['audience'] || item['web_audiences']

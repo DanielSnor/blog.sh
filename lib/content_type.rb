@@ -30,7 +30,14 @@ module ContentType
     explicit = post['type']
     return explicit if PRIORITY.include?(explicit)
 
-    blocks = post['content']
+    # Array(), like every other reader of this key in the build -- and a
+    # nil INSIDE the array too. A post with no `content`, or with a null
+    # entry among its blocks, killed the whole build here with a raw
+    # NoMethodError naming this file and no post, before a single page
+    # was written; `check` read the same archive and called it sound.
+    blocks = Array(post['content']).compact
+    return 'text' if blocks.empty?
+
     types = blocks.map { |b| b['type'] == 'file' ? 'document' : b['type'] }
     # A quote is a text subtype, not a block type, so it can't win the scan
     # on its own. Only a post that OPENS with one counts as a quote post --

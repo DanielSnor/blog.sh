@@ -60,6 +60,26 @@ module Import
       @wordpress = super || !document.elements['rss/channel/item/wp:post_type'].nil?
     end
 
+    # Answered before Feed decides the post is empty -- see Feed#map. A
+    # photo post whose body parses to nothing, or one whose only block was
+    # the newsletter form stripped in body_html, used to be refused as
+    # :empty and its picture with it: map() adds the image, and map() only
+    # runs on a post Feed did not already throw away. Nothing is fetched
+    # here, so the media numbering is exactly what it was.
+    def extra_leading?(item)
+      !feature_attachment_url(item).nil?
+    end
+
+    # The export escapes titles twice, and the decode in map() happens on
+    # the finished post -- too late for the slug, which is built from this.
+    # A draft (whose <link> is "/null", so the title is all there is) was
+    # filed under skillman-amp-hackett-draft while its own heading read
+    # "Skillman & Hackett Draft", and that address is the one the author
+    # publishes under later.
+    def slug_title(item)
+      HtmlBlocks.decode_entities(super)
+    end
+
     # The <link> is a relative path; everything downstream (post_url,
     # redirect_from, image absolutizing) expects a full URL, and the
     # channel's own link is the base the export means.
@@ -142,16 +162,24 @@ module Import
       end
     end
 
+    # The address of that attachment, or nil. Separate from the block it
+    # becomes, because the emptiness test above needs the answer without
+    # downloading anything.
+    def feature_attachment_url(item)
+      index = entries.index(item)
+      neighbour = index && entries[index + 1]
+      return nil unless neighbour && text_of(neighbour, 'wp:post_type') == 'attachment'
+
+      url = text_of(neighbour, 'wp:attachment_url')
+      url.match?(IMAGE_EXT) || url.include?('images.unsplash.com') ? url : nil
+    end
+
     # The feature image is the NEXT item in the export -- an attachment
     # carrying wp:attachment_url -- which Feed would only ever count as
     # skipped. A lookahead turns it into the post's first image.
     def feature_image_for(item, media)
-      index = entries.index(item)
-      neighbour = index && entries[index + 1]
-      return [] unless neighbour && text_of(neighbour, 'wp:post_type') == 'attachment'
-
-      url = text_of(neighbour, 'wp:attachment_url')
-      return [] unless url.match?(IMAGE_EXT) || url.include?('images.unsplash.com')
+      url = feature_attachment_url(item)
+      return [] unless url
 
       filename = media.from_url(url)
       return [] unless filename

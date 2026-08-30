@@ -10,6 +10,7 @@
 # isn't fetched by the visitor's browser, but server-side (see lib/sidebar.rb).
 
 require_relative '../lib/sidebar'
+require_relative '../lib/public_file'
 require_relative '../lib/post_stats'
 require_relative '../lib/site_config'
 
@@ -33,11 +34,23 @@ PUBLIC_DIR = File.join(ROOT, 'public.nosync')
 # The wrapper maps 3 back to 0.
 require_relative '../lib/run_lock'
 require_relative '../lib/i18n'
-RunLock.acquire!(ROOT, label: 'sidebar', busy_exit: 3)
+RunLock.acquire!(ROOT, label: 'sidebar', busy_exit: 3, quiet_when_busy: true)
 
-abort('❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb).') unless Dir.exist?(PUBLIC_DIR)
+# Not an abort: this runs every half hour under cron, where a non-zero
+# exit with a line on stderr is a mail, and "you have not built the site
+# yet" is not news worth mailing forty-eight times a day. Saying it and
+# leaving quietly also lets refresh-sidebar.sh reach its own "Nothing
+# built yet" branch, which was written for this and could never run.
+unless Dir.exist?(PUBLIC_DIR)
+  puts I18n.t('cron.sidebar_not_built')
+  exit 0
+end
 
-puts Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))
+# Printed only when there is something to say. A switched-off sidebar
+# returns nothing, and this line runs under cron, where every line is
+# mail: a blank one every half hour is still a half-hourly mail.
+sidebar_line = Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))
+puts sidebar_line unless sidebar_line.strip.empty?
 
 # Stats for tooted posts are only fetched here, not on every build.
 #
@@ -115,7 +128,20 @@ fetched = PostStats.fetch_all(recent_only: !full_refresh)
 # back until the weekly pass. Not being able to tell is a reason to keep
 # everything, not to forget.
 live, unreadable = PostStats.entries_with_gaps
-if unreadable.positive?
+# ...and only when the archive is THERE. PathGlob answers an absent or
+# empty content.nosync with [] and no error, so a tick on a volume that
+# had not mounted -- or in a working copy whose files were still arriving
+# -- read as "every announced post was deleted": both public files were
+# sliced down to {}, uploaded (they are in refresh-sidebar.sh's --only
+# list), and the live site lost every approved comment and every counter
+# at once. Exit 0, nothing said, nothing mailed. Not being able to see the
+# archive is a reason to keep everything, exactly like not being able to
+# read part of it.
+missing_archive = !Dir.exist?(PostStats::CONTENT_DIR) ||
+                  (live.empty? && (previous_stats.any? || previous_comments.any?))
+if missing_archive
+  warn I18n.t('cron.sidebar_no_archive', dir: PostStats::CONTENT_DIR)
+elsif unreadable.positive?
   warn I18n.t('cron.sidebar_gaps', count: unreadable)
 else
   previous_stats = previous_stats.slice(*live)
@@ -123,7 +149,11 @@ else
 end
 
 stats = previous_stats.merge(fetched.transform_values { |result| result['stats'] })
-File.write(STATS_PATH, stats.to_json)
+# PublicFile.write, not File.write: this file is served to readers, and
+# under cron the umask is whatever the daemon's is -- 0600 on a stock
+# Cloudron, which is a stats.json the web server cannot read. Its sibling
+# comments.json has gone through PublicFile since it was written.
+PublicFile.write(STATS_PATH, stats.to_json)
 # The stamp says "the weekly pass was done", and the next six days are
 # decided by it. A pass in which every single fetch failed -- an instance
 # down, a token that lost its scope -- used to write it anyway, so the
@@ -157,7 +187,7 @@ else
   # request blanking a whole discussion.
   approved = fetched.reject { |_key, result| result['comments'].nil? }
   comments = previous_comments.merge(approved.transform_values { |result| result['comments'] })
-  File.write(COMMENTS_PATH, comments.to_json)
+  PublicFile.write(COMMENTS_PATH, comments.to_json)
   puts I18n.t('cron.sidebar_comments', threads: approved.size,
                                        comments: comments.values.sum { |list| Array(list).size })
 end

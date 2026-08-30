@@ -99,7 +99,7 @@ module MarkdownParser
   # three spans -- permutations and repeated types included; that matrix
   # is what these positions were settled against, and what will notice
   # if they move.
-  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*).)+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\*)\*(?!\*)|~~(?<strike>.+?)~~|`(?<code>[^`]+?)`|\[(?<ltext>(?:\\.|[^\]\\])*)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*)[^*])+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?!\*)(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:\\.|(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\\)(?<!(?<!\\)\*)\*(?!\*)|~~(?<strike>.+?)(?<!\\)~~|(?<fence>`+)(?<code>.+?)\k<fence>|\[(?<ltext>(?:\\.|[^\]\\])*)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -170,7 +170,19 @@ module MarkdownParser
       elsif m[:strike]
         append_span(result, formatting, m[:strike], 'strikethrough', start)
       elsif m[:code]
-        result << m[:code]
+        # A fence of however many backticks it takes, not always one: a
+        # code span whose content HAS a backtick can only be written that
+        # way -- markdown honours no escapes inside a span, so the writer's
+        # backslash used to come back as visible text with the span cut
+        # short at the inner backtick. The writer emits the long fence
+        # (see MarkdownWriter#code_span); this is the other half.
+        #
+        # One leading and one trailing space are dropped, which is
+        # markdown's own rule and what lets a span start or end with a
+        # backtick at all.
+        code = m[:code]
+        code = code[1..-2] if code.length > 2 && code.start_with?(' ') && code.end_with?(' ')
+        result << code
         formatting << { 'type' => 'code', 'start' => start, 'end' => result.length }
       elsif m[:ltext]
         # A label-less link is consumed and NOTHING is put in its place.
@@ -239,6 +251,16 @@ module MarkdownParser
   VIDEO_RE = /\A!!\[(.*)\]\(([^)"]+?)\)\z/
   HEADING_RE = /\A(\#{1,6})\s+(.+)\z/
   HR_RE = /\A(?:-{3,}|_{3,}|\*[ \t]*\*[ \t]*\*[ \t*]*)\z/
+  # Where the teaser ends: everything above this line is the post's own
+  # invitation, everything below is the body. Deliberately NOT a horizontal
+  # rule, which would have been the obvious reading of "put a divider there":
+  # rules are already in use as rules, and their first one usually sits deep
+  # in the post -- eleven posts across the three sites the engine runs, with
+  # first rules at block 17, 19, 27 and 36 -- so "the first rule ends the
+  # teaser" would have silently handed those a teaser half a page long.
+  # Strict on purpose: a looser pattern would let an ordinary note like
+  # "// more below //" split somebody's post without saying so.
+  TEASER_END_RE = %r{\A//--more--//\z}
   UL_ITEM_RE = /\A[-*]\s+(.+)\z/
   OL_ITEM_RE = /\A\d+[.)]\s+(.+)\z/
   BLOCKQUOTE_LINE_RE = /\A>[ \t]?(.*)\z/
@@ -282,7 +304,14 @@ module MarkdownParser
     # Spaces before the marker are eaten here, before parse_inline computes
     # formatting offsets -- trimming them afterwards would shift every span
     # that crosses the break.
-    para.gsub(/ *(?<!\\)\\\n/, BREAK_SENTINEL).tr("\n", ' ')
+    # Two trailing spaces are markdown's other hard break, and the writer
+    # needs it for the one line the backslash marker cannot end: a line
+    # whose own last character is a backslash. "\\\\" there is an escaped
+    # backslash and there is no marker left over, so the break was lost
+    # and the text gained a space instead.
+    para.gsub(/ *(?<!\\)\\\n/, BREAK_SENTINEL)
+        .gsub(/  +\n/, BREAK_SENTINEL)
+        .tr("\n", ' ')
   end
   YOUTUBE_RE = %r{\Ahttps?://(?:www\.)?(?:youtube\.com/watch\?(?:[^\s]*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})}
 
@@ -742,6 +771,27 @@ module MarkdownParser
     segments
   end
 
+  # A paragraph without the indentation it shares, rather than one merely
+  # stripped at both ends.
+  #
+  # `strip` takes the leading spaces off the FIRST line only, so a flat
+  # list written with one to three spaces in front of every marker -- what
+  # a converter emits and what plenty of people type -- arrived at
+  # parse_list as one item at column 0 followed by items at column 2, and
+  # came back as a one-item list with everything else nested under it.
+  # parse_list was reading it correctly; it was handed the wrong thing.
+  #
+  # The COMMON indent, so a genuinely nested list keeps its shape: the
+  # minimum is the outer level, and every relative depth survives it.
+  def dedent(para)
+    lines = para.to_s.split("\n", -1)
+    present = lines.reject { |l| l.strip.empty? }
+    return para.to_s.strip if present.empty?
+
+    common = present.map { |l| l[/\A[ ]*/].length }.min
+    lines.map { |l| l.strip.empty? ? '' : l[common..] }.join("\n").strip
+  end
+
   def parse_prose_block(para, media_dir, media_files, counter, incoming_dir: nil)
     if (m = VIDEO_RE.match(para))
       caption, target = m[1].strip, m[2].strip
@@ -796,7 +846,11 @@ module MarkdownParser
       end
 
       counter += 1
-      alt, path, caption = m[1], m[2], unescape_title(m[3])
+      # The label is unescaped like the title beside it: the writer escapes
+      # "[" and "]" so an alt text holding one cannot end the label early,
+      # and reading it back raw left the backslashes where the reader could
+      # see them -- and put them into the alt attribute on the page.
+      alt, path, caption = unescape_title(m[1]), m[2], unescape_title(m[3])
       # A single exclamation mark is for images only. A video with just one
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.
@@ -840,6 +894,8 @@ module MarkdownParser
       abort "Both images and videos must be on their own line, separated by blank lines. The problem is here:\n#{para}"
     elsif !para.include?("\n") && HR_RE.match?(para)
       return [{ 'type' => 'hr' }, counter]
+    elsif !para.include?("\n") && TEASER_END_RE.match?(para)
+      return [{ 'type' => 'teaser_end' }, counter]
     elsif !para.include?("\n") && (m = HEADING_RE.match(para))
       text, formatting = parse_inline(m[2])
       # A heading line whose whole content was a label-less anchor has no
@@ -878,6 +934,14 @@ module MarkdownParser
     media_files = {}
     counter = 0
 
+    # CRLF at the door. A markdown tree written on Windows -- which is most
+    # of what a converter hands over -- carries \r before every newline, and
+    # the paragraph collapse turns a soft break into a space and leaves the
+    # \r sitting in the stored text. It is invisible in the editor, comes
+    # out in the JSON, and travels into the page and the feed. A code fence
+    # keeps its own bytes; nothing else has any use for a carriage return.
+    body = body.to_s.gsub(/\r\n?/, "\n")
+
     split_code_fences(body).each do |segment|
       if segment[:type] == :code
         # The chat fence rides the code-fence rails on purpose: a fence is
@@ -896,7 +960,16 @@ module MarkdownParser
         next
       end
 
-      segment[:text].split(/\n\s*\n/).map(&:strip).reject(&:empty?).each do |para|
+      # The marker is a BLOCK, so it gets to be its own paragraph even when
+      # the author did not leave blank lines around it. Without this it sat
+      # inside a paragraph, where the block rules below never look for it:
+      # the post was not split, and because the marker is content rather
+      # than a note it was not stripped either -- so `//--more--//` was
+      # printed on the page, in the feed, in the description and in a toot
+      # that cannot be taken back. Code fences are already separated out
+      # above, so a marker inside one is left exactly as it was typed.
+      text = segment[:text].gsub(/^[ \t]*(\/\/--more--\/\/)[ \t]*$/, "\n\\1\n")
+      text.split(/\n\s*\n/).map { |para| dedent(para) }.reject(&:empty?).each do |para|
         block, counter = parse_prose_block(para, media_dir, media_files, counter, incoming_dir: incoming_dir)
         # nil is a paragraph that turned out to hold nothing a reader could
         # see -- see the heading branch. Every other path returns a block.

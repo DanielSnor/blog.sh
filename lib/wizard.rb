@@ -585,6 +585,11 @@ module Wizard
     puts Tui.paint("❌ #{t('template_missing', path: relative(e.path))}", :red)
     puts
     exit 1
+  rescue ConfigWriter::Unreadable => e
+    puts
+    puts Tui.paint("❌ #{t('config_unreadable_file', path: relative(e.path), error: e.message)}", :red)
+    puts
+    exit 1
   end
 
   # A path as the reader would type it: the engine's own root cut off, so

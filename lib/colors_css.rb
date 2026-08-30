@@ -138,6 +138,21 @@ module ColorsCss
       # across every palette this engine has shipped (orange/bluebird/garden/
       # sunflower all set dark card-bg == dark nav-bg exactly).
       'card-bg' => mode == 'dark' ? nav_bg : '#ffffff',
+      # The footer's own surface, and the one place a value is chosen per
+      # mode rather than taken from the palette. In light mode the nav bar's
+      # colour is what makes the footer read as a band -- which is what it
+      # was given in 1.3. In dark mode that same value is ALSO the card
+      # colour (the line above), so the band never appeared: the footer, the
+      # cards and the bar were one surface divided by hairlines. The page
+      # background is the only shipped colour darker than the cards, so the
+      # footer sinks rather than rises -- which is what a footer does anyway.
+      #
+      # On `contrast` this changes nothing, and deliberately: that palette
+      # sets bg and nav_bg to the same black and divides by lines, not by
+      # planes. Measured across the seven shipped palettes: six gain a band,
+      # sunflower gains a quiet one (its bg is #241708 against #3a2a14
+      # cards), contrast keeps its lines.
+      'footer-bg' => mode == 'dark' ? color_for(colors, mode, 'bg') : nav_bg,
       'text' => text,
       'meta-text' => meta_text,
       'accent' => color_for(colors, mode, 'accent'),

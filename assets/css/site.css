@@ -132,6 +132,16 @@ nav a[aria-current="page"]:focus-visible { outline-color: #ffffff; }
   margin: 30px auto;
   border-top: 5px solid var(--nav-border);
   border-bottom: 5px solid var(--nav-border);
+  /* The sides close the frame the two rules above open. Thin where they
+     are thick, deliberately: the horizontal rules carry the weight --
+     they are what separates the site from the page around it -- while
+     these only have to say where the block ends. At the same 5px the
+     page reads as a picture in a mount, and it would cost 10 of the 940
+     the bar above measures its menu against.
+     Drawn in the bar's own line colour, which follows the theme: #767676
+     in light, #8c8c8c in dark. */
+  border-left: 1px solid var(--nav-border);
+  border-right: 1px solid var(--nav-border);
   border-radius: 6px;
 }
 
@@ -444,6 +454,12 @@ nav a[aria-current="page"]:hover {
    appearance toggle sits in the corner it starts from, and 65% is what has
    always kept it from running underneath. */
 @media (max-width: 700px) {
+  /* On a phone the block already runs to both edges of the screen, so a
+     frame has nothing to enclose -- and two more lines take two more
+     pixels from a column that has none to spare. A tablet keeps them:
+     there the page still sits on a background. */
+  .wrap { border-left: 0; border-right: 0; }
+
   .banner-overlay { padding: 10px 14px; }
   .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); max-width: 65%; }
   .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 100%; }
@@ -578,7 +594,13 @@ nav a[aria-current="page"]:hover {
   .search-form input[type="search"] { height: 40px; }
   .search-form button { width: 40px; height: 40px; }
 
-  nav li { float: none; margin-left: 0; line-height: normal; }
+  /* height too. The desktop bar fixes the row at 60px so a hovered link
+     can paint over the bar's frame; stacked on a narrow screen that
+     leaves every 40px link floating in a 60px row, with the divider
+     under it in mid-gap rather than under the text. The rest of this
+     block already undoes the desktop row metrics -- this was the one
+     property left behind. */
+  nav li { float: none; margin-left: 0; line-height: normal; height: auto; }
 
   nav a {
     height: auto;
@@ -824,6 +846,47 @@ blockquote {
   margin: 1rem 0;
   overflow-x: auto;
 }
+/* The copy button hangs on a WRAPPER the script builds around the block,
+   not on the block itself. A <pre> that scrolls is its own scroll
+   container, so an absolutely positioned child of it is placed against
+   the CONTENT: on a long command the button rode across the code as the
+   reader scrolled, and at the far end left the block altogether. The
+   wrapper does not scroll, so the corner stays a corner. */
+.code-wrap { position: relative; }
+.copy-code {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--meta-text);
+  cursor: pointer;
+  /* Always there rather than on hover: a phone has no hover, and a button
+     that appears only to a mouse is a button half the readers never get. */
+  opacity: 0.75;
+  transition: opacity 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+.copy-code:hover, .copy-code:focus-visible { opacity: 1; color: var(--text); }
+/* The icon becoming a check is the whole of the VISIBLE feedback; the
+   button's own name carries it for a reader who cannot see the corner. */
+.copy-code--done { color: var(--accent); opacity: 1; }
+/* Room ABOVE the first line rather than beside it. Padding on the side
+   cannot work: a code block does not wrap, so its long first line runs
+   under anything parked at the right edge -- measured on this project's
+   own /markdown/ page, 14 of 27 blocks had characters covered on a
+   phone. A strip at the top is the only place a button can sit where no
+   character can ever be behind it. */
+.code-wrap > pre.code-block { padding-top: 2.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  .copy-code { transition: none; }
+}
 /* Inline `code` spans get a small pill look; .content pre code below
    resets that for the fenced-block case so the two don't double up. */
 .content code, .chrome-text code {
@@ -842,7 +905,12 @@ blockquote {
   white-space: pre;
 }
 
-.video-unavailable { color: var(--meta-text); font-style: italic; }
+.video-unavailable, .audio-unavailable { color: var(--meta-text); font-style: italic; }
+/* The note search.js draws when the archive index will not load. Its twin
+   -- the line shown while the index is still coming -- has always been
+   styled; this one was left plain, so the one message that says a SEARCH
+   IS INCOMPLETE looked like ordinary text. */
+.search-archive-failed { color: var(--meta-text); font-style: italic; }
 
 /* The link block is body text and stays body text. A link post's title is
    no longer in here -- it is the post's heading now, in an h1 or an h2 like
@@ -1123,7 +1191,18 @@ a.tag-pill:hover { background: var(--accent); color: #ffffff; }
 
 /* Stays put whether or not there is a query, so starting to type swaps the
    text beside it instead of shifting the whole line. */
-.listing-heading__icon { vertical-align: -0.15em; margin-right: var(--listing-heading-gap); color: var(--meta-text); }
+/* Lifted to sit on the text's own middle rather than on its baseline: a
+   20px glyph hung from a 1.6rem baseline reads as having fallen off the
+   line. 0.02em rather than a round number because that is where the
+   calendar's box and the cap height of the heading line up. */
+.listing-heading__icon { vertical-align: 0.02em; margin-right: var(--listing-heading-gap); color: var(--meta-text); }
+
+/* A heading that is also a way back. It keeps the heading's own colour
+   until the pointer is on it -- underlined orange at 1.6rem would read as
+   a link that happens to be big rather than as a title you can click. */
+.listing-heading__link { color: inherit; text-decoration: none; }
+.listing-heading__link:hover,
+.listing-heading__link:focus-visible { color: var(--accent); text-decoration: underline; }
 
 .search-tagline { margin-bottom: 0.25rem; }
 
@@ -1147,14 +1226,14 @@ a.tag-pill:hover { background: var(--accent); color: #ffffff; }
 main .post-list-item { margin-bottom: 1.5rem; }
 main .post-list-item:last-child { margin-bottom: 0; }
 
-.content.excerpt { max-height: 500px; overflow: hidden; position: relative; }
-.content.excerpt::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 70px;
-  background: linear-gradient(to bottom, transparent, var(--card-bg));
-}
+/* A listing card used to render the whole post and hide the rest here, at
+   500px, under a fade. Measured on a real front page, that meant every one
+   of fourteen cards carried between 794 and 2616 pixels of content and
+   showed 500 -- and 33 of the page's 154 focusable elements were reachable
+   by the keyboard while invisible on screen. The card is cut at a block
+   boundary before it is written now (lib/card_teaser.rb), so there is
+   nothing left here to hide and no fade over a cut that no longer falls
+   mid-sentence. */
 .read-more { display: inline-block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 400; }
 
 .pagination {
@@ -1253,7 +1332,7 @@ aside .card { margin-bottom: 1.5rem; }
 }
 
 footer {
-  background: var(--nav-bg);
+  background: var(--footer-bg);
   border-radius: 4px;
   padding: 1.5rem;
   display: grid;
@@ -1449,4 +1528,175 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* The archive index. A row per year with a strip of twelve months, so the
+   shape of the whole archive is visible at once -- which is the only thing
+   this page does that no listing could. An empty month is drawn rather
+   than skipped: on an archive spanning twenty-three years the silences are
+   as much of the picture as the busy stretches, and so is an empty year. */
+/* As wide as the strip needs and no wider, centred on the page: the row
+   is a table, and a table whose rule runs off past its last column reads
+   as an unfinished one. fit-content rather than a fixed max-width because
+   the twelve cells decide the width -- and they change size on a phone. */
+.archive-map {
+  list-style: none;
+  padding: 0;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: 100%;
+}
+.archive-year {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.archive-year-name { min-width: 3.4rem; font-weight: 600; color: var(--accent); text-decoration: none; }
+.archive-year.is-empty .archive-year-name { color: var(--meta-text); font-weight: 400; }
+.archive-year-count { min-width: 2.6rem; text-align: right; color: var(--meta-text); font-size: 0.85rem; }
+.archive-months { display: flex; gap: 3px; flex-wrap: nowrap; }
+/* Fixed width so the twelve cells line up down the page: the strip is only
+   readable as a shape if January sits above January. */
+.archive-month {
+  width: 1.6rem;
+  padding: 0.15rem 0;
+  text-align: center;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  background: var(--pill-bg);
+  color: var(--text);
+  text-decoration: none;
+}
+/* Four steps mixed out of the site's own accent, so the map takes the
+   palette with it instead of introducing a colour of its own. The text
+   stays --text on the lighter two and flips on the darker two, which is
+   where mixing enough accent in stops leaving room for it. */
+.archive-month.is-l1 { background: color-mix(in srgb, var(--accent) 18%, var(--pill-bg)); }
+.archive-month.is-l2 { background: color-mix(in srgb, var(--accent) 42%, var(--pill-bg)); }
+.archive-month.is-l3 { background: color-mix(in srgb, var(--accent) 70%, var(--pill-bg)); color: var(--bg); }
+.archive-month.is-l4 { background: var(--accent); color: var(--bg); }
+.archive-month:hover { outline: 2px solid var(--text); outline-offset: 1px; }
+.archive-month.is-empty { background: transparent; border: 1px solid var(--border); color: var(--meta-text); }
+
+.archive-section { margin: 0 0 1.75rem; }
+/* The month sticks while its own months' worth of posts scrolls past.
+   A year here can be four hundred lines long, and a number left at the top
+   of the section stops answering "which month am I in?" after the first
+   screenful. 70px is the sticky bar's own height, the same figure
+   scroll-padding-top uses above; the background is its own, or the lines
+   underneath show through as they pass. */
+.archive-section h2 {
+  position: sticky;
+  top: 70px;
+  z-index: 1;
+  margin: 0 0 0.5rem;
+  /* The number sits in from the edge of its own band rather than against
+     it: flush left it read as the start of the line under it instead of
+     as a label over the section. */
+  padding: 0.2rem 0.5rem;
+  font-size: 1.1rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.archive-list { list-style: none; padding: 0; margin: 0; }
+.archive-list li { display: flex; gap: 0.6rem; padding: 0.2rem 0; align-items: baseline; }
+.archive-list time { min-width: 2.2rem; text-align: right; color: var(--meta-text); font-size: 0.85rem; flex: 0 0 auto; }
+
+@media (max-width: 700px) {
+  /* The strip is what has to survive a phone: the year and the count give
+     up their fixed columns first, and the cells shrink rather than wrap,
+     because a strip that wraps to two lines stops being one shape. */
+  .archive-year { gap: 0.4rem; }
+  .archive-year-name { min-width: 2.9rem; }
+  .archive-year-count { min-width: 2rem; font-size: 0.8rem; }
+  .archive-months { gap: 2px; }
+  .archive-month { width: 1.35rem; font-size: 0.72rem; }
+}
+
+/* The tag index at /tag/. Pills in long wrapped lines rather than a cloud:
+   a cloud sizes words by frequency and then asks the reader to compare type
+   sizes, which is a worse way of saying a number than the number is. Seven
+   hundred tags is a page, not a wall -- and a pill is the shape this engine
+   already uses for a tag everywhere else, so the index looks like what it
+   indexes. */
+.tag-index {
+  list-style: none;
+  padding: 0;
+  /* Centred like the archive map, and capped rather than fit-content:
+     pills fill whatever they are given, so fit-content would take the
+     whole page back. */
+  margin: 0 auto;
+  /* The width the two-column version had, now spent on one column: the
+     list never ran edge to edge and should not start now -- a wrapped
+     line of pills is easier to scan when the eye knows where it turns. */
+  max-width: 34rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+/* The archive's month band, at the width of the block rather than of a
+   name -- it labels the run under it, so it takes the line to itself.
+   Not sticky: a year is one long column and a heading that follows the
+   reader down it earns its place, while twenty-seven of them would spend
+   the page sticking over each other. */
+.tag-index-letter {
+  flex: 0 0 100%;
+  margin: 1rem 0 0.15rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--meta-text);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+/* The first one opens the list, so it needs no room above it. */
+.tag-index-letter:first-child { margin-top: 0; }
+/* A tag with no space in it -- an imported hashtag can be sixty
+   characters long -- made the pill wider than the page and put a
+   horizontal scrollbar under the whole document, not just under the
+   list. It wraps inside the pill instead. */
+.tag-index-item { display: inline-flex; max-width: 100%; }
+.tag-index-item > .tag-pill { overflow-wrap: anywhere; }
+/* The same size as a tag pill anywhere else on the site: this page is an
+   index OF those pills, and a tag that changes size depending on which
+   page it is on is a tag the reader has to recognise twice. The margin
+   goes because the list has a gap of its own. */
+.tag-index-item > .tag-pill { margin: 0; }
+/* The count rides inside the pill: one link, one target, and a number
+   that cannot drift to the name after it when the line wraps. Smaller
+   than the name it belongs to, and dimmed, so the pill still reads as
+   its word first. */
+.tag-index-count {
+  font-size: 0.62em;
+  opacity: 0.75;
+  margin-left: 0.2em;
+}
+/* Two buttons meeting in the middle of the block, with the list's own gap
+   between them. */
+.tag-index-sort {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  max-width: 34rem;
+  margin: 0 auto 1rem;
+}
+.tag-index-sort-button:first-child { justify-self: end; }
+.tag-index-sort-button:last-child { justify-self: start; }
+.tag-index-sort-button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.tag-index-sort-button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+@media (max-width: 700px) {
+  .tag-index-sort { gap: 1rem; }
 }

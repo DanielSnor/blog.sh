@@ -10,7 +10,7 @@
                   <%= post_names_itself?(post) ? post_heading_html(post, 'h1', nil) : hero_time_html(post, heading: true) %>
                   <p class="post-hero__meta"><span class="post-hero__author"><%= h(SITE_AUTHOR) %></span><%= post_names_itself?(post) ? hero_time_html(post) : '' %><%= reading_time_html(reading_labels(post)) %></p>
                 </div>
-              </div><% elsif !page?(post) %><%= date_badge(post, heading: !post_names_itself?(post)) %><% end %><%# A page has no date worth showing: "Contact, 1 July 2022" says nothing except that somebody had to type a date into a field. %>
+              </div><% elsif !page?(post) %><%= date_badge(post, heading: !post_names_itself?(post), link: archive_link_for(post)) %><% end %><%# A page has no date worth showing: "Contact, 1 July 2022" says nothing except that somebody had to type a date into a field. %>
               <div class="post-body">
                 <% unless hero_media %><%= post_heading_html(post, 'h1', nil) %><% end %>
                 <%= post_meta_html(post, hero_media ? nil : reading_labels(post)) %><%= series_nav_html(series_slug, series_posts, series_index, :top, post) %><%= toc_html(toc) %><%# All four on one line, and the crowding is the point: each helper returns '' when it has nothing to say, but a line of its own emits its indentation and its newline regardless -- so a post with no reading time, no series and no contents would carry a blank line that the same post did not carry before 1.3. %>
@@ -28,4 +28,4 @@
             </div>
           </article>
         </div>
-        <nav class="pagination back"><a href="/"><%= h(t('post.back_to_list')) %></a></nav>
+        <nav class="pagination back" aria-label="<%= h(t('pagination.nav_label')) %>"><a href="/"><%= h(t('post.back_to_list')) %></a></nav>

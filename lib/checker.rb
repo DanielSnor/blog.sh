@@ -7,6 +7,7 @@ require 'net/http'
 require 'uri'
 require 'timeout'
 require 'time'
+require_relative 'entity_text'
 require_relative 'post_address'
 require_relative 'slug'
 require_relative 'i18n'
@@ -58,6 +59,13 @@ module Checker
   # left over from an import. A checker that is confidently wrong about a
   # working address costs more than one that says nothing, which is the rule
   # the comment on known_paths sets out and this list was breaking.
+  # /archive/ and /tag/ are deliberately NOT here. They were, and neither
+  # is unconditional: the map needs one post in the stream and the tag
+  # index needs one tag on one of them. A menu entry pointing at either
+  # was then ticked as sound by doctor while it 404'd from every page of
+  # the site -- the exact failure check_nav exists to prevent. They are
+  # worked out in known_paths instead, from the same condition the build
+  # guards them with.
   FIXED_PATHS = ['/', '/search/', '/markdown/',
                  '/rss.xml', '/sitemap.xml', '/robots.txt', '/404.html'].freeze
 
@@ -132,9 +140,11 @@ module Checker
     findings.concat(check_relative_links(posts, cap))
     findings.concat(check_orphan_media(root, posts, cap))
     findings.concat(check_stray_media(root, posts, cap))
-    findings.concat(check_redirects(posts))
-    findings.concat(check_series_names(posts))
+    findings.concat(check_redirects(posts, cap))
+    findings.concat(check_redirect_entries(posts, cap))
+    findings.concat(check_series_names(posts, cap))
     findings.concat(check_duplicate_addresses(posts))
+    findings.concat(check_html_entities(posts, cap))
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
 
@@ -185,12 +195,77 @@ module Checker
   # parse: both are states the build refuses to run on, so a check that
   # calls the archive sound while either is present is telling the author
   # the opposite of what they are about to find out.
+  # Text that still carries HTML entities instead of the characters they
+  # stand for: "journalists &amp; writers" reads as "journalists &amp;
+  # writers" on the page, because the build escapes it again -- correctly,
+  # since as far as it knows the ampersand is what the author wrote.
+  #
+  # Where they come from: Twitter escapes <, > and & in its archive and says
+  # nothing about it, and the importer only learned to decode them in 1.4.
+  # Every archive imported before that carries them, and an upgrade cannot
+  # help -- the entities are in the posts by then. Reported from one such
+  # site, and true of 10 posts on another.
+  #
+  # A warning rather than an error, and offered rather than applied: an
+  # author writing ABOUT html has every right to "&amp;" in their text, and
+  # nothing here can tell the two apart.
+  # No cap here, and none anywhere else in a check either: capping is
+  # `capped`'s job, done once, and `--json` asks for all of them by passing
+  # nil. Slicing here took that nil and died on it -- which took the whole
+  # --json document with it, along with its count, its total and its kinds.
+  def check_html_entities(posts, cap = nil)
+    found = posts.filter_map do |post|
+      next if draft?(post)
+
+      # The TITLE too, and a link block's title and description. The whole
+      # point of this finding is archives imported before 1.4, and a
+      # Twitter or Ghost import puts `journalists &amp; writers` in a
+      # post's title as readily as in its body -- where it is worse,
+      # because that string is the heading, the browser tab, the feed
+      # item and the link card. It was neither reported nor repairable.
+      texts = Array(post['content']).select { |b| b.is_a?(Hash) && b['type'] == 'text' }
+      hits = texts.filter_map { |b| b['text'].to_s[EntityText::ANY_ENTITY] if EntityText.entities?(b['text']) }
+      links = Array(post['content']).select { |b| b.is_a?(Hash) && b['type'] == 'link' }
+      hits += ([post['title']] + links.flat_map { |b| [b['title'], b['description']] })
+              .filter_map { |v| v.to_s[EntityText::ANY_ENTITY] if EntityText.entities?(v) }
+      next if hits.empty?
+
+      [post, hits.uniq]
+    end
+
+    capped(found.map do |post, hits|
+      warn(t('post_entities', slug: post['slug'], entities: hits.first(3).join(' ')),
+           t('post_entities_fix'), kind: :post_entities,
+           # file_year, not date_year: the repair opens this as a PATH,
+           # and a post whose date was corrected across a year boundary
+           # keeps its file where it was so its address does not move.
+           # Every other finding in this file records __year already.
+           data: { 'slug' => post['slug'].to_s, 'year' => PostAddress.file_year(post).to_s,
+                   'entities' => hits })
+    end, cap)
+  end
+
   def check_unbuildable(posts, cap = CAP)
     findings = unreadable_files.map do |path, reason|
       error(t('post_unreadable', file: short_path(path), reason: reason),
             t('post_unreadable_fix'), kind: :post_unreadable,
             data: { 'file' => path, 'reason' => reason })
     end
+    # A page whose slug is one of the addresses the engine writes itself.
+    # The build refuses to write it and says so on the terminal -- but a
+    # rebuild scrolls past, and this tool then called the archive sound
+    # about a page that is not on the site at all. The names come from
+    # PostAddress rather than a second list here: the two refusing
+    # different sets is the same bug with an extra step.
+    posts.each do |post|
+      next unless PostAddress.page?(post)
+      next unless PostAddress::RESERVED_ROOT_SEGMENTS.include?(post['slug'].to_s.downcase)
+
+      findings << error(t('page_reserved_slug', slug: post['slug']),
+                        t('page_reserved_slug_fix'), kind: :page_reserved_slug,
+                        data: { 'slug' => post['slug'].to_s })
+    end
+
     posts.each do |post|
       # A post whose content is not a list of blocks. Every reader here
       # wraps it in Array() so the check itself survives such a file --
@@ -198,7 +273,16 @@ module Checker
       # the build dies on with a raw NoMethodError, which is the exact
       # thing check_unbuildable exists to prevent. Surviving it is not the
       # same as blessing it.
-      unless post['content'].nil? || post['content'].is_a?(Array)
+      # The `.nil?` exemption used to sit here, and it was the hole: a post
+      # with no `content` key at all -- or "content": null -- was waved
+      # through as sound and the build then died on it. A post the build
+      # cannot read is unbuildable whether the key is the wrong TYPE or
+      # missing altogether; surviving a file is not the same as blessing it.
+      # ...and every entry in it has to be a block. A null among them is
+      # dropped by the build now rather than killing it, but a post with a
+      # hole where a block should be is still a post somebody has to look
+      # at -- and this is the tool whose job is to say so.
+      unless post['content'].is_a?(Array) && post['content'].all? { |b| b.is_a?(Hash) }
         findings << error(t('post_content_unreadable', file: short_path(post['__path'].to_s),
                                                        value: post['content'].class.to_s),
                           t('post_content_unreadable_fix'), kind: :post_content_unreadable,
@@ -312,10 +396,19 @@ module Checker
     File.join(File.dirname(path), "#{m[1]}#{m[2]}")
   end
 
+  # A String, and then a parseable one. The `.to_s` used to do both jobs and
+  # hid the first: a post file whose date is a JSON NUMBER -- 20260608
+  # rather than "2026-06-08", which is what a hand-edited or externally
+  # generated file gets -- parsed happily here and was blessed, while the
+  # build calls Time.parse(post['date']) with no coercion and dies on it.
+  # check said "the archive is sound" and exited 0, the very next build
+  # exited 1 with a TypeError naming no post at all. check_unbuildable
+  # exists precisely so that cannot happen.
   def parseable_date?(value)
-    return false if value.to_s.strip.empty?
+    return false unless value.is_a?(String)
+    return false if value.strip.empty?
 
-    Time.parse(value.to_s)
+    Time.parse(value)
     true
   rescue StandardError
     false
@@ -369,18 +462,34 @@ module Checker
       slug = Slug.slugify(post['series'].to_s)
       series_sizes[slug] += 1 unless slug.empty?
     end
+    # Whether the two roots exist at all, decided by the same conditions
+    # the build guards them with rather than assumed.
+    stream_post = false
+    stream_tag = false
     posts.each do |post|
       paths << post_path(post)
+      # A year of the archive index exists when a post in the stream lives
+      # in it -- worked out from the posts rather than written down, because
+      # a hand-kept list of years is a list that goes stale on new year's
+      # day. The year is the ADDRESS's, matching what the build groups by:
+      # taking the displayed date instead would invent /archive/2015/ for a
+      # post served under 2014 and call the site's own link dead.
+      in_stream = !(draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post))
+      if in_stream
+        stream_post = true
+        year = PostAddress.date_year(post)
+        paths << "/archive/#{year}/" if year
+      end
       # A tag page is built from the STREAM, exactly like a series page:
       # a tag carried only by a draft, a page or an unlisted post never
       # gets one. Counting those tags as known made every link to such a
       # tag look sound -- including the ones the site puts in its own menu,
       # on every page, where doctor then called the menu fine.
-      in_stream = !(draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post))
       (in_stream ? Array(post['tags']) : []).each do |tag|
         slug = Slug.slugify(tag.to_s)
         next if slug.empty?
 
+        stream_tag = true
         paths << "/tag/#{slug}/"
         # A tag the site names in its menu gets a feed of its own. Which
         # tags those are is a config question, so the feed is accepted
@@ -402,9 +511,22 @@ module Checker
       # link to one pass as sound while the reader gets a 404.
       if in_stream || !draft?(post)
         Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
-        Array(post['redirect_from']).each { |origin| paths << origin.to_s }
+        # ...and only the ones the build will actually serve. It refuses a
+        # redirect_from whose first segment belongs to the site itself, or
+        # whose shape it cannot make a directory of, and says so once in
+        # the middle of a build log. Counting those among the addresses
+        # the site answers at passed every link to them as sound -- under
+        # a closing sentence that names redirects by name.
+        Array(post['redirect_from']).each do |origin|
+          paths << origin.to_s if PostAddress.redirect_refusal(origin).nil?
+        end
       end
     end
+    # The map exists once one post is in the stream; the tag index once
+    # one of those carries a tag. A site whose tags all live on drafts,
+    # pages or unlisted posts has neither.
+    paths << '/archive/' if stream_post
+    paths << '/tag/' if stream_tag
     paths
   end
 
@@ -432,6 +554,13 @@ module Checker
   # named first.
   def unusable_media_cause(path)
     return 'dir' if File.directory?(path)
+    # A symlink whose target is gone answers File.readable? with false, so
+    # it was reported as a missing read permission and the fix text told the
+    # author to chmod a file that is not there. The advice cannot work, and
+    # following it teaches them the tool is wrong about something else too.
+    # Asked before readable? for the same reason `dir` is: the shapes shadow
+    # each other, so the more specific one has to be named first.
+    return 'broken_link' if File.symlink?(path) && !File.exist?(path)
     return 'unreadable' unless File.readable?(path)
 
     'empty'
@@ -534,7 +663,14 @@ module Checker
         elsif claim.nil?
           missing << [post['slug'], url, post['__year']]
         elsif claim.last != :exact
-          misnamed << [post['slug'], url, claim.first, claim.last, post['__year'], rel_dir]
+          # Whether this post ALSO refers to the correct spelling somewhere
+          # else. The repair pass refuses the rename in that case -- two
+          # blocks would end up sharing one url and which picture was lost
+          # is not a machine's question -- but it refused at apply time,
+          # after offering the rename in full and taking the keypress. The
+          # answer is known here, so the offer is never made.
+          misnamed << [post['slug'], url, claim.first, claim.last, post['__year'], rel_dir,
+                       urls.include?(claim.first)]
         end
       end
     end
@@ -556,14 +692,15 @@ module Checker
       # warning), where it does not the hole is already there (an error).
       # And when the two spellings look identical on screen -- NFC against
       # NFD -- the sentence has to say so, or it reads as nonsense.
-      capped(misnamed.map do |slug, url, actual, how, year, rel|
+      capped(misnamed.map do |slug, url, actual, how, year, rel, in_use|
         key = url.unicode_normalize(:nfc) == actual.unicode_normalize(:nfc) &&
               url.downcase != actual.downcase ? 'media_misnamed_form' : 'media_misnamed'
         text = t(key, slug: slug, file: url, actual: actual)
         data = { 'slug' => slug, 'file' => url, 'actual' => actual, 'year' => year,
-                 'match' => how.to_s, 'dir' => rel }
-        how == :fold ? error(text, t('media_misnamed_fix'), kind: :media_misnamed, data: data)
-                     : warn(text, t('media_misnamed_fix'), kind: :media_misnamed, data: data)
+                 'match' => how.to_s, 'dir' => rel, 'actual_in_use' => in_use }
+        fix = t(in_use ? 'media_misnamed_both_fix' : 'media_misnamed_fix')
+        how == :fold ? error(text, fix, kind: :media_misnamed, data: data)
+                     : warn(text, fix, kind: :media_misnamed, data: data)
       end, cap)
   end
 
@@ -792,7 +929,7 @@ module Checker
   # alone -- rok-2025 next to rok-2026 is two year-series, not a typo.
   # And a distance of two only counts when one side has a single post:
   # two established series that merely have similar names are not news.
-  def check_series_names(posts)
+  def check_series_names(posts, cap = nil)
     groups = posts.reject { |p| draft?(p) }
                   .group_by { |p| Slug.slugify(p['series'].to_s) }
                   .reject { |slug, _| slug.empty? }
@@ -812,7 +949,7 @@ module Checker
                        data: { 'a' => names[0], 'posts_a' => groups[a].size,
                                'b' => names[1], 'posts_b' => groups[b].size })
     end
-    findings
+    capped(findings, cap)
   end
 
   # What is left of a slug once its numbers are gone -- and once the
@@ -846,18 +983,39 @@ module Checker
     previous.last
   end
 
-  def check_redirects(posts)
+  # Every redirect_from the build will refuse to serve, said here instead
+  # of once in the middle of a build log nobody keeps. The two refusals are
+  # kept apart because they are different mistakes: a reserved first
+  # segment is a redirect somebody wrote by hand into the site's own
+  # namespace, an unusable one is a shape no directory can be made of.
+  def check_redirect_entries(posts, cap = nil)
+    findings = posts.flat_map do |post|
+      Array(post['redirect_from']).filter_map do |origin|
+        refusal = PostAddress.redirect_refusal(origin)
+        next if refusal.nil?
+
+        warn(t("redirect_from_#{refusal}", slug: post['slug'].to_s, entry: origin.to_s),
+             t("redirect_from_#{refusal}_fix"),
+             kind: :"redirect_from_#{refusal}",
+             data: { 'slug' => post['slug'].to_s, 'entry' => origin.to_s,
+                     'year' => PostAddress.file_year(post).to_s })
+      end
+    end
+    capped(findings, cap)
+  end
+
+  def check_redirects(posts, cap = nil)
     claims = Hash.new { |h, k| h[k] = [] }
     posts.each do |post|
       Array(post['redirect_from']).each { |origin| claims[origin.to_s] << post['slug'] }
       Array(post['former_slugs']).each { |former| claims["/posts/#{former}/"] << post['slug'] }
     end
-    claims.filter_map do |origin, slugs|
+    capped(claims.filter_map do |origin, slugs|
       next if slugs.uniq.size < 2
 
       error(t('redirect_collision', origin: origin, slugs: slugs.uniq.join(', ')), t('redirect_collision_fix'),
             kind: :redirect_collision, data: { 'origin' => origin, 'slugs' => slugs.uniq })
-    end
+    end, cap)
   end
 
   # --- the outside world (--online only) -----------------------------------

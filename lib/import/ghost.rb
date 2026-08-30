@@ -32,6 +32,7 @@ module Import
       @site_url = site_url.to_s.sub(%r{/+\z}, '')
       @keep_permalinks = keep_permalinks
       @scheduled = 0
+      @members = 0
       @page_paths = []
     end
 
@@ -72,12 +73,26 @@ module Import
       return :empty if blocks.empty?
 
       state = item_state(item)
+      tags = tags_for(item)
+      # Ghost gates a members-only or paid post at serve time and ships
+      # the WHOLE body in the export regardless. Written as published,
+      # every word anybody paid for was on the open web the moment the
+      # site was built -- with no tag, no count and no line in the run.
+      # Both siblings protect them: beehiiv drafts a premium issue and
+      # tags it, Substack tags a paid one. A draft is the reversible half
+      # of that pair, so the person migrating decides post by post what
+      # the public archive gets.
+      if members_only?(item)
+        @members += 1
+        state = 'draft'
+        tags += [MEMBERS_TAG] unless tags.include?(MEMBERS_TAG)
+      end
       post = {
         'slug' => Slug.slugify(item['slug'].to_s.empty? ? item['title'].to_s : item['slug']),
         'title' => item['title'],
         'date' => item_date(item).iso8601,
         'state' => state,
-        'tags' => tags_for(item),
+        'tags' => tags,
         'content' => blocks,
         'source' => {
           'platform' => 'ghost',
@@ -109,6 +124,7 @@ module Import
     def postscript
       notes = []
       notes << I18n.t('import.note.ghost_scheduled', count: @scheduled) if @scheduled.positive?
+      notes << I18n.t('import.note.ghost_members', count: @members) if @members.positive?
       notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
     end
@@ -148,6 +164,16 @@ module Import
     # queue: its time was a promise made to a different site, and silently
     # entering it into this one's cron would publish -- and announce --
     # posts nobody here reviewed. The postscript says how many wait.
+    # Ghost's visibility column: public | members | paid | tiers. Anything
+    # that is not public was gated, and an export written before the
+    # column existed says nothing -- which is public, the way it was.
+    MEMBERS_TAG = 'ghost-members'
+
+    def members_only?(item)
+      visibility = item['visibility'].to_s.strip.downcase
+      !visibility.empty? && visibility != 'public'
+    end
+
     def item_state(item)
       case item['status']
       when 'published' then 'published'
@@ -180,10 +206,41 @@ module Import
     def leading_blocks(item, media)
       blocks = []
       feature = item['feature_image'].to_s.gsub('__GHOST_URL__', @site_url)
-      blocks << { 'type' => 'image', 'media' => [{ 'url' => feature }] } unless feature.empty?
+      unless feature.empty?
+        block = { 'type' => 'image', 'media' => [{ 'url' => feature }] }
+        # The caption and the alt text an editor typed under the feature
+        # image live in the export's posts_meta table, which nothing here
+        # ever opened -- 8 of the 118 posts in the export this was measured
+        # against lost one. Body images kept theirs all along; the lead
+        # photo arrived bare, and nothing said so.
+        meta = post_meta(item)
+        caption = caption_text(meta['feature_image_caption'])
+        alt = meta['feature_image_alt'].to_s.strip
+        block['caption'] = caption if caption
+        block['alt_text'] = alt unless alt.empty?
+        blocks << block
+      end
       excerpt = item['custom_excerpt'].to_s.strip
       blocks << { 'type' => 'text', 'text' => excerpt } unless excerpt.empty?
       localize_images(blocks, media, item)
+    end
+
+    def post_meta(item)
+      @posts_meta ||= (data['posts_meta'] || []).to_h { |row| [row['post_id'], row] }
+      @posts_meta[item['id']] || {}
+    end
+
+    # Ghost writes the caption as HTML -- a <span>, often with a link in
+    # it. The schema's caption is a plain string, so it is read the way
+    # HtmlBlocks reads a <figcaption>: tags out, entities decoded.
+    def caption_text(html)
+      return nil if html.to_s.strip.empty?
+
+      text = HtmlBlocks.parse("<p>#{html}</p>").blocks
+                       .select { |block| block['type'] == 'text' }
+                       .map { |block| block['text'].to_s }
+                       .join(' ').strip
+      text.empty? ? nil : text
     end
 
     def body_blocks(html, media, item)

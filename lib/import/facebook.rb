@@ -53,6 +53,14 @@ module Import
       @crossposts = 0
     end
 
+    # The directory this export lives in. Media#from_file refuses any path
+    # that resolves outside it -- an export naming a file on the importer's
+    # own disk got it copied into the archive and published.
+    def import_root
+      @dir
+    end
+
+
     # The unpacked export nests differently per era -- posts/ at the
     # top, or under your_facebook_activity/. Accept the archive root,
     # either parent, or the posts directory itself.

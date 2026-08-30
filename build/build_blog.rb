@@ -10,6 +10,7 @@ require 'cgi'
 require 'uri'
 require 'digest'
 require_relative '../lib/sidebar'
+require_relative '../lib/public_file'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/embed'
@@ -20,6 +21,7 @@ require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 require_relative '../lib/colors_css'
 require_relative '../lib/post_text'
+require_relative '../lib/card_teaser'
 require_relative '../lib/path_glob'
 
 SiteConfig.use_site_timezone!
@@ -61,8 +63,21 @@ RunLock.acquire!(ROOT, label: 'build', busy_exit: 3) unless ENV['BLOG_SH_PUBLIC_
 # a taste knob worth setting ONCE, before the first deploy: pagination is
 # anchored to the oldest post precisely so page contents never change,
 # and changing the size later renumbers every existing page.
-PAGE_SIZE = SiteConfig.get('site', 'page_size', default: 10)
-EXCERPT_TEXT_THRESHOLD = 400 # plain-text chars; CSS max-height does the actual visual clipping
+# doctor has owned this rule since it was written -- "a whole number
+# greater than zero" -- and the build never asked. config/site.yml is a
+# documented hand-edit surface, so `page_size: 10.5` is a typo somebody
+# can make: it built a site of /page/-1.0/ and /page/0.38095238095238093/
+# addresses and exited 0. A number nobody can page by is not a reason to
+# refuse to build; it is a reason to say so and use the default.
+PAGE_SIZE = begin
+  configured = SiteConfig.get('site', 'page_size', default: 10)
+  if configured.is_a?(Integer) && configured.positive?
+    configured
+  else
+    warn I18n.t('build.page_size_unusable', value: configured.inspect)
+    10
+  end
+end
 RSS_ITEM_LIMIT = 30
 META_DESCRIPTION_LENGTH = 160
 # The search index splits in two: search-index.json (recent posts) loads on
@@ -171,7 +186,23 @@ def fediverse_creator_meta
 end
 
 SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
-SITE_LOCALE = SiteConfig.get('site', 'locale', default: 'en_US')
+# locale is a SECOND language switch, independent of site.lang, and only
+# ./setup.sh ever kept the two in step. A site localized by hand -- or one
+# whose language was changed in the file afterwards -- shipped
+# og:locale="en_US" on every page of a Czech or German blog, and nothing
+# anywhere said so.
+#
+# It is NOT overridden here: a site that wants en_GB, or pt_BR under lang
+# en, says so on purpose and the engine has no business guessing against
+# it. What was missing is the sentence, and it belongs to doctor rather
+# than to the build -- "your config could be better" is doctor's subject,
+# and an upgrade that starts printing a new warning on every build of
+# every existing site is the noise tests/test_upgrade_from_12.rb refuses.
+# The default follows the language, because a site that never named a
+# locale has not chosen one.
+LOCALE_FOR_LANG = { 'cs' => 'cs_CZ', 'de' => 'de_DE', 'en' => 'en_US' }.freeze
+SITE_LOCALE = SiteConfig.get('site', 'locale',
+                             default: LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US'))
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
 # site that just doesn't want the overlay) can drop either line without
@@ -268,12 +299,15 @@ end
 def client_i18n_json
   {
     date_locale: t('js.date_locale'),
+    tags_sort_alpha: t('tags.sort_alpha'),
+    tags_sort_count: t('tags.sort_count'),
     stats_favourited: t('js.stats_favourited'),
     stats_boosted: t('js.stats_boosted'),
     stats_comments: t('js.stats_comments'),
     reply_on_mastodon: t('js.reply_on_mastodon'),
     reply_on_bluesky: t('js.reply_on_bluesky'),
     comments_moderated: t('js.comments_moderated'),
+    comment_picture: t('js.comment_picture'),
     results_one: t('js.results_one'),
     results_few: t('js.results_few'),
     results_many: t('js.results_many'),
@@ -282,6 +316,7 @@ def client_i18n_json
     no_results_final: t('js.no_results_final'),
     try_other_words: t('js.try_other_words'),
     searching_archive: t('js.searching_archive'),
+    archive_unavailable: t('js.archive_unavailable'),
     search_prompt: t('search.prompt'),
     loading_index: t('js.loading_index'),
     index_unavailable: t('js.index_unavailable'),
@@ -290,6 +325,9 @@ def client_i18n_json
     lightbox_next: t('js.lightbox_next'),
     lightbox_label: t('js.lightbox_label'),
     lightbox_open: t('js.lightbox_open'),
+    copy_code: t('js.copy_code'),
+    copy_code_done: t('js.copied'),
+    copy_code_failed: t('js.copy_failed'),
     theme_auto: t('ui.theme_auto'),
     theme_light: t('ui.theme_light'),
     theme_dark: t('ui.theme_dark')
@@ -550,7 +588,8 @@ def render_config_block(block)
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
-      nested = it['children'] ? render_config_block(it['children']) : ''
+      child = nested_list(it['children'])
+      nested = child ? render_config_block(child) : ''
       body = apply_formatting(it['text'], it['formatting'], escape: false)
       if it.key?('checked')
         box = %(<input type="checkbox" disabled#{it['checked'] ? ' checked' : ''}>)
@@ -562,12 +601,22 @@ def render_config_block(block)
     "<#{tag}>#{items}</#{tag}>"
   when 'hr'
     '<hr>'
+  when 'teaser_end'
+    # Where the teaser stops. The post's own page shows everything, so the
+    # marker itself renders as nothing; it exists for the toot, the link
+    # card and the listing, which is where a post has to introduce itself.
+    ''
   when 'code'
     # The one place in the chrome that keeps escaping: a code block exists to
     # show markup as text, so passing it through raw would render the very
     # thing the author was quoting.
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{h(block['lang'])}")
-    %(<pre><code#{lang_class}>#{h(block['text'].to_s)}</code></pre>)
+    # The class is what the copy button hangs on, and it hangs on the BLOCK
+    # TYPE rather than on the <pre>: a chat is a <dl>, but the fallback for
+    # a block type nothing here knows renders as a <pre> too, and offering
+    # to copy the engine's own error state is not the feature anybody asked
+    # for. Inline code is a <code> with no <pre> and is left alone.
+    %(<pre class="code-block"><code#{lang_class}>#{h(block['text'].to_s)}</code></pre>)
   else
     ''
   end
@@ -696,13 +745,17 @@ def render_audio(block, media_prefix)
   elsif (src = Embed.src(block))
     embed_iframe(src, block)
   elsif block['embed_html'] && !block['embed_html'].strip.empty?
-    block['embed_html']
+    Embed.without_scripts(block['embed_html'])
   elsif block['url']
     # A player that could not be looked up (offline at save time, or a
     # service with none for that address) still leaves the address, and a
     # link to it beats a dead end -- the same courtesy the video branch has
     # always shown.
-    %(<p class="audio-unavailable">#{h(t('post.audio_unavailable'))} <a href="#{h(block['url'])}">#{h(block['url'])}</a></p>)
+    # safe_href, like the video fallback five lines of comment below --
+    # the address comes from an import or a hand-edited post, which is
+    # exactly the input a javascript: URL arrives in. The two branches are
+    # the same shape and only one of them was filtering.
+    %(<p class="audio-unavailable">#{h(t('post.audio_unavailable'))} <a href="#{h(safe_href(block['url']))}">#{h(block['url'])}</a></p>)
   else
     "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
   end
@@ -731,9 +784,9 @@ def render_video(block, media_prefix)
     # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
     # other providers (e.g. Instagram) ship their own responsive blockquote/script.
     if block['provider'] == 'youtube'
-      %(<div class="embed-responsive">#{block['embed_html']}</div>)
+      %(<div class="embed-responsive">#{Embed.without_scripts(block['embed_html'])}</div>)
     else
-      block['embed_html']
+      Embed.without_scripts(block['embed_html'])
     end
   elsif (id = block['youtube_id'])
     # Hand-written videos carry url + youtube_id, and the iframe is built
@@ -773,6 +826,29 @@ def heading_id(text, seen)
   seen[base] > 1 ? "#{base}-#{seen[base]}" : base
 end
 
+# A list item's `children` is a nested list -- whatever shape the producer that
+# wrote it happened to use. Three have shipped and all three are in archives
+# now: markdown_parser writes a whole list block, html_blocks writes
+# {style, items} with no type at all, and wix wrote the bare items ARRAY.
+#
+# Only the first rendered. The second fell through `case block['type']` to the
+# unknown-type fallback, so a nested bullet imported from HTML -- Tumblr,
+# Ghost, WordPress, a feed, a rescued page -- printed as raw JSON in a <pre>
+# on the published page. The third reached `case` as an Array and took the
+# WHOLE BUILD down with a TypeError: not one page on the site regenerated,
+# `check` calling the archive sound, and `edit` refusing the post too, so the
+# archive was stuck.
+#
+# A nested list is a list. This is the one place that has to know it, and it
+# has to keep knowing it, because the two older shapes are already written.
+def nested_list(children)
+  return nil if children.nil?
+  return { 'type' => 'list', 'items' => children } if children.is_a?(Array)
+  return nil unless children.is_a?(Hash)
+
+  children['type'] ? children : children.merge('type' => 'list')
+end
+
 def render_block(block, media_prefix, seen = {}, title_lifted: false)
   case block['type']
   when 'text'
@@ -790,7 +866,8 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
-      nested = it['children'] ? render_block(it['children'], media_prefix, seen) : ''
+      child = nested_list(it['children'])
+      nested = child ? render_block(child, media_prefix, seen) : ''
       # A task item gets a real (disabled) checkbox and drops the bullet via
       # the class -- the checkbox is the bullet.
       if it.key?('checked')
@@ -805,11 +882,29 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
     render_table(block)
   when 'hr'
     '<hr>'
+  when 'teaser_end'
+    # Where the teaser stops. The post's own page shows everything, so the
+    # marker itself renders as nothing; it exists for the toot, the link
+    # card and the listing, which is where a post has to introduce itself.
+    ''
   when 'code'
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
-    %(<pre><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
+    # Same class as the chrome's own code blocks render with, for the same
+    # reason -- see render_chrome_block. But NOT when this copy was cut to
+    # fit a listing card: the button copies what the block holds, and what
+    # a cut block holds is the truncation. A reader lifting a shell script
+    # off the front page would get the first lines of it, run them, and
+    # never be told the rest existed. With no class there is no button,
+    # and the card's "read more" is what leads to the whole thing.
+    cls = block['cut'] ? '' : ' class="code-block"'
+    %(<pre#{cls}><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
   when 'file'
     file = (block['media'] || []).first || {}
+    # Nothing attached: the card used to link the post's own directory
+    # with a `download` attribute on it, which downloads an HTML page
+    # named after the post. There is no file, so there is no card.
+    return '' if file['url'].to_s.empty?
+
     label = block['label'].to_s.empty? ? file['url'].to_s : block['label']
     ext = File.extname(file['url'].to_s).delete('.').upcase
     ext = 'FILE' if ext.empty?
@@ -824,6 +919,11 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
       '<path d="M5 21h14"/></svg></a>'
   when 'image'
     media = (block['media'] || []).first || {}
+    # An image block with no media at all renders <img src="/posts/2026/x/">
+    # -- the post's own directory -- which the browser fetches and draws as
+    # a broken picture, and check called the archive clean. There is
+    # nothing to show, so nothing is shown.
+    return '' if media['url'].to_s.empty?
     caption = block['caption'] ? "<figcaption>#{CGI.escapeHTML(block['caption'])}</figcaption>" : ''
     # Listing pages ship the full post and let CSS clip it at 500px, so most
     # images on them are never actually seen -- lazy loading is what keeps
@@ -866,7 +966,11 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
       %(<p class="link-block"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
     end
   else
-    "<pre>#{block.to_json}</pre>"
+    # Escaped. architecture.md promises an unknown type renders "as its
+    # raw JSON in a <pre> -- loud, not silent", and raw is what it was: a
+    # "<" anywhere in the block left the <pre> and became markup on the
+    # page. Loud is the point; live is not.
+    "<pre>#{h(block.to_json)}</pre>"
   end
 end
 
@@ -1264,7 +1368,8 @@ end
 def plain_text_length(post)
   post['content'].sum do |b|
     case b['type']
-    when 'text' then b['text'].to_s.length
+    when 'text', 'code' then b['text'].to_s.length
+    when 'chat' then Array(b['lines']).sum { |l| l['text'].to_s.length }
     when 'list' then (b['items'] || []).sum { |it| it['text'].to_s.length }
     when 'table' then ((b['header'] || []) + (b['rows'] || []).flatten).sum { |c| c['text'].to_s.length }
     else 0
@@ -1280,18 +1385,22 @@ def plain_text_for_search(post)
   PostText.plain(post)
 end
 
+# What stands between two paragraphs in a search result. A middle dot with
+# spaces rather than an ellipsis: an ellipsis already means "the text was
+# cut here" at the end of every snippet, and two meanings for one mark is
+# how a reader learns to trust neither.
+SNIPPET_SEPARATOR = ' · '
+
 def truncate_excerpt(text, len = 200)
   text = text.to_s.gsub(/\s+/, ' ').strip
   return text if text.length <= len
 
-  "#{text[0...len].rstrip}…"
-end
-
-# CSS max-height does the actual visual clipping (however tall that ends up
-# being onscreen); this is just a cheap build-time decision on whether a post
-# is worth wrapping in the excerpt treatment at all.
-def excerpt?(post)
-  plain_text_length(post) > EXCERPT_TEXT_THRESHOLD || post['content'].count { |b| %w[image video link].include?(b['type']) } > 1
+  # A cut that lands just past a paragraph mark left the mark hanging on
+  # the end -- "...vlhko a listy ·…" on 23 posts of one real archive. The
+  # separator says "another paragraph follows"; the ellipsis says the same
+  # thing and says it better, so the mark goes.
+  cut = text[0...len].rstrip.sub(/#{Regexp.escape(SNIPPET_SEPARATOR.rstrip)}\z/, '').rstrip
+  "#{cut}…"
 end
 
 # The stats row and the comments container carry whichever network the
@@ -1331,10 +1440,50 @@ end
 
 def build_list_item(post, pinned: false)
   prefix = post_path(post)
-  content = post_content_html(post)
-  excerpt = excerpt?(post)
-  content_class = excerpt ? 'content excerpt' : 'content'
-  read_more = excerpt ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
+  # A post that wrote its own teaser shows exactly that here, and nothing
+  # below it: the listing is where the site invites, and an author who wrote
+  # the invitation should not have it padded with the first 500px of the
+  # article. The CSS clip is dropped with it -- there is nothing left to
+  # clip, and a fade over a finished sentence reads as damage. "Read more"
+  # stays, because the post does continue.
+  #
+  # An empty teaser is honoured in the toot but not here: a card with a
+  # heading and no words looks like a build that went wrong, and nobody
+  # asking for a quiet announcement is asking for that.
+  teaser = PostText.teaser_blocks(post['content'])
+  teaser = nil unless teaser&.any?
+  # `lifted:` on this branch too. A post's own page passes it so the link
+  # block renders WITHOUT the title the heading borrowed from it; the
+  # teaser branch did not, so a card printed the borrowed headline twice
+  # -- once as its <h2> and again in the body under it -- while the post's
+  # own page printed it once.
+  # Without a teaser of its own the card is cut HERE rather than by the
+  # stylesheet: blocks until the budget, never through one, and the first
+  # one always. See lib/card_teaser.rb for what that costs and why the
+  # budget is measured in height rather than in characters.
+  #
+  # A post that fits whole reuses the memoized render, so nothing about it
+  # changes -- 77% of this archive is in that case.
+  cut = false
+  content = if teaser
+              render_content(teaser, prefix, lifted: link_title_block(post))
+            else
+              kept, cut = CardTeaser.blocks(post['content'])
+              cut ? render_content(kept, prefix, lifted: link_title_block(post)) : post_content_html(post)
+            end
+  # Heading anchors belong to the post's own page. A listing stacks ten
+  # posts' bodies into ONE document, so two posts that both have a
+  # "Co dal?" section put id="co-dal" on the page twice -- 105 pages of a
+  # real archive carried duplicate ids, which makes the document invalid
+  # and sends any same-page anchor to whichever came first. heading_id
+  # de-duplicates within a post; nothing could de-duplicate across them,
+  # because each post's HTML is rendered (and cached) on its own.
+  content = content.gsub(%r{<(h[1-6])([^>]*) id="[^"]*"}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2)}" }
+  # The link is there exactly when a block did not fit -- or when the
+  # author wrote a teaser, which says the same thing about the post. It
+  # used to follow a separate rule (400 characters, or more than one
+  # picture), so it could sit under a card that showed everything.
+  read_more = teaser || cut ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
   title = post_heading_html(post, 'h2', prefix)
   stats = post_meta_html(post, reading_labels(post))
   <<~HTML
@@ -1344,7 +1493,7 @@ def build_list_item(post, pinned: false)
         <div class="post-body">
           #{title}
           #{stats}
-          <div class="#{content_class}">
+          <div class="content">
             #{content}
           </div>
           #{read_more}
@@ -1366,12 +1515,44 @@ def post_og_image(post)
   # Basename, the same as the page's own <img> uses: this address goes into
   # og:image and into the JSON-LD, and a name carrying "../" pointed both
   # of them outside the post -- at whatever happens to sit there.
-  "#{SITE_BASE_URL}#{post_path(post)}#{File.basename(media['url'].to_s)}"
+  # Percent-encoded, like the page's own <img>. 83baf51 escaped the URL
+  # in the markup and left these two behind, so the picture on the page
+  # pointed at foto%20%231.jpg while og:image pointed at "foto #1.jpg" --
+  # where a scraper reads everything from the # as a fragment, requests
+  # "foto " and gets a 404. The link card on Mastodon and Bluesky and the
+  # search engine's thumbnail were then blank for exactly the pictures
+  # whose names needed the encoding most.
+  "#{SITE_BASE_URL}#{post_path(post)}#{media_name_encoded(media['url'])}"
 end
 
 def post_description(post)
-  text = plain_text_for_search(post)
-  text = post['title'].to_s if text.strip.empty?
+  # A teaser the author wrote is what the post says about itself, so it wins
+  # over the cut here too. The empty teaser is the one place this parts ways
+  # with the toot: there, "marker on the first line" means "announce with the
+  # title and link alone" and an empty perex honours it. A description is not
+  # a message but standing metadata -- it is what a search engine quotes
+  # months later -- so an empty one would cost the post something without
+  # anybody having asked for that, and the cut stands in.
+  # A link card shows the title above the description, so when the title was
+  # taken from the post's own opening the description has to carry on from
+  # there. Otherwise the card reads the same sentence twice -- which did not
+  # happen while the title was a slug, and would have arrived with this
+  # release as a new defect rather than a fix.
+  # ...but only while there IS something after the name. A post short enough
+  # to be named in full leaves nothing behind it, and taking that emptiness
+  # at face value cost 286 posts on one real archive their own description
+  # and gave them the site's instead -- a card that stopped saying what the
+  # post is and started saying what the site is. Repeating the text under
+  # the title is the lesser of the two: it still describes this post.
+  name, rest = PostText.name_and_rest(post)
+  text = if name && !rest.to_s.strip.empty? && name_stands_as_title?(post)
+           rest
+         else
+           teaser = PostText.teaser_blocks(post['content'])
+           raw = teaser&.any? ? PostText.plain({ 'content' => teaser }) : plain_text_for_search(post)
+           without_borrowed_title(raw, post)
+         end
+  text = post['title'].to_s if text.to_s.strip.empty?
   text = SITE_DESCRIPTION if text.strip.empty?
   truncate_excerpt(text, META_DESCRIPTION_LENGTH)
 end
@@ -1446,7 +1627,27 @@ def hero_time_html(post, heading: false)
   return '' if page?(post)
 
   stamp = %(<time datetime="#{h(post_time(post).iso8601)}">#{h(post_display_date(post))}</time>)
+  link = archive_link_for(post)
+  stamp = %(<a href="#{h(link)}">#{stamp}</a>) if link
   heading ? %(<h1 class="post-hero__date">#{stamp}</h1>) : stamp
+end
+
+# Where a post's own date stamp leads: to the month it was written in,
+# inside the archive index. The stamp is on every post page and led nowhere
+# until now, so the index is reachable from anywhere in the archive without
+# adding a control to the page.
+#
+# Nil for anything the index does not list -- a draft, a page, an unlisted
+# post -- because a stamp pointing at a year page that will not mention it
+# is worse than a stamp pointing nowhere.
+#
+# The year is the ADDRESS's, matching what the index groups by and what the
+# checker will look for.
+def archive_link_for(post)
+  return nil if draft?(post) || page?(post) || unlisted?(post)
+
+  time = post_time(post)
+  "/archive/#{time.year}/#m#{format('%02d', time.month)}"
 end
 
 # Whether the post says what it is called. Untitled posts -- an imported
@@ -1600,7 +1801,11 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   links = []
   links << %(<a class="series-prev" href="#{h(post_path(prev_post))}">#{h(t('post.series_previous', title: post_title_for(prev_post)))}</a>) if prev_post
   links << %(<a class="series-next" href="#{h(post_path(next_post))}">#{h(t('post.series_next', title: post_title_for(next_post)))}</a>) if next_post
-  %(<nav class="series-nav">#{links.join}</nav>\n                )
+  # Named, like the table of contents is. A screen reader lists the
+  # landmarks on a page, and a post can carry three <nav>s -- the site
+  # bar, this one and the pagination -- of which only the toc had a name.
+  # Three entries reading "navigation" are three guesses.
+  %(<nav class="series-nav" aria-label="#{h(t('post.series_nav_label'))}">#{links.join}</nav>\n                )
 end
 
 # A link post carries no title of its own -- what the reader takes for its
@@ -1612,16 +1817,50 @@ end
 # The first link block that has a title lends it to the post. The block then
 # renders without it (see render_block), or the page would say it twice.
 def link_title_block(post)
-  return nil if post['title']
+  PostText.link_title_block(post)
+end
 
-  (post['content'] || []).find { |b| b['type'] == 'link' && !b['title'].to_s.empty? }
+# Whether the post's DERIVED name is what stands above it. The title comes
+# from three places in order -- the author's own, a link block's, then the
+# name cut from the opening words -- and only in the third case has the
+# reader already seen that opening. When a link block supplies the title,
+# cutting the name out anyway takes the post's first sentence away from
+# its description and its search result while the heading shows somebody
+# else's words entirely: the reader is shown a link's title over a comment
+# that starts in the middle.
+# The words under a borrowed title, without the borrowed title itself. A
+# link post's stored text begins with the link's own title, and that title
+# is what stands above the post -- so a description or a search row built
+# from the text starts by repeating the headline the reader has just read.
+# Cut off the front rather than dropped from the middle: the same words
+# further down are the post talking about them, which is worth keeping.
+def without_borrowed_title(text, post)
+  borrowed = link_title_block(post)&.[]('title').to_s.strip
+  return text if borrowed.empty?
+
+  stripped = text.to_s.sub(/\A#{Regexp.escape(borrowed)}/, '')
+  stripped = stripped.sub(/\A\s*#{Regexp.escape(SNIPPET_SEPARATOR.strip)}\s*/, '').lstrip
+  stripped.empty? ? text : stripped
+end
+
+def name_stands_as_title?(post)
+  post['title'].nil? && link_title_block(post).nil?
 end
 
 def post_title_for(post)
   return post['title'].to_s if post['title']
 
   block = link_title_block(post)
-  (block ? block['title'] : post['slug']).to_s
+  return block['title'].to_s if block
+
+  # The slug used to stand in here, which meant the same post was called two
+  # different things: a date in its own heading and
+  # "burtiky-opekame-hipstamatic-oggl-jane" in the browser tab, the link card
+  # and the feed. A slug is an address, made by machine out of the words --
+  # so the words themselves are the better name, and the post's own heading
+  # stays the date it has been since 1.3.
+  name, = PostText.name_and_rest(post)
+  name || post['slug'].to_s
 end
 
 # The heading itself. A post's own title links to the post in a listing and
@@ -1648,7 +1887,19 @@ def render_post_html(post, template)
   # Rendered without the lifted block, or the same photo appears twice --
   # once as the lead and once where it was written. Only the hero path
   # pays for the extra render; every other post keeps the memoized one.
-  content_html = hero_block ? render_content(post['content'] - [hero_block], post_path(post)) : post_content_html(post)
+  # `lifted:` here too -- without it a link post with a hero printed the
+  # borrowed title twice, once as the h1 and again in full inside the
+  # link card.
+  #
+  # And the hero is dropped by IDENTITY, not by value: Array#- compares
+  # with ==, so a post showing the same photograph twice (same media, same
+  # caption) lost BOTH copies when hero_for lifted the first one.
+  content_html = if hero_block
+                   rest = post['content'].reject { |b| b.equal?(hero_block) }
+                   render_content(rest, post_path(post), lifted: link_title_block(post))
+                 else
+                   post_content_html(post)
+                 end
   draft_banner = draft?(post) ? draft_banner(post) : ''
   layout(template.result(binding),
          title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),
@@ -1689,7 +1940,7 @@ def rss_item(post)
                                    .map { |t| "<category>#{h(t)}</category>" }.join
   <<~ITEM
     <item>
-      <title>#{title}</title>
+      <title>#{xml_text(title)}</title>
       <link>#{url}</link>
       <guid isPermaLink="true">#{url}</guid>
       <pubDate>#{pub_date}</pubDate>
@@ -1704,15 +1955,20 @@ def render_rss(posts, path: '/rss.xml', title: SITE_TITLE, description: SITE_DES
   items = posts.first(RSS_ITEM_LIMIT).map { |post| rss_item(post) }.join
   # The newest post's date, not Time.now -- otherwise rss.xml differs on
   # every build and gets re-uploaded even when nothing changed.
-  last_build = post_time(posts.first).rfc2822 if posts.first
+  # RSS 2.0 wants an RFC-822 date-time here, and an empty element is not
+  # one: a site with nothing in the stream yet published
+  # <lastBuildDate></lastBuildDate>, which strict readers refuse along with
+  # the whole feed. The build's own clock is the honest answer to "when was
+  # this feed last built" when no post can answer it.
+  last_build = (posts.first ? post_time(posts.first) : Time.now).rfc2822
   <<~XML
     <?xml version="1.0" encoding="UTF-8"?>
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
       <channel>
-        <title>#{h(title)}</title>
+        <title>#{h(xml_text(title))}</title>
         <link>#{link}</link>
         <atom:link href="#{SITE_BASE_URL}#{path}" rel="self" type="application/rss+xml" />
-        <description>#{h(description)}</description>
+        <description>#{h(xml_text(description))}</description>
         <language>#{SITE_LANG}</language>
         <lastBuildDate>#{last_build}</lastBuildDate>
         #{items}
@@ -1726,22 +1982,67 @@ def sitemap_url(loc, lastmod = nil)
   "<url><loc>#{loc}</loc>#{lastmod_tag}</url>"
 end
 
-def render_sitemap(posts, tags_map, content_types)
-  urls = [sitemap_url("#{SITE_BASE_URL}/", posts.first && post_time(posts.first).iso8601)]
+# `entries`, not `posts`: the caller hands this posts AND pages, and the name
+# it used to have is what produced the defect below. Everything with an
+# address belongs on a sitemap, so the combined list is right for the URL
+# list -- but the archive is built from the STREAM alone, so it is given the
+# stream rather than left to guess from a list that is not one.
+def render_sitemap(entries, tags_map, content_types, stream)
+  urls = [sitemap_url("#{SITE_BASE_URL}/", entries.first && post_time(entries.first).iso8601)]
 
-  posts.each do |post|
-    urls << sitemap_url("#{SITE_BASE_URL}#{post_path(post)}", post_time(post).iso8601)
+  entries.each do |entry|
+    urls << sitemap_url("#{SITE_BASE_URL}#{post_path(entry)}", post_time(entry).iso8601)
   end
 
+  # max_by post_time, not max_by the stored STRING. The comment on the post
+  # sort spells out why a lexical compare is wrong here: a post written
+  # "2026-08-22 10:00" sorts above one written "2026-08-22T09:00+02:00"
+  # because a space is below a T, and an offset moves an instant without
+  # moving its text. Three lastmods were picked that way -- so a crawler
+  # could be told a listing was last touched by the wrong post.
   tags_map.each do |slug, data|
-    latest = data[:posts].max_by { |p| p['date'] }
+    latest = data[:posts].max_by { |p| post_time(p) }
     urls << sitemap_url("#{SITE_BASE_URL}/tag/#{slug}/", latest && post_time(latest).iso8601)
   end
 
   content_types.each do |type|
-    type_posts = posts.select { |post| dominant_content_type(post) == type }
-    latest = type_posts.max_by { |p| p['date'] }
+    # From the stream, not from the combined list: /type/<t>/ shows posts
+    # and never pages, so a page could hand the listing a lastmod for
+    # something that listing does not contain. The archive block below was
+    # given `stream` for exactly this reason, and says so.
+    type_posts = stream.select { |entry| dominant_content_type(entry) == type }
+    latest = type_posts.max_by { |p| post_time(p) }
     urls << sitemap_url("#{SITE_BASE_URL}/type/#{type}/", latest && post_time(latest).iso8601)
+  end
+
+  # Every series listing, for the same reason as a tag's: the build writes
+  # it, every post in the series links to it, and the sitemap was the one
+  # place that had never heard of it.
+  SERIES_MAP.each do |slug, in_series|
+    next unless Slug.pageable?(slug)
+
+    latest = in_series.max_by { |p| post_time(p) }
+    urls << sitemap_url("#{SITE_BASE_URL}/series/#{slug}/", latest && post_time(latest).iso8601)
+  end
+
+  # The tag index: one entry, and only when there is at least one tag with a
+  # page of its own -- a site with no tags builds no index and must not be
+  # advertising one.
+  urls << sitemap_url("#{SITE_BASE_URL}/tag/", entries.first && post_time(entries.first).iso8601) if tags_map.any?
+
+  # The archive index and one entry per year that has posts in it, from the
+  # stream and only the stream -- the same list the map itself is grouped
+  # from. Grouping the combined list sent crawlers to /archive/<year>/ for
+  # every year that held nothing but a page: an About page older than the
+  # oldest post, or a Contact page added to a blog whose last post was two
+  # years ago. The root was worse -- written unconditionally, while the build
+  # skips the whole map when the stream is empty.
+  unless stream.empty?
+    urls << sitemap_url("#{SITE_BASE_URL}/archive/", stream.first && post_time(stream.first).iso8601)
+    stream.group_by { |post| post_time(post).year }.each do |year, in_year|
+      latest = in_year.max_by { |p| post_time(p) }
+      urls << sitemap_url("#{SITE_BASE_URL}/archive/#{year}/", latest && post_time(latest).iso8601)
+    end
   end
 
   <<~XML
@@ -1765,11 +2066,37 @@ end
 #
 # Returns [[number, posts], ...] newest first, plus the count of fixed
 # (already-final) pages.
-def anchored_pages(posts)
+# `oldest_first:` is for the one listing that is not a timeline. A series
+# reads from part one -- tests/test_post_page.rb has held that since it was
+# written -- and the anchoring below assumes the opposite: it takes the
+# flexible landing page off the FRONT and slices the fixed /page/N/ pages
+# off the TAIL, which is what makes "a page's contents never change once
+# written" true when new posts arrive at the front.
+#
+# Handed an oldest-first list it did the reverse of what it promises: the
+# fixed pages were cut from the NEWEST end, so every part added re-cut
+# every one of them, and "Older ->" led towards the newest.
+#
+# Mirrored rather than reversed. Reversing the list would have fixed the
+# paging by breaking the reading order; anchoring the fixed pages at the
+# FRONT -- where the parts that will never change again are -- keeps both,
+# and needs no new numbering and no new labels: page 1 is still the far
+# end of the walk and the landing page is still the flexible one.
+def anchored_pages(posts, oldest_first: false)
   fixed = posts.length < 2 * PAGE_SIZE ? 0 : (posts.length / PAGE_SIZE) - 1
-  newest_length = posts.length - fixed * PAGE_SIZE
-  pages = [[fixed + 1, posts.first(newest_length)]]
-  posts.drop(newest_length).each_slice(PAGE_SIZE).with_index do |slice, i|
+  flexible_length = posts.length - fixed * PAGE_SIZE
+  return [[[fixed + 1, posts]], fixed] if fixed.zero?
+
+  if oldest_first
+    pages = posts.first(fixed * PAGE_SIZE).each_slice(PAGE_SIZE).with_index.map do |slice, i|
+      [i + 1, slice]
+    end
+    pages << [fixed + 1, posts.last(flexible_length)]
+    return [pages, fixed]
+  end
+
+  pages = [[fixed + 1, posts.first(flexible_length)]]
+  posts.drop(flexible_length).each_slice(PAGE_SIZE).with_index do |slice, i|
     pages << [fixed - i, slice]
   end
   [pages, fixed]
@@ -1790,7 +2117,7 @@ def pagination_html(number, fixed, base_path = '')
   newer = number <= fixed ? %(<a href="#{page_url(number + 1, fixed, base_path)}">#{h(t('pagination.newer'))}</a>) : ''
   older = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path)}">#{h(t('pagination.older'))}</a>) : ''
   label = number > fixed ? t('pagination.latest') : t('pagination.page', number: number)
-  %(<nav class="pagination">#{newer}<span>#{h(label)}</span>#{older}</nav>)
+  %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{newer}<span>#{h(label)}</span>#{older}</nav>)
 end
 
 # Templates only contain their own <main>; the header, nav, sidebar and
@@ -1934,7 +2261,11 @@ end
 # post title, while the eight content-type labels are a closed set that
 # cannot be mistaken for one. That is why type listings pass no kind and
 # always did without one.
-def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil)
+# `value_href:` makes the heading itself the way back: a tag listing links
+# to the index of tags, a year to the map of years. The same address the
+# "back" link at the foot carries -- a reader who has scrolled to the top
+# of a long year should not have to scroll to the bottom to leave it.
+def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil, value_href: nil)
   value = value.to_s
   kind = kind.to_s
   return '' if value.empty? && kind.empty?
@@ -1945,7 +2276,8 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   parts << %(<span class="listing-heading__kind">#{h(kind)}</span>) unless kind.empty?
   parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
-  parts << %(<span class="listing-heading__value"#{id_attr}>#{h(value)}</span>)
+  inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
+  parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
   # h1, not h2. This is what the page is about -- the tag being listed, the
   # search being run -- and the posts under it are h2 already, so at h2 it
   # was a sibling of the things it introduces rather than their heading. A
@@ -1991,6 +2323,16 @@ LISTING_HEADING_ICONS = {
           '<path d="M17 3v3a1 1 0 0 0 1 1h3"/>' \
           '<path d="M6 7v12a2 2 0 0 0 2 2h9"/>' \
           '<path d="M3 11v8a2 2 0 0 0 2 2h8"/></svg>',
+  # A month grid rather than a single page: the archive map IS twelve cells
+  # a year, and a calendar drawn as one sheet says "date" where this page
+  # says "every date there is". The two rings are what make it read as a
+  # wall calendar at 20px, where a grid alone reads as a table.
+  calendar: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+            'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+            'stroke-linejoin="round" aria-hidden="true">' \
+            '<rect x="3" y="5" width="18" height="16" rx="2"/>' \
+            '<line x1="3" y1="10" x2="21" y2="10"/>' \
+            '<line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>',
   # The hole in the label is a circle rather than the zero-length line the
   # shape is usually drawn with: that trick renders only under a round
   # linecap, and one stylesheet override away it disappears without
@@ -1999,13 +2341,72 @@ LISTING_HEADING_ICONS = {
        'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
        'stroke-linejoin="round" aria-hidden="true">' \
        '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/>' \
-       '<circle cx="7" cy="7" r="1.2"/></svg>'
+       '<circle cx="7" cy="7" r="1.2"/></svg>',
+  # One per content type, because a listing of one kind of post is a page
+  # about that kind and the three pages that already had an icon made the
+  # other seven look unfinished beside them. Same drawing rules as those
+  # three: 24-unit box, stroked in currentColor at 2, round joins -- an
+  # icon here is a heading's companion, not an illustration.
+  #
+  # Each shape is the plainest thing that survives 20px. Lines for text
+  # (a paragraph seen from across the room), one big quotation mark for
+  # quotes, a bubble for chat, frame-and-horizon for images, a play mark
+  # for video, a note for audio, the chain for links and a single sheet
+  # for documents -- single, because `series` above is already the stack.
+  type_text: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+             'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+             'aria-hidden="true">' \
+             '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="11" x2="20" y2="11"/>' \
+             '<line x1="4" y1="16" x2="15" y2="16"/></svg>',
+  # The one drawn FILLED rather than stroked, and deliberately: a
+  # quotation mark is a typographic glyph, and outlined at 20px the pair
+  # closed up into something that read as the digits 99. Filled, it is the
+  # mark itself at any size.
+  type_quote: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="currentColor" aria-hidden="true">' \
+              '<path d="M10 5H6a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3h1.2c-.2 1.7-1.3 2.7-3.2 3.2V19' \
+              'c3.7-.6 6-3.2 6-6.9V5z"/>' \
+              '<path d="M21 5h-4a3 3 0 0 0-3 3v3a3 3 0 0 0 3 3h1.2c-.2 1.7-1.3 2.7-3.2 3.2V19' \
+              'c3.7-.6 6-3.2 6-6.9V5z"/></svg>',
+  type_chat: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+             'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+             'stroke-linejoin="round" aria-hidden="true">' \
+             '<path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.6-4.4A8 8 0 1 1 21 12z"/></svg>',
+  type_image: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+              'stroke-linejoin="round" aria-hidden="true">' \
+              '<rect x="3" y="4" width="18" height="16" rx="2"/>' \
+              '<circle cx="8.5" cy="9.5" r="1.6"/>' \
+              '<path d="M21 16l-5-5-6 6-2-2-5 5"/></svg>',
+  type_video: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+              'stroke-linejoin="round" aria-hidden="true">' \
+              '<rect x="3" y="5" width="18" height="14" rx="2"/>' \
+              '<path d="M10 8.5l5.5 3.5L10 15.5z"/></svg>',
+  type_audio: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+              'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+              'stroke-linejoin="round" aria-hidden="true">' \
+              '<path d="M9 18V5l11-2v13"/>' \
+              '<circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+  type_link: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+             'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+             'stroke-linejoin="round" aria-hidden="true">' \
+             '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>' \
+             '<path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
+  type_document: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
+                 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' \
+                 'stroke-linejoin="round" aria-hidden="true">' \
+                 '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>' \
+                 '<path d="M14 3v4a1 1 0 0 0 1 1h4"/>' \
+                 '<line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>'
 }.freeze
 
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
-                  heading_kind: nil, heading_variant: nil, heading_icon: nil, feed_path: nil,
-                  title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil)
-  pages, fixed = anchored_pages(posts)
+                  heading_kind: nil, heading_variant: nil, heading_icon: nil,
+                  heading_href: nil, feed_path: nil,
+                  title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil,
+                  oldest_first: false)
+  pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
     # The landing page shows the pinned post ONCE, at the top: when it
     # would otherwise appear further down that same page, it is lifted out
@@ -2024,7 +2425,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
-                                        icon: heading_icon)
+                                        icon: heading_icon, value_href: heading_href)
     # Tags, series and content types all name themselves; the landing page is
     # the only listing that arrives here with nothing, and it is the only one
     # that would otherwise have no h1 (see home_heading_html).
@@ -2067,13 +2468,97 @@ end
 # cloud-synced folder.
 WRITTEN = {}
 
+# Readable by everyone, because everything under public/ is on its way to a
+# web server -- which runs as somebody else. Nothing here used to say so, so
+# the permissions were whatever the author's umask happened to be: on a
+# machine with umask 077 an import wrote its pictures 600 and the site
+# served holes. Reported from an install doing exactly that.
+# Defined in lib/public_file.rb, not here: the build is not the only writer
+# into public/ and a rule kept in the build is a rule the cron cannot read.
+PUBLIC_READABLE = PublicFile::READABLE
+PUBLIC_TRAVERSABLE = PublicFile::TRAVERSABLE
+
+def world_readable?(path, stat = nil)
+  PublicFile.readable?(path, stat)
+end
+
+# A file nobody can reach is as good as unreadable, so the directories on
+# the way to it get the same treatment -- read AND execute, since a
+# directory without +x cannot be entered even when it can be listed.
+#
+# Directories this run has already put right, so the walk below costs one
+# hash lookup per file after the first time it climbs a given branch.
+TRAVERSED = {}
+
+# Walks up to PUBLIC_DIR, stopping only at a directory THIS RUN has already
+# handled.
+#
+# It used to stop at the first directory that merely LOOKED right, on the
+# grounds that everything above it was made by the same code. That is false
+# the moment a new directory is created inside an old one that is wrong:
+# mkdir_p mints the new leaf at 0777 & ~umask, so publishing a post into a
+# year directory left at 0700 made a correct new page behind a shut gate --
+# the walk stopped on the child it had just created and never looked up.
+# The author then saw a 404 for the post they had just published, rebuilt,
+# and the build said "Postaveno" and changed nothing.
+def make_traversable(dir)
+  path = File.expand_path(dir)
+  root = File.expand_path(PUBLIC_DIR)
+  while path.start_with?(root)
+    break if TRAVERSED[path]
+
+    mode = File.stat(path).mode & 0o7777
+    File.chmod(mode | PUBLIC_TRAVERSABLE, path) unless (mode & PUBLIC_TRAVERSABLE) == PUBLIC_TRAVERSABLE
+    TRAVERSED[path] = true
+    parent = File.dirname(path)
+    break if parent == path
+
+    path = parent
+  end
+rescue SystemCallError
+  nil
+end
+
+def make_readable(path)
+  PublicFile.make_readable(path)
+end
+
 def emit(path, content)
   WRITTEN[path] = true
   bytes = content.to_s.b
-  return if File.exist?(path) && File.binread(path) == bytes
+  dir = File.dirname(path)
+  FileUtils.mkdir_p(dir)
+  # Before the early return, not after. A file whose bytes AND mode are both
+  # right can still sit behind a directory nobody can enter, and that is
+  # precisely what `chmod -R a+r public.nosync` leaves behind: read without
+  # execute, every directory at 744, every file at 644. The build was then
+  # permanently blind to it -- it returned here on the matching bytes and
+  # never reached the walk -- while rsync -az carried the 744 to the server
+  # verbatim. Directories were half of what PUBLIC_TRAVERSABLE was added for
+  # and the half that never got repaired.
+  make_traversable(dir)
+  # Permissions count as "up to date" too. Without this the fix below could
+  # never reach a file that already exists with the wrong ones -- which is
+  # what happened to the reporter: chmod, rebuild, nothing, because the
+  # bytes matched and the build had nothing else to look at.
+  if File.exist?(path)
+    stat = File.stat(path)
+    if File.binread(path) == bytes
+      # The bytes are already right, so there is nothing to write and only
+      # the mode can be wrong -- and make_readable is both the thing that
+      # fixes it and the thing that forgives a file we do not own. Falling
+      # through to binwrite here performed an UNRESCUED write purely to
+      # carry a chmod, so a file we could not chmod (a foreign owner, uchg)
+      # killed the build mid-loop with an Errno backtrace: no sitemap, no
+      # sidebar, no search index, no prune, exit 1 -- on a rebuild that had
+      # nothing to write in the first place.
+      make_readable(path) unless world_readable?(path, stat)
+      return
+    end
+  end
 
-  FileUtils.mkdir_p(File.dirname(path))
   File.binwrite(path, bytes)
+  make_readable(path)
 end
 
 FAVICON_PNG = File.join(ROOT, 'assets', 'images', 'favicon.png')
@@ -2126,6 +2611,12 @@ end
 # in-place edit rather than only that one.
 def emit_copy(src, dest, compare_content: false)
   WRITTEN[dest] = true
+  dir = File.dirname(dest)
+  FileUtils.mkdir_p(dir)
+  # Before the early return, for the reason emit gives: a picture whose
+  # bytes and mode are both right is still unreachable behind a directory
+  # nobody can enter, and the return below never reached the walk.
+  make_traversable(dir)
   if File.exist?(dest)
     # On a volume that ignores letter case or unicode form, File.exist?
     # answers yes for a file the directory writes differently -- and then
@@ -2141,11 +2632,15 @@ def emit_copy(src, dest, compare_content: false)
            else
              File.size(dest) == File.size(src) && File.mtime(dest) >= File.mtime(src)
            end
-    return if same
+    # ...and readable, for the reason emit gives. A chmod changes neither
+    # size nor mtime -- it moves ctime, which nothing here was reading -- so
+    # a picture copied under a strict umask stayed unreadable through every
+    # rebuild that followed.
+    return if same && world_readable?(dest)
   end
 
-  FileUtils.mkdir_p(File.dirname(dest))
   FileUtils.cp(src, dest)
+  make_readable(dest)
 end
 
 # Make the directory write the name we are about to record. Only ever a
@@ -2250,6 +2745,25 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # looked up by the date, so the picture was never copied and the page was
   # served with a hole in it. check saw nothing wrong, because check looks
   # where the file actually is.
+  # `content` is a list of blocks, decided once, here. Eleven readers in
+  # this file reach for it and most of them wrapped it in Array() by hand;
+  # the ones that did not -- dominant_content_type and
+  # referenced_media_filenames -- died on a post with no `content` key, or
+  # with "content": null, or with a null entry among its blocks, and took
+  # the WHOLE build with them: a raw NoMethodError naming this file and no
+  # post, before a single page was written. Guarding each reader is a game
+  # nobody wins; the shape is settled at the door instead. check refuses
+  # such a post separately, so this is the second line of defence rather
+  # than a licence to write one.
+  parsed['content'] = parsed['content'].is_a?(Array) ? parsed['content'].select { |b| b.is_a?(Hash) } : []
+  # And `title`, for the same reason and at the same door. The engine's
+  # contract for an untitled post is `title: nil` -- then the date becomes
+  # the heading, <title> falls back to the post's first sentence, and a
+  # listing link carries that sentence as its text. An empty STRING is
+  # what the feed, WordPress and Squarespace importers write for an item
+  # with no title, and it is truthy: the page shipped a blank <title>, an
+  # empty <h1> and archive links with nothing to click.
+  parsed['title'] = nil if parsed['title'].to_s.strip.empty?
   parsed['__year'] = File.basename(File.dirname(f))
   # The file this came out of. The duplicate message below names it,
   # because an address does not find a file: two pages collide on a slug
@@ -2325,7 +2839,12 @@ end
 # another post. Without a tiebreaker their relative order shifts between
 # builds, which silently changes the contents of dozens of pages and forces
 # a content-hash-based deploy to re-upload them even though nothing was edited.
-posts.sort_by! { |p| [p['date'], p['slug']] }
+# By the INSTANT, not by the stored string. A lexical compare puts a post
+# stored as 2026-06-08T06:00:00Z after one stored as
+# 2026-06-08T07:00:00+02:00, though the second happened first -- and an
+# archive that mixes offsets is every archive that was imported, since
+# the importers store UTC and the CLI writes the site's own offset.
+posts.sort_by! { |p| [post_time(p), p['slug']] }
 posts.reverse!
 
 # From here on, `posts` means only published posts -- listings, tags, types,
@@ -2342,8 +2861,14 @@ drafts, posts = posts.partition { |p| draft?(p) }
 # A page at the root cannot be allowed to shadow an address the engine
 # already owns. The rest of the site lives under /posts/, /tag/, /type/,
 # /draft/ and the two generated pages, so those are the names to refuse.
-RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown assets page rss.xml sitemap.xml
-                            robots.txt 404 favicon.ico].freeze
+# `archive` joined this list late, and the gap had a cost: the map was
+# added in 1.5 without touching these names, so a page slugged `archive`
+# was accepted, rendered, and then flatly overwritten by the map -- with
+# no warning from the build, a green `check`, a silent `doctor`, and the
+# page still listed in the search index, so searching for it by name
+# handed the reader the map. `archive` is one of the commonest names a
+# blog has for a page.
+RESERVED_ROOT_SEGMENTS = PostAddress::RESERVED_ROOT_SEGMENTS
 pages, posts = posts.partition { |p| page?(p) }
 # Out of the stream on the same principle as pages, one step further:
 # a page is taken out of the listings but stays findable (sitemap,
@@ -2517,14 +3042,52 @@ NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 # And a name is not a path: "../" in it walks out of the post's directory,
 # both when the page links it and when the build copies it. The name is
 # taken as a basename, so a crafted one lands beside the post or nowhere.
+# A media file's own name, ready to be put in an attribute -- and to be
+# read back as a path by a browser, which is where this used to stop.
+#
+# h() escapes the markup, so a name could not break out of the attribute;
+# nothing escaped the URL, so a name could break out of the PATH. A picture
+# called "foto #1.jpg" produced src="…/foto #1.jpg", where a browser reads
+# "…/foto " and takes "#1.jpg" as a fragment: no request, no picture, no
+# error anywhere. A "%" did the same by starting an escape sequence of its
+# own, and a "?" by starting a query.
+#
+# Only the characters that actually change how a path is read are encoded.
+# Letters with diacritics are left alone deliberately: browsers handle them,
+# every existing site already has them in its markup, and encoding them
+# would rewrite pages that have nothing wrong with them.
+URL_UNSAFE_IN_PATH = /[#%?"'<>\s\\^`{|}]/.freeze
+
+# The address half, with no markup escaping: og:image and the JSON-LD go
+# through their own (a template h(), and to_json), and a second layer
+# there would put a literal &amp; in a URL.
+def media_name_encoded(name)
+  File.basename(name.to_s).gsub(URL_UNSAFE_IN_PATH) { |c| format('%%%02X', c.ord) }
+end
+
 def media_src(prefix, name)
-  "#{prefix}#{h(File.basename(name.to_s))}"
+  "#{prefix}#{h(media_name_encoded(name))}"
+end
+
+# Characters XML 1.0 forbids ANYWHERE in a document -- CDATA included, which
+# is the part that caught this out. lib/import/xml_repair.rb strips them from
+# an export on the way in but leaves CDATA regions byte for byte on purpose,
+# and a WordPress post body IS inside CDATA, so one control character in an
+# old export landed in the post JSON and went straight into
+# <description><![CDATA[...]]></description>. libxml2 -- which is what most
+# feed readers are -- then refuses the WHOLE document, so one character in
+# one post takes every subscriber's feed away, and neither the build nor
+# check says a word. Tab, newline and carriage return are the three allowed.
+XML_FORBIDDEN = /[\x00-\x08\x0B\x0C\x0E-\x1F]/
+
+def xml_text(text)
+  text.to_s.gsub(XML_FORBIDDEN, '')
 end
 
 # "]]>" cannot appear inside a CDATA section at all -- the only escape is
 # to end the section and start another around the ">".
 def cdata_safe(text)
-  text.to_s.gsub(']]>', ']]]]><![CDATA[>')
+  xml_text(text).gsub(']]>', ']]]]><![CDATA[>')
 end
 
 
@@ -2619,6 +3182,59 @@ end
 # Pages are in here as well as posts: a renamed page owes its old
 # address exactly what a renamed post does. They are out of the
 # LISTINGS, not out of the engine's promises.
+# Whether this volume treats two names differing only in case or in unicode
+# form as one file. macOS APFS does both by default, and that is where this
+# matters: the stub loops below guard against clobbering the build's own
+# output with a byte-exact WRITTEN lookup, so `public/About/index.html` and
+# `public/about/index.html` -- one file on such a volume -- slipped past it.
+# emit then wrote the redirect stub straight over the page the build had
+# produced seconds earlier: the page's content gone, and the address serving
+# a meta-refresh to itself, which is an infinite loop for every visitor.
+#
+# Probed once rather than assumed, because the answer decides whether the
+# folded index below is consulted at all -- on a case-sensitive volume
+# /About/ and /about/ are two real addresses and refusing one would be
+# wrong.
+def case_folding_public?
+  return @case_folding_public unless @case_folding_public.nil?
+
+  FileUtils.mkdir_p(PUBLIC_DIR)
+  probe = File.join(PUBLIC_DIR, '.blogsh-case-probe')
+  File.binwrite(probe, '')
+  @case_folding_public = File.exist?(File.join(PUBLIC_DIR, '.BLOGSH-CASE-PROBE'))
+  File.delete(probe)
+  @case_folding_public
+rescue StandardError
+  @case_folding_public = false
+end
+
+def fold_path(path)
+  path.to_s.unicode_normalize(:nfc).downcase
+end
+
+# The same question WRITTEN answers, asked the way the volume will answer it.
+def written_already?(dest)
+  return true if WRITTEN[dest]
+  return false unless case_folding_public?
+
+  @written_folded ||= {}
+  if @written_folded.size != WRITTEN.size
+    @written_folded = WRITTEN.keys.to_h { |k| [fold_path(k), true] }
+  end
+  @written_folded.key?(fold_path(dest))
+end
+
+# The longest a single path segment may be. POSIX NAME_MAX is 255 bytes on
+# macOS and Linux alike, and mkdir_p raises ENAMETOOLONG past it -- which
+# killed the build at its very LAST stage, after the whole site had already
+# been written, with a backtrace naming no post. An imported permalink is
+# where such a segment comes from: 36 Japanese characters percent-encode to
+# 333 bytes, and importers put the source URL's path straight into
+# redirect_from. The three collisions below are already guarded on the
+# stated grounds that one bad imported entry must not kill the build; a
+# name the filesystem refuses is the fourth.
+NAME_MAX_BYTES = 255
+
 (posts + pages + unlisted_posts).each do |post|
   Array(post['former_slugs']).each do |former|
     parts = former.to_s.split('/').reject(&:empty?)
@@ -2626,13 +3242,14 @@ end
     # emits them), but hand-edited JSON is exactly where this list lives
     # -- and a ".." here would write the stub outside posts/, up to and
     # including over the homepage or above public.nosync entirely.
-    unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' }
+    unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' } &&
+           parts.none? { |p| p.bytesize > NAME_MAX_BYTES }
       warn t('build.former_slug_unusable', slug: post['slug'], entry: former.inspect)
       next
     end
 
     dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
-    if WRITTEN[dest]
+    if written_already?(dest)
       warn t('build.former_slug_taken', slug: post['slug'], former: former)
       next
     end
@@ -2656,7 +3273,15 @@ page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_pos
 tags_map = {}
 overlong_tags = []
 posts.each do |post|
-  (post['tags'] || []).each do |tag|
+  # Folded by SLUG before anything is appended, because the map groups by
+  # slug while the loop walked tag STRINGS: "sci-fi" and "Sci Fi", "Praha"
+  # and "praha", "Cesko" and "Česko" -- or the same tag simply typed twice
+  # -- are one page, and the post was appended to it once per spelling. The
+  # listing then showed the post twice in a row, the tag's feed carried two
+  # <item>s with the same guid, and the index said 2 beside a tag that one
+  # post carries. First spelling wins, matching how the map already picks a
+  # display name across posts.
+  (post['tags'] || []).uniq { |tag| tag_slug(tag) }.each do |tag|
     slug = tag_slug(tag)
     next if slug.empty?
 
@@ -2700,9 +3325,75 @@ tags_map.each do |slug, data|
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
                 heading_kind: t('tag.kind'), heading_variant: 'tag', heading_icon: :tag,
+                # Only when there IS an index to go back to: a site whose
+                # tags all live on drafts builds no /tag/, and a heading
+                # linking there would be the dead menu item doctor refuses.
+                heading_href: (tags_map.empty? ? nil : '/tag/'),
                 feed_path: FEED_TAG_SLUGS.include?(slug) ? "/tag/#{slug}/rss.xml" : nil,
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
+end
+
+# --- The tag index ------------------------------------------------------
+#
+# /tag/ was a dead address: the site built a listing per tag and nothing
+# that showed them all, so the only complete list of a site's own subjects
+# lived in the terminal. Asked for by a site whose tags are subjects rather
+# than provenance, where the list is short enough to read at a glance.
+#
+# Every tag that has a page, and no others: a tag carried only by a draft,
+# a page or an unlisted post is drawn under its post as a flat pill with no
+# link, and listing it here would point at a 404.
+#
+# Sorted by the FOLDED name, not the raw one. Ruby sorts strings by bytes,
+# which puts every accented tag after z -- on one real archive that is
+# fifty-two of them, and the last six in byte order are `skoleni`,
+# `skolitel`, `sumava`, `svihov`, `zelnava`, `zivotvkorporatu` (with their
+# diacritics). A reader looking for one between `sirky` and `sport` would
+# not find it there. `browse` in the CLI already folds for this reason.
+unless tags_map.empty?
+  tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
+                           .sort_by { |_, name, _| [Slug.fold(name), name] }
+  # A letter above each run of names, so seven hundred tags read as a
+  # dictionary rather than as a wall. Taken from the FOLDED name, because
+  # that is the order the list is in: `škola` belongs under S, where the
+  # reader looking between `sirky` and `sport` will be. Anything that is
+  # not a letter -- a tag that starts with a digit -- goes under `#`.
+  #
+  # Emitted as list items rather than as headings between lists: the list
+  # is one <ul> and breaking it into twenty-seven of them would break the
+  # wrapping with it -- a band is a full-width item in the same flow, the
+  # way the archive's month is. The switch to count order takes them back
+  # out (see assets/js/tag-index.js).
+  last_letter = nil
+  items = tag_index_rows.flat_map do |slug, name, count|
+    letter = Slug.fold(name).to_s[0].to_s.upcase
+    letter = '#' unless letter.match?(/[A-Z]/)
+    head = if letter == last_letter
+             []
+           else
+             last_letter = letter
+             [%(<li class="tag-index-letter" aria-hidden="true">#{h(letter)}</li>)]
+           end
+    # The count travels in an attribute as well as in the text: the switch
+    # reorders these in the DOM, and reading a number back out of rendered
+    # markup is how a sort starts depending on how a number is punctuated.
+    # Name and count in ONE pill, one link, one target: the count is what
+    # makes the index a diagnostic rather than a menu (`pacmam 1` beside
+    # `pacman 12` says on sight what a list of names alone never would),
+    # and hung outside the pill it detached from its own name -- with the
+    # list wrapped into lines, a number between two pills reads as easily
+    # for the one that follows it.
+    head + [%(<li class="tag-index-item" data-count="#{count}">) +
+            %(<a class="tag-pill" href="/tag/#{h(slug)}/">#{h(name)}) +
+            %(<sup class="tag-index-count">#{count}</sup></a></li>)]
+  end
+  emit(File.join(PUBLIC_DIR, 'tag', 'index.html'),
+       layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
+              %(\n<ul class="tag-index" id="tag-index">\n#{items.join("\n")}\n</ul>),
+              title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
+              description: t('tags.description', site_title: SITE_TITLE),
+              path: '/tag/'))
 end
 
 # A series gets a listing of its own, in series order rather than newest
@@ -2711,7 +3402,20 @@ end
 # already guarantees -- a "series" of one is a post.
 SERIES_MAP.each do |slug, in_series|
   name = SERIES_NAMES[slug].to_s
+  # Read from part one, and paged from part one: see anchored_pages.
+  #
+  # An overlong name is refused the same way a tag's is (Slug.pageable?),
+  # because mkdir raises ENAMETOOLONG at the site's very last stage with a
+  # backtrace naming nothing -- and check and doctor both call the archive
+  # sound. The series still works everywhere else: only its listing page
+  # is skipped, and skipped out loud.
+  unless Slug.pageable?(slug)
+    warn t('build.series_too_long', name: name[0, 60])
+    next
+  end
+
   write_listing(in_series, index_template, File.join(PUBLIC_DIR, 'series', slug),
+                oldest_first: true,
                 base_path: "/series/#{slug}", heading: name,
                 heading_kind: t('series.kind'), heading_variant: 'series',
                 heading_icon: :series,
@@ -2724,19 +3428,188 @@ PRESENT_TYPES.each do |type|
   label = CONTENT_TYPE_LABELS[type]
   write_listing(type_posts, index_template, File.join(PUBLIC_DIR, 'type', type),
                 base_path: "/type/#{type}", heading: label, heading_variant: 'type',
+                heading_icon: :"type_#{type}",
                 title: t('type.title', label: label, short_name: SITE_SHORT_NAME),
                 description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
 end
 
+
 def search_index_entry(post)
   text = plain_text_for_search(post)
+  # A result shows the title with the excerpt under it, so the same rule as
+  # the link card: a title taken from the opening means the excerpt starts
+  # after it. `folded` is untouched on purpose -- that is what queries are
+  # matched against, and an index that stopped at the title would quietly
+  # stop finding every word below it.
+  # Same rule as the description, and for the same reason: a post named in
+  # full has nothing after the name, and an empty excerpt in a result list
+  # is a row that says its title twice and nothing else.
+  name, rest = PostText.name_and_rest(post)
+  # The snippet gets its paragraphs marked; `text` above does not, because
+  # it is what `folded` is built from and a mark in that would stop a
+  # phrase spanning two paragraphs from finding its own post.
+  #
+  # Only on this branch, and measured: a snippet runs past the first
+  # paragraph in 593 of the 1636 titled posts of the archive this was
+  # written against and in 50 of the 2752 untitled ones -- an untitled post
+  # is short, so its whole text is usually one paragraph. The other branch
+  # is the REST after the name has been cut out of the joined text, and a
+  # separator there would have to survive that cut without ending up inside
+  # the post's own name.
+  # ...and only when that name is what the row's title actually shows. A
+  # post that borrows its title from a link block has not shown the reader
+  # its opening sentence, so cutting it out leaves the result starting
+  # mid-thought under somebody else's headline.
+  after = if name && !rest.to_s.strip.empty? && name_stands_as_title?(post)
+            rest
+          else
+            without_borrowed_title(PostText.plain(post, separator: SNIPPET_SEPARATOR), post)
+          end
   {
     url: post_path(post),
-    title: post['title'],
+    # A link post has no title of its own and no opening sentence to lift a
+    # name from, so this used to be nil: the page, the tab, the feed and the
+    # announcement all showed the borrowed link title and the search result
+    # showed a card with nothing to click. Same order as post_title_for.
+    title: post['title'] || link_title_block(post)&.[]('title') || name,
     date: post_display_time(post).strftime(t('date_format')),
-    excerpt: truncate_excerpt(text),
+    excerpt: truncate_excerpt(after),
     folded: PostText.searchable(post, text)
   }
+end
+
+# --- The archive index -------------------------------------------------
+#
+# A map of the whole archive in two levels and no more. /archive/ is a row
+# per year with a strip of twelve months; /archive/<year>/ is one line per
+# post. No excerpts and no pictures: this is an index, not another listing,
+# and the point of it is that a reader can see the shape of twenty-three
+# years at once -- which nothing on the site could show before. Pagination
+# cannot: it is anchored from the oldest post, so /page/128/ says nothing
+# about whether it is 2009 or 2014.
+#
+# Grouped by the year of the post's ADDRESS, not of its displayed date.
+# Those two can differ by one for a post published either side of midnight
+# on 31 December, and the address is what this is a map OF -- the checker
+# compares paths, and a row pointing at a year the post does not live in
+# would be a dead link the moment it happened.
+#
+# Cheap by construction, which is why the year pages are safe to have: a
+# new post rewrites the map and the current year and nothing else. 2014 has
+# not changed since new year's eve 2014 and never will, so a deploy that
+# compares content has nothing to upload for it.
+ARCHIVE_PATH = '/archive/'
+# Longer than any blog, shorter than a typo. 200 years of empty rows is
+# already nonsense to look at; 18,000 is a page nobody can open.
+ARCHIVE_SPAN_MAX = 200
+archive_by_year = posts.group_by { |post| post_time(post).year }
+
+unless archive_by_year.empty?
+  # Every year between the first and the last, including the ones with
+  # nothing in them -- sean.cz has a silent 2025 between 2024 and 2026, and
+  # a map that skipped it would draw an axis that lies about the gap.
+  #
+  # ...up to a point. The span was unbounded, and one mistyped year is all
+  # it takes: 20226 for 2026 parses, gives the post a real address, and
+  # draws 18,201 rows -- a 12.8 MB page that hangs a browser and that
+  # deploy then uploads, while the build's summary says "posts: 2" and both
+  # check and doctor call the archive sound. Past the bound the map falls
+  # back to the years that actually hold something, so a typo costs the
+  # empty-year axis rather than the whole page, and it is said out loud.
+  span_from = archive_by_year.keys.min
+  span_to = archive_by_year.keys.max
+  archive_span = if span_to - span_from >= ARCHIVE_SPAN_MAX
+                   warn t('build.archive_span_absurd', from: span_from, to: span_to)
+                   archive_by_year.keys.sort.reverse
+                 else
+                   span_to.downto(span_from).to_a
+                 end
+
+  month_cells = lambda do |year, by_month|
+    (1..12).map do |m|
+      count = (by_month[m] || []).length
+      label = CGI.escapeHTML(m.to_s)
+      if count.zero?
+        %(<span class="archive-month is-empty">#{label}</span>)
+      else
+        # Four steps of shading, because "has posts / has none" is not the
+        # thing worth seeing: on this archive a month holds anywhere from
+        # one post to eighty-seven, and a map that draws those the same
+        # answers a question nobody asked. The thresholds are read off a
+        # real archive rather than picked round: most months sit under
+        # fifteen, and the handful above forty are the bursts.
+        level = if count < 5 then 1
+                elsif count < 15 then 2
+                elsif count < 40 then 3
+                else 4
+                end
+        %(<a class="archive-month is-l#{level}" href="/archive/#{year}/#m#{format('%02d', m)}" ) +
+          %(title="#{count}">#{label}</a>)
+      end
+    end.join
+  end
+
+  rows = archive_span.map do |year|
+    in_year = archive_by_year[year] || []
+    by_month = in_year.group_by { |post| post_time(post).month }
+    name = in_year.empty? ? %(<span class="archive-year-name">#{year}</span>) : %(<a class="archive-year-name" href="/archive/#{year}/">#{year}</a>)
+    %(<li class="archive-year#{in_year.empty? ? ' is-empty' : ''}">#{name}) +
+      %(<span class="archive-year-count">#{in_year.length}</span>) +
+      %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
+  end
+
+  emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
+       layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
+              %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
+              title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
+              description: t('archive.description', site_title: SITE_TITLE),
+              path: ARCHIVE_PATH))
+
+  archive_span.each do |year|
+    in_year = archive_by_year[year] || []
+    # A year nobody wrote in gets a row on the map but no page of its own:
+    # there is nothing to put on it, and an empty page is an invitation to
+    # a dead end.
+    next if in_year.empty?
+
+    sections = in_year.group_by { |post| post_time(post).month }.sort.map do |month, in_month|
+      # The month heading is a number, the way this site writes dates: two
+      # of the three shipped languages spell months with digits anyway, and
+      # spelling them out would mean thirty-six new translations for the
+      # one language that does not.
+      # Its own copy of the key above, and it has to say the same thing:
+      # the year page's stated contract is date order inside the month.
+      lines = in_month.sort_by { |post| [post_time(post), post['slug']] }.map do |post|
+        # The attribute and the text are the same date said twice, one for
+        # a machine and one for a reader -- that is what <time> means. The
+        # attribute used to carry the STORED date while the text showed the
+        # local day, so a post filed at a year's turn read
+        # `<time datetime="2025-12-31">1.</time>`: a value and a rendering
+        # of it that disagree. Which year the post is FILED under is a
+        # separate decision and stays as it was -- the address year, so the
+        # page and /posts/<year>/ agree.
+        %(<li><time datetime="#{h(post_display_time(post).strftime('%Y-%m-%d'))}">) +
+          %(#{post_display_time(post).day}.</time> ) +
+          %(<a href="#{h(post_path(post))}">#{h(post_title_for(post))}</a></li>)
+      end
+      %(<section class="archive-section" id="m#{format('%02d', month)}">) +
+        %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
+    end
+
+    emit(File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html'),
+         layout(listing_heading_html(t('archive.year_title', year: year),
+                                     variant: 'archive', icon: :calendar,
+                                     value_href: ARCHIVE_PATH) + "\n" +
+                sections.join("\n") +
+                # Below the list and on the left, which is where a post's own
+                # "back" link has always sat. A way out belongs at the end of
+                # the thing you are reading, not above it.
+                %(\n<nav class="pagination back" aria-label="#{h(t('pagination.nav_label'))}">) +
+                %(<a href="#{ARCHIVE_PATH}">#{h(t('archive.back'))}</a></nav>),
+                title: "#{t('archive.year_title', year: year)} – #{SITE_SHORT_NAME}",
+                description: t('archive.year_description', year: year, site_title: SITE_TITLE),
+                path: "/archive/#{year}/"))
+  end
 end
 
 # posts is sorted newest-first, so splitting into "first N" / "the rest" is
@@ -2828,7 +3701,16 @@ Sidebar::FEEDS.each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
 # an empty one if it doesn't exist yet. Fetching it on every build would mean
 # two Mastodon requests per tooted post.
 STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
-File.write(STATS_PATH, '{}') unless File.exist?(STATS_PATH)
+# Written directly rather than through emit, because cron owns the contents
+# and the build only guarantees the file exists -- but it is served to the
+# same browsers as everything else, so it needs the same permissions. It was
+# the one file left behind by the sweep above: 600 on a strict umask, and a
+# stats row that quietly showed nothing.
+unless File.exist?(STATS_PATH)
+  File.write(STATS_PATH, '{}')
+  make_readable(STATS_PATH)
+end
+make_readable(STATS_PATH) unless world_readable?(STATS_PATH)
 WRITTEN[STATS_PATH] = true
 
 # The approved comments, written by the same cron and needing the same
@@ -2855,7 +3737,7 @@ emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES))
+emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts))
 # The crawlers that collect text to train on, as of this release. A list in
 # the engine goes stale, which is why the free-text key below exists beside
 # it -- but a list nobody has to research is the difference between a site
@@ -2899,18 +3781,20 @@ emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
 # are arbitrary, so unlike the former_slugs loop this one runs after
 # EVERYTHING real -- posts, listings, search, feeds, root files -- and a
 # stub yields to whatever the build already produced, out loud.
-REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
+# The list itself now lives in PostAddress, so the build, the checker and
+# the repair pass cannot drift apart about it.
+REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
 # Pages too, for the reason above -- and because a source like Substack
 # serves its pages under /p/<slug>, so the old address is a real one the
 # importer records and this loop is the only thing that answers it.
 (posts + pages + unlisted_posts).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
-    if parts.empty? || parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
+    case PostAddress.redirect_refusal(origin)
+    when :unusable
       warn t('build.redirect_from_unusable', slug: post['slug'], entry: origin.inspect)
       next
-    end
-    if REDIRECT_FROM_RESERVED.include?(parts.first)
+    when :reserved
       warn t('build.redirect_from_reserved', slug: post['slug'], entry: origin.inspect, segment: parts.first)
       next
     end
@@ -2930,8 +3814,8 @@ REDIRECT_FROM_RESERVED = %w[posts page tag type assets search markdown].freeze
     # ROOT FILE sitting where the path needs a directory (a stub at
     # "/rss.xml/whatever/" would need rss.xml to be one). Both end in the
     # same loud skip -- the build's own output always wins over a stub.
-    prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| WRITTEN[p] }
-    if WRITTEN[dest] || prefix_file
+    prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| written_already?(p) }
+    if written_already?(dest) || prefix_file
       warn t('build.redirect_from_taken', slug: post['slug'], origin: origin)
       next
     end

@@ -25,6 +25,7 @@ require_relative '../lib/site_header'
 require_relative '../lib/i18n'
 require_relative '../lib/publishing'
 require_relative '../lib/import/run'
+require_relative '../lib/import/run_notes'
 require_relative '../lib/import/beehiiv'
 require_relative '../lib/import/blogger'
 require_relative '../lib/import/bluesky'
@@ -375,8 +376,14 @@ def build_twitter
   return nil unless dir
 
   dir = File.expand_path(dir)
-  unless File.exist?(File.join(dir, 'data', 'tweets.js'))
-    puts t('import.twitter_dir_invalid', dir: dir)
+  # Both files, not just the tweets: the adapter needs account.js for the
+  # handle, and checking only one of them meant the wizard accepted a path,
+  # printed "Reading Twitter/X (@" and died on the very next expression --
+  # its own validation was what promised to cope. Asked here, the person
+  # gets to type the path again.
+  missing = %w[tweets.js account.js].reject { |name| File.exist?(File.join(dir, 'data', name)) }
+  unless missing.empty?
+    puts t('import.twitter_dir_invalid', dir: dir, missing: missing.map { |n| "data/#{n}" }.join(', '))
     return nil
   end
 
@@ -601,6 +608,17 @@ def report(result, dry_run:)
   pages_note = Import.pages_note(Array(result.respond_to?(:pages) ? result.pages : nil))
   puts Tui.paint(pages_note, :cyan) if pages_note
 
+  # What the HTML parser could not represent -- an iframe, a video, a form
+  # -- and a source that handed out the same id twice. Both were counted
+  # all along and printed only by the scripted door, so the wizard, which
+  # is the door most people use, reported an import full of holes as
+  # "Wrote N post(s)" and no more. Said in the preview too, where it can
+  # still change the answer to the confirmation below.
+  dropped_note = Import.dropped_note(result.respond_to?(:dropped_elements) ? result.dropped_elements : nil)
+  puts Tui.paint(dropped_note, :yellow) if dropped_note
+  dupes_note = Import.duplicate_ids_note(result.respond_to?(:duplicate_ids) ? Array(result.duplicate_ids) : [])
+  puts Tui.paint(dupes_note, :yellow) if dupes_note
+
   # An item that failed is a loss, not a category of skip -- and the count
   # alone leaves the reader to guess which of five thousand it was.
   errors = Array(result.respond_to?(:errors) ? result.errors : nil)
@@ -691,6 +709,14 @@ def run_import(adapter)
 
   puts
   puts t('import.dry_run_running', label: adapter.label)
+  # An adapter counts as it goes -- snapshots read, items it could not
+  # parse, pictures the Archive never saved -- and the wizard runs the SAME
+  # adapter twice: once for the preview, once for real. Without putting the
+  # counters back, the postscript after the real run reported both runs
+  # added together, so "N image(s) are lost" said twice what was lost. Only
+  # whole numbers are touched: those are the counters, and everything else
+  # an adapter holds -- its paths, its parsed export -- has to survive.
+  counters = Import::Run.counter_snapshot(adapter)
   preview = Import::Run.new(adapter, dry_run: true, on_scan: scan_reporter).call
   print "\r\e[2K" if Tui.interactive?
   report(preview, dry_run: true)
@@ -715,6 +741,10 @@ def run_import(adapter)
   end
 
   puts
+  # The preview is over; the adapter goes back to how it started so the
+  # numbers below are this run's, not both runs'.
+  Import::Run.restore_counters(adapter, counters)
+
   puts t('import.running', label: adapter.label)
   # Media is downloaded for real this time, so an archive of any size takes
   # a while -- a line per post is the progress report. The dry-run just
@@ -724,6 +754,14 @@ def run_import(adapter)
   on_post = ->(written, post, _scanned) { puts "  #{written}/#{target} #{post['slug']}" }
   result = Import::Run.new(adapter, on_post: on_post).call
   report(result, dry_run: false)
+  # ...and again here, because several of these notes only have numbers
+  # in them AFTER the real run: the Wayback rescue counts the images the
+  # Archive never saved as it fetches them, so "N image(s) are lost" --
+  # the one line that says what the rescue actually cost -- could not be
+  # printed anywhere the operator would see it. The preview's copy is
+  # what changes the answer to the question above; this one is the
+  # record of what happened.
+  puts "  #{adapter.postscript}" if adapter.respond_to?(:postscript) && adapter.postscript
   # Whatever the run lost, the exit code has to carry -- scripts/*.rb have
   # done this since 1.2 (lib/import/cli.rb), and the wizard, which is what
   # people actually run, ended 0 on a source that died halfway and on every

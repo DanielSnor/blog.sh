@@ -257,6 +257,19 @@ module Doctor
     size = dig(data, 'site', 'page_size')
     findings << error(t('page_size', value: size.inspect)) if size && !(size.is_a?(Integer) && size.positive?)
 
+    # site.locale is a SECOND language switch, independent of site.lang,
+    # and only ./setup.sh ever kept the two in step. A site localized by
+    # hand -- or one whose language was changed in the file afterwards --
+    # announces og:locale on every page to everything that reads one, and
+    # nothing anywhere said so. A warning, not an error: en_GB under lang
+    # en is a deliberate and correct thing to write.
+    locale = dig(data, 'site', 'locale').to_s
+    lang = dig(data, 'site', 'lang').to_s
+    if !locale.empty? && !lang.empty? &&
+       locale.split(/[_-]/).first.to_s.downcase != lang.downcase
+      findings << warn(t('locale_mismatch', locale: locale, lang: lang), t('locale_mismatch_fix'))
+    end
+
     findings << ok(t('identity_ok')) if findings.empty?
     findings
   end
@@ -366,6 +379,15 @@ module Doctor
       end
       length = dig(data, 'mastodon', 'toot_length')
       findings << error(t('toot_length', value: length.inspect)) if length && !(length.is_a?(Integer) && length.positive?)
+      # Same guard as its sibling, because the same kind of mistake is
+      # silent in the same way: this number is subtracted from the budget
+      # every announcement is composed against, so a string or a negative
+      # there cuts every perex short (or lets a toot overflow) with
+      # nothing on screen to say why.
+      reserved = dig(data, 'mastodon', 'link_length')
+      if reserved && !(reserved.is_a?(Integer) && !reserved.negative?)
+        findings << error(t('link_length', value: reserved.inspect))
+      end
     elsif bluesky
       if ENV['BLUESKY_APP_PASSWORD'].to_s.empty?
         findings << if moderated
@@ -671,7 +693,19 @@ module Doctor
       end
       # Nothing to judge against on an archive with no posts in it yet.
       next if posts.empty?
-      next if known.include?(url) || known.include?("#{url}/")
+      # A menu address is a URL, not a path: `/o-mne/#kontakt` is an anchor
+      # on a page that exists and `/search/?q=foto` is a query the search
+      # page reads. Judged raw, both were reported as addresses the site
+      # does not answer at, the install failed, and the fix text sent the
+      # owner looking for a post that had been "renamed or deleted" -- a
+      # post that was never renamed. check has split these off before
+      # comparing since it was written; the /assets/ branch above does it
+      # too. This is the one place that did not.
+      path = url.split('#').first.to_s.split('?').first.to_s
+      # A bare "#kontakt" or "?q=x" is a same-page address: there is
+      # nothing left to look up and nothing wrong with it.
+      next if path.empty?
+      next if known.include?(path) || known.include?("#{path}/")
 
       findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
     end
@@ -703,6 +737,24 @@ module Doctor
     return false if url.include?('://')
 
     !url.start_with?('mailto:', 'tel:')
+  end
+
+  # Where the toots widget would ask, given the config as written -- the
+  # same fallback the fetcher uses (lib/mastodon_fetcher.rb), so doctor and
+  # the fetcher cannot disagree about whether a site has an instance.
+  def instance_for_toots(data, conf)
+    (conf['instance'] || dig(data, 'mastodon', 'instance')).to_s.strip
+  end
+
+  # And who the Bluesky card would ask about. The fetcher takes
+  # widgets.bluesky.handle and falls back to bluesky.handle, because a site
+  # that announces to Bluesky has already said its handle once -- so a
+  # flat WIDGET_REQUIRED entry would have cried wolf on every site that
+  # fills it in the second way. Without either, the card is drawn on every
+  # page, never fetched and never filled, and doctor said the widgets were
+  # all in order.
+  def handle_for_bluesky(data, conf)
+    (conf['handle'] || dig(data, 'bluesky', 'handle')).to_s.strip
   end
 
   # Each widget needs the one value that identifies what it should show.
@@ -772,6 +824,24 @@ module Doctor
         # as an id (Mastodon numbers, GoToSocial ULIDs, Pleroma flakes)
         # lives in lib/account_id.rb, shared with the style wizard.
         findings << error(t('widget_account_id', value: conf['account_id'].inspect), t('widget_account_id_fix'))
+      end
+
+      # Asked separately rather than as another branch above: WHO and WHERE
+      # are two different mistakes and a config can make both at once. As an
+      # elsif this hid the @handle error behind the missing instance, which
+      # is a report that fixes one thing and then surprises you with the
+      # next -- and the reason a test caught it here is that it had one.
+      if name == 'bluesky' && handle_for_bluesky(data, conf).empty?
+        findings << error(t('widget_incomplete', name: name, key: 'handle'))
+      end
+
+      if name == 'toots' && instance_for_toots(data, conf).empty?
+        # The account id alone does not say WHERE to ask. The fetcher takes
+        # widgets.toots.instance and falls back to mastodon.instance, so a
+        # site with neither has a widget that can never fill itself -- and
+        # the only symptom is an empty card, which looks exactly like an
+        # author who has not posted lately.
+        findings << error(t('widget_toots_instance'), t('widget_toots_instance_fix'))
       end
 
       # The commits widget's own two settings, checked by the same rules the
@@ -965,8 +1035,17 @@ module Doctor
     return nil if dirs.empty?
 
     dirs.flat_map do |dir|
-      PathGlob.under(dir, '**', '*.{jpg,jpeg,JPG,JPEG}').select do |path|
-        ExifLocation.present?(path)
+      # By the first two bytes, not by the name. Every other half of this
+      # feature is content-based -- ExifLocation.jpeg? tests the marker,
+      # PostWriter strips whatever the bytes say is a JPEG, and
+      # MediaDimensions::SYNONYMS lists .jpe and .jfif as spellings the
+      # engine keeps on purpose -- so a photograph filed under one of
+      # those was invisible to BOTH this report and its fixer, and doctor
+      # said "no photo carries where it was taken" about an archive that
+      # had some. Two bytes per file to ask; present? still reads its
+      # 256 kB only for the files that really are JPEGs.
+      PathGlob.under(dir, '**', '*').select do |path|
+        File.file?(path) && ExifLocation.jpeg?(path) && ExifLocation.present?(path)
       end
     end
   rescue StandardError
@@ -1032,6 +1111,24 @@ module Doctor
     src = dig(data, 'analytics', 'src')
     urls[t('analytics_label')] = src if src
 
+    # The commits widget identifies itself by instance + username rather
+    # than by a feed_url, so the loop above never saw it -- the one widget
+    # 1.4 added was the one --online did not reach. Its address is built the
+    # way the fetcher builds it (lib/commits_fetcher.rb), not by a second
+    # copy of the rule, and only for a forge: GitHub is the default and
+    # answers whether or not the username exists, so asking it proves
+    # nothing a config check has not already proven.
+    commits = dig(data, 'widgets', 'commits')
+    if commits.is_a?(Hash)
+      instance = commits['instance'].to_s.strip
+      user = ForgeAddress.username(commits['username'])
+      base = instance.empty? ? nil : ForgeAddress.base(instance)
+      if base && user
+        urls[t('widget_label', name: 'commits')] =
+          "#{base}/api/v1/users/#{user}/activities/feeds?only-performed-by=true&limit=1"
+      end
+    end
+
     urls.each do |label, url|
       FeedHttp.get(url)
       findings << ok(t('online_ok', label: label))
@@ -1051,6 +1148,13 @@ module Doctor
   def check_online_approval(data)
     approval = dig(data, 'comments', 'approval').to_s.strip.downcase
     return [] unless %w[fav favourite favorite].include?(approval)
+
+    # The one require of lib/post_stats.rb used to sit inside
+    # check_online_thread_readable, behind its early returns -- so on a
+    # site where that check bows out, this one died on an uninitialized
+    # constant instead of answering the question it exists for. It is
+    # required here as well, where it is used.
+    require_relative 'post_stats'
 
     # The newest announcement the token can actually be tested against: a
     # Mastodon entry on the configured instance (a foreign one is refused

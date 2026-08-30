@@ -67,7 +67,15 @@ module MarkdownWriter
         # A newline stored in a paragraph is a hard break and writes back as
         # the visible backslash marker -- without this, re-saving would
         # collapse it into a space via the parser's prose-wrapping rule.
-        else escape_block_starts(rendered).gsub("\n", "\\\n")
+        # A line whose rendered form already ends with a backslash cannot
+        # take the backslash marker: "\\\\" is an escaped backslash and the
+        # break has nothing left to be written with, so it was lost and
+        # the text came back with a space in its place. Markdown's other
+        # hard break -- two trailing spaces -- says the same thing and
+        # does not collide with anything.
+        else escape_block_starts(rendered).gsub(/(\\*)\n/) do
+          (Regexp.last_match(1).length.odd? ? "#{Regexp.last_match(1)}  \n" : "#{Regexp.last_match(1)}\\\n")
+        end
         end
       when 'table'
         table_to_markdown(b)
@@ -75,6 +83,8 @@ module MarkdownWriter
         list_to_markdown(b)
       when 'hr'
         '---'
+      when 'teaser_end'
+        '//--more--//'
       when 'chat'
         body = (b['lines'] || []).map { |l| l['name'] ? "#{l['name']}: #{l['text']}" : l['text'].to_s }.join("\n")
         fence = fence_for(body)
@@ -90,14 +100,22 @@ module MarkdownWriter
       when 'image'
         media = (b['media'] || []).first || {}
         path = File.join(media_dir, media['url'].to_s)
-        cap = b['caption'] ? %( "#{escape_title(b['caption'])}") : ''
-        "![#{b['alt_text']}](#{path}#{cap})"
+        # one_line here and not inside escape_title: that helper also writes a
+        # LINK title, where a hard break is supported and round-trips through
+        # the parser's own sentinel. An image caption shares the alt text's
+        # single line, so it shares the alt text's rule.
+        cap = b['caption'] ? %( "#{escape_title(one_line(b['caption']))}") : ''
+        # Brackets escaped: an alt text holding "[" or "]" closed the label
+        # early, so `![[es] W-ZERO3](...)` stopped being an image at all --
+        # the block came back as text, the alt text was gone and the file
+        # was pruned as an orphan on the next build.
+        "![#{escape_label(one_line(b['alt_text']))}](#{path}#{cap})"
       when 'file'
         file = (b['media'] || []).first
         # Round-trips as the link line it came from: a bare filename, so
         # re-saving an edited post keeps the attachment instead of
         # turning it into a dead link to a name that isn't a URL.
-        "[#{b['label']}](#{File.join(media_dir, file['url'].to_s)})" if file
+        "[#{escape_label(one_line(b['label']))}](#{File.join(media_dir, file['url'].to_s)})" if file
       when 'audio'
         # Mirrors the video branch: a local file writes back as !![](file),
         # and so does a platform the engine can build a player for from the
@@ -116,9 +134,9 @@ module MarkdownWriter
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
         if media
-          "!![#{caption.empty? ? 'Audio' : caption}](#{File.join(media_dir, media['url'].to_s)})"
+          "!![#{caption.empty? ? 'Audio' : one_line(caption)}](#{File.join(media_dir, media['url'].to_s)})"
         elsif Embed.src(b) || Embed.detect(b['url'].to_s)
-          "!![#{caption.empty? ? 'Audio' : caption}](#{b['url']})"
+          "!![#{caption.empty? ? 'Audio' : one_line(caption)}](#{b['url']})"
         end
       when 'video'
         # Without this, `edit` would silently drop the video -- filter_map
@@ -128,11 +146,11 @@ module MarkdownWriter
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
         if media
-          "!![#{caption.empty? ? 'Video' : caption}](#{File.join(media_dir, media['url'].to_s)})"
+          "!![#{caption.empty? ? 'Video' : one_line(caption)}](#{File.join(media_dir, media['url'].to_s)})"
         elsif youtube_playable?(b)
-          "!![#{caption.empty? ? 'YT Video' : caption}](#{b['url']})"
+          "!![#{caption.empty? ? 'YT Video' : one_line(caption)}](#{b['url']})"
         elsif Embed.src(b) || Embed.detect(b['url'].to_s)
-          "!![#{caption.empty? ? 'Video' : caption}](#{b['url']})"
+          "!![#{caption.empty? ? 'Video' : one_line(caption)}](#{b['url']})"
         end
       end
     end.join("\n\n")
@@ -142,6 +160,26 @@ module MarkdownWriter
   # the content would turn into markup on the next edit. The backslash and
   # exclamation mark are only escaped where they'd actually mean something --
   # so `d8-\` and an ordinary "Hi!" stay readable.
+  # A code span, fenced by however many backticks it takes.
+  #
+  # The content used to be handed to the ordinary escaper when it held a
+  # backtick of its own, which put a BACKSLASH inside the span -- and
+  # markdown honours no escapes in there, so the text came back with the
+  # backslash visible and the span cut short at the inner backtick. The
+  # rule markdown does have for this is a longer fence, which is what the
+  # code BLOCK writer already uses (see fence_for).
+  #
+  # The padding space is the other half of that rule: a span whose content
+  # begins or ends with a backtick needs one, or the fence and the content
+  # run together. Markdown drops a single leading and trailing space when
+  # reading a code span back, so it costs nothing.
+  def code_span(content)
+    text = content.to_s
+    fence = '`' * ([text.scan(/`+/).map(&:length).max.to_i + 1, 1].max)
+    pad = text.start_with?('`') || text.end_with?('`') ? ' ' : ''
+    "#{fence}#{pad}#{text}#{pad}#{fence}"
+  end
+
   def escape_markdown(raw)
     raw.gsub(/\\(?=[#{Regexp.escape(ESCAPABLE)}])|!(?=\[)|[*`~\[\]]/) { |c| "\\#{c}" }
   end
@@ -168,6 +206,37 @@ module MarkdownWriter
   # broken and no escape form that would have worked. The link case was
   # worse for being silent -- the link was destroyed and its raw markdown
   # published as body text. The parser unescapes the same pair.
+  # Text that has to live on ONE line, because the construct it goes into is
+  # a single line and markdown offers no escape for a newline inside it.
+  #
+  # An alt text with a line break was interpolated raw, and IMAGE_RE is not
+  # /m, so the line no longer matched: with a bare newline the paragraph hit
+  # the mid-paragraph image guard and parse_body ABORTED, which means
+  # `blog.sh edit` refused to save and the post could never be edited again
+  # -- complaining about a rule the author never broke. With a blank line
+  # inside it the paragraph split in two, the image block vanished, the
+  # author's absolute disk path was published as body text and the media
+  # file was pruned as an orphan. A caption, a label or a title with a
+  # newline in it does the same to its own line.
+  # A label sits between "[" and "]", so a bracket inside it has to say so.
+  # The parser reads \[ and \] as literals; unescaped, the first "]" ends
+  # the label and what follows is no longer a link or an image.
+  def escape_label(text)
+    text.to_s.gsub(/([\[\]])/) { "\\#{Regexp.last_match(1)}" }
+  end
+
+  # A caption, an alt text and an attachment label have to fit on one line
+  # -- a newline in the middle of `![alt](file)` is a broken image. Only
+  # the whitespace that would BREAK that line is collapsed: `[[:space:]]`
+  # matches U+00A0 too, so every non-breaking space an import carried in
+  # became an ordinary one on the first edit, silently and for good. On the
+  # archive this was measured against, 466 fields in 64 posts hold one --
+  # and the text, list, table and quote blocks keep theirs, so a single
+  # edit made a post typographically inconsistent with itself.
+  def one_line(text)
+    text.to_s.gsub(/[\t\n\r\f\v ]+/, ' ').strip
+  end
+
   def escape_title(text)
     text.to_s.gsub(/([\\"])/) { "\\#{Regexp.last_match(1)}" }
   end
@@ -203,7 +272,13 @@ module MarkdownWriter
     when 'code' then "`#{chunk}`"
     when 'link'
       url = link_url_for_markdown(f['url'].to_s)
-      f['title'] ? %([#{chunk}](#{url} "#{escape_title(f['title'])}")) : "[#{chunk}](#{url})"
+      # A label ending in a backslash escapes the "]" the writer is about to
+      # add, so the link came back with no label at all and its address was
+      # published as body text on the next edit. escape_markdown cannot see
+      # this: it escapes a backslash only before an escapable character, and
+      # the character that makes this one dangerous is added afterwards.
+      label = chunk.sub(/(\\+)\z/) { Regexp.last_match(1) * 2 }
+      f['title'] ? %([#{label}](#{url} "#{escape_title(f['title'])}")) : "[#{label}](#{url})"
     else chunk
     end
   end
@@ -215,6 +290,12 @@ module MarkdownWriter
   # truncated at its first ")" and the tail spilled into the visible
   # text.
   def link_url_for_markdown(url)
+    # A space is not legal in a URL and markdown has nowhere to put one:
+    # the parser's address pattern stops at whitespace, so `[x](/a b.html)`
+    # came back with the link gone and the address spilled into the visible
+    # text -- and the next edit published it as prose. %20 is what the
+    # address should have been, and it round-trips.
+    url = url.gsub(/[[:space:]]/) { |c| format('%%%02X', c.ord) }
     depth = 0
     balanced = url.each_char.all? do |ch|
       depth += 1 if ch == '('
@@ -264,8 +345,8 @@ module MarkdownWriter
       # demonstrating markdown ("`**tučně**`") grew a new layer of
       # backslashes with every edit. Raw, unless the content itself has a
       # backtick, which the fence could not hold.
-      wrapped = if e['type'] == 'code' && !text[e['start']...e['end']].include?('`')
-                  "`#{text[e['start']...e['end']]}`"
+      wrapped = if e['type'] == 'code'
+                  code_span(text[e['start']...e['end']])
                 else
                   wrap_markdown(render_markdown_range(text, inner, e['start'], e['end']), e)
                 end
@@ -372,6 +453,20 @@ module MarkdownWriter
     spans
   end
 
+  # `children` in three shapes, because three producers each wrote their own:
+  # a whole list block (markdown_parser), {style, items} with no type
+  # (html_blocks), and the bare items array (wix). The last one arrived here as
+  # an Array and raised TypeError, so a post carrying one could not be OPENED --
+  # `edit` died on the way in, and with the build dying too there was no way
+  # back out of it. build_blog.rb keeps the same rule.
+  def nested_list(children)
+    return nil if children.nil?
+    return { 'type' => 'list', 'items' => children } if children.is_a?(Array)
+    return nil unless children.is_a?(Hash)
+
+    children['type'] ? children : children.merge('type' => 'list')
+  end
+
   # Renders a (possibly nested) list block back to markdown -- each level of
   # `children` adds two more spaces of indentation, mirroring what
   # parse_list_level expects on the way back in.
@@ -381,7 +476,8 @@ module MarkdownWriter
     (list['items'] || []).each_with_index.map do |it, idx|
       task = it.key?('checked') ? (it['checked'] ? '[x] ' : '[ ] ') : ''
       line = "#{pad}#{marker_for.call(idx)} #{task}#{render_text_markdown(it['text'], it['formatting'])}"
-      it['children'] ? "#{line}\n#{list_to_markdown(it['children'], indent + 1)}" : line
+      child = nested_list(it['children'])
+      child ? "#{line}\n#{list_to_markdown(child, indent + 1)}" : line
     end.join("\n")
   end
 
