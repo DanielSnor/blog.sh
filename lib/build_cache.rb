@@ -3,7 +3,6 @@
 require 'json'
 require 'digest'
 require_relative 'atomic_write'
-require_relative 'path_glob'
 
 # lib/build_cache.rb -- what the last build wrote, so this one can skip
 # producing the same bytes a second time.
@@ -115,16 +114,8 @@ module BuildCache
         dir = File.join(@root, tree)
         next unless File.directory?(dir)
 
-        PathGlob.under(dir, '**', '*').sort.each do |file|
-          next unless File.file?(file)
-
-          # Size and mtime rather than contents. Reading every library and
-          # template on every build to hash them would spend a slice of
-          # what this exists to save, and an engine file whose mtime did
-          # not move is an engine file nobody edited. `git checkout` and
-          # `git pull` both touch mtime, so a version change is seen.
-          stat = File.stat(file)
-          parts << "#{file.delete_prefix(@root)}:#{stat.size}:#{stat.mtime.to_i}"
+        engine_files(dir).each do |file|
+          parts << "#{file.delete_prefix(@root)}:#{file_digest(file)}"
         end
       end
       @fingerprint = Digest::SHA256.hexdigest((parts + facts.map(&:to_s)).join("\n"))
@@ -230,6 +221,62 @@ module BuildCache
     end
 
     private
+
+    # What the engine is MADE of, hashed. This used to be size and mtime,
+    # on the reasoning that reading every template and library to hash them
+    # would spend a slice of what the cache exists to save. Measured on the
+    # engine itself: 136 files, 3.3 MB, 9 ms -- against the seven seconds a
+    # publish saves. And the build reads all of it anyway; Ruby loads lib/
+    # and build/ at startup, the renderer reads templates/ and locales/,
+    # and emit_copy compares assets/ byte for byte.
+    #
+    # Contents cut both ways and both ways are the right one. Stricter
+    # where mtime lied: rsync -a, tar -p and a restore from backup all
+    # carry mtime across, so an engine that changed underneath kept its
+    # cache and the site went on serving the old markup with nothing
+    # saying so. More forgiving where mtime moved for nothing: a git pull
+    # bringing back what was already there no longer throws the cache away
+    # and buys a full build for no change at all.
+    def file_digest(path)
+      Digest::SHA256.file(path).hexdigest
+    rescue SystemCallError
+      # Unreadable is a fact about the file, and a steady one -- recording
+      # it keeps the fingerprint still rather than making the cache the
+      # thing that kills a build over a file it was only looking at.
+      'unreadable'
+    end
+
+    # Walked by hand rather than globbed, for two reasons.
+    #
+    # Dir.glob's "**" does not descend into a SYMLINKED directory, and then
+    # drops the link itself for not being a file -- so everything behind
+    # one was in no fingerprint at all. templates/partials is the reachable
+    # case: edit a partial through such a link and every page kept its old
+    # bytes, while each newly published post got the new ones, so the site
+    # served two different footers with nothing saying which was which.
+    # File.directory? and File.file? both follow a link, which is the
+    # point; realpath remembers where we have been, so a link pointing at
+    # its own ancestor ends the walk instead of the process.
+    #
+    # And a walk carries no pattern, so an installation whose own path
+    # holds a glob metacharacter -- "blog [1]", "blog {old}" -- cannot be
+    # misread. That is the whole reason PathGlob exists, answered here by
+    # not having a pattern in the first place.
+    def engine_files(dir, seen = {})
+      real = File.realpath(dir)
+      return [] if seen[real]
+
+      seen[real] = true
+      Dir.children(dir).sort.flat_map do |name|
+        path = File.join(dir, name)
+        if File.directory?(path) then engine_files(path, seen)
+        elsif File.file?(path) then [path]
+        else []
+        end
+      end
+    rescue SystemCallError
+      []
+    end
 
     def suffix_for(root, public_dir)
       default = File.join(root, 'public.nosync')
