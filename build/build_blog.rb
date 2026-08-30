@@ -1385,11 +1385,22 @@ def plain_text_for_search(post)
   PostText.plain(post)
 end
 
+# What stands between two paragraphs in a search result. A middle dot with
+# spaces rather than an ellipsis: an ellipsis already means "the text was
+# cut here" at the end of every snippet, and two meanings for one mark is
+# how a reader learns to trust neither.
+SNIPPET_SEPARATOR = ' · '
+
 def truncate_excerpt(text, len = 200)
   text = text.to_s.gsub(/\s+/, ' ').strip
   return text if text.length <= len
 
-  "#{text[0...len].rstrip}…"
+  # A cut that lands just past a paragraph mark left the mark hanging on
+  # the end -- "...vlhko a listy ·…" on 23 posts of one real archive. The
+  # separator says "another paragraph follows"; the ellipsis says the same
+  # thing and says it better, so the mark goes.
+  cut = text[0...len].rstrip.sub(/#{Regexp.escape(SNIPPET_SEPARATOR.rstrip)}\z/, '').rstrip
+  "#{cut}…"
 end
 
 # The stats row and the comments container carry whichever network the
@@ -1534,11 +1545,12 @@ def post_description(post)
   # post is and started saying what the site is. Repeating the text under
   # the title is the lesser of the two: it still describes this post.
   name, rest = PostText.name_and_rest(post)
-  text = if name && !rest.to_s.strip.empty?
+  text = if name && !rest.to_s.strip.empty? && name_stands_as_title?(post)
            rest
          else
            teaser = PostText.teaser_blocks(post['content'])
-           teaser&.any? ? PostText.plain({ 'content' => teaser }) : plain_text_for_search(post)
+           raw = teaser&.any? ? PostText.plain({ 'content' => teaser }) : plain_text_for_search(post)
+           without_borrowed_title(raw, post)
          end
   text = post['title'].to_s if text.to_s.strip.empty?
   text = SITE_DESCRIPTION if text.strip.empty?
@@ -1806,6 +1818,33 @@ end
 # renders without it (see render_block), or the page would say it twice.
 def link_title_block(post)
   PostText.link_title_block(post)
+end
+
+# Whether the post's DERIVED name is what stands above it. The title comes
+# from three places in order -- the author's own, a link block's, then the
+# name cut from the opening words -- and only in the third case has the
+# reader already seen that opening. When a link block supplies the title,
+# cutting the name out anyway takes the post's first sentence away from
+# its description and its search result while the heading shows somebody
+# else's words entirely: the reader is shown a link's title over a comment
+# that starts in the middle.
+# The words under a borrowed title, without the borrowed title itself. A
+# link post's stored text begins with the link's own title, and that title
+# is what stands above the post -- so a description or a search row built
+# from the text starts by repeating the headline the reader has just read.
+# Cut off the front rather than dropped from the middle: the same words
+# further down are the post talking about them, which is worth keeping.
+def without_borrowed_title(text, post)
+  borrowed = link_title_block(post)&.[]('title').to_s.strip
+  return text if borrowed.empty?
+
+  stripped = text.to_s.sub(/\A#{Regexp.escape(borrowed)}/, '')
+  stripped = stripped.sub(/\A\s*#{Regexp.escape(SNIPPET_SEPARATOR.strip)}\s*/, '').lstrip
+  stripped.empty? ? text : stripped
+end
+
+def name_stands_as_title?(post)
+  post['title'].nil? && link_title_block(post).nil?
 end
 
 def post_title_for(post)
@@ -3394,11 +3433,6 @@ PRESENT_TYPES.each do |type|
                 description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
 end
 
-# What stands between two paragraphs in a search result. A middle dot with
-# spaces rather than an ellipsis: an ellipsis already means "the text was
-# cut here" at the end of every snippet, and two meanings for one mark is
-# how a reader learns to trust neither.
-SNIPPET_SEPARATOR = ' · '
 
 def search_index_entry(post)
   text = plain_text_for_search(post)
@@ -3422,7 +3456,15 @@ def search_index_entry(post)
   # is the REST after the name has been cut out of the joined text, and a
   # separator there would have to survive that cut without ending up inside
   # the post's own name.
-  after = name && !rest.to_s.strip.empty? ? rest : PostText.plain(post, separator: SNIPPET_SEPARATOR)
+  # ...and only when that name is what the row's title actually shows. A
+  # post that borrows its title from a link block has not shown the reader
+  # its opening sentence, so cutting it out leaves the result starting
+  # mid-thought under somebody else's headline.
+  after = if name && !rest.to_s.strip.empty? && name_stands_as_title?(post)
+            rest
+          else
+            without_borrowed_title(PostText.plain(post, separator: SNIPPET_SEPARATOR), post)
+          end
   {
     url: post_path(post),
     # A link post has no title of its own and no opening sentence to lift a

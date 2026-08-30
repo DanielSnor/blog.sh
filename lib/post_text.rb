@@ -227,7 +227,9 @@ module PostText
       else []
       end
     end
-    parts.compact.join(separator)
+    # Blank parts dropped, not joined: an image with no alt text between two
+    # paragraphs put a mark on the page with nothing on one side of it.
+    parts.compact.reject { |part| part.to_s.strip.empty? }.join(separator)
   end
 
   # Everything a query is matched against -- title, text and tags -- folded
