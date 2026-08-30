@@ -1096,6 +1096,8 @@ check:
   media_stray: "Beitrag %{slug} nennt die Datei %{file} in seinem Medienverzeichnis nicht mehr."
   media_stray_fix: "Übrig von einem Bild, das die Quelle zwischen Importen entfernt oder umbenannt hat. Der Beitrag verweist nicht darauf; sieh nach und lösche sie selbst."
   address_duplicate: "%{count} Beiträge würden unter /posts/%{year}/%{slug}/ ausgeliefert."
+  page_reserved_slug: "Die Seite „%{slug}“ läge auf einer Adresse, die die Engine selbst schreibt (/%{slug}/), deshalb weigert sich der Build -- die Seite steht nicht auf der Website."
+  page_reserved_slug_fix: "Benenne sie um. Der Build sagt es bei jedem Durchlauf, aber eine Warnung, die durchrollt, ist genau der Grund, warum eine Seite monatelang fehlt."
   post_unreadable: "%{file} ließ sich nicht lesen (%{reason})."
   json_and_repair: "❌ --json und --repair gehen nicht zusammen: --json beschreibt das Archiv, wie es ist, --repair verändert es. Führe erst `check --repair` aus, danach `check --json`."
   post_unreadable_fix: "Der Build läuft in diesem Zustand gar nicht. Repariere die Datei oder lege sie beiseite -- solange sie so dort liegt, weiß check nichts von ihr und die Site wird nicht gebaut."

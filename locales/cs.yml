@@ -1082,6 +1082,8 @@ check:
   media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
   media_stray_fix: "Zbylo po obrázku, který zdroj mezi importy odebral nebo přejmenoval. Post na něj neodkazuje; až se podíváš, smaž ho sám."
   address_duplicate: "Na adrese /posts/%{year}/%{slug}/ by se servíroval víc než jeden post (%{count})."
+  page_reserved_slug: "Stránka „%{slug}“ by seděla na adrese, kterou engine používá sám (/%{slug}/), takže ji build odmítá zapsat — na webu vůbec není."
+  page_reserved_slug_fix: "Přejmenuj ji. Build to při každé přestavbě říká, jenže varování, které uteče v terminálu, je přesně to, kvůli čemu stránka chybí měsíce."
   post_unreadable: "Soubor %{file} se nepodařilo přečíst (%{reason})."
   json_and_repair: "❌ --json a --repair naráz nejdou: --json je popis archivu, jak vypadá teď, kdežto --repair ho mění. Pusť napřed `check --repair` a pak `check --json`."
   post_unreadable_fix: "Build v tomhle stavu vůbec neproběhne. Oprav ten soubor, nebo ho odlož stranou — dokud tam takhle leží, kontrola nad ním nic neví a web se nepostaví."

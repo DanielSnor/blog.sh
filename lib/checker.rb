@@ -251,6 +251,21 @@ module Checker
             t('post_unreadable_fix'), kind: :post_unreadable,
             data: { 'file' => path, 'reason' => reason })
     end
+    # A page whose slug is one of the addresses the engine writes itself.
+    # The build refuses to write it and says so on the terminal -- but a
+    # rebuild scrolls past, and this tool then called the archive sound
+    # about a page that is not on the site at all. The names come from
+    # PostAddress rather than a second list here: the two refusing
+    # different sets is the same bug with an extra step.
+    posts.each do |post|
+      next unless PostAddress.page?(post)
+      next unless PostAddress::RESERVED_ROOT_SEGMENTS.include?(post['slug'].to_s.downcase)
+
+      findings << error(t('page_reserved_slug', slug: post['slug']),
+                        t('page_reserved_slug_fix'), kind: :page_reserved_slug,
+                        data: { 'slug' => post['slug'].to_s })
+    end
+
     posts.each do |post|
       # A post whose content is not a list of blocks. Every reader here
       # wraps it in Array() so the check itself survives such a file --

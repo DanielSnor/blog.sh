@@ -2829,8 +2829,7 @@ drafts, posts = posts.partition { |p| draft?(p) }
 # page still listed in the search index, so searching for it by name
 # handed the reader the map. `archive` is one of the commonest names a
 # blog has for a page.
-RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page rss.xml
-                            sitemap.xml robots.txt 404 favicon.ico].freeze
+RESERVED_ROOT_SEGMENTS = PostAddress::RESERVED_ROOT_SEGMENTS
 pages, posts = posts.partition { |p| page?(p) }
 # Out of the stream on the same principle as pages, one step further:
 # a page is taken out of the listings but stays findable (sitemap,

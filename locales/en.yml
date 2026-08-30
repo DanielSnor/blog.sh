@@ -1113,6 +1113,8 @@ check:
   media_stray: "Post %{slug} no longer names the file %{file} in its media directory."
   media_stray_fix: "Left behind by a picture the source dropped or renamed between imports. The post does not reference it; delete it yourself once you have looked."
   address_duplicate: "%{count} posts would be served at /posts/%{year}/%{slug}/."
+  page_reserved_slug: "The page \"%{slug}\" would sit at an address the engine writes itself (/%{slug}/), so the build refuses to write it -- the page is not on the site."
+  page_reserved_slug_fix: "Rename the page to something else. The build says so on the terminal at every rebuild, but a scrolled-past warning is how a page stays missing for months."
   post_unreadable: "%{file} could not be read (%{reason})."
   json_and_repair: "❌ --json and --repair cannot run together: --json is a document about the archive as it stands, --repair changes it. Run `check --repair` first, then `check --json`."
   post_unreadable_fix: "The build refuses to run in this state. Repair the file or move it aside -- while it sits there like this, check knows nothing about it and the site will not build."
