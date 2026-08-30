@@ -3369,7 +3369,36 @@ end
 # files anyway.
 def post_page_key(post, source_media_dir)
   slug, in_series, = series_context(post)
-  series_bit = slug ? "#{slug}/#{SERIES_NAMES[slug]}:#{in_series.map { |p| p['slug'] }.join(',')}" : ''
+  # Everything this page says about its siblings is made out of the
+  # siblings: the name and "part 3 of 7" at the top, and at the bottom
+  # prev/next carrying each neighbour's ADDRESS and TITLE. The key used to
+  # carry their slugs, which is neither -- so a sibling retitled left stale
+  # words on every other member's page, and a sibling whose date was
+  # corrected across a year left every neighbour linking at a 404, both
+  # without touching the pages that were now wrong.
+  #
+  # Their digests rather than their titles and addresses on purpose: what
+  # the nav shows about a neighbour has grown before and will again, and a
+  # key listing today's fields goes blind the day one is added. A series is
+  # a handful of posts, so the cost of rebuilding all of them when one
+  # changes is a handful of pages.
+  series_bit = if slug
+                 "#{slug}/#{SERIES_NAMES[slug]}:" +
+                   in_series.map { |p| "#{post_path(p)}=#{POST_DIGEST[p['__path']]}" }.join(',')
+               elsif draft?(post) && !post['series'].to_s.strip.empty?
+                 # A draft is not in SERIES_MAP -- "part 3 of 7" is a fact
+                 # about the published set and the draft is not in it -- so
+                 # the branch above never covered it and nothing else did
+                 # either. Its note is built entirely out of things that
+                 # move without the draft being touched: how many of the
+                 # series are published, and how the published ones spell
+                 # its name.
+                 draft_slug = series_slug_of(post)
+                 ['draft', post['series'], draft_slug, SERIES_NAMES[draft_slug],
+                  SERIES_PUBLISHED[draft_slug]].join('/')
+               else
+                 ''
+               end
   tag_bit = Array(post['tags']).map { |tag| "#{tag_slug(tag)}=#{TAG_PAGES[tag_slug(tag)] ? 1 : 0}" }.join(',')
   media_bit = referenced_media_filenames(post).map do |name|
     file = File.join(source_media_dir, File.basename(name.to_s))
@@ -3851,14 +3880,24 @@ unless archive_by_year.empty?
       %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
   end
 
-  # The map is years and counts, so it moves whenever a year's count does
-  # -- which is any publish at all. The YEAR pages below are the ones this
-  # buys something on: 2014 has not changed since new year's eve 2014 and
-  # never will.
+  # Keyed on the digest of the rows themselves, not on a summary of them.
+  # The summary was "year:count" -- and the map draws MONTHS: a cell per
+  # month, shaded in four steps by how many posts it holds, linking to an
+  # anchor on the year page. So a post whose date moved from March to
+  # January changed the cells at both ends, the shading of one of them and
+  # the anchor the other pointed at, while the year's count sat exactly
+  # where it was and the key never moved. The map then disagreed with the
+  # year page it links to, and kept disagreeing.
+  #
+  # The rows are built above whatever the cache decides, so this costs one
+  # hash of a few kilobytes -- and, unlike a summary, it cannot drift from
+  # what is drawn: anything added to a cell is in the key the same day it
+  # is on the page.
+  #
+  # The YEAR pages below are what this buys something on anyway: 2014 has
+  # not changed since new year's eve 2014 and never will.
   cached_emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
-              Digest::SHA256.hexdigest(archive_span.map do |year|
-                "#{year}:#{(archive_by_year[year] || []).length}"
-              end.join(','))) do
+              Digest::SHA256.hexdigest(rows.join)) do
     layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
            %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
            title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
