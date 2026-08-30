@@ -960,7 +960,16 @@ module MarkdownParser
         next
       end
 
-      segment[:text].split(/\n\s*\n/).map { |para| dedent(para) }.reject(&:empty?).each do |para|
+      # The marker is a BLOCK, so it gets to be its own paragraph even when
+      # the author did not leave blank lines around it. Without this it sat
+      # inside a paragraph, where the block rules below never look for it:
+      # the post was not split, and because the marker is content rather
+      # than a note it was not stripped either -- so `//--more--//` was
+      # printed on the page, in the feed, in the description and in a toot
+      # that cannot be taken back. Code fences are already separated out
+      # above, so a marker inside one is left exactly as it was typed.
+      text = segment[:text].gsub(/^[ \t]*(\/\/--more--\/\/)[ \t]*$/, "\n\\1\n")
+      text.split(/\n\s*\n/).map { |para| dedent(para) }.reject(&:empty?).each do |para|
         block, counter = parse_prose_block(para, media_dir, media_files, counter, incoming_dir: incoming_dir)
         # nil is a paragraph that turned out to hold nothing a reader could
         # see -- see the heading branch. Every other path returns a block.

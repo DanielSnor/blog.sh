@@ -334,6 +334,8 @@ def client_i18n_json
     lightbox_label: t('js.lightbox_label'),
     lightbox_open: t('js.lightbox_open'),
     copy_code: t('js.copy_code'),
+    copy_code_done: t('js.copied'),
+    copy_code_failed: t('js.copy_failed'),
     theme_auto: t('ui.theme_auto'),
     theme_light: t('ui.theme_light'),
     theme_dark: t('ui.theme_dark')
@@ -413,9 +415,22 @@ SOCIAL_ICONS = {
   'email' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>'
 }.freeze
 
-def social_icon(entry)
-  entry['icon_svg'] || SOCIAL_ICONS[entry['icon'].to_s] || ''
+# An icon somebody wrote in their own config, made safe to inline. The
+# same treatment an imported embed gets, and for the same reason: an SVG
+# can carry <script>, an on* handler or a javascript: href, and this one
+# is pasted into every page that draws it. Social icons went unguarded
+# until tag icons made the hole worth closing -- it was the same hole in
+# the footer all along, only nobody had asked about it.
+def own_icon_svg(svg)
+  Embed.without_scripts(svg.to_s)
 end
+
+def social_icon(entry)
+  return own_icon_svg(entry['icon_svg']) if entry['icon_svg']
+
+  SOCIAL_ICONS[entry['icon'].to_s] || ''
+end
+
 
 def social_links_html
   SOCIAL.map do |entry|
@@ -896,8 +911,14 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
   when 'code'
     lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
     # Same class as the chrome's own code blocks render with, for the same
-    # reason -- see render_chrome_block.
-    %(<pre class="code-block"><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
+    # reason -- see render_chrome_block. But NOT when this copy was cut to
+    # fit a listing card: the button copies what the block holds, and what
+    # a cut block holds is the truncation. A reader lifting a shell script
+    # off the front page would get the first lines of it, run them, and
+    # never be told the rest existed. With no class there is no button,
+    # and the card's "read more" is what leads to the whole thing.
+    cls = block['cut'] ? '' : ' class="code-block"'
+    %(<pre#{cls}><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
   when 'file'
     file = (block['media'] || []).first || {}
     # Nothing attached: the card used to link the post's own directory
@@ -1080,6 +1101,33 @@ CONTENT_ICONS = {
   'chat' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
 }.freeze
 
+# What a tag may put on its own listing heading and on the date badge of
+# every post carrying it. A LIST rather than a map, because the order in
+# it is the priority: a post has more than one tag on 68% of the archive
+# this was measured against, and the tag it was given FIRST is usually the
+# platform tag an importer added -- `twitter` opens 1256 posts there. So
+# the site owner decides once, here, rather than post by post.
+TAG_ICONS = SiteConfig::Chrome.list(SiteConfig.data, 'tag_icons').filter_map do |entry|
+  next unless entry.is_a?(Hash)
+
+  tag = entry['tag'].to_s
+  next if tag.empty?
+
+  svg = entry['icon_svg'] ? own_icon_svg(entry['icon_svg']) : CONTENT_ICONS[entry['icon'].to_s]
+  next if svg.to_s.empty?
+
+  [Slug.fold(tag), svg]
+end.to_h
+
+# The icon of the first tag in TAG_ICONS the post carries -- folded, so a
+# tag written two ways is one tag here as it is everywhere else.
+def tag_icon_for(post)
+  return nil if TAG_ICONS.empty?
+
+  folded = (post['tags'] || []).map { |t| Slug.fold(t.to_s) }
+  TAG_ICONS.find { |tag, _| folded.include?(tag) }&.last
+end
+
 # Every post is rendered onto its own page, the index, its content-type
 # listing and each of its tag listings -- with a large enough tag count that
 # can mean rendering the same content several times over, and re-parsing its
@@ -1203,7 +1251,13 @@ end
 # listing the heading is the post title at h2 and the badge beside it is a
 # link to the post, which is a different job.
 def date_badge(post, link: nil, pinned: false, heading: false)
-  icon = CONTENT_ICONS[dominant_content_type(post)]
+  # A tag's icon REPLACES the content type's rather than joining it. The
+  # badge is a small tile carrying a date and one glyph, and the only
+  # thing that ever adds a second is a pinned post -- which earns it by
+  # being the single one on the site. Two glyphs on every tagged post
+  # would make that exception the rule, and on a listing page there are
+  # twenty badges under each other.
+  icon = tag_icon_for(post) || CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
   pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
   inner = "#{icon}<span>#{date}</span>"
@@ -1385,11 +1439,22 @@ def plain_text_for_search(post)
   PostText.plain(post)
 end
 
+# What stands between two paragraphs in a search result. A middle dot with
+# spaces rather than an ellipsis: an ellipsis already means "the text was
+# cut here" at the end of every snippet, and two meanings for one mark is
+# how a reader learns to trust neither.
+SNIPPET_SEPARATOR = ' · '
+
 def truncate_excerpt(text, len = 200)
   text = text.to_s.gsub(/\s+/, ' ').strip
   return text if text.length <= len
 
-  "#{text[0...len].rstrip}…"
+  # A cut that lands just past a paragraph mark left the mark hanging on
+  # the end -- "...vlhko a listy ·…" on 23 posts of one real archive. The
+  # separator says "another paragraph follows"; the ellipsis says the same
+  # thing and says it better, so the mark goes.
+  cut = text[0...len].rstrip.sub(/#{Regexp.escape(SNIPPET_SEPARATOR.rstrip)}\z/, '').rstrip
+  "#{cut}…"
 end
 
 # The stats row and the comments container carry whichever network the
@@ -1534,11 +1599,12 @@ def post_description(post)
   # post is and started saying what the site is. Repeating the text under
   # the title is the lesser of the two: it still describes this post.
   name, rest = PostText.name_and_rest(post)
-  text = if name && !rest.to_s.strip.empty?
+  text = if name && !rest.to_s.strip.empty? && name_stands_as_title?(post)
            rest
          else
            teaser = PostText.teaser_blocks(post['content'])
-           teaser&.any? ? PostText.plain({ 'content' => teaser }) : plain_text_for_search(post)
+           raw = teaser&.any? ? PostText.plain({ 'content' => teaser }) : plain_text_for_search(post)
+           without_borrowed_title(raw, post)
          end
   text = post['title'].to_s if text.to_s.strip.empty?
   text = SITE_DESCRIPTION if text.strip.empty?
@@ -1806,6 +1872,33 @@ end
 # renders without it (see render_block), or the page would say it twice.
 def link_title_block(post)
   PostText.link_title_block(post)
+end
+
+# Whether the post's DERIVED name is what stands above it. The title comes
+# from three places in order -- the author's own, a link block's, then the
+# name cut from the opening words -- and only in the third case has the
+# reader already seen that opening. When a link block supplies the title,
+# cutting the name out anyway takes the post's first sentence away from
+# its description and its search result while the heading shows somebody
+# else's words entirely: the reader is shown a link's title over a comment
+# that starts in the middle.
+# The words under a borrowed title, without the borrowed title itself. A
+# link post's stored text begins with the link's own title, and that title
+# is what stands above the post -- so a description or a search row built
+# from the text starts by repeating the headline the reader has just read.
+# Cut off the front rather than dropped from the middle: the same words
+# further down are the post talking about them, which is worth keeping.
+def without_borrowed_title(text, post)
+  borrowed = link_title_block(post)&.[]('title').to_s.strip
+  return text if borrowed.empty?
+
+  stripped = text.to_s.sub(/\A#{Regexp.escape(borrowed)}/, '')
+  stripped = stripped.sub(/\A\s*#{Regexp.escape(SNIPPET_SEPARATOR.strip)}\s*/, '').lstrip
+  stripped.empty? ? text : stripped
+end
+
+def name_stands_as_title?(post)
+  post['title'].nil? && link_title_block(post).nil?
 end
 
 def post_title_for(post)
@@ -2235,7 +2328,11 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   classes << "listing-heading--#{variant}" if variant
   parts = []
   parts << %(<span class="listing-heading__kind">#{h(kind)}</span>) unless kind.empty?
-  parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
+  # A symbol names one of the icons the engine ships; a String IS one --
+  # that is how a tag's own icon reaches its heading without a second
+  # parameter and a second code path drawing the same thing.
+  icon_svg = icon.is_a?(String) ? icon : LISTING_HEADING_ICONS[icon]
+  parts << icon_svg unless icon_svg.to_s.empty?
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
   parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
@@ -2689,11 +2786,51 @@ def emit_copy(src, dest, compare_content: false)
     # size nor mtime -- it moves ctime, which nothing here was reading -- so
     # a picture copied under a strict umask stayed unreadable through every
     # rebuild that followed.
-    return if same && world_readable?(dest)
+    #
+    # One inode under two names is the cheapest possible answer: nothing to
+    # compare and nothing to write. An archive built before this existed
+    # falls THROUGH here even when its copy is up to date, and is relinked
+    # once -- otherwise it would keep paying twice for every file that
+    # never changes, which for media is all of them.
+    return if File.identical?(src, dest) && world_readable?(dest)
+    return if links_impossible? && same && world_readable?(dest)
   end
 
-  FileUtils.cp(src, dest)
+  place_public(src, dest)
+  # On a link this changes the mode of the ORIGINAL too -- one inode has one
+  # mode. That is the intended direction: a media file the web server cannot
+  # read is the bug this makes impossible, and an original that becomes
+  # readable is what its owner was going to do by hand anyway.
   make_readable(dest)
+end
+
+# The same bytes under two names, paid for once. Measured on one real
+# archive: media.nosync and public.nosync held 1.8 GB each -- the same
+# 1.8 GB twice, and every import doubled again.
+#
+# Nothing in the build ever writes INTO a file under public.nosync: pages
+# are written whole by `emit`, and media arrives only through here. So the
+# two names cannot drift apart, and deleting one of them -- prune, or a
+# deploy with --prune -- only drops that name.
+def place_public(src, dest)
+  unless links_impossible?
+    begin
+      File.unlink(dest) if File.exist?(dest)
+      File.link(src, dest)
+      return
+    rescue SystemCallError
+      # A volume that refuses the first link will refuse the rest: a
+      # separate mount for public.nosync (EXDEV), a source somebody else
+      # owns (EPERM), a filesystem with a link limit (EMLINK). Asking again
+      # per file would copy the whole archive on every build.
+      @links_impossible = true
+    end
+  end
+  FileUtils.cp(src, dest)
+end
+
+def links_impossible?
+  @links_impossible == true
 end
 
 # Make the directory write the name we are about to record. Only ever a
@@ -2929,8 +3066,7 @@ drafts, posts = posts.partition { |p| draft?(p) }
 # page still listed in the search index, so searching for it by name
 # handed the reader the map. `archive` is one of the commonest names a
 # blog has for a page.
-RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page rss.xml
-                            sitemap.xml robots.txt 404 favicon.ico].freeze
+RESERVED_ROOT_SEGMENTS = PostAddress::RESERVED_ROOT_SEGMENTS
 pages, posts = posts.partition { |p| page?(p) }
 # Out of the stream on the same principle as pages, one step further:
 # a page is taken out of the listings but stays findable (sitemap,
@@ -3443,7 +3579,8 @@ tags_map.each do |slug, data|
   end
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
-                heading_kind: t('tag.kind'), heading_variant: 'tag', heading_icon: :tag,
+                heading_kind: t('tag.kind'), heading_variant: 'tag',
+                heading_icon: TAG_ICONS[Slug.fold(data[:name].to_s)] || :tag,
                 # Only when there IS an index to go back to: a site whose
                 # tags all live on drafts builds no /tag/, and a heading
                 # linking there would be the dead menu item doctor refuses.
@@ -3558,11 +3695,6 @@ PRESENT_TYPES.each do |type|
                 description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
 end
 
-# What stands between two paragraphs in a search result. A middle dot with
-# spaces rather than an ellipsis: an ellipsis already means "the text was
-# cut here" at the end of every snippet, and two meanings for one mark is
-# how a reader learns to trust neither.
-SNIPPET_SEPARATOR = ' · '
 
 def search_index_entry(post)
   text = plain_text_for_search(post)
@@ -3586,7 +3718,15 @@ def search_index_entry(post)
   # is the REST after the name has been cut out of the joined text, and a
   # separator there would have to survive that cut without ending up inside
   # the post's own name.
-  after = name && !rest.to_s.strip.empty? ? rest : PostText.plain(post, separator: SNIPPET_SEPARATOR)
+  # ...and only when that name is what the row's title actually shows. A
+  # post that borrows its title from a link block has not shown the reader
+  # its opening sentence, so cutting it out leaves the result starting
+  # mid-thought under somebody else's headline.
+  after = if name && !rest.to_s.strip.empty? && name_stands_as_title?(post)
+            rest
+          else
+            without_borrowed_title(PostText.plain(post, separator: SNIPPET_SEPARATOR), post)
+          end
   {
     url: post_path(post),
     # A link post has no title of its own and no opening sentence to lift a
@@ -3717,7 +3857,15 @@ unless archive_by_year.empty?
       # Its own copy of the key above, and it has to say the same thing:
       # the year page's stated contract is date order inside the month.
       lines = in_month.sort_by { |post| [post_time(post), post['slug']] }.map do |post|
-        %(<li><time datetime="#{h(post_time(post).strftime('%Y-%m-%d'))}">) +
+        # The attribute and the text are the same date said twice, one for
+        # a machine and one for a reader -- that is what <time> means. The
+        # attribute used to carry the STORED date while the text showed the
+        # local day, so a post filed at a year's turn read
+        # `<time datetime="2025-12-31">1.</time>`: a value and a rendering
+        # of it that disagree. Which year the post is FILED under is a
+        # separate decision and stays as it was -- the address year, so the
+        # page and /posts/<year>/ agree.
+        %(<li><time datetime="#{h(post_display_time(post).strftime('%Y-%m-%d'))}">) +
           %(#{post_display_time(post).day}.</time> ) +
           %(<a href="#{h(post_path(post))}">#{h(post_title_for(post))}</a></li>)
       end

@@ -219,7 +219,24 @@ module RunLock
     # run's label only when the holder could not say who it is (a
     # read-only handle, the cron-as-root case).
     holder_label = holder_label(holder) || label
-    "ℹ️  Another #{holder_label ? "#{holder_label} " : ''}run is still going#{detail} -- " \
+    # Through i18n when it is loaded: this line is what cron mails to the
+    # operator, and a Czech or German site had it arrive in English. The
+    # fallback is the same sentence, because a lock message must never be
+    # the reason a run dies -- lib/ is used by scripts that do not load
+    # the locale files at all.
+    translated(holder_label, detail, stuck)
+  end
+
+  def translated(holder_label, detail, stuck)
+    who = holder_label ? "#{holder_label} " : ''
+    if defined?(I18n) && I18n.respond_to?(:t)
+      begin
+        return "ℹ️  #{I18n.t('lock.busy', who: who, detail: detail)}#{stuck}"
+      rescue StandardError
+        # ...and on to the English below.
+      end
+    end
+    "ℹ️  Another #{who}run is still going#{detail} -- " \
       "skipping this one. Nothing is broken; try again in a minute.#{stuck}"
   end
 

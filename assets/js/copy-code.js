@@ -14,6 +14,8 @@
 
   var i18n = window.BLOG_I18N || {};
   var LABEL = i18n.copy_code || 'Copy text';
+  var DONE_LABEL = i18n.copy_code_done || 'Copied';
+  var FAILED_LABEL = i18n.copy_code_failed || 'Could not copy';
   // Long enough to be seen, short enough not to look like a state the
   // page is stuck in.
   var SHOWN = 1400;
@@ -54,20 +56,46 @@
       navigator.clipboard.writeText(code.textContent).then(function () {
         button.innerHTML = DONE;
         button.classList.add('copy-code--done');
+        // The icon is the feedback for anybody who can see it; the name
+        // is the feedback for anybody who cannot. Without this a screen
+        // reader hears the same "Copy text" whether the copy happened or
+        // was refused, which is no feedback at all.
+        button.setAttribute('aria-label', DONE_LABEL);
+        button.title = DONE_LABEL;
         clearTimeout(timer);
         timer = setTimeout(function () {
           button.innerHTML = COPY;
           button.classList.remove('copy-code--done');
+          button.setAttribute('aria-label', LABEL);
+          button.title = LABEL;
         }, SHOWN);
       }).catch(function () {
         // A refused clipboard (a permission policy, a browser that asks
-        // and was told no) leaves the button as it was. Saying nothing is
-        // the honest answer: nothing was copied, and an error message in
-        // the corner of a code block is worse than the reader's own
-        // second attempt.
+        // and was told no) must not look like a copy that worked. No
+        // message appears -- an error in the corner of a code block is
+        // worse than a second attempt -- but the button says so to
+        // anybody who asks it, and stops saying it once the reader has
+        // had time to try again.
+        button.setAttribute('aria-label', FAILED_LABEL);
+        button.title = FAILED_LABEL;
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          button.setAttribute('aria-label', LABEL);
+          button.title = LABEL;
+        }, SHOWN);
       });
     });
 
-    pre.appendChild(button);
+    // The button goes in a WRAPPER around the block, never inside it.
+    // A <pre> that scrolls is its own scroll container, and an absolutely
+    // positioned child of it is placed against the CONTENT rather than
+    // against the box: on a long command the button rode across the code
+    // as the reader scrolled and ended up outside the block entirely.
+    // The wrapper does not scroll, so the button stays in its corner.
+    var wrap = document.createElement('div');
+    wrap.className = 'code-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    wrap.appendChild(button);
   });
 })();

@@ -221,7 +221,7 @@ Zapsáno jako:
 
 Bez tohoto řádku si engine upoutávku ustřihne ze začátku textu sám — a strojový řez zřídka skončí tam, kde by měl.
 
-Zapisuje se přesně takhle, bez mezer a malými písmeny. Jinak zapsaný řádek je obyčejná poznámka a při uložení zmizí.
+Zapisuje se přesně takhle, bez mezer a malými písmeny. Jinak zapsaný řádek je obyčejná poznámka a při uložení zmizí. Prázdné řádky kolem nejsou potřeba — stačí, když je na řádku sama.
 
 ```
 První odstavec, který má zaujmout.

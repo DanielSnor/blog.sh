@@ -199,6 +199,8 @@ js:
   lightbox_label: "Prohlížeč obrázků"
   lightbox_open: "Zvětšit obrázek"
   copy_code: "Zkopírovat text"
+  copied: "Zkopírováno"
+  copy_failed: "Zkopírovat se nepovedlo"
 
 cli:
   cancel_word: "zrušit"
@@ -428,6 +430,22 @@ cli:
 
   edited_label: "Upraveno: %{path}"
 
+  empty_trash_none: "Koš je prázdný."
+
+  empty_trash_confirm: "Vysypat koš nadobro — postů: %{count}, uvolní se %{size}? Tohle vzít zpět nejde. Pro potvrzení napiš, kolik postů se maže: "
+
+  empty_trash_done: "Koš vysypán: postů %{count}, uvolněno %{size}."
+
+  empty_versions_none: "Každý post už si drží jen svou poslední verzi."
+
+  empty_versions_confirm: "Smazat starší verze — souborů: %{count}, uvolní se %{size}? Nejnovější verze každého postu zůstane. Pro potvrzení napiš, kolik souborů se maže: "
+
+  empty_versions_done: "Starších verzí odstraněno: %{count}, uvolněno %{size}. Každý post si nechal tu nejnovější."
+
+  empty_cancelled: "Nic se nesmazalo."
+
+  empty_what: "Řekni, co vysypat: ./blog.sh empty trash, nebo ./blog.sh empty versions."
+
   confirm_delete: "Opravdu smazat '%{slug}'? Napiš slug pro potvrzení: "
   delete_takes_announcement: "Tenhle post byl oznámený na %{url} — smazáním zmizí i to oznámení a všechno, co se pod ním napsalo. Obnova vrátí post, vlákno už ne."
   deleted_label: "Smazáno (v koši, obnovíš přes ./blog.sh restore %{slug}): %{path}"
@@ -475,6 +493,8 @@ cli:
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
       ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
+      ./blog.sh empty trash          nadobro smaže všechno v koši; napřed řekne kolik toho je
+      ./blog.sh empty versions       nechá každému postu poslední verzi a starší smaže
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
       ./blog.sh rebuild              znovu sestaví a nasadí celý web, bez vazby na konkrétní post
@@ -837,6 +857,13 @@ import:
 # čte ho někdo, kdo neví, ve kterém souboru to nastavení bydlí, natož pod
 # kterým klíčem.
 doctor:
+  tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."
+  tag_icon_shape: "Položka v `tag_icons` není mapa — každá potřebuje `tag` a k tomu buď jméno v `icon`, nebo vlastní `icon_svg`."
+  tag_icon_no_tag: "Položka v `tag_icons` nemá `tag`, takže nepatří ničemu a nic nevykreslí."
+  tag_icon_unknown: "Štítek „%{tag}“ si říká o ikonu „%{icon}“, kterou engine nemá. Zná tyhle: %{known}. Na cokoli jiného použij vlastní `icon_svg`."
+  tag_icon_not_svg: "`icon_svg` štítku „%{tag}“ neobsahuje prvek <svg>, takže se nevykreslí nic."
+  tag_icon_scale: "`icon_svg` štítku „%{tag}“ není kreslené na mřížce 24 jednotek jako ostatní ikony (`viewBox=\"0 0 24 24\"`), takže bude v datovém razítku nakřivo."
+  trash_holds: "V koši leží postů: %{count}, celkem %{size}. Pořád se dají vrátit; `./blog.sh empty trash` je smaže nadobro."
   heading: "Kontrola této instalace"
   running_online: "Kontroluju i dostupnost serverů a platnost tokenu (--online)"
   summary: "Problémů: %{errors}, ke zvážení: %{warnings}, v pořádku: %{oks}."
@@ -1082,6 +1109,10 @@ check:
   media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
   media_stray_fix: "Zbylo po obrázku, který zdroj mezi importy odebral nebo přejmenoval. Post na něj neodkazuje; až se podíváš, smaž ho sám."
   address_duplicate: "Na adrese /posts/%{year}/%{slug}/ by se servíroval víc než jeden post (%{count})."
+  post_unknown_type: "Post „%{slug}“ si říká o `type: %{type}`, který engine nezná — uloží se a nikdo ho nečte, takže post nedostane vlastní výpis, položku v menu ani ikonu."
+  post_unknown_type_fix: "Zná těchhle osm: text, quote, chat, image, video, audio, link, document. Na vlastní sekci použij ŠTÍTEK a jmenuj ho v `nav:` — dostaneš výpis s vlastním stránkováním, položku v menu a RSS feed, což by obsahový typ nedal."
+  page_reserved_slug: "Stránka „%{slug}“ by seděla na adrese, kterou engine používá sám (/%{slug}/), takže ji build odmítá zapsat — na webu vůbec není."
+  page_reserved_slug_fix: "Přejmenuj ji. Build to při každé přestavbě říká, jenže varování, které uteče v terminálu, je přesně to, kvůli čemu stránka chybí měsíce."
   post_unreadable: "Soubor %{file} se nepodařilo přečíst (%{reason})."
   json_and_repair: "❌ --json a --repair naráz nejdou: --json je popis archivu, jak vypadá teď, kdežto --repair ho mění. Pusť napřed `check --repair` a pak `check --json`."
   post_unreadable_fix: "Build v tomhle stavu vůbec neproběhne. Oprav ten soubor, nebo ho odlož stranou — dokud tam takhle leží, kontrola nad ním nic neví a web se nepostaví."
@@ -1517,3 +1548,6 @@ style:
   rebuilt: "✅ Sestaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
   rebuild_failed: "Sestavení nedoběhlo — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."
   rebuild_busy: "Zámek drží jiný běh, web se teď nepřestavěl. Nic není rozbité a konfigurace se zapsala — zkus to za minutu znovu."
+
+lock:
+  busy: "Jiný běh %{who}ještě neskončil%{detail} — tenhle se přeskakuje. Nic není rozbité, zkus to za chvíli znovu."

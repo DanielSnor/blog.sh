@@ -221,6 +221,14 @@ module Exporter
     fallbacks = Hash.new(0)
     parts = Array(blocks).map do |block|
       type = block['type'].to_s
+      # Where the teaser stops is a real idea on the destination too, and
+      # both Jekyll and Hugo spell it `<!--more-->`. `//--more--//` is this
+      # engine's own spelling and nobody else's: written out as it stands,
+      # every such post arrives on the new site with a line of punctuation
+      # in the middle of it. Translated rather than dropped, because the
+      # author drew that line on purpose.
+      next '<!--more-->' if type == 'teaser_end'
+
       unless HTML_ONLY.include?(type)
         rendered = MarkdownWriter.blocks_to_markdown([block], media_rel)
         next rendered unless rendered.strip.empty?

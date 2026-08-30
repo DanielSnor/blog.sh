@@ -728,7 +728,18 @@ module Import
 
     def toml_array(raw)
       inner = raw[/\[(.*)\]/m, 1] || raw.sub(/\A\[/, '')
-      inner.split(',').map { |v| unquote_toml(v.strip) }.reject(&:empty?)
+      # A comment inside a multi-line array belongs to the line it sits on,
+      # not to the value after it. Splitting first and unquoting second ate
+      # the next tag whole: `"a", # note\n "b",` handed `# note\n "b"` to
+      # the unquoter, which found no matching quotes around it and kept the
+      # comment, the newline and the tag as one string. Hugo's own exports
+      # write arrays like that, so the tag became a line of punctuation on
+      # every post that had one.
+      # Per LINE, because a comment ends at the end of its line: stripping
+      # it from the whole array text would take everything after it,
+      # including the values on the lines below.
+      cleaned = inner.lines.map { |line| strip_toml_comment(line) }.join("\n")
+      cleaned.split(',').map { |v| unquote_toml(v.strip) }.reject(&:empty?)
     end
 
     # The OUTER quotes only. Everything between them is what somebody

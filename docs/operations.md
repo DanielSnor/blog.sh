@@ -482,6 +482,99 @@ Three things are worth knowing before you rely on the result:
   to another machine or another host -- and, run against a scratch
   copy, the way to check that an export really did come out whole.
 
+## Reading the archive
+
+Two pages the build writes for you, both from the posts themselves --
+there is nothing to configure and nothing to keep up to date.
+
+**`/archive/`** is a map of the site in two levels. The first is a row per
+year with a strip of twelve months, each month shaded by how much was
+written in it; the second, `/archive/<year>/`, is one line per post,
+grouped by month, oldest first. No excerpts and no pictures: this is an
+index, and its whole point is that twenty years fit on one screen.
+Pagination cannot do that -- it is anchored to the oldest post, so
+`/page/128/` says nothing about whether it holds 2009 or 2014. Every
+post's date badge links into the month it belongs to, so a reader who
+finds one post can see what surrounded it.
+
+A year nobody wrote in gets a row on the map and no page of its own: an
+empty page is an invitation to a dead end. A post is filed under the year
+of its ADDRESS, so `/archive/2025/` and `/posts/2025/` always agree.
+
+**`/tag/`** is every tag the site has, as pills, with a superscript count
+of how often each was used. It is built alphabetically -- folded, so an
+accented name sorts where a reader expects rather than after z -- and a
+reader can switch it to by-count, which is remembered for next time. Only
+tags that have a page of their own appear, so the list never points at an
+address the build did not write.
+
+Neither page needs a menu item to work, but `nav:` in `site.yml` is where
+you would put one; see **Configuration** in the README.
+
+## Giving a tag its own icon
+
+A tag can carry an icon, and it shows up in two places: the heading of its
+`/tag/<name>/` listing, and the date badge of every post that has the tag,
+where it **replaces** the content-type icon rather than joining it.
+
+```yaml
+tag_icons:
+  - tag: "fotografie"
+    icon: "image"
+  - tag: "kolo"
+    icon_svg: '<svg viewBox="0 0 24 24" ...>...</svg>'
+```
+
+The order is the priority. Most posts carry more than one tag -- 68% of
+them on the archive this engine was built around -- and the tag a post was
+given FIRST is usually the one an importer added, not a subject: `twitter`
+opens 1256 posts there. So the first entry in this list that a post has is
+the one it wears, and the site owner decides once instead of post by post.
+
+`icon` names one of the eight the engine ships: text, quote, chat, image,
+video, audio, link, document. `icon_svg` is your own drawing, on the same
+24-unit grid (`viewBox="0 0 24 24"`) and stroked in `currentColor` so it
+follows the light and dark themes. Scripts, styles and event handlers are
+stripped out of it before it reaches a page -- the same treatment an
+imported embed gets, and for the same reason. `doctor` says when an icon
+name is one the engine does not have, when an `icon_svg` holds no `<svg>`,
+and when it is drawn to another scale.
+
+A tag with no entry here changes nothing: its listing keeps the generic
+tag icon and its posts keep the icon of their content type.
+
+## Emptying the trash and the versions
+
+The engine keeps two things after you are done with them, and both have a
+way back: a deleted post waits in `trash/` for `./blog.sh restore`, and
+every save keeps the previous text of a post, offered by the version
+picker in `./blog.sh props`. Neither had a way OUT before 1.6 -- the only
+way to empty either was `rm` on the server.
+
+```bash
+./blog.sh empty trash       # deletes every trashed post for good
+./blog.sh empty versions    # keeps each post's newest version, removes the older ones
+```
+
+Both say how much they are about to delete and confirm by having you type
+that number -- the way `delete` has you type the slug. A trash has no slug
+to repeat back, and the count is the one number you have just been shown,
+so typing it means having read it. Anything else, including an empty
+answer, cancels and deletes nothing.
+
+`empty trash` takes the media of a trashed post with it, and covers both
+shapes the trash has had: today's `trash/<year>/<slug>/` and the flat
+`trash/<slug>/` of an installation older than that.
+
+`empty versions` deliberately keeps ONE version per post -- the newest.
+Versions exist to answer "give me back what I just overwrote", and that
+answer is the newest one; removing it too would take away the thing they
+are for.
+
+`doctor` mentions a trash that has anything in it, with its size. Not as a
+fault -- a trash with posts in it is a trash doing its job -- but because
+nothing else on the site ever says it is there.
+
 ## Checking the archive
 
 ```bash

@@ -44,7 +44,15 @@ module CardTeaser
   # it is a broken one -- and a photograph taller than the whole budget is
   # still what the post IS.
   def blocks(content, budget: BUDGET)
-    all = Array(content).compact
+    # The same blocks the renderer will draw, which means WITHOUT the
+    # tracking pixels it drops. Counted here, a 1x1 gif claims the full
+    # width of the card (534 px by the model below) and a 1x100 spacer
+    # claims fifty thousand, so it alone fills the budget -- and then the
+    # renderer throws it away and the card is empty with a "read more"
+    # under it. Four posts on the archive this was measured against are
+    # exactly that shape, all four from one Tumblr import, all four with
+    # the pixel first.
+    all = Array(content).compact.reject { |b| tracking_pixel?(b) }
     kept = []
     used = 0
     all.each do |block|
@@ -83,7 +91,9 @@ module CardTeaser
       room = [(budget - GAP) / 20, 1].max
       return block if lines.length <= room
 
-      return block.merge('text' => lines.first(room).join("\n"))
+      # `cut` travels with the block so the renderer knows this copy is
+      # not the whole thing. A card must not offer to copy half a script.
+      return block.merge('text' => lines.first(room).join("\n"), 'cut' => true)
     end
 
     key = ROW_KEYS[block['type']]
@@ -91,7 +101,7 @@ module CardTeaser
     room = [(budget - GAP) / LINE, 1].max
     return block if rows.length <= room
 
-    block.merge(key => rows.first(room))
+    block.merge(key => rows.first(room), 'cut' => true)
   end
 
   # Roughly what this block will take on screen. Every branch is the
@@ -157,8 +167,28 @@ module CardTeaser
     spans.empty? ? out.reject { |k, _| k == 'formatting' } : out.merge('formatting' => spans)
   end
 
+  # The twin of `degenerate_image?` in build/build_blog.rb, and it has to
+  # stay its twin: an image this drops and the renderer keeps would take
+  # room on a card that shows nothing, and one the renderer drops and this
+  # keeps is the empty card above. Unknown or unreadable dimensions render,
+  # so they count here too -- only a real 1x1 is the pixel being dropped.
+  def tracking_pixel?(block)
+    return false unless block.is_a?(Hash) && block['type'] == 'image'
+
+    media = (block['media'] || []).first || {}
+    w = Integer(media['width'], exception: false)
+    h = Integer(media['height'], exception: false)
+    return false if w.nil? || h.nil?
+
+    w <= 1 || h <= 1
+  end
+
+  # A line the reader sees, not a line of source: a paragraph wraps at
+  # roughly CHARS_PER_LINE, and a hard break inside it starts a new line
+  # of its own -- the renderer turns each one into a <br>. Counting only
+  # the wrapping put a 60-line poem at 184 px when it draws over 1400.
   def lines(text)
-    [1, (text.to_s.length.to_f / CHARS_PER_LINE).ceil].max
+    text.to_s.split("\n", -1).sum { |part| [1, (part.length.to_f / CHARS_PER_LINE).ceil].max }
   end
 
   def list_lines(block)

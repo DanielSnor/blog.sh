@@ -210,6 +210,8 @@ js:
   lightbox_label: "Image viewer"
   lightbox_open: "Open image"
   copy_code: "Copy text"
+  copied: "Copied"
+  copy_failed: "Could not copy"
 
 # scripts/manage_post.rb (the ./blog.sh authoring CLI/wizard) and its
 # frontmatter-editor hint text. cancel_word is compared against user input
@@ -449,6 +451,22 @@ cli:
 
   edited_label: "Edited: %{path}"
 
+  empty_trash_none: "The trash is empty."
+
+  empty_trash_confirm: "Delete %{count} post(s) from the trash for good, freeing %{size}? This cannot be undone. Type how many POSTS are being deleted to confirm: "
+
+  empty_trash_done: "Trash emptied: %{count} post(s), %{size} freed."
+
+  empty_versions_none: "Every post already keeps just its last version."
+
+  empty_versions_confirm: "Delete %{count} older version(s), freeing %{size}? The newest version of each post stays. Type how many FILES are being deleted to confirm: "
+
+  empty_versions_done: "Older versions removed: %{count}, %{size} freed. Each post keeps its newest one."
+
+  empty_cancelled: "Nothing was deleted."
+
+  empty_what: "Say what to empty: ./blog.sh empty trash, or ./blog.sh empty versions."
+
   confirm_delete: "Really delete '%{slug}'? Type the slug to confirm: "
   delete_takes_announcement: "This post was announced at %{url} -- deleting it takes that announcement down too, along with anything said under it. Restore brings the post back, but not the thread."
   deleted_label: "Deleted (in trash, restore with ./blog.sh restore %{slug}): %{path}"
@@ -496,6 +514,8 @@ cli:
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
+      ./blog.sh empty trash          deletes everything in the trash for good, after telling you how much
+      ./blog.sh empty versions       keeps each post's newest version and removes the older ones
       ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
       ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
       ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
@@ -867,6 +887,13 @@ import:
 # its own: it is read by someone who does not know which file the setting
 # lives in, let alone which key.
 doctor:
+  tag_icons_ok: "Tag icons: %{count}, all of them drawable."
+  tag_icon_shape: "An entry under `tag_icons` is not a mapping -- each one needs a `tag` and either an `icon` name or an `icon_svg`."
+  tag_icon_no_tag: "An entry under `tag_icons` has no `tag`, so it belongs to nothing and draws nothing."
+  tag_icon_unknown: "The tag \"%{tag}\" asks for the icon \"%{icon}\", which this engine does not have. The names it knows: %{known}. For anything else, give it an `icon_svg` of your own."
+  tag_icon_not_svg: "The `icon_svg` of the tag \"%{tag}\" holds no <svg> element, so nothing will be drawn."
+  tag_icon_scale: "The `icon_svg` of the tag \"%{tag}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked in a date badge."
+  trash_holds: "The trash holds %{count} post(s), %{size}. They are still restorable; `./blog.sh empty trash` deletes them for good."
   heading: "Checking this install"
   running_online: "Checking hosts and tokens too (--online)"
   summary: "%{errors} problem(s), %{warnings} worth a look, %{oks} fine."
@@ -1113,6 +1140,10 @@ check:
   media_stray: "Post %{slug} no longer names the file %{file} in its media directory."
   media_stray_fix: "Left behind by a picture the source dropped or renamed between imports. The post does not reference it; delete it yourself once you have looked."
   address_duplicate: "%{count} posts would be served at /posts/%{year}/%{slug}/."
+  post_unknown_type: "The post \"%{slug}\" asks for `type: %{type}`, which this engine does not know -- it is stored and read by nobody, so the post gets no listing, no menu entry and no icon of its own."
+  post_unknown_type_fix: "The eight it knows are text, quote, chat, image, video, audio, link and document. For a section of your own, use a TAG and name it in `nav:` -- that gives a listing with its own pagination, a menu entry and an RSS feed, which a content type would not."
+  page_reserved_slug: "The page \"%{slug}\" would sit at an address the engine writes itself (/%{slug}/), so the build refuses to write it -- the page is not on the site."
+  page_reserved_slug_fix: "Rename the page to something else. The build says so on the terminal at every rebuild, but a scrolled-past warning is how a page stays missing for months."
   post_unreadable: "%{file} could not be read (%{reason})."
   json_and_repair: "❌ --json and --repair cannot run together: --json is a document about the archive as it stands, --repair changes it. Run `check --repair` first, then `check --json`."
   post_unreadable_fix: "The build refuses to run in this state. Repair the file or move it aside -- while it sits there like this, check knows nothing about it and the site will not build."
@@ -1548,3 +1579,6 @@ style:
   rebuilt: "✅ Built. ./blog.sh preview serves it at http://localhost:8000/, and ./blog.sh rebuild deploys it."
   rebuild_failed: "The build did not finish -- the lines above say why. Your config was written either way."
   rebuild_busy: "Another run holds the lock, so the site was not rebuilt. Nothing is broken and your config was written -- try again in a minute."
+
+lock:
+  busy: "Another %{who}run is still going%{detail} -- skipping this one. Nothing is broken; try again in a minute."

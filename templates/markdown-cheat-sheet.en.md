@@ -222,7 +222,7 @@ A line reading `//--more--//`, on its own, splits the post in two. What is above
 
 Without this line the engine cuts a teaser off the start of the text itself -- and a machine cut rarely lands where it should.
 
-Write it exactly like that, no inner spaces and in lower case. Written any other way it is an ordinary note and disappears when the post is saved.
+Write it exactly like that, no inner spaces and in lower case. Written any other way it is an ordinary note and disappears when the post is saved. Blank lines around it are not required -- a line holding nothing else is enough.
 
 ```
 The opening paragraph, the one meant to catch the eye.

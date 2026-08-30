@@ -4876,6 +4876,89 @@ def cmd_rebuild
   exit RunLock::BUSY_EXIT if Publishing.stopped_on_busy_lock?
 end
 
+# --- empty ------------------------------------------------------------
+#
+# The way OUT of the two places the engine keeps things after you are done
+# with them. Both had a way back -- `restore` for the trash, the version
+# picker in `props` -- and no way out at all: emptying either meant `rm` on
+# the server, which on a container install means `docker exec` without an
+# alias. So both grew and nobody could say by how much.
+#
+# Confirmed by typing the COUNT rather than a yes: `delete` has you type the
+# slug, and a trash has no slug to repeat back. The number is the one thing
+# the person has just been shown, and typing it means having read it.
+def confirm_count(prompt_key, count:, size:)
+  print t(prompt_key, count: count, size: FileSize.human(size))
+  answer = $stdin.gets&.strip
+  return true if answer == count.to_s
+
+  puts t('cli.empty_cancelled')
+  false
+end
+
+def dir_size(path)
+  PathGlob.under(path, '**', '*').sum { |f| File.file?(f) ? File.size(f) : 0 }
+end
+
+# Every trashed post, in both shapes: today's trash/<year>/<slug>/ and the
+# flat trash/<slug>/ an installation from before the trash grew years left
+# behind. `restore` reads both, so `empty` has to delete both -- otherwise
+# half of it stays and the count somebody was shown was a lie.
+def trashed_dirs
+  return [] unless Dir.exist?(TRASH_DIR)
+
+  (PathGlob.under(TRASH_DIR, '*', '*', 'post.json') +
+   PathGlob.under(TRASH_DIR, '*', 'post.json')).map { |f| File.dirname(f) }.uniq.sort
+end
+
+def cmd_empty_trash
+  dirs = trashed_dirs
+  if dirs.empty?
+    puts t('cli.empty_trash_none')
+    return
+  end
+
+  size = dirs.sum { |d| dir_size(d) }
+  return unless confirm_count('cli.empty_trash_confirm', count: dirs.length, size: size)
+
+  dirs.each { |d| FileUtils.rm_rf(d) }
+  # The year directories the posts sat in, when nothing else is left in
+  # them: an empty trash should look empty.
+  PathGlob.under(TRASH_DIR, '*').each do |d|
+    Dir.rmdir(d) if File.directory?(d) && Dir.children(d).empty?
+  rescue SystemCallError
+    nil
+  end
+  puts t('cli.empty_trash_done', count: dirs.length, size: FileSize.human(size))
+end
+
+# The last version of each post stays. They exist to answer "give me back
+# what I just overwrote", and that answer is the newest one -- emptying
+# them completely would take away the thing they are for.
+def cmd_empty_versions
+  root = PostVersions.versions_root(CONTENT_DIR)
+  dirs = Dir.exist?(root) ? PathGlob.under(root, '*', '*').select { |d| File.directory?(d) } : []
+  doomed = dirs.flat_map { |d| PathGlob.under(d, '*.json').sort[0...-1] }
+  if doomed.empty?
+    puts t('cli.empty_versions_none')
+    return
+  end
+
+  size = doomed.sum { |f| File.size(f) }
+  return unless confirm_count('cli.empty_versions_confirm', count: doomed.length, size: size)
+
+  doomed.each { |f| File.unlink(f) }
+  puts t('cli.empty_versions_done', count: doomed.length, size: FileSize.human(size))
+end
+
+def cmd_empty(what)
+  case what
+  when 'trash' then cmd_empty_trash
+  when 'versions' then cmd_empty_versions
+  else abort t('cli.empty_what')
+  end
+end
+
 def print_usage
   # The identity block above the usage: "what am I even running, and
   # where" is the first question of someone reading help on a server
@@ -5105,6 +5188,8 @@ else
   when 'restore'
     slug = ARGV.shift || pick_trash_interactively
     cmd_restore(slug)
+  when 'empty'
+    cmd_empty(ARGV.shift)
   when 'publish'
     slug = ARGV.shift || pick_draft_interactively
     cmd_publish(slug)

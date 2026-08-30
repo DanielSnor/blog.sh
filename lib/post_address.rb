@@ -119,6 +119,14 @@ module PostAddress
   # refusals, kept apart because the build says a different sentence for
   # each and the checker now says them too.
   REDIRECT_RESERVED = %w[posts page tag type assets search markdown].freeze
+  # Every first segment the build writes itself. A PAGE lives at /<slug>/,
+  # so a page slugged like one of these would sit where the engine's own
+  # output goes -- the build refuses to write it and says so. The list
+  # lives here rather than in the build because `check` has to refuse the
+  # same names: two copies of it is how a page ends up unbuilt on a site
+  # whose check calls the archive sound.
+  RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page
+                              rss.xml sitemap.xml robots.txt 404 favicon.ico].freeze
   REDIRECT_SEGMENT_MAX_BYTES = 255
 
   def redirect_refusal(origin)

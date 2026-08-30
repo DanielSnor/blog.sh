@@ -356,6 +356,30 @@ footer:
 # your home page in the profile field and it just works. The url: here
 # has to be your profile as Mastodon shows it (https://instance/@handle).
 # More than one entry may carry rel: "me".
+# Icons for tags. A tag named here carries its icon in two places: the
+# heading of its own /tag/<name>/ listing, and the date badge of every post
+# that has it -- where it REPLACES the content-type icon rather than
+# joining it. A badge is a small tile with a date and one glyph; the only
+# thing that ever adds a second is a pinned post, and that stays the
+# exception.
+#
+# A LIST, because the order is the priority: most posts carry more than one
+# tag, and the tag a post was given first is usually the one an importer
+# added. The first entry here that a post has is the one it wears.
+#
+# `icon` names one the engine ships: text, quote, chat, image, video,
+# audio, link, document. `icon_svg` is your own -- drawn on the same
+# 24-unit grid (`viewBox="0 0 24 24"`) and stroked in `currentColor`, or it
+# will not follow the light and dark themes. Scripts, styles and event
+# handlers are stripped from it before it reaches a page.
+#
+# tag_icons:
+#   - tag: "fotografie"
+#     icon: "image"
+#   - tag: "kolo"
+#     icon_svg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="17" r="4"/><circle cx="18" cy="17" r="4"/><path d="M6 17l4-9h5l3 9"/></svg>'
+# --- end of tag_icons ---
+
 social:
   - name: "Mastodon"
     url: "https://mastodon.social/@yourname"

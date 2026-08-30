@@ -204,6 +204,8 @@ js:
   lightbox_label: "Bildansicht"
   lightbox_open: "Bild öffnen"
   copy_code: "Text kopieren"
+  copied: "Kopiert"
+  copy_failed: "Kopieren nicht möglich"
 
 cli:
   cancel_word: "abbrechen"
@@ -440,6 +442,22 @@ cli:
 
   edited_label: "Bearbeitet: %{path}"
 
+  empty_trash_none: "Der Papierkorb ist leer."
+
+  empty_trash_confirm: "%{count} Beitrag/Beiträge endgültig aus dem Papierkorb löschen und %{size} freigeben? Das lässt sich nicht rückgängig machen. Zur Bestätigung eintippen, wie viele BEITRÄGE gelöscht werden: "
+
+  empty_trash_done: "Papierkorb geleert: %{count} Beitrag/Beiträge, %{size} frei."
+
+  empty_versions_none: "Jeder Beitrag behält bereits nur seine letzte Fassung."
+
+  empty_versions_confirm: "%{count} ältere Fassung(en) löschen und %{size} freigeben? Die neueste Fassung jedes Beitrags bleibt. Zur Bestätigung eintippen, wie viele DATEIEN gelöscht werden: "
+
+  empty_versions_done: "Ältere Fassungen entfernt: %{count}, %{size} frei. Jeder Beitrag behält seine neueste."
+
+  empty_cancelled: "Es wurde nichts gelöscht."
+
+  empty_what: "Sag, was geleert werden soll: ./blog.sh empty trash oder ./blog.sh empty versions."
+
   confirm_delete: "'%{slug}' wirklich löschen? Zur Bestätigung den Slug eintippen: "
   delete_takes_announcement: "Dieser Beitrag wurde unter %{url} angekündigt -- beim Löschen verschwindet auch die Ankündigung und alles, was darunter geschrieben wurde. Das Wiederherstellen bringt den Beitrag zurück, den Thread nicht."
   deleted_label: "Gelöscht (im Papierkorb, zurückholen mit ./blog.sh restore %{slug}): %{path}"
@@ -487,6 +505,8 @@ cli:
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
       ./blog.sh delete [<slug>]      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh restore [<slug>]     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt
+      ./blog.sh empty trash          löscht den Papierkorb endgültig; sagt vorher, wie viel darin ist
+      ./blog.sh empty versions       behält je Beitrag die neueste Fassung und entfernt die älteren
       ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
       ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
       ./blog.sh rebuild              baut und deployt die ganze Seite, unabhängig von einem Beitrag
@@ -849,6 +869,13 @@ import:
 # welcher Datei die Einstellung steht, geschweige denn unter welchem
 # Schlüssel.
 doctor:
+  tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."
+  tag_icon_shape: "Ein Eintrag unter `tag_icons` ist keine Zuordnung -- jeder braucht ein `tag` und dazu einen `icon`-Namen oder ein eigenes `icon_svg`."
+  tag_icon_no_tag: "Ein Eintrag unter `tag_icons` hat kein `tag`, gehört also zu nichts und zeichnet nichts."
+  tag_icon_unknown: "Das Schlagwort „%{tag}“ verlangt das Symbol „%{icon}“, das diese Engine nicht hat. Bekannt sind: %{known}. Für alles andere nimm ein eigenes `icon_svg`."
+  tag_icon_not_svg: "Das `icon_svg` des Schlagworts „%{tag}“ enthält kein <svg>-Element, es wird also nichts gezeichnet."
+  tag_icon_scale: "Das `icon_svg` des Schlagworts „%{tag}“ ist nicht auf dem 24er-Raster der übrigen Symbole gezeichnet (`viewBox=\"0 0 24 24\"`) und sitzt im Datumsschild schief."
+  trash_holds: "Im Papierkorb liegen %{count} Beitrag/Beiträge, %{size}. Sie lassen sich noch zurückholen; `./blog.sh empty trash` löscht sie endgültig."
   heading: "Prüfung dieser Installation"
   running_online: "Prüft auch, ob Server und Zugriffstoken noch antworten (--online)"
   summary: "%{errors} Problem(e), %{warnings} zum Nachsehen, %{oks} in Ordnung."
@@ -1096,6 +1123,10 @@ check:
   media_stray: "Beitrag %{slug} nennt die Datei %{file} in seinem Medienverzeichnis nicht mehr."
   media_stray_fix: "Übrig von einem Bild, das die Quelle zwischen Importen entfernt oder umbenannt hat. Der Beitrag verweist nicht darauf; sieh nach und lösche sie selbst."
   address_duplicate: "%{count} Beiträge würden unter /posts/%{year}/%{slug}/ ausgeliefert."
+  post_unknown_type: "Der Beitrag „%{slug}“ verlangt `type: %{type}`, den diese Engine nicht kennt -- er wird gespeichert und von niemandem gelesen, also bekommt der Beitrag keine eigene Liste, keinen Menüeintrag und kein Symbol."
+  post_unknown_type_fix: "Bekannt sind diese acht: text, quote, chat, image, video, audio, link, document. Für einen eigenen Bereich nimm ein SCHLAGWORT und nenne es in `nav:` -- das ergibt eine Liste mit eigener Seitennummerierung, einen Menüeintrag und einen RSS-Feed, was ein Inhaltstyp nicht gibt."
+  page_reserved_slug: "Die Seite „%{slug}“ läge auf einer Adresse, die die Engine selbst schreibt (/%{slug}/), deshalb weigert sich der Build -- die Seite steht nicht auf der Website."
+  page_reserved_slug_fix: "Benenne sie um. Der Build sagt es bei jedem Durchlauf, aber eine Warnung, die durchrollt, ist genau der Grund, warum eine Seite monatelang fehlt."
   post_unreadable: "%{file} ließ sich nicht lesen (%{reason})."
   json_and_repair: "❌ --json und --repair gehen nicht zusammen: --json beschreibt das Archiv, wie es ist, --repair verändert es. Führe erst `check --repair` aus, danach `check --json`."
   post_unreadable_fix: "Der Build läuft in diesem Zustand gar nicht. Repariere die Datei oder lege sie beiseite -- solange sie so dort liegt, weiß check nichts von ihr und die Site wird nicht gebaut."
@@ -1531,3 +1562,6 @@ style:
   rebuilt: "✅ Gebaut. ./blog.sh preview liefert sie unter http://localhost:8000/ aus, ./blog.sh rebuild veröffentlicht sie."
   rebuild_failed: "Der Build lief nicht durch -- warum, sagen die Zeilen oben. Deine Konfiguration wurde trotzdem geschrieben."
   rebuild_busy: "Ein anderer Lauf hält die Sperre, die Website wurde nicht neu gebaut. Es ist nichts kaputt und deine Konfiguration wurde geschrieben -- versuch es in einer Minute noch einmal."
+
+lock:
+  busy: "Ein anderer %{who}Lauf ist noch unterwegs%{detail} -- dieser wird übersprungen. Nichts ist kaputt, versuche es gleich noch einmal."

@@ -225,8 +225,16 @@ module MarkdownWriter
     text.to_s.gsub(/([\[\]])/) { "\\#{Regexp.last_match(1)}" }
   end
 
+  # A caption, an alt text and an attachment label have to fit on one line
+  # -- a newline in the middle of `![alt](file)` is a broken image. Only
+  # the whitespace that would BREAK that line is collapsed: `[[:space:]]`
+  # matches U+00A0 too, so every non-breaking space an import carried in
+  # became an ordinary one on the first edit, silently and for good. On the
+  # archive this was measured against, 466 fields in 64 posts hold one --
+  # and the text, list, table and quote blocks keep theirs, so a single
+  # edit made a post typographically inconsistent with itself.
   def one_line(text)
-    text.to_s.gsub(/[[:space:]]+/, ' ').strip
+    text.to_s.gsub(/[\t\n\r\f\v ]+/, ' ').strip
   end
 
   def escape_title(text)
