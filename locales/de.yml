@@ -1533,3 +1533,6 @@ style:
   rebuilt: "✅ Gebaut. ./blog.sh preview liefert sie unter http://localhost:8000/ aus, ./blog.sh rebuild veröffentlicht sie."
   rebuild_failed: "Der Build lief nicht durch -- warum, sagen die Zeilen oben. Deine Konfiguration wurde trotzdem geschrieben."
   rebuild_busy: "Ein anderer Lauf hält die Sperre, die Website wurde nicht neu gebaut. Es ist nichts kaputt und deine Konfiguration wurde geschrieben -- versuch es in einer Minute noch einmal."
+
+lock:
+  busy: "Ein anderer %{who}Lauf ist noch unterwegs%{detail} -- dieser wird übersprungen. Nichts ist kaputt, versuche es gleich noch einmal."

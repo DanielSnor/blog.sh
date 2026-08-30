@@ -1550,3 +1550,6 @@ style:
   rebuilt: "✅ Built. ./blog.sh preview serves it at http://localhost:8000/, and ./blog.sh rebuild deploys it."
   rebuild_failed: "The build did not finish -- the lines above say why. Your config was written either way."
   rebuild_busy: "Another run holds the lock, so the site was not rebuilt. Nothing is broken and your config was written -- try again in a minute."
+
+lock:
+  busy: "Another %{who}run is still going%{detail} -- skipping this one. Nothing is broken; try again in a minute."

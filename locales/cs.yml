@@ -1519,3 +1519,6 @@ style:
   rebuilt: "✅ Sestaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
   rebuild_failed: "Sestavení nedoběhlo — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."
   rebuild_busy: "Zámek drží jiný běh, web se teď nepřestavěl. Nic není rozbité a konfigurace se zapsala — zkus to za minutu znovu."
+
+lock:
+  busy: "Jiný běh %{who}ještě neskončil%{detail} — tenhle se přeskakuje. Nic není rozbité, zkus to za chvíli znovu."
