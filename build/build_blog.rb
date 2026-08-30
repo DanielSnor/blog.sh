@@ -3247,8 +3247,35 @@ NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 # emit BEFORE this line -- the assets, the generated stylesheet -- ran
 # without a cache to consult and compared bytes the old way. There are a
 # few dozen of them and they are not what a publish is spent on.
+#
+# SITE_BASE_URL and the timezone are here for a reason the trees above
+# cannot cover: both are allowed to come from env.sh, and env.sh is not a
+# file the fingerprint reads -- it holds tokens, it is never in git, and it
+# is deliberately the one thing this engine does not touch.
+#
+# The address is on every page (canonical, og:url) and in the feed and the
+# sitemap, and docs/install.md tells every new operator to change it after
+# their first build. So the first build after taking that advice was the
+# first build to get it wrong, on every page it did not happen to rebuild.
+#
+# The zone decides the day printed on every badge. site.timezone reaches
+# the fingerprint through config/, but it is ALLOWED to be empty, and then
+# the zone is whatever the process was started with -- which a cron entry
+# and a login shell routinely disagree about.
+#
+# The zone is named by its RULES rather than by the moment: the offset at
+# a fixed winter instant and a fixed summer one. That tells UTC from
+# Prague from Kiritimati, and unlike Time.now.zone it does not move at a
+# DST transition, which would otherwise throw the whole cache away twice a
+# year to render the identical site.
+TZ_PROBE_WINTER = 1_579_046_400 # 2020-01-15Z
+TZ_PROBE_SUMMER = 1_594_771_200 # 2020-07-15Z
+TIMEZONE_FACT = [ENV['TZ'].to_s,
+                 Time.at(TZ_PROBE_WINTER).utc_offset,
+                 Time.at(TZ_PROBE_SUMMER).utc_offset].join(':')
 BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
-                 SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT)
+                 SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
+                 SITE_BASE_URL, TIMEZONE_FACT)
 
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
