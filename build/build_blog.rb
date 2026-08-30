@@ -2792,8 +2792,14 @@ def emit_copy(src, dest, compare_content: false)
     # falls THROUGH here even when its copy is up to date, and is relinked
     # once -- otherwise it would keep paying twice for every file that
     # never changes, which for media is all of them.
-    return if File.identical?(src, dest) && world_readable?(dest)
-    return if links_impossible? && same && world_readable?(dest)
+    if (File.identical?(src, dest) && world_readable?(dest)) ||
+       (links_impossible? && same && world_readable?(dest))
+      # Written down although nothing was written: what prune has to know
+      # is whether this build still produces the file, and one it skipped
+      # is one it still produces.
+      BuildCache.note_copy(dest)
+      return
+    end
   end
 
   place_public(src, dest)
@@ -2802,6 +2808,7 @@ def emit_copy(src, dest, compare_content: false)
   # read is the bug this makes impossible, and an original that becomes
   # readable is what its owner was going to do by hand anyway.
   make_readable(dest)
+  BuildCache.note_copy(dest)
 end
 
 # The same bytes under two names, paid for once. Measured on one real

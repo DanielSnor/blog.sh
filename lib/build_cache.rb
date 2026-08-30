@@ -169,6 +169,28 @@ module BuildCache
       @outputs[rel(path)] = [digest, stat.size, stat.mtime.to_i]
     end
 
+    # A file the build COPIED rather than rendered -- media, and the assets
+    # carried across beside them. Remembered by name, size and mtime, with
+    # no digest: hashing 1.8 GB of photographs on every build to learn
+    # something the NAME already answers would cost more than the walk this
+    # exists to skip.
+    #
+    # Without it, media were the one output the record could not see stop
+    # being produced. Take a photograph out of a post that keeps its slug
+    # and every PAGE is still written, so outputs_dropped? answered "none
+    # dropped", prune_public was skipped, and the orphan stayed in
+    # public.nosync/ -- and then on the site, because the deploy after a
+    # publish mirrors whatever is there.
+    #
+    # `written?` can never vouch for one of these: it is asked with a real
+    # digest, and nil equals none of them.
+    def note_copy(path)
+      stat = stat_of(path)
+      return unless stat
+
+      @outputs[rel(path)] = [nil, stat.size, stat.mtime.to_i]
+    end
+
     # --- what a page renderer asks ---------------------------------------
 
     # True when the page at `dest` was last built from exactly these inputs
