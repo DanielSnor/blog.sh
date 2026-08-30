@@ -497,7 +497,8 @@ cli:
       ./blog.sh empty versions       nechá každému postu poslední verzi a starší smaže
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
-      ./blog.sh rebuild              znovu sestaví a nasadí celý web, bez vazby na konkrétní post
+      ./blog.sh rebuild [--full]     znovu sestaví a nasadí celý web, bez vazby na konkrétní post;
+                                     --full sestaví znovu každou stránku, ne jen ty změněné
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      vypíše posty po řádcích, od nejnovějšího — prostý text do roury nebo skriptu

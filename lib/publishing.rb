@@ -508,14 +508,22 @@ module Publishing
   # yes/no and a third state would quietly read as success in half of
   # them. Which KIND of no it was decides the wording and the marker, not
   # the return value.
-  def rebuild_and_deploy(reason)
+  # `full` renders every page instead of only the ones whose inputs moved.
+  # Off for everything that publishes, edits or deletes a post -- those know
+  # what they changed, and the build cache is exactly the machinery for
+  # spending nothing on the rest. It is on only when somebody asks for it by
+  # hand (`./blog.sh rebuild --full`), which is what you do when you doubt
+  # what is on disk rather than what is in the archive.
+  def rebuild_and_deploy(reason, full: false)
     @stopped_on_busy_lock = false
     # Noted before the build reads a single file, so a marker written after
     # this instant is somebody else's debt and survives our success.
     started = Time.now
     puts
     puts "#{reason}…"
-    unless system('ruby', File.join(ROOT, 'build', 'build_blog.rb'))
+    build = [File.join(ROOT, 'build', 'build_blog.rb')]
+    build << '--full' if full
+    unless system('ruby', *build)
       finish_later('build', $CHILD_STATUS)
       return false
     end

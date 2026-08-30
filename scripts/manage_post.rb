@@ -4847,8 +4847,8 @@ end
 # Build and deploy as one step -- the mechanics (and the reasoning for
 # the built-in --prune) live in Publishing.rebuild_and_deploy, shared
 # with the scheduled-publish cron.
-def rebuild_and_deploy(reason = nil)
-  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'))
+def rebuild_and_deploy(reason = nil, full: false)
+  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'), full: full)
 end
 
 def maybe_rebuild
@@ -4863,8 +4863,8 @@ end
 
 # A manual build+deploy not tied to a specific post -- e.g. after a manual
 # template edit, when nothing else would otherwise trigger a rebuild.
-def cmd_rebuild
-  return if rebuild_and_deploy
+def cmd_rebuild(full: false)
+  return if rebuild_and_deploy(nil, full: full)
 
   # The lock's own exit code, same as the build and deploy scripts leave
   # with: somebody ran this by hand, and exit 0 reads as "a deploy
@@ -5208,7 +5208,10 @@ else
     slug = ARGV.shift || pick_published_interactively
     cmd_bluesky(slug)
   when 'rebuild'
-    cmd_rebuild
+    # Read here rather than inside cmd_rebuild, the way `list` and `browse`
+    # read their filters: the dispatcher is where this file turns a command
+    # line into arguments, and the wizard calls cmd_rebuild with none.
+    cmd_rebuild(full: ARGV.include?('--full'))
   when 'preview'
     # A local static server over the build output -- the quickest way to
     # look at the site before deploying anywhere.

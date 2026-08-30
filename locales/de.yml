@@ -509,7 +509,8 @@ cli:
       ./blog.sh empty versions       behält je Beitrag die neueste Fassung und entfernt die älteren
       ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
       ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
-      ./blog.sh rebuild              baut und deployt die ganze Seite, unabhängig von einem Beitrag
+      ./blog.sh rebuild [--full]     baut und deployt die ganze Seite, unabhängig von einem Beitrag;
+                                     --full baut jede Seite neu, nicht nur die geänderten
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte

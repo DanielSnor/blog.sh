@@ -395,7 +395,8 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh restore [<slug>]     # restores a post from trash
 ./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
-./blog.sh rebuild              # rebuilds and deploys the whole site
+./blog.sh rebuild [--full]     # rebuilds and deploys the whole site;
+                               # --full builds every page again instead of only the changed ones
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                # the archive on screen: filters, search, preview, Enter opens the post
