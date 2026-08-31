@@ -1298,19 +1298,25 @@ aside .card { margin-bottom: 1.5rem; }
 
 .share__links { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
+/* The tile the footer's social icons are: same size, same ground, same
+   corner, no frame. A row of icons offering somewhere to go is a thing
+   this site already has, and sharing had grown a second shape for it --
+   a ringed 2.2rem tile with an 8px corner, on a site whose badges and
+   pills are all 4px. One object, met twice. */
 .share__link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 4px;
   background: var(--pill-bg);
   color: var(--text);
   cursor: pointer;
   text-decoration: none;
+  transition: 0.3s ease-in-out;
   /* The button carries the browser's own font otherwise, and sits a
      pixel off the links beside it. */
   font: inherit;
@@ -1323,16 +1329,26 @@ aside .card { margin-bottom: 1.5rem; }
    the markup. */
 .share__link[hidden] { display: none; }
 
-.share__link svg { width: 1.1rem; height: 1.1rem; }
+.share__link svg { width: 20px; height: 20px; }
 
-.share__link:hover, .share__link:focus-visible { border-color: var(--accent); color: var(--accent); }
-/* Filled, not merely tinted: hover already changes the border and the
-   colour, so a confirmation that did the same was a confirmation nobody
-   could tell from a mouse resting on the button. */
+/* ⚠️ The one place this parts company with the footer, and it has to.
+   Those icons fill with the accent on hover, and nothing about them has
+   a STATE. The copy button does: `is-done` says the address is on the
+   clipboard, and it says it with colour alone -- the script swaps the
+   label and the title, and neither of those is visible. Fill both with
+   the accent and the confirmation arrives under a pointer that is
+   already accent, so clicking produces no visible change whatever. That
+   is precisely the confusion the old ringed tile was written to avoid,
+   and it must not come back with the new shape. Hover borrows the date
+   badge's inversion, which this site already uses everywhere, and the
+   accent is left to mean one thing. */
+.share__link:hover, .share__link:focus-visible {
+  background: var(--hover-invert);
+  color: var(--badge-hover-text);
+}
 .share__link.is-done {
   background: var(--accent);
-  border-color: var(--accent);
-  color: var(--card-bg);
+  color: #ffffff;
 }
 
 /* The row that asks which instance the reader is on. Hidden in the markup
