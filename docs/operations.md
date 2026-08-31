@@ -367,37 +367,49 @@ exit code is 0 or 1, nothing else.
 
 ### A post sent from the phone itself
 
-`add <file>` still wants the file to be on the server already. The last
-step is sending it there, and that is what `--bundle` is for:
+`add <file>` wants the file to be on the server already. `receive.sh` is
+how it gets there: **one file per connection**, the name on the first
+line and its base64 after it.
 
 ```bash
-base64 < post.zip | ./scripts/receive.sh
+{ printf '%s\n' "photo.jpg"; base64 < photo.jpg; } | ssh blog ./scripts/receive.sh
 ```
 
-The bundle is a ZIP holding one `.md` file and the pictures its text
-refers to, by bare name. `receive.sh` is what a shortcut on a phone runs
-over SSH; it carries the stream and nothing else -- the unpacking and the
-checking happen in the engine, in `lib/bundle.rb`. The answer is the same
-JSON `add --json` gives, so a caller reads one set of keys.
+A shortcut on a phone sends the pictures that way, one connection each,
+and **the markdown last** -- because the markdown arriving is what makes
+the post. Everything its text names is already staged under the name it
+uses, so there is no other signal to send and none is needed. The answer
+to a picture is `{"ok":true,"stored":"photo.jpg"}`; the answer to the
+markdown is the same JSON `add --json` gives.
 
-**Nothing new listens on the network.** It travels over the SSH the server
-already has, and the key it travels on wants a forced command:
+A delivery that goes wrong halfway can simply be repeated. Pictures wait
+in `incoming/` until a text names them, so a refused post leaves them
+where they are and sending it again finds them -- nothing has to be
+uploaded twice.
+
+**Nothing new listens on the network.** It travels over the SSH the
+server already has, and the key it travels on wants a forced command:
 
     restrict,command="/path/to/blog/scripts/receive.sh" ssh-ed25519 AAAA... phone
 
-Everything that arrives this way is **untrusted**, and the engine is told
-so. A picture may be named only by a bare filename -- a reference carrying
-a path is refused (`bad_reference`), because `![](/etc/passwd)` would
-otherwise read that file into the post and publish it. An entry in the ZIP
-that is not an ordinary file is refused (`bad_entry`): a symlink survives
-being flattened and would be followed. Two entries that end up with the
-same name are refused rather than one silently replacing the other, and
-the bundle is weighed for what it actually unpacks to, not for what its
-own directory claims. `BLOGSH_MAX_MB` (24) and `BLOGSH_MAX_UNPACKED_MB`
-(120) set the ceilings.
+**What a stranger chooses is a filename and some bytes**, so that is what
+is checked. A name carrying a path, beginning with a dot, empty, or
+holding a control character is refused (`bad_name`) and nothing is
+written. What arrives is bounded before it lands rather than weighed
+afterwards: `BLOGSH_MAX_MB` (24) is a ceiling on reading, so a sender
+costs that much and not whatever they felt like sending. And the post
+itself is handed to the engine as **untrusted**, so a picture may be
+named only by a bare filename -- `![](/etc/passwd)` is refused
+(`bad_reference`), because otherwise it would read that file into the
+post and publish it.
 
-It stops at a draft, like every other way in. The app that packs the
-bundle is a separate project.
+There is deliberately no archive. An earlier design took a ZIP and
+unpacked it here; three adversarial audits found blocking faults in three
+successive rewrites of it, and nearly all of them lived in the unpacking
+-- entries that were symlinks, names that collapsed onto each other, a
+bomb that wrote gigabytes from megabytes, a half-failed extraction that
+published a truncated photograph and reported success. None of that can
+be expressed when there is nothing to unpack.
 
 ## Pinning a post to the front page
 

@@ -298,7 +298,6 @@ cli:
   add_file_empty: "Není co zapsat: %{file} nemá pod hlavičkou žádný obsah."
   add_file_missing_images: "Tyhle soubory tu ještě nejsou: %{files}. Nahraj je nejdřív do %{dir} — nic se nezapsalo. (Interaktivní `add` na ně počká, tady ale není kdo by čekal.)"
   add_json_needs_file: "--json potřebuje soubor ke čtení: `add <soubor> --json`. Bez něj `add` otevře editor a až do jeho zavření není co hlásit."
-  add_bundle_needs_json: "--bundle odpovídá programu, takže potřebuje vedle sebe --json: `add --bundle --json`."
   add_unknown_option: "Neznámý přepínač: %{option}. add bere soubor a --json, nic jiného."
   publish_unknown_option: "Neznámý přepínač: %{option}. publish bere slug, --yes a --no-announce, nic jiného."
   publish_yes_needs_slug: "--yes musí pojmenovat post: `publish <slug> --yes`. Bez slugu nabídne publish drafty na výběr — a vybírat se má nad náhledem, ne jedním klávesovým úhozem od oznámení, které nejde vzít zpět."

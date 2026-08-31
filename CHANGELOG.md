@@ -67,19 +67,15 @@ leaves a 404 in the console.
   else: `slug`, `path`, `state`, `url`, `deploy`, `warnings`, every key
   always present, exit code 0 or 1. It stops at the draft, because the
   file says *write this down*, not *put it in front of the world*.
-- **A post can arrive from a phone.** `./blog.sh add --bundle --json`
-  reads a base64 ZIP on standard input -- one markdown file and the
-  pictures its text refers to -- and writes a draft, answering as data.
-  `scripts/receive.sh` is what a shortcut runs at the far end over SSH,
-  and it is forty-eight lines because it only carries the stream: the
-  unpacking and every check live in `lib/bundle.rb`, under the same test
-  suite as the rest of the engine. Untrusted by construction -- a picture
-  may be named only by a bare filename, an entry that is not an ordinary
-  file is refused, and the bundle is weighed for what it actually unpacks
-  to rather than for what it claims it will. The client that packs the
-  bundle is a separate project. **Nothing new listens on the network:** it
-  travels over the SSH the server already has, and the key that carries it
-  wants a forced command.
+- **A post can be sent from a phone.** `scripts/receive.sh` takes one
+  file per connection -- the name on the first line, its base64 after it
+  -- and puts it in `incoming/`. Pictures go first and the markdown last,
+  and the markdown arriving is what makes the post. Ninety-one lines, no
+  archive and nothing to unpack: what an untrusted sender chooses is a
+  filename and a stream of bytes, and both are bounded. **Nothing new
+  listens on the network** -- it travels over the SSH the server already
+  has, and the key wants a forced command. The app that writes the post
+  is a separate project.
 - **`add <file> --untrusted`.** The same refusal for markdown that came
   from somewhere other than the person at the keyboard: a picture
   reference may name only a bare filename. Without it,

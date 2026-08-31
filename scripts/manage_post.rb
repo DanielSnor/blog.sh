@@ -44,7 +44,6 @@ require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
 require_relative '../lib/version'
 require_relative '../lib/incoming_path'
-require_relative '../lib/bundle'
 
 # A script that ASKS has to flush before it blocks. stdout is block
 # buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
@@ -66,40 +65,10 @@ end
 ROOT = File.expand_path('..', __dir__)
 CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
 MEDIA_DIR = File.join(ROOT, 'media.nosync')
-# Where a bare filename is looked for -- normally <root>/incoming/, the
-# one directory a separate upload account can write to.
-#
-# ⚠️ Overridable, and exactly one caller does it. scripts/receive.sh
-# serves deliveries that arrive from a network, several of which can be in
-# flight at once, and incoming/ is FLAT and shared by every route into the
-# site: two bundles both carrying photo.jpg raced there, one post was
-# silently written with the other's picture, and both senders were told it
-# had worked. That was answered first with a lock, which turned out to be
-# a small consensus problem solved with mkdir -- every fix uncovered
-# another window. Giving each delivery a directory of its own removes the
-# thing being contended instead of arbitrating it.
-#
-# Confined to inside incoming/ on purpose. The value comes from the
-# environment, which is the operator's own, but an override that could
-# point anywhere would turn a bare filename into a way of reading any
-# directory -- and this constant is what `--untrusted` narrows a hostile
-# post down TO.
-INCOMING_DIR = begin
-  default = File.join(ROOT, 'incoming')
-  asked = ENV['BLOG_SH_INCOMING'].to_s
-  # realpath on both sides, not expand_path: /var and /private/var name
-  # the same directory on a Mac and expand_path resolves no symlink, so
-  # the comparison said "outside" about a directory that was plainly
-  # inside. The same trap resolve_image documents a hundred lines below.
-  real = lambda do |path|
-    File.realpath(path)
-  rescue SystemCallError
-    File.expand_path(path)
-  end
-  inside = !asked.empty? && File.directory?(asked) &&
-           real.call(asked).start_with?("#{real.call(default)}/")
-  inside ? real.call(asked) : default
-end
+# Where a bare filename is looked for: <root>/incoming/, the one
+# directory a separate upload account can write to, and where a phone
+# sends what it wants published.
+INCOMING_DIR = File.join(ROOT, 'incoming')
 TRASH_DIR = File.join(ROOT, 'trash')
 SITE_BASE_URL = ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')
 # Optional (`get`, not `fetch`) so the wizard header degrades quietly
@@ -294,10 +263,10 @@ end
 # here), but the staged .heic was used up exactly like a directly-copied
 # photo -- in converted form -- so the same "empty incoming/ means nothing
 # pending" rule applies to it.
-def cleanup_incoming(media_files, extra_sources = [], incoming_dir = INCOMING_DIR)
+def cleanup_incoming(media_files, extra_sources = [])
   left = []
   incoming_root = begin
-    File.realpath(incoming_dir)
+    File.realpath(INCOMING_DIR)
   rescue SystemCallError
     # No incoming/ at all: nothing here came out of it, so there is
     # nothing to tidy and certainly nothing to delete.
@@ -944,7 +913,7 @@ end
 # own shape to drift.
 #
 # Returns the path written, or nil when there was nothing to write.
-def compose_post(raw, suggested, interactive:, also_consume: [], confined: false, incoming_dir: INCOMING_DIR)
+def compose_post(raw, suggested, interactive:, also_consume: [], confined: false)
   meta, body = MarkdownParser.parse_frontmatter(raw)
   abort_on_double_frontmatter(body)
   abort_on_unknown_frontmatter(meta, interactive: interactive)
@@ -967,7 +936,7 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
   type, page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = begin
-    MarkdownParser.parse_body(body, nil, incoming_dir: incoming_dir, confined: confined)
+    MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR, confined: confined)
   rescue MarkdownParser::ConfinedPath => e
     # The whole post is refused, not the picture. Somebody who sent this
     # asked for a file they are not entitled to, and writing the words
@@ -986,7 +955,7 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
     # then saying "upload them to <the same directory>" filled the screen
     # with one repeated string and buried the only part that differs.
     refuse('missing_images', t('cli.add_file_missing_images',
-                               files: missing.map { |m| File.basename(m) }.join(', '), dir: incoming_dir))
+                               files: missing.map { |m| File.basename(m) }.join(', '), dir: INCOMING_DIR))
   end
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
@@ -1099,7 +1068,7 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
   # "an empty incoming/ means nothing is pending" is only true if the thing
   # that made the post goes too -- otherwise every phone-written article
   # leaves its own source behind to look like unfinished business.
-  cleanup_incoming(media_files, heic_consumed + also_consume, incoming_dir)
+  cleanup_incoming(media_files, heic_consumed + also_consume)
   puts t('cli.wrote_draft', path: path) if interactive
   path
 end
@@ -1136,47 +1105,6 @@ def refuse(code, message)
   raise Refused.new(code, message) if JSON_REFUSALS[:enabled]
 
   abort message
-end
-
-# `add --bundle`: a post that arrived from somewhere else.
-#
-# Reads the base64 of a ZIP on standard input, unpacks it into a staging
-# directory of its own inside incoming/, and then walks the same road
-# `add <file>` walks -- untrusted, so a picture may only be named by a
-# bare filename.
-#
-# The whole of the checking is in lib/bundle.rb rather than in the shell
-# script that receives the delivery, because the checks turn out to be
-# where the mistakes are, and they are mistakes about the LANGUAGE: a
-# `mkdir -p` that adopts an existing name, an awk that pads a record, a
-# ulimit that bounds each file instead of the total. In here the staging
-# directory cannot be pre-empted, an entry's type is asked of lstat, and
-# a refusal is the same Refused every other route raises -- so `--json`
-# answers with one vocabulary and the receiver has nothing left to invent.
-def add_from_bundle(json: false)
-  JSON_REFUSALS[:enabled] = json
-  post, dir = Bundle.unpack($stdin.read, INCOMING_DIR)
-  # The staging directory is inside incoming/, so IncomingPath and
-  # resolve_image both find a bare name in it without being told anything
-  # new -- and nothing outside it, because that is what confined means.
-  path, warnings = quietly(json) do
-    compose_post(File.read(File.join(dir, post), encoding: 'utf-8'),
-                 Time.parse(Time.now.strftime('%Y-%m-%d %H:%M')),
-                 interactive: false, also_consume: [File.join(dir, post)],
-                 confined: true, incoming_dir: dir)
-  end
-  refuse('empty', t('cli.add_file_empty', file: post)) if path.nil?
-
-  report_added(path, warnings, json: json)
-rescue Bundle::Rejected, Refused => e
-  # One clause for both, because an exception raised inside a rescue is
-  # not caught by its siblings -- routing Bundle::Rejected through
-  # refuse() would have raised Refused into nobody's hands, and the
-  # caller's answer was a Ruby backtrace.
-  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
-  exit 1
-ensure
-  FileUtils.rm_rf(dir) if dir
 end
 
 # `add <file>`: the same post-making as the wizard, with the markdown
@@ -5701,25 +5629,11 @@ else
     # because over a wire that is how a stranger reads /etc/passwd into a
     # post. The receiver (scripts/receive.sh) passes it always.
     untrusted = !ARGV.delete('--untrusted').nil?
-    # --bundle reads a base64 ZIP on standard input instead of naming a
-    # file: the route a phone takes. Taken off the line here, beside the
-    # others, because the unknown-option guard below refuses anything it
-    # does not recognise -- and it was right to refuse this.
-    bundled = !ARGV.delete('--bundle').nil?
     # Before the shift, so a mistyped flag is refused instead of being
     # taken for the name of a file to read (and reported as "no such
     # file: --yes", which sends the reader looking in the wrong place).
     unknown = ARGV.find { |arg| arg.start_with?('--') }
     abort t('cli.add_unknown_option', option: unknown) if unknown
-    if bundled
-      # Untrusted by construction: nobody with a shell needs this route,
-      # so it never asks whether to trust what arrives on it.
-      abort t('cli.add_bundle_needs_json') unless json
-
-      add_from_bundle(json: json)
-      exit 0
-    end
-
     file = ARGV.shift
     # One file, one post. A second name was shifted off into nothing: the
     # run wrote the first, said not a word about the rest, and exited 0 --

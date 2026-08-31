@@ -393,7 +393,6 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/
 ./blog.sh restore [<slug>]     # restores a post from trash
-./blog.sh add --bundle --json  # a post as a base64 ZIP on stdin -- the route a phone takes
 ./blog.sh empty trash          # deletes everything in the trash, for good
 ./blog.sh empty versions       # keeps each post's newest version, removes the older ones
 ./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)

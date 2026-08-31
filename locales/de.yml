@@ -310,7 +310,6 @@ cli:
   add_file_empty: "Nichts zu schreiben: %{file} hat unter dem Frontmatter keinen Inhalt."
   add_file_missing_images: "Diese Dateien sind noch nicht da: %{files}. Lade sie zuerst nach %{dir} — es wurde nichts geschrieben. (Das interaktive `add` wartet darauf, hier ist aber niemand zum Warten.)"
   add_json_needs_file: "--json braucht eine Datei zum Lesen: `add <Datei> --json`. Ohne sie öffnet `add` einen Editor, und bis der geschlossen ist, gibt es nichts zu melden."
-  add_bundle_needs_json: "--bundle antwortet einem Programm und braucht daher --json daneben: `add --bundle --json`."
   add_unknown_option: "Unbekannte Option: %{option}. add kennt eine Datei und --json."
   publish_unknown_option: "Unbekannte Option: %{option}. publish kennt einen Slug, --yes und --no-announce."
   publish_yes_needs_slug: "--yes muss den Beitrag benennen: `publish <slug> --yes`. Ohne Slug bietet publish die Entwürfe zur Auswahl an — und ausgewählt wird vor der Vorschau, nicht einen Tastendruck von einer Ankündigung entfernt, die sich nicht zurückholen lässt."
