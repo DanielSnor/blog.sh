@@ -893,6 +893,13 @@ import:
 doctor:
   tag_icons_ok: "Tag icons: %{count}, all of them drawable."
   tag_icon_stripped: "The `icon_svg` of the tag \"%{tag}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from, and whoever wrote it should say whether that source is worth trusting."
+  social_icon_unknown: "The link \"%{name}\" in the footer asks for an icon called \"%{icon}\", which the engine does not have -- it draws an empty space where the icon belongs. The ones it does have: %{known}. Your own SVG goes in `icon_svg` instead."
+  social_shape: "An entry under `social:` is not a mapping. Each one wants a `name:`, a `url:` and an `icon:`; anything else is read as empty and takes the build down with it."
+  social_icon_missing: "The link \"%{name}\" in the footer names no icon at all, so it publishes an empty, unclickable space on every page. Give it an `icon:` from the list the engine ships, or an `icon_svg:` of your own."
+  social_icon_not_svg: "The `icon_svg` of the footer link \"%{name}\" is not an SVG -- whatever is in it prints as words in the footer of every page."
+  social_icon_scale: "The `icon_svg` of the footer link \"%{name}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked beside them."
+  social_icon_stripped: "The `icon_svg` of the footer link \"%{name}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from."
+  share_unknown: "`share:` names \"%{name}\", which is not somewhere this engine can send a reader -- it is dropped and no button appears. The ones it knows: %{known}."
   tag_icon_shape: "An entry under `tag_icons` is not a mapping -- each one needs a `tag` and either an `icon` name or an `icon_svg`."
   tag_icon_no_tag: "An entry under `tag_icons` has no `tag`, so it belongs to nothing and draws nothing."
   tag_icon_unknown: "The tag \"%{tag}\" asks for the icon \"%{icon}\", which this engine does not have. The names it knows: %{known}. For anything else, give it an `icon_svg` of your own."
@@ -1587,3 +1594,21 @@ style:
 
 lock:
   busy: "Another %{who}run is still going%{detail} -- skipping this one. Nothing is broken; try again in a minute."
+
+share:
+  heading: "Share this post"
+  mastodon: "Share on Mastodon"
+  bluesky: "Share on Bluesky"
+  email: "Share by e-mail"
+  ask_label: "Which Mastodon instance are you on? This browser will remember it."
+  ask_go: "Share"
+  change_instance: "Change instance"
+  ask_invalid: "That does not look like an instance address. Try something like mastodon.social."
+  copy: "Copy the link"
+  copied: "Link copied"
+  copy_failed: "Could not copy the link"
+  system: "Share…"
+  facebook: "Share on Facebook"
+  linkedin: "Share on LinkedIn"
+  threads: "Share on Threads"
+  x: "Share on X"

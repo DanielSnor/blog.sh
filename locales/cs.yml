@@ -863,6 +863,13 @@ import:
 doctor:
   tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."
   tag_icon_stripped: "`icon_svg` štítku „%{tag}“ nese něco, co engine před vykreslením odstraní — skript, styl, obsluhu události nebo adresu javascript:. Stránky jsou v pořádku; ikona ale není tím, odkud byla zkopírovaná, a jestli tomu zdroji věřit, rozhodne jen ten, kdo ji vkládal."
+  social_icon_unknown: "Odkaz „%{name}“ v patičce chce ikonu „%{icon}“, kterou engine nemá — nakreslí se prázdné místo. Umí tyhle: %{known}. Vlastní SVG patří do `icon_svg`."
+  social_shape: "Položka pod `social:` není mapování. Každá chce `name:`, `url:` a `icon:`; cokoli jiného se čte jako prázdno a shodí s sebou build."
+  social_icon_missing: "Odkaz „%{name}“ v patičce nemá žádnou ikonu, takže na každé stránce publikuje prázdné místo, na které nejde kliknout. Dej mu `icon:` ze seznamu, který engine veze, nebo vlastní `icon_svg:`."
+  social_icon_not_svg: "`icon_svg` odkazu „%{name}“ v patičce není SVG — co v něm je, se vypíše jako text v patičce každé stránky."
+  social_icon_scale: "`icon_svg` odkazu „%{name}“ v patičce není kreslené na mřížce 24 jednotek jako ostatní ikony (`viewBox=\"0 0 24 24\"`), takže bude vedle nich nakřivo."
+  social_icon_stripped: "`icon_svg` odkazu „%{name}“ v patičce nese něco, co engine před vykreslením odstraní — skript, styl, obsluhu události nebo adresu javascript:. Stránky jsou v pořádku; ikona ale není tím, odkud byla zkopírovaná."
+  share_unknown: "`share:` jmenuje „%{name}“, což není místo, kam engine umí čtenáře poslat — vypadne to a žádné tlačítko se neukáže. Umí tohle: %{known}."
   tag_icon_shape: "Položka v `tag_icons` není mapa — každá potřebuje `tag` a k tomu buď jméno v `icon`, nebo vlastní `icon_svg`."
   tag_icon_no_tag: "Položka v `tag_icons` nemá `tag`, takže nepatří ničemu a nic nevykreslí."
   tag_icon_unknown: "Štítek „%{tag}“ si říká o ikonu „%{icon}“, kterou engine nemá. Zná tyhle: %{known}. Na cokoli jiného použij vlastní `icon_svg`."
@@ -1556,3 +1563,21 @@ style:
 
 lock:
   busy: "Jiný běh %{who}ještě neskončil%{detail} — tenhle se přeskakuje. Nic není rozbité, zkus to za chvíli znovu."
+
+share:
+  heading: "Sdílet tenhle příspěvek"
+  mastodon: "Sdílet na Mastodonu"
+  bluesky: "Sdílet na Bluesky"
+  email: "Poslat e-mailem"
+  ask_label: "Na jaké mastodoní instanci jsi? Tenhle prohlížeč si ji zapamatuje."
+  ask_go: "Sdílet"
+  change_instance: "Změnit instanci"
+  ask_invalid: "Tohle nevypadá jako adresa instance. Zkus třeba mastodon.social."
+  copy: "Zkopírovat odkaz"
+  copied: "Odkaz zkopírován"
+  copy_failed: "Odkaz se nepodařilo zkopírovat"
+  system: "Sdílet…"
+  facebook: "Sdílet na Facebooku"
+  linkedin: "Sdílet na LinkedInu"
+  threads: "Sdílet na Threads"
+  x: "Sdílet na X"

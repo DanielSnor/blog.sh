@@ -380,6 +380,30 @@ footer:
 #     icon_svg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="17" r="4"/><circle cx="18" cy="17" r="4"/><path d="M6 17l4-9h5l3 9"/></svg>'
 # --- end of tag_icons ---
 
+# WHERE A READER CAN CARRY A POST AWAY TO. A list of network names; leave
+# it out and no block appears. What gets prefilled is the post's name and
+# its address -- the reader writes the part that is theirs.
+#
+# `mastodon` asks the reader once which instance they are on and remembers
+# it in their own browser; there is no way for a page to know it, and the
+# alternative is sending every reader through somebody else's redirector.
+# Its button needs JavaScript, so it stays hidden without it rather than
+# sitting there doing nothing. `bluesky` and `email` are plain links.
+#
+# Pixelfed is not on the list: it has no share address to send anyone to,
+# and a post there wants a photograph rather than a link.
+#
+# share:
+#   - mastodon
+#   - bluesky
+#   - email
+# --- end of share ---
+
+# `icon` names one the engine ships, and it ships sixteen: mastodon,
+# pixelfed, bluesky, threads, instagram, facebook, x, linkedin, youtube,
+# github, gitlab, gitea, forgejo, codeberg, rss, email. A name it does not
+# know draws nothing at all -- a link with an empty space where the icon
+# should be -- so `./blog.sh doctor` says when it finds one.
 social:
   - name: "Mastodon"
     url: "https://mastodon.social/@yourname"

@@ -875,6 +875,13 @@ import:
 doctor:
   tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."
   tag_icon_stripped: "Das `icon_svg` des Schlagworts „%{tag}“ enthält etwas, das die Engine vor dem Rendern entfernt — ein Skript, ein Style, einen Event-Handler oder eine javascript:-Adresse. Die Seiten sind sicher; das Symbol ist aber nicht mehr das, woher es kopiert wurde."
+  social_icon_unknown: "Der Link „%{name}“ in der Fußzeile verlangt ein Symbol namens „%{icon}“, das die Engine nicht hat — an seiner Stelle bleibt eine Lücke. Vorhanden sind: %{known}. Ein eigenes SVG gehört in `icon_svg`."
+  social_shape: "Ein Eintrag unter `social:` ist kein Mapping. Jeder braucht `name:`, `url:` und `icon:`; alles andere wird als leer gelesen und reißt den Build mit."
+  social_icon_missing: "Der Link „%{name}“ in der Fußzeile nennt gar kein Symbol und veröffentlicht auf jeder Seite eine leere, nicht anklickbare Stelle."
+  social_icon_not_svg: "Das `icon_svg` des Fußzeilen-Links „%{name}“ ist kein SVG — sein Inhalt erscheint als Text in der Fußzeile jeder Seite."
+  social_icon_scale: "Das `icon_svg` des Fußzeilen-Links „%{name}“ ist nicht auf dem 24er-Raster gezeichnet (`viewBox=\"0 0 24 24\"`) und sitzt daneben schief."
+  social_icon_stripped: "Das `icon_svg` des Fußzeilen-Links „%{name}“ enthält etwas, das die Engine vor dem Rendern entfernt — ein Skript, ein Style, einen Event-Handler oder eine javascript:-Adresse."
+  share_unknown: "`share:` nennt „%{name}“ — dorthin kann die Engine niemanden schicken; der Eintrag entfällt und es erscheint keine Schaltfläche. Bekannt sind: %{known}."
   tag_icon_shape: "Ein Eintrag unter `tag_icons` ist keine Zuordnung -- jeder braucht ein `tag` und dazu einen `icon`-Namen oder ein eigenes `icon_svg`."
   tag_icon_no_tag: "Ein Eintrag unter `tag_icons` hat kein `tag`, gehört also zu nichts und zeichnet nichts."
   tag_icon_unknown: "Das Schlagwort „%{tag}“ verlangt das Symbol „%{icon}“, das diese Engine nicht hat. Bekannt sind: %{known}. Für alles andere nimm ein eigenes `icon_svg`."
@@ -1570,3 +1577,21 @@ style:
 
 lock:
   busy: "Ein anderer %{who}Lauf ist noch unterwegs%{detail} -- dieser wird übersprungen. Nichts ist kaputt, versuche es gleich noch einmal."
+
+share:
+  heading: "Diesen Beitrag teilen"
+  mastodon: "Auf Mastodon teilen"
+  bluesky: "Auf Bluesky teilen"
+  email: "Per E-Mail teilen"
+  ask_label: "Auf welcher Mastodon-Instanz bist du? Dieser Browser merkt sie sich."
+  ask_go: "Teilen"
+  change_instance: "Instanz ändern"
+  ask_invalid: "Das sieht nicht nach einer Instanz-Adresse aus. Versuche es mit mastodon.social."
+  copy: "Link kopieren"
+  copied: "Link kopiert"
+  copy_failed: "Der Link konnte nicht kopiert werden"
+  system: "Teilen…"
+  facebook: "Auf Facebook teilen"
+  linkedin: "Auf LinkedIn teilen"
+  threads: "Auf Threads teilen"
+  x: "Auf X teilen"

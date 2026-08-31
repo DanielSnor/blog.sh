@@ -674,6 +674,15 @@ wrote. Then, in load order:
   and by-count, and remembers which the reader chose. The page is built
   alphabetically, so a reader without the script gets the order the
   markup already has rather than a control that does nothing.
+- **Sharing** (`share.js`) drives the three share controls a link cannot
+  be. `mastodon` has no single address to point at -- the destination is
+  the reader's own instance -- so it asks once and remembers the answer in
+  that browser, refusing anything that is not a hostname rather than
+  pasting it into an address. `copy` writes the address to the clipboard
+  and renames itself while it says so. `system` hands the post to the
+  operating system's share sheet. The last two arrive HIDDEN and are shown
+  only where they can work, which is the same promise the copy button
+  below makes and for the same reason.
 - **Copy** (`copy-code.js`) puts a copy button on every `code` block --
   built in the script rather than in the markup, so a page whose script
   never runs shows no button instead of a dead one. It refuses to appear

@@ -168,7 +168,7 @@ module SiteConfig
     # them -- which is exactly why an unknown name passed the check meant
     # to catch it.
     CARDS = %w[toots pixelfed commits bluesky rss].freeze
-    LISTS = [%w[nav], %w[social], %w[footer links]].freeze
+    LISTS = [%w[nav], %w[social], %w[share], %w[footer links]].freeze
     MAPS = [%w[about], %w[footer], %w[widgets], %w[layout]].freeze
     # The chrome's prose. Written as a list or a map it renders as nothing
     # at all -- the page simply loses its about text, and until now without

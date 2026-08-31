@@ -740,6 +740,56 @@ each line is there:
 `--json` prints the same figures unlocalized and unrounded, so the
 numbers can go into a post, a cron job or a graph.
 
+## Letting a reader pass a post on
+
+The old way to do this was a row of buttons for Facebook, Twitter and
+Pinterest, each with one address to send somebody to. The fediverse has no
+such address: the destination is the READER's instance, and a page has no
+way to know it.
+
+So the block is a list you write, and it holds three different kinds of
+thing:
+
+```yaml
+share:
+  - mastodon
+  - bluesky
+  - email
+  - copy
+  - system
+```
+
+Leave `share:` out and no block appears. The order here is the order they
+are drawn in.
+
+`bluesky`, `email`, `facebook`, `linkedin`, `threads` and `x` are plain
+links: one address each, nothing to ask, no script. `mastodon` asks the
+reader once which instance they are on -- in a row that opens under the
+buttons, in the site's own type -- and remembers the answer in their
+browser. Not in a dialog from the browser: those look like something the
+page did not make, browsers throttle them, and a box demanding the name of
+a server is the shape people are taught not to trust. And no third-party
+redirector, which would put an outside service on every post page and in
+the way of every share. `copy`
+puts the address on the clipboard and says that it did. `system` hands it
+to the operating system's own share sheet, which on a phone is Signal and
+WhatsApp and Telegram and whatever else is installed, so one control
+covers what a row of them could not.
+
+The last two of those are the ones that need a browser to co-operate, and
+neither is drawn where it cannot work: `system` stays hidden unless the
+browser has a share sheet, and `mastodon` stays hidden until its script
+has run. A control that opens nothing is worse than no control.
+
+Pixelfed is not on the list. It has no share address to send anyone to --
+the request for one was closed without it -- and a post there wants a
+photograph rather than a link.
+
+What gets prefilled is the post's NAME and its address; the reader writes
+the part that is theirs. Nothing appears on a page or on a draft preview:
+there is nothing to pass on from a contact page, and a draft has no
+address anybody else can open.
+
 ## Rebuilding only what changed
 
 A publish rebuilds the site, and until 1.6 that meant rebuilding all of

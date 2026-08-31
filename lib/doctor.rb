@@ -13,6 +13,8 @@ require_relative 'i18n'
 require_relative 'media_dimensions'
 require_relative 'exif_location'
 require_relative 'embed'
+require_relative 'social_icons'
+require_relative 'share_targets'
 require_relative 'deploy_backend'
 require_relative 'slug'
 require_relative 'account_id'
@@ -162,6 +164,8 @@ module Doctor
     findings.concat(check_deploy_pending)
     findings.concat(check_media_location(root))
     findings.concat(check_tag_icons(data))
+    findings.concat(check_social_icons(data))
+    findings.concat(check_share(data))
     findings.concat(check_trash(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
@@ -1091,6 +1095,57 @@ module Doctor
     return findings unless findings.empty?
 
     [ok(I18n.t('doctor.tag_icons_ok', count: entries.length))]
+  end
+
+  # A footer icon the engine does not have draws NOTHING -- social_icon
+  # answers '' and the link goes out with an empty space where the icon
+  # belongs. The tag icons have been checked since they existed; these
+  # never were, and a typo in `icon:` is silent on the page and silent
+  # here.
+  def check_social_icons(data)
+    SiteConfig::Chrome.list(data, 'social').filter_map { |entry| social_icon_finding(entry) }
+  end
+
+  # The footer's icons, given the same three questions the tag icons have
+  # been asked since they existed. They are the identical field four lines
+  # of code apart, and this one was answering none of them: junk in
+  # `icon_svg` printed as words in the footer of every page, an entry with
+  # no icon at all published an empty unclickable anchor, and an entry that
+  # was not a mapping walked past here and took the BUILD down instead --
+  # which is precisely the traceback docs/install.md promises doctor names
+  # first.
+  def social_icon_finding(entry)
+    return warn(I18n.t('doctor.social_shape')) unless entry.is_a?(Hash)
+
+    name = entry['name'].to_s
+    if entry['icon_svg']
+      svg = entry['icon_svg'].to_s
+      return warn(I18n.t('doctor.social_icon_not_svg', name: name)) unless svg.include?('<svg')
+      return warn(I18n.t('doctor.social_icon_scale', name: name)) unless svg.match?(/viewBox\s*=\s*["']0 0 24 24/)
+      return warn(I18n.t('doctor.social_icon_stripped', name: name)) if Embed.without_scripts(svg) != svg
+
+      return nil
+    end
+
+    icon = entry['icon'].to_s
+    return warn(I18n.t('doctor.social_icon_missing', name: name)) if icon.empty?
+    return nil if SocialIcons::NAMES.include?(icon)
+
+    warn(I18n.t('doctor.social_icon_unknown', name: name, icon: icon,
+                                              known: SocialIcons::NAMES.join(', ')))
+  end
+
+  # A share list naming something the engine cannot draw is dropped in
+  # silence -- the same hole check_social_icons was written to close, one
+  # key over.
+  def check_share(data)
+    SiteConfig::Chrome.list(data, 'share').filter_map do |name|
+      value = name.to_s.strip.downcase
+      next if value.empty? || ShareTargets::NAMES.include?(value)
+
+      warn(I18n.t('doctor.share_unknown', name: name.to_s,
+                                          known: ShareTargets::NAMES.join(', ')))
+    end
   end
 
   # What is in the trash, said out loud once in a while. Not an error: a

@@ -1279,6 +1279,115 @@ aside .card { margin-bottom: 1.5rem; }
   overflow-wrap: break-word;
 }
 
+/* Sharing sits between the post and its comments: after the words, before
+   the conversation about them. The button and the links have to be the
+   same shape -- one of the three is a <button>, because the fediverse has
+   no single address to link to and its instance has to be asked for. */
+.share { margin-top: 2rem; }
+.share[hidden] { display: none; }
+
+.share__heading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin: 0 0 0.6rem;
+}
+
+.share__links { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.share__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--pill-bg);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  /* The button carries the browser's own font otherwise, and sits a
+     pixel off the links beside it. */
+  font: inherit;
+}
+
+/* An author's `display` beats the browser's own [hidden] rule, so the two
+   controls that arrive hidden -- Mastodon until the script runs, the OS
+   share sheet unless there is one -- were drawn anyway, and clicking them
+   did nothing. Caught by looking at a built page rather than by reading
+   the markup. */
+.share__link[hidden] { display: none; }
+
+.share__link svg { width: 1.1rem; height: 1.1rem; }
+
+.share__link:hover, .share__link:focus-visible { border-color: var(--accent); color: var(--accent); }
+/* Filled, not merely tinted: hover already changes the border and the
+   colour, so a confirmation that did the same was a confirmation nobody
+   could tell from a mouse resting on the button. */
+.share__link.is-done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--card-bg);
+}
+
+/* The row that asks which instance the reader is on. Hidden in the markup
+   and shown by the script, so it is never a form that cannot submit. */
+.share__ask[hidden] { display: none; }
+.share__change[hidden] { display: none; }
+
+/* A quiet way back, not a fifth button: it is only ever useful to the one
+   reader in a hundred who typed the wrong instance or moved to another. */
+.share__change {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  opacity: 0.7;
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.share__change:hover, .share__change:focus-visible { opacity: 1; color: var(--accent); }
+.share__ask { margin-top: 0.75rem; }
+.share__ask-label { display: block; font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.35rem; }
+.share__ask-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.share__ask-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.share__ask-input[aria-invalid="true"] { border-color: var(--accent); }
+
+.share__ask-go {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--pill-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.share__ask-go:hover, .share__ask-go:focus-visible { border-color: var(--accent); color: var(--accent); }
+.share__ask-error { display: block; margin-top: 0.35rem; font-size: 0.8rem; color: var(--accent); }
+.share__ask-error[hidden] { display: none; }
+
 .comments { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 
 .comments-reply { margin: 0 0 1rem; }

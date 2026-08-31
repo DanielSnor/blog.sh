@@ -24,6 +24,7 @@ require 'rbconfig'
 # was held decides the words, and $? does not read as either.
 require 'English'
 require_relative '../lib/run_lock'
+require_relative '../lib/social_icons'
 require_relative '../lib/site_config'
 require_relative '../lib/account_id'
 
@@ -70,10 +71,10 @@ HEX = /\A#(\h{3}|\h{6})\z/.freeze
 
 # The icons the build already knows how to draw. Anything else needs
 # icon_svg, which is markup and belongs in the file rather than a prompt.
-# Kept in step with SOCIAL_ICONS in build/build_blog.rb -- an icon the
-# engine can draw and the wizard never offers is one nobody finds.
-ICONS = %w[mastodon pixelfed linkedin github gitea forgejo codeberg gitlab
-           bluesky instagram threads facebook x youtube rss email].freeze
+# Read from the engine's own list rather than written out again: this was
+# a second copy kept in step by hand, and an icon the engine can draw but
+# the wizard never offers is one nobody finds.
+ICONS = SocialIcons::NAMES
 
 # current.dig blows up the moment a key holds something other than a
 # mapping -- a hand-edited config with `widgets:` as a list, say -- and
