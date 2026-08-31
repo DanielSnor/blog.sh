@@ -393,6 +393,8 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/
 ./blog.sh restore [<slug>]     # restores a post from trash
+./blog.sh empty trash          # deletes everything in the trash, for good
+./blog.sh empty versions       # keeps each post's newest version, removes the older ones
 ./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
 ./blog.sh rebuild [--full]     # rebuilds and deploys the whole site;

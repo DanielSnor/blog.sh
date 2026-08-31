@@ -857,10 +857,16 @@ to the operating system's own share sheet, which on a phone is Signal and
 WhatsApp and Telegram and whatever else is installed, so one control
 covers what a row of them could not.
 
-The last two of those are the ones that need a browser to co-operate, and
-neither is drawn where it cannot work: `system` stays hidden unless the
-browser has a share sheet, and `mastodon` stays hidden until its script
-has run. A control that opens nothing is worse than no control.
+Three of them need the browser to co-operate, and none is drawn where it
+cannot work -- a control that opens nothing is worse than no control.
+`mastodon` stays hidden until its script has run, `system` unless the
+browser has a share sheet, and `copy` unless there is a clipboard to write
+to. That last one has a condition worth knowing about: browsers only give
+a page the clipboard over **https**, so on a site served over plain
+`http://` the copy button is not drawn at all. If the whole block would be
+empty -- every target you named turned out to be one of these three, and
+none of them could run -- the block stays hidden too, rather than leaving
+a heading over nothing.
 
 Pixelfed is not on the list. It has no share address to send anyone to --
 the request for one was closed without it -- and a post there wants a

@@ -680,9 +680,13 @@ wrote. Then, in load order:
   that browser, refusing anything that is not a hostname rather than
   pasting it into an address. `copy` writes the address to the clipboard
   and renames itself while it says so. `system` hands the post to the
-  operating system's share sheet. The last two arrive HIDDEN and are shown
-  only where they can work, which is the same promise the copy button
-  below makes and for the same reason.
+  operating system's share sheet. All three of those arrive HIDDEN and are
+  shown only where they can work -- the fediverse button once its script
+  has run, the sheet where the browser has one, the clipboard button where
+  there is a clipboard, which browsers grant over https alone. That is the
+  same promise the copy button below makes and for the same reason. A
+  block left with nothing it can draw hides itself rather than standing a
+  heading over an empty row.
 - **Copy** (`copy-code.js`) puts a copy button on every `code` block --
   built in the script rather than in the markup, so a page whose script
   never runs shows no button instead of a dead one. It refuses to appear

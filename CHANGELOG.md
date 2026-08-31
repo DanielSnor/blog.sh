@@ -10,6 +10,204 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.6 -- 2026-08-31
+
+A release about the time between deciding to publish and the site saying
+so. The build stopped rebuilding what nobody changed, a photograph
+stopped being stored twice, and a post can now be handed over as a file
+by something that is not a person -- a phone shortcut, a cron job, a
+script. Around those, a row of share controls under each post, an icon a
+tag can carry, a way out of the trash and the versions, and eleven places
+where the engine behaved differently depending on whether a terminal
+happened to be watching.
+
+The cache is the change everyone will feel. Publishing used to cost the
+size of the archive rather than the size of the change: a post dated
+today alters twelve files out of eight thousand, and the build rendered
+all eight thousand and read all eight thousand back off disk to find that
+out. It now records what each page was made of and skips the ones whose
+inputs have not moved. Measured on this project's own archive of 6,639
+posts, a rebuild that changes nothing costs 44% of what it did and an
+ordinary publish about half; backdating into the early 2000s still costs
+four fifths, because a post landing in 2003 moves 766 files and there is
+no way around that. On the server that archive lives on, a full first
+build and upload took 197 seconds and the next build 9.
+
+Nothing to migrate -- `git pull`, rebuild, deploy. Four things happen by
+themselves on an existing site. The first build after the upgrade is a
+full one and writes `.build_cache.json` in the installation directory
+(gitignored, per-machine, always safe to delete). Published pictures
+become hardlinks to the archive's own copies, which halves what they take
+on disk. `doctor` gains a line if the trash is not empty, and `check`
+gains one for any post whose `type:` the engine does not recognise. And
+`assets/js/share.js` is a new file that every page now loads: it does
+nothing on a site that never sets `share:`, but a deploy that misses it
+leaves a 404 in the console.
+
+### Added
+
+- **A page already on disk is not built again.** The build keeps a record
+  of what went into each page -- the post, the template, the locale, the
+  configuration, the engine itself -- and renders only the pages whose
+  record no longer matches. Files it did not have to render cost one
+  `stat` instead of a full read-back. Anything the record cannot vouch
+  for means "do the work": a missing record, a truncated one, a different
+  format, a build that died halfway. The escape hatch is
+  `./blog.sh rebuild --full`, which renders and compares everything while
+  still recording what it wrote, so reaching for it costs one slow build
+  and not two.
+- **`./blog.sh add <file>` writes a post without asking anything.** The
+  same work the wizard does, with the markdown handed over instead of
+  typed: no editor, no questions, no dialog at the end. A bare filename is
+  looked for in `incoming/`, so the file can arrive by the same upload as
+  the photos, and it is deleted once the post is written. Where the wizard
+  would ask, this refuses and writes nothing -- a photo that has not
+  finished uploading, an empty body, a file that is not text, a second
+  filename. `--json` answers as one object on standard output and nothing
+  else: `slug`, `path`, `state`, `url`, `deploy`, `warnings`, every key
+  always present, exit code 0 or 1. It stops at the draft, because the
+  file says *write this down*, not *put it in front of the world*.
+- **`publish <slug> --yes` and `publish --no-announce`.** `--yes` answers
+  the draft dialog with "publish" in advance; `--no-announce` puts the
+  page up and sends nothing to Mastodon or Bluesky, and because nothing
+  was attempted, `toot` can still send it by hand afterwards. One question
+  `--yes` will not answer for you: a post dated outside the recent window
+  is published but **not** announced, and the run says so. It also refuses
+  to guess between two posts sharing a slug in different years, and wants
+  the slug spelled out rather than picking from a list.
+- **A row of share controls under a post.** Off unless `share:` names
+  what you want, drawn in the order you name it. What is prefilled is the
+  post's own name and its address; the reader writes the part that is
+  theirs. Bluesky, mail, Facebook, LinkedIn, Threads and X are plain
+  links. Three are not: the fediverse has as many addresses as it has
+  instances and a page cannot know which is the reader's, so `mastodon`
+  is a button that asks -- in a row that opens under the controls, in the
+  site's own type, remembered in that browser afterwards. `copy` puts the
+  address on the clipboard, and `system` hands the post to the operating
+  system's own sheet, which on a phone is Signal and WhatsApp and Telegram
+  at once. Those three appear only where they can work, and a block left
+  with nothing to draw hides itself rather than standing a heading over an
+  empty row.
+- **A tag can carry an icon.** `tag_icons` gives a tag one of the eight
+  the engine ships or an SVG of your own, and it shows up in the heading
+  of `/tag/<name>/` and on the date badge of every post that has the tag,
+  where it **replaces** the content-type icon rather than joining it.
+  Most posts carry more than one tag -- 68% of them on the archive this
+  was measured against -- so the order of the list is the priority and the
+  first entry a post matches is the one it wears. That rule was chosen
+  because the tag a post was given first is usually an importer's rather
+  than a subject: `twitter` alone opens 1,256 posts there. Asked for in
+  issue #45.
+- **`empty trash` and `empty versions`.** Both stores had a way back --
+  `restore`, and the version picker in `props` -- and no way out, so both
+  grew for years and nothing said by how much. Each prints what it is
+  about to remove, in items and in megabytes, and requires that count to
+  be typed back before anything goes. `empty versions` keeps each post's
+  newest version, because versions exist to answer "give me back what I
+  just overwrote".
+- **`doctor` says what is in the trash**, as a note rather than a fault --
+  a trash with posts in it is a trash doing its job, but nothing on the
+  site ever mentioned it, and on the installation this engine was built
+  around the only way to see it was `du` on the server.
+
+### Changed
+
+- **A published picture is the archive's own file, under a second name.**
+  `public.nosync/` used to hold a second copy of every photograph;
+  it holds a hardlink now. The bytes are stored once, so the pictures take
+  half of what they did -- 1.8 GB on this project's installation. It does
+  **not** save anything in a backup: a backup copies file by file and
+  stores each name in full. That was measured rather than assumed -- 200
+  files under two names, 101 MB on disk, 201 MB in the backup.
+- **`browse --drafts` shows scheduled drafts**, the way `list --drafts`
+  always has. The two flags meant different things, and `browse` hid the
+  post going out tomorrow -- the one a person asking for their drafts most
+  wants to see -- without saying it had hidden anything.
+- **Esc backs out of the palette preview instead of accepting it.** The
+  style wizard asks whether to show a preview of a palette, and on a
+  deployed site a yes uploads that page to the web. Enter and Esc answered
+  that question identically, so the key people press to cancel published
+  something. Every other question with a default is about a setting, where
+  Esc meaning "leave it as it is" is the promise the wizard makes and
+  keeps.
+- **A relative path is read against where you are standing.** Both
+  wrappers move into the installation before starting Ruby, so
+  `add sub/post.md` meant a file next to the engine rather than next to
+  the caller -- silently the wrong file, or a refusal over a file that was
+  plainly there.
+- **`doctor` asks the footer's `social:` icons what it has always asked
+  the tag icons**: whether the name is one the engine has, whether a
+  hand-written `icon_svg` contains an `<svg>` at all, and whether it is
+  drawn to the same scale as the rest. An unknown name drew an empty space
+  and nothing said why. It checks the `share:` list the same way.
+
+### Fixed
+
+- **A byte-order mark swallowed the whole frontmatter.** Three invisible
+  bytes in front of the opening `---` -- which Windows editors and several
+  iOS apps write by default -- and the header was read as body text: the
+  post arrived with no title and no tags, named after the words "title:"
+  and "tags:", and the run exited 0.
+- **Attaching a photo through a symlinked directory in `incoming/`
+  deleted the original.** `ln -s ~/Pictures incoming/photos` is the
+  obvious way to stop copying photographs twice. The tidy-up that clears
+  `incoming/` after a save compared path text, which follows no symlinks,
+  so every original behind that link was inside its reach and the archive
+  deleted the author's own picture from outside `incoming/` entirely.
+- **`./setup.sh | tee setup.log` echoed the access token in clear text.**
+  The prompt hid what was typed only when *both* streams were terminals,
+  and hiding acts on the keyboard alone. Anyone who set a site up that way
+  should assume the token is in that log and rotate it.
+- **A script that asks now flushes before it blocks.** None of the five
+  did, so piped or tee'd the question sat in a buffer while the process
+  waited for its answer. At the import wizard's confirmation gate that
+  meant a nought-byte log -- and that gate is built so the answer is a
+  number from the preview, which was in the buffer too.
+- **The QR code for a palette preview was trimmed to unscannable
+  thirds**, and the plain address, which is there for exactly the case
+  where the code cannot be read, had been trimmed off ahead of it. On the
+  ordinary 24-row terminal three rows of fifteen survived, under an intact
+  "scan this with your phone". A picture is kept whole or dropped whole
+  now, and the address is said last, because last said is last trimmed.
+- **A tag or type with a letter outside ASCII crashed on a terminal and
+  matched nothing down a pipe.** Command-line arguments carry the
+  encoding the environment declares, and `LANG` is unset under
+  `docker exec`, cron, systemd and launchd -- which is how a server runs
+  this. The bytes were always right; only the label on them was wrong.
+- **An embed could still smuggle a script past the sanitiser.** Three
+  spellings got through: `<svg/onload=...>`, which is the same tag to a
+  browser as `<svg onload=...>`; `javascript&#58;` written as an entity
+  rather than a colon; and `<animate attributeName="href"
+  values="javascript:...">`, a script in a form no URL rule would read.
+  The pass now walks a tag's attributes and asks each one what it is,
+  rather than matching shapes. This is the guard that also dresses a
+  tag's own `icon_svg`.
+- **A list item under a list item could not be found from the search
+  box.** The index flattened nested lists to their first level, so a
+  paragraph's worth of a post was missing from search on every site that
+  writes them. Rebuilding regenerates the index.
+- **One file that would not go took the whole build with it.** A single
+  unremovable file in `public.nosync/` aborted the sweep, and a picture
+  that could not be placed ended the run rather than the picture.
+- **A page was written straight through a symlink** left in
+  `public.nosync/`, so a build could put a page somewhere the archive
+  never chose.
+- **The queue's `[m]` was offered on a terminal and accepted everywhere**,
+  so a piped run that typed it got forty lines of `ENOTTY` over a key its
+  own prompt had never shown it.
+- **Ctrl-C on the import wizard's first screens** escaped as an uncaught
+  interrupt and printed a stack trace, where the same key in the style
+  wizard says that nothing was written.
+- **The About and footer questions lost their labels on a terminal.** The
+  wizard painted the question and then repainted over it, leaving "Open it
+  in your editor? [y/N]" with nothing saying what "it" was -- the same
+  bare line for two different sections. A piped run had always been told
+  all three: the label, the hint and the value that is there now.
+- **"Nothing changed, no post" read as though recovered text had gone with
+  it.** Text left in the editor buffer by an interrupted session survives
+  when you continue without it, and the line saying so was printed only
+  after a restore.
+
 ## 1.5 -- 2026-08-30
 
 Two things happened here. The site learned to say what it holds -- a post

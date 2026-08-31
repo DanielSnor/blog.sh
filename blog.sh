@@ -8,6 +8,7 @@
 #   ./blog.sh unpublish [<slug>]
 #   ./blog.sh delete [<slug>]
 #   ./blog.sh restore [<slug>]
+#   ./blog.sh empty trash|versions
 #   ./blog.sh toot [<slug>]
 #   ./blog.sh rebuild [--full]
 #   ./blog.sh browse [--type=image] [--tag=foo]
