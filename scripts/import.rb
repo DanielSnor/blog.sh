@@ -49,6 +49,17 @@ require_relative '../lib/import/squarespace'
 require_relative '../lib/import/substack'
 require_relative '../lib/import/pages_note'
 
+# A script that ASKS has to flush before it blocks. stdout is block
+# buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
+# and every wrapper that captures output leaves the question sitting in
+# the buffer while the process waits for an answer to it. Reproduced on
+# the import wizard: at the confirmation gate the log was 0 bytes -- and
+# that gate is deliberately built so the answer IS a number from the
+# preview, which was in the buffer too. All 1499 bytes arrived when the
+# process finally exited.
+$stdout.sync = true
+
+
 def t(key, **vars)
   I18n.t(key, **vars)
 end
@@ -787,7 +798,24 @@ if Tui.interactive?
   puts SiteHeader.render(tool: './import.sh')
 end
 
-source = ask_source
+# Ctrl-C has to mean the same thing here as it does two screens later.
+# The rescue at the foot of this file covered run_import alone, so the way
+# out of a wizard that had not imported anything yet -- the documented way
+# out, the one the menu's own hint line offers -- escaped as an uncaught
+# Interrupt and printed a seven-line stack trace. The same key in
+# scripts/style.rb says "stopped, nothing was written" and exits 130.
+#
+# `cancelled`, not `interrupted`: the message at the foot talks about
+# posts already on disk, and at this point there are none. Nothing has
+# been read, nothing chosen, nothing written.
+begin
+  source = ask_source
+rescue Interrupt
+  puts
+  puts t('import.cancelled')
+  puts
+  exit 130
+end
 if source.nil?
   # A blank line before the verdict, the way the interrupt handler below and
   # the cancelled confirmation in run_import both write one. The same
@@ -800,7 +828,16 @@ if source.nil?
   exit 0
 end
 
-adapter = source[1].call
+# The adapter build asks for the export's path, so it is the second place
+# a person can reasonably decide they are in the wrong wizard.
+begin
+  adapter = source[1].call
+rescue Interrupt
+  puts
+  puts t('import.cancelled')
+  puts
+  exit 130
+end
 if adapter.nil?
   puts
   puts t('import.cancelled')

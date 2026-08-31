@@ -63,6 +63,17 @@ require_relative '../lib/post_address'
 require_relative '../lib/forge_address'
 require_relative '../lib/incoming_path'
 
+# A script that ASKS has to flush before it blocks. stdout is block
+# buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
+# and every wrapper that captures output leaves the question sitting in
+# the buffer while the process waits for an answer to it. Reproduced on
+# the import wizard: at the confirmation gate the log was 0 bytes -- and
+# that gate is deliberately built so the answer IS a number from the
+# preview, which was in the buffer too. All 1499 bytes arrived when the
+# process finally exited.
+$stdout.sync = true
+
+
 def t(key, **vars)
   I18n.t("style.#{key}", **vars)
 end
@@ -261,7 +272,13 @@ def offer_palette_preview(colors, name)
   # Declining is an ending too. Every other way out of this method closes on
   # a blank line and this one closed on the question, so the palette section
   # was the one section whose last line depended on the answer.
-  unless Wizard.confirm(t('q_palette_preview'), default: true)
+  # escape: false, and this is the only question in the engine that needs
+  # it. Every other confirm with a default is about a SETTING, where Esc
+  # meaning "leave it alone" is both the wizard's promise and the safe
+  # answer. This one builds a page and, on a deployed site, PUTS IT ON THE
+  # WEB -- so answering the cancel key with the convenient default
+  # published something on the keystroke people press to get out.
+  unless Wizard.confirm(t('q_palette_preview'), default: true, escape: false)
     puts
     return
   end
@@ -327,24 +344,36 @@ def show_preview_online(url, local_fallback)
     return
   end
 
-  Wizard.say(t('pv_online', url: url), :cyan)
-  # Said with the address rather than under the QR code: a piped run gets no
-  # QR and still deserves to know. The page really is temporary -- the build
-  # removes anything it did not produce itself (prune_public), and the deploy
-  # then takes it off the site as an orphan. That is the build doing its job,
-  # not a defect; what was missing was anybody saying so. Somebody
-  # photographed the QR one evening and found it dead the next morning.
-  Wizard.say(t('pv_temporary'), :dim)
+  # ⚠️ The address goes AFTER the picture, and that order is the point.
+  # The record is trimmed from the top, so anything said before a 15-row
+  # QR code is the first thing to go -- and on a 24-row terminal the
+  # address, which exists precisely for the case where the code cannot be
+  # read, was gone while the code itself survived in useless thirds.
+  # Last said is last trimmed.
   if Tui.interactive? && (qr = QrCode.render(url))
-    # Into the frame, one row at a time, and NOT through Wizard.say: say
-    # wraps to the terminal width, and a wrapped QR code is a picture of
-    # nothing. Printed straight to the screen the code lasted until the
-    # menu repainted over it -- which is immediately -- so what the person
-    # was meant to photograph was gone before they reached for the phone.
-    Wizard.remember('')
-    qr.to_s.lines.each { |line| Wizard.remember(line.chomp) }
-    Wizard.remember(Tui.paint(I18n.t('cli.qr_hint'), :dim))
+    # remember_block, not a row at a time: kept whole or dropped whole.
+    # Into the record and NOT through Wizard.say, because say wraps to the
+    # terminal width and a wrapped QR code is a picture of nothing.
+    # Printed straight to the screen it lasted until the menu repainted
+    # over it -- which is immediately -- so what the person was meant to
+    # photograph was gone before they reached for the phone.
+    Wizard.remember_block([''] + qr.to_s.lines.map(&:chomp) +
+                          [Tui.paint(I18n.t('cli.qr_hint'), :dim)])
   end
+  # The page really is temporary -- the build removes anything it did not
+  # produce itself (prune_public), and the deploy then takes it off the
+  # site as an orphan. That is the build doing its job, not a defect; what
+  # was missing was anybody saying so. Somebody photographed the QR code
+  # one evening and found it dead the next morning. Said here rather than
+  # under the picture, because a piped run gets no picture and still
+  # deserves to know.
+  Wizard.say(t('pv_temporary'), :dim)
+  # ⚠️ The address goes LAST of everything. The record is trimmed from the
+  # top, so the final row is the one that survives the smallest window --
+  # and of the three things this method has to say, the address is the one
+  # without which the other two are of no use. A reader who cannot scan
+  # the code and cannot read the warning can still type this.
+  Wizard.say(t('pv_online', url: url), :cyan)
   open_in_browser(url)
 end
 

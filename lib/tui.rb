@@ -325,7 +325,15 @@ module Tui
     answer == I18n.lookup('cli.confirm_yes_char').to_s.downcase || %w[y j a].include?(answer)
   end
 
-  def key_choice(prompt)
+  # escape: what the Esc key answers with. '' by default, which is what
+  # Enter answers with too, and that is the wizard's own promise -- its
+  # hint bar reads "Esc keep current", and for a question about a setting
+  # keeping what is there IS the answer. It is wrong for a question that
+  # DOES something: Esc is the key people press to back out, and at
+  # style.rb's palette preview it built a page and uploaded it to the
+  # live site instead. That one caller asks for a different answer here;
+  # nobody else's case statement sees anything new.
+  def key_choice(prompt, escape: '')
     unless interactive?
       print prompt
       answer = $stdin.gets
@@ -345,9 +353,12 @@ module Tui
 
     key = read_key
     case key
-    when :enter, :escape
+    when :enter
       puts
       ''
+    when :escape
+      puts
+      escape
     when String
       puts key
       key.downcase
@@ -436,7 +447,14 @@ module Tui
   # $stdin.noecho would raise on a pipe.
   def password(prompt)
     print prompt
-    unless interactive?
+    # ⚠️ $stdin.tty?, not interactive?. noecho acts on STDIN and nothing
+    # else, while interactive? also demands that stdout be a terminal --
+    # so `./setup.sh | tee setup.log`, which is what somebody does when
+    # they want a record of a first install, took the branch below and the
+    # terminal echoed the access token in clear text, into the scrollback
+    # and over anybody's shoulder. The question is whether the keyboard is
+    # a terminal, and only that.
+    unless $stdin.tty?
       value = $stdin.gets.to_s.chomp
       return value
     end

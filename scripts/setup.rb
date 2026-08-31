@@ -68,6 +68,17 @@ require_relative '../lib/site_header'
 require_relative '../lib/publish_slots'
 require_relative '../lib/path_glob'
 
+# A script that ASKS has to flush before it blocks. stdout is block
+# buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
+# and every wrapper that captures output leaves the question sitting in
+# the buffer while the process waits for an answer to it. Reproduced on
+# the import wizard: at the confirmation gate the log was 0 bytes -- and
+# that gate is deliberately built so the answer IS a number from the
+# preview, which was in the buffer too. All 1499 bytes arrived when the
+# process finally exited.
+$stdout.sync = true
+
+
 def t(key, **vars)
   I18n.t("setup.#{key}", **vars)
 end

@@ -45,6 +45,17 @@ require_relative '../lib/i18n'
 require_relative '../lib/version'
 require_relative '../lib/incoming_path'
 
+# A script that ASKS has to flush before it blocks. stdout is block
+# buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
+# and every wrapper that captures output leaves the question sitting in
+# the buffer while the process waits for an answer to it. Reproduced on
+# the import wizard: at the confirmation gate the log was 0 bytes -- and
+# that gate is deliberately built so the answer IS a number from the
+# preview, which was in the buffer too. All 1499 bytes arrived when the
+# process finally exited.
+$stdout.sync = true
+
+
 SiteConfig.use_site_timezone!
 
 def t(key, **vars)
@@ -140,6 +151,22 @@ SITE_HERO = SiteConfig.get('layout', 'hero', default: false)
 # do nothing at all and never say so. Every key the author typed is checked
 # against the list above, and an unknown one stops the save while the text
 # is still recoverable (the editor buffer holds it).
+# A command-line argument, labelled with the encoding it actually is.
+#
+# Ruby tags ARGV with the encoding the environment declares, and with LANG
+# unset that is ASCII-8BIT -- which is `docker exec` without -e LANG, and
+# cron, and systemd, and launchd. The bytes are the UTF-8 the shell sent
+# either way; only the label is wrong, and the label is what makes
+# unicode_normalize refuse to touch them.
+#
+# force_encoding, not encode: nothing is being converted, a mislabelled
+# string is being labelled correctly. An argument that really is not UTF-8
+# keeps its bytes and fails its own comparison, which is the honest
+# outcome for a name no post can have.
+def utf8(value)
+  value.to_s.dup.force_encoding(Encoding::UTF_8)
+end
+
 def abort_on_unknown_frontmatter(meta, interactive: true)
   unknown = meta.keys.reject { |k| FRONTMATTER_KEYS.include?(k.to_s) }
   return if unknown.empty?
@@ -2387,14 +2414,23 @@ def queue_act(entries, index)
   case (key = Tui.key_choice(with_carry_key(t('cli.queue_actions', slug: entry[:slug]))))
   when 'u' then queue_swap(entries, index, index - 1)
   when 'd' then queue_swap(entries, index, index + 1)
-  when 'm' then queue_carry(entries, index)
+  # ⚠️ The ROUTE, not only the label. with_carry_key offers [m] on a
+  # terminal alone -- carrying a post is a screen, and a piped caller has
+  # [u] and [d], which need none -- but the route took 'm' from anybody.
+  # A piped run that typed it fell into Tui.screen and died with ENOTTY
+  # and forty lines of backtrace, over a key its own prompt had never
+  # shown it, and exited 1 for a keystroke that would have done nothing.
+  when 'm' then Tui.interactive? ? queue_carry(entries, index) : queue_unknown_key
   when 'p', 's', 'n' then queue_act_slow(entries, index, key)
   when '' then false
-  else
-    puts t('cli.queue_unknown')
-    puts
-    false
+  else queue_unknown_key
   end
+end
+
+def queue_unknown_key
+  puts t('cli.queue_unknown')
+  puts
+  false
 end
 
 # Runs a queue's writes in order -- under the lock, after checking every
@@ -4591,6 +4627,7 @@ end
 
 def browse_state_match?(post, state)
   case state
+  when 'unpublished' then post[:state] == DRAFT
   when 'draft' then post[:state] == DRAFT && !post[:scheduled]
   when 'scheduled' then !post[:scheduled].nil? && post[:scheduled] != false
   when 'pinned' then !!post[:pinned]
@@ -4806,7 +4843,13 @@ def cmd_browse(filters = {})
     return
   end
 
-  active = { type: filters[:type], state: filters[:drafts] ? 'draft' : nil, tag: filters[:tag] }
+  # 'unpublished', not 'draft'. The browse menu's own 'draft' means
+  # "a draft that is NOT scheduled", because it offers 'scheduled'
+  # alongside it -- but `--drafts` is the flag `list` also has, and there
+  # it means everything unpublished. So `browse --drafts` hid the post
+  # going out tomorrow, which is the one a person asking for their drafts
+  # most wants to see, and said nothing about having hidden it.
+  active = { type: filters[:type], state: filters[:drafts] ? 'unpublished' : nil, tag: filters[:tag] }
   index = nil
   contexts = {}
   view = []
@@ -5622,8 +5665,17 @@ else
   when 'list', 'browse'
     filters = {}
     ARGV.each do |arg|
-      filters[:type] = Regexp.last_match(1) if arg =~ /\A--type=(.+)\z/
-      filters[:tag] = Regexp.last_match(1) if arg =~ /\A--tag=(.+)\z/
+      # ⚠️ force_encoding, because ARGV arrives in the encoding the
+      # ENVIRONMENT declares -- and with LANG unset that is ASCII-8BIT.
+      # LANG unset is not exotic: it is `docker exec` without -e LANG,
+      # which is how this engine is operated, and it is cron, systemd and
+      # launchd. `browse --tag=kočky` then reached Slug.fold, whose
+      # unicode_normalize refuses a binary string, and the terminal died
+      # with a stack trace; down a pipe the comparison is a plain downcase
+      # that does not raise, so it quietly matched nothing instead. The
+      # bytes are UTF-8 either way -- only the label on them was wrong.
+      filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
+      filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
       filters[:drafts] = true if arg == '--drafts'
     end
     # Same filters, two ways to read the answer: `list` prints it,
