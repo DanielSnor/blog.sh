@@ -34,7 +34,16 @@ fail() {  # code, message
 [ -d "$INSTALL/incoming" ] || fail "no_incoming" "No incoming/ directory in $INSTALL."
 [ -x "$INSTALL/blog.sh" ] || fail "no_engine" "No executable blog.sh in $INSTALL."
 
-IFS= read -r NAME || fail "empty_input" "Nothing arrived on standard input."
+# ⚠️ With a deadline. A caller that opens the connection and then says
+# nothing -- a client that never closes its end, a network that dropped
+# without telling anybody -- left `read` waiting for as long as the
+# connection lasted, holding a process for nothing. Measured at sixty
+# seconds against a writer that simply sat there. The name is the FIRST
+# thing sent and it is short, so half a minute is generous; the bytes
+# after it have a ceiling of their own and may take as long as a phone on
+# a train needs.
+IFS= read -r -t 30 NAME \
+  || fail "empty_input" "Nothing arrived on standard input, or nothing was sent for thirty seconds."
 NAME=${NAME%$'\r'}   # a shortcut may end its lines the Windows way
 
 # ⚠️ A BARE filename and nothing else. This is the whole of what an
