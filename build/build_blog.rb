@@ -552,8 +552,15 @@ def share_links_html(post)
   # heading with nothing under it. share.js unhides it the moment it knows
   # something is drawable.
   all_conditional = SHARE.all? { |name| SHARE_CONDITIONAL.include?(name) }
-  %(<div class="share"#{all_conditional ? ' hidden' : ''}>) +
-    %(<h2 class="share__heading">#{h(t('share.heading'))}</h2>) +
+  # A group with a name, not a HEADING. As an h2 it entered the post's own
+  # outline as a peer of the author's sections -- so a reader moving by
+  # headings met "Share this post" among the things the post is actually
+  # about, and the comments heading below it was dragged under it. The
+  # words stay where they were and still name the block, through
+  # aria-labelledby; they simply stop pretending to be a section of the
+  # writing.
+  %(<div class="share" role="group" aria-labelledby="share-heading"#{all_conditional ? ' hidden' : ''}>) +
+    %(<p class="share__heading" id="share-heading">#{h(t('share.heading'))}</p>) +
     %(<div class="share__links">#{links.join}</div>#{share_ask_html}</div>\n                )
 end
 

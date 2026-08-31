@@ -126,11 +126,12 @@
     if (change) { change.hidden = !remembered(); }
   }
 
-  function openAsk(text, opener) {
+  function openAsk(text, by) {
     if (!ask) { return; }
     pending = text;
+    opener = by;
     ask.hidden = false;
-    if (opener) { opener.setAttribute('aria-expanded', 'true'); }
+    if (by) { by.setAttribute('aria-expanded', 'true'); }
     if (field) {
       // Prefilled with what is stored, so changing it is editing rather
       // than remembering and retyping.
@@ -145,8 +146,15 @@
                 '_blank', 'noopener');
   }
 
+  // Who opened the row, so closing it can hand focus back. Without this a
+  // reader who pressed Escape -- or who shared and watched the row go --
+  // was left with focus on an element that is no longer rendered, and the
+  // next Tab started again from the top of the document.
+  var opener = null;
+
   function closeAsk() {
     if (!ask) { return; }
+    var wasInside = ask.contains(document.activeElement);
     ask.hidden = true;
     if (error) { error.hidden = true; }
     if (field) { field.removeAttribute('aria-invalid'); }
@@ -154,6 +162,10 @@
       b.setAttribute('aria-expanded', 'false');
     });
     if (change) { change.setAttribute('aria-expanded', 'false'); }
+    // Only when focus was in the thing being closed: taking it from
+    // somewhere else would be its own rudeness.
+    if (wasInside && opener && !opener.hidden) { opener.focus(); }
+    opener = null;
     pending = null;
   }
 
@@ -175,7 +187,7 @@
     change.addEventListener('click', function () {
       var button = document.querySelector('[data-share-mastodon]');
       change.setAttribute('aria-expanded', 'true');
-      openAsk(button ? button.getAttribute('data-share-text') || '' : '', null);
+      openAsk(button ? button.getAttribute('data-share-text') || '' : '', change);
     });
     showChange();
   }

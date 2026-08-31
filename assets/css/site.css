@@ -1286,6 +1286,7 @@ aside .card { margin-bottom: 1.5rem; }
 .share { margin-top: 2rem; }
 .share[hidden] { display: none; }
 
+/* A <p>, not a heading -- see share_links_html. */
 .share__heading {
   font-size: 0.8rem;
   font-weight: 600;
