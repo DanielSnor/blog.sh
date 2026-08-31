@@ -369,11 +369,18 @@ exit code is 0 or 1, nothing else.
 
 `add <file>` wants the file to be on the server already. `receive.sh` is
 how it gets there: **one file per connection**, the name on the first
-line and its base64 after it.
+line, its base64 after it, and a line holding a single `.` to say that
+was all of it.
 
 ```bash
-{ printf '%s\n' "photo.jpg"; base64 < photo.jpg; } | ssh blog ./scripts/receive.sh
+{ printf '%s\n' "photo.jpg"; base64 < photo.jpg; printf '.\n'; } | ssh blog ./scripts/receive.sh
 ```
+
+**The closing dot is not decoration.** A connection that drops halfway
+ends the same way a finished one does -- the receiver reads to the end
+of the stream either way -- so half a photograph arrived, decoded into
+half a picture, and was answered with `ok`. Without the dot the transfer
+is refused as `truncated` and nothing is stored.
 
 A shortcut on a phone sends the pictures that way, one connection each,
 and **the markdown last** -- because the markdown arriving is what makes

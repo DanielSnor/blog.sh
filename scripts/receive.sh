@@ -1,25 +1,20 @@
 #!/usr/bin/env bash
 # Takes ONE file from standard input and puts it in incoming/.
 #
-#   printf '%s\n' "photo.jpg" | cat - <(base64 < photo.jpg) | ./scripts/receive.sh
+#   { printf '%s\n' photo.jpg; base64 < photo.jpg; echo .; } | ./scripts/receive.sh
 #
-# The first line is the name; everything after it is that file's base64.
+# First line the name, then that file's base64, then a line with a dot --
+# which is what says the transfer finished rather than stopped.
 # A shortcut on a phone sends the pictures this way, one connection each,
 # and the markdown last -- and the markdown arriving is what makes the
 # post, because there is no other signal to give and none is needed.
 # Everything before it is already staged under the names its text uses.
 #
-# ⚠️ There was a version of this that took a ZIP of the whole post and
-# unpacked it here. Three adversarial audits found nine, twelve and ten
-# blocking faults in successive rewrites of it, and nearly every one lived
-# in the archive handling: entries that were symlinks, names that
-# flattened onto each other, a bomb that wrote two gigabytes from three
-# megabytes, an extraction that half-failed and was never checked. None of
-# that exists here, because there is no archive. The whole of what arrives
-# from a network is a filename and a stream of bytes.
-#
-# The client had the files separately all along -- it packed them at the
-# last moment -- so this asks it to do less, not more.
+# ⚠️ An earlier version took a ZIP and unpacked it here. Three audits
+# found nine, twelve and ten blockers in successive rewrites, nearly all
+# of them in the archive handling. There is no archive now: what arrives
+# from a network is a filename and a stream of bytes. The client had the
+# files separately all along, so this asks it to do less, not more.
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || { printf '{"ok":false,"error":"no_cd","message":"Cannot reach the installation directory."}\n'; exit 1; }
@@ -46,15 +41,14 @@ unavailable() {
 [ -d "$INSTALL/incoming" ] || unavailable "no_incoming" "No incoming/ directory in $INSTALL."
 [ -x "$INSTALL/blog.sh" ] || unavailable "no_engine" "No executable blog.sh in $INSTALL."
 
-# ⚠️ With a deadline. A caller that opens the connection and then says
-# nothing -- a client that never closes its end, a network that dropped
-# without telling anybody -- left `read` waiting for as long as the
-# connection lasted, holding a process for nothing. Measured at sixty
-# seconds against a writer that simply sat there. The name is the FIRST
-# thing sent and it is short, so half a minute is generous; the bytes
-# after it have a ceiling of their own and may take as long as a phone on
-# a train needs.
-IFS= read -r -t 30 NAME \
+# With a deadline: a caller that opens the connection and says nothing
+# held a process for as long as the connection lasted (measured at sixty
+# seconds). The name comes first and is short, so half a minute is
+# generous; the bytes after it may take as long as a phone on a train.
+# -n 1024: without a bound, `read` consumes until a newline, so bytes put
+# BEFORE it evaded the ceiling -- 256 MB of them took 266 MB of memory
+# with BLOGSH_MAX_MB=24 in force.
+IFS= read -r -t 30 -n 1024 NAME \
   || fail "empty_input" "Nothing arrived on standard input, or nothing was sent for thirty seconds."
 NAME=${NAME%$'\r'}   # a shortcut may end its lines the Windows way
 
@@ -75,21 +69,37 @@ WORK=$(mktemp -d) || unavailable "no_tmp" "Cannot create a temporary directory."
 # in /tmp after a failure.
 trap 'rm -rf "$WORK"' EXIT
 
-# ⚠️ Bounded BEFORE it lands, not weighed afterwards. The version that
-# checked the size after writing let three megabytes of input put two
-# gigabytes on the disk. head stops reading at the ceiling, so the cost of
-# a hostile sender is the ceiling and not whatever they felt like sending.
+# Bounded before it lands: head stops READING at the ceiling, so a
+# hostile sender costs that and not whatever they felt like sending.
 head -c $(( (MAX_MB * 1048576) + 1 )) > "$WORK/encoded"
 [ -s "$WORK/encoded" ] || fail "empty_input" "The file is empty."
 [ "$(wc -c < "$WORK/encoded")" -le $(( MAX_MB * 1048576 )) ] \
   || fail "too_large" "The file is over the ${MAX_MB} MB limit."
 
-base64 -d < "$WORK/encoded" > "$WORK/file" 2>/dev/null \
+# ⚠️ A closing '.' line is what says the transfer FINISHED -- nothing else
+# can. base64 -d returns 0 on a stream cut short, and a cut landing on a
+# four-character boundary is valid base64 by definition: a post cut in
+# half produced a real draft with one paragraph of three and its sender
+# was told it worked. A dot is not in the base64 alphabet.
+LAST=$(tail -n 1 "$WORK/encoded")
+[ "${LAST%$'\r'}" = "." ] \
+  || fail "truncated" "The transfer ended early: the closing '.' line is missing."
+sed '$d' "$WORK/encoded" > "$WORK/body"
+
+base64 -d < "$WORK/body" > "$WORK/file" 2>/dev/null \
   || fail "bad_base64" "The file is not valid base64."
 
-# Into place under its own name. Not `cp` onto a name that may already be
-# a dangling symlink -- write to a fresh name and move it over, so nothing
-# is ever followed.
+# ⚠️ Only a plain file may be replaced. `mv` onto a DIRECTORY moves the
+# file INSIDE it, and onto a symlink to one it writes through, outside
+# incoming/ altogether -- `ln -s ~/Pictures incoming/fotky` is an
+# arrangement this engine's own comments call ordinary, and a sender who
+# named `fotky` had their bytes land there, answered ok.
+if [ -d "$INSTALL/incoming/$NAME" ] || [ -L "$INSTALL/incoming/$NAME" ]; then
+  fail "name_taken" "incoming/$NAME is not a plain file; nothing was replaced."
+fi
+
+# Into place under its own name, written beside it first so a half-copy
+# is never visible under the name the post will look for.
 cp "$WORK/file" "$INSTALL/incoming/.incoming-$$" 2>/dev/null \
   || fail "write_failed" "Could not write into $INSTALL/incoming/."
 chmod 644 "$INSTALL/incoming/.incoming-$$" 2>/dev/null
