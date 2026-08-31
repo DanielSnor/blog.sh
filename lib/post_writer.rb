@@ -50,21 +50,23 @@ module PostWriter
 
     dir = File.join(CONTENT_DIR, year)
     FileUtils.mkdir_p(dir)
-    slug = unique_slug(post.fetch('slug'), dir, post['source'], year)
-    post = post.merge('slug' => slug)
-    post = ensure_draft_token(post)
-
-    # The slug can be settled and STILL have a past: unique_slug hands the
-    # same name back when the source id matches the file already sitting
-    # there (the cold-index fallback), and that file is a previous copy in
-    # every sense the two calls below care about.
-    previous = begin
-      JSON.parse(File.read(File.join(dir, "#{slug}.json"), encoding: 'utf-8'))
-    rescue StandardError
-      nil
-    end
+    # The name is taken by CREATING the file, not by finding it free.
+    # Looking and then writing are two steps with a media copy in between,
+    # and two runs that start together (a delivery from a phone while an
+    # import is running, two phones at once) both saw the same name free:
+    # the second one's file replaced the first one's, and both callers
+    # were told it had gone well. What claim_slug hands back is a name
+    # nobody else can still be holding.
+    #
+    # `previous` comes back with it. The name can be settled and STILL
+    # have a past: claim_slug hands the same name back when the source id
+    # matches the file already sitting there (the cold-index fallback),
+    # and that file is a previous copy in every sense the two calls below
+    # care about.
+    post, previous, claimed = claim_slug(post, dir, year)
+    slug = post.fetch('slug')
     path = File.join(dir, "#{slug}.json")
-    # unique_slug settles the FILE name; it says nothing about the address.
+    # claim_slug settles the FILE name; it says nothing about the address.
     # An imported page is served at the root, where a page already standing
     # there has no year to be told apart by -- so the import wrote both,
     # reported success, and left an archive whose two pages share one
@@ -72,7 +74,7 @@ module PostWriter
     # and the rest of the import goes on.
     #
     # Asked BEFORE a single file is copied. Refusing after the media were
-    # already on disk left an orphaned directory behind, which unique_slug
+    # already on disk left an orphaned directory behind, which claim_slug
     # then counted as an occupied name -- so running the very same import
     # again put the post somewhere else. An import that is refused has to
     # leave the archive exactly as it found it, or it is not repeatable.
@@ -91,6 +93,13 @@ module PostWriter
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
     path
+  rescue StandardError
+    # A write that is refused has to leave the archive exactly as it found
+    # it -- and that now includes the name it had only reserved. Left
+    # behind, the reservation would push the next attempt at the same post
+    # onto a serial nobody asked for.
+    File.delete(path) if claimed && path && File.exist?(path)
+    raise
   end
 
   # media.strip_location, on unless a site says otherwise. On by default
@@ -988,13 +997,30 @@ module PostWriter
     path if path && File.exist?(path)
   end
 
-  def self.unique_slug(base_slug, dir, source, year)
+  # Settles the name AND takes it, in one step that cannot be interleaved.
+  #
+  # Returns [post, previous, claimed]: the post carrying its final slug and
+  # draft token, whatever stood at that name before (only ever in the
+  # same-source case), and whether this run is the one holding a
+  # reservation it must clean up if the write goes on to fail.
+  def self.claim_slug(post, dir, year)
+    base_slug = post.fetch('slug')
     n = 1
     loop do
       candidate = n == 1 ? base_slug : "#{base_slug}-#{n}"
       existing_path = File.join(dir, "#{candidate}.json")
       if File.exist?(existing_path)
-        return candidate if same_source?(existing_path, source)
+        if same_source?(existing_path, post['source'])
+          previous = begin
+            JSON.parse(File.read(existing_path, encoding: 'utf-8'))
+          rescue StandardError
+            nil
+          end
+          # Not claimed: the file is already there and already ours, and
+          # deleting it on a later failure would destroy the very post
+          # this run came to update.
+          return [ensure_draft_token(post.merge('slug' => candidate)), previous, false]
+        end
       # A media directory with files in it and no post behind it is what a
       # deleted or half-imported post leaves. Handing a NEW post that name
       # publishes the orphan's pictures as its own: copy_media declines to
@@ -1007,7 +1033,27 @@ module PostWriter
         # Orphaned versions are refused for the same reason as orphaned
         # media one branch up: a new post on that name would inherit a
         # stranger's history, [v] and all.
-        return candidate
+        claimed = ensure_draft_token(post.merge('slug' => candidate))
+        # O_EXCL is the whole point: of two runs asking at the same
+        # instant, the kernel lets exactly one create the file and hands
+        # the other EEXIST, which walks on to the next serial rather than
+        # writing over a post it never saw.
+        #
+        # The reservation is written as a FINISHED post rather than left
+        # empty, because the build refuses to run at all when a post file
+        # will not parse -- and the media copy below can take seconds, a
+        # long time for a scheduled build to stumble into. What it holds
+        # is true: the text as it arrived, before the pictures were put
+        # beside it.
+        begin
+          File.open(existing_path, File::CREAT | File::EXCL | File::WRONLY, 0o644) do |f|
+            f.write(JSON.pretty_generate(claimed))
+          end
+          return [claimed, nil, true]
+        rescue Errno::EEXIST
+          # Somebody took it in the moment between the question and the
+          # answer. Nothing is wrong; walk on.
+        end
       end
 
       n += 1

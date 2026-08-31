@@ -158,6 +158,16 @@ leaves a 404 in the console.
 
 ### Fixed
 
+- **Two posts written at the same instant left one post.** Settling a
+  post's file name and writing the file were two steps with a media copy
+  between them, and a copy with photographs in it takes seconds. Two runs
+  that started together -- a delivery arriving from a phone while an
+  import ran, two phones one after the other -- both asked whether the
+  name was free, both were told yes, and the second one's file replaced
+  the first one's. Both callers were told it had gone well, and nothing
+  anywhere said a post was missing. The name is taken by creating the
+  file now, which of two runs asking at the same instant only one can
+  do; the other walks on to the next serial and both posts survive.
 - **A byte-order mark swallowed the whole frontmatter.** Three invisible
   bytes in front of the opening `---` -- which Windows editors and several
   iOS apps write by default -- and the header was read as body text: the
