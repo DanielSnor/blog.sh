@@ -223,7 +223,7 @@ cli:
   buffer_restored: "Obnoveno — editor se otevře s tím textem."
   buffer_discarded: "Zahozeno."
   buffer_kept_for_now: "Zůstává v %{path} — jakmile v tomhle sezení něco napíšeš, přepíše se."
-  buffer_still_kept: "Nic se nezměnilo, obnovený text tedy zůstává v %{path} — další add/edit ho nabídne znovu."
+  buffer_still_kept: "Nic se nezměnilo, text v %{path} tedy pořád leží — další add/edit ho nabídne znovu."
   image_dimensions_unknown: "⚠️  %{file}: rozměry obrázku nejde přečíst, takže mu stránka nemůže rezervovat místo a při načtení může poskočit. PNG, JPEG, GIF a WebP se čtou vždy."
   image_heic_hint: "   HEIC zobrazí jen Safari — nejdřív ho převeď: sips -s format jpeg SOUBOR --out SOUBOR.jpg (macOS), heif-convert SOUBOR SOUBOR.jpg (Linux)."
   frontmatter_date_invalid: "❌ Datum %{value} nejde přečíst — čekám YYYY-MM-DD [HH:MM]. Text je uložený v bufferu, po opravě otevři post znovu."

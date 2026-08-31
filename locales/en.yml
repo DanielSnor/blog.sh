@@ -238,7 +238,7 @@ cli:
   buffer_restored: "Restored -- the editor opens with that text."
   buffer_discarded: "Discarded."
   buffer_kept_for_now: "Left in %{path} -- writing anything in this session replaces it."
-  buffer_still_kept: "Nothing changed, so the recovered text stays in %{path} -- the next add/edit offers it again."
+  buffer_still_kept: "Nothing changed, so the text in %{path} is still there -- the next add/edit offers it again."
   image_dimensions_unknown: "⚠️  %{file}: the image size could not be read, so the page cannot reserve space for it and may jump while loading. PNG, JPEG, GIF and WebP are always read."
   image_heic_hint: "   HEIC displays only in Safari -- convert it first: sips -s format jpeg FILE --out FILE.jpg (macOS), heif-convert FILE FILE.jpg (Linux)."
   frontmatter_date_invalid: "❌ Cannot read the date %{value} -- expected YYYY-MM-DD [HH:MM]. Your text is kept in the buffer; reopen the post after fixing it."

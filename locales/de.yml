@@ -228,7 +228,7 @@ cli:
   buffer_restored: "Wiederhergestellt -- der Editor öffnet sich mit diesem Text."
   buffer_discarded: "Verworfen."
   buffer_kept_for_now: "Bleibt in %{path} -- sobald du in dieser Sitzung etwas schreibst, wird er ersetzt."
-  buffer_still_kept: "Nichts geändert, der wiederhergestellte Text bleibt also in %{path} -- das nächste add/edit bietet ihn erneut an."
+  buffer_still_kept: "Nichts geändert, der Text in %{path} liegt also weiterhin dort -- das nächste add/edit bietet ihn erneut an."
   image_dimensions_unknown: "⚠️  %{file}: Die Bildgröße ist nicht lesbar, die Seite kann keinen Platz dafür reservieren und springt beim Laden möglicherweise. PNG, JPEG, GIF und WebP werden immer gelesen."
   image_heic_hint: "   HEIC zeigt nur Safari an -- wandle es zuerst um: sips -s format jpeg DATEI --out DATEI.jpg (macOS), heif-convert DATEI DATEI.jpg (Linux)."
   frontmatter_date_invalid: "❌ Das Datum %{value} lässt sich nicht lesen -- erwartet YYYY-MM-DD [HH:MM]. Der Text bleibt im Puffer; öffne den Beitrag nach der Korrektur erneut."

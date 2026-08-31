@@ -1252,7 +1252,15 @@ def cmd_add
     # an EARLIER session -- recovered a moment ago, or left alone with [c].
     # Throwing that away would turn the action meant to protect it into the
     # one that loses it.
-    warn t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
+    # ⚠️ The FILE, not `restored`. restored is only non-nil after [r], so
+    # somebody who chose [c] -- keep it, I am writing something else --
+    # and then closed the editor untouched was told "nothing happened"
+    # and nothing about their text. The [c] line said it stays, but that
+    # scrolled past an editor session ago, and "the template was
+    # unchanged, no post" is exactly the sentence that reads like
+    # everything is gone. What the message claims is a fact on disk, so
+    # the honest test is whether the file is there.
+    warn t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
     warn t('cli.template_unchanged')
     warn ''
     return
@@ -3885,7 +3893,9 @@ def edit_post(slug, path: nil)
     # Same as cmd_add: an untouched editor wrote no buffer, so there is
     # nothing of this session's to clean up and possibly something of an
     # earlier one's to protect.
-    puts t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
+    # Same as cmd_add, and for the same reason: after [c] the buffer is
+    # still there and `restored` cannot see it.
+    puts t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if File.exist?(EDITOR_BUFFER_PATH)
     puts t('cli.no_changes')
     puts
     return
