@@ -382,6 +382,15 @@ uses, so there is no other signal to send and none is needed. The answer
 to a picture is `{"ok":true,"stored":"photo.jpg"}`; the answer to the
 markdown is the same JSON `add --json` gives.
 
+**The exit code answers a different question from the JSON.** Zero means
+an answer arrived -- read the object, which says `"ok"` and, when that is
+false, names the reason. Non-zero means there is no object to read: the
+machine is not set up, or the engine is not there. A refusal is an
+answer, so it leaves with zero. (iOS Shortcuts discards the output of a
+remote command that failed, so a refusal that exited non-zero reached a
+phone as a bare status with its reason gone -- exactly when the reason
+was the point.)
+
 A delivery that goes wrong halfway can simply be repeated. Pictures wait
 in `incoming/` until a text names them, so a refused post leaves them
 where they are and sending it again finds them -- nothing has to be

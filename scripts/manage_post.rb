@@ -1177,8 +1177,17 @@ rescue Refused => e
   # Outside quietly, so file descriptor 1 is the caller's again. stderr
   # already carries whatever the run said on its way here; this is the one
   # line a program reads.
+  #
+  # ⚠️ And it leaves with 0. The answer is the object, which says
+  # "ok":false and names the reason; the status answers the question the
+  # object cannot -- whether an answer arrived at all. A non-zero one here
+  # cost the caller the reason: iOS Shortcuts discards the output of a
+  # remote command that failed, so every refusal a phone could meet came
+  # back as a bare status and nothing else, exactly when the reason was
+  # the whole point. Without --json nothing changes: a person at a
+  # terminal gets prose on stderr and a non-zero status, as always.
   puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
-  exit 1
+  exit 0
 end
 
 # Runs a block with the terminal chatter put aside -- progress lines

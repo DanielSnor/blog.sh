@@ -26,13 +26,25 @@ cd "$(dirname "$0")/.." || { printf '{"ok":false,"error":"no_cd","message":"Cann
 INSTALL="${1:-$PWD}"
 MAX_MB="${BLOGSH_MAX_MB:-24}"
 
-fail() {  # code, message
+# ⚠️ A refusal leaves with 0. The answer is the OBJECT -- it says
+# "ok":false and names the reason -- so the status is free to answer what
+# the object cannot: whether an answer arrived at all. It was exit 1, and
+# that cost the caller the reason, because iOS Shortcuts discards the
+# output of a remote command that failed: every refusal a phone could
+# meet came back as a bare status with the message gone.
+fail() {  # an answer, so: 0
+  printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$2"
+  exit 0
+}
+
+# No answer to give: the machine is not set up, the engine is missing.
+unavailable() {
   printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$2"
   exit 1
 }
 
-[ -d "$INSTALL/incoming" ] || fail "no_incoming" "No incoming/ directory in $INSTALL."
-[ -x "$INSTALL/blog.sh" ] || fail "no_engine" "No executable blog.sh in $INSTALL."
+[ -d "$INSTALL/incoming" ] || unavailable "no_incoming" "No incoming/ directory in $INSTALL."
+[ -x "$INSTALL/blog.sh" ] || unavailable "no_engine" "No executable blog.sh in $INSTALL."
 
 # ⚠️ With a deadline. A caller that opens the connection and then says
 # nothing -- a client that never closes its end, a network that dropped
@@ -58,7 +70,7 @@ case "$NAME" in
   *[![:print:]]*)   fail "bad_name" "A name may not hold control characters." ;;
 esac
 
-WORK=$(mktemp -d) || fail "no_tmp" "Cannot create a temporary directory."
+WORK=$(mktemp -d) || unavailable "no_tmp" "Cannot create a temporary directory."
 # A bundle carries somebody's photographs; they have no business staying
 # in /tmp after a failure.
 trap 'rm -rf "$WORK"' EXIT
@@ -86,7 +98,7 @@ mv -f "$INSTALL/incoming/.incoming-$$" "$INSTALL/incoming/$NAME" 2>/dev/null \
 
 case "$NAME" in
   *.md|*.MD)
-    cd "$INSTALL" || fail "no_cd" "Cannot enter $INSTALL."
+    cd "$INSTALL" || unavailable "no_cd" "Cannot enter $INSTALL."
     # The markdown is the last thing sent, so its arrival is the signal.
     # --untrusted: it came off a network, so a picture may be named only
     # by a bare filename -- the engine refuses a path, in the method that
