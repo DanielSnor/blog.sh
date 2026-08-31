@@ -740,6 +740,78 @@ each line is there:
 `--json` prints the same figures unlocalized and unrounded, so the
 numbers can go into a post, a cron job or a graph.
 
+## Rebuilding only what changed
+
+A publish rebuilds the site, and until 1.6 that meant rebuilding all of
+it: every page rendered, and every file read back off disk to find out
+whether its bytes had moved. On an archive of a few thousand posts that is
+most of a minute, every time, for a change that touched a dozen files.
+
+Since 1.6 the build writes down what it produced -- in `.build_cache.json`
+in the installation directory -- and the next build leaves alone the pages
+whose inputs have not moved. Nothing you do changes: `./blog.sh publish`
+and `./blog.sh rebuild` work exactly as before, only quicker. The summary
+at the end says how many pages were left alone, so you can see it working.
+
+Measured on this project's own archive of 6,639 posts and 13,465 published
+files: a rebuild that changes nothing now costs 44% of what it did, and an
+ordinary publish about half. Backdating is the case it can do least about,
+and the measurement says so plainly -- a post dated into the early 2000s
+still costs four fifths of the old build. A post arriving in the middle of
+the archive shifts every listing page between the front page and where it
+lands, so those pages really did change and really do have to be built.
+Importing an archive, which is backdating several thousand times over, is
+a full build for the same reason.
+
+The ratio is what travels; the seconds behind it are one machine's. These
+are our own measurements, on our own archive, on one laptop -- where a
+rebuild that changed nothing went from 19.2 s to 8.4 s. Yours will differ
+with your archive, your disk, and whatever else the machine is doing at
+the time.
+
+The cache is an optimisation and never an authority. Anything it cannot
+vouch for is built the old way -- rendered, read back, compared. A page
+somebody deleted or damaged in `public.nosync/` by hand comes back on the
+next build, because the record is checked against what is actually on
+disk, and `public.nosync/` is still swept clean of anything the build does
+not produce on every build, cache or no cache. Editing a template, a
+stylesheet, a locale or `site.yml` throws the whole cache away, since any
+of those can change every page; so does changing `SITE_BASE_URL`, and so
+does a change of timezone -- including the one that happens without you
+touching anything, when a system update rewrites the rules of the zone you
+publish in.
+
+```bash
+./blog.sh rebuild --full        # build every page again, then deploy
+```
+
+Reach for `rebuild --full` when you want the site rendered from scratch --
+after restoring `public.nosync/` from a backup, say, or when you suspect
+what is on disk is not what the archive says it should be. It costs one
+slow build, and it still leaves a usable record behind for the build after
+it. (`ruby build/build_blog.rb --full` does the building half alone, if
+you want the site rebuilt without being deployed.)
+
+## A published picture is the archive's own file
+
+Until 1.6 every picture existed twice: once in `media.nosync/`, and once
+as a copy of itself under `public.nosync/`. On this project's own
+installation that was 1.8 GB counted twice, and every import doubled again.
+
+They are one file under two names now. Nothing about publishing changes,
+and neither does the archive's copy: deleting a picture from
+`public.nosync/` -- by hand, or by the sweep, or by a deploy with
+`--prune` -- drops that name and leaves the archive's. What DOES follow
+the link is the mode: making the published picture readable makes the
+original readable too, which is the direction that was wanted, because a
+picture the web server cannot read was the bug this makes impossible.
+
+It saves disk and it does not save backups. Measured against this
+project's own: 200 files under two names take 101 MB on the disk and 201
+MB in the backup, because the backup copies file by file and stores each
+name in full. Back up `media.nosync/` as you always did -- that is the
+archive's copy, and it is the one that matters.
+
 ## Deploying
 
 `./blog.sh rebuild` = build + deploy with `--prune` in one step; the
