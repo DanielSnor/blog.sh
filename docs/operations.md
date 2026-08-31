@@ -365,6 +365,40 @@ HEIC that was converted. `url` is empty rather than half an address when
 the site has no `base_url` yet, and the reason is in `warnings`. The
 exit code is 0 or 1, nothing else.
 
+### A post sent from the phone itself
+
+`add <file>` still wants the file to be on the server already. The last
+step is sending it there, and that is what `--bundle` is for:
+
+```bash
+base64 < post.zip | ./scripts/receive.sh
+```
+
+The bundle is a ZIP holding one `.md` file and the pictures its text
+refers to, by bare name. `receive.sh` is what a shortcut on a phone runs
+over SSH; it carries the stream and nothing else -- the unpacking and the
+checking happen in the engine, in `lib/bundle.rb`. The answer is the same
+JSON `add --json` gives, so a caller reads one set of keys.
+
+**Nothing new listens on the network.** It travels over the SSH the server
+already has, and the key it travels on wants a forced command:
+
+    restrict,command="/path/to/blog/scripts/receive.sh" ssh-ed25519 AAAA... phone
+
+Everything that arrives this way is **untrusted**, and the engine is told
+so. A picture may be named only by a bare filename -- a reference carrying
+a path is refused (`bad_reference`), because `![](/etc/passwd)` would
+otherwise read that file into the post and publish it. An entry in the ZIP
+that is not an ordinary file is refused (`bad_entry`): a symlink survives
+being flattened and would be followed. Two entries that end up with the
+same name are refused rather than one silently replacing the other, and
+the bundle is weighed for what it actually unpacks to, not for what its
+own directory claims. `BLOGSH_MAX_MB` (24) and `BLOGSH_MAX_UNPACKED_MB`
+(120) set the ceilings.
+
+It stops at a draft, like every other way in. The app that packs the
+bundle is a separate project.
+
 ## Pinning a post to the front page
 
 The `[c]` action in `./blog.sh props <slug>` pins a published post --

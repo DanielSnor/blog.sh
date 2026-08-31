@@ -44,6 +44,7 @@ require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
 require_relative '../lib/version'
 require_relative '../lib/incoming_path'
+require_relative '../lib/bundle'
 
 # A script that ASKS has to flush before it blocks. stdout is block
 # buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
@@ -65,7 +66,40 @@ end
 ROOT = File.expand_path('..', __dir__)
 CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
 MEDIA_DIR = File.join(ROOT, 'media.nosync')
-INCOMING_DIR = File.join(ROOT, 'incoming')
+# Where a bare filename is looked for -- normally <root>/incoming/, the
+# one directory a separate upload account can write to.
+#
+# ⚠️ Overridable, and exactly one caller does it. scripts/receive.sh
+# serves deliveries that arrive from a network, several of which can be in
+# flight at once, and incoming/ is FLAT and shared by every route into the
+# site: two bundles both carrying photo.jpg raced there, one post was
+# silently written with the other's picture, and both senders were told it
+# had worked. That was answered first with a lock, which turned out to be
+# a small consensus problem solved with mkdir -- every fix uncovered
+# another window. Giving each delivery a directory of its own removes the
+# thing being contended instead of arbitrating it.
+#
+# Confined to inside incoming/ on purpose. The value comes from the
+# environment, which is the operator's own, but an override that could
+# point anywhere would turn a bare filename into a way of reading any
+# directory -- and this constant is what `--untrusted` narrows a hostile
+# post down TO.
+INCOMING_DIR = begin
+  default = File.join(ROOT, 'incoming')
+  asked = ENV['BLOG_SH_INCOMING'].to_s
+  # realpath on both sides, not expand_path: /var and /private/var name
+  # the same directory on a Mac and expand_path resolves no symlink, so
+  # the comparison said "outside" about a directory that was plainly
+  # inside. The same trap resolve_image documents a hundred lines below.
+  real = lambda do |path|
+    File.realpath(path)
+  rescue SystemCallError
+    File.expand_path(path)
+  end
+  inside = !asked.empty? && File.directory?(asked) &&
+           real.call(asked).start_with?("#{real.call(default)}/")
+  inside ? real.call(asked) : default
+end
 TRASH_DIR = File.join(ROOT, 'trash')
 SITE_BASE_URL = ENV['SITE_BASE_URL'] || SiteConfig.get('site', 'base_url')
 # Optional (`get`, not `fetch`) so the wizard header degrades quietly
@@ -176,7 +210,7 @@ def abort_on_unknown_frontmatter(meta, interactive: true)
   # file there is nothing below, and the file is still on disk anyway --
   # so the promise was both empty and beside the point.
   key = interactive ? 'cli.unknown_frontmatter_key' : 'cli.unknown_frontmatter_key_file'
-  abort t(key, keys: unknown.join(', '), known: FRONTMATTER_KEYS.join(', '))
+  refuse('unknown_frontmatter_key', t(key, keys: unknown.join(', '), known: FRONTMATTER_KEYS.join(', ')))
 end
 
 # `unlisted` and `page` are NOT read with this: they decide whether a post
@@ -219,7 +253,7 @@ end
 def abort_on_double_frontmatter(body)
   return unless frontmatter_in_body?(body)
 
-  abort t('cli.double_frontmatter_error')
+  refuse('double_frontmatter', t('cli.double_frontmatter_error'))
 end
 
 # Pauses so a still-in-transit photo (e.g. being SFTP'd into incoming/ from
@@ -260,10 +294,10 @@ end
 # here), but the staged .heic was used up exactly like a directly-copied
 # photo -- in converted form -- so the same "empty incoming/ means nothing
 # pending" rule applies to it.
-def cleanup_incoming(media_files, extra_sources = [])
+def cleanup_incoming(media_files, extra_sources = [], incoming_dir = INCOMING_DIR)
   left = []
   incoming_root = begin
-    File.realpath(INCOMING_DIR)
+    File.realpath(incoming_dir)
   rescue SystemCallError
     # No incoming/ at all: nothing here came out of it, so there is
     # nothing to tidy and certainly nothing to delete.
@@ -910,7 +944,7 @@ end
 # own shape to drift.
 #
 # Returns the path written, or nil when there was nothing to write.
-def compose_post(raw, suggested, interactive:, also_consume: [])
+def compose_post(raw, suggested, interactive:, also_consume: [], confined: false, incoming_dir: INCOMING_DIR)
   meta, body = MarkdownParser.parse_frontmatter(raw)
   abort_on_double_frontmatter(body)
   abort_on_unknown_frontmatter(meta, interactive: interactive)
@@ -932,7 +966,14 @@ def compose_post(raw, suggested, interactive:, also_consume: [])
   tags = tags_from_frontmatter(meta['tags'])
   type, page = frontmatter_type_and_page(meta)
 
-  blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
+  blocks, media_files, missing = begin
+    MarkdownParser.parse_body(body, nil, incoming_dir: incoming_dir, confined: confined)
+  rescue MarkdownParser::ConfinedPath => e
+    # The whole post is refused, not the picture. Somebody who sent this
+    # asked for a file they are not entitled to, and writing the words
+    # around it would be answering half of what they asked.
+    refuse('bad_reference', t('cli.bad_reference', reference: e.reference))
+  end
   # With an argument this must not wait: wait_for_missing_images refuses
   # on EOF but BLOCKS on a tty, and a command that promises never to ask
   # cannot hang on one. The list it would have printed is printed by the
@@ -944,8 +985,8 @@ def compose_post(raw, suggested, interactive:, also_consume: [])
     # <incoming>/<name>, so spelling the directory out on each line and
     # then saying "upload them to <the same directory>" filled the screen
     # with one repeated string and buried the only part that differs.
-    abort t('cli.add_file_missing_images',
-            files: missing.map { |m| File.basename(m) }.join(', '), dir: INCOMING_DIR)
+    refuse('missing_images', t('cli.add_file_missing_images',
+                               files: missing.map { |m| File.basename(m) }.join(', '), dir: incoming_dir))
   end
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
@@ -1058,9 +1099,84 @@ def compose_post(raw, suggested, interactive:, also_consume: [])
   # "an empty incoming/ means nothing is pending" is only true if the thing
   # that made the post goes too -- otherwise every phone-written article
   # leaves its own source behind to look like unfinished business.
-  cleanup_incoming(media_files, heic_consumed + also_consume)
+  cleanup_incoming(media_files, heic_consumed + also_consume, incoming_dir)
   puts t('cli.wrote_draft', path: path) if interactive
   path
+end
+
+# A refusal a PROGRAM can read.
+#
+# `--json` is a contract with a caller that is not a person, and until now
+# it held only when the run SUCCEEDED: every refusal printed prose on
+# stderr and exited 1, so the caller learned that something was wrong and
+# nothing whatever about what. scripts/receive.sh had to invent a code of
+# its own for all of them alike (`add_failed`) and pass the prose through
+# as a message -- a second set of rules describing the first, which is the
+# shape this engine keeps trying not to grow.
+#
+# Raised rather than printed, because a refusal can happen deep inside
+# `quietly`, where file descriptor 1 is pointed at /dev/null or at the
+# capture file. Printing there would send the answer nowhere. The rescue
+# sits in add_from_file, outside the redirection, which is also the only
+# place that knows whether JSON was asked for.
+class Refused < StandardError
+  attr_reader :code
+
+  def initialize(code, message)
+    @code = code
+    super(message)
+  end
+end
+
+# Set by add_from_file alone, so the wizard and every other route keep the
+# prose-and-exit-1 they have always had.
+JSON_REFUSALS = { enabled: false }
+
+def refuse(code, message)
+  raise Refused.new(code, message) if JSON_REFUSALS[:enabled]
+
+  abort message
+end
+
+# `add --bundle`: a post that arrived from somewhere else.
+#
+# Reads the base64 of a ZIP on standard input, unpacks it into a staging
+# directory of its own inside incoming/, and then walks the same road
+# `add <file>` walks -- untrusted, so a picture may only be named by a
+# bare filename.
+#
+# The whole of the checking is in lib/bundle.rb rather than in the shell
+# script that receives the delivery, because the checks turn out to be
+# where the mistakes are, and they are mistakes about the LANGUAGE: a
+# `mkdir -p` that adopts an existing name, an awk that pads a record, a
+# ulimit that bounds each file instead of the total. In here the staging
+# directory cannot be pre-empted, an entry's type is asked of lstat, and
+# a refusal is the same Refused every other route raises -- so `--json`
+# answers with one vocabulary and the receiver has nothing left to invent.
+def add_from_bundle(json: false)
+  JSON_REFUSALS[:enabled] = json
+  post, dir = Bundle.unpack($stdin.read, INCOMING_DIR)
+  # The staging directory is inside incoming/, so IncomingPath and
+  # resolve_image both find a bare name in it without being told anything
+  # new -- and nothing outside it, because that is what confined means.
+  path, warnings = quietly(json) do
+    compose_post(File.read(File.join(dir, post), encoding: 'utf-8'),
+                 Time.parse(Time.now.strftime('%Y-%m-%d %H:%M')),
+                 interactive: false, also_consume: [File.join(dir, post)],
+                 confined: true, incoming_dir: dir)
+  end
+  refuse('empty', t('cli.add_file_empty', file: post)) if path.nil?
+
+  report_added(path, warnings, json: json)
+rescue Bundle::Rejected, Refused => e
+  # One clause for both, because an exception raised inside a rescue is
+  # not caught by its siblings -- routing Bundle::Rejected through
+  # refuse() would have raised Refused into nobody's hands, and the
+  # caller's answer was a Ruby backtrace.
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 1
+ensure
+  FileUtils.rm_rf(dir) if dir
 end
 
 # `add <file>`: the same post-making as the wizard, with the markdown
@@ -1077,9 +1193,10 @@ end
 # (`publish <slug> --yes`). A command that both accepted a file and
 # announced it to the world on the same keystroke is one typo away from an
 # unrecallable toot.
-def add_from_file(source, json: false)
+def add_from_file(source, json: false, confined: false)
+  JSON_REFUSALS[:enabled] = json
   file = IncomingPath.resolve(source, INCOMING_DIR)
-  abort t('cli.add_file_not_found', file: source) if file.nil?
+  refuse('not_found', t('cli.add_file_not_found', file: source)) if file.nil?
   # Said apart from "there is nothing there", because they send the
   # reader to different places: a directory, a link pointing nowhere or a
   # bare "." is a name that IS there and is not a file, and answering
@@ -1088,9 +1205,9 @@ def add_from_file(source, json: false)
   # exist? follows the link and so answers false for a broken one -- the
   # very case where the name is plainly in `ls`.
   if (File.exist?(file) || File.symlink?(file)) && !File.file?(file)
-    abort t('cli.add_file_not_a_file', file: file)
+    refuse('not_a_file', t('cli.add_file_not_a_file', file: file))
   end
-  abort t('cli.add_file_not_found', file: source) unless File.file?(file)
+  refuse('not_found', t('cli.add_file_not_found', file: source)) unless File.file?(file)
 
   raw = begin
     File.read(file, encoding: 'utf-8')
@@ -1098,13 +1215,13 @@ def add_from_file(source, json: false)
     # Permissions, most often: incoming/ is written by a separate upload
     # account, so a file arriving mode 600 under another uid is an
     # ordinary Tuesday there. It ended the command with an Errno backtrace.
-    abort t('cli.add_file_unreadable', file: file, reason: e.message)
+    refuse('unreadable', t('cli.add_file_unreadable', file: file, reason: e.message))
   end
   # A JPEG named .md, a Word document, anything half-transferred: caught
   # here, where the file can still be named, rather than as an encoding
   # error thrown from somewhere inside the markdown parser.
-  abort t('cli.add_file_not_text', file: file) unless raw.valid_encoding?
-  abort t('cli.add_file_empty', file: file) if raw.strip.empty?
+  refuse('not_text', t('cli.add_file_not_text', file: file)) unless raw.valid_encoding?
+  refuse('empty', t('cli.add_file_empty', file: file)) if raw.strip.empty?
 
   # created_at == date marks an auto-suggested date, the same contract the
   # wizard documents at length: with no `date:` line in the file, publish
@@ -1119,15 +1236,21 @@ def add_from_file(source, json: false)
   # here read like extra care and was really a second place for the rule
   # to drift.
   path, warnings = quietly(json, keep_stdout: true) do
-    compose_post(raw, suggested, interactive: false, also_consume: [file])
+    compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined)
   end
   # compose_post returns nil only for "there was nothing to write" (an
   # empty body under a frontmatter block); everything worse has aborted by
   # now. Exit 1 either way: nothing was written, and a caller that only
   # reads the status must not read that as success.
-  abort t('cli.add_file_empty', file: file) if path.nil?
+  refuse('empty', t('cli.add_file_empty', file: file)) if path.nil?
 
   report_added(path, warnings, json: json)
+rescue Refused => e
+  # Outside quietly, so file descriptor 1 is the caller's again. stderr
+  # already carries whatever the run said on its way here; this is the one
+  # line a program reads.
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 1
 end
 
 # Runs a block with the terminal chatter put aside -- progress lines
@@ -4828,7 +4951,7 @@ rescue ArgumentError
   # repair. With a file no buffer was ever written (writing one would
   # have discarded somebody else's), and the repair is to edit the file
   # that is still sitting there.
-  abort t(interactive ? 'cli.frontmatter_date_invalid' : 'cli.frontmatter_date_invalid_file', value: raw_value)
+  refuse('bad_date', t(interactive ? 'cli.frontmatter_date_invalid' : 'cli.frontmatter_date_invalid_file', value: raw_value))
 end
 
 def cmd_browse(filters = {})
@@ -5572,11 +5695,31 @@ else
     # the dispatcher is where this file turns a command line into
     # arguments, and the wizard calls cmd_add with none.
     json = !ARGV.delete('--json').nil?
+    # --untrusted says the markdown did not come from somebody with a
+    # shell. Everything an author at their own desk may do -- naming any
+    # path on the machine in a picture reference -- stops being allowed,
+    # because over a wire that is how a stranger reads /etc/passwd into a
+    # post. The receiver (scripts/receive.sh) passes it always.
+    untrusted = !ARGV.delete('--untrusted').nil?
+    # --bundle reads a base64 ZIP on standard input instead of naming a
+    # file: the route a phone takes. Taken off the line here, beside the
+    # others, because the unknown-option guard below refuses anything it
+    # does not recognise -- and it was right to refuse this.
+    bundled = !ARGV.delete('--bundle').nil?
     # Before the shift, so a mistyped flag is refused instead of being
     # taken for the name of a file to read (and reported as "no such
     # file: --yes", which sends the reader looking in the wrong place).
     unknown = ARGV.find { |arg| arg.start_with?('--') }
     abort t('cli.add_unknown_option', option: unknown) if unknown
+    if bundled
+      # Untrusted by construction: nobody with a shell needs this route,
+      # so it never asks whether to trust what arrives on it.
+      abort t('cli.add_bundle_needs_json') unless json
+
+      add_from_bundle(json: json)
+      exit 0
+    end
+
     file = ARGV.shift
     # One file, one post. A second name was shifted off into nothing: the
     # run wrote the first, said not a word about the rest, and exited 0 --
@@ -5584,7 +5727,7 @@ else
     abort t('cli.add_extra_arguments', extra: ARGV.join(', ')) unless ARGV.empty?
 
     if file
-      add_from_file(file, json: json)
+      add_from_file(file, json: json, confined: untrusted)
     else
       # There is nothing to print as JSON when the post is still being
       # typed, and an editor session that ends by printing a machine's

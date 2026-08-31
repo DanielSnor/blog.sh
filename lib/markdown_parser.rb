@@ -616,7 +616,41 @@ module MarkdownParser
     name
   end
 
-  def resolve_image(path, media_dir, counter, media_files = {}, incoming_dir: nil)
+  # A picture reference this parse is not allowed to follow.
+  #
+  # Raised rather than collected the way a missing file is, because the two
+  # are different questions. A missing file is a delay -- upload it and run
+  # again. A reference the caller may not follow is a refusal, and the post
+  # around it must not be written either: whoever sent that markdown asked
+  # for something they are not entitled to, and writing the rest of their
+  # post would be answering half of it.
+  class ConfinedPath < StandardError
+    attr_reader :reference
+
+    def initialize(reference)
+      @reference = reference
+      super("picture reference is not a bare filename: #{reference}")
+    end
+  end
+
+  # confined: the markdown did not come from somebody with a shell.
+  #
+  # `add <file>` and the editor both let a reference name any path on the
+  # machine, which is the whole convenience of writing at your own desk --
+  # ![](~/Pictures/x.jpg) works, and whoever typed it already had the file.
+  # The moment markdown arrives over a wire that convenience is a door:
+  # ![](/etc/passwd) pulled the file into the post's media and published
+  # it. So a caller that does not trust its input says so, and then only a
+  # BARE NAME is accepted -- resolvable in the post's own media or in
+  # incoming/, the two places a bundle can legitimately have put something.
+  #
+  # Enforced here, in the method that does the resolving, rather than by
+  # the caller inspecting the markdown first: a second reader of the same
+  # text is a second set of rules, and the gap between them is where the
+  # hole would be. One parser, one rule.
+  def resolve_image(path, media_dir, counter, media_files = {}, incoming_dir: nil, confined: false)
+    raise ConfinedPath, path if confined && File.basename(path) != path
+
     expanded = File.expand_path(path)
     # realpath, not just expand_path: /tmp vs /private/tmp (macOS) or any
     # symlinked path names the same file two ways, and classifying the
@@ -800,7 +834,7 @@ module MarkdownParser
     lines.map { |l| l.strip.empty? ? '' : l[common..] }.join("\n").strip
   end
 
-  def parse_prose_block(para, media_dir, media_files, counter, incoming_dir: nil)
+  def parse_prose_block(para, media_dir, media_files, counter, incoming_dir: nil, confined: false)
     if (m = VIDEO_RE.match(para))
       caption, target = m[1].strip, m[2].strip
       abort "Video needs a caption: !![caption](#{target})" if caption.empty?
@@ -810,7 +844,7 @@ module MarkdownParser
       # media file with a caption".
       if audio_path?(target)
         counter += 1
-        filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
+        filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir, confined: confined)
         media_files[src] = filename if src
         counter -= 1 unless src
         return [{ 'type' => 'audio', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
@@ -833,7 +867,7 @@ module MarkdownParser
       end
 
       counter += 1
-      filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
+      filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir, confined: confined)
       media_files[src] = filename if src
       counter -= 1 unless src # filename was recycled, the number wasn't consumed
       return [{ 'type' => 'video', 'media' => [{ 'url' => filename }], 'caption' => caption }, counter]
@@ -863,7 +897,7 @@ module MarkdownParser
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.
       warn "Note: #{File.basename(path)} looks like a video but is written as an image. For a video, use !![caption](#{path})." if video_path?(path)
-      filename, src = resolve_image(path, media_dir, counter, media_files, incoming_dir: incoming_dir)
+      filename, src = resolve_image(path, media_dir, counter, media_files, incoming_dir: incoming_dir, confined: confined)
       media_files[src] = filename if src
       counter -= 1 unless src
       return [{ 'type' => 'image', 'media' => [{ 'url' => filename }], 'alt_text' => (alt.empty? ? nil : alt), 'caption' => caption }.compact, counter]
@@ -875,7 +909,7 @@ module MarkdownParser
       # better than a link reading "download".
       counter += 1
       label, target = m[1].strip, m[2].strip
-      filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir)
+      filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir, confined: confined)
       media_files[src] = filename if src
       counter -= 1 unless src
       file = { 'url' => filename }
@@ -937,7 +971,7 @@ module MarkdownParser
     end
   end
 
-  def parse_body(body, media_dir, incoming_dir: nil)
+  def parse_body(body, media_dir, incoming_dir: nil, confined: false)
     blocks = []
     media_files = {}
     counter = 0
@@ -978,7 +1012,8 @@ module MarkdownParser
       # above, so a marker inside one is left exactly as it was typed.
       text = segment[:text].gsub(/^[ \t]*(\/\/--more--\/\/)[ \t]*$/, "\n\\1\n")
       text.split(/\n\s*\n/).map { |para| dedent(para) }.reject(&:empty?).each do |para|
-        block, counter = parse_prose_block(para, media_dir, media_files, counter, incoming_dir: incoming_dir)
+        block, counter = parse_prose_block(para, media_dir, media_files, counter,
+                                                 incoming_dir: incoming_dir, confined: confined)
         # nil is a paragraph that turned out to hold nothing a reader could
         # see -- see the heading branch. Every other path returns a block.
         blocks << block if block
