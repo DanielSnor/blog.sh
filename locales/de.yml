@@ -232,8 +232,10 @@ cli:
   image_dimensions_unknown: "⚠️  %{file}: Die Bildgröße ist nicht lesbar, die Seite kann keinen Platz dafür reservieren und springt beim Laden möglicherweise. PNG, JPEG, GIF und WebP werden immer gelesen."
   image_heic_hint: "   HEIC zeigt nur Safari an -- wandle es zuerst um: sips -s format jpeg DATEI --out DATEI.jpg (macOS), heif-convert DATEI DATEI.jpg (Linux)."
   frontmatter_date_invalid: "❌ Das Datum %{value} lässt sich nicht lesen -- erwartet YYYY-MM-DD [HH:MM]. Der Text bleibt im Puffer; öffne den Beitrag nach der Korrektur erneut."
+  frontmatter_date_invalid_file: "❌ Das Datum %{value} ist nicht lesbar -- erwartet wird YYYY-MM-DD [HH:MM]. Es wurde nichts geschrieben; korrigiere das Datum in der Datei und starte es erneut."
   post_changed_while_editing: "❌ '%{slug}' wurde während des Bearbeitens auf der Festplatte geändert (der Cron veröffentlicht geplante Beiträge selbst). Es wurde nichts gespeichert, also ging von dieser Änderung nichts verloren -- öffne den Beitrag erneut und wende deine Änderung auf die aktuelle Fassung an."
   unknown_frontmatter_key: "❌ Unbekannter Schlüssel im Kopf: %{keys}. Bekannt: %{known}. Ein Tippfehler würde beim Speichern still verworfen, also wurde nichts geschrieben -- dein Text bleibt erhalten, siehe unten."
+  unknown_frontmatter_key_file: "❌ Unbekannter Schlüssel im Kopf: %{keys}. Bekannt sind: %{known}. Ein Tippfehler würde beim Speichern still verworfen, also wurde nichts geschrieben -- korrigiere den Schlüssel in der Datei und starte es erneut."
   heic_refused: "❌ %{files}: HEIC zeigt nur Safari an -- andere Browser würden ein kaputtes Bild zeigen. Es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Wandle sie zuerst um (%{command}), oder setze media.convert_heic: true in config/site.yml und die Engine erledigt das selbst."
   heic_no_tool: "❌ %{files}: media.convert_heic ist an, aber kein Konverter wurde gefunden (versucht: sips, heif-convert, heif-dec, magick/convert, vips). Es wurde nichts gespeichert. Wandle von Hand um: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC umgewandelt via %{tool})."
@@ -299,6 +301,20 @@ cli:
   template_unchanged: "Vorlage unverändert (nicht gespeichert?), es wurde kein Beitrag angelegt."
   empty_content: "Leerer Inhalt, nichts geschrieben."
   wrote_draft: "Als Entwurf gespeichert: %{path}"
+  add_file_not_found: "Keine solche Datei: %{file}. Ein bloßer Name wird in incoming/ gesucht; alles mit einem Verzeichnis darin wird so genommen, wie es dasteht."
+  add_file_not_a_file: "Keine Datei: %{file}. Das ist ein Verzeichnis, ein ins Leere zeigender Link oder etwas anderes, woraus sich kein Beitrag lesen lässt."
+  add_file_unreadable: "Kann %{file} nicht lesen: %{reason}. Kam die Datei per Upload, gehört sie womöglich dem Upload-Konto und nicht diesem -- `chmod 644` hilft, oder die Aufnahme in dessen Gruppe."
+  add_extra_arguments: "Eine Datei nach der anderen. Das hier blieb übrig, und es ist nichts damit geschehen: %{extra}"
+  add_file_not_text: "Nicht als Text lesbar: %{file}. `add` nimmt eine Markdown-Datei — diese ist kein gültiges UTF-8, also vermutlich ein Foto, ein Office-Dokument oder eine unfertige Übertragung."
+  add_file_empty: "Nichts zu schreiben: %{file} hat unter dem Frontmatter keinen Inhalt."
+  add_file_missing_images: "Diese Dateien sind noch nicht da: %{files}. Lade sie zuerst nach %{dir} — es wurde nichts geschrieben. (Das interaktive `add` wartet darauf, hier ist aber niemand zum Warten.)"
+  add_json_needs_file: "--json braucht eine Datei zum Lesen: `add <Datei> --json`. Ohne sie öffnet `add` einen Editor, und bis der geschlossen ist, gibt es nichts zu melden."
+  add_unknown_option: "Unbekannte Option: %{option}. add kennt eine Datei und --json."
+  publish_unknown_option: "Unbekannte Option: %{option}. publish kennt einen Slug, --yes und --no-announce."
+  publish_yes_needs_slug: "--yes muss den Beitrag benennen: `publish <slug> --yes`. Ohne Slug bietet publish die Entwürfe zur Auswahl an — und ausgewählt wird vor der Vorschau, nicht einen Tastendruck von einer Ankündigung entfernt, die sich nicht zurückholen lässt."
+  no_announce_not_scheduled: "Achtung: --no-announce erreicht die geplante Veröffentlichung nicht. Der Cron richtet sich nach dem Beitrag selbst und kündigt ihn zu seinem Termin an. Soll er still bleiben, veröffentliche ihn von Hand mit --no-announce oder markiere ihn als unlisted."
+  publish_yes_ambiguous: "Den Slug %{slug} gibt es in mehr als einem Jahr (%{years}), und --yes hat niemanden, den es fragen könnte. Veröffentliche ihn über `props %{slug}`, wo sie angezeigt und ausgewählt werden können."
+  toot_skipped_old: "Keine Ankündigung: das Datum (%{date}) liegt außerhalb des Frischefensters, und diese Frage kann hier niemand beantworten. Der Beitrag ist veröffentlicht; mit `toot` lässt er sich von Hand ankündigen."
   incoming_not_cleaned: "In incoming/ geblieben: %{files} — die Kopie steckt im Beitrag, das Original ließ sich nicht löschen (keine Schreibrechte auf incoming/). Räume es von Hand weg, damit ein leeres incoming/ weiterhin heißt: nichts steht aus."
   generating_preview: "Erzeuge Vorschau"
   draft_saved_preview_pending: "Der Entwurf ist gespeichert. Die Vorschau erscheint nach einem erfolgreichen Deploy -- dann ./blog.sh edit %{slug} ausführen"
@@ -499,10 +515,14 @@ cli:
   header_mode: "Modus: %{mode}"
   usage: |
     Verwendung:
-      ./blog.sh add                  legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht
+      ./blog.sh add [<Datei>]        legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht;
+                                     mit einer Markdown-Datei fragt es gar nichts und schreibt nur den Entwurf --
+                                     der Weg für Handy, Skript oder Kurzbefehl (--json meldet das Ergebnis als Daten)
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh props [<slug>]       zeigt Status und Aktionen eines Beitrags (veröffentlichen, zurückziehen, Slug umbenennen, löschen...)
-      ./blog.sh publish [<slug>]     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit)
+      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+                                     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit);
+                                     --yes veröffentlicht sofort ohne Rückfrage, --no-announce hält ihn von Mastodon und Bluesky fern
       ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
       ./blog.sh queue                die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)

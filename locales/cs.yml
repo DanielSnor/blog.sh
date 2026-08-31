@@ -227,8 +227,10 @@ cli:
   image_dimensions_unknown: "⚠️  %{file}: rozměry obrázku nejde přečíst, takže mu stránka nemůže rezervovat místo a při načtení může poskočit. PNG, JPEG, GIF a WebP se čtou vždy."
   image_heic_hint: "   HEIC zobrazí jen Safari — nejdřív ho převeď: sips -s format jpeg SOUBOR --out SOUBOR.jpg (macOS), heif-convert SOUBOR SOUBOR.jpg (Linux)."
   frontmatter_date_invalid: "❌ Datum %{value} nejde přečíst — čekám YYYY-MM-DD [HH:MM]. Text je uložený v bufferu, po opravě otevři post znovu."
+  frontmatter_date_invalid_file: "❌ Datum %{value} nejde přečíst — čekám YYYY-MM-DD [HH:MM]. Nic se nezapsalo, oprav datum v souboru a spusť to znovu."
   post_changed_while_editing: "❌ '%{slug}' se během editace změnil na disku (cron publikuje naplánované posty sám). Nic se neuložilo, takže se z té změny nic neztratilo — otevři post znovu a udělej úpravu nad aktuální verzí."
   unknown_frontmatter_key: "❌ Neznámý klíč v hlavičce: %{keys}. Znám: %{known}. Překlep by se při uložení tiše zahodil, takže se nic nezapsalo — text ti zůstal, viz níže."
+  unknown_frontmatter_key_file: "❌ Neznámý klíč v hlavičce: %{keys}. Znám: %{known}. Překlep by se při uložení tiše zahodil, takže se nic nezapsalo — oprav klíč v souboru a spusť to znovu."
   heic_refused: "❌ %{files}: HEIC zobrazí jen Safari — ostatní prohlížeče by ukázaly rozbitý obrázek. Nic se neuložilo a soubor zůstává, kde je. Nejdřív ho převeď (%{command}), nebo zapni media.convert_heic: true v config/site.yml a engine to udělá sám."
   heic_no_tool: "❌ %{files}: media.convert_heic je zapnuté, ale žádný převodník se nenašel (zkoušeno sips, heif-convert, heif-dec, magick/convert, vips). Nic se neuložilo. Převeď ručně: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC převeden přes %{tool})."
@@ -287,6 +289,20 @@ cli:
   template_unchanged: "Šablona zůstala beze změny (neuloženo?), post nevznikl."
   empty_content: "Prázdný obsah, nic se nezapsalo."
   wrote_draft: "Zapsáno jako draft: %{path}"
+  add_file_not_found: "Takový soubor není: %{file}. Samotné jméno se hledá v incoming/, cesta s adresářem se bere tak, jak je."
+  add_file_not_a_file: "Tohle není soubor: %{file}. Je to adresář, odkaz do prázdna, nebo něco jiného, z čeho post přečíst nejde."
+  add_file_unreadable: "Nejde přečíst %{file}: %{reason}. Pokud přišel nahráním, může patřit uploadovacímu účtu a ne tomuhle — pomůže `chmod 644`, nebo se přidat do jeho skupiny."
+  add_extra_arguments: "Jeden soubor po druhém. Tohle zbylo a nic se s tím nestalo: %{extra}"
+  add_file_not_text: "Nejde přečíst jako text: %{file}. `add` bere soubor s markdownem — tenhle není platné UTF-8, takže je to nejspíš fotka, dokument z kanceláře, nebo nedokončený přenos."
+  add_file_empty: "Není co zapsat: %{file} nemá pod hlavičkou žádný obsah."
+  add_file_missing_images: "Tyhle soubory tu ještě nejsou: %{files}. Nahraj je nejdřív do %{dir} — nic se nezapsalo. (Interaktivní `add` na ně počká, tady ale není kdo by čekal.)"
+  add_json_needs_file: "--json potřebuje soubor ke čtení: `add <soubor> --json`. Bez něj `add` otevře editor a až do jeho zavření není co hlásit."
+  add_unknown_option: "Neznámý přepínač: %{option}. add bere soubor a --json, nic jiného."
+  publish_unknown_option: "Neznámý přepínač: %{option}. publish bere slug, --yes a --no-announce, nic jiného."
+  publish_yes_needs_slug: "--yes musí pojmenovat post: `publish <slug> --yes`. Bez slugu nabídne publish drafty na výběr — a vybírat se má nad náhledem, ne jedním klávesovým úhozem od oznámení, které nejde vzít zpět."
+  no_announce_not_scheduled: "Pozor: --no-announce se do naplánované publikace nepřenese. Cron se řídí samotným postem, takže ho v jeho čase oznámí. Když má zůstat potichu, publikuj ho ručně s --no-announce, nebo ho označ jako unlisted."
+  publish_yes_ambiguous: "Slug %{slug} je ve víc než jednom roce (%{years}) a --yes se nemá koho zeptat, který to má být. Publikuj ho přes `props %{slug}`, kde se ukážou a dají vybrat."
+  toot_skipped_old: "Bez oznámení: datum (%{date}) je mimo okno čerstvosti a tuhle otázku tu nemá kdo zodpovědět. Post je publikovaný, oznámit se dá ručně přes `toot`."
   incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je v postu, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně, ať dál platí, že prázdné incoming = nic nečeká."
   generating_preview: "Generuji náhled"
   draft_saved_preview_pending: "Draft je uložený. Náhled se ukáže po úspěšném nasazení — pak spusť ./blog.sh edit %{slug}"
@@ -487,10 +503,14 @@ cli:
   header_mode: "Režim: %{mode}"
   usage: |
     usage:
-      ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
+      ./blog.sh add [<soubor>]       založí draft, ukáže náhled a zeptá se, co dál;
+                                     se souborem s markdownem se nezeptá na nic a jen zapíše draft,
+                                     což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
       ./blog.sh props [<slug>]       ukáže stav postu a jeho akce (publikovat, stáhnout z webu, přejmenovat slug, smazat…)
-      ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
+      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+                                     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty);
+                                     --yes publikuje rovnou bez ptaní, --no-announce nechá post mimo Mastodon a Bluesky
       ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
       ./blog.sh queue                fronta naplánovaných postů — pořadí, publikace hned, vyřazení zpět do draftů
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)

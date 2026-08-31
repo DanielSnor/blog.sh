@@ -13,6 +13,7 @@ require 'set'
 require 'securerandom'
 require 'shellwords'
 require 'stringio'
+require 'tempfile'
 require_relative '../lib/post_writer'
 require_relative '../lib/post_versions'
 require_relative '../lib/atomic_write'
@@ -42,6 +43,7 @@ require_relative '../lib/qr_code'
 require_relative '../lib/preview_server'
 require_relative '../lib/i18n'
 require_relative '../lib/version'
+require_relative '../lib/incoming_path'
 
 SiteConfig.use_site_timezone!
 
@@ -138,11 +140,16 @@ SITE_HERO = SiteConfig.get('layout', 'hero', default: false)
 # do nothing at all and never say so. Every key the author typed is checked
 # against the list above, and an unknown one stops the save while the text
 # is still recoverable (the editor buffer holds it).
-def abort_on_unknown_frontmatter(meta)
+def abort_on_unknown_frontmatter(meta, interactive: true)
   unknown = meta.keys.reject { |k| FRONTMATTER_KEYS.include?(k.to_s) }
   return if unknown.empty?
 
-  abort t('cli.unknown_frontmatter_key', keys: unknown.join(', '), known: FRONTMATTER_KEYS.join(', '))
+  # Two endings for one refusal. The editor route can promise "your text
+  # is kept, see below" because it prints the text underneath; with a
+  # file there is nothing below, and the file is still on disk anyway --
+  # so the promise was both empty and beside the point.
+  key = interactive ? 'cli.unknown_frontmatter_key' : 'cli.unknown_frontmatter_key_file'
+  abort t(key, keys: unknown.join(', '), known: FRONTMATTER_KEYS.join(', '))
 end
 
 # `unlisted` and `page` are NOT read with this: they decide whether a post
@@ -228,12 +235,32 @@ end
 # pending" rule applies to it.
 def cleanup_incoming(media_files, extra_sources = [])
   left = []
+  incoming_root = begin
+    File.realpath(INCOMING_DIR)
+  rescue SystemCallError
+    # No incoming/ at all: nothing here came out of it, so there is
+    # nothing to tidy and certainly nothing to delete.
+    return
+  end
   (media_files.keys + extra_sources).each do |src|
     next unless src
 
     expanded = File.expand_path(src)
-    next unless expanded.start_with?("#{File.expand_path(INCOMING_DIR)}/")
     next unless File.exist?(expanded)
+    # ⚠️ Where the file REALLY is, not what its path spells. A string
+    # prefix does not follow symlinks, so a link inside incoming/ --
+    # `ln -s ~/Pictures incoming/fotky`, which is exactly how somebody
+    # stops copying their photos twice -- made every original behind it
+    # pass this guard. The archive then deleted the author's own
+    # pictures, outside incoming/, having only ever been asked to tidy up
+    # after itself. The directory is resolved rather than the file: a
+    # photo that is itself a symlink is still the author's to keep.
+    parent = begin
+      File.realpath(File.dirname(expanded))
+    rescue SystemCallError
+      next
+    end
+    next unless parent == incoming_root || parent.start_with?("#{incoming_root}/")
 
     begin
       File.delete(expanded)
@@ -846,62 +873,53 @@ end
 
 # --- commands ------------------------------------------------------------
 
-def cmd_add
-  # created_at == date is what marks a draft's date as auto-suggested
-  # (see publish_draft, and unpublish, which restores that equality on
-  # purpose). With no date: line typed, created_at is therefore written
-  # from the very same Time object as date below. When the author *does*
-  # type one, created_at keeps this pre-editor creation timestamp, the
-  # two fields differ, and publish_draft leaves the typed date alone.
-  # (Writing both from one object matters: this value is truncated to
-  # minutes and taken before the editor opens, so comparing it against a
-  # post-editor, seconds-precise date could never come out equal -- for a
-  # long time every draft published as if hand-dated because of that.)
-  suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
-  # Offered before the template is built, because restoring means opening
-  # the editor on the recovered text INSTEAD of the template.
-  restored = offer_editor_buffer('add')
-  template = restored || build_frontmatter(title: '', tags: '', type: '') + "#{t('cli.template_body_placeholder')}\n"
-  raw = edit_in_editor(template, FRONTMATTER_HINT, { 'kind' => 'add' })
-
-  # Editor closed without saving (or saved untouched) leaves the template
-  # byte-identical -- treat that as "nothing happened": no post, no toot,
-  # no rebuild question. (This is how an accidental empty-template post once
-  # made it all the way to a published Mastodon toot.)
-  #
-  # After a restore the comparison is against the RESTORED text, which is
-  # the honest no-op test for that case: someone who recovers a draft and
-  # closes the editor untouched has changed nothing this session either.
-  if raw == template
-    # Nothing is discarded here. An untouched editor wrote no buffer (see
-    # edit_in_editor), so the only thing that could be deleted is text from
-    # an EARLIER session -- recovered a moment ago, or left alone with [c].
-    # Throwing that away would turn the action meant to protect it into the
-    # one that loses it.
-    warn t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
-    warn t('cli.template_unchanged')
-    warn ''
-    return
-  end
-
+# The middle of `add`: a finished piece of markdown in, a post on disk out.
+#
+# Shared by the wizard and by `add <file>`, because the two differ only at
+# their ENDS -- the wizard opens an editor before this and asks what to do
+# after it; the argument form reads a file and prints what it made. Between
+# those, twenty-one steps that are the same work, and a second copy of them
+# is a second place for the slug rules, the collision loop and the post's
+# own shape to drift.
+#
+# Returns the path written, or nil when there was nothing to write.
+def compose_post(raw, suggested, interactive:, also_consume: [])
   meta, body = MarkdownParser.parse_frontmatter(raw)
   abort_on_double_frontmatter(body)
-  abort_on_unknown_frontmatter(meta)
+  abort_on_unknown_frontmatter(meta, interactive: interactive)
 
   if body.strip.empty?
-    discard_editor_buffer
-    warn t('cli.empty_content')
-    warn ''
-    return
+    discard_editor_buffer if interactive
+    # Said once. With a file the caller gets the same refusal from
+    # add_from_file, which can name the file the empty body was in --
+    # this one only knows that an editor was closed on nothing.
+    if interactive
+      warn t('cli.empty_content')
+      warn ''
+    end
+    return nil
   end
 
-  date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'])
+  date = meta['date'].to_s.empty? ? Time.now : parse_frontmatter_date!(meta['date'], interactive: interactive)
   title = meta['title'].to_s.empty? ? nil : meta['title']
   tags = tags_from_frontmatter(meta['tags'])
   type, page = frontmatter_type_and_page(meta)
 
   blocks, media_files, missing = MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR)
-  wait_for_missing_images(missing)
+  # With an argument this must not wait: wait_for_missing_images refuses
+  # on EOF but BLOCKS on a tty, and a command that promises never to ask
+  # cannot hang on one. The list it would have printed is printed by the
+  # refusal instead, and nothing is written.
+  if interactive
+    wait_for_missing_images(missing)
+  elsif missing.any?
+    # Names, not the full paths. Every one of them expands to
+    # <incoming>/<name>, so spelling the directory out on each line and
+    # then saying "upload them to <the same directory>" filled the screen
+    # with one repeated string and buried the only part that differs.
+    abort t('cli.add_file_missing_images',
+            files: missing.map { |m| File.basename(m) }.join(', '), dir: INCOMING_DIR)
+  end
   heic_consumed = convert_heic_attachments(blocks, media_files)
   check_attachment_sizes(media_files)
   check_video_playback(media_files)
@@ -1002,9 +1020,246 @@ def cmd_add
   end
 
   path = PostWriter.write(post, media_files: media_files)
-  discard_editor_buffer
-  cleanup_incoming(media_files, heic_consumed)
-  puts t('cli.wrote_draft', path: path)
+  # ⚠️ Only when the editor put it there. With a file argument the buffer
+  # belongs to somebody ELSE's unfinished article in another session, and
+  # discarding it here would lose their text silently -- the interactive
+  # path is safe only because the editor has just overwritten the buffer
+  # with this very post.
+  discard_editor_buffer if interactive
+  # also_consume: the markdown file itself, when `add` was given one out of
+  # incoming/. It was used up by this post exactly like a staged photo, and
+  # "an empty incoming/ means nothing is pending" is only true if the thing
+  # that made the post goes too -- otherwise every phone-written article
+  # leaves its own source behind to look like unfinished business.
+  cleanup_incoming(media_files, heic_consumed + also_consume)
+  puts t('cli.wrote_draft', path: path) if interactive
+  path
+end
+
+# `add <file>`: the same post-making as the wizard, with the markdown
+# handed over instead of typed into an editor.
+#
+# The point is a route that never asks -- something a phone shortcut, a
+# cron job or a Claude artifact can call and know the answer from the exit
+# code alone. So every question the wizard asks is either answered from
+# the file or refused outright; none of them is allowed to sit and wait
+# for a keypress that will never come.
+#
+# Deliberately NOT a publish: the file makes a draft, exactly as typing it
+# would, and putting it on the site stays a second, separate decision
+# (`publish <slug> --yes`). A command that both accepted a file and
+# announced it to the world on the same keystroke is one typo away from an
+# unrecallable toot.
+def add_from_file(source, json: false)
+  file = IncomingPath.resolve(source, INCOMING_DIR)
+  abort t('cli.add_file_not_found', file: source) if file.nil?
+  # Said apart from "there is nothing there", because they send the
+  # reader to different places: a directory, a link pointing nowhere or a
+  # bare "." is a name that IS there and is not a file, and answering
+  # that with "no such file" makes a person go looking for a typo in a
+  # name that was right. File.symlink? as well as File.exist?, because
+  # exist? follows the link and so answers false for a broken one -- the
+  # very case where the name is plainly in `ls`.
+  if (File.exist?(file) || File.symlink?(file)) && !File.file?(file)
+    abort t('cli.add_file_not_a_file', file: file)
+  end
+  abort t('cli.add_file_not_found', file: source) unless File.file?(file)
+
+  raw = begin
+    File.read(file, encoding: 'utf-8')
+  rescue SystemCallError => e
+    # Permissions, most often: incoming/ is written by a separate upload
+    # account, so a file arriving mode 600 under another uid is an
+    # ordinary Tuesday there. It ended the command with an Errno backtrace.
+    abort t('cli.add_file_unreadable', file: file, reason: e.message)
+  end
+  # A JPEG named .md, a Word document, anything half-transferred: caught
+  # here, where the file can still be named, rather than as an encoding
+  # error thrown from somewhere inside the markdown parser.
+  abort t('cli.add_file_not_text', file: file) unless raw.valid_encoding?
+  abort t('cli.add_file_empty', file: file) if raw.strip.empty?
+
+  # created_at == date marks an auto-suggested date, the same contract the
+  # wizard documents at length: with no `date:` line in the file, publish
+  # is free to stamp the post with the moment it goes out rather than the
+  # moment it was written. A file that names a date keeps it.
+  suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
+
+  # Handed over whole. Whether it is actually deleted is cleanup_incoming's
+  # decision, and only its: a file given by full path is the author's own
+  # -- on a Mac quite possibly the only copy -- and that method already
+  # refuses to touch anything outside incoming/. A second copy of the test
+  # here read like extra care and was really a second place for the rule
+  # to drift.
+  path, warnings = quietly(json, keep_stdout: true) do
+    compose_post(raw, suggested, interactive: false, also_consume: [file])
+  end
+  # compose_post returns nil only for "there was nothing to write" (an
+  # empty body under a frontmatter block); everything worse has aborted by
+  # now. Exit 1 either way: nothing was written, and a caller that only
+  # reads the status must not read that as success.
+  abort t('cli.add_file_empty', file: file) if path.nil?
+
+  report_added(path, warnings, json: json)
+end
+
+# Runs a block with the terminal chatter put aside -- progress lines
+# dropped, warnings collected and returned -- so `--json` can print a
+# machine's answer and nothing else. Without json: it does nothing at all.
+#
+# An abort inside the block is the exception (literally): its message is
+# the only thing anyone will ever see about the failure, so it is written
+# back out to the real stderr on the way through rather than dying inside
+# the capture.
+# keep_stdout: whether what the block prints on stdout is a MESSAGE or
+# just progress. Writing the post it is a message every time -- six of
+# them exist (an attachment over the size limit, a video whose codec or
+# container some browsers refuse, a HEIC that was converted), all of them
+# things the author needs to hear, all of them written with `puts` and
+# therefore thrown away when only stderr was kept: --json answered
+# `warnings: []` to a run that had just said three things out loud.
+# Building and deploying it is narration, and folding "Postaveno do…"
+# into a warnings list would make the field useless by filling it.
+def quietly(json, keep_stdout: false)
+  return [yield, []] unless json
+
+  # reopen, not `$stdout = StringIO.new`: the build and the deploy are
+  # separate PROCESSES, and a child writes to file descriptor 1, which
+  # knows nothing about a Ruby global. Swapping the object left every
+  # progress line of the build in the middle of the JSON, so the answer
+  # this flag exists to produce did not parse.
+  #
+  # Both streams land in one file, in the order they were said -- which
+  # is the point of the sync below. $stderr is unbuffered and $stdout is
+  # not, so without it a `warn` overtook a `puts` written before it and
+  # the warnings list read back out of order: the note about a converted
+  # photo turned up after the complaint that followed it.
+  #
+  # Nothing is dropped either way (reopening flushes what was buffered,
+  # and that happens before the file is read below) -- the defect was
+  # sequence, not loss.
+  captured = Tempfile.new(['blogsh-warn', '.txt'])
+  text = ''
+  saved_out = $stdout.dup
+  saved_err = $stderr.dup
+  begin
+    $stdout.reopen(keep_stdout ? captured.path : File::NULL, 'a')
+    $stdout.sync = true
+    $stderr.reopen(captured.path, 'a')
+    result = yield
+  ensure
+    $stdout.reopen(saved_out)
+    $stderr.reopen(saved_err)
+    saved_out.close
+    saved_err.close
+    # Rescued because this runs in an ensure: a temp file that has gone
+    # away (a /tmp sweeper, a full disk) would otherwise replace whatever
+    # really happened -- including the abort being carried out through
+    # here -- with a NameError on the last line of this method.
+    text = begin
+      File.read(captured.path, encoding: 'utf-8')
+    rescue SystemCallError
+      ''
+    end
+    captured.close!
+    # An abort inside the block wrote its message in there, and that
+    # message is the only thing anyone will ever learn about the failure.
+    # Put it back where a person is looking rather than letting it die
+    # inside the capture.
+    $stderr.write(text) if $!
+  end
+  [result, text.scrub('').split("\n").map(&:strip).reject(&:empty?)]
+end
+
+# What `add <file>` says when it worked.
+#
+# The JSON shape is a promise to whatever called this, so it is written
+# once, here, with every key always present -- a consumer that has to test
+# for a missing key is a consumer that will one day guess wrong. `deploy`
+# distinguishes a site that is already carrying the draft from one that
+# owes an upload (Publishing leaves a .deploy-pending marker and the next
+# scheduled run finishes it), because that is the difference between "open
+# this URL now" and "open it shortly".
+def report_added(path, warnings, json:)
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  # Said out loud rather than swallowed: with no base_url there is no
+  # address to give, so `url` below would be a bare /draft/… fragment
+  # under a key that promises a URL. The draft dialog has always said
+  # this; this route said nothing and handed the fragment over.
+  no_base = SITE_BASE_URL.to_s.empty?
+  warnings += [t('cli.base_url_missing_preview')] if no_base
+  deployed, rebuild_warnings = quietly(json) { rebuild_and_deploy(t('cli.generating_preview')) }
+  warnings += rebuild_warnings
+
+  unless json
+    puts t('cli.wrote_draft', path: path)
+    # ⚠️ Only where there is a page at that address. The wizard prints
+    # this from inside the draft dialog, which it reaches only after a
+    # build that worked; printed unconditionally here it sent the author
+    # to a preview the failed build never wrote, and the run still read
+    # as if everything had gone well.
+    if deployed && !no_base
+      puts Tui.paint(t('cli.preview_label', url: draft_url(post)), :cyan)
+    else
+      warn t('cli.draft_saved_preview_pending', slug: post['slug'])
+    end
+    puts
+    return
+  end
+
+  puts JSON.pretty_generate(
+    'slug' => post['slug'],
+    'path' => path,
+    'state' => post['state'],
+    # An address only where there is one. A key called url whose value is
+    # "/draft/ab12/x/" is worse than an empty one: a caller cannot tell a
+    # deliberately relative answer from a hostless mistake.
+    'url' => no_base ? '' : draft_url(post),
+    'deploy' => deployed ? 'done' : 'pending',
+    'warnings' => warnings
+  )
+end
+
+def cmd_add
+  # created_at == date is what marks a draft's date as auto-suggested
+  # (see publish_draft, and unpublish, which restores that equality on
+  # purpose). With no date: line typed, created_at is therefore written
+  # from the very same Time object as date below. When the author *does*
+  # type one, created_at keeps this pre-editor creation timestamp, the
+  # two fields differ, and publish_draft leaves the typed date alone.
+  # (Writing both from one object matters: this value is truncated to
+  # minutes and taken before the editor opens, so comparing it against a
+  # post-editor, seconds-precise date could never come out equal -- for a
+  # long time every draft published as if hand-dated because of that.)
+  suggested = Time.parse(Time.now.strftime('%Y-%m-%d %H:%M'))
+  # Offered before the template is built, because restoring means opening
+  # the editor on the recovered text INSTEAD of the template.
+  restored = offer_editor_buffer('add')
+  template = restored || build_frontmatter(title: '', tags: '', type: '') + "#{t('cli.template_body_placeholder')}\n"
+  raw = edit_in_editor(template, FRONTMATTER_HINT, { 'kind' => 'add' })
+
+  # Editor closed without saving (or saved untouched) leaves the template
+  # byte-identical -- treat that as "nothing happened": no post, no toot,
+  # no rebuild question. (This is how an accidental empty-template post once
+  # made it all the way to a published Mastodon toot.)
+  #
+  # After a restore the comparison is against the RESTORED text, which is
+  # the honest no-op test for that case: someone who recovers a draft and
+  # closes the editor untouched has changed nothing this session either.
+  if raw == template
+    # Nothing is discarded here. An untouched editor wrote no buffer (see
+    # edit_in_editor), so the only thing that could be deleted is text from
+    # an EARLIER session -- recovered a moment ago, or left alone with [c].
+    # Throwing that away would turn the action meant to protect it into the
+    # one that loses it.
+    warn t('cli.buffer_still_kept', path: EDITOR_BUFFER_PATH) if restored
+    warn t('cli.template_unchanged')
+    warn ''
+    return
+  end
+
+  path = compose_post(raw, suggested, interactive: true)
+  return if path.nil?
 
   final_slug = File.basename(path, '.json')
   unless rebuild_and_deploy(t('cli.generating_preview'))
@@ -1019,7 +1274,12 @@ end
 # After every draft change, it builds and deploys without asking -- the
 # preview has to be on the live site, or it couldn't be opened from an iPad,
 # which is the whole point.
-def draft_decision_loop(slug, path: nil)
+# announce: false travels with the [p] choice, so `publish --no-announce`
+# means the same thing whether the author looked at the preview first or
+# not. Passed down rather than checked again inside publish_draft: the
+# dialog is reachable from add, edit, unpublish and props as well, and
+# none of those has been told to keep quiet.
+def draft_decision_loop(slug, path: nil, announce: true)
   known_path = path
   if SITE_BASE_URL.to_s.empty?
     warn t('cli.base_url_missing_preview')
@@ -1069,10 +1329,16 @@ def draft_decision_loop(slug, path: nil)
     # slug here meant the screen could describe one post while the
     # keystroke acted on another -- two drafts sharing a slug in different
     # years is ordinary, and the dialog is where the author decides.
-    when 'p' then return publish_draft(slug, path: path)
+    when 'p' then return publish_draft(slug, path: path, announce: announce)
     when 'e' then edit_post(slug, path: path)
     when 's'
       puts
+      # Scheduling hands the post to the cron, and the cron has never
+      # heard of this run's flags: it decides silence from the post
+      # itself (unlisted, already announced, backdated). So --no-announce
+      # cannot travel with it, and saying nothing here would let the
+      # author walk away believing it had.
+      warn t('cli.no_announce_not_scheduled') unless announce
       # == true: :busy already said why nothing happened, and the dialog
       # coming back around is the retry.
       return if prompt_and_schedule(path, post, raw: raw) == true
@@ -1278,7 +1544,7 @@ def prompt_and_schedule(path, post, raw: nil)
   true
 end
 
-def announce_on_publish(post, year, date)
+def announce_on_publish(post, year, date, ask: true)
   # Before everything else, the record on the post itself: an announcement
   # that already exists is never repeated from here -- not by publish, not
   # by the standalone toot/bluesky commands, which all arrive through this
@@ -1306,6 +1572,16 @@ def announce_on_publish(post, year, date)
 
   force = false
   unless Publishing.within_recency_window?(date)
+    # `--yes` answers the questions it can answer; this one it declines.
+    # The question is "this post is old -- announce it anyway?", and a run
+    # with nobody watching must not answer yes to that on its own: the
+    # post still publishes, and the one step that cannot be taken back
+    # goes unmade. Backdating an import is exactly this case.
+    unless ask
+      warn t('cli.toot_skipped_old', date: date.strftime(t('date_format')))
+      return nil
+    end
+
     answer = Tui.key_choice(t('cli.date_outside_window_prompt', date: date.strftime(t('date_format'))))
     # Saying no here is a decision, and it used to be reported as a
     # failure: the question scrolled away, "Failed to send the toot (see
@@ -1327,7 +1603,7 @@ end
 # different years -- looking the post up by slug again would publish, and
 # ANNOUNCE, whichever the lookup preferred rather than the row the author
 # picked.
-def publish_draft(slug, path: nil)
+def publish_draft(slug, path: nil, announce: true, asked: true)
   path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
@@ -1369,7 +1645,21 @@ def publish_draft(slug, path: nil)
   Publishing.mark_deploy_pending
   new_path, updated = Publishing.publish(path, post, date: date)
 
-  fields = announce_on_publish(updated, new_year, date)
+  # announce: false is `--no-announce` -- publish the page, say nothing
+  # anywhere. Not the same as an announcement that failed: nothing is
+  # attempted, so nothing is recorded on the post either, and announcing
+  # it later by hand with `toot` still works.
+  #
+  # ⚠️ asked, not Tui.interactive?. Deciding this from the TERMINAL was
+  # wrong in both directions at once. Under `--yes` on a tty -- which is
+  # every ssh -t, every tmux, every person typing it -- the backdating
+  # question was asked after all, and the run then sat on a keypress
+  # forever with the post ALREADY published on disk, the deploy owed and
+  # nothing built. And down a pipe without `--yes` it stopped asking a
+  # question it had always asked, so a piped run that used to answer yes
+  # and announce quietly stopped announcing. Only the flag knows whether
+  # anybody is there to answer.
+  fields = announce ? announce_on_publish(updated, new_year, date, ask: asked) : nil
   if fields
     updated.merge!(fields)
     AtomicWrite.write_json(new_path, updated)
@@ -1396,7 +1686,7 @@ end
 # can't outlive its post.
 RESOLVED_PATHS = {}
 
-def find_post_path(slug)
+def find_post_path(slug, ask: true)
   chosen = RESOLVED_PATHS[slug]
   return chosen if chosen && File.exist?(chosen)
 
@@ -1406,6 +1696,14 @@ def find_post_path(slug)
   # build was publishing.
   matches = PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").sort
   return matches.first if matches.size <= 1
+
+  # A caller that cannot be asked is told which years exist and stopped.
+  # Guessing the oldest is what this method used to do for everybody, and
+  # it acted on posts nobody had chosen.
+  unless ask
+    abort t('cli.publish_yes_ambiguous', slug: slug,
+                                         years: matches.map { |m| File.basename(File.dirname(m)) }.join(', '))
+  end
 
   RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
 end
@@ -1593,8 +1891,15 @@ end
 # loop as `add`/`edit`, so before a draft is actually sent out, it can still
 # be looked at one more time or sent back to editing. The actual publishing
 # only happens via the [p] choice in draft_decision_loop, which calls publish_draft.
-def cmd_publish(slug)
-  path = find_post_path(slug)
+def cmd_publish(slug, yes: false, announce: true)
+  # ask: false is --yes. find_post_path ASKS when a slug lives in more
+  # than one year -- backdating makes that ordinary, and the picker is a
+  # full-screen menu -- and under --yes there is nobody to work it: on a
+  # tty the run stopped there for good, off one it took the first row by
+  # itself and published a post the caller had not named. Asked here
+  # rather than pre-checked with a second glob of my own: where a post
+  # lives is one question and belongs in one method.
+  path = find_post_path(slug, ask: !yes)
   abort t('cli.post_not_found', slug: slug) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
@@ -1613,13 +1918,23 @@ def cmd_publish(slug)
   # archive, and the ordinary publish-after-edit walk has already paid it.
   # A draft without a token has no preview address to be dead; the build
   # would not conjure one.
+  # ...but not under --yes, which never shows the dialog this preview is
+  # for. On a large archive that is minutes of building a page nobody
+  # will open, immediately before publishing throws it away again.
   token = post['draft_token'].to_s
-  unless token.empty? ||
+  unless yes || token.empty? ||
          File.exist?(File.join(ROOT, 'public.nosync', 'draft', token, slug, 'index.html'))
     rebuild_and_deploy(t('cli.generating_preview'))
   end
 
-  draft_decision_loop(slug, path: path)
+  # `--yes` is the whole of the draft dialog answered in advance with [p].
+  # It skips the preview, the QR code and the question -- everything that
+  # exists to give a person a look before they commit -- and goes straight
+  # to publishing, which is what a shortcut or a script is asking for when
+  # it passes the flag.
+  return publish_draft(slug, path: path, announce: announce, asked: false) if yes
+
+  draft_decision_loop(slug, path: path, announce: announce)
 end
 
 # Marks a draft for automatic publishing by cron
@@ -4458,10 +4773,15 @@ end
 # Time.parse with the file's own sentence instead of a backtrace -- a
 # hand-typed frontmatter date ("za tyden nekdy") used to end the run as
 # an uncaught ArgumentError while the editor buffer sat recoverable.
-def parse_frontmatter_date!(raw_value)
+def parse_frontmatter_date!(raw_value, interactive: true)
   Time.parse(raw_value)
 rescue ArgumentError
-  abort t('cli.frontmatter_date_invalid', value: raw_value)
+  # The editor route can say "your text is in the buffer, reopen the post
+  # once you have fixed it" -- there is a buffer and reopening is the
+  # repair. With a file no buffer was ever written (writing one would
+  # have discarded somebody else's), and the repair is to edit the file
+  # that is still sitting there.
+  abort t(interactive ? 'cli.frontmatter_date_invalid' : 'cli.frontmatter_date_invalid_file', value: raw_value)
 end
 
 def cmd_browse(filters = {})
@@ -5179,7 +5499,13 @@ SiteConfig.data unless ['help', '--help', '-h', 'version', '--version', '-v'].in
 # `./blog.sh list | wc -l` must keep counting posts, not banner lines.
 HEADER_MODES = %w[add edit props publish unpublish schedule queue delete
                   restore toot bluesky rebuild preview list browse].freeze
-if HEADER_MODES.include?(command) && $stdout.tty?
+# ⚠️ ...and neither does a run that promised its whole output would be
+# one JSON object. The tty guard above reads as "a person is watching",
+# and with --json a person may well be watching -- while a script reads
+# what scrolls past. The banner went out ahead of the object and the
+# answer did not parse, on exactly the terminals (ssh -t, tmux) somebody
+# would try the flag on first.
+if HEADER_MODES.include?(command) && $stdout.tty? && !ARGV.include?('--json')
   puts SiteHeader.render(extra: t('cli.header_mode', mode: command))
   puts
 end
@@ -5189,7 +5515,31 @@ if command.nil?
 else
   case command
   when 'add'
-    cmd_add
+    # Read here rather than inside cmd_add, the way `rebuild` reads --full:
+    # the dispatcher is where this file turns a command line into
+    # arguments, and the wizard calls cmd_add with none.
+    json = !ARGV.delete('--json').nil?
+    # Before the shift, so a mistyped flag is refused instead of being
+    # taken for the name of a file to read (and reported as "no such
+    # file: --yes", which sends the reader looking in the wrong place).
+    unknown = ARGV.find { |arg| arg.start_with?('--') }
+    abort t('cli.add_unknown_option', option: unknown) if unknown
+    file = ARGV.shift
+    # One file, one post. A second name was shifted off into nothing: the
+    # run wrote the first, said not a word about the rest, and exited 0 --
+    # so a script looping wrongly lost posts it believed it had made.
+    abort t('cli.add_extra_arguments', extra: ARGV.join(', ')) unless ARGV.empty?
+
+    if file
+      add_from_file(file, json: json)
+    else
+      # There is nothing to print as JSON when the post is still being
+      # typed, and an editor session that ends by printing a machine's
+      # answer would be a promise this cannot keep.
+      abort t('cli.add_json_needs_file') if json
+
+      cmd_add
+    end
   when 'edit'
     slug = ARGV.shift || pick_slug_interactively
     cmd_edit(slug)
@@ -5205,8 +5555,23 @@ else
   when 'empty'
     cmd_empty(ARGV.shift)
   when 'publish'
-    slug = ARGV.shift || pick_draft_interactively
-    cmd_publish(slug)
+    yes = !ARGV.delete('--yes').nil?
+    announce = ARGV.delete('--no-announce').nil?
+    unknown = ARGV.find { |arg| arg.start_with?('--') }
+    abort t('cli.publish_unknown_option', option: unknown) if unknown
+    # --no-announce on its own still shows the dialog; it only says what
+    # [p] must not do when it gets there. Refusing the combination would
+    # be refusing "let me look first, and keep it off Mastodon".
+    slug = ARGV.shift
+    # ⚠️ --yes has to name its post. Without a slug this fell into the
+    # draft picker and then published WITHOUT the dialog -- so one Enter
+    # over a highlighted row published a post and announced it, with no
+    # preview and no confirmation anywhere in between. The picker is for
+    # people who are about to be shown what they picked.
+    abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
+
+    slug ||= pick_draft_interactively
+    cmd_publish(slug, yes: yes, announce: announce)
   when 'schedule'
     slug = ARGV.shift || pick_draft_interactively
     cmd_schedule(slug)

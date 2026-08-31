@@ -284,6 +284,87 @@ repacking for the container, which copies the video across untouched.
 The post is saved either way; the only hard stop for a video is the
 per-file size limit, and a long 4K clip reaches that on its own.
 
+### Handing over a whole file
+
+Every step above is a conversation: the CLI opens an editor, waits for a
+photo, asks what to do with the draft. `./blog.sh add <file>` is the same
+work with the conversation removed -- it takes a markdown file with the
+usual header, writes the draft, and returns. It never asks anything, so
+it is the route for a shortcut, a script or anything else running where
+nobody is at the keyboard.
+
+```bash
+./blog.sh add clanek.md
+```
+
+A bare name -- one with no slash in it -- is looked for in `incoming/`,
+so the file can arrive by the same upload as the photos. Anything else is
+a path and is used as given, relative to wherever you were standing. A
+file that came out of `incoming/` is deleted once the post is written --
+the photos already work that way, and an empty `incoming/` is what says
+nothing is pending. **A file outside `incoming/` is never touched**: on a
+Mac that is quite possibly the only copy. The rule is about where the
+file *is*, not how you named it, so `./blog.sh add "$PWD/incoming/x.md"`
+tidies up after itself like any other upload.
+
+Where the wizard would ask, this refuses instead, and writes nothing:
+
+- a photo that has not finished uploading -- the wizard waits and
+  re-checks on Enter; here there is nobody to wait for, so the missing
+  names are printed and the post is not written. Upload them and run it
+  again.
+- an empty body, a file that is not text, a file this account cannot
+  read, something that is not a file at all, an option the command does
+  not have, or a second filename (one file, one post -- a name silently
+  dropped is a post a looping script thinks it made).
+
+It stops at the draft. The file says *write this down*, not *put it in
+front of the world* -- publishing stays a second command:
+
+```bash
+./blog.sh publish <slug> --yes
+```
+
+`--yes` answers the draft dialog with "publish" in advance.
+`--no-announce` publishes the page and sends nothing to Mastodon or
+Bluesky; it works with or without `--yes`, and because nothing was
+attempted, `./blog.sh toot <slug>` can still send the announcement by
+hand afterwards. (It does not travel into a *scheduled* publish -- the
+cron works from the post itself and will announce it when its date
+arrives; the run says so if you schedule under the flag.)
+
+One question `--yes` will not answer for you: a post dated outside the
+recent window is published but **not** announced, and the run says so.
+Announcing is the one step that cannot be taken back. Two more it
+refuses rather than guesses: `--yes` needs the slug spelled out (without
+one, `publish` offers the drafts to pick from, and picking belongs with
+the preview in front of you), and it will not choose between two posts
+sharing a slug in different years -- it names the years and stops.
+
+`--json` turns the answer into data -- one object on standard output and
+nothing else, so a caller can read it without parsing prose:
+
+```json
+{
+  "slug": "psano-v-posteli",
+  "path": "content.nosync/posts/2026/psano-v-posteli.json",
+  "state": "draft",
+  "url": "https://example.com/draft/89260b63fb498e75/psano-v-posteli/",
+  "deploy": "done",
+  "warnings": []
+}
+```
+
+Every key is always there. `deploy` is `done` when the site is already
+carrying the draft and `pending` when it owes an upload that the next
+scheduled run will finish -- the difference between "open this address
+now" and "open it shortly". `warnings` collects everything the run said
+for itself, which on this route is the only place to hear it: a photo
+over the size limit, a video whose container some browsers refuse, a
+HEIC that was converted. `url` is empty rather than half an address when
+the site has no `base_url` yet, and the reason is in `warnings`. The
+exit code is 0 or 1, nothing else.
+
 ## Pinning a post to the front page
 
 The `[c]` action in `./blog.sh props <slug>` pins a published post --

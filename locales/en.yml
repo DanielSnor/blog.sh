@@ -242,8 +242,10 @@ cli:
   image_dimensions_unknown: "⚠️  %{file}: the image size could not be read, so the page cannot reserve space for it and may jump while loading. PNG, JPEG, GIF and WebP are always read."
   image_heic_hint: "   HEIC displays only in Safari -- convert it first: sips -s format jpeg FILE --out FILE.jpg (macOS), heif-convert FILE FILE.jpg (Linux)."
   frontmatter_date_invalid: "❌ Cannot read the date %{value} -- expected YYYY-MM-DD [HH:MM]. Your text is kept in the buffer; reopen the post after fixing it."
+  frontmatter_date_invalid_file: "❌ I cannot read the date %{value} -- I expect YYYY-MM-DD [HH:MM]. Nothing was written; fix the date in the file and run it again."
   post_changed_while_editing: "❌ '%{slug}' changed on disk while you were editing it (the scheduled-publish cron publishes on its own). Nothing was saved, so nothing of that change was lost -- reopen the post and redo your edit on the current version."
   unknown_frontmatter_key: "❌ Unknown key in the header: %{keys}. I know: %{known}. A typo here would be silently dropped on save, so nothing was written -- your text is kept, see below."
+  unknown_frontmatter_key_file: "❌ Unknown key in the header: %{keys}. I know: %{known}. A typo here would be silently dropped on save, so nothing was written -- fix the key in the file and run it again."
   heic_refused: "❌ %{files}: HEIC displays only in Safari -- other browsers would show a broken image. Nothing was saved and the file stays where it is. Convert it first (%{command}), or set media.convert_heic: true in config/site.yml and the engine will convert it for you."
   heic_no_tool: "❌ %{files}: media.convert_heic is on, but no converter was found (tried sips, heif-convert, heif-dec, magick/convert, vips). Nothing was saved. Convert by hand: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC converted via %{tool})."
@@ -304,6 +306,20 @@ cli:
   template_unchanged: "Template left unchanged (not saved?), no post was created."
   empty_content: "Empty content, nothing was written."
   wrote_draft: "Written as draft: %{path}"
+  add_file_not_found: "No such file: %{file}. A bare name is looked for in incoming/; anything with a directory in it is used as given."
+  add_file_not_a_file: "Not a file: %{file}. That is a directory, a link pointing nowhere, or something else the archive cannot read a post out of."
+  add_file_unreadable: "Cannot read %{file}: %{reason}. If it arrived by upload it may belong to the upload account and not to this one -- `chmod 644` on it, or add yourself to its group."
+  add_extra_arguments: "One file at a time. These were left over and nothing was done with them: %{extra}"
+  add_file_not_text: "Not readable as text: %{file}. `add` takes a markdown file -- this one is not valid UTF-8, so it is probably a photo, an office document, or a transfer that has not finished."
+  add_file_empty: "Nothing to write: %{file} has no content below the frontmatter."
+  add_file_missing_images: "These files are not there yet: %{files}. Upload them to %{dir} first -- nothing was written. (Interactive `add` waits for them; with a file argument there is nobody to wait for.)"
+  add_json_needs_file: "--json needs a file to read: `add <file> --json`. Without one, `add` opens an editor and there is nothing to report until it closes."
+  add_unknown_option: "Unknown option: %{option}. add takes a file and --json, nothing else."
+  publish_unknown_option: "Unknown option: %{option}. publish takes a slug, --yes and --no-announce, nothing else."
+  publish_yes_needs_slug: "--yes needs to name the post: `publish <slug> --yes`. Without a slug, publish offers the drafts to choose from -- and choosing is something to do with the preview in front of you, not one keystroke away from an announcement that cannot be recalled."
+  no_announce_not_scheduled: "Note: --no-announce does not reach the scheduled publish. The cron works from the post itself, so it will announce this one when its date arrives. To keep it quiet, publish it by hand with --no-announce, or mark it unlisted."
+  publish_yes_ambiguous: "The slug %{slug} exists in more than one year (%{years}), and --yes has nobody to ask which. Publish it from `props %{slug}`, which shows them and lets you choose."
+  toot_skipped_old: "No announcement: the date (%{date}) is outside the recent window, and that question has nobody to answer it here. The post is published; `toot` still sends it by hand."
   incoming_not_cleaned: "Left in incoming/: %{files} — the copy is in the post, but the staged original could not be deleted (no write permission on incoming/). Remove it by hand, so an empty incoming/ still means nothing is pending."
   generating_preview: "Generating preview"
   draft_saved_preview_pending: "Draft is saved. The preview will show up after a successful deploy -- then run ./blog.sh edit %{slug}"
@@ -508,10 +524,14 @@ cli:
   header_mode: "Mode: %{mode}"
   usage: |
     usage:
-      ./blog.sh add                  creates a draft, shows a preview and asks what's next
+      ./blog.sh add [<file>]         creates a draft, shows a preview and asks what's next;
+                                     with a markdown file it asks nothing at all and just writes the draft,
+                                     which is the route for a phone, a script or a shortcut (--json reports it as data)
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh props [<slug>]       shows a post's state and its actions (publish, unpublish, rename the slug, delete...)
-      ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
+      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+                                     shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
+                                     --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
       ./blog.sh queue                the scheduled-post queue -- reorder, publish now, return a post to the drafts
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)

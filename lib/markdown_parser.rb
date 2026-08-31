@@ -24,6 +24,14 @@ module MarkdownParser
   # --- frontmatter -------------------------------------------------------
 
   def parse_frontmatter(text)
+    # A byte-order mark first, because three invisible bytes in front of
+    # the opening --- mean this method sees no frontmatter at all and
+    # hands the WHOLE header back as body. Nothing then fails: the post
+    # is written with no title and no tags, its name derived from the
+    # words "title:" and "tags:", and the run exits 0. Windows editors
+    # and several iOS apps write one by default, and `add <file>` made
+    # that reachable without anybody ever seeing the file.
+    text = text.sub("\uFEFF", '') if text.start_with?("\uFEFF")
     return [{}, text] unless text.start_with?("---\n") || text.start_with?("---\r\n")
 
     _, fm, body = text.split(/^---\s*$/, 3)

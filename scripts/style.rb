@@ -61,6 +61,7 @@ require_relative '../lib/slug'
 require_relative '../lib/checker'
 require_relative '../lib/post_address'
 require_relative '../lib/forge_address'
+require_relative '../lib/incoming_path'
 
 def t(key, **vars)
   I18n.t("style.#{key}", **vars)
@@ -477,18 +478,7 @@ end
 INCOMING_DIR = File.join(ROOT, 'incoming')
 
 def resolve_source(answer)
-  path = answer.to_s.strip.gsub(/\A['"]|['"]\z/, '')
-  return nil if path.empty?
-
-  # Dragging a file from Finder into a terminal writes the spaces escaped
-  # ("~/Mobile\ Documents/…"). Typed by nobody, produced by the most
-  # natural gesture there is -- and refused as "no such file".
-  path = path.gsub(/\\(.)/, '\1') if !File.exist?(path) && path.include?('\\')
-
-  return File.expand_path(path) unless File.dirname(path) == '.'
-
-  in_incoming = File.join(INCOMING_DIR, path)
-  File.file?(in_incoming) ? in_incoming : File.expand_path(path)
+  IncomingPath.resolve(answer, INCOMING_DIR)
 end
 
 # Queued, not copied: everything in these wizards happens after the diff is
