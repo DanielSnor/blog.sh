@@ -33,6 +33,8 @@ window.I18N = {
       "pending": "Uloženo. Web se přestaví do čtvrt hodiny."
     },
     "app": {
+      "picture_as_is": "Tenhle prohlížeč to neotevře, takže to půjde tak, jak to je, a blog si to převede sám -- odesílání potrvá déle, ale nic se neztratí",
+      "picture_failed": "Tenhle obrázek se nepodařilo přečíst vůbec. Zkus jiný, nebo ho ulož jako JPEG.",
       "name": "blog.sh",
       "subtitle": "Napsat příspěvek",
       "title_label": "Titulek",
@@ -64,7 +66,7 @@ window.I18N = {
       "result_preview": "Náhled",
       "result_pending": "Web se přestaví do čtvrt hodiny.",
       "result_warnings": "Za pozornost stojí",
-      "saved_instead": "Balíček uložen. Předej ho zkratce odtamtud, kam ti chodí stažené soubory.",
+      "saved_instead": "Tenhle prohlížeč soubory předat neumí, takže jsou uložené v jednom archivu. ROZBAL ho a zkratce předej soubory z něj -- blog bere soubory, ne archivy.",
       "share_cancelled": "Odesílání se zastavilo. Jestli jsi klepnul na zkratku, ověř, že post dorazil.",
       "not_saved": "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."
     }
@@ -101,6 +103,8 @@ window.I18N = {
       "pending": "Gespeichert. Die Website wird binnen einer Viertelstunde neu gebaut."
     },
     "app": {
+      "picture_as_is": "Dieser Browser kann es nicht öffnen, also geht es so, wie es ist, und das Blog wandelt es beim Empfang um -- langsamer zu senden, nichts geht verloren",
+      "picture_failed": "Dieses Bild konnte gar nicht gelesen werden. Nimm ein anderes oder speichere es als JPEG.",
       "name": "blog.sh",
       "subtitle": "Beitrag schreiben",
       "title_label": "Titel",
@@ -132,7 +136,7 @@ window.I18N = {
       "result_preview": "Vorschau",
       "result_pending": "Die Website wird binnen einer Viertelstunde neu gebaut.",
       "result_warnings": "Wissenswert",
-      "saved_instead": "Paket gesichert. Übergib es dem Kurzbefehl von dort, wo deine Downloads landen.",
+      "saved_instead": "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive.",
       "share_cancelled": "Das Senden wurde abgebrochen. Falls du den Kurzbefehl angetippt hast, prüfe, ob der Beitrag angekommen ist.",
       "not_saved": "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."
     }
@@ -169,6 +173,8 @@ window.I18N = {
       "pending": "Saved. The site rebuilds within a quarter of an hour."
     },
     "app": {
+      "picture_as_is": "This browser cannot open it, so it goes as it is and the blog converts it on arrival -- slower to send, nothing lost",
+      "picture_failed": "That picture could not be read at all. Try another one, or export it as JPEG.",
       "name": "blog.sh",
       "subtitle": "Write a post",
       "title_label": "Title",
@@ -200,7 +206,7 @@ window.I18N = {
       "result_preview": "Preview",
       "result_pending": "The site rebuilds within a quarter of an hour.",
       "result_warnings": "Worth knowing",
-      "saved_instead": "Bundle saved. Hand it to the shortcut from wherever your downloads land.",
+      "saved_instead": "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives.",
       "share_cancelled": "Sending stopped. If you tapped the shortcut, check the post arrived.",
       "not_saved": "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
     }

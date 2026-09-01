@@ -31,6 +31,8 @@ deploy:
   pending: "Gespeichert. Die Website wird binnen einer Viertelstunde neu gebaut."
 
 app:
+  picture_as_is: "Dieser Browser kann es nicht öffnen, also geht es so, wie es ist, und das Blog wandelt es beim Empfang um -- langsamer zu senden, nichts geht verloren"
+  picture_failed: "Dieses Bild konnte gar nicht gelesen werden. Nimm ein anderes oder speichere es als JPEG."
   name: "blog.sh"
   subtitle: "Beitrag schreiben"
   title_label: "Titel"
@@ -62,6 +64,6 @@ app:
   result_preview: "Vorschau"
   result_pending: "Die Website wird binnen einer Viertelstunde neu gebaut."
   result_warnings: "Wissenswert"
-  saved_instead: "Paket gesichert. Übergib es dem Kurzbefehl von dort, wo deine Downloads landen."
+  saved_instead: "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive."
   share_cancelled: "Das Senden wurde abgebrochen. Falls du den Kurzbefehl angetippt hast, prüfe, ob der Beitrag angekommen ist."
   not_saved: "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."

@@ -31,6 +31,8 @@ deploy:
   pending: "Uloženo. Web se přestaví do čtvrt hodiny."
 
 app:
+  picture_as_is: "Tenhle prohlížeč to neotevře, takže to půjde tak, jak to je, a blog si to převede sám -- odesílání potrvá déle, ale nic se neztratí"
+  picture_failed: "Tenhle obrázek se nepodařilo přečíst vůbec. Zkus jiný, nebo ho ulož jako JPEG."
   name: "blog.sh"
   subtitle: "Napsat příspěvek"
   title_label: "Titulek"
@@ -62,6 +64,6 @@ app:
   result_preview: "Náhled"
   result_pending: "Web se přestaví do čtvrt hodiny."
   result_warnings: "Za pozornost stojí"
-  saved_instead: "Balíček uložen. Předej ho zkratce odtamtud, kam ti chodí stažené soubory."
+  saved_instead: "Tenhle prohlížeč soubory předat neumí, takže jsou uložené v jednom archivu. ROZBAL ho a zkratce předej soubory z něj -- blog bere soubory, ne archivy."
   share_cancelled: "Odesílání se zastavilo. Jestli jsi klepnul na zkratku, ověř, že post dorazil."
   not_saved: "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."

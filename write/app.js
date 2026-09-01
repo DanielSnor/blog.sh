@@ -97,11 +97,21 @@
 
   // Names must survive being read back out of markdown, so anything that
   // would need escaping there is replaced rather than kept.
-  function safeName(name, index) {
+  function safeName(name, index, ext) {
     var base = String(name || "").replace(/\.[^.]*$/, "");
     base = base.normalize ? base.normalize("NFKD").replace(/[̀-ͯ]/g, "") : base;
     base = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    return (base || ("photo-" + index)) + ".jpg";
+    return (base || ("photo-" + index)) + "." + (ext || "jpg");
+  }
+
+  // What to call a picture that is passed through untouched. The name it
+  // arrived with first, because that is what the author will recognise;
+  // the MIME subtype when the name carries no extension at all.
+  function extensionOf(file) {
+    var m = /\.([a-z0-9]{1,8})$/i.exec(String(file.name || ""));
+    if (m) return m[1].toLowerCase();
+    var t = /^image\/([a-z0-9]+)/i.exec(String(file.type || ""));
+    return t ? t[1].toLowerCase() : "img";
   }
 
   // ⚠️ Two photographs can slug to the same name -- "Vlak v Chocni.jpg" and
@@ -113,31 +123,58 @@
   // and nothing anywhere said so.
   function freeName(name, taken) {
     if (taken.indexOf(name) === -1) return name;
-    var stem = name.replace(/\.jpg$/, "");
+    var dot = name.lastIndexOf(".");
+    var stem = dot > 0 ? name.slice(0, dot) : name;
+    var ext = dot > 0 ? name.slice(dot) : "";
     var n = 2;
-    while (taken.indexOf(stem + "-" + n + ".jpg") !== -1) n++;
-    return stem + "-" + n + ".jpg";
+    while (taken.indexOf(stem + "-" + n + ext) !== -1) n++;
+    return stem + "-" + n + ext;
   }
 
   function addFiles(files) {
     var list = Array.prototype.filter.call(files, function (f) { return /^image\//.test(f.type); });
     if (!list.length) return;
     say(t("app.sending") === "" ? "" : "…");
+    var asIs = [];
+    function keep(file, ext, dataUrl, w, h) {
+      state.shots.push({
+        name: freeName(safeName(file.name, state.shots.length + 1, ext),
+                       state.shots.map(function (s) { return s.name; })),
+        data: dataUrl, w: w, h: h, alt: "", raw: !w, size: file.size
+      });
+      drawShots();
+    }
     list.reduce(function (chain, file) {
       return chain.then(function () {
         return shrink(file).then(function (out) {
           return blobToDataUrl(out.blob).then(function (dataUrl) {
-            state.shots.push({
-              name: freeName(safeName(file.name, state.shots.length + 1),
-                             state.shots.map(function (s) { return s.name; })),
-              data: dataUrl, w: out.w, h: out.h, alt: ""
-            });
-            drawShots();
+            keep(file, "jpg", dataUrl, out.w, out.h);
+          });
+        }, function () {
+          // ⚠️ A picture this browser cannot open goes as it IS, rather
+          // than being refused. Safari does not decode HEIC in an <img>,
+          // and HEIC is what an iPhone writes by default -- so the
+          // shrinking step fails on exactly the format this app exists to
+          // carry. The blog converts HEIC when it arrives, so the honest
+          // answer is to hand it over whole. What is lost is the preview
+          // and the shrinking: it travels at full size, and the message
+          // below says so rather than letting the wait be a mystery.
+          return blobToDataUrl(file).then(function (dataUrl) {
+            keep(file, extensionOf(file), dataUrl, 0, 0);
+            asIs.push(state.shots[state.shots.length - 1].name);
           });
         });
       });
-    }, Promise.resolve()).then(function () { say(""); save(); })
-      .catch(function () { say(t("error.not_a_zip"), "bad"); });
+    }, Promise.resolve()).then(function () {
+      save();
+      say(asIs.length ? t("app.picture_as_is") + ": " + asIs.join(", ") : "",
+          asIs.length ? "good" : "");
+    }).catch(function () {
+      // Not "the bundle is not a readable archive", which is what this
+      // said for one release after the archive itself was removed: the
+      // message named a thing that no longer existed anywhere.
+      say(t("app.picture_failed"), "bad");
+    });
   }
 
   function blobToDataUrl(blob) {
@@ -188,10 +225,15 @@
             '<button type="button" class="link" data-insert="' + i + '">![ ]</button>' +
           '</div>' +
         '</div>';
-      row.querySelector("img").src = shot.data;
+      // A passed-through picture has no preview here for the same reason
+      // it could not be shrunk: the browser will not decode it.
+      if (shot.raw) row.querySelector("img").remove();
+      else row.querySelector("img").src = shot.data;
       var used = usedInText(shot.name);
       var name = row.querySelector(".name");
-      name.textContent = shot.name + "  " + shot.w + "×" + shot.h + " ";
+      name.textContent = shot.name + "  " +
+        (shot.raw ? Math.round((shot.size || 0) / 1024) + " kB"
+                  : shot.w + "×" + shot.h) + " ";
       var chip = document.createElement("span");
       chip.className = "chip " + (used ? "ok" : "warn");
       chip.textContent = used ? t("app.used_in_text") : t("app.unused_image");
@@ -357,10 +399,14 @@
     return files;
   }
 
-  // Only for the way out when sharing is not on offer: saved as one
-  // archive because a browser will not hand over four downloads in a row,
-  // and it is unpacked in Files before the pieces are shared into the
-  // shortcut. Nothing on the server ever sees an archive.
+  // ⚠️ Only for the way out when sharing is not on offer -- and on a Mac
+  // that is the ordinary case, not the rare one: Safari there does not
+  // hand files from a page to a share target at all, so this is the path
+  // a desktop takes every time. Saved as ONE archive because a browser
+  // will not give four downloads in a row, and the person unpacks it and
+  // hands the files inside to the shortcut. The archive never reaches the
+  // server: the receiver has no unpacking in it, and a post.zip sent
+  // whole would simply be stored in incoming/ and make nothing.
   function buildBundle() {
     var enc = new TextEncoder();
     var entries = [{ name: slugForFile(), bytes: enc.encode(markdown()) }];

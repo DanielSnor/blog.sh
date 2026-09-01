@@ -37,6 +37,8 @@ deploy:
   pending: "Saved. The site rebuilds within a quarter of an hour."
 
 app:
+  picture_as_is: "This browser cannot open it, so it goes as it is and the blog converts it on arrival -- slower to send, nothing lost"
+  picture_failed: "That picture could not be read at all. Try another one, or export it as JPEG."
   name: "blog.sh"
   subtitle: "Write a post"
   title_label: "Title"
@@ -68,6 +70,6 @@ app:
   result_preview: "Preview"
   result_pending: "The site rebuilds within a quarter of an hour."
   result_warnings: "Worth knowing"
-  saved_instead: "Bundle saved. Hand it to the shortcut from wherever your downloads land."
+  saved_instead: "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives."
   share_cancelled: "Sending stopped. If you tapped the shortcut, check the post arrived."
   not_saved: "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
