@@ -624,6 +624,19 @@ module MarkdownParser
   # around it must not be written either: whoever sent that markdown asked
   # for something they are not entitled to, and writing the rest of their
   # post would be answering half of it.
+  # ⚠️ A refusal that reached nobody. The two aborts below are right for a
+  # person at a terminal -- prose on stderr, a non-zero exit -- and useless
+  # for a program: `add --json` promises an object, and iOS Shortcuts
+  # throws away the output of a command that failed. A post written on a
+  # phone with the picture on the line under the sentence therefore came
+  # back to the phone as a blank screen, with the post never written and
+  # nothing anywhere saying why.
+  #
+  # Confined markdown is by definition somebody else's, arriving over a
+  # network, so it is the input whose refusals have to be catchable. Every
+  # other caller still gets the abort it has always got.
+  class Rejected < StandardError; end
+
   class ConfinedPath < StandardError
     attr_reader :reference
 
@@ -648,6 +661,13 @@ module MarkdownParser
   # the caller inspecting the markdown first: a second reader of the same
   # text is a second set of rules, and the gap between them is where the
   # hole would be. One parser, one rule.
+  # Raise for a caller that has to answer in JSON; abort for a person.
+  def reject(message, confined)
+    raise Rejected, message if confined
+
+    abort message
+  end
+
   def resolve_image(path, media_dir, counter, media_files = {}, incoming_dir: nil, confined: false)
     raise ConfinedPath, path if confined && File.basename(path) != path
 
@@ -837,7 +857,7 @@ module MarkdownParser
   def parse_prose_block(para, media_dir, media_files, counter, incoming_dir: nil, confined: false)
     if (m = VIDEO_RE.match(para))
       caption, target = m[1].strip, m[2].strip
-      abort "Video needs a caption: !![caption](#{target})" if caption.empty?
+      reject("Video needs a caption: !![caption](#{target})", confined) if caption.empty?
 
       # Same !! marker, told apart by extension -- a third sigil would be one
       # more thing to remember for what is the same gesture: "embed this
@@ -933,7 +953,8 @@ module MarkdownParser
       # An image in the middle of a paragraph can't be rendered -- the
       # schema only knows image blocks. This used to silently turn into a
       # link to the file plus a stray exclamation mark.
-      abort "Both images and videos must be on their own line, separated by blank lines. The problem is here:\n#{para}"
+      reject("Both images and videos must be on their own line, separated by " \
+             "blank lines. The problem is here:\n#{para}", confined)
     elsif !para.include?("\n") && HR_RE.match?(para)
       return [{ 'type' => 'hr' }, counter]
     elsif !para.include?("\n") && TEASER_END_RE.match?(para)

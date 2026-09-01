@@ -438,6 +438,18 @@
     save();
   });
 
+  // ⚠️ A blank line on each side, counted. The blog renders a picture only
+  // as a paragraph of its own and refuses one sitting on the line straight
+  // after a sentence -- and this button used to put in a single newline,
+  // so the one route that needs no typing at all reliably produced the one
+  // post that cannot be written. Counted, so pressing it twice does not
+  // open a chasm, and so an existing blank line is left alone.
+  function spacedMark(before, after, mark) {
+    var gapBefore = before === "" ? "" : ["\n\n", "\n", ""][Math.min(2, /\n*$/.exec(before)[0].length)];
+    var gapAfter = after === "" ? "\n" : ["\n\n", "\n", ""][Math.min(2, /^\n*/.exec(after)[0].length)];
+    return gapBefore + mark + gapAfter;
+  }
+
   // Rewrites ![old](name) to ![new](name). Only an exact match of what was
   // there is replaced: anything else is the author's own wording and is
   // not ours to overwrite.
@@ -457,9 +469,17 @@
     if (insert) {
       var shot = state.shots[Number(insert.dataset.insert)];
       var body = $("body");
-      var mark = "\n![" + (shot.alt || "") + "](" + shot.name + ")\n";
       var at = body.selectionStart != null ? body.selectionStart : body.value.length;
-      body.value = body.value.slice(0, at) + mark + body.value.slice(at);
+      var before = body.value.slice(0, at), after = body.value.slice(at);
+      // ⚠️ A BLANK LINE on each side, not one newline. The blog renders a
+      // picture only as a paragraph of its own and refuses one sitting on
+      // the line straight after a sentence -- and this button used to
+      // insert exactly that shape. The one route that needs no typing at
+      // all reliably produced the one post that cannot be written, and
+      // the refusal came back from the far end as nothing at all.
+      // Counted, so pressing it twice does not open a chasm.
+      body.value = before + spacedMark(before, after,
+                                       "![" + (shot.alt || "") + "](" + shot.name + ")") + after;
       state.body = body.value;
       drawShots(); save();
     }

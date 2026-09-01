@@ -937,6 +937,12 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
 
   blocks, media_files, missing = begin
     MarkdownParser.parse_body(body, nil, incoming_dir: INCOMING_DIR, confined: confined)
+  rescue MarkdownParser::Rejected => e
+    # Markdown the parser cannot turn into blocks: a picture sharing a
+    # paragraph with a sentence, a video with no caption. A person gets
+    # this on stderr and can fix it; a phone gets it here, as an object,
+    # or it gets a blank screen and no post.
+    refuse('bad_markdown', e.message)
   rescue MarkdownParser::ConfinedPath => e
     # The whole post is refused, not the picture. Somebody who sent this
     # asked for a file they are not entitled to, and writing the words
