@@ -89,6 +89,15 @@ sed '$d' "$WORK/encoded" > "$WORK/body"
 base64 -d < "$WORK/body" > "$WORK/file" 2>/dev/null \
   || fail "bad_base64" "The file is not valid base64."
 
+# ⚠️ The check above this one asks whether anything ARRIVED; this one asks
+# whether anything is IN it. A sender that framed the transfer correctly
+# but put nothing between the name and the closing dot got a nought-byte
+# file in incoming/ and the word ok -- which is how a shortcut wired to
+# encode the wrong thing looked like it was working. An empty photograph
+# is not a photograph, and an empty markdown makes no post.
+[ -s "$WORK/file" ] \
+  || fail "empty_file" "The name and the closing dot arrived, but nothing between them."
+
 # ⚠️ Only a plain file may be replaced. `mv` onto a DIRECTORY moves the
 # file INSIDE it, and onto a symlink to one it writes through, outside
 # incoming/ altogether -- `ln -s ~/Pictures incoming/fotky` is an
