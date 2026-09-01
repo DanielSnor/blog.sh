@@ -59,7 +59,9 @@
       } catch (e) {
         // Quota, most often, and it matters: the author must not believe
         // their text is safe when it is not.
-        say(t("error.no_reply"), "bad");
+        // It used to say error.no_reply -- "the server said nothing" --
+        // about a server that nothing had asked.
+        say(t("app.not_saved"), "bad");
       }
     }, 400);
   }
@@ -102,6 +104,21 @@
     return (base || ("photo-" + index)) + ".jpg";
   }
 
+  // ⚠️ Two photographs can slug to the same name -- "Vlak v Chocni.jpg" and
+  // "vlak v chocni.JPEG", or two a camera numbered alike, once the diacritics
+  // and the extension are gone. Both were pushed under that one name and both
+  // were really sent; at the far end the second landed on top of the first,
+  // because replacing a plain file is what an ordinary re-send does. What
+  // arrived was a post referring to two pictures with one of them on disk,
+  // and nothing anywhere said so.
+  function freeName(name, taken) {
+    if (taken.indexOf(name) === -1) return name;
+    var stem = name.replace(/\.jpg$/, "");
+    var n = 2;
+    while (taken.indexOf(stem + "-" + n + ".jpg") !== -1) n++;
+    return stem + "-" + n + ".jpg";
+  }
+
   function addFiles(files) {
     var list = Array.prototype.filter.call(files, function (f) { return /^image\//.test(f.type); });
     if (!list.length) return;
@@ -111,7 +128,8 @@
         return shrink(file).then(function (out) {
           return blobToDataUrl(out.blob).then(function (dataUrl) {
             state.shots.push({
-              name: safeName(file.name, state.shots.length + 1),
+              name: freeName(safeName(file.name, state.shots.length + 1),
+                             state.shots.map(function (s) { return s.name; })),
               data: dataUrl, w: out.w, h: out.h, alt: ""
             });
             drawShots();
@@ -331,11 +349,11 @@
       // whatever it arrived as, and safeName has already given it a .jpg.
       return new File([dataUrlToBytes(shot.data)], shot.name, { type: "image/jpeg" });
     });
-    // The NAME is what the far end reads; the type only decides whether
-    // the share sheet is willing to carry the file at all. If a device
-    // turns out to refuse text/markdown, text/plain is the safer one and
-    // changes nothing on the server.
-    files.push(new File([enc.encode(markdown())], slugForFile(), { type: "text/markdown" }));
+    // text/plain rather than text/markdown. iOS decides what a shared file
+    // IS from its filename extension and never reads this field, so the .md
+    // survives either way; elsewhere text/plain is a type share targets
+    // actually accept, and the far end reads only the name.
+    files.push(new File([enc.encode(markdown())], slugForFile(), { type: "text/plain" }));
     return files;
   }
 
@@ -465,9 +483,11 @@
     say(t("app.sending"));
     var files = buildFiles();
     // Sharing hands the files to the shortcut. Whether a browser will do
-    // it cannot be asked in advance -- canShare answers for this exact
-    // list, and even then the sheet may refuse -- so saving is not a
-    // fallback bolted on afterwards but the other half of the same button.
+    // ⚠️ canShare is a far smaller question than it looks: it answers
+    // whether this page may share at all and whether the list is not empty,
+    // and NOTHING about the types, the sizes or how many there are. It
+    // cannot be used to validate a share. So saving is not a fallback
+    // bolted on afterwards but the other half of the same button.
     if (navigator.canShare && navigator.canShare({ files: files })) {
       // files ALONE. Adding title or text makes sharing fail on iOS often
       // enough that the MDN example itself carries the workaround

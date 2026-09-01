@@ -69,4 +69,5 @@ app:
   result_pending: "The site rebuilds within a quarter of an hour."
   result_warnings: "Worth knowing"
   saved_instead: "Bundle saved. Hand it to the shortcut from wherever your downloads land."
-  share_cancelled: "Sending stopped. Nothing was sent and nothing was lost."
+  share_cancelled: "Sending stopped. If you tapped the shortcut, check the post arrived."
+  not_saved: "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."

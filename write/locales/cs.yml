@@ -63,4 +63,5 @@ app:
   result_pending: "Web se přestaví do čtvrt hodiny."
   result_warnings: "Za pozornost stojí"
   saved_instead: "Balíček uložen. Předej ho zkratce odtamtud, kam ti chodí stažené soubory."
-  share_cancelled: "Odesílání zastaveno. Nic se neodeslalo a nic se neztratilo."
+  share_cancelled: "Odesílání se zastavilo. Jestli jsi klepnul na zkratku, ověř, že post dorazil."
+  not_saved: "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."

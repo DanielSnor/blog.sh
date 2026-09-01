@@ -65,7 +65,8 @@ window.I18N = {
       "result_pending": "Web se přestaví do čtvrt hodiny.",
       "result_warnings": "Za pozornost stojí",
       "saved_instead": "Balíček uložen. Předej ho zkratce odtamtud, kam ti chodí stažené soubory.",
-      "share_cancelled": "Odesílání zastaveno. Nic se neodeslalo a nic se neztratilo."
+      "share_cancelled": "Odesílání se zastavilo. Jestli jsi klepnul na zkratku, ověř, že post dorazil.",
+      "not_saved": "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."
     }
   },
   "de": {
@@ -132,7 +133,8 @@ window.I18N = {
       "result_pending": "Die Website wird binnen einer Viertelstunde neu gebaut.",
       "result_warnings": "Wissenswert",
       "saved_instead": "Paket gesichert. Übergib es dem Kurzbefehl von dort, wo deine Downloads landen.",
-      "share_cancelled": "Senden abgebrochen. Es wurde nichts gesendet und nichts ging verloren."
+      "share_cancelled": "Das Senden wurde abgebrochen. Falls du den Kurzbefehl angetippt hast, prüfe, ob der Beitrag angekommen ist.",
+      "not_saved": "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."
     }
   },
   "en": {
@@ -199,7 +201,8 @@ window.I18N = {
       "result_pending": "The site rebuilds within a quarter of an hour.",
       "result_warnings": "Worth knowing",
       "saved_instead": "Bundle saved. Hand it to the shortcut from wherever your downloads land.",
-      "share_cancelled": "Sending stopped. Nothing was sent and nothing was lost."
+      "share_cancelled": "Sending stopped. If you tapped the shortcut, check the post arrived.",
+      "not_saved": "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
     }
   }
 };

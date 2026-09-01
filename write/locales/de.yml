@@ -63,4 +63,5 @@ app:
   result_pending: "Die Website wird binnen einer Viertelstunde neu gebaut."
   result_warnings: "Wissenswert"
   saved_instead: "Paket gesichert. Übergib es dem Kurzbefehl von dort, wo deine Downloads landen."
-  share_cancelled: "Senden abgebrochen. Es wurde nichts gesendet und nichts ging verloren."
+  share_cancelled: "Das Senden wurde abgebrochen. Falls du den Kurzbefehl angetippt hast, prüfe, ob der Beitrag angekommen ist."
+  not_saved: "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."
