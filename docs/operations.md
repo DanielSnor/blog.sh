@@ -376,28 +376,47 @@ needs is the key, and that lives in the shortcut on the phone.
 Pressing send hands the files to iOS: **one for each picture, and one for
 the text**. There is no archive anywhere in this.
 
-**The shortcut sends them in two passes** -- everything that is not a
-`.md` first, the markdown after it. Filter the shortcut's input by name,
-loop over the pictures, then loop over the text; for each file it builds
+**The shortcut builds one text and sends it once.** Loop over the files
+and add three lines to a variable for each of them --
 
     <the file's name>
     <the file, base64>
     .
 
-and puts that in the **Input** of *Run Script over SSH*. The order matters
-because the markdown arriving is what makes the post: everything its text
-names has to be on the server already. Get it wrong and nothing breaks --
-the engine answers `missing_images` and writes nothing, and sending the
-text again once the pictures are up is all it takes.
+-- then, AFTER the loop, put that variable in the **Input** of a single
+*Run Script over SSH*. One connection carries the post however many
+photographs are in it, which is the point: connections are the scarce
+thing, not bytes.
+
+The order inside the batch matters, because the markdown arriving is what
+makes the post and everything its text names has to be on the server by
+then. The app puts the markdown last for exactly this reason. Get it wrong
+and nothing breaks -- the engine answers `missing_images` and writes
+nothing, and sending the text again once the pictures are up is all it
+takes.
 
 `add <file>` wants the file to be on the server already. `receive.sh` is
-how it gets there: **one file per connection**, the name on the first
-line, its base64 after it, and a line holding a single `.` to say that
-was all of it.
+how it gets there: **the whole post down one connection**. Each file is a
+name on its own line, its base64 after it, and a line holding a single `.`
+to say that was all of it -- then the next name.
 
 ```bash
-{ printf '%s\n' "photo.jpg"; base64 < photo.jpg; printf '.\n'; } | ssh blog ./scripts/receive.sh
+{ for f in photo.jpg post.md; do
+    printf '%s\n' "$f"; base64 < "$f"; printf '.\n'
+  done
+} | ssh blog ./scripts/receive.sh
 ```
+
+**One connection, not one per file.** It was one per file once, which is
+simpler and does not work: a server worth running drops new SSH
+connections that arrive in a rush, and a common setting allows about four
+a minute. A post with three photographs sat exactly on that line and one
+with nine had no chance -- the sender saw "could not connect to the SSH
+server" and the pictures that never arrived were missed by nobody, since
+each connection answered for itself alone.
+
+Every name in the delivery is read before a single byte is written, so a
+batch refused on its fifth name leaves nothing behind from the first four.
 
 **The closing dot is not decoration.** A connection that drops halfway
 ends the same way a finished one does -- the receiver reads to the end
