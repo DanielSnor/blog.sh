@@ -74,8 +74,15 @@ leaves a 404 in the console.
   archive and nothing to unpack: what an untrusted sender chooses is a
   filename and a stream of bytes, and both are bounded. **Nothing new
   listens on the network** -- it travels over the SSH the server already
-  has, and the key wants a forced command. The app that writes the post
-  is a separate project.
+  has, and the key wants a forced command.
+- **And a page to write it on: `/write/`.** Set `write: true` and the
+  build publishes a small editor -- a title, the text, tags and
+  photographs, each picture with its description, everything kept in the
+  browser between visits. The send button hands the files to an iOS
+  shortcut, which carries them over. It is served from the blog it writes
+  to, so the same `git pull` moves both ends of the protocol and they
+  cannot drift apart; it is off by default, marked `noindex`, and holds no
+  secret -- what sending needs is the key in the shortcut, on the phone.
 - **`add <file> --untrusted`.** The same refusal for markdown that came
   from somewhere other than the person at the keyboard: a picture
   reference may name only a bare filename. Without it,

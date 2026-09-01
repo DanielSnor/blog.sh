@@ -3148,6 +3148,26 @@ PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
 
   emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
+# The writer: a page the owner opens on a phone, writes a post in, and
+# hands to a shortcut that carries it to scripts/receive.sh. Off unless a
+# site asks for it -- it is a page for whoever runs the blog, not for the
+# people reading it, and a site with no use for it should not carry the
+# weight or answer for the address.
+#
+# ⚠️ A NAMED LIST, not the directory. write/ also holds the locale sources
+# and the script that turns them into i18n.js, and neither belongs on a
+# public web server; a directory copy would publish whatever anyone ever
+# dropped in there, which is how a note-to-self becomes a URL.
+WRITE_FILES = %w[index.html app.js i18n.js manifest.webmanifest].freeze
+if SiteConfig.get('write', default: false)
+  WRITE_FILES.each do |name|
+    src = File.join(ROOT, 'write', name)
+    next unless File.file?(src)
+
+    emit_copy(src, File.join(PUBLIC_DIR, 'write', name), compare_content: true)
+  end
+end
+
 emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
                         fonts: SiteConfig.get('fonts', default: {}),

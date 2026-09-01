@@ -367,6 +367,29 @@ exit code is 0 or 1, nothing else.
 
 ### A post sent from the phone itself
 
+`write: true` publishes a page at `/write/` to write the post on: a title,
+the text, tags, and photographs each with its description. It keeps what
+is typed in the browser, so closing the tab in a tunnel loses nothing. The
+page is marked `noindex` and holds no secret of its own -- what sending
+needs is the key, and that lives in the shortcut on the phone.
+
+Pressing send hands the files to iOS: **one for each picture, and one for
+the text**. There is no archive anywhere in this.
+
+**The shortcut sends them in two passes** -- everything that is not a
+`.md` first, the markdown after it. Filter the shortcut's input by name,
+loop over the pictures, then loop over the text; for each file it builds
+
+    <the file's name>
+    <the file, base64>
+    .
+
+and puts that in the **Input** of *Run Script over SSH*. The order matters
+because the markdown arriving is what makes the post: everything its text
+names has to be on the server already. Get it wrong and nothing breaks --
+the engine answers `missing_images` and writes nothing, and sending the
+text again once the pictures are up is all it takes.
+
 `add <file>` wants the file to be on the server already. `receive.sh` is
 how it gets there: **one file per connection**, the name on the first
 line, its base64 after it, and a line holding a single `.` to say that
