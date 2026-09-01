@@ -27,14 +27,24 @@ MAX_MB="${BLOGSH_MAX_MB:-24}"
 # that cost the caller the reason, because iOS Shortcuts discards the
 # output of a remote command that failed: every refusal a phone could
 # meet came back as a bare status with the message gone.
+# The two characters JSON cannot carry raw. Backslash first, or it would
+# escape the backslashes the quote rule has just put in. Everything a
+# caller is told carries the sender's own text -- a filename in a refusal,
+# a filename in a receipt -- and one quotation mark in it would hand a
+# program an answer that is not JSON at all.
+json_escape() {
+  t=${1//\\/\\\\}
+  printf '%s' "${t//\"/\\\"}"
+}
+
 fail() {  # an answer, so: 0
-  printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$2"
+  printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$(json_escape "$2")"
   exit 0
 }
 
 # No answer to give: the machine is not set up, the engine is missing.
 unavailable() {
-  printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$2"
+  printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$(json_escape "$2")"
   exit 1
 }
 
@@ -61,8 +71,18 @@ case "$NAME" in
   ''|.|..)          fail "bad_name" "The first line must be a filename." ;;
   */*|*\\*)         fail "bad_name" "A name may not contain a path: $NAME" ;;
   .*)               fail "bad_name" "A name may not begin with a dot: $NAME" ;;
-  *[![:print:]]*)   fail "bad_name" "A name may not hold control characters." ;;
 esac
+
+# ⚠️ Control characters, asked BY THE BYTE and in a locale that cannot
+# disagree. A macOS screenshot is named "Screenshot ... 11.59.29 AM.png"
+# with a NARROW NO-BREAK SPACE (U+202F) in it, and both [![:print:]] and
+# [[:cntrl:]] answer differently depending on the locale a shell happens
+# to run under: the same delivery was taken by the server and refused on a
+# Mac. tr with an explicit range says what is meant -- the C0 controls and
+# DEL, nothing else. A space is a space, whatever width it is.
+if [ "$NAME" != "$(printf %s "$NAME" | LC_ALL=C tr -d '\000-\037\177')" ]; then
+  fail "bad_name" "A name may not hold control characters."
+fi
 
 WORK=$(mktemp -d) || unavailable "no_tmp" "Cannot create a temporary directory."
 # A bundle carries somebody's photographs; they have no business staying
@@ -86,7 +106,13 @@ LAST=$(tail -n 1 "$WORK/encoded")
   || fail "truncated" "The transfer ended early: the closing '.' line is missing."
 sed '$d' "$WORK/encoded" > "$WORK/body"
 
-base64 -d < "$WORK/body" > "$WORK/file" 2>/dev/null \
+# ⚠️ The carriage returns go first. Base64 wrapped at 76 characters with
+# CRLF is what RFC 2045 asks for and what an iOS shortcut produces -- but
+# GNU base64 -d treats a \r as a character outside the alphabet and
+# refuses the whole stream. It decoded the first line, met the first \r
+# and stopped: 57 bytes of a 48 kB screenshot, reported as "not valid
+# base64", which sent everybody looking at the sender instead of here.
+tr -d '\r' < "$WORK/body" | base64 -d > "$WORK/file" 2>/dev/null \
   || fail "bad_base64" "The file is not valid base64."
 
 # ⚠️ The check above this one asks whether anything ARRIVED; this one asks
@@ -126,6 +152,6 @@ case "$NAME" in
     ;;
   *)
     # A picture, stored and waiting for the text that names it.
-    printf '{"ok":true,"stored":"%s"}\n' "$NAME"
+    printf '{"ok":true,"stored":"%s"}\n' "$(json_escape "$NAME")"
     ;;
 esac
