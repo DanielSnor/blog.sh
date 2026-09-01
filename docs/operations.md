@@ -412,6 +412,16 @@ uses, so there is no other signal to send and none is needed. The answer
 to a picture is `{"ok":true,"stored":"photo.jpg"}`; the answer to the
 markdown is the same JSON `add --json` gives.
 
+⚠️ **The shortcut has to SHOW the answer, or every refusal looks like it
+worked.** A refusal leaves with zero -- deliberately, because iOS Shortcuts
+discards the output of a remote command that failed, and the reason is the
+whole point of the answer. The cost is that Shortcuts then reports a tick
+for a refusal exactly as it does for a post. End the shortcut with a *Show
+Result* of the SSH output, or a notification carrying it, and read the
+`ok` field. Without that, a shortcut whose Input field is empty connects,
+waits out the thirty-second deadline, is refused for `empty_input`, and
+shows a tick -- which is a slow, silent way to learn nothing.
+
 **The exit code answers a different question from the JSON.** Zero means
 an answer arrived -- read the object, which says `"ok"` and, when that is
 false, names the reason. Non-zero means there is no object to read: the
