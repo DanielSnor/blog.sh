@@ -2,11 +2,17 @@
   "use strict";
 
   // ---------------------------------------------------------------- i18n
-  // The reader's language, then its base ("de-AT" -> "de"), then English.
-  // Missing keys fall through rather than showing the key itself: a raw
+  // The blog's language first -- site.js says what it is -- because this
+  // is the blog's own desk, not an app of its own: its author writes a
+  // Czech blog from an English phone and expects the desk in Czech. Only
+  // without site.js does the browser's language decide: the reader's
+  // language, then its base ("de-AT" -> "de"), then English. Missing
+  // keys fall through rather than showing the key itself: a raw
   // "app.send" in the middle of a button is worse than an English word.
   var LANG = (function () {
     var have = window.I18N || {};
+    var site = window.BLOG_SITE && String(window.BLOG_SITE.lang || "").toLowerCase();
+    if (site && have[site]) return site;
     var want = (navigator.languages || [navigator.language || "en"]);
     for (var i = 0; i < want.length; i++) {
       var code = String(want[i] || "").toLowerCase();
