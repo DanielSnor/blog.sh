@@ -89,6 +89,15 @@ textarea{resize:vertical;line-height:1.6}
 .tagrow button{font:inherit;font-size:.8rem;padding:.25rem .65rem;border-radius:99px;
   border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
 .tagrow button b{font-weight:400;color:var(--meta);margin-left:.3rem}
+/* The marks the text takes, in a row above it: a tap wraps what is
+   selected, or puts the pair in with the caret between. Scrolls sideways
+   on a narrow screen rather than wrapping into a second row. */
+.marks{display:flex;gap:.3rem;overflow-x:auto;padding:.1rem 0 .2rem;scrollbar-width:none}
+.marks::-webkit-scrollbar{display:none}
+.marks button{flex:0 0 auto;min-width:2.4rem;height:2.2rem;padding:0 .6rem;font:inherit;
+  font-size:.9rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);
+  color:var(--text);cursor:pointer;touch-action:manipulation}
+.marks button:active{background:var(--accent-soft);border-color:var(--accent)}
 /* The post as the blog would show it, in the blog's own stylesheets: an
    iframe, because those stylesheets are written for a whole page and would
    restyle this one. Sized to its content once it has loaded. */
@@ -184,6 +193,18 @@ details.server .field{margin:.8rem 0 .2rem}
 
   <div class="field">
     <label for="body" data-t="app.body_label"></label>
+    <div class="marks" id="marks" role="toolbar">
+      <button type="button" data-mark="bold"><b>B</b></button>
+      <button type="button" data-mark="italic"><i>I</i></button>
+      <button type="button" data-mark="strike"><s>S</s></button>
+      <button type="button" data-mark="code">&lt;/&gt;</button>
+      <button type="button" data-mark="link" data-t="app.mark_link_label"></button>
+      <button type="button" data-mark="h2">H</button>
+      <button type="button" data-mark="quote">&#10077;</button>
+      <button type="button" data-mark="ul">&bull;</button>
+      <button type="button" data-mark="ol">1.</button>
+      <button type="button" data-mark="fence">```</button>
+    </div>
     <textarea id="body"></textarea>
     <div class="hintrow">
       <span class="hint" data-t="app.body_hint"></span>

@@ -390,6 +390,16 @@ contains the letters so far, searched across every tag. So a tag is
 tapped rather than typed, and typed as it was before instead of the blog
 growing a second spelling of it.
 
+The page speaks the blog's language, `site.lang`, whatever the phone is
+set to; only a page without `site.js` falls back to the browser's. Above
+the text sits a row of marks -- bold, italic, strikethrough, code, link,
+heading, quote, list, numbered list, code block. A paired mark wraps
+what is selected, and a second tap takes it off; with nothing selected
+it puts the pair in and leaves the caret between. A line mark goes to
+the start of every line the selection touches, and comes off the same
+way. The link mark reads the selection: an address gets the words left
+to type, words get the address.
+
 *Preview*, under the text, shows the post as the blog would show it --
 in the blog's own stylesheets, which `site.js` names, with the pictures
 in their places. Near enough, not exact: the engine renders the real

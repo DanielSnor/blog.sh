@@ -842,6 +842,107 @@
     });
   }
 
+  // --------------------------------------------------------------- marks
+  // The marks the text takes, from the row of buttons above it. Each is a
+  // function of the text and the selection alone, so it can be checked
+  // without a screen. A paired mark wraps what is selected and, applied
+  // again to the same selection, takes itself off; with nothing selected
+  // it puts the pair in and leaves the caret between. A line mark goes to
+  // the start of every line the selection touches, and comes off the
+  // same way. Words for the link's two placeholders come from the reader's
+  // language.
+  var PAIRED = { bold: "**", italic: "*", strike: "~~", code: "`" };
+  var LINED = { h2: "## ", quote: "> ", ul: "- " };
+
+  function applyMark(value, start, end, kind, words) {
+    var v = String(value || "");
+    start = Math.max(0, Math.min(start, v.length));
+    end = Math.max(start, Math.min(end, v.length));
+    var sel = v.slice(start, end);
+    var mark = PAIRED[kind];
+    if (mark) {
+      var n = mark.length;
+      // Selected together with its marks, or between them: either way
+      // the second tap takes them off.
+      if (sel.length >= 2 * n && sel.slice(0, n) === mark && sel.slice(-n) === mark) {
+        return { value: v.slice(0, start) + sel.slice(n, -n) + v.slice(end), start: start, end: end - 2 * n };
+      }
+      if (v.slice(start - n, start) === mark && v.slice(end, end + n) === mark && start >= n) {
+        return { value: v.slice(0, start - n) + sel + v.slice(end + n), start: start - n, end: end - n };
+      }
+      return { value: v.slice(0, start) + mark + sel + mark + v.slice(end), start: start + n, end: end + n };
+    }
+    if (kind === "link") {
+      var w = words || {};
+      var isUrl = /^(https?:\/\/|mailto:)\S+$/i.test(sel);
+      var label = isUrl ? String(w.text || "text") : (sel || String(w.text || "text"));
+      var url = isUrl ? sel : String(w.url || "https://");
+      var out = "[" + label + "](" + url + ")";
+      // What is left selected is what the author still has to type: the
+      // words for a bare address, the address for bare words.
+      var from = isUrl ? start + 1 : start + 1 + label.length + 2;
+      var len = isUrl ? label.length : url.length;
+      return { value: v.slice(0, start) + out + v.slice(end), start: from, end: from + len };
+    }
+    if (kind === "fence") {
+      var open = (start > 0 && v.charAt(start - 1) !== "\n" ? "\n" : "") + "```\n";
+      var close = "\n```" + (end < v.length && v.charAt(end) !== "\n" ? "\n" : "");
+      return { value: v.slice(0, start) + open + sel + close + v.slice(end), start: start + open.length, end: start + open.length + sel.length };
+    }
+    // Line marks: the lines the selection touches, whole.
+    var ls = v.lastIndexOf("\n", start - 1) + 1;
+    var probe = end > start ? end - 1 : end;
+    var le = v.indexOf("\n", probe);
+    if (le === -1) le = v.length;
+    var lines = v.slice(ls, le).split("\n");
+    var has;
+    if (kind === "ol") {
+      has = lines.every(function (l) { return /^\d+\. /.test(l); });
+      lines = lines.map(function (l, i) { return has ? l.replace(/^\d+\. /, "") : (i + 1) + ". " + l; });
+    } else {
+      var prefix = LINED[kind];
+      if (!prefix) return { value: v, start: start, end: end };
+      has = lines.every(function (l) { return l.indexOf(prefix) === 0; });
+      lines = lines.map(function (l) { return has ? l.slice(prefix.length) : prefix + l; });
+    }
+    var block = lines.join("\n");
+    var nv = v.slice(0, ls) + block + v.slice(le);
+    if (end > start) return { value: nv, start: ls, end: ls + block.length };
+    // A bare caret stays on its line, moved by what the line gained or lost
+    // before it.
+    var firstDelta = lines[0].length - v.slice(ls, le).split("\n")[0].length;
+    var caret = Math.max(ls, start + firstDelta);
+    return { value: nv, start: caret, end: caret };
+  }
+
+  // The toolbar. pointerdown is swallowed so the text keeps its focus and
+  // its selection: a button that took the focus would close the keyboard
+  // on a phone and lose the very selection it was about to mark.
+  (function () {
+    var bar = $("marks");
+    if (!bar) return;
+    bar.addEventListener("pointerdown", function (e) {
+      if (e.target.closest("[data-mark]")) e.preventDefault();
+    });
+    Array.prototype.forEach.call(bar.querySelectorAll("[data-mark]"), function (b) {
+      var name = t("app.mark_" + b.dataset.mark);
+      b.title = name;
+      b.setAttribute("aria-label", name);
+    });
+    bar.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-mark]");
+      if (!b) return;
+      var ta = $("body");
+      var out = applyMark(ta.value, ta.selectionStart, ta.selectionEnd, b.dataset.mark,
+                          { text: t("app.mark_link_text"), url: t("app.mark_link_url") });
+      ta.value = out.value;
+      ta.focus();
+      ta.setSelectionRange(out.start, out.end);
+      state.body = ta.value;
+      drawShots(); save();
+    });
+  })();
+
   // ------------------------------------------------------------- preview
   // The post as the blog would show it, near enough: the markdown this
   // page knows -- paragraphs, headings, bold, italic, strikethrough,

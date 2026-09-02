@@ -96,6 +96,10 @@ leaves a 404 in the console.
   And a preview, in those same stylesheets, of the post as the blog
   would show it -- near enough to see its shape before it leaves the
   phone; the draft's own preview after sending is the exact one.
+  Above the text, a row of marks -- bold, italic, strikethrough, code,
+  link, heading, quote, lists, code block -- that wrap what is selected
+  and come off again on a second tap. And the page speaks the blog's
+  language, not the phone's.
 - **`publish: yes` in a file's front matter publishes it on arrival.** The
   one thing a file may ask for that the wizard never could. A post sent
   from a phone has no desk to come back to, so the choice draft-or-public
