@@ -487,6 +487,8 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    back from.
 4. **Open URLs**: `shortcuts://run-shortcut?name=UploadIncoming`.
 
+![Shortcut A as the Shortcuts app shows it: the Repeat with Each loop with the If around Encode Media, the base64 Text and Add to Variable, then Combine Text, Save File and Open URLs](shortcut-a.png)
+
 *Shortcut B*, named exactly `UploadIncoming`, not in the Share Sheet:
 
 1. **Get File** `incoming/batch.txt` from the Shortcuts folder, without
