@@ -19,19 +19,20 @@ by something that is not a person -- a phone shortcut, a cron job, a
 script. Around those, a row of share controls under each post, an icon a
 tag can carry, a way out of the trash and the versions, and eleven places
 where the engine behaved differently depending on whether a terminal
-happened to be watching.
+happened to be watching -- nine of them named below.
 
 The cache is the change everyone will feel. Publishing used to cost the
 size of the archive rather than the size of the change: a post dated
-today alters twelve files out of eight thousand, and the build rendered
-all eight thousand and read all eight thousand back off disk to find that
-out. It now records what each page was made of and skips the ones whose
-inputs have not moved. Measured on this project's own archive of 6,639
-posts, a rebuild that changes nothing costs 44% of what it did and an
-ordinary publish about half; backdating into the early 2000s still costs
-four fifths, because a post landing in 2003 moves 766 files and there is
-no way around that. On the server that archive lives on, a full first
-build and upload took 197 seconds and the next build 9.
+today alters a dozen files, and the build rendered every page in the
+archive and read every one back off disk to find that out. It now
+records what each page was made of and skips the ones whose inputs have
+not moved. Measured on this project's own archive of 6,639 posts and
+13,465 published files, a rebuild that changes nothing costs 44% of what
+it did and an ordinary publish about half; backdating into the early
+2000s still costs four fifths, because a post landing there moves every
+listing page between the front page and where it lands, and there is no
+way around that. On the server that archive lives on, a full first build
+and upload took 197 seconds and the next build 9.
 
 Nothing to migrate -- `git pull`, rebuild, deploy. Four things happen by
 themselves on an existing site. The first build after the upgrade is a
@@ -64,9 +65,15 @@ leaves a 404 in the console.
   would ask, this refuses and writes nothing -- a photo that has not
   finished uploading, an empty body, a file that is not text, a second
   filename. `--json` answers as one object on standard output and nothing
-  else: `slug`, `path`, `state`, `url`, `deploy`, `warnings`, every key
-  always present, exit code 0 or 1. It stops at the draft, because the
-  file says *write this down*, not *put it in front of the world*.
+  else. A post that was written: `slug`, `path`, `state`, `url`,
+  `deploy`, `warnings`, every key always present. A refusal: `ok: false`,
+  the reason as a code, and a sentence -- and it leaves with **zero**
+  too, because iOS Shortcuts throws away the output of a command that
+  failed, and the reason is the whole point. A non-zero status answers
+  what the object cannot: no answer arrived at all -- the engine is
+  missing, the machine is not set up. Without `--json` nothing changes:
+  prose on stderr and a non-zero status, as always. It stops at the
+  draft unless the file asks otherwise -- see `publish: yes` below.
 - **A post can be sent from a phone.** `scripts/receive.sh` takes a
   whole post over one connection -- for each file its name on a line,
   its base64, and a line holding a dot -- and puts the files in
@@ -74,39 +81,48 @@ leaves a 404 in the console.
   arriving is what makes the post. No archive and nothing to unpack:
   what an untrusted sender chooses is a filename and a stream of bytes,
   and both are bounded -- every name is checked before anything is
-  written, and a delivery over the ceiling is read to its end into
-  nothing and refused as `too_large`, so the sender hears why instead of
-  sitting on a closed channel. **Nothing new listens on the network** --
+  written, a delivery over the ceiling is drained rather than cut off, up
+  to four times the ceiling more, so an honest overshoot finishes and
+  hears `too_large` instead of sitting on a closed channel, and a
+  connection that opens and says nothing is let go after thirty seconds
+  rather than holding a process for as long as it lasts. **Nothing new
+  listens on the network** --
   it travels over the SSH the server already has, and the key wants a
   forced command.
 - **And a page to write it on: `/write/`.** Set `write: true` and the
   build publishes a small editor -- a title, the text, tags and
   photographs, each picture with its description, everything kept in the
-  browser between visits. The send button hands the files to an iOS
-  shortcut, which carries them over. It is served from the blog it writes
-  to, so the same `git pull` moves both ends of the protocol and they
-  cannot drift apart; it is off by default, marked `noindex`, and holds no
-  secret -- what sending needs is the key in the shortcut, on the phone.
-  The answer comes back to the same page: the shortcut opens it with
-  the server's reply in the address, as base64 after `#b=`, and it says
-  what was kept, where the preview or the post is, and what was refused
-  -- in the reader's language, with the draft cleared from the device
-  once the server has the post.
-  The page wears the blog it writes to: the build puts `site.js` beside
-  it with the site's name and claim for the header, its palette, its
-  favicon, and every tag it has used with a count, offered as they are
-  typed -- what the blog has tagged in the last year first -- so a tag
-  is tapped rather than spelt a second way.
-  And a preview, in those same stylesheets, of the post as the blog
-  would show it -- near enough to see its shape before it leaves the
-  phone; the draft's own preview after sending is the exact one.
-  Above the text, a row of marks -- bold, italic, strikethrough, code,
-  link, heading, quote, lists, code block -- that wrap what is selected
-  and come off again on a second tap. And the page speaks the blog's
-  language, not the phone's.
-  A video goes the same way as a picture, as it is, and the page says
-  how much the server takes before the phone spends the upload finding
-  out.
+  browser between visits: the text in local storage, the pictures' bytes
+  in IndexedDB, because five megabytes is all local storage gets and one
+  phone video is more than that. The send button hands the files to a
+  pair of iOS shortcuts -- one takes them from the share sheet, the other
+  opens the connection, because the shortcut that receives may not open
+  one. It is served from the blog it writes to, so the same `git pull`
+  moves both ends of the protocol and they cannot drift apart; it is off
+  by default, marked `noindex`, and holds no secret -- what sending needs
+  is the key in the shortcut, on the phone. Above the send button, a
+  Draft | Publish switch: choosing Publish renames the button, so the
+  thumb knows what it is about to do, and writes `publish: yes` into the
+  markdown. The answer comes back to the same page: the shortcut opens
+  it with the server's reply in the address, as base64 after `#b=`, and
+  it says what was kept, where the preview or the post is, and what was
+  refused -- in the reader's language where the page knows the code --
+  with the draft cleared from the device once the server has the post.
+- **The page wears the blog it writes to.** The build puts `site.js`
+  beside it with the site's name and claim for the header, its palette,
+  its favicon, and every tag it has used, with two counts -- all time,
+  and the last twelve months. An empty field offers what the blog has
+  tagged in the last year; typing searches every tag it has, most used
+  first -- so a tag is tapped rather than spelt a second way. And the
+  page speaks the blog's language, not the phone's.
+- **A preview, a row of marks, and video.** A preview, in the blog's own
+  stylesheets, of the post as the blog would show it -- near enough to
+  see its shape before it leaves the phone; the draft's own preview after
+  sending is the exact one. Above the text, a row of marks -- bold,
+  italic, strikethrough, code, link, heading, quote, lists, code block --
+  that wrap what is selected and come off again on a second tap. And a
+  video goes the same way as a picture, as it is, and the page says how
+  much the server takes before the phone spends the upload finding out.
 - **`publish: yes` in a file's front matter publishes it on arrival.** The
   one thing a file may ask for that the wizard never could. A post sent
   from a phone has no desk to come back to, so the choice draft-or-public
@@ -130,9 +146,11 @@ leaves a 404 in the console.
   the slug spelled out rather than picking from a list.
 - **A row of share controls under a post.** Off unless `share:` names
   what you want, drawn in the order you name it. What is prefilled is the
-  post's own name and its address; the reader writes the part that is
-  theirs. Bluesky, mail, Facebook, LinkedIn, Threads and X are plain
-  links. Three are not: the fediverse has as many addresses as it has
+  post's own name and its address, where the target takes both --
+  Facebook and LinkedIn take the address alone and read the name off the
+  page; the reader writes the part that is theirs. `bluesky`, `email`,
+  `facebook`, `linkedin`, `threads` and `x` are plain links. Three are
+  not: the fediverse has as many addresses as it has
   instances and a page cannot know which is the reader's, so `mastodon`
   is a button that asks -- in a row that opens under the controls, in the
   site's own type, remembered in that browser afterwards. `copy` puts the
@@ -162,6 +180,12 @@ leaves a 404 in the console.
   a trash with posts in it is a trash doing its job, but nothing on the
   site ever mentioned it, and on the installation this engine was built
   around the only way to see it was `du` on the server.
+- **`check` says when a post asks for a `type:` the engine does not
+  know.** `type: story` was stored on the post and read by nobody: no
+  listing, no menu entry, no icon, and not a word about why. The eight it
+  knows are named, and so is the route somebody reaching for a ninth
+  usually wants -- a tag named in `nav:`, which gives a listing with its
+  own pagination, a menu entry and an RSS feed. Asked for in issue #42.
 
 ### Changed
 
@@ -192,7 +216,8 @@ leaves a 404 in the console.
   the tag icons**: whether the name is one the engine has, whether a
   hand-written `icon_svg` contains an `<svg>` at all, and whether it is
   drawn to the same scale as the rest. An unknown name drew an empty space
-  and nothing said why. It checks the `share:` list the same way.
+  and nothing said why. It checks the `share:` list too, for a name the
+  engine does not have.
 
 ### Fixed
 
@@ -270,6 +295,20 @@ leaves a 404 in the console.
   it.** Text left in the editor buffer by an interrupted session survives
   when you continue without it, and the line saying so was printed only
   after a restore.
+
+### Not fixed, on purpose
+
+- **Backdating still costs four fifths of a full build.** A post landing
+  in 2003 moves every listing page between the front page and there, and
+  those pages genuinely changed; the cache skips what did not, and cannot
+  skip what did.
+- **A nested list item is not in a post's excerpt.** It is findable --
+  search reaches it now -- but the excerpt, the description, the reading
+  time and the word count are all cut from the same plain text, and
+  widening it to fix a search would have changed all four.
+- **There is no `pixelfed` in `share:`.** Pixelfed has no address a page
+  can hand a post to; a button that opened nothing would be worse than
+  none.
 
 ## 1.5 -- 2026-08-30
 

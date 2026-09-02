@@ -385,10 +385,14 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
 
 ```bash
 ./blog.sh                      # interactive wizard (menu)
-./blog.sh add                  # creates a draft, shows a preview, asks what's next
+./blog.sh add [<file>] [--json]
+                               # creates a draft, shows a preview, asks what's next;
+                               # with a markdown file it asks nothing, and --json answers as data
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
 ./blog.sh props [<slug>]       # a post's state + actions (publish, rename the slug, delete...)
-./blog.sh publish [<slug>]     # shows the draft's preview, asks what's next
+./blog.sh publish [<slug>] [--yes] [--no-announce]
+                               # shows the draft's preview, asks what's next;
+                               # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky
 ./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/

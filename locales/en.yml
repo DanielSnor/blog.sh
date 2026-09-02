@@ -315,7 +315,7 @@ cli:
   add_file_empty: "Nothing to write: %{file} has no content below the frontmatter."
   add_file_missing_images: "These files are not there yet: %{files}. Upload them to %{dir} first -- nothing was written. (Interactive `add` waits for them; with a file argument there is nobody to wait for.)"
   add_json_needs_file: "--json needs a file to read: `add <file> --json`. Without one, `add` opens an editor and there is nothing to report until it closes."
-  add_unknown_option: "Unknown option: %{option}. add takes a file and --json, nothing else."
+  add_unknown_option: "Unknown option: %{option}. add takes a file, --json and --untrusted, nothing else."
   publish_unknown_option: "Unknown option: %{option}. publish takes a slug, --yes and --no-announce, nothing else."
   publish_yes_needs_slug: "--yes needs to name the post: `publish <slug> --yes`. Without a slug, publish offers the drafts to choose from -- and choosing is something to do with the preview in front of you, not one keystroke away from an announcement that cannot be recalled."
   no_announce_not_scheduled: "Note: --no-announce does not reach the scheduled publish. The cron works from the post itself, so it will announce this one when its date arrives. To keep it quiet, publish it by hand with --no-announce, or mark it unlisted."

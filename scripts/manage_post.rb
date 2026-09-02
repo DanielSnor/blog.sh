@@ -1117,16 +1117,16 @@ end
 # handed over instead of typed into an editor.
 #
 # The point is a route that never asks -- something a phone shortcut, a
-# cron job or a Claude artifact can call and know the answer from the exit
-# code alone. So every question the wizard asks is either answered from
-# the file or refused outright; none of them is allowed to sit and wait
-# for a keypress that will never come.
+# cron job or a script can call and know the answer from the exit code
+# alone. So every question the wizard asks is either answered from the
+# file or refused outright; none of them is allowed to sit and wait for a
+# keypress that will never come.
 #
-# Deliberately NOT a publish: the file makes a draft, exactly as typing it
-# would, and putting it on the site stays a second, separate decision
-# (`publish <slug> --yes`). A command that both accepted a file and
-# announced it to the world on the same keystroke is one typo away from an
-# unrecallable toot.
+# A draft unless the file says otherwise: it makes a draft exactly as
+# typing it would, and putting it on the site stays a second, separate
+# decision (`publish <slug> --yes`) -- unless the front matter carries
+# `publish: yes`, the one thing a file may ask for that the wizard never
+# could, because a post sent from a phone has no desk to come back to.
 def add_from_file(source, json: false, confined: false)
   JSON_REFUSALS[:enabled] = json
   file = IncomingPath.resolve(source, INCOMING_DIR)

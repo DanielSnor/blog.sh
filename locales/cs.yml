@@ -298,7 +298,7 @@ cli:
   add_file_empty: "Není co zapsat: %{file} nemá pod hlavičkou žádný obsah."
   add_file_missing_images: "Tyhle soubory tu ještě nejsou: %{files}. Nahraj je nejdřív do %{dir} — nic se nezapsalo. (Interaktivní `add` na ně počká, tady ale není kdo by čekal.)"
   add_json_needs_file: "--json potřebuje soubor ke čtení: `add <soubor> --json`. Bez něj `add` otevře editor a až do jeho zavření není co hlásit."
-  add_unknown_option: "Neznámý přepínač: %{option}. add bere soubor a --json, nic jiného."
+  add_unknown_option: "Neznámý přepínač: %{option}. add bere soubor, --json a --untrusted, nic jiného."
   publish_unknown_option: "Neznámý přepínač: %{option}. publish bere slug, --yes a --no-announce, nic jiného."
   publish_yes_needs_slug: "--yes musí pojmenovat post: `publish <slug> --yes`. Bez slugu nabídne publish drafty na výběr — a vybírat se má nad náhledem, ne jedním klávesovým úhozem od oznámení, které nejde vzít zpět."
   no_announce_not_scheduled: "Pozor: --no-announce se do naplánované publikace nepřenese. Cron se řídí samotným postem, takže ho v jeho čase oznámí. Když má zůstat potichu, publikuj ho ručně s --no-announce, nebo ho označ jako unlisted."

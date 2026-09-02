@@ -42,7 +42,6 @@ require_relative '../lib/checker'
 # process finally exited.
 $stdout.sync = true
 
-
 # An unknown switch is refused rather than ignored. `--online` sat here
 # unimplemented for a while and a run that quietly accepted it told its
 # user that external links had been checked when nothing had left the
