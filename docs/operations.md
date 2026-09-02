@@ -980,16 +980,15 @@ rather than a file under `public.nosync`: something to go and fix.
 What it looks for, each with a line saying what to do about it:
 
 - **A post file that will not read, a date nothing can parse, a post whose
-  text is not a list of blocks, or a slug that is not one path segment
-  (a slash or a `..` in it).** The build refuses to run on any of them, or
-  writes the page nowhere good, so check says so first: without this it
-  counted the archive minus the broken file and called the rest sound.
-- **A `type:` the engine does not know.** It is stored on the post and
-  read by nobody: the eight it knows are text, quote, chat, image, video,
-  audio, link and document, and anything else gets no listing, no menu
-  entry and no icon of its own. The fix line points at the tag route,
-  which is usually what somebody reaching for a new type wanted -- a tag
-  named in `nav:` has a listing, pagination, a menu entry and a feed.
+  text is not a list of blocks, a slug that is not one path segment
+  (a slash or a `..` in it), or a `type:` the engine does not know.** The
+  build refuses to run on the first four, or writes the page nowhere
+  good, so check says so first: without this it counted the archive minus
+  the broken file and called the rest sound. The unknown type is stored
+  on the post and read by nobody -- no listing, no menu entry, no icon --
+  and the fix line points at the tag route, which is usually what
+  somebody reaching for a ninth type wanted: a tag named in `nav:` has a
+  listing, pagination, a menu entry and a feed.
 - **A file a queue move stepped aside and a crash left parked.** The
   parking name is dotted precisely so no listing shows it -- which also
   means nothing would ever find one again without this. What to do with
