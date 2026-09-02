@@ -48,6 +48,7 @@
   }
   var saveTimer = null;
   function save() {
+    drawBatch();
     // Debounced: this runs on every keystroke and the body can hold photos
     // as data URLs, so writing on each one makes typing stutter.
     clearTimeout(saveTimer);
@@ -303,6 +304,34 @@
     base = base.normalize ? base.normalize("NFKD").replace(/[̀-ͯ]/g, "") : base;
     base = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     return (base || "post").slice(0, 40) + ".md";
+  }
+
+  // ---------------------------------------------------------------- size
+  // What is about to travel, counted from what is on the device, so the
+  // wait afterwards is not a mystery. The wire carries a third more --
+  // the batch is base64 -- and one connection carries all of it.
+  function batchSize() {
+    var bytes = 0;
+    state.shots.forEach(function (shot) {
+      var data = String(shot.data || "");
+      bytes += Math.floor((data.length - (data.indexOf(",") + 1)) * 3 / 4);
+    });
+    bytes += new TextEncoder().encode(markdown()).length;
+    return { pictures: state.shots.length, bytes: bytes };
+  }
+
+  function formatBytes(n) {
+    if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + " kB";
+    return String(Math.round(n / 1024 / 1024 * 10) / 10).replace(".", t("app.decimal")) + " MB";
+  }
+
+  // "3 pictures, 4.2 MB" -- with the plural the reader's language wants:
+  // one, a few (two to four, which Czech counts differently), many.
+  function describeBatch(size) {
+    var n = size.pictures;
+    var what = n === 0 ? t("app.text_only")
+             : n + " " + t(n === 1 ? "app.pictures_1" : n < 5 ? "app.pictures_few" : "app.pictures_many");
+    return what + ", " + formatBytes(size.bytes);
   }
 
   // ----------------------------------------------------------------- zip
@@ -616,7 +645,7 @@
       return;
     }
     this.dataset.anyway = "";
-    say(t("app.sending"));
+    say(t("app.handing").replace("{what}", describeBatch(batchSize())));
     var files = buildFiles();
     // Sharing hands the files to the shortcut. Whether a browser will do
     // ⚠️ canShare is a far smaller question than it looks: it answers
@@ -802,12 +831,23 @@
   }
 
   // --------------------------------------------------------------- start
+  function drawBatch() {
+    var el = $("batch");
+    if (!el) return;
+    var size = batchSize();
+    // Nothing to say about an empty page.
+    var empty = !state.shots.length && !state.body.trim();
+    el.hidden = empty;
+    el.textContent = empty ? "" : t("app.batch").replace("{what}", describeBatch(size));
+  }
+
   function render() {
     $("title").value = state.title;
     $("body").value = state.body;
     $("tags").value = state.tags;
     drawShots();
     drawMode();
+    drawBatch();
     $("kept").hidden = !(state.title || state.body || state.shots.length);
     $("kept").textContent = t("app.saved_locally");
   }
