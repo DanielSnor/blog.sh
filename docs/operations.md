@@ -397,8 +397,10 @@ heading, quote, list, numbered list, code block. A paired mark wraps
 what is selected, and a second tap takes it off; with nothing selected
 it puts the pair in and leaves the caret between. A line mark goes to
 the start of every line the selection touches, and comes off the same
-way. The link mark reads the selection: an address gets the words left
-to type, words get the address.
+way. The link mark reads the selection, widened to whole words: an
+address -- `https://…`, or a bare domain, which gets its `https://` --
+becomes a link with the words left to type; words become one with the
+address left to type.
 
 *Preview*, under the text, shows the post as the blog would show it --
 in the blog's own stylesheets, which `site.js` names, with the pictures

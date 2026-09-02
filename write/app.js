@@ -880,14 +880,27 @@
     }
     if (kind === "link") {
       var w = words || {};
+      // The whole word, when the selection stops inside one: a phone
+      // selects a word up to its dot, so "sean.cz" arrived as "sean." --
+      // and half an address is no address. A bare caret takes the word
+      // it stands in or just after. Brackets and the punctuation a
+      // sentence puts around a word stay outside the link.
+      while (start > 0 && /\S/.test(v.charAt(start - 1))) start--;
+      while (end < v.length && /\S/.test(v.charAt(end))) end++;
+      while (start < end && /[([{"']/.test(v.charAt(start))) start++;
+      while (end > start && /[)\]}.,;:!?"']/.test(v.charAt(end - 1))) end--;
+      sel = v.slice(start, end);
       var isUrl = /^(https?:\/\/|mailto:)\S+$/i.test(sel);
+      // A bare domain is an address too, and its own best label.
+      var isDomain = !isUrl && /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/i.test(sel);
       var label = isUrl ? String(w.text || "text") : (sel || String(w.text || "text"));
-      var url = isUrl ? sel : String(w.url || "https://");
+      var url = isUrl ? sel : isDomain ? "https://" + sel : String(w.url || "https://");
       var out = "[" + label + "](" + url + ")";
-      // What is left selected is what the author still has to type: the
-      // words for a bare address, the address for bare words.
-      var from = isUrl ? start + 1 : start + 1 + label.length + 2;
-      var len = isUrl ? label.length : url.length;
+      // What is left selected is what the author may still want to type:
+      // the words for an address, the address for words.
+      var onLabel = isUrl || isDomain;
+      var from = onLabel ? start + 1 : start + 1 + label.length + 2;
+      var len = onLabel ? label.length : url.length;
       return { value: v.slice(0, start) + out + v.slice(end), start: from, end: from + len };
     }
     if (kind === "fence") {
