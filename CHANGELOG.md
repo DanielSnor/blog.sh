@@ -92,6 +92,9 @@ leaves a 404 in the console.
   it with the site's name and claim for the header, its palette, its
   favicon, and every tag it has used with a count, offered as they are
   typed so a tag is tapped rather than spelt a second way.
+  And a preview, in those same stylesheets, of the post as the blog
+  would show it -- near enough to see its shape before it leaves the
+  phone; the draft's own preview after sending is the exact one.
 - **`publish: yes` in a file's front matter publishes it on arrival.** The
   one thing a file may ask for that the wizard never could. A post sent
   from a phone has no desk to come back to, so the choice draft-or-public

@@ -387,6 +387,12 @@ or contains the letters so far -- so a tag is tapped rather than typed,
 and typed as it was before instead of the blog growing a second
 spelling of it.
 
+*Preview*, under the text, shows the post as the blog would show it --
+in the blog's own stylesheets, which `site.js` names, with the pictures
+in their places. Near enough, not exact: the engine renders the real
+thing, and the draft's preview after sending is that. What it is for is
+seeing the shape of a post before it leaves the phone.
+
 Pressing send hands the files to iOS: **one for each picture, and one for
 the text**. There is no archive anywhere in this.
 

@@ -89,6 +89,14 @@ textarea{resize:vertical;line-height:1.6}
 .tagrow button{font:inherit;font-size:.8rem;padding:.25rem .65rem;border-radius:99px;
   border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
 .tagrow button b{font-weight:400;color:var(--meta);margin-left:.3rem}
+/* The post as the blog would show it, in the blog's own stylesheets: an
+   iframe, because those stylesheets are written for a whole page and would
+   restyle this one. Sized to its content once it has loaded. */
+.hintrow{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline}
+.hintrow .link{white-space:nowrap;flex:0 0 auto}
+.preview{margin-top:.6rem;display:flex;flex-direction:column;gap:.35rem}
+.preview iframe{width:100%;min-height:6rem;border:1px solid var(--border);
+  border-radius:var(--radius);background:#fff}
 .link{background:none;border:none;padding:0;color:var(--accent);font:inherit;
   font-size:.8rem;text-decoration:underline;cursor:pointer}
 /* The insert is the picture's primary action, so it is a real button --
@@ -177,7 +185,14 @@ details.server .field{margin:.8rem 0 .2rem}
   <div class="field">
     <label for="body" data-t="app.body_label"></label>
     <textarea id="body"></textarea>
-    <span class="hint" data-t="app.body_hint"></span>
+    <div class="hintrow">
+      <span class="hint" data-t="app.body_hint"></span>
+      <button type="button" class="link" id="preview" data-t="app.preview"></button>
+    </div>
+    <div class="preview" id="preview-box" hidden>
+      <iframe id="preview-frame" sandbox="allow-same-origin"></iframe>
+      <span class="hint" data-t="app.preview_note"></span>
+    </div>
   </div>
 
   <div class="field">

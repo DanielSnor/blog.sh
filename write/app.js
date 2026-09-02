@@ -49,6 +49,7 @@
   var saveTimer = null;
   function save() {
     drawBatch();
+    schedulePreview();
     // Debounced: this runs on every keystroke and the body can hold photos
     // as data URLs, so writing on each one makes typing stutter.
     clearTimeout(saveTimer);
@@ -834,6 +835,145 @@
       b.appendChild(n);
       row.appendChild(b);
     });
+  }
+
+  // ------------------------------------------------------------- preview
+  // The post as the blog would show it, near enough: the markdown this
+  // page knows -- paragraphs, headings, bold, italic, strikethrough,
+  // code, links, quotes, lists, fenced code, and a picture on a line of
+  // its own -- rendered here and dressed in the blog's own stylesheets,
+  // which site.js names. Near enough, not exact: the engine renders the
+  // real thing, and the draft's preview after sending is that. What this
+  // is for is seeing the shape of a post before it leaves the phone.
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // Code spans first and kept apart, so a * inside one is not emphasis.
+  function inlineHtml(text) {
+    return String(text).split(/(`[^`]+`)/).map(function (piece) {
+      if (/^`[^`]+`$/.test(piece)) return "<code>" + escapeHtml(piece.slice(1, -1)) + "</code>";
+      var out = escapeHtml(piece);
+      out = out.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      out = out.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+      out = out.replace(/~~(.+?)~~/g, "<del>$1</del>");
+      // A link only to somewhere a link may go; anything else stays words.
+      // One level of parentheses inside an address, as the engine allows:
+      // a Wikipedia link ends in one more often than not.
+      out = out.replace(/\[([^\]]+)\]\(((?:\([^()\s]*\)|[^)\s])+)\)/g, function (_, label, url) {
+        return /^(https?:\/\/|mailto:|\/)/i.test(url) ? '<a href="' + url + '">' + label + "</a>" : label;
+      });
+      return out;
+    }).join("");
+  }
+
+  function renderMarkdown(md, shots) {
+    var byName = {};
+    (shots || []).forEach(function (shot) { byName[shot.name] = shot; });
+    var lines = String(md || "").replace(/\r\n?/g, "\n").split("\n");
+    var html = [], para = [], i = 0, m;
+    var LIST = /^\s*([-*+]|\d+\.)\s+/;
+    function flush() {
+      if (para.length) html.push("<p>" + inlineHtml(para.join("\n")) + "</p>");
+      para = [];
+    }
+    while (i < lines.length) {
+      var line = lines[i];
+      if (/^```/.test(line)) {
+        flush();
+        var code = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i])) code.push(lines[i++]);
+        i++;
+        html.push('<pre class="code-block"><code>' + escapeHtml(code.join("\n")) + "</code></pre>");
+        continue;
+      }
+      if ((m = /^(#{1,3})\s+(.+)$/.exec(line))) {
+        flush();
+        var level = m[1].length + 1;   // a post's own title is the h1
+        html.push("<h" + level + ">" + inlineHtml(m[2]) + "</h" + level + ">");
+        i++; continue;
+      }
+      if ((m = /^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line))) {
+        flush();
+        var shot = byName[m[2]];
+        if (shot && !shot.raw) {
+          html.push('<figure><img src="' + shot.data + '" alt="' + escapeHtml(m[1]) + '"></figure>');
+        } else {
+          // A picture the browser could not decode has no bytes to show
+          // here; the blog converts it on arrival. Said in the box where
+          // it will stand, rather than left out as if the line were not
+          // there.
+          html.push('<figure><div class="no-preview">' +
+                    escapeHtml(t("app.preview_missing_picture").replace("{name}", m[2])) + "</div></figure>");
+        }
+        i++; continue;
+      }
+      if (/^>\s?/.test(line)) {
+        flush();
+        var quote = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])) quote.push(lines[i++].replace(/^>\s?/, ""));
+        html.push("<blockquote><p>" + inlineHtml(quote.join("\n")) + "</p></blockquote>");
+        continue;
+      }
+      if (LIST.test(line)) {
+        flush();
+        var ordered = /^\s*\d+\./.test(line);
+        var items = [];
+        while (i < lines.length && LIST.test(lines[i])) items.push("<li>" + inlineHtml(lines[i++].replace(LIST, "")) + "</li>");
+        html.push((ordered ? "<ol>" : "<ul>") + items.join("") + (ordered ? "</ol>" : "</ul>"));
+        continue;
+      }
+      if (line.trim() === "") { flush(); i++; continue; }
+      para.push(line);
+      i++;
+    }
+    flush();
+    return html.join("\n");
+  }
+
+  // A whole page for the iframe, wearing the stylesheets a post page
+  // wears -- the same paths, resolved against this site, so the preview
+  // changes when the skin does.
+  function previewDocument(bodyHtml) {
+    var sheets = (SITE && SITE.css) || [];
+    var links = sheets.map(function (href) {
+      return '<link rel="stylesheet" href="' + escapeHtml(href) + '">';
+    }).join("");
+    var title = state.title.trim() ? "<h1>" + escapeHtml(state.title.trim()) + "</h1>" : "";
+    return '<!doctype html><html lang="' + escapeHtml((SITE && SITE.lang) || LANG) + '"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1"><base href="/">' + links +
+      "<style>body{margin:0;padding:1rem}figure{margin:1rem 0}figure img{max-width:100%;height:auto}" +
+      ".no-preview{padding:1rem;border:1px dashed currentColor;opacity:.6;font-size:.9em}</style></head>" +
+      '<body><main><article><div class="post-header">' + title + '</div><div class="post-body">' +
+      bodyHtml + "</div></article></main></body></html>";
+  }
+
+  var previewOpen = false, previewTimer = null;
+  function drawPreview() {
+    var box = $("preview-box"), btn = $("preview");
+    if (!box || !btn) return;
+    btn.textContent = t(previewOpen ? "app.preview_hide" : "app.preview");
+    box.hidden = !previewOpen;
+    if (!previewOpen) return;
+    var frame = $("preview-frame");
+    frame.title = t("app.preview");
+    frame.onload = function () {
+      try { frame.style.height = Math.max(96, frame.contentDocument.documentElement.scrollHeight + 8) + "px"; }
+      catch (e) { /* the frame's height stays as it is */ }
+    };
+    frame.srcdoc = previewDocument(renderMarkdown(state.body, state.shots));
+  }
+  // Redrawn a moment after the typing stops, not on each keystroke: the
+  // pictures ride inside the document as data URLs, and re-parsing them
+  // per letter makes the keyboard lag.
+  function schedulePreview() {
+    if (!previewOpen) return;
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(drawPreview, 350);
+  }
+  if ($("preview")) {
+    $("preview").addEventListener("click", function () { previewOpen = !previewOpen; drawPreview(); });
   }
 
   // -------------------------------------------------------------- answer
