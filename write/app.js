@@ -1308,6 +1308,21 @@
   }
 
   // --------------------------------------------------------------- start
+  // ⚠️ The bar at the bottom covers whatever the page's bottom padding
+  // does not clear -- and the padding was a figure guessed when the bar
+  // was one row. It has a mode row and a message line now, and the line
+  // wraps; on a phone the end of the form, the very button that adds a
+  // picture, sat under it and could not be scrolled to. Measured, and
+  // measured again whenever the bar changes height.
+  (function () {
+    var bar = document.querySelector(".bar");
+    if (!bar) return;
+    function clear() { document.body.style.paddingBottom = (bar.offsetHeight + 24) + "px"; }
+    clear();
+    if (window.ResizeObserver) new ResizeObserver(clear).observe(bar);
+    window.addEventListener("resize", clear);
+  })();
+
   function maxMb() { return (SITE && Number(SITE.max_mb)) || 24; }
 
   function drawBatch() {

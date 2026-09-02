@@ -42,8 +42,11 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--text);
   font:400 16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   -webkit-text-size-adjust:100%;
-  /* room for the sticky bar, plus the home indicator on a phone */
-  padding-bottom:calc(5.5rem + env(safe-area-inset-bottom))}
+  /* Room for the bar at the bottom, plus the home indicator on a phone.
+     A first guess only: the bar has a mode row and a message line now
+     and grows with the message, so the script below measures it and
+     sets the real figure. */
+  padding-bottom:calc(9rem + env(safe-area-inset-bottom))}
 .wrap{max-width:42rem;margin:0 auto;padding:1rem 1rem 0}
 
 /* The blog's own mark on the left, then two lines: what this page is, and
