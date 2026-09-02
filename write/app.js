@@ -1373,9 +1373,13 @@
       if (!post) add("h2", t("app.result_refused"));
       d.refused.forEach(function (r) {
         // The code in the reader's language where the app knows it, the
-        // server's own words where it does not.
+        // server's own words where it does not -- and beside the
+        // translation where it does, because the server's words carry
+        // what the code cannot: which line, which picture.
         var known = t("error." + r.error);
-        add("p", known !== "error." + r.error ? known : (r.message || r.error), "bad");
+        var text = known !== "error." + r.error ? known : (r.message || r.error);
+        if (known !== "error." + r.error && r.message && r.message !== known) text += " (" + r.message + ")";
+        add("p", text, "bad");
       });
     }
     if (d.stored.length) add("p", t("app.result_stored") + ": " + d.stored.join(", "), "meta");

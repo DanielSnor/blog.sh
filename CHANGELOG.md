@@ -67,14 +67,18 @@ leaves a 404 in the console.
   else: `slug`, `path`, `state`, `url`, `deploy`, `warnings`, every key
   always present, exit code 0 or 1. It stops at the draft, because the
   file says *write this down*, not *put it in front of the world*.
-- **A post can be sent from a phone.** `scripts/receive.sh` takes one
-  file per connection -- the name on the first line, its base64 after it
-  -- and puts it in `incoming/`. Pictures go first and the markdown last,
-  and the markdown arriving is what makes the post. Ninety-one lines, no
-  archive and nothing to unpack: what an untrusted sender chooses is a
-  filename and a stream of bytes, and both are bounded. **Nothing new
-  listens on the network** -- it travels over the SSH the server already
-  has, and the key wants a forced command.
+- **A post can be sent from a phone.** `scripts/receive.sh` takes a
+  whole post over one connection -- for each file its name on a line,
+  its base64, and a line holding a dot -- and puts the files in
+  `incoming/`. Pictures go first and the markdown last, and the markdown
+  arriving is what makes the post. No archive and nothing to unpack:
+  what an untrusted sender chooses is a filename and a stream of bytes,
+  and both are bounded -- every name is checked before anything is
+  written, and a delivery over the ceiling is read to its end into
+  nothing and refused as `too_large`, so the sender hears why instead of
+  sitting on a closed channel. **Nothing new listens on the network** --
+  it travels over the SSH the server already has, and the key wants a
+  forced command.
 - **And a page to write it on: `/write/`.** Set `write: true` and the
   build publishes a small editor -- a title, the text, tags and
   photographs, each picture with its description, everything kept in the
@@ -84,10 +88,10 @@ leaves a 404 in the console.
   cannot drift apart; it is off by default, marked `noindex`, and holds no
   secret -- what sending needs is the key in the shortcut, on the phone.
   The answer comes back to the same page: the shortcut opens it with
-  the server's reply after `#r=`, and it says what was kept, where the
-  preview or the post is, and what was refused -- in the reader's
-  language, with the draft cleared from the device once the server has
-  the post.
+  the server's reply in the address, as base64 after `#b=`, and it says
+  what was kept, where the preview or the post is, and what was refused
+  -- in the reader's language, with the draft cleared from the device
+  once the server has the post.
   The page wears the blog it writes to: the build puts `site.js` beside
   it with the site's name and claim for the header, its palette, its
   favicon, and every tag it has used with a count, offered as they are

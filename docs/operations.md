@@ -368,7 +368,12 @@ for itself, which on this route is the only place to hear it: a photo
 over the size limit, a video whose container some browsers refuse, a
 HEIC that was converted. `url` is empty rather than half an address when
 the site has no `base_url` yet, and the reason is in `warnings`. The
-exit code is 0 or 1, nothing else.
+exit code is 0 or 1, nothing else. A refusal answers in the same place
+and leaves with zero too, as a different object -- `ok`, `error`,
+`message` -- because the status answers a question the object cannot:
+whether an answer arrived at all. Only a flag the command does not have
+and a second filename fall outside this, and those end in prose on
+standard error.
 
 ### A post sent from the phone itself
 
@@ -394,7 +399,8 @@ tapped rather than typed, and typed as it was before instead of the blog
 growing a second spelling of it.
 
 The page speaks the blog's language, `site.lang`, whatever the phone is
-set to; only a page without `site.js` falls back to the browser's. Above
+set to; the browser's is used only where there is no `site.js`, or where
+the blog's language is one the page has not been translated into. Above
 the text sits a row of marks -- bold, italic, strikethrough, code, link,
 heading, quote, list, numbered list, code block. A paired mark wraps
 what is selected, and a second tap takes it off; with nothing selected
@@ -414,7 +420,9 @@ ceiling on one delivery, `BLOGSH_MAX_MB` (24): the page carries that
 number in `site.js`, says under the pictures what happens to a picture,
 what to a video and how much the server takes, and turns the batch line
 red the moment the post outgrows it -- before the phone spends the
-upload finding out. The receiver reads the variable in its own
+upload finding out. The first tap on Send stops there and says it; a
+second tap sends anyway, because the page's number is the build's and
+the server's may have been raised since. The receiver reads the variable in its own
 environment, the forced command's, and the build reads it in the
 build's; raise it in both places or in neither.
 
@@ -425,7 +433,10 @@ thing, and the draft's preview after sending is that. What it is for is
 seeing the shape of a post before it leaves the phone.
 
 Pressing send hands the files to iOS: **one for each picture, and one for
-the text**. There is no archive anywhere in this.
+the text**. Nothing is packed for the server: it takes files, not
+archives. Only where a browser will not hand files over at all -- Safari
+on a Mac -- does the page fall back to saving them as one archive, to be
+unpacked and given to the shortcut by hand.
 
 **Two shortcuts, because the one that receives the files may not open an
 SSH connection.** A shortcut started from the Share Sheet runs in
@@ -450,16 +461,18 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    **Text** of three lines -- `Name.File Extension`, `Base64 Encoded`,
    `.` -- and **Add to Variable** `batch`.
 
-   The If is what makes a video from the phone fit: thirty seconds of
-   HEVC at 32.5 MB came out of Encode Media at 5 MB of H.264, in the
+   The If is what makes a video from the phone fit: a clip from an
+   iPhone, 32.5 MB of HEVC, came out of Encode Media at 5 MB of H.264, in the
    QuickTime container it arrived in, so the extension the batch names
    is still right. A picture takes the Otherwise branch untouched. The
    page cannot know the shortcut does this, so its red line for a video
    measures the original; send anyway, and the answer says what
    arrived.
 2. After the loop: **Combine Text** `batch` with New Lines.
-3. **Save File** the combined text to iCloud Drive, *Ask Where to Save*
-   off, subpath `incoming/batch.txt`, *Overwrite If File Exists* on.
+3. **Save File** the combined text to iCloud Drive, into the Shortcuts
+   folder, *Ask Where to Save* off, subpath `incoming/batch.txt`,
+   *Overwrite If File Exists* on -- the same folder shortcut B reads it
+   back from.
 4. **Open URLs**: `shortcuts://run-shortcut?name=UploadIncoming`.
 
 *Shortcut B*, named exactly `UploadIncoming`, not in the Share Sheet:
@@ -478,13 +491,14 @@ Base64, not URL Encode, and not for taste: Shortcuts reads a reply
 that is JSON as a Dictionary and then refuses to hand a Dictionary to
 URL Encode -- "couldn't convert from Dictionary to Text" -- on exactly
 the replies that matter, the refusals. Base64 Encode takes anything.
-(A page also reads a percent-encoded reply after `#r=`.)
+(The page also still reads a percent-encoded reply after `#r=`.)
 
 The last three carry the answer back to the page. It opens with the
 reply after `#b=` -- a fragment, so it never leaves the browser -- and
 says what the server did: the pictures it kept, the draft's preview
 address or the post's public one, the command that publishes a draft
-from a keyboard, and any refusal in the reader's language. A post the
+from a keyboard, and a refusal in the reader's language where the page
+knows the code, in the server's own words where it does not. A post the
 server took is cleared from the device; a refusal keeps everything, so
 it can be mended and sent again.
 
@@ -545,9 +559,10 @@ of the stream either way -- so half a photograph arrived, decoded into
 half a picture, and was answered with `ok`. Without the dot the transfer
 is refused as `truncated` and nothing is stored.
 
-A shortcut on a phone sends the pictures that way, one connection each,
-and **the markdown last** -- because the markdown arriving is what makes
-the post. Everything its text names is already staged under the name it
+A shortcut on a phone sends a whole post that way -- every picture, then
+the markdown, down one connection -- and **the markdown last**, because
+the markdown arriving is what makes the post. Everything its text names
+is already staged under the name it
 uses, so there is no other signal to send and none is needed. The answer
 to a picture is `{"ok":true,"stored":"photo.jpg"}`; the answer to the
 markdown is the same JSON `add --json` gives.
@@ -557,8 +572,11 @@ worked.** A refusal leaves with zero -- deliberately, because iOS Shortcuts
 discards the output of a remote command that failed, and the reason is the
 whole point of the answer. The cost is that Shortcuts then reports a tick
 for a refusal exactly as it does for a post. End the shortcut by opening the
-page with the answer, as shortcut B above does, or with a *Show Result*
-of the SSH output, and read the `ok` field. Without that, a shortcut whose Input field is empty connects,
+page with the answer, as shortcut B above does, or with a *Show Content*
+of the SSH output. The reply is one JSON object per file, so read it
+whole: a picture answers `"ok":true`, a refusal answers `"ok":false` and
+names the reason, and the post that was written answers with a `slug`
+and no `ok` at all. Without that, a shortcut whose Input field is empty connects,
 waits out the thirty-second deadline, is refused for `empty_input`, and
 shows a tick -- which is a slow, silent way to learn nothing.
 
@@ -579,14 +597,22 @@ uploaded twice.
 **Nothing new listens on the network.** It travels over the SSH the
 server already has, and the key it travels on wants a forced command:
 
-    restrict,command="/path/to/blog/scripts/receive.sh" ssh-ed25519 AAAA... phone
+    restrict,command="/path/to/blog/scripts/receive.sh" ssh-rsa AAAA... phone
+
+The key has to be RSA. Shortcuts' *Run Script over SSH* does not speak
+ed25519 and says nothing when it meets one -- the run simply fails.
 
 **What a stranger chooses is a filename and some bytes**, so that is what
-is checked. A name carrying a path, beginning with a dot, empty, or
-holding a control character is refused (`bad_name`) and nothing is
-written. What arrives is bounded before it lands rather than weighed
-afterwards: `BLOGSH_MAX_MB` (24) is a ceiling on reading, so a sender
-costs that much and not whatever they felt like sending. A delivery that overshoots
+is checked. A name carrying a path or a backslash, beginning with a dot,
+empty, longer than a filesystem will take, or holding a control
+character is refused (`bad_name`) and nothing is written. What arrives
+is bounded before it lands rather than weighed afterwards:
+`BLOGSH_MAX_MB` (24) is a ceiling on reading, so a sender costs that
+much and not whatever they felt like sending. The number is measured on
+the encoded stream, not on the files -- base64 is a third larger -- so a
+24 MB ceiling takes about eighteen megabytes of photographs; the page's
+legend says the same, and the red line it draws counts the encoded
+size. A delivery that overshoots
 is read to its end into nothing -- up to four times the ceiling -- and
 then refused, so the sender finishes and hears `too_large`; refused the
 moment the ceiling was reached, a phone with megabytes still to send sat

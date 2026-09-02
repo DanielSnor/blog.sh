@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Takes ONE file from standard input and puts it in incoming/.
+# Takes a whole post from standard input and puts its files in incoming/.
 #
-#   { printf '%s\n' photo.jpg; base64 < photo.jpg; echo .; } | ./scripts/receive.sh
+#   { printf '%s\n' photo.jpg; base64 < photo.jpg; echo .;
+#     printf '%s\n' post.md;   base64 < post.md;   echo .; } | ./scripts/receive.sh
 #
-# First line the name, then that file's base64, then a line with a dot --
-# which is what says the transfer finished rather than stopped.
-# A shortcut on a phone sends the pictures this way, one connection each,
-# and the markdown last -- and the markdown arriving is what makes the
-# post, because there is no other signal to give and none is needed.
-# Everything before it is already staged under the names its text uses.
+# For each file its name on a line, then its base64, then a line with a
+# dot -- which is what says that file finished rather than stopped. One
+# connection carries the post however many pictures are in it. The
+# markdown goes last, and the markdown arriving is what makes the post,
+# because there is no other signal to give and none is needed:
+# everything before it is already staged under the names its text uses.
 #
 # ⚠️ An earlier version took a ZIP and unpacked it here. Three audits
 # found nine, twelve and ten blockers in successive rewrites, nearly all

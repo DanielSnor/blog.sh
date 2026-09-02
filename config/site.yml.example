@@ -406,7 +406,7 @@ footer:
 # lives in the shortcut, on the phone.
 #
 # Off by default. It is a page for whoever runs the blog, and a site that
-# writes from a desk has no use for it. Turning it on publishes four files
+# writes from a desk has no use for it. Turning it on publishes five files
 # under /write/ and nothing else changes; the page is marked noindex.
 #
 # Setting it up is in docs/operations.md, under "A post sent from the
