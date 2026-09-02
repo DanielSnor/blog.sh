@@ -3914,8 +3914,17 @@ end
 # here rather than kept in write/, because all of it is this site's, and
 # the page itself is the same file on every site.
 if SiteConfig.get('write', default: false)
-  tag_counts = tags_map.map { |_slug, data| [data[:name].to_s, data[:posts].length] }
-                       .sort_by { |name, count| [-count, name.downcase] }
+  # Each tag with two counts: all time, and the last twelve months. The
+  # page ranks an empty field by the second -- what the blog is tagging
+  # NOW -- because all time is led by where an archive came from
+  # (twitter, tumblr, an old blog), and nobody tags a new post with
+  # those. Typing searches every tag, ranked by all time.
+  recent_since = Time.now - (365 * 24 * 60 * 60)
+  tag_counts = tags_map.map do |_slug, data|
+    recent = data[:posts].count { |post| post_time(post) >= recent_since }
+    [data[:name].to_s, data[:posts].length, recent]
+  end
+  tag_counts.sort_by! { |name, count, recent| [-recent, -count, name.downcase] }
   site_facts = {
     'name' => SITE_SHORT_NAME,
     'claim' => SiteConfig.get('banner', 'claim', default: nil) || SITE_DESCRIPTION,

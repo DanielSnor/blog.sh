@@ -381,11 +381,14 @@ needs is the key, and that lives in the shortcut on the phone.
 The page is the same file on every site; what is this site's the build
 writes beside it as `write/site.js`: the short name and claim for the
 header, the palette from `colors:` so the page is dressed like the blog,
-the favicon, and every tag the blog has used with a count. The tags are
-offered as they are typed -- most used first, then whatever begins with
-or contains the letters so far -- so a tag is tapped rather than typed,
-and typed as it was before instead of the blog growing a second
-spelling of it.
+the favicon, and every tag the blog has used, with its count of all time
+and of the last twelve months. The tags are offered as they are typed:
+with nothing typed yet, what the blog has tagged in the last year, most
+used first -- not the most used of all time, which on an imported
+archive are the places it came from; then whatever begins with or
+contains the letters so far, searched across every tag. So a tag is
+tapped rather than typed, and typed as it was before instead of the blog
+growing a second spelling of it.
 
 *Preview*, under the text, shows the post as the blog would show it --
 in the blog's own stylesheets, which `site.js` names, with the pictures

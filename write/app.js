@@ -789,24 +789,29 @@
   // ---------------------------------------------------------------- tags
   // The tags the blog has used, offered as the author types: those that
   // begin with what is typed first, then those that merely contain it,
-  // each group by how often the blog has used them; the most used when
-  // nothing is typed yet. Never one the post already carries. Offered so a
-  // tag is tapped rather than typed -- and typed as it was before, instead
-  // of the blog growing a second spelling of it.
+  // each group by how often the blog has used them. With nothing typed
+  // yet, the ones used in the last twelve months, most used first -- not
+  // the most used of all time, which on an imported archive are the
+  // places it came from, and nobody tags a new post with those. Never one
+  // the post already carries. Offered so a tag is tapped rather than
+  // typed -- and typed as it was before, instead of the blog growing a
+  // second spelling of it.
   function suggestTags(all, typed, taken, limit) {
     var q = String(typed || "").trim().toLowerCase();
     var have = (taken || []).map(function (s) { return String(s).toLowerCase(); });
     var starts = [], holds = [];
-    (all || []).forEach(function (pair) {
-      var name = String(pair[0]), low = name.toLowerCase();
+    (all || []).forEach(function (row) {
+      var name = String(row[0]), low = name.toLowerCase();
       if (have.indexOf(low) !== -1) return;
-      if (!q || low.indexOf(q) === 0) starts.push(pair);
-      else if (low.indexOf(q) !== -1) holds.push(pair);
+      if (!q) { if (row[2] > 0) starts.push(row); }
+      else if (low.indexOf(q) === 0) starts.push(row);
+      else if (low.indexOf(q) !== -1) holds.push(row);
     });
-    var by = function (a, b) {
-      return (b[1] - a[1]) || (a[0].toLowerCase() < b[0].toLowerCase() ? -1 : 1);
-    };
-    return starts.sort(by).concat(holds.sort(by)).slice(0, limit || 8);
+    var byName = function (a, b) { return a[0].toLowerCase() < b[0].toLowerCase() ? -1 : 1; };
+    var byUse = function (a, b) { return (b[1] - a[1]) || byName(a, b); };
+    var byRecent = function (a, b) { return ((b[2] || 0) - (a[2] || 0)) || byUse(a, b); };
+    if (!q) return starts.sort(byRecent).slice(0, limit || 8);
+    return starts.sort(byUse).concat(holds.sort(byUse)).slice(0, limit || 8);
   }
 
   // The tags field as the author has it: the ones finished, and the one
