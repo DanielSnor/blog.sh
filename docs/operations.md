@@ -619,7 +619,8 @@ was the point.)
 
 The body has a deadline of its own, `BLOGSH_BODY_SECONDS` (600): a delivery
 that has not finished by then is dropped and, if the sender is still
-listening, told `timeout`. Two files under one name in one delivery are
+listening, told `timeout`; it is set where `BLOGSH_MAX_MB` is, below.
+Two files under one name in one delivery are
 refused (`bad_name`) rather than one silently replacing the other, every
 body is decoded before any file is written, so a refusal on the third
 picture leaves nothing of the first two behind, and a blank line after a
