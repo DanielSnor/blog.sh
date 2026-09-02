@@ -102,7 +102,7 @@ app:
   mark_ul: "List"
   mark_ol: "Numbered list"
   mark_fence: "Code block"
-  images_hint: "A picture is shrunk to {edge} px on its long edge before it goes; a video goes as it is. The whole post -- text, pictures, video -- has to stay under {max} MB, the server's limit, and the limit is measured on the encoded transfer, a third larger than the files: the files themselves get about {files} MB. A phone's HEVC .mov plays mainly in Safari; the blog says so when it arrives."
+  images_hint: "A picture is shrunk to {edge} px on its long edge before it goes; a video goes as it is. The whole post -- text, pictures, video -- has to stay under {max} MB, the server's limit, and the limit is measured on the encoded transfer, a third larger than the files: the files themselves get about {files} MB. A phone's HEVC .mov plays mainly in Safari; the blog says so when it arrives. If the sending shortcut shrinks video first -- the recipe does, to 720p -- a red line for a video measures the original, not what leaves."
   video_badge: "video"
   videos_1: "video"
   videos_few: "videos"

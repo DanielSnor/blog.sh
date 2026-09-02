@@ -96,7 +96,7 @@ app:
   mark_ul: "Liste"
   mark_ol: "Nummerierte Liste"
   mark_fence: "Codeblock"
-  images_hint: "Ein Bild wird vor dem Senden auf {edge} px an der langen Kante verkleinert; ein Video geht, wie es ist. Der ganze Beitrag -- Text, Bilder, Video -- muss unter {max} MB bleiben, dem Limit des Servers; gemessen wird die kodierte Übertragung, ein Drittel größer als die Dateien, für die Dateien selbst bleiben also etwa {files} MB. Ein HEVC-.mov vom Telefon spielt vor allem Safari ab; das Blog sagt es beim Empfang."
+  images_hint: "Ein Bild wird vor dem Senden auf {edge} px an der langen Kante verkleinert; ein Video geht, wie es ist. Der ganze Beitrag -- Text, Bilder, Video -- muss unter {max} MB bleiben, dem Limit des Servers; gemessen wird die kodierte Übertragung, ein Drittel größer als die Dateien, für die Dateien selbst bleiben also etwa {files} MB. Ein HEVC-.mov vom Telefon spielt vor allem Safari ab; das Blog sagt es beim Empfang. Verkleinert der Kurzbefehl Video vor dem Senden -- die Anleitung tut es, auf 720p --, misst eine rote Zeile bei einem Video das Original, nicht das, was abgeht."
   video_badge: "Video"
   videos_1: "Video"
   videos_few: "Videos"

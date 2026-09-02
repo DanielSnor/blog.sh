@@ -96,7 +96,7 @@ app:
   mark_ul: "Seznam"
   mark_ol: "Číslovaný seznam"
   mark_fence: "Blok kódu"
-  images_hint: "Obrázek se před odesláním zmenší na {edge} px po delší straně; video jde tak, jak je. Celý příspěvek — text, obrázky, video — se musí vejít do {max} MB, to je limit serveru; měří se zakódovaný přenos, který je o třetinu větší než soubory, takže na soubory zbývá zhruba {files} MB. HEVC .mov z telefonu přehraje hlavně Safari; blog to při přijetí řekne."
+  images_hint: "Obrázek se před odesláním zmenší na {edge} px po delší straně; video jde tak, jak je. Celý příspěvek — text, obrázky, video — se musí vejít do {max} MB, to je limit serveru; měří se zakódovaný přenos, který je o třetinu větší než soubory, takže na soubory zbývá zhruba {files} MB. HEVC .mov z telefonu přehraje hlavně Safari; blog to při přijetí řekne. Pokud zkratka video před odesláním zmenšuje (návod to dělá, na 720p), červený řádek u videa měří originál, ne to, co odejde."
   video_badge: "video"
   videos_1: "video"
   videos_few: "videa"

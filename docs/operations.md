@@ -442,9 +442,21 @@ writes a file and opens a URL, and the sending shortcut does the rest.
 "If there's no input": Stop and Respond:
 
 1. **Repeat with Each** over Shortcut Input, and inside it: Get **Name**,
-   Get **File Extension**, **Base64 Encode** the item, a **Text** of three
-   lines -- `Name.File Extension`, `Base64 Encoded`, `.` -- and **Add to
-   Variable** `batch`.
+   Get **File Extension**, then a **Text** holding `mov mp4 m4v MOV MP4
+   M4V` and an **If** *Text contains File Extension*. Inside the If:
+   **Encode Media** the Repeat Item with Size **1280x720**, and **Set
+   Variable** `item` to *Encoded Media*; in Otherwise: **Set Variable**
+   `item` to *Repeat Item*. After End If: **Base64 Encode** `item`, a
+   **Text** of three lines -- `Name.File Extension`, `Base64 Encoded`,
+   `.` -- and **Add to Variable** `batch`.
+
+   The If is what makes a video from the phone fit: thirty seconds of
+   HEVC at 32.5 MB came out of Encode Media at 5 MB of H.264, in the
+   QuickTime container it arrived in, so the extension the batch names
+   is still right. A picture takes the Otherwise branch untouched. The
+   page cannot know the shortcut does this, so its red line for a video
+   measures the original; send anyway, and the answer says what
+   arrived.
 2. After the loop: **Combine Text** `batch` with New Lines.
 3. **Save File** the combined text to iCloud Drive, *Ask Where to Save*
    off, subpath `incoming/batch.txt`, *Overwrite If File Exists* on.
