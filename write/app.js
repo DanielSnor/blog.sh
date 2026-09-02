@@ -1277,11 +1277,21 @@
   }
 
   // The reply out of the address, decoded; null when the page was simply
-  // opened. Everything after #r= belongs to it: the shortcut encodes the
-  // whole reply, so no & or # in there can be anything but its own.
+  // opened. Everything after the key belongs to it: the shortcut encodes
+  // the whole reply, so no & or # in there can be anything but its own.
+  //
+  // Two keys, because Shortcuts reads a reply that is JSON as a
+  // Dictionary and then refuses to hand a Dictionary to URL Encode --
+  // "couldn't convert from Dictionary to Text", on exactly the replies
+  // that matter, the refusals. Base64 Encode takes anything, so #b=
+  // carries the reply as base64 (line breaks and all, which Shortcuts
+  // puts in every 76 characters unless told not to); #r= stays for a
+  // percent-encoded reply.
   function answerIn(href) {
     var s = String(href || "");
-    var at = s.indexOf("#r=");
+    var at = s.indexOf("#b=");
+    if (at !== -1) return fromBase64(s.slice(at + 3));
+    at = s.indexOf("#r=");
     var raw;
     if (at !== -1) raw = s.slice(at + 3);
     else {
@@ -1290,6 +1300,22 @@
       raw = m[1];
     }
     try { return decodeURIComponent(raw); } catch (e) { return raw; }
+  }
+
+  // Base64 as an address carries it: percent-encoded by whoever put it
+  // in the fragment, or not; wrapped every 76 characters, or not; with
+  // - and _ where + and / are awkward, or not. UTF-8 underneath, because
+  // a refusal names a file, and a file is named in whatever language.
+  function fromBase64(raw) {
+    var text = raw;
+    try { text = decodeURIComponent(raw); } catch (e) { /* not percent-encoded, then */ }
+    text = text.replace(/[^A-Za-z0-9+/_=-]/g, "").replace(/-/g, "+").replace(/_/g, "/");
+    try {
+      var binary = atob(text);
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch (e) { return raw; }
   }
 
   // The reply sorted into what the page will say about it: the pictures

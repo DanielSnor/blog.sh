@@ -468,13 +468,20 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    the document picker.
 2. **Run Script over SSH** with that file as the **Input**; the script is
    the receiver, or the wrapper that reaches it.
-3. **URL Encode** the *Shell Script Result*.
-4. **Text**: `https://YOUR-BLOG/write/#r=` followed by the *URL Encoded
-   Text* variable, with nothing between them.
+3. **Base64 Encode** the *Shell Script Result* (Line Breaks: None, if
+   the option is offered; the page copes either way).
+4. **Text**: `https://YOUR-BLOG/write/#b=` followed by the *Base64
+   Encoded* variable, with nothing between them.
 5. **Open URLs** with that text.
 
+Base64, not URL Encode, and not for taste: Shortcuts reads a reply
+that is JSON as a Dictionary and then refuses to hand a Dictionary to
+URL Encode -- "couldn't convert from Dictionary to Text" -- on exactly
+the replies that matter, the refusals. Base64 Encode takes anything.
+(A page also reads a percent-encoded reply after `#r=`.)
+
 The last three carry the answer back to the page. It opens with the
-reply after `#r=` -- a fragment, so it never leaves the browser -- and
+reply after `#b=` -- a fragment, so it never leaves the browser -- and
 says what the server did: the pictures it kept, the draft's preview
 address or the post's public one, the command that publishes a draft
 from a keyboard, and any refusal in the reader's language. A post the
