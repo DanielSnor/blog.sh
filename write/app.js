@@ -958,9 +958,17 @@
     if (!previewOpen) return;
     var frame = $("preview-frame");
     frame.title = t("app.preview");
-    frame.onload = function () {
+    // Measured when the document has loaded, and again once its web fonts
+    // have: the blog's own face arrives after the markup, and the text
+    // reflows taller than the first measurement saw -- which left a
+    // scrollbar inside the frame where it should not be.
+    function fit() {
       try { frame.style.height = Math.max(96, frame.contentDocument.documentElement.scrollHeight + 8) + "px"; }
       catch (e) { /* the frame's height stays as it is */ }
+    }
+    frame.onload = function () {
+      fit();
+      try { frame.contentDocument.fonts.ready.then(fit); } catch (e) { setTimeout(fit, 600); }
     };
     frame.srcdoc = previewDocument(renderMarkdown(state.body, state.shots));
   }
