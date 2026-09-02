@@ -85,8 +85,10 @@ leaves a 404 in the console.
   to four times the ceiling more, so an honest overshoot finishes and
   hears `too_large` instead of sitting on a closed channel, and a
   connection that opens and says nothing is let go after thirty seconds
-  rather than holding a process for as long as it lasts. **Nothing new
-  listens on the network** --
+  rather than holding a process for as long as it lasts, and one that
+  has not finished in `BLOGSH_BODY_SECONDS` (600) is dropped too. Every
+  body is decoded before any file is written, so a refusal leaves
+  `incoming/` as it was found. **Nothing new listens on the network** --
   it travels over the SSH the server already has, and the key wants a
   forced command.
 - **And a page to write it on: `/write/`.** Set `write: true` and the
