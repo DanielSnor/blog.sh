@@ -67,7 +67,7 @@ app:
   download: "Uložit balíček"
   no_body: "Není co odeslat, text je prázdný."
   result_published: "Publikováno."
-  result_stored: "Uložené obrázky"
+  result_stored: "Uložené soubory"
   result_refused: "Server to odmítl"
   result_publish_hint: "Publikovat od klávesnice:"
   result_unreadable: "Stránka odpovědi serveru nerozumí. Přišlo tohle:"

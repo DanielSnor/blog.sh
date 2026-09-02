@@ -73,7 +73,7 @@ app:
   download: "Save the bundle"
   no_body: "There is no text to send."
   result_published: "Published."
-  result_stored: "Pictures stored"
+  result_stored: "Files stored"
   result_refused: "The server refused it"
   result_publish_hint: "To publish it from a keyboard:"
   result_unreadable: "The page could not read the server's answer. This is what came back:"
