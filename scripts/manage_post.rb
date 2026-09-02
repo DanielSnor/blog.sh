@@ -144,7 +144,11 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc publish].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc].freeze
+# Read by `add <file>` alone. On every other route -- the wizard, edit --
+# the key would be accepted and do nothing, which is the one thing the
+# unknown-key rule below exists to prevent; so it is unknown there.
+FILE_ONLY_FRONTMATTER_KEYS = %w[publish].freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -170,9 +174,15 @@ def utf8(value)
   value.to_s.dup.force_encoding(Encoding::UTF_8)
 end
 
-def abort_on_unknown_frontmatter(meta, interactive: true)
-  unknown = meta.keys.reject { |k| FRONTMATTER_KEYS.include?(k.to_s) }
+def abort_on_unknown_frontmatter(meta, interactive: true, extra: [])
+  known = FRONTMATTER_KEYS + extra
+  unknown = meta.keys.reject { |k| known.include?(k.to_s) }
   return if unknown.empty?
+
+  # A key that IS read somewhere -- by add <file> -- deserves to be told
+  # where, not listed among typos.
+  file_only = unknown.select { |k| FILE_ONLY_FRONTMATTER_KEYS.include?(k.to_s) }
+  refuse('unknown_frontmatter_key', t('cli.publish_key_file_only', keys: file_only.join(', '))) if file_only.any?
 
   # Two endings for one refusal. The editor route can promise "your text
   # is kept, see below" because it prints the text underneath; with a
@@ -200,7 +210,7 @@ end
 # exactly how a cheat-sheet-titled post once ended up with a slug like
 # "title-markdown-cheat-sheet-tags".
 def frontmatter_key_line?(line)
-  FRONTMATTER_KEYS.any? { |k| line.to_s.strip.start_with?("#{k}:") }
+  (FRONTMATTER_KEYS + FILE_ONLY_FRONTMATTER_KEYS).any? { |k| line.to_s.strip.start_with?("#{k}:") }
 end
 
 def frontmatter_in_body?(body)
@@ -330,11 +340,11 @@ def convert_heic_attachments(blocks, media_files)
   names = heic.map { |src| File.basename(src) }.join(', ')
   command = HeicConverter.suggested_command(heic.first)
   unless SiteConfig.get('media', 'convert_heic', default: false) == true
-    abort t('cli.heic_refused', files: names, command: command)
+    refuse('heic_unsupported', t('cli.heic_refused', files: names, command: command))
   end
 
   tool = HeicConverter.tool
-  abort t('cli.heic_no_tool', files: names, command: command) unless tool
+  refuse('heic_no_tool', t('cli.heic_no_tool', files: names, command: command)) unless tool
 
   # One temp dir per process, removed at exit: the converted files must
   # outlive this pass (PostWriter copies them much later in the save).
@@ -349,8 +359,8 @@ def convert_heic_attachments(blocks, media_files)
     target = "#{File.basename(filename, '.*')}.jpg"
     dest = File.join(@heic_tmpdir, target)
     unless HeicConverter.convert(src, dest)
-      abort t('cli.heic_convert_failed', file: File.basename(src), tool: tool[0],
-                                         command: HeicConverter.suggested_command(src))
+      refuse('heic_convert_failed', t('cli.heic_convert_failed', file: File.basename(src), tool: tool[0],
+                                        command: HeicConverter.suggested_command(src)))
     end
 
     media_files.delete(src)
@@ -395,7 +405,7 @@ def check_attachment_sizes(media_files)
   describe = ->(list) { list.map { |(name, bytes)| "#{name} (#{limit.call(bytes)})" }.join(', ') }
 
   hard = sized.select { |(_, bytes)| FileSize.classify(bytes) == :hard }
-  abort t('cli.media_too_large', files: describe.call(hard), limit: limit.call(FileSize::HARD_LIMIT)) if hard.any?
+  refuse('media_too_large', t('cli.media_too_large', files: describe.call(hard), limit: limit.call(FileSize::HARD_LIMIT))) if hard.any?
 
   soft = sized.select { |(_, bytes)| FileSize.classify(bytes) == :soft }
   puts t('cli.media_large', files: describe.call(soft), limit: limit.call(FileSize::HARD_LIMIT)) if soft.any?
@@ -913,10 +923,10 @@ end
 # own shape to drift.
 #
 # Returns the path written, or nil when there was nothing to write.
-def compose_post(raw, suggested, interactive:, also_consume: [], confined: false)
+def compose_post(raw, suggested, interactive:, also_consume: [], confined: false, extra_keys: [])
   meta, body = MarkdownParser.parse_frontmatter(raw)
   abort_on_double_frontmatter(body)
-  abort_on_unknown_frontmatter(meta, interactive: interactive)
+  abort_on_unknown_frontmatter(meta, interactive: interactive, extra: extra_keys)
 
   if body.strip.empty?
     discard_editor_buffer if interactive
@@ -1178,7 +1188,8 @@ def add_from_file(source, json: false, confined: false)
   meta, = MarkdownParser.parse_frontmatter(raw)
   publish = truthy_frontmatter?(meta['publish'])
   path, warnings = quietly(json, keep_stdout: true) do
-    compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined)
+    compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined,
+                 extra_keys: FILE_ONLY_FRONTMATTER_KEYS)
   end
   # compose_post returns nil only for "there was nothing to write" (an
   # empty body under a frontmatter block); everything worse has aborted by
@@ -1290,23 +1301,32 @@ def report_added(path, warnings, json:, publish: false)
     # silenced under --json exactly as the draft preview's is. asked: false
     # because there is nobody at this end to ask; a caller that wanted to
     # be asked would not have written publish: yes.
-    published, publish_warnings = quietly(json) do
-      !publish_draft(post['slug'], path: path, announce: true, asked: false).nil?
+    # publish_draft hands back the path it published to -- the file moved,
+    # because publishing keys a post by the date it was given, which can be
+    # another year than the draft sat in -- and the answer describes the
+    # post as it stands there. Whether the site carries it is what the
+    # deploy-pending marker says: absent, the upload went through.
+    begin
+      moved, publish_warnings = quietly(json) do
+        publish_draft(post['slug'], path: path, announce: true, asked: false)
+      end
+    rescue SystemExit => e
+      # An abort deeper down -- the slug taken in the publishing year, and
+      # the guard that refuses to write over it. Under --json that has to
+      # be an object too, not prose on a discarded stderr and a bare 1.
+      refuse('publish_refused', e.message.to_s)
     end
     warnings += publish_warnings
-    # The file moved: publishing keys it by the date it was given, and that
-    # can be another year than the draft sat in. Read it back from wherever
-    # it is now, so the answer describes the post as it stands.
-    moved = find_post_path(post['slug'])
-    post = JSON.parse(File.read(moved, encoding: 'utf-8')) if moved
-    path = moved || path
+    path = moved if moved
+    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    deployed = !File.exist?(Publishing::DEPLOY_PENDING)
     if json
       puts JSON.pretty_generate(
         'slug' => post['slug'],
         'path' => path,
         'state' => post['state'],
-        'url' => SITE_BASE_URL.to_s.empty? ? '' : published_url(post['slug'], post_time!(post).year),
-        'deploy' => published ? 'done' : 'pending',
+        'url' => SITE_BASE_URL.to_s.empty? ? '' : published_url(post['slug'], post_time!(post).year, page: PostAddress.page?(post)),
+        'deploy' => deployed ? 'done' : 'pending',
         'warnings' => warnings
       )
     end
@@ -1748,7 +1768,7 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   unless draft?(post)
-    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year))
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year, page: PostAddress.page?(post)))
     puts
     return
   end
@@ -1805,14 +1825,20 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   end
 
   puts t('cli.published_label', path: new_path)
-  rebuild_and_deploy(t('cli.publishing')) || return
+  # The path is the answer, deployed or not: add <file> reads back the
+  # post from it. Re-resolving the slug afterwards asked which year --
+  # on a terminal it waited for an answer, with the post already
+  # published and announced -- and under --json it wrote the question
+  # where the answer should have been.
+  return new_path unless rebuild_and_deploy(t('cli.publishing'))
   # No extra `puts` before "Done:" -- rebuild_and_deploy ended with a blank
   # line after its own "Done: uploaded...", same doubling as
   # draft_decision_loop above.
-  puts Tui.paint(t('cli.done_label', url: published_url(slug, new_year)), :green)
-  puts_local_preview_hint(published_path(slug, new_year))
+  puts Tui.paint(t('cli.done_label', url: published_url(slug, new_year, page: PostAddress.page?(updated))), :green)
+  puts_local_preview_hint(published_path(slug, new_year, page: PostAddress.page?(updated)))
   puts t('cli.backdated_note') unless untouched
   puts
+  new_path
 end
 
 # The answer sticks for the rest of the run. publish/edit/delete resolve
@@ -2043,7 +2069,7 @@ def cmd_publish(slug, yes: false, announce: true)
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   unless draft?(post)
-    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year))
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(post).year, page: PostAddress.page?(post)))
     puts
     return
   end

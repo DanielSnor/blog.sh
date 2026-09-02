@@ -245,6 +245,7 @@ cli:
   frontmatter_date_invalid_file: "❌ I cannot read the date %{value} -- I expect YYYY-MM-DD [HH:MM]. Nothing was written; fix the date in the file and run it again."
   post_changed_while_editing: "❌ '%{slug}' changed on disk while you were editing it (the scheduled-publish cron publishes on its own). Nothing was saved, so nothing of that change was lost -- reopen the post and redo your edit on the current version."
   unknown_frontmatter_key: "❌ Unknown key in the header: %{keys}. I know: %{known}. A typo here would be silently dropped on save, so nothing was written -- your text is kept, see below."
+  publish_key_file_only: "❌ %{keys} is read only when a post comes in as a file (./blog.sh add <file>). Here it would do nothing, so nothing was saved -- take the line out and publish with ./blog.sh publish <slug>."
   unknown_frontmatter_key_file: "❌ Unknown key in the header: %{keys}. I know: %{known}. A typo here would be silently dropped on save, so nothing was written -- fix the key in the file and run it again."
   heic_refused: "❌ %{files}: HEIC displays only in Safari -- other browsers would show a broken image. Nothing was saved and the file stays where it is. Convert it first (%{command}), or set media.convert_heic: true in config/site.yml and the engine will convert it for you."
   heic_no_tool: "❌ %{files}: media.convert_heic is on, but no converter was found (tried sips, heif-convert, heif-dec, magick/convert, vips). Nothing was saved. Convert by hand: %{command}"

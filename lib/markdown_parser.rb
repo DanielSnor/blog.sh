@@ -712,6 +712,25 @@ module MarkdownParser
       expanded = File.expand_path(File.join(incoming_dir, path)) if incoming_dir
     end
 
+    # What the name resolves to has to be an ordinary file -- a directory
+    # under a bare name crashed the save halfway through with a raw
+    # EISDIR, media directory left behind, slug burnt -- and, when the
+    # markdown is not trusted, one that really lives in incoming/ or in
+    # the post's own media. The spelling test above cannot see where a
+    # symlink points: a link planted under a bare name read env.sh into a
+    # published picture. A name that resolves to nothing yet is left
+    # alone here; the missing-picture answer is the one for that.
+    if File.exist?(expanded) || File.symlink?(expanded)
+      reject("#{path} is not a file: a directory or a device cannot be a picture", confined) unless File.file?(expanded)
+      if confined
+        real_dir = File.dirname((File.realpath(expanded) rescue expanded))
+        allowed = [incoming_dir, media_dir].compact.map do |d|
+          (File.realpath(File.expand_path(d)) rescue File.expand_path(d))
+        end
+        raise ConfinedPath, path unless allowed.include?(real_dir)
+      end
+    end
+
     # If the post has already referenced this source once, reuse the same
     # filename. media_files is keyed by source path, so a second reference
     # to the same file would otherwise overwrite the first and one of the

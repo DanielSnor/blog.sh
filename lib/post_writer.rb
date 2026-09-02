@@ -93,12 +93,20 @@ module PostWriter
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
     path
-  rescue StandardError
+  rescue Exception # rubocop:disable Lint/RescueException -- a signal must not leave the reservation behind either
     # A write that is refused has to leave the archive exactly as it found
     # it -- and that now includes the name it had only reserved. Left
     # behind, the reservation would push the next attempt at the same post
-    # onto a serial nobody asked for.
+    # onto a serial nobody asked for. Exception, not StandardError: Ctrl-C
+    # in the middle of the media copy is not a StandardError, and it left
+    # exactly the orphan this rescue promises never to leave. And the
+    # media directory the copy had begun goes too, when it is empty --
+    # compose_post takes a directory that exists for a name that is taken.
     File.delete(path) if claimed && path && File.exist?(path)
+    if claimed && slug
+      dir_started = File.join(MEDIA_DIR, year, slug)
+      Dir.rmdir(dir_started) if Dir.exist?(dir_started) && Dir.empty?(dir_started)
+    end
     raise
   end
 
@@ -156,6 +164,9 @@ module PostWriter
   # already in the folder means to replace it, and always has.
   def self.copy_media_file(src_path, dest, replace: false)
     return if !replace && File.exist?(dest)
+    # A directory or a device is not a picture, and FileUtils.cp on one
+    # dies halfway through the save with a raw EISDIR.
+    raise ArgumentError, "#{src_path} is not a file" unless File.file?(src_path)
 
     FileUtils.mkdir_p(File.dirname(dest))
     # Copied beside the destination and renamed into place: a copy
@@ -170,7 +181,7 @@ module PostWriter
       # rename is the one moment the file is the engine's alone.
       ExifLocation.strip_file(tmp) if strip_location?
       File.rename(tmp, dest)
-    rescue StandardError
+    rescue Exception # rubocop:disable Lint/RescueException -- a .part must not survive a signal either
       begin
         File.delete(tmp)
       rescue StandardError
@@ -1042,9 +1053,11 @@ module PostWriter
         # The reservation is written as a FINISHED post rather than left
         # empty, because the build refuses to run at all when a post file
         # will not parse -- and the media copy below can take seconds, a
-        # long time for a scheduled build to stumble into. What it holds
-        # is true: the text as it arrived, before the pictures were put
-        # beside it.
+        # long time for a scheduled build to stumble into. It is the whole
+        # post, pictures named and all, for a moment before the pictures
+        # are beside it; a run killed inside that moment leaves a draft
+        # whose picture `check` reports as missing, and a refusal takes
+        # the reservation away again (see the rescue in write).
         begin
           File.open(existing_path, File::CREAT | File::EXCL | File::WRONLY, 0o644) do |f|
             f.write(JSON.pretty_generate(claimed))

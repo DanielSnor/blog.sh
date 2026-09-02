@@ -42,7 +42,10 @@ module IncomingPath
     # bare names are looked for in incoming/" about a name `ls incoming/`
     # shows in the first column.
     in_incoming = incoming_dir && File.join(incoming_dir, path)
-    if in_incoming && (File.file?(in_incoming) || File.symlink?(in_incoming))
+    # Anything that EXISTS under that name is the name the author meant --
+    # a directory or a broken link included, so that add can say "not a
+    # file" about it rather than "no such file" about a name ls shows.
+    if in_incoming && (File.exist?(in_incoming) || File.symlink?(in_incoming))
       in_incoming
     else
       absolute(path)
