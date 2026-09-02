@@ -31,6 +31,9 @@ deploy:
   pending: "Uloženo. Web se přestaví do čtvrt hodiny."
 
 app:
+  insert: "Vložit do textu"
+  remove: "Odebrat"
+  remove_confirm: "Odebrat obrázek?"
   picture_as_is: "Tenhle prohlížeč to neotevře, takže to půjde tak, jak to je, a blog si to převede sám -- odesílání potrvá déle, ale nic se neztratí"
   picture_failed: "Tenhle obrázek se nepodařilo přečíst vůbec. Zkus jiný, nebo ho ulož jako JPEG."
   name: "blog.sh"

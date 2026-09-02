@@ -31,6 +31,9 @@ deploy:
   pending: "Gespeichert. Die Website wird binnen einer Viertelstunde neu gebaut."
 
 app:
+  insert: "In den Text einfügen"
+  remove: "Entfernen"
+  remove_confirm: "Bild entfernen?"
   picture_as_is: "Dieser Browser kann es nicht öffnen, also geht es so, wie es ist, und das Blog wandelt es beim Empfang um -- langsamer zu senden, nichts geht verloren"
   picture_failed: "Dieses Bild konnte gar nicht gelesen werden. Nimm ein anderes oder speichere es als JPEG."
   name: "blog.sh"

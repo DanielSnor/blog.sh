@@ -33,6 +33,9 @@ window.I18N = {
       "pending": "Uloženo. Web se přestaví do čtvrt hodiny."
     },
     "app": {
+      "insert": "Vložit do textu",
+      "remove": "Odebrat",
+      "remove_confirm": "Odebrat obrázek?",
       "picture_as_is": "Tenhle prohlížeč to neotevře, takže to půjde tak, jak to je, a blog si to převede sám -- odesílání potrvá déle, ale nic se neztratí",
       "picture_failed": "Tenhle obrázek se nepodařilo přečíst vůbec. Zkus jiný, nebo ho ulož jako JPEG.",
       "name": "blog.sh",
@@ -103,6 +106,9 @@ window.I18N = {
       "pending": "Gespeichert. Die Website wird binnen einer Viertelstunde neu gebaut."
     },
     "app": {
+      "insert": "In den Text einfügen",
+      "remove": "Entfernen",
+      "remove_confirm": "Bild entfernen?",
       "picture_as_is": "Dieser Browser kann es nicht öffnen, also geht es so, wie es ist, und das Blog wandelt es beim Empfang um -- langsamer zu senden, nichts geht verloren",
       "picture_failed": "Dieses Bild konnte gar nicht gelesen werden. Nimm ein anderes oder speichere es als JPEG.",
       "name": "blog.sh",
@@ -173,6 +179,9 @@ window.I18N = {
       "pending": "Saved. The site rebuilds within a quarter of an hour."
     },
     "app": {
+      "insert": "Insert into text",
+      "remove": "Remove",
+      "remove_confirm": "Remove this picture?",
       "picture_as_is": "This browser cannot open it, so it goes as it is and the blog converts it on arrival -- slower to send, nothing lost",
       "picture_failed": "That picture could not be read at all. Try another one, or export it as JPEG.",
       "name": "blog.sh",

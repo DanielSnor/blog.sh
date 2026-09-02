@@ -77,6 +77,17 @@ textarea{resize:vertical;line-height:1.6}
 .chip.warn{background:transparent;color:var(--warn);border:1px solid currentColor}
 .link{background:none;border:none;padding:0;color:var(--accent);font:inherit;
   font-size:.8rem;text-decoration:underline;cursor:pointer}
+/* The insert is the picture's primary action, so it is a real button --
+   small, but a full tap target. */
+button.btn.small{font-size:.85rem;padding:.5rem .8rem;flex:0 0 auto}
+/* A destructive control looks inactive until it is armed: no border, muted
+   text, pushed to the far right so a thumb heading for Insert does not
+   pass over it. Armed, it becomes a warning-coloured button. */
+.remove,button.btn.ghost[data-arm=""],button.btn.ghost:not([data-arm]){
+  margin-left:auto;background:none;border:1px solid transparent;color:var(--meta);
+  font:inherit;font-size:.85rem;padding:.5rem .8rem;border-radius:8px;cursor:pointer}
+.remove[data-arm="yes"],button.btn.ghost[data-arm="yes"]{
+  color:#fff;background:var(--warn);border-color:var(--warn)}
 
 button.btn{font:inherit;font-weight:600;font-size:.95rem;padding:.8rem 1.1rem;
   border-radius:var(--radius);border:1px solid var(--accent);background:var(--accent);

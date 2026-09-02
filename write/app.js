@@ -220,9 +220,15 @@
         '<div class="side">' +
           '<span class="name"></span>' +
           '<textarea data-i="' + i + '" rows="2"></textarea>' +
+          // ⚠️ Insert first and big, remove last and dim. These two used to
+          // be a pair of tiny underlined links, the destructive one on the
+          // LEFT, and it removed the picture on a single tap -- so a thumb
+          // aiming for ![ ] took the photograph away instead, often. The
+          // insert is a real button now; the remove sits at the far right,
+          // looks inactive, and only becomes a button once it is tapped.
           '<div class="row">' +
-            '<button type="button" class="link" data-drop="' + i + '"></button>' +
-            '<button type="button" class="link" data-insert="' + i + '">![ ]</button>' +
+            '<button type="button" class="btn small" data-insert="' + i + '"></button>' +
+            '<button type="button" class="remove" data-drop="' + i + '"></button>' +
           '</div>' +
         '</div>';
       // A passed-through picture has no preview here for the same reason
@@ -247,7 +253,8 @@
       var ta = row.querySelector("textarea");
       ta.value = shot.alt;
       ta.placeholder = t("app.alt_hint");
-      row.querySelector("[data-drop]").textContent = t("app.discard");
+      row.querySelector("[data-insert]").textContent = t("app.insert");
+      row.querySelector("[data-drop]").textContent = t("app.remove");
       box.appendChild(row);
     });
   }
@@ -450,6 +457,24 @@
     return gapBefore + mark + gapAfter;
   }
 
+  // Takes every ![…](name) line out of the text, together with the blank
+  // line that was keeping it a paragraph of its own -- so removing a
+  // picture never leaves a chasm where it stood, and never leaves a
+  // reference the far end would refuse. A reference that shares a line
+  // with prose is left alone: cutting words out of a sentence is not this
+  // button's business.
+  function unreference(text, name) {
+    var line = new RegExp("^[ \\t]*!\\[[^\\]]*\\]\\(" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\)[ \\t]*$");
+    var out = [], lines = text.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      if (!line.test(lines[i])) { out.push(lines[i]); continue; }
+      // The blank line that followed it goes too: the reference and its
+      // paragraph gap were put in together, and they leave together.
+      if (i + 1 < lines.length && lines[i + 1].trim() === "") i++;
+    }
+    return out.join("\n");
+  }
+
   // Rewrites ![old](name) to ![new](name). Only an exact match of what was
   // there is replaced: anything else is the author's own wording and is
   // not ours to overwrite.
@@ -464,7 +489,27 @@
 
   $("shots").addEventListener("click", function (e) {
     var drop = e.target.closest("[data-drop]");
-    if (drop) { state.shots.splice(Number(drop.dataset.drop), 1); drawShots(); save(); return; }
+    if (drop) {
+      // Two taps, with the second one having to come soon. The first only
+      // ARMS the control -- it turns into a button that says what it is
+      // about to do -- and a tap that never comes lets it fall back to
+      // inactive. The same rule the big Discard below has followed since
+      // its first version; the picture's own remove never had it.
+      if (drop.dataset.arm !== "yes") {
+        arm(drop, t("app.remove_confirm"), t("app.remove"));
+        return;
+      }
+      // ⚠️ The reference goes with the picture. Removing a photograph
+      // used to leave its ![…](name) standing in the text, and the post
+      // then failed at the far end with missing_images -- for a picture
+      // the author had deliberately taken out.
+      var gone = state.shots[Number(drop.dataset.drop)];
+      state.shots.splice(Number(drop.dataset.drop), 1);
+      var body = $("body");
+      body.value = unreference(body.value, gone.name);
+      state.body = body.value;
+      drawShots(); save(); return;
+    }
     var insert = e.target.closest("[data-insert]");
     if (insert) {
       var shot = state.shots[Number(insert.dataset.insert)];
@@ -503,21 +548,28 @@
     if (files.length) { e.preventDefault(); addFiles(files); }
   });
 
-  var askTimer = null;
+  // Arms a destructive control for five seconds: it changes from something
+  // that looks inactive into a button that names what it will do, and a
+  // second tap inside that window is what does it. Left alone, it falls
+  // back. One rule for both the big Discard and each picture's remove.
+  function arm(btn, armedLabel, restLabel) {
+    btn.dataset.arm = "yes";
+    btn.textContent = armedLabel;
+    clearTimeout(btn._armTimer);
+    btn._armTimer = setTimeout(function () {
+      btn.dataset.arm = ""; btn.textContent = restLabel;
+    }, 5000);
+  }
+
   $("discard").addEventListener("click", function () {
     var btn = this;
-    if (btn.dataset.ask !== "yes") {
-      btn.dataset.ask = "yes";
-      btn.textContent = t("app.discard_confirm");
+    if (btn.dataset.arm !== "yes") {
+      arm(btn, t("app.discard_confirm"), t("app.discard"));
       say(t("app.discard_note"));
-      clearTimeout(askTimer);
-      askTimer = setTimeout(function () {
-        btn.dataset.ask = ""; btn.textContent = t("app.discard"); say("");
-      }, 5000);
       return;
     }
-    clearTimeout(askTimer);
-    btn.dataset.ask = ""; btn.textContent = t("app.discard");
+    clearTimeout(btn._armTimer);
+    btn.dataset.arm = ""; btn.textContent = t("app.discard");
     state = { title: "", body: "", tags: "", shots: [] };
     try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
     render();
