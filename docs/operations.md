@@ -570,6 +570,17 @@ named only by a bare filename -- `![](/etc/passwd)` is refused
 (`bad_reference`), because otherwise it would read that file into the
 post and publish it.
 
+**Raising the ceiling is two settings, not one.** The receiver reads
+`BLOGSH_MAX_MB` from its own environment -- the one the forced command
+runs in: put it in the key's line, `command="BLOGSH_MAX_MB=64
+/path/to/blog/scripts/receive.sh"`, or, where the command is a wrapper
+that enters a container, in that wrapper (`docker exec -e
+BLOGSH_MAX_MB=64 …`). The page at `/write/` never asks the server; it
+shows the number the BUILD saw in `BLOGSH_MAX_MB` when it wrote
+`site.js` -- so set the same value where the build runs (`env.sh`) and
+rebuild, or the page will warn at 24 while the server takes 64, or say
+nothing while the server refuses. Unset on both sides, both say 24.
+
 There is deliberately no archive. An earlier design took a ZIP and
 unpacked it here; three adversarial audits found blocking faults in three
 successive rewrites of it, and nearly all of them lived in the unpacking
