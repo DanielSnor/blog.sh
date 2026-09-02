@@ -497,7 +497,7 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    the receiver, or the wrapper that reaches it.
 3. **Base64 Encode** the *Shell Script Result* (Line Breaks: None, if
    the option is offered; the page copes either way).
-4. **Text**: `https://YOUR-BLOG/write/#b=` followed by the *Base64
+4. **Text**: `https://YOUR-BLOG-URL/write/#b=` followed by the *Base64
    Encoded* variable, with nothing between them.
 5. **Open URLs** with that text.
 
@@ -507,17 +507,13 @@ Both can be imported instead of built: [blog.sh Send post](shortcuts/blog.sh-sen
 is shortcut A and [UploadIncoming template](shortcuts/UploadIncoming-template.shortcut)
 is shortcut B, signed so that anyone may import them. After importing,
 rename the second to exactly `UploadIncoming` -- the first opens it by
-that name -- and fill in what is yours, in two places that are not the
-same thing. In *Run Script over SSH*: the machine you log into, as a
-host name or an IP address, its SSH port, the user, and the path to
-`scripts/receive.sh` (or the wrapper that reaches it) -- for this
-project's own site that is the server's address and port 202, not the
-site's domain. In the *Text*: `YOUR-BLOG` stands for the address the
-site is served at, `base_url` in `config/site.yml`, so the line becomes
-`https://sean.cz/write/#b=` here; not the blog's name, not its claim,
-not the server. The SSH action carries no key; pick or generate one
-there and put its public half on the server, as the key line below
-shows. The first shortcut needs nothing changed.
+that name -- and fill in what is yours. In *Run Script over SSH*: the
+machine you log into (a host name or an IP address), its SSH port, the
+user, and the path to `scripts/receive.sh` or the wrapper that reaches
+it. In the *Text*: `YOUR-BLOG-URL` is the address the site is served at,
+`base_url` in `config/site.yml`. The SSH action carries no key; pick or
+generate one there and put its public half on the server, as the key
+line below shows. The first shortcut needs nothing changed.
 
 Base64, not URL Encode, and not for taste: Shortcuts reads a reply
 that is JSON as a Dictionary and then refuses to hand a Dictionary to
