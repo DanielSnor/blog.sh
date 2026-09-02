@@ -501,6 +501,18 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    Encoded* variable, with nothing between them.
 5. **Open URLs** with that text.
 
+![Shortcut B as the Shortcuts app shows it, with placeholders where the server's details go: Get File, Run Script over SSH, Base64 Encode, the Text with #b=, Open URLs](shortcut-b.png)
+
+Both can be imported instead of built: [blog.sh Send post](shortcuts/blog.sh-send-post.shortcut)
+is shortcut A and [UploadIncoming template](shortcuts/UploadIncoming-template.shortcut)
+is shortcut B, signed so that anyone may import them. After importing,
+rename the second to exactly `UploadIncoming` -- the first opens it by
+that name -- and fill in what is yours: the host, the port, the user, the
+path to `scripts/receive.sh` (or the wrapper that reaches it), and your
+blog's address in the Text before `#b=`. The SSH action carries no key;
+pick or generate one there and put its public half on the server, as the
+key line below shows. The first shortcut needs nothing changed.
+
 Base64, not URL Encode, and not for taste: Shortcuts reads a reply
 that is JSON as a Dictionary and then refuses to hand a Dictionary to
 URL Encode -- "couldn't convert from Dictionary to Text" -- on exactly
