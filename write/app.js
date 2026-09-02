@@ -93,11 +93,34 @@
     });
   }
 
+  // What the page wrote is what it expects back; anything else -- a hand
+  // edit, another version's shape, half a write -- is taken for what it
+  // is worth and no further. A draft that could not be read used to
+  // throw inside load(), before render() and before the page began to
+  // listen for the server's reply: the form stood empty, the buttons
+  // wore their labels, and the reply that arrived went nowhere.
+  function sane(saved) {
+    var out = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
+    if (!saved || typeof saved !== "object") return out;
+    ["title", "body", "tags"].forEach(function (k) { if (typeof saved[k] === "string") out[k] = saved[k]; });
+    out.publish = saved.publish === true;
+    out.sentAt = typeof saved.sentAt === "number" ? saved.sentAt : 0;
+    if (Array.isArray(saved.shots)) {
+      out.shots = saved.shots.filter(function (shot) {
+        return shot && typeof shot === "object" && typeof shot.name === "string" && shot.name;
+      }).map(function (shot) {
+        if (typeof shot.alt !== "string") shot.alt = "";
+        if (shot.data != null && typeof shot.data !== "string") delete shot.data;
+        return shot;
+      });
+    }
+    return out;
+  }
+
   function load() {
     try {
-      var saved = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (saved) state = Object.assign(state, saved);
-    } catch (e) { /* private mode, cleared storage: start empty */ }
+      state = sane(JSON.parse(localStorage.getItem(KEY) || "null"));
+    } catch (e) { /* private mode, cleared storage, not JSON: start empty */ }
     // The bytes, from IndexedDB. A draft written before the split still
     // carries them inline, and keeps them until its next save moves them.
     var need = state.shots.filter(function (shot) { return !shot.data; });
@@ -112,8 +135,13 @@
         lost.push(shot.name);
         return false;
       });
-      // Said, not silently dropped: the text still names them.
-      if (lost.length) say(t("app.pictures_lost") + ": " + lost.join(", "), "bad");
+      // Said, and taken out of the text as well: a reference left standing
+      // sent a post the far end refused for a picture nobody could see on
+      // this page any more.
+      if (lost.length) {
+        lost.forEach(function (name) { state.body = unreference(state.body, name); });
+        say(t("app.pictures_lost") + ": " + lost.join(", "), "bad");
+      }
     }
     return bytesGetAll().then(without, function () { without([]); });
   }
@@ -136,6 +164,7 @@
         // It used to say error.no_reply -- "the server said nothing" --
         // about a server that nothing had asked.
         say(t("app.not_saved"), "bad");
+        $("kept").hidden = true;
       }
       // The bytes, once each: a picture already stored is not written again.
       state.shots.forEach(function (shot) {
@@ -183,7 +212,7 @@
   function safeName(name, index, ext) {
     var base = String(name || "").replace(/\.[^.]*$/, "");
     base = base.normalize ? base.normalize("NFKD").replace(/[̀-ͯ]/g, "") : base;
-    base = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    base = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
     return (base || ("photo-" + index)) + "." + (ext || "jpg");
   }
 
@@ -193,8 +222,10 @@
   function extensionOf(file) {
     var m = /\.([a-z0-9]{1,8})$/i.exec(String(file.name || ""));
     if (m) return m[1].toLowerCase();
-    var t = /^image\/([a-z0-9]+)/i.exec(String(file.type || ""));
-    return t ? t[1].toLowerCase() : "img";
+    var t = /^(image|video)\/([a-z0-9-]+)/i.exec(String(file.type || ""));
+    if (!t) return "img";
+    var sub = t[2].toLowerCase();
+    return { quicktime: "mov", "x-m4v": "m4v", jpeg: "jpg" }[sub] || sub;
   }
 
   // ⚠️ Two photographs can slug to the same name -- "Vlak v Chocni.jpg" and
@@ -214,9 +245,19 @@
     return stem + "-" + n + ext;
   }
 
+  var MEDIA_EXT = /\.(jpe?g|png|gif|webp|heic|heif|avif|tiff?|bmp|mp4|mov|m4v)$/i;
+  function isMedia(f) {
+    // iOS hands some files over with no type at all; the extension then
+    // says what the type did not.
+    return /^(image|video)\//.test(f.type) || (!f.type && MEDIA_EXT.test(String(f.name || "")));
+  }
+  function isVideo(f) {
+    return /^video\//.test(f.type) || (!f.type && /\.(mp4|mov|m4v)$/i.test(String(f.name || "")));
+  }
   function addFiles(files) {
-    var list = Array.prototype.filter.call(files, function (f) { return /^(image|video)\//.test(f.type); });
-    if (!list.length) return;
+    var list = Array.prototype.filter.call(files, isMedia);
+    var skipped = files.length - list.length;
+    if (!list.length) { if (skipped) say(t("app.files_skipped"), "bad"); return; }
     say(t("app.sending") === "" ? "" : "…");
     var asIs = [];
     function keep(file, ext, dataUrl, w, h, kind) {
@@ -233,7 +274,7 @@
         // A video goes as it is: nothing on this page can shrink one, and
         // the blog takes the file whole. The same card, the same button,
         // one more exclamation mark in the text.
-        if (/^video\//.test(file.type)) {
+        if (isVideo(file)) {
           return blobToDataUrl(file).then(function (dataUrl) {
             keep(file, extensionOf(file), dataUrl, 0, 0, "video");
           });
@@ -259,8 +300,9 @@
       });
     }, Promise.resolve()).then(function () {
       save();
-      say(asIs.length ? t("app.picture_as_is") + ": " + asIs.join(", ") : "",
-          asIs.length ? "good" : "");
+      var note = asIs.length ? t("app.picture_as_is") + ": " + asIs.join(", ") : "";
+      if (skipped) note = (note ? note + " " : "") + t("app.files_skipped");
+      say(note, skipped ? "bad" : (asIs.length ? "good" : ""));
     }).catch(function () {
       // Not "the bundle is not a readable archive", which is what this
       // said for one release after the archive itself was removed: the
@@ -286,11 +328,22 @@
   // told by one's own phone before sending beats a rejection afterwards.
   function badReferences() {
     var out = [];
-    var re = /!\[[^\]]*\]\(([^)]+)\)/g;
+    var re = /!\[[^\n]*?\]\(([^)]+)\)/g;
     var m;
     while ((m = re.exec(state.body)) !== null) {
       var target = m[1].trim();
       if (target.indexOf("/") !== -1 || target.charAt(0) === "~") out.push(target);
+    }
+    return out;
+  }
+
+  // Every name the text refers to that is not among the pictures here.
+  function missingReferences() {
+    var have = state.shots.map(function (shot) { return shot.name; });
+    var out = [], re = /!{1,2}\[[^\n]*?\]\(([^)\s]+)\)/g, m;
+    while ((m = re.exec(state.body)) !== null) {
+      var name = m[1].trim();
+      if (name.indexOf("/") === -1 && name.charAt(0) !== "~" && have.indexOf(name) === -1 && out.indexOf(name) === -1) out.push(name);
     }
     return out;
   }
@@ -367,8 +420,8 @@
     // the value literally, so "[foto] Sobota" would keep its brackets in
     // the title exactly as [foto] would keep them in a tag name.
     var title = state.title.trim()
-      .replace(/^["']|["']$/g, "")
-      .replace(/^\[|\]$/g, "")
+      .replace(/^(["'])(.*)\1$/, "$2")
+      .replace(/^\[(.*)\]$/, "$1")
       .trim();
     if (title) lines.push("title: " + title);
     // Brackets stripped before AND after the split, because both spellings
@@ -389,7 +442,9 @@
     // straight out is written down -- and the blog reads it the way it
     // reads `publish <slug> --yes` at a desk: published, and announced.
     if (state.publish) lines.push("publish: yes");
-    if (!lines.length) return "";
+    // A body that itself opens with --- would be read as front matter by
+    // the engine; an empty header in front of it keeps it a body.
+    if (!lines.length) return /^---(\n|$)/.test(state.body) ? "---\n---\n\n" : "";
     return "---\n" + lines.join("\n") + "\n---\n\n";
   }
 
@@ -407,28 +462,47 @@
   // wait afterwards is not a mystery. The wire carries a third more --
   // the batch is base64 -- and one connection carries all of it.
   function batchSize() {
-    var bytes = 0, pictures = 0, videos = 0;
+    var bytes = 0, pictures = 0, videos = 0, files = [];
     state.shots.forEach(function (shot) {
       var data = String(shot.data || "");
-      bytes += Math.floor((data.length - (data.indexOf(",") + 1)) * 3 / 4);
+      var n = Math.floor((data.length - (data.indexOf(",") + 1)) * 3 / 4);
+      bytes += n; files.push(n);
       if (shot.kind === "video") videos++; else pictures++;
     });
-    bytes += new TextEncoder().encode(markdown()).length;
-    return { pictures: pictures, videos: videos, bytes: bytes };
+    var text = new TextEncoder().encode(markdown()).length;
+    bytes += text; files.push(text);
+    return { pictures: pictures, videos: videos, bytes: bytes, files: files };
   }
 
   // What the wire carries: the batch is base64, a third more than the
   // bytes, plus a name and a dot for each file. The receiver measures
   // THAT against its ceiling, so this is the number to compare.
+  //
+  // Per file: base64 is four characters for every three bytes, and the
+  // shortcut's Base64 Encode breaks the line every 76 characters with a
+  // CRLF -- two more bytes each -- which the receiver counts, because it
+  // measures the stream. Modelled without the wrapping, the page said
+  // "fine" over a band of half a megabyte below the ceiling, and the
+  // phone spent the upload finding out.
+  function wireBytesOf(bytes) {
+    var chars = 4 * Math.ceil(bytes / 3);
+    return chars + 2 * Math.ceil(chars / 76);
+  }
   function wireBytes(size) {
-    return Math.ceil(size.bytes * 4 / 3) + (size.pictures + size.videos + 1) * 80;
+    var files = (size.files || []);
+    var total = 0;
+    if (files.length) files.forEach(function (n) { total += wireBytesOf(n); });
+    else total = wireBytesOf(size.bytes);
+    return total + (size.pictures + size.videos + 1) * 80;
   }
   function overLimit(size, maxMb) {
     return !!maxMb && wireBytes(size) > maxMb * 1048576;
   }
 
   function formatBytes(n) {
-    if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + " kB";
+    var kb = Math.round(n / 1024);
+    if (n > 0 && kb === 0) kb = 1;   // a few bytes are not nothing
+    if (kb < 1024) return kb + " kB";
     return String(Math.round(n / 1024 / 1024 * 10) / 10).replace(".", t("app.decimal")) + " MB";
   }
 
@@ -589,7 +663,15 @@
     // text. Without this it was copied once, when the picture was
     // inserted, and a description written afterwards stayed on this screen
     // only -- the post went out as ![](photo.jpg) and nothing said so.
-    if (retitle(shot.name, before, shot.alt)) drawShots();
+    if (retitle(shot.name, before, shot.alt)) {
+      // The chips follow the text, so the cards are redrawn -- and the
+      // redraw used to take the focus, and with it the keyboard, out of
+      // the very field being typed into, after every letter.
+      var i = e.target.dataset.i, at = e.target.selectionStart, to = e.target.selectionEnd;
+      drawShots();
+      var again = $("shots").querySelector('textarea[data-i="' + i + '"]');
+      if (again) { again.focus(); try { again.setSelectionRange(at, to); } catch (err) { /* fine */ } }
+    }
     save();
   });
 
@@ -613,7 +695,7 @@
   // button's business.
   function unreference(text, name) {
     // One mark or two: a picture is ![…](name), a video !![…](name).
-    var line = new RegExp("^[ \\t]*!{1,2}\\[[^\\]]*\\]\\(" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\)[ \\t]*$");
+    var line = new RegExp("^[ \\t]*!{1,2}\\[[^\\n]*\\]\\(" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\)[ \\t]*$");
     var out = [], lines = text.split("\n");
     for (var i = 0; i < lines.length; i++) {
       if (!line.test(lines[i])) { out.push(lines[i]); continue; }
@@ -627,11 +709,16 @@
   // Rewrites ![old](name) to ![new](name). Only an exact match of what was
   // there is replaced: anything else is the author's own wording and is
   // not ours to overwrite.
+  // A description is one line in the markdown, whatever the box held: a
+  // newline in ![…](name) is a picture the engine refuses, with a reason
+  // that names the wrong thing.
+  function oneLine(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
   function retitle(name, before, after) {
     var body = $("body");
-    var find = "![" + before + "](" + name + ")";
+    var find = "![" + oneLine(before) + "](" + name + ")";
     if (body.value.indexOf(find) === -1) return false;
-    body.value = body.value.split(find).join("![" + after + "](" + name + ")");
+    body.value = body.value.split(find).join("![" + oneLine(after) + "](" + name + ")");
     state.body = body.value;
     return true;
   }
@@ -677,7 +764,7 @@
       // tells them apart, and the reader never has to know.
       var bang = shot.kind === "video" ? "!!" : "!";
       body.value = before + spacedMark(before, after,
-                                       bang + "[" + (shot.alt || "") + "](" + shot.name + ")") + after;
+                                       bang + "[" + oneLine(shot.alt) + "](" + shot.name + ")") + after;
       state.body = body.value;
       drawShots(); save();
     }
@@ -748,7 +835,8 @@
     }
     clearTimeout(btn._armTimer);
     btn.dataset.arm = ""; btn.textContent = t("app.discard");
-    state = { title: "", body: "", tags: "", shots: [], publish: false };
+    clearTimeout(saveTimer);
+    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
     try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
     forget(bytesClear());
     render();
@@ -764,30 +852,50 @@
       say(t("error.bad_reference") + " " + bad.join(", "), "bad");
       return;
     }
+    // A picture the text names and this page no longer has -- its bytes
+    // were lost, or the line was typed by hand -- would be refused at the
+    // far end under a name the author cannot see anywhere here.
+    var gone = missingReferences();
+    if (gone.length) {
+      say(t("app.reference_missing").replace("{names}", gone.join(", ")), "bad");
+      return;
+    }
     // Said once, and only about pictures the text actually shows: a
     // description missing from a published picture cannot be added later
     // by the person who needed it. Not a refusal -- the author may have
     // reasons -- but it must not leave silently either.
+    // One latch per reason: the second tap that answers "no description"
+    // must not also answer "over the limit".
     var mute = state.shots.filter(function (shot) {
-      return usedInText(shot.name) && !shot.alt.trim();
+      return usedInText(shot.name) && !(shot.alt || "").trim();
     });
-    if (mute.length && !this.dataset.anyway) {
-      this.dataset.anyway = "yes";
+    if (mute.length && this.dataset.anyway !== "alt") {
+      this.dataset.anyway = "alt";
       say(t("app.alt_missing") + ": " + mute.map(function (s) { return s.name; }).join(", "), "bad");
       return;
     }
     // Over the server's ceiling as this page knows it. A second tap
     // sends anyway, because the page's number is the build's and the
     // server's may have been raised since; but the first tap says it.
-    if (overLimit(batchSize(), maxMb()) && !this.dataset.anyway) {
-      this.dataset.anyway = "yes";
+    if (overLimit(batchSize(), maxMb()) && this.dataset.anyway !== "size") {
+      this.dataset.anyway = "size";
       say(t("app.batch_over_send").replace("{max}", String(maxMb()))
                                   .replace("{wire}", formatBytes(wireBytes(batchSize()))), "bad");
       return;
     }
     this.dataset.anyway = "";
     say(t("app.handing").replace("{what}", describeBatch(batchSize())));
-    var files = buildFiles();
+    var files;
+    try { files = buildFiles(); } catch (e) {
+      // A picture whose stored bytes will not decode. Said, rather than
+      // a button that does nothing from now on.
+      say(t("app.picture_failed"), "bad");
+      return;
+    }
+    // The hand-off is what a later reply is allowed to answer for: a
+    // reply that arrives at a page which sent nothing clears nothing.
+    state.sentAt = Date.now();
+    save();
     // Sharing hands the files to the shortcut. Whether a browser will do
     // ⚠️ canShare is a far smaller question than it looks: it answers
     // whether this page may share at all and whether the list is not empty,
@@ -810,10 +918,10 @@
           // cannot tell the two apart. So the message claims neither:
           // it says the files left, and where the answer is.
           if (err && err.name === "AbortError") { say(t("app.share_cancelled"), "good"); return; }
-          download(buildBundle());
+          try { download(buildBundle()); } catch (e2) { say(t("app.picture_failed"), "bad"); }
         });
     } else {
-      download(buildBundle());
+      try { download(buildBundle()); } catch (e) { say(t("app.picture_failed"), "bad"); }
     }
   });
 
@@ -992,10 +1100,14 @@
       var n = mark.length;
       // Selected together with its marks, or between them: either way
       // the second tap takes them off.
-      if (sel.length >= 2 * n && sel.slice(0, n) === mark && sel.slice(-n) === mark) {
+      // A mark of one character next to another of the same character is
+      // part of a longer mark -- the * of **bold** -- and not this one:
+      // tapping italic on a bold word used to un-bold it.
+      var edge = function (a, b) { return n === 1 && (v.charAt(a - 1) === mark || v.charAt(b) === mark); };
+      if (sel.length >= 2 * n && sel.slice(0, n) === mark && sel.slice(-n) === mark && !edge(start, end)) {
         return { value: v.slice(0, start) + sel.slice(n, -n) + v.slice(end), start: start, end: end - 2 * n };
       }
-      if (v.slice(start - n, start) === mark && v.slice(end, end + n) === mark && start >= n) {
+      if (start >= n && v.slice(start - n, start) === mark && v.slice(end, end + n) === mark && !edge(start - n, end + n)) {
         return { value: v.slice(0, start - n) + sel + v.slice(end + n), start: start - n, end: end - n };
       }
       return { value: v.slice(0, start) + mark + sel + mark + v.slice(end), start: start + n, end: end + n };
@@ -1009,6 +1121,11 @@
       // sentence puts around a word stay outside the link.
       while (start > 0 && /\S/.test(v.charAt(start - 1))) start--;
       while (end < v.length && /\S/.test(v.charAt(end))) end++;
+      // Inside a link that already is one, there is nothing to make.
+      var around = v.slice(Math.max(0, start - 1), end + 1);
+      if (/^\[[^\]]*\]\([^)]*\)$/.test(v.slice(start, end)) || /\]\(/.test(v.slice(start, end))) {
+        return { value: v, start: start, end: end };
+      }
       while (start < end && /[([{"']/.test(v.charAt(start))) start++;
       while (end > start && /[)\]}.,;:!?"']/.test(v.charAt(end - 1))) end--;
       sel = v.slice(start, end);
@@ -1037,14 +1154,17 @@
     if (le === -1) le = v.length;
     var lines = v.slice(ls, le).split("\n");
     var has;
+    // Added, a mark goes on every line once -- a line that already had it
+    // is not given a second one -- and every line loses it when they all
+    // had it.
     if (kind === "ol") {
       has = lines.every(function (l) { return /^\d+\. /.test(l); });
-      lines = lines.map(function (l, i) { return has ? l.replace(/^\d+\. /, "") : (i + 1) + ". " + l; });
+      lines = lines.map(function (l, i) { var bare = l.replace(/^\d+\. /, ""); return has ? bare : (i + 1) + ". " + bare; });
     } else {
       var prefix = LINED[kind];
       if (!prefix) return { value: v, start: start, end: end };
       has = lines.every(function (l) { return l.indexOf(prefix) === 0; });
-      lines = lines.map(function (l) { return has ? l.slice(prefix.length) : prefix + l; });
+      lines = lines.map(function (l) { var bare = l.indexOf(prefix) === 0 ? l.slice(prefix.length) : l; return has ? bare : prefix + bare; });
     }
     var block = lines.join("\n");
     var nv = v.slice(0, ls) + block + v.slice(le);
@@ -1141,11 +1261,19 @@
         html.push("<h" + level + ">" + inlineHtml(m[2]) + "</h" + level + ">");
         i++; continue;
       }
-      if ((m = /^!!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line))) {
+      var glued = function () {
+        // The engine takes a picture only as a paragraph of its own: a
+        // blank line before it and after it. The preview used to show a
+        // figure where the engine would refuse the post.
+        return (i > 0 && lines[i - 1].trim() !== "") || (i + 1 < lines.length && lines[i + 1].trim() !== "");
+      };
+      if ((m = /^!!\[([^\n]*)\]\(([^)\s]+)\)\s*$/.exec(line))) {
         flush();
         var clip = byName[m[2]];
-        if (clip && clip.data) {
-          html.push('<figure><video controls playsinline src="' + clip.data + '"></video>' +
+        if (glued()) {
+          html.push('<figure><div class="no-preview">' + escapeHtml(t("app.preview_picture_glued").replace("{name}", m[2])) + "</div></figure>");
+        } else if (clip && clip.data) {
+          html.push('<figure><video controls playsinline src="' + escapeHtml(clip.data) + '"></video>' +
                     (m[1] ? "<figcaption>" + escapeHtml(m[1]) + "</figcaption>" : "") + "</figure>");
         } else {
           html.push('<figure><div class="no-preview">' +
@@ -1153,11 +1281,13 @@
         }
         i++; continue;
       }
-      if ((m = /^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line))) {
+      if ((m = /^!\[([^\n]*)\]\(([^)\s]+)\)\s*$/.exec(line))) {
         flush();
         var shot = byName[m[2]];
-        if (shot && !shot.raw) {
-          html.push('<figure><img src="' + shot.data + '" alt="' + escapeHtml(m[1]) + '"></figure>');
+        if (glued()) {
+          html.push('<figure><div class="no-preview">' + escapeHtml(t("app.preview_picture_glued").replace("{name}", m[2])) + "</div></figure>");
+        } else if (shot && !shot.raw) {
+          html.push('<figure><img src="' + escapeHtml(shot.data) + '" alt="' + escapeHtml(m[1]) + '"></figure>');
         } else {
           // A picture the browser could not decode has no bytes to show
           // here; the blog converts it on arrival. Said in the box where
@@ -1290,16 +1420,16 @@
   function answerIn(href) {
     var s = String(href || "");
     var at = s.indexOf("#b=");
-    if (at !== -1) return fromBase64(s.slice(at + 3));
-    at = s.indexOf("#r=");
-    var raw;
-    if (at !== -1) raw = s.slice(at + 3);
+    var raw = null;
+    if (at !== -1) raw = fromBase64(s.slice(at + 3));
     else {
-      var m = /[?&]r=([^&#]*)/.exec(s);
-      if (!m) return null;
-      raw = m[1];
+      at = s.indexOf("#r=");
+      if (at === -1) return null;
+      raw = s.slice(at + 3);
+      try { raw = decodeURIComponent(raw); } catch (e) { /* not percent-encoded, then */ }
     }
-    try { return decodeURIComponent(raw); } catch (e) { return raw; }
+    // A key with nothing after it is no reply, not a reply that said nothing.
+    return raw.trim() === "" ? null : raw;
   }
 
   // Base64 as an address carries it: percent-encoded by whoever put it
@@ -1314,7 +1444,11 @@
       var binary = atob(text);
       var bytes = new Uint8Array(binary.length);
       for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return new TextDecoder("utf-8").decode(bytes);
+      var decoded = new TextDecoder("utf-8").decode(bytes);
+      // Text that was never base64 decodes to rubbish rather than failing:
+      // the words that came are better than that, so they are shown when
+      // they are what holds the braces.
+      return decoded.indexOf("{") === -1 && raw.indexOf("{") !== -1 ? raw : decoded;
     } catch (e) { return raw; }
   }
 
@@ -1345,7 +1479,11 @@
     if (post) {
       var open = post.state === "published";
       add("h2", t(open ? "app.result_published" : "app.result_saved"));
-      if (post.url) {
+      // A link only to this site. The reply comes in through the address
+      // bar, where anyone who can send the author a link can put one, and
+      // a "Preview" that ran javascript: on the blog's own origin is not
+      // a preview.
+      if (siteUrl(post.url)) {
         var a = document.createElement("a");
         a.href = post.url;
         a.textContent = open ? post.url : t("app.result_preview");
@@ -1359,7 +1497,7 @@
         code.textContent = "./blog.sh publish " + post.slug;
         add("p", t("app.result_publish_hint") + " ", "meta").appendChild(code);
       }
-      if (post.warnings && post.warnings.length) {
+      if (Array.isArray(post.warnings) && post.warnings.length) {
         add("p", t("app.result_warnings"), "meta");
         var ul = add("ul");
         post.warnings.forEach(function (w) {
@@ -1398,8 +1536,13 @@
     // A post the server took is no longer a draft on this device: the
     // text is on the blog now, and a copy kept here is a post sent twice.
     // A refusal keeps everything, so it can be mended and sent again.
-    if (post) {
-      state = { title: "", body: "", tags: "", shots: [], publish: false };
+    // And only a page that SENT something is cleared: the reply arrives
+    // through the address bar, and a link with a slug in it is something
+    // anyone can send the author -- it used to empty two hours of writing
+    // on arrival.
+    if (post && state.sentAt) {
+      clearTimeout(saveTimer);
+      state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
       try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
       forget(bytesClear());
       render();
@@ -1407,13 +1550,22 @@
     window.scrollTo(0, 0);
   }
 
+  // Only an address on this site. Everything after "://" up to the first
+  // slash has to be this page's own host.
+  function siteUrl(url) {
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
+    try { return new URL(url).origin === location.origin; } catch (e) { return false; }
+  }
+
   function answerFromAddress() {
-    var raw = answerIn(location.href);
+    var raw;
+    try { raw = answerIn(location.href); } catch (e) { raw = null; }
     if (raw === null) return;
-    showAnswer(describeAnswer(parseAnswer(raw)), raw);
-    // Off the address once read: a reload or a bookmark must not clear
-    // a new draft against an old answer.
-    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* file:, maybe */ }
+    // Off the address FIRST: whatever showing it does, a reload or a
+    // bookmark must not clear a new draft against an old answer.
+    try { history.replaceState(null, "", location.pathname); } catch (e) { /* file:, maybe */ }
+    try { showAnswer(describeAnswer(parseAnswer(raw)), raw); }
+    catch (e) { say(t("app.result_unreadable"), "bad"); }
   }
 
   // --------------------------------------------------------------- start
@@ -1460,7 +1612,7 @@
     var el = $("images-hint");
     if (!el) return;
     el.textContent = t("app.images_hint").replace("{edge}", String(MAX_EDGE))
-      .replace("{max}", String(maxMb())).replace("{files}", String(Math.floor(maxMb() * 3 / 4)));
+      .replace("{max}", String(maxMb())).replace("{files}", String(Math.floor(maxMb() * 0.73)));
   }
 
   function render() {
@@ -1477,11 +1629,25 @@
   }
 
   applySite();
-  load().then(function () {
+  // The same page may already be open when the shortcut arrives; then
+  // only the fragment changes, and nothing is loaded again. Registered
+  // before anything below can fail, so a draft that will not load does
+  // not also make the page deaf.
+  window.addEventListener("hashchange", answerFromAddress);
+  // Two pages of this site -- a Safari tab and the home-screen app, or two
+  // tabs -- share this storage. When one of them sent the post and
+  // cleared the draft, the other must not keep a copy that a keystroke
+  // would write back and a tap would send again.
+  window.addEventListener("storage", function (e) {
+    if (e.key !== KEY && e.key !== null) return;
+    if (e.newValue !== null) return;
+    clearTimeout(saveTimer);
+    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
     render();
+    say(t("app.sent_elsewhere"), "good");
+  });
+  load().then(null, function () { /* the bytes could not be read; the text stands */ }).then(function () {
+    try { render(); } catch (e) { /* a draft the page cannot draw must not stop the reply below */ }
     answerFromAddress();
-    // The same page may already be open when the shortcut arrives; then
-    // only the fragment changes, and nothing is loaded again.
-    window.addEventListener("hashchange", answerFromAddress);
   });
 })();
