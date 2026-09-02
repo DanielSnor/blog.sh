@@ -46,22 +46,88 @@
   var MAX_EDGE = 2560;   // long edge; a phone photo is far larger than any blog needs
   var state = { title: "", body: "", tags: "", shots: [], publish: false };
 
+  // ------------------------------------------------------------ storage
+  // The text, and what the page knows about each picture, go to
+  // localStorage: small and synchronous. The bytes of the pictures and
+  // videos go to IndexedDB, which holds hundreds of megabytes where
+  // localStorage holds five. Until this split a draft with a phone video
+  // -- or with five photographs -- could not be kept at all, and the page
+  // said so on every keystroke.
+  var DB = "blogsh-write", STORE = "shots";
+  function idb() {
+    return new Promise(function (done, fail) {
+      if (!window.indexedDB) return fail(new Error("no indexedDB"));
+      var req = indexedDB.open(DB, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore(STORE, { keyPath: "name" }); };
+      req.onsuccess = function () { done(req.result); };
+      req.onerror = function () { fail(req.error); };
+    });
+  }
+  function bytesRun(mode, act) {
+    return idb().then(function (db) {
+      return new Promise(function (done, fail) {
+        var tx = db.transaction(STORE, mode);
+        var req = act(tx.objectStore(STORE));
+        tx.oncomplete = function () { db.close(); done(req && req.result); };
+        tx.onerror = function () { db.close(); fail(tx.error); };
+        tx.onabort = function () { db.close(); fail(tx.error); };
+      });
+    });
+  }
+  function bytesGetAll() { return bytesRun("readonly", function (st) { return st.getAll(); }); }
+  function bytesPut(name, data) { return bytesRun("readwrite", function (st) { return st.put({ name: name, data: data }); }); }
+  function bytesDelete(name) { return bytesRun("readwrite", function (st) { return st.delete(name); }); }
+  function bytesClear() { return bytesRun("readwrite", function (st) { return st.clear(); }); }
+  function forget(promise) { promise.then(null, function () { /* nothing to clear, or nowhere */ }); }
+
+  // What localStorage gets: everything but the bytes, and nothing that is
+  // only this page's bookkeeping.
+  function forStorage(st) {
+    return Object.assign({}, st, {
+      shots: st.shots.map(function (shot) {
+        var copy = Object.assign({}, shot);
+        delete copy.data;
+        delete copy._stored;
+        return copy;
+      })
+    });
+  }
+
   function load() {
     try {
       var saved = JSON.parse(localStorage.getItem(KEY) || "null");
       if (saved) state = Object.assign(state, saved);
     } catch (e) { /* private mode, cleared storage: start empty */ }
+    // The bytes, from IndexedDB. A draft written before the split still
+    // carries them inline, and keeps them until its next save moves them.
+    var need = state.shots.filter(function (shot) { return !shot.data; });
+    if (!need.length) return Promise.resolve();
+    function without(rows) {
+      var by = {};
+      (rows || []).forEach(function (row) { by[row.name] = row.data; });
+      var lost = [];
+      state.shots = state.shots.filter(function (shot) {
+        if (shot.data) return true;
+        if (by[shot.name]) { shot.data = by[shot.name]; shot._stored = true; return true; }
+        lost.push(shot.name);
+        return false;
+      });
+      // Said, not silently dropped: the text still names them.
+      if (lost.length) say(t("app.pictures_lost") + ": " + lost.join(", "), "bad");
+    }
+    return bytesGetAll().then(without, function () { without([]); });
   }
+
   var saveTimer = null;
   function save() {
     drawBatch();
     schedulePreview();
-    // Debounced: this runs on every keystroke and the body can hold photos
-    // as data URLs, so writing on each one makes typing stutter.
+    // Debounced: this runs on every keystroke, so writing on each one
+    // makes typing stutter.
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () {
       try {
-        localStorage.setItem(KEY, JSON.stringify(state));
+        localStorage.setItem(KEY, JSON.stringify(forStorage(state)));
         $("kept").textContent = t("app.saved_locally");
         $("kept").hidden = false;
       } catch (e) {
@@ -71,6 +137,15 @@
         // about a server that nothing had asked.
         say(t("app.not_saved"), "bad");
       }
+      // The bytes, once each: a picture already stored is not written again.
+      state.shots.forEach(function (shot) {
+        if (shot._stored || !shot.data) return;
+        shot._stored = "pending";
+        bytesPut(shot.name, shot.data).then(function () { shot._stored = true; }, function () {
+          shot._stored = false;
+          say(t("app.pictures_not_saved"), "bad");
+        });
+      });
     }, 400);
   }
 
@@ -579,6 +654,7 @@
       // the author had deliberately taken out.
       var gone = state.shots[Number(drop.dataset.drop)];
       state.shots.splice(Number(drop.dataset.drop), 1);
+      forget(bytesDelete(gone.name));
       var body = $("body");
       body.value = unreference(body.value, gone.name);
       state.body = body.value;
@@ -674,6 +750,7 @@
     btn.dataset.arm = ""; btn.textContent = t("app.discard");
     state = { title: "", body: "", tags: "", shots: [], publish: false };
     try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
+    forget(bytesClear());
     render();
     say(t("app.discarded"), "good");
   });
@@ -704,7 +781,8 @@
     // server's may have been raised since; but the first tap says it.
     if (overLimit(batchSize(), maxMb()) && !this.dataset.anyway) {
       this.dataset.anyway = "yes";
-      say(t("app.batch_over_send").replace("{max}", String(maxMb())), "bad");
+      say(t("app.batch_over_send").replace("{max}", String(maxMb()))
+                                  .replace("{wire}", formatBytes(wireBytes(batchSize()))), "bad");
       return;
     }
     this.dataset.anyway = "";
@@ -1293,6 +1371,7 @@
     if (post) {
       state = { title: "", body: "", tags: "", shots: [], publish: false };
       try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
+      forget(bytesClear());
       render();
     }
     window.scrollTo(0, 0);
@@ -1336,7 +1415,10 @@
     // Said here, in red, the moment the batch outgrows the server's
     // ceiling -- not after the phone has spent the upload finding out.
     var over = !empty && overLimit(size, maxMb());
-    if (over) text += " -- " + t("app.batch_over").replace("{max}", String(maxMb()));
+    if (over) {
+      text += " -- " + t("app.batch_over").replace("{max}", String(maxMb()))
+                                          .replace("{wire}", formatBytes(wireBytes(size)));
+    }
     el.textContent = text;
     if (over) el.dataset.kind = "bad"; else el.removeAttribute("data-kind");
   }
@@ -1347,7 +1429,8 @@
   function drawLegend() {
     var el = $("images-hint");
     if (!el) return;
-    el.textContent = t("app.images_hint").replace("{edge}", String(MAX_EDGE)).replace("{max}", String(maxMb()));
+    el.textContent = t("app.images_hint").replace("{edge}", String(MAX_EDGE))
+      .replace("{max}", String(maxMb())).replace("{files}", String(Math.floor(maxMb() * 3 / 4)));
   }
 
   function render() {
@@ -1364,10 +1447,11 @@
   }
 
   applySite();
-  load();
-  render();
-  answerFromAddress();
-  // The same page may already be open when the shortcut arrives; then
-  // only the fragment changes, and nothing is loaded again.
-  window.addEventListener("hashchange", answerFromAddress);
+  load().then(function () {
+    render();
+    answerFromAddress();
+    // The same page may already be open when the shortcut arrives; then
+    // only the fragment changes, and nothing is loaded again.
+    window.addEventListener("hashchange", answerFromAddress);
+  });
 })();

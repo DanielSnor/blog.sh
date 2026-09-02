@@ -374,7 +374,10 @@ exit code is 0 or 1, nothing else.
 
 `write: true` publishes a page at `/write/` to write the post on: a title,
 the text, tags, and photographs each with its description. It keeps what
-is typed in the browser, so closing the tab in a tunnel loses nothing. The
+is typed in the browser, so closing the tab in a tunnel loses nothing --
+the text in localStorage, the bytes of the pictures and videos in
+IndexedDB, which holds hundreds of megabytes where localStorage holds
+five. The
 page is marked `noindex` and holds no secret of its own -- what sending
 needs is the key, and that lives in the shortcut on the phone.
 
