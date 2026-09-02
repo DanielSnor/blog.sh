@@ -384,7 +384,9 @@ the text in localStorage, the bytes of the pictures and videos in
 IndexedDB, which holds hundreds of megabytes where localStorage holds
 five. The
 page is marked `noindex` and holds no secret of its own -- what sending
-needs is the key, and that lives in the shortcut on the phone.
+needs is the key, and that lives in the shortcut on the phone. Add it to
+the home screen and it opens as an app -- that is what the manifest among
+the published files is for.
 
 The page is the same file on every site; what is this site's the build
 writes beside it as `write/site.js`: the short name and claim for the
@@ -410,6 +412,16 @@ way. The link mark reads the selection, widened to whole words: an
 address -- `https://…`, or a bare domain, which gets its `https://` --
 becomes a link with the words left to type; words become one with the
 address left to type.
+
+A picture does not travel as it is. The page draws it through a canvas
+first -- 2560 px on its long edge, JPEG at quality 0.88 -- which is what
+makes a post of four photographs fit under the ceiling at all, and it is
+why the file arrives as `vlak-v-chocni.jpg` whatever the phone called it:
+the name is folded to ASCII so the markdown can name it without escaping,
+and a second picture folding to the same name gets `-2`. A picture this
+browser cannot decode -- a HEIC outside Safari -- is passed through
+untouched under its own extension. Send the original by SFTP and use
+`add` if the re-encode is not what you want.
 
 A video goes the same way as a picture -- the same button, the same
 card, the same description -- and into the text as `!![description]
@@ -956,6 +968,12 @@ What it looks for, each with a line saying what to do about it:
   (a slash or a `..` in it).** The build refuses to run on any of them, or
   writes the page nowhere good, so check says so first: without this it
   counted the archive minus the broken file and called the rest sound.
+- **A `type:` the engine does not know.** It is stored on the post and
+  read by nobody: the eight it knows are text, quote, chat, image, video,
+  audio, link and document, and anything else gets no listing, no menu
+  entry and no icon of its own. The fix line points at the tag route,
+  which is usually what somebody reaching for a new type wanted -- a tag
+  named in `nav:` has a listing, pagination, a menu entry and a feed.
 - **A file a queue move stepped aside and a crash left parked.** The
   parking name is dotted precisely so no listing shows it -- which also
   means nothing would ever find one again without this. What to do with
@@ -1151,9 +1169,11 @@ the request for one was closed without it -- and a post there wants a
 photograph rather than a link.
 
 What gets prefilled is the post's NAME and its address; the reader writes
-the part that is theirs. Nothing appears on a page or on a draft preview:
-there is nothing to pass on from a contact page, and a draft has no
-address anybody else can open.
+the part that is theirs. Nothing appears on a page, on a draft preview or
+on an unlisted post: there is nothing to pass on from a contact page, a
+draft has no address anybody else can open, and handing a reader a button
+that posts an unlisted post to Bluesky is the mistake the unlisted flag
+exists to prevent.
 
 ## Rebuilding only what changed
 
@@ -1437,7 +1457,7 @@ everything generated is rebuildable:
 | --- | --- |
 | `content.nosync/posts/` | the posts -- the one thing that's truly irreplaceable |
 | `content.nosync/versions/` | what each edited post said before its last ten saves, which is what `[v]` restores from ([Properties and actions](#properties-and-actions)). It sits beside the content and dies with it, so a backup of the posts alone keeps the archive and loses the undo |
-| `media.nosync/` | their images and videos |
+| `media.nosync/` | their images and videos. A published picture has been a hardlink to this file since 1.6, so a backup still stores it once per name -- this is the copy that matters ([A published picture is the archive's own file](#a-published-picture-is-the-archives-own-file)) |
 | `config/site.yml` | site identity and integrations |
 | `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
 | `env.sh` | tokens (or re-create them; mind the file's 600 mode in backups too) |
@@ -1447,7 +1467,9 @@ everything generated is rebuildable:
 Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
 (self-heals with one full re-upload), `.deploy_baseline.json` (the guards'
 reference; losing it costs one deploy with the growth guard standing down,
-and it is rewritten by that same run), `incoming/` (transient staging), and
+and it is rewritten by that same run), `incoming/` (transient staging),
+`.build_cache*.json` (what the last build wrote, so the next one can skip
+re-making it -- per-machine, and deleting it costs one full build), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still
@@ -1492,6 +1514,9 @@ whole), but restoring from the archive itself is exact.
 | `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |
 | `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. |
 | `HEIC displays only in Safari` when attaching a photo | The iPhone default format. Convert it with the command the message prints, set `media.convert_heic: true` to have the engine do it, or set the phone to Settings → Camera → Formats → Most Compatible. |
+| A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
+| `name_taken` from the receiver | Something in `incoming/` under that name is not a plain file -- a directory, or a symlink. Nothing was replaced; clear the name on the server. |
+| `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the shortcut's command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. All but `write_failed` leave with a non-zero status, which is how a caller tells "no answer" from "refused". |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |
 | sftp deploy hangs | It's waiting for a password -- the sftp backend needs key-based auth (see [install.md](install.md#sftp-hosts-with-neither-rsync-nor-git)). |

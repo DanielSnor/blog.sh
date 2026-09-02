@@ -247,6 +247,14 @@ manifest diffs by hash (with a size+mtime fast path), and RSS avoids
 embedding "now". A one-character edit deploys a handful of files, which
 also keeps cloud-synced and content-hashed targets calm.
 
+Since 1.6 there is a layer above that: the build records what went into
+each page and does not render the ones whose inputs have not moved,
+because comparing bytes still costs rendering them first. The record is
+never an authority -- anything it cannot vouch for is rendered and
+compared as before -- and it is thrown away whole whenever a template, a
+locale, the configuration or the engine changes, since any of those can
+reach every page.
+
 **Pagination is anchored to the oldest post.** Slicing from the newest
 end -- the obvious way -- shifts every page boundary each time a post
 is published, rewriting the whole archive on every deploy. Anchoring to

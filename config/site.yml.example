@@ -345,7 +345,9 @@ footer:
 
 # icon = a name from the built-in set: mastodon, pixelfed, linkedin,
 # github, gitea, forgejo, codeberg, gitlab, bluesky, instagram, threads,
-# facebook, x, youtube, rss, email.
+# facebook, x, youtube, rss, email. A name it does not know draws nothing
+# at all -- a link with an empty space where the icon should be -- so
+# `./blog.sh doctor` says when it finds one.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is
@@ -356,6 +358,21 @@ footer:
 # your home page in the profile field and it just works. The url: here
 # has to be your profile as Mastodon shows it (https://instance/@handle).
 # More than one entry may carry rel: "me".
+social:
+  - name: "Mastodon"
+    url: "https://mastodon.social/@yourname"
+    icon: "mastodon"
+    rel: "me"
+  - name: "Bluesky"
+    url: "https://bsky.app/profile/yourname.bsky.social"
+    icon: "bluesky"
+  - name: "GitHub"
+    url: "https://github.com/yourname"
+    icon: "github"
+  - name: "E-mail"
+    url: "mailto:you@example.com"
+    icon: "email"
+
 # Icons for tags. A tag named here carries its icon in two places: the
 # heading of its own /tag/<name>/ listing, and the date badge of every post
 # that has it -- where it REPLACES the content-type icon rather than
@@ -384,11 +401,17 @@ footer:
 # it out and no block appears. What gets prefilled is the post's name and
 # its address -- the reader writes the part that is theirs.
 #
+# The names: mastodon, bluesky, email, facebook, linkedin, threads, x --
+# plain links, one address each -- plus copy, which puts the address on the
+# clipboard, and system, which hands the post to the operating system's own
+# share sheet (on a phone that is Signal and WhatsApp and Telegram at once).
+#
 # `mastodon` asks the reader once which instance they are on and remembers
 # it in their own browser; there is no way for a page to know it, and the
 # alternative is sending every reader through somebody else's redirector.
-# Its button needs JavaScript, so it stays hidden without it rather than
-# sitting there doing nothing. `bluesky` and `email` are plain links.
+# Those three -- mastodon, copy and system -- need the browser to
+# co-operate and are not drawn where it will not: copy needs https, system
+# needs a share sheet. A block left with nothing it can draw hides itself.
 #
 # Pixelfed is not on the list: it has no share address to send anyone to,
 # and a post there wants a photograph rather than a link.
@@ -414,26 +437,6 @@ footer:
 #
 # write: true
 # --- end of write ---
-
-# `icon` names one the engine ships, and it ships sixteen: mastodon,
-# pixelfed, bluesky, threads, instagram, facebook, x, linkedin, youtube,
-# github, gitlab, gitea, forgejo, codeberg, rss, email. A name it does not
-# know draws nothing at all -- a link with an empty space where the icon
-# should be -- so `./blog.sh doctor` says when it finds one.
-social:
-  - name: "Mastodon"
-    url: "https://mastodon.social/@yourname"
-    icon: "mastodon"
-    rel: "me"
-  - name: "Bluesky"
-    url: "https://bsky.app/profile/yourname.bsky.social"
-    icon: "bluesky"
-  - name: "GitHub"
-    url: "https://github.com/yourname"
-    icon: "github"
-  - name: "E-mail"
-    url: "mailto:you@example.com"
-    icon: "email"
 
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's

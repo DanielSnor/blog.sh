@@ -18,7 +18,7 @@ error:
   no_reply: "Server neodpověděl. Příspěvek se přesto mohl uložit — než ho pošleš znovu, mrkni na blog."
 
   bad_reference: "Obrázek se smí odkazovat jenom jménem, bez cesty. Tyhle ji mají:"
-  name_taken: "Příspěvek toho jména už se píše. Přejmenuj ho nebo to zkus znovu."
+  name_taken: "V incoming/ je pod tím jménem něco, co není obyčejný soubor -- složka nebo symbolický odkaz. Nic se nepřepsalo. Přejmenuj obrázek, nebo na serveru ukliď, co pod tím jménem leží."
 
 app:
   mode_draft: "Draft"

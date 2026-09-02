@@ -18,7 +18,7 @@ error:
   no_reply: "Der Server hat nicht geantwortet. Der Beitrag kann trotzdem gespeichert sein — sieh im Blog nach, bevor du ihn erneut schickst."
 
   bad_reference: "Ein Bild darf nur mit seinem Namen angegeben werden, ohne Pfad. Diese haben einen:"
-  name_taken: "Ein Beitrag dieses Namens wird bereits geschrieben. Benenne ihn um oder versuche es erneut."
+  name_taken: "Unter diesem Namen liegt in incoming/ etwas, das keine gewöhnliche Datei ist -- ein Ordner oder ein Link. Es wurde nichts ersetzt. Benenne das Bild um, oder entferne auf dem Server, was dort unter diesem Namen liegt."
 
 app:
   mode_draft: "Entwurf"

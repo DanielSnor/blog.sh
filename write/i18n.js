@@ -19,7 +19,7 @@ window.I18N = {
       "no_cd": "Server nedokázal vstoupit do adresáře instalace.",
       "no_reply": "Server neodpověděl. Příspěvek se přesto mohl uložit — než ho pošleš znovu, mrkni na blog.",
       "bad_reference": "Obrázek se smí odkazovat jenom jménem, bez cesty. Tyhle ji mají:",
-      "name_taken": "Příspěvek toho jména už se píše. Přejmenuj ho nebo to zkus znovu."
+      "name_taken": "V incoming/ je pod tím jménem něco, co není obyčejný soubor -- složka nebo symbolický odkaz. Nic se nepřepsalo. Přejmenuj obrázek, nebo na serveru ukliď, co pod tím jménem leží."
     },
     "app": {
       "mode_draft": "Draft",
@@ -119,7 +119,7 @@ window.I18N = {
       "no_cd": "Der Server konnte das Installationsverzeichnis nicht betreten.",
       "no_reply": "Der Server hat nicht geantwortet. Der Beitrag kann trotzdem gespeichert sein — sieh im Blog nach, bevor du ihn erneut schickst.",
       "bad_reference": "Ein Bild darf nur mit seinem Namen angegeben werden, ohne Pfad. Diese haben einen:",
-      "name_taken": "Ein Beitrag dieses Namens wird bereits geschrieben. Benenne ihn um oder versuche es erneut."
+      "name_taken": "Unter diesem Namen liegt in incoming/ etwas, das keine gewöhnliche Datei ist -- ein Ordner oder ein Link. Es wurde nichts ersetzt. Benenne das Bild um, oder entferne auf dem Server, was dort unter diesem Namen liegt."
     },
     "app": {
       "mode_draft": "Entwurf",
@@ -219,7 +219,7 @@ window.I18N = {
       "no_cd": "The server could not enter the installation directory.",
       "no_reply": "The server said nothing. It may still have saved the post -- check the blog before sending it again.",
       "bad_reference": "A picture must be referenced by name alone, without a path. These have one:",
-      "name_taken": "A post of that name is already being written. Rename it or try again."
+      "name_taken": "Something of that name in incoming/ is not an ordinary file -- a folder, or a link. Nothing was replaced. Rename the picture, or clear that name on the server."
     },
     "app": {
       "mode_draft": "Draft",

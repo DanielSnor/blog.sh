@@ -216,7 +216,17 @@ The example is fully commented. The short version:
   asking for a date --
   [operations.md](operations.md#publishing-slots)),
   `media` (`convert_heic` and `strip_location`, both discussed under
-  [Writing from a phone](operations.md#writing-from-a-phone)), and `seo`
+  [Writing from a phone](operations.md#writing-from-a-phone)),
+  `tag_icons` (an icon a tag carries, on its own listing and on the date
+  badge of every post that has it --
+  [operations.md](operations.md#giving-a-tag-its-own-icon)),
+  `share` (the row of controls under a post, drawn in the order you name
+  them --
+  [operations.md](operations.md#letting-a-reader-pass-a-post-on)),
+  `write` (`write: true` publishes a page at `/write/` to write a post on
+  from a phone --
+  [operations.md](operations.md#a-post-sent-from-the-phone-itself)),
+  and `seo`
   (`block_ai_crawlers` writes a maintained list of the crawlers that
   collect text to train on into `robots.txt`, `robots_extra` is appended
   verbatim -- off by default, because wanting to be findable in an answer
@@ -551,7 +561,14 @@ variant:
    photos are uploaded there by name and referenced as bare filenames
    in posts (see
    [operations.md](operations.md#writing-from-a-phone)).
-4. In a container setup (Cloudron and similar), the engine lives inside
+4. For a post sent whole from a phone, add the key the shortcut uses to
+   `authorized_keys` with a forced command pointing at
+   `scripts/receive.sh` -- the line, the RSA requirement and the size
+   ceiling are in
+   [operations.md](operations.md#a-post-sent-from-the-phone-itself).
+   Nothing new listens on the network; it travels over the SSH the
+   server already has.
+5. In a container setup (Cloudron and similar), the engine lives inside
    the container's persistent data directory and commands run via
    `docker exec` / the platform's terminal -- the engine itself doesn't
    care, it's just Ruby + bash in a directory.
@@ -678,6 +695,13 @@ Worth knowing before switching it on:
 git pull
 ruby build/build_blog.rb && ./scripts/deploy-web.sh
 ```
+
+The first build after an upgrade may be a full one -- the engine's own
+fingerprint changed, so the record of the last build is thrown away --
+and it writes `.build_cache.json` in the installation directory, which
+is per-machine, gitignored and always safe to delete. Deploy the assets
+with it: a page that cannot fetch `assets/js/share.js` logs a 404 on
+every load.
 
 Per-deployment files (`content.nosync/`, `media.nosync/`,
 `config/site.yml`, `env.sh`, `incoming/`, `trash/`, `drafts/`,

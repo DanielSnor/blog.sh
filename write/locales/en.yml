@@ -1,7 +1,7 @@
 # locales/en.yml -- default/fallback locale. Every key here MUST exist:
 # a locale may be partial and anything missing is read from this file.
 #
-# `error` mirrors the codes server/receive.sh returns. The server never
+# `error` mirrors the codes scripts/receive.sh returns. The server never
 # sends translated text -- it sends a code, and the app says it in the
 # reader's language. That is why no locale file has to be installed next
 # to blog.sh.
@@ -24,7 +24,7 @@ error:
   no_reply: "The server said nothing. It may still have saved the post -- check the blog before sending it again."
 
   bad_reference: "A picture must be referenced by name alone, without a path. These have one:"
-  name_taken: "A post of that name is already being written. Rename it or try again."
+  name_taken: "Something of that name in incoming/ is not an ordinary file -- a folder, or a link. Nothing was replaced. Rename the picture, or clear that name on the server."
 
 app:
   mode_draft: "Draft"

@@ -277,6 +277,12 @@ leaves a 404 in the console.
 - **One file that would not go took the whole build with it.** A single
   unremovable file in `public.nosync/` aborted the sweep, and a picture
   that could not be placed ended the run rather than the picture.
+- **Turning the sidebar off left yesterday's widget JSON on the site.**
+  The build registered every configured widget file as written whether or
+  not it had written one, which is what keeps the sweep from deleting
+  them -- so the files an author had just switched off were protected from
+  the sweep by a build that never produced them, and stayed on the site
+  for good. It registers what was actually written now.
 - **A page was written straight through a symlink** left in
   `public.nosync/`, so a build could put a page somewhere the archive
   never chose.
