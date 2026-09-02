@@ -659,6 +659,148 @@
     say(t("app.saved_instead"), "good");
   }
 
+  // -------------------------------------------------------------- answer
+  // The server's reply comes back through the address bar. The sending
+  // shortcut has no page of its own to show, so it percent-encodes what
+  // came over SSH and opens this page with it after #r=. A fragment, not
+  // a query: it never leaves the browser, so nothing on the way logs it.
+  //
+  // What comes is one JSON object per picture, then whatever the engine
+  // printed for the text -- an object across several lines, or a refusal
+  // on one. Found by brace depth rather than by line, because pretty
+  // printing is not a promise the engine makes.
+  function parseAnswer(text) {
+    var out = [], depth = 0, start = -1, inString = false, escaped = false;
+    var s = String(text || "");
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (c === "\\") escaped = true;
+        else if (c === '"') inString = false;
+        continue;
+      }
+      if (c === '"') { if (depth > 0) inString = true; continue; }
+      if (c === "{") { if (depth === 0) start = i; depth++; continue; }
+      if (c === "}" && depth > 0) {
+        depth--;
+        if (depth === 0) {
+          try { out.push(JSON.parse(s.slice(start, i + 1))); } catch (e) { /* not JSON: skipped */ }
+        }
+      }
+    }
+    return out;
+  }
+
+  // The reply out of the address, decoded; null when the page was simply
+  // opened. Everything after #r= belongs to it: the shortcut encodes the
+  // whole reply, so no & or # in there can be anything but its own.
+  function answerIn(href) {
+    var s = String(href || "");
+    var at = s.indexOf("#r=");
+    var raw;
+    if (at !== -1) raw = s.slice(at + 3);
+    else {
+      var m = /[?&]r=([^&#]*)/.exec(s);
+      if (!m) return null;
+      raw = m[1];
+    }
+    try { return decodeURIComponent(raw); } catch (e) { return raw; }
+  }
+
+  // The reply sorted into what the page will say about it: the pictures
+  // the server kept, what it refused, and the post if the text was taken.
+  function describeAnswer(objects) {
+    var d = { stored: [], refused: [], post: null };
+    (objects || []).forEach(function (o) {
+      if (!o || typeof o !== "object") return;
+      if (typeof o.stored === "string") d.stored.push(o.stored);
+      else if (o.ok === false) d.refused.push({ error: String(o.error || ""), message: String(o.message || "") });
+      else if (typeof o.slug === "string") d.post = o;
+    });
+    return d;
+  }
+
+  function showAnswer(d, raw) {
+    var box = $("result");
+    box.textContent = "";
+    function add(tag, text, cls) {
+      var el = document.createElement(tag);
+      if (text != null) el.textContent = text;
+      if (cls) el.className = cls;
+      box.appendChild(el);
+      return el;
+    }
+    var post = d.post;
+    if (post) {
+      var open = post.state === "published";
+      add("h2", t(open ? "app.result_published" : "app.result_saved"));
+      if (post.url) {
+        var a = document.createElement("a");
+        a.href = post.url;
+        a.textContent = open ? post.url : t("app.result_preview");
+        add("p").appendChild(a);
+      }
+      if (post.deploy === "pending") add("p", t("app.result_pending"));
+      if (!open) {
+        // No button for it here, on purpose: publishing is a decision the
+        // desk makes with the preview open, and the command is one line.
+        var code = document.createElement("code");
+        code.textContent = "./blog.sh publish " + post.slug;
+        add("p", t("app.result_publish_hint") + " ", "meta").appendChild(code);
+      }
+      if (post.warnings && post.warnings.length) {
+        add("p", t("app.result_warnings"), "meta");
+        var ul = add("ul");
+        post.warnings.forEach(function (w) {
+          var li = document.createElement("li");
+          li.textContent = String(w);
+          ul.appendChild(li);
+        });
+      }
+    }
+    if (d.refused.length) {
+      if (!post) add("h2", t("app.result_refused"));
+      d.refused.forEach(function (r) {
+        // The code in the reader's language where the app knows it, the
+        // server's own words where it does not.
+        var known = t("error." + r.error);
+        add("p", known !== "error." + r.error ? known : (r.message || r.error), "bad");
+      });
+    }
+    if (d.stored.length) add("p", t("app.result_stored") + ": " + d.stored.join(", "), "meta");
+    if (!post && !d.refused.length) {
+      if (d.stored.length) add("h2", t("error.missing_markdown"));
+      else if (!String(raw || "").trim()) add("h2", t("error.no_reply"));
+      else {
+        add("h2", t("app.result_unreadable"));
+        add("pre", String(raw).slice(0, 2000));
+      }
+    }
+    var close = add("button", t("app.result_close"), "btn ghost close");
+    close.type = "button";
+    close.addEventListener("click", function () { box.hidden = true; });
+    box.hidden = false;
+    // A post the server took is no longer a draft on this device: the
+    // text is on the blog now, and a copy kept here is a post sent twice.
+    // A refusal keeps everything, so it can be mended and sent again.
+    if (post) {
+      state = { title: "", body: "", tags: "", shots: [], publish: false };
+      try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
+      render();
+    }
+    window.scrollTo(0, 0);
+  }
+
+  function answerFromAddress() {
+    var raw = answerIn(location.href);
+    if (raw === null) return;
+    showAnswer(describeAnswer(parseAnswer(raw)), raw);
+    // Off the address once read: a reload or a bookmark must not clear
+    // a new draft against an old answer.
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { /* file:, maybe */ }
+  }
+
   // --------------------------------------------------------------- start
   function render() {
     $("title").value = state.title;
@@ -672,4 +814,8 @@
 
   load();
   render();
+  answerFromAddress();
+  // The same page may already be open when the shortcut arrives; then
+  // only the fragment changes, and nothing is loaded again.
+  window.addEventListener("hashchange", answerFromAddress);
 })();

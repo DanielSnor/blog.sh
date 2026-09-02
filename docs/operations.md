@@ -410,7 +410,18 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    the document picker.
 2. **Run Script over SSH** with that file as the **Input**; the script is
    the receiver, or the wrapper that reaches it.
-3. **Quick Look** the result.
+3. **URL Encode** the *Shell Script Result*.
+4. **Text**: `https://YOUR-BLOG/write/#r=` followed by the *URL Encoded
+   Text* variable, with nothing between them.
+5. **Open URLs** with that text.
+
+The last three carry the answer back to the page. It opens with the
+reply after `#r=` -- a fragment, so it never leaves the browser -- and
+says what the server did: the pictures it kept, the draft's preview
+address or the post's public one, the command that publishes a draft
+from a keyboard, and any refusal in the reader's language. A post the
+server took is cleared from the device; a refusal keeps everything, so
+it can be mended and sent again.
 
 One connection carries the post however many photographs are in it, which
 is the point: connections are the scarce thing, not bytes. The first run
@@ -420,7 +431,8 @@ could not put on screen.
 
 The page that sent the files sees the share end in an abort -- that is
 how the hand-off to the app looks from a web page, not a failure -- so it
-says the files have left and where the answer is.
+says the files have left. The answer arrives when shortcut B opens the
+page again with it.
 
 The order inside the batch matters, because the markdown arriving is what
 makes the post and everything its text names has to be on the server by
@@ -479,9 +491,9 @@ markdown is the same JSON `add --json` gives.
 worked.** A refusal leaves with zero -- deliberately, because iOS Shortcuts
 discards the output of a remote command that failed, and the reason is the
 whole point of the answer. The cost is that Shortcuts then reports a tick
-for a refusal exactly as it does for a post. End the shortcut with a *Show
-Result* of the SSH output, or a notification carrying it, and read the
-`ok` field. Without that, a shortcut whose Input field is empty connects,
+for a refusal exactly as it does for a post. End the shortcut by opening the
+page with the answer, as shortcut B above does, or with a *Show Result*
+of the SSH output, and read the `ok` field. Without that, a shortcut whose Input field is empty connects,
 waits out the thirty-second deadline, is refused for `empty_input`, and
 shows a tick -- which is a slow, silent way to learn nothing.
 

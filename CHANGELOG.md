@@ -83,6 +83,11 @@ leaves a 404 in the console.
   to, so the same `git pull` moves both ends of the protocol and they
   cannot drift apart; it is off by default, marked `noindex`, and holds no
   secret -- what sending needs is the key in the shortcut, on the phone.
+  The answer comes back to the same page: the shortcut opens it with
+  the server's reply after `#r=`, and it says what was kept, where the
+  preview or the post is, and what was refused -- in the reader's
+  language, with the draft cleared from the device once the server has
+  the post.
 - **`publish: yes` in a file's front matter publishes it on arrival.** The
   one thing a file may ask for that the wizard never could. A post sent
   from a phone has no desk to come back to, so the choice draft-or-public
