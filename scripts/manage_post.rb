@@ -144,7 +144,7 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc publish].freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -1169,6 +1169,14 @@ def add_from_file(source, json: false, confined: false)
   # refuses to touch anything outside incoming/. A second copy of the test
   # here read like extra care and was really a second place for the rule
   # to drift.
+  # `publish: yes` in the front matter is the one thing a file may ask for
+  # that the wizard never could: to go straight out, announcement and all,
+  # the way `publish <slug> --yes` does at a desk. It is read here rather
+  # than inside compose_post because compose_post writes a DRAFT and hands
+  # back a path, and publishing is what happens to that path afterwards.
+  # Absent, or anything but yes/true/1, means what it always meant: draft.
+  meta, = MarkdownParser.parse_frontmatter(raw)
+  publish = truthy_frontmatter?(meta['publish'])
   path, warnings = quietly(json, keep_stdout: true) do
     compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined)
   end
@@ -1178,7 +1186,7 @@ def add_from_file(source, json: false, confined: false)
   # reads the status must not read that as success.
   refuse('empty', t('cli.add_file_empty', file: file)) if path.nil?
 
-  report_added(path, warnings, json: json)
+  report_added(path, warnings, json: json, publish: publish)
 rescue Refused => e
   # Outside quietly, so file descriptor 1 is the caller's again. stderr
   # already carries whatever the run said on its way here; this is the one
@@ -1273,8 +1281,38 @@ end
 # owes an upload (Publishing leaves a .deploy-pending marker and the next
 # scheduled run finishes it), because that is the difference between "open
 # this URL now" and "open it shortly".
-def report_added(path, warnings, json:)
+def report_added(path, warnings, json:, publish: false)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
+
+  if publish
+    # The same road `publish <slug> --yes` takes -- date settled, the
+    # announcement sent, the site rebuilt and deployed -- with its prose
+    # silenced under --json exactly as the draft preview's is. asked: false
+    # because there is nobody at this end to ask; a caller that wanted to
+    # be asked would not have written publish: yes.
+    published, publish_warnings = quietly(json) do
+      !publish_draft(post['slug'], path: path, announce: true, asked: false).nil?
+    end
+    warnings += publish_warnings
+    # The file moved: publishing keys it by the date it was given, and that
+    # can be another year than the draft sat in. Read it back from wherever
+    # it is now, so the answer describes the post as it stands.
+    moved = find_post_path(post['slug'])
+    post = JSON.parse(File.read(moved, encoding: 'utf-8')) if moved
+    path = moved || path
+    if json
+      puts JSON.pretty_generate(
+        'slug' => post['slug'],
+        'path' => path,
+        'state' => post['state'],
+        'url' => SITE_BASE_URL.to_s.empty? ? '' : published_url(post['slug'], post_time!(post).year),
+        'deploy' => published ? 'done' : 'pending',
+        'warnings' => warnings
+      )
+    end
+    return
+  end
+
   # Said out loud rather than swallowed: with no base_url there is no
   # address to give, so `url` below would be a bare /draft/… fragment
   # under a key that promises a URL. The draft dialog has always said

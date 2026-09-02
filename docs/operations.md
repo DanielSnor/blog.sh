@@ -63,6 +63,11 @@ already carries, so each can be read as well as changed:
   as "a typo, or the first part?" -- so a misspelling doesn't quietly
   found a second series. `check` catches the older ones
   ([below](#checking-the-archive)).
+- **`publish: yes`** publishes the post the moment `add <file>` writes
+  it -- the date settled, the announcement sent, the site rebuilt -- the
+  road `publish <slug> --yes` takes at a desk. It is the one key only the
+  file route reads; the wizard never publishes directly. Absent, or
+  anything but yes/true/1, is a draft.
 - **`toc: true` / `toc: false`** overrides the table of contents. A post
   with four headings or more gets one on its own -- that is the length at
   which a reader starts scrolling to look for something rather than
@@ -423,6 +428,16 @@ then. The app puts the markdown last for exactly this reason. Get it wrong
 and nothing breaks -- the engine answers `missing_images` and writes
 nothing, and sending the text again once the pictures are up is all it
 takes.
+
+**Draft or public is decided when the post is sent.** The page has a
+switch, Draft or Publish now; Draft is the default and writes nothing.
+Publish now writes `publish: yes` into the front matter, and `add` then
+takes the road `publish <slug> --yes` takes at a desk: the date is
+settled, the announcement goes out to the networks the site has
+configured, the site is rebuilt and deployed, and the answer carries the
+public address rather than a draft one. There is no third state: a post
+that is public is announced, on a phone as at a desk. The key is only
+read by `add <file>`; the wizard never publishes directly.
 
 `add <file>` wants the file to be on the server already. `receive.sh` is
 how it gets there: **the whole post down one connection**. Each file is a

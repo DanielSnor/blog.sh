@@ -31,6 +31,9 @@ deploy:
   pending: "Gespeichert. Die Website wird binnen einer Viertelstunde neu gebaut."
 
 app:
+  mode_draft: "Entwurf"
+  mode_publish: "Sofort veröffentlichen"
+  send_publish: "Im Blog veröffentlichen"
   insert: "In den Text einfügen"
   remove: "Entfernen"
   remove_confirm: "Bild entfernen?"

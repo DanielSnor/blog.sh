@@ -37,6 +37,9 @@ deploy:
   pending: "Saved. The site rebuilds within a quarter of an hour."
 
 app:
+  mode_draft: "Draft"
+  mode_publish: "Publish now"
+  send_publish: "Publish on the blog"
   insert: "Insert into text"
   remove: "Remove"
   remove_confirm: "Remove this picture?"

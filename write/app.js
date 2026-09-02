@@ -38,7 +38,7 @@
   // --------------------------------------------------------------- state
   var KEY = "blogsh-mobile-draft";
   var MAX_EDGE = 2560;   // long edge; a phone photo is far larger than any blog needs
-  var state = { title: "", body: "", tags: "", shots: [] };
+  var state = { title: "", body: "", tags: "", shots: [], publish: false };
 
   function load() {
     try {
@@ -288,6 +288,10 @@
         .trim();
     }).filter(Boolean);
     if (tags.length) lines.push("tags: " + tags.join(", "));
+    // Draft is the default and needs no saying. Only the decision to go
+    // straight out is written down -- and the blog reads it the way it
+    // reads `publish <slug> --yes` at a desk: published, and announced.
+    if (state.publish) lines.push("publish: yes");
     if (!lines.length) return "";
     return "---\n" + lines.join("\n") + "\n---\n\n";
   }
@@ -530,6 +534,20 @@
     }
   });
 
+  $("mode").addEventListener("click", function (e) {
+    var seg = e.target.closest("[data-mode]");
+    if (!seg) return;
+    state.publish = seg.dataset.mode === "publish";
+    drawMode(); save();
+  });
+  function drawMode() {
+    var segs = $("mode").querySelectorAll("[data-mode]");
+    for (var i = 0; i < segs.length; i++) {
+      segs[i].classList.toggle("on", (segs[i].dataset.mode === "publish") === !!state.publish);
+    }
+    $("send").textContent = t(state.publish ? "app.send_publish" : "app.send");
+  }
+
   $("pick").addEventListener("click", function () { $("file").click(); });
   $("file").addEventListener("change", function (e) {
     addFiles(e.target.files);
@@ -570,7 +588,7 @@
     }
     clearTimeout(btn._armTimer);
     btn.dataset.arm = ""; btn.textContent = t("app.discard");
-    state = { title: "", body: "", tags: "", shots: [] };
+    state = { title: "", body: "", tags: "", shots: [], publish: false };
     try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
     render();
     say(t("app.discarded"), "good");
@@ -647,6 +665,7 @@
     $("body").value = state.body;
     $("tags").value = state.tags;
     drawShots();
+    drawMode();
     $("kept").hidden = !(state.title || state.body || state.shots.length);
     $("kept").textContent = t("app.saved_locally");
   }

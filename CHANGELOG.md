@@ -83,6 +83,13 @@ leaves a 404 in the console.
   to, so the same `git pull` moves both ends of the protocol and they
   cannot drift apart; it is off by default, marked `noindex`, and holds no
   secret -- what sending needs is the key in the shortcut, on the phone.
+- **`publish: yes` in a file's front matter publishes it on arrival.** The
+  one thing a file may ask for that the wizard never could. A post sent
+  from a phone has no desk to come back to, so the choice draft-or-public
+  is made when it is sent -- and public means what it means at a desk:
+  the date settled, the announcement sent, the site rebuilt, the answer
+  carrying the public address. Absent, or anything but yes/true/1, is a
+  draft, as it always was.
 - **`add <file> --untrusted`.** The same refusal for markdown that came
   from somewhere other than the person at the keyboard: a picture
   reference may name only a bare filename. Without it,

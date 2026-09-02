@@ -33,6 +33,9 @@ window.I18N = {
       "pending": "Uloženo. Web se přestaví do čtvrt hodiny."
     },
     "app": {
+      "mode_draft": "Draft",
+      "mode_publish": "Rovnou publikovat",
+      "send_publish": "Publikovat na blog",
       "insert": "Vložit do textu",
       "remove": "Odebrat",
       "remove_confirm": "Odebrat obrázek?",
@@ -106,6 +109,9 @@ window.I18N = {
       "pending": "Gespeichert. Die Website wird binnen einer Viertelstunde neu gebaut."
     },
     "app": {
+      "mode_draft": "Entwurf",
+      "mode_publish": "Sofort veröffentlichen",
+      "send_publish": "Im Blog veröffentlichen",
       "insert": "In den Text einfügen",
       "remove": "Entfernen",
       "remove_confirm": "Bild entfernen?",
@@ -179,6 +185,9 @@ window.I18N = {
       "pending": "Saved. The site rebuilds within a quarter of an hour."
     },
     "app": {
+      "mode_draft": "Draft",
+      "mode_publish": "Publish now",
+      "send_publish": "Publish on the blog",
       "insert": "Insert into text",
       "remove": "Remove",
       "remove_confirm": "Remove this picture?",

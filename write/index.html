@@ -108,6 +108,13 @@ details.server .field{margin:.8rem 0 .2rem}
 .bar .inner{max-width:42rem;margin:0 auto;display:flex;gap:.6rem;align-items:center}
 .bar .btn{flex:1}
 .bar .btn.ghost{flex:0 0 auto}
+/* Draft or public, decided when the post is sent. A segmented pair rather
+   than a checkbox: both words are visible at once, and the one in force
+   is the one that is filled in. */
+.bar .mode{margin-bottom:.5rem;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.bar .seg{flex:1;font:inherit;font-size:.85rem;padding:.55rem .6rem;background:transparent;
+  border:none;color:var(--meta);cursor:pointer}
+.bar .seg.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .say{font-size:.85rem;color:var(--meta);min-height:1.2em;margin:.5rem 0 0;text-align:center}
 .say[data-kind="bad"]{color:var(--bad)}
 .say[data-kind="good"]{color:var(--accent)}
@@ -161,6 +168,10 @@ details.server .field{margin:.8rem 0 .2rem}
 </div>
 
 <div class="bar">
+  <div class="inner mode" role="radiogroup" id="mode">
+    <button type="button" class="seg on" data-mode="draft" data-t="app.mode_draft"></button>
+    <button type="button" class="seg" data-mode="publish" data-t="app.mode_publish"></button>
+  </div>
   <div class="inner">
     <button type="button" class="btn" id="send" data-t="app.send"></button>
     <button type="button" class="btn ghost" id="discard" data-t="app.discard"></button>
