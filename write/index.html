@@ -46,10 +46,18 @@ body{background:var(--bg);color:var(--text);
   padding-bottom:calc(5.5rem + env(safe-area-inset-bottom))}
 .wrap{max-width:42rem;margin:0 auto;padding:1rem 1rem 0}
 
-header{display:flex;align-items:baseline;gap:.5rem;padding:.5rem 0 1rem}
+/* The blog's own mark on the left, then two lines: what this page is, and
+   whose blog it writes to. The second line and the mark come from site.js,
+   which the build writes; without it the header is the first line alone. */
+header{display:flex;align-items:center;gap:.7rem;padding:.5rem 0 1rem}
+header .mark{width:2.4rem;height:2.4rem;border-radius:8px;flex:0 0 auto;object-fit:cover}
+header .titles{display:flex;flex-direction:column;gap:.05rem;min-width:0}
+header .line{display:flex;align-items:baseline;gap:.5rem}
 header h1{font-size:1.1rem;margin:0;letter-spacing:-.01em}
 header .sub{color:var(--meta);font-size:.9rem}
-header .kept{margin-left:auto;color:var(--meta);font-size:.75rem}
+header .site{color:var(--meta);font-size:.85rem;display:flex;gap:.4rem;flex-wrap:wrap;line-height:1.35}
+header .site-name{font-weight:600;color:var(--text)}
+header .kept{margin-left:auto;color:var(--meta);font-size:.75rem;align-self:flex-start;white-space:nowrap}
 
 .field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:1.1rem}
 .field > label{font-size:.8rem;font-weight:600;letter-spacing:.02em;text-transform:uppercase;
@@ -75,6 +83,12 @@ textarea{resize:vertical;line-height:1.6}
 .chip{font-size:.7rem;padding:.12rem .4rem;border-radius:99px;white-space:nowrap}
 .chip.ok{background:var(--accent-soft);color:var(--accent)}
 .chip.warn{background:transparent;color:var(--warn);border:1px solid currentColor}
+/* Tags the blog has used, offered as they are typed. Pills, like the tags
+   on the blog itself, each with its count in a quieter colour. */
+.tagrow{display:flex;flex-wrap:wrap;gap:.35rem;margin:.1rem 0}
+.tagrow button{font:inherit;font-size:.8rem;padding:.25rem .65rem;border-radius:99px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.tagrow button b{font-weight:400;color:var(--meta);margin-left:.3rem}
 .link{background:none;border:none;padding:0;color:var(--accent);font:inherit;
   font-size:.8rem;text-decoration:underline;cursor:pointer}
 /* The insert is the picture's primary action, so it is a real button --
@@ -138,8 +152,17 @@ details.server .field{margin:.8rem 0 .2rem}
 <body>
 <div class="wrap">
   <header>
-    <h1 data-t="app.name">blog.sh</h1>
-    <span class="sub" data-t="app.subtitle"></span>
+    <img class="mark" id="mark" alt="" hidden>
+    <div class="titles">
+      <div class="line">
+        <h1 data-t="app.name">blog.sh</h1>
+        <span class="sub" data-t="app.subtitle"></span>
+      </div>
+      <div class="site" id="site" hidden>
+        <span class="site-name" id="site-name"></span>
+        <span class="site-claim" id="site-claim"></span>
+      </div>
+    </div>
     <span class="kept" id="kept" hidden></span>
   </header>
 
@@ -160,6 +183,7 @@ details.server .field{margin:.8rem 0 .2rem}
   <div class="field">
     <label for="tags" data-t="app.tags_label"></label>
     <input type="text" id="tags" autocomplete="off">
+    <div class="tagrow" id="tagrow" hidden></div>
     <span class="hint" data-t="app.tags_hint"></span>
   </div>
 
@@ -188,6 +212,7 @@ details.server .field{margin:.8rem 0 .2rem}
 </div>
 
 <script src="i18n.js"></script>
+<script src="site.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -88,6 +88,10 @@ leaves a 404 in the console.
   preview or the post is, and what was refused -- in the reader's
   language, with the draft cleared from the device once the server has
   the post.
+  The page wears the blog it writes to: the build puts `site.js` beside
+  it with the site's name and claim for the header, its palette, its
+  favicon, and every tag it has used with a count, offered as they are
+  typed so a tag is tapped rather than spelt a second way.
 - **`publish: yes` in a file's front matter publishes it on arrival.** The
   one thing a file may ask for that the wizard never could. A post sent
   from a phone has no desk to come back to, so the choice draft-or-public

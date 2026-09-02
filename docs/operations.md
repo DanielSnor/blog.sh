@@ -378,6 +378,15 @@ is typed in the browser, so closing the tab in a tunnel loses nothing. The
 page is marked `noindex` and holds no secret of its own -- what sending
 needs is the key, and that lives in the shortcut on the phone.
 
+The page is the same file on every site; what is this site's the build
+writes beside it as `write/site.js`: the short name and claim for the
+header, the palette from `colors:` so the page is dressed like the blog,
+the favicon, and every tag the blog has used with a count. The tags are
+offered as they are typed -- most used first, then whatever begins with
+or contains the letters so far -- so a tag is tapped rather than typed,
+and typed as it was before instead of the blog growing a second
+spelling of it.
+
 Pressing send hands the files to iOS: **one for each picture, and one for
 the text**. There is no archive anywhere in this.
 

@@ -461,6 +461,7 @@
     $(id).addEventListener("input", function (e) {
       state[id] = e.target.value;
       if (id === "body") drawShots();   // the "used in text" chips follow along
+      if (id === "tags") drawTags();
       save();
     });
   });
@@ -561,6 +562,17 @@
       state.body = body.value;
       drawShots(); save();
     }
+  });
+
+  $("tagrow").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-tag]");
+    if (!b) return;
+    // The chosen tag replaces whatever was being typed, and the comma
+    // after it leaves the field ready for the next one.
+    var parts = tagParts(state.tags);
+    state.tags = parts.done.concat([b.dataset.tag]).join(", ") + ", ";
+    $("tags").value = state.tags;
+    drawTags(); save();
   });
 
   $("mode").addEventListener("click", function (e) {
@@ -686,6 +698,142 @@
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
     say(t("app.saved_instead"), "good");
+  }
+
+  // ---------------------------------------------------------------- site
+  // What the build knows about the blog this page belongs to, written
+  // into site.js beside it: the name and claim, the palette, the favicon,
+  // and the tags the blog has used, each with a count. Absent -- an older
+  // build, a page opened from disk -- and the page is what it always was:
+  // blog.sh's own colours, no second line, no suggestions.
+  var SITE = window.BLOG_SITE || null;
+
+  function luminance(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+    if (!m) return null;
+    var parts = [0, 2, 4].map(function (i) {
+      var c = parseInt(m[1].slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2];
+  }
+
+  // The blog's palette in this page's terms. The blog names seven colours;
+  // the page uses a few more, and takes them from the nearest: the tinted
+  // nav background is what a sunken field looks like, the pill colour is
+  // the soft accent, and a card is white by day and the nav colour by
+  // night. The text on an accent button is whichever of white and near
+  // black the accent's lightness asks for.
+  function paletteCss(colors) {
+    function block(c, dark) {
+      var out = [];
+      if (c.bg) out.push("--bg:" + c.bg);
+      if (c.text) out.push("--text:" + c.text);
+      if (c.meta_text) out.push("--meta:" + c.meta_text);
+      if (c.border) out.push("--border:" + c.border);
+      if (c.accent) {
+        out.push("--accent:" + c.accent);
+        var l = luminance(c.accent);
+        if (l !== null) out.push("--on-accent:" + (l < 0.4 ? "#ffffff" : "#1a1c1e"));
+      }
+      if (c.pill_bg) out.push("--accent-soft:" + c.pill_bg);
+      if (c.nav_bg) { out.push("--sunk:" + c.nav_bg); if (dark) out.push("--surface:" + c.nav_bg); }
+      if (!dark && c.bg) out.push("--surface:#ffffff");
+      return out.join(";");
+    }
+    var light = block((colors && colors.light) || {}, false);
+    var dark = block((colors && colors.dark) || {}, true);
+    var css = "";
+    if (light) css += ":root{" + light + "}\n";
+    if (dark) {
+      css += "@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){" + dark + "}}\n";
+      css += ":root[data-theme=\"dark\"]{" + dark + "}\n";
+    }
+    return css;
+  }
+
+  function applySite() {
+    if (!SITE) return;
+    var head = document.head;
+    if (SITE.colors) {
+      var style = document.createElement("style");
+      style.textContent = paletteCss(SITE.colors);
+      head.appendChild(style);
+      var accent = SITE.colors.light && SITE.colors.light.accent;
+      var theme = document.querySelector('meta[name="theme-color"]');
+      if (accent && theme) theme.content = accent;
+    }
+    if (SITE.favicon) {
+      var mark = $("mark");
+      mark.src = SITE.favicon;
+      mark.hidden = false;
+      ["icon", "apple-touch-icon"].forEach(function (rel) {
+        var link = document.createElement("link");
+        link.rel = rel; link.href = SITE.favicon;
+        head.appendChild(link);
+      });
+    }
+    if (SITE.name) {
+      $("site-name").textContent = SITE.name;
+      $("site-claim").textContent = SITE.claim || "";
+      $("site").hidden = false;
+      document.title = SITE.name + " · " + t("app.subtitle");
+      // What the phone calls the page once it is on the home screen.
+      var title = document.createElement("meta");
+      title.name = "apple-mobile-web-app-title"; title.content = SITE.name;
+      head.appendChild(title);
+    }
+  }
+
+  // ---------------------------------------------------------------- tags
+  // The tags the blog has used, offered as the author types: those that
+  // begin with what is typed first, then those that merely contain it,
+  // each group by how often the blog has used them; the most used when
+  // nothing is typed yet. Never one the post already carries. Offered so a
+  // tag is tapped rather than typed -- and typed as it was before, instead
+  // of the blog growing a second spelling of it.
+  function suggestTags(all, typed, taken, limit) {
+    var q = String(typed || "").trim().toLowerCase();
+    var have = (taken || []).map(function (s) { return String(s).toLowerCase(); });
+    var starts = [], holds = [];
+    (all || []).forEach(function (pair) {
+      var name = String(pair[0]), low = name.toLowerCase();
+      if (have.indexOf(low) !== -1) return;
+      if (!q || low.indexOf(q) === 0) starts.push(pair);
+      else if (low.indexOf(q) !== -1) holds.push(pair);
+    });
+    var by = function (a, b) {
+      return (b[1] - a[1]) || (a[0].toLowerCase() < b[0].toLowerCase() ? -1 : 1);
+    };
+    return starts.sort(by).concat(holds.sort(by)).slice(0, limit || 8);
+  }
+
+  // The tags field as the author has it: the ones finished, and the one
+  // being typed after the last comma.
+  function tagParts(value) {
+    var parts = String(value || "").split(",");
+    var typing = parts.pop();
+    return { done: parts.map(function (s) { return s.trim(); }).filter(Boolean), typing: typing.trim() };
+  }
+
+  function drawTags() {
+    var row = $("tagrow");
+    if (!row) return;
+    if (!SITE || !SITE.tags || !SITE.tags.length) { row.hidden = true; return; }
+    var parts = tagParts(state.tags);
+    var pairs = suggestTags(SITE.tags, parts.typing, parts.done, 8);
+    row.textContent = "";
+    row.hidden = !pairs.length;
+    pairs.forEach(function (pair) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.dataset.tag = pair[0];
+      b.textContent = pair[0];
+      var n = document.createElement("b");
+      n.textContent = String(pair[1]);
+      b.appendChild(n);
+      row.appendChild(b);
+    });
   }
 
   // -------------------------------------------------------------- answer
@@ -848,10 +996,12 @@
     drawShots();
     drawMode();
     drawBatch();
+    drawTags();
     $("kept").hidden = !(state.title || state.body || state.shots.length);
     $("kept").textContent = t("app.saved_locally");
   }
 
+  applySite();
   load();
   render();
   answerFromAddress();
