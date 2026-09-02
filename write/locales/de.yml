@@ -65,5 +65,5 @@ app:
   result_pending: "Die Website wird binnen einer Viertelstunde neu gebaut."
   result_warnings: "Wissenswert"
   saved_instead: "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive."
-  share_cancelled: "Das Senden wurde abgebrochen. Falls du den Kurzbefehl angetippt hast, prüfe, ob der Beitrag angekommen ist."
+  share_cancelled: "Übergeben. iOS meldet das gleich, ob der Kurzbefehl die Dateien genommen hat oder du das Blatt geschlossen hast -- die Antwort steht in der Kurzbefehle-App."
   not_saved: "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."

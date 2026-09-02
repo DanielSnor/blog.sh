@@ -67,7 +67,7 @@ window.I18N = {
       "result_pending": "Web se přestaví do čtvrt hodiny.",
       "result_warnings": "Za pozornost stojí",
       "saved_instead": "Tenhle prohlížeč soubory předat neumí, takže jsou uložené v jednom archivu. ROZBAL ho a zkratce předej soubory z něj -- blog bere soubory, ne archivy.",
-      "share_cancelled": "Odesílání se zastavilo. Jestli jsi klepnul na zkratku, ověř, že post dorazil.",
+      "share_cancelled": "Předáno. iOS to hlásí stejně, ať už si zkratka soubory vzala, nebo jsi list zavřel -- odpověď najdeš v aplikaci Zkratky.",
       "not_saved": "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."
     }
   },
@@ -137,7 +137,7 @@ window.I18N = {
       "result_pending": "Die Website wird binnen einer Viertelstunde neu gebaut.",
       "result_warnings": "Wissenswert",
       "saved_instead": "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive.",
-      "share_cancelled": "Das Senden wurde abgebrochen. Falls du den Kurzbefehl angetippt hast, prüfe, ob der Beitrag angekommen ist.",
+      "share_cancelled": "Übergeben. iOS meldet das gleich, ob der Kurzbefehl die Dateien genommen hat oder du das Blatt geschlossen hast -- die Antwort steht in der Kurzbefehle-App.",
       "not_saved": "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."
     }
   },
@@ -207,7 +207,7 @@ window.I18N = {
       "result_pending": "The site rebuilds within a quarter of an hour.",
       "result_warnings": "Worth knowing",
       "saved_instead": "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives.",
-      "share_cancelled": "Sending stopped. If you tapped the shortcut, check the post arrived.",
+      "share_cancelled": "Handed over. iOS reports this the same way whether the shortcut took the files or you closed the sheet, so check the answer in the Shortcuts app.",
       "not_saved": "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
     }
   }

@@ -71,5 +71,5 @@ app:
   result_pending: "The site rebuilds within a quarter of an hour."
   result_warnings: "Worth knowing"
   saved_instead: "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives."
-  share_cancelled: "Sending stopped. If you tapped the shortcut, check the post arrived."
+  share_cancelled: "Handed over. iOS reports this the same way whether the shortcut took the files or you closed the sheet, so check the answer in the Shortcuts app."
   not_saved: "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."

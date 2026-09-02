@@ -65,5 +65,5 @@ app:
   result_pending: "Web se přestaví do čtvrt hodiny."
   result_warnings: "Za pozornost stojí"
   saved_instead: "Tenhle prohlížeč soubory předat neumí, takže jsou uložené v jednom archivu. ROZBAL ho a zkratce předej soubory z něj -- blog bere soubory, ne archivy."
-  share_cancelled: "Odesílání se zastavilo. Jestli jsi klepnul na zkratku, ověř, že post dorazil."
+  share_cancelled: "Předáno. iOS to hlásí stejně, ať už si zkratka soubory vzala, nebo jsi list zavřel -- odpověď najdeš v aplikaci Zkratky."
   not_saved: "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."

@@ -561,10 +561,15 @@
       navigator.share({ files: files })
         .then(function () { say(t("app.bundle_note"), "good"); })
         .catch(function (err) {
-          // Dismissing the sheet is a decision, not a failure -- and it
-          // used to say nothing at all, which reads like the button is
-          // broken.
-          if (err && err.name === "AbortError") { say(t("app.share_cancelled")); return; }
+          // ⚠️ AbortError is the NORMAL end of this path, not a failure.
+          // A share-sheet shortcut that hands the run over to the
+          // Shortcuts app -- which this one must, to be allowed to open
+          // an SSH connection -- leaves the extension without completing
+          // the share, and WebKit reports that as an abort. The very same
+          // error also means the person closed the sheet, and the page
+          // cannot tell the two apart. So the message claims neither:
+          // it says the files left, and where the answer is.
+          if (err && err.name === "AbortError") { say(t("app.share_cancelled"), "good"); return; }
           download(buildBundle());
         });
     } else {
