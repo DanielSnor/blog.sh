@@ -579,7 +579,13 @@ is checked. A name carrying a path, beginning with a dot, empty, or
 holding a control character is refused (`bad_name`) and nothing is
 written. What arrives is bounded before it lands rather than weighed
 afterwards: `BLOGSH_MAX_MB` (24) is a ceiling on reading, so a sender
-costs that much and not whatever they felt like sending. And the post
+costs that much and not whatever they felt like sending. A delivery that overshoots
+is read to its end into nothing -- up to four times the ceiling -- and
+then refused, so the sender finishes and hears `too_large`; refused the
+moment the ceiling was reached, a phone with megabytes still to send sat
+on "running" with no timeout to save it, and the answer never arrived.
+Beyond that bound the channel closes, and a hostile sender costs
+reading, never storage. And the post
 itself is handed to the engine as **untrusted**, so a picture may be
 named only by a bare filename -- `![](/etc/passwd)` is refused
 (`bad_reference`), because otherwise it would read that file into the

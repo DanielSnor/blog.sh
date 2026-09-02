@@ -102,8 +102,18 @@ head -c $(( (MAX_MB * 1048576) + 1 )) > "$WORK/rest"
 # an over-sized delivery lost its closing dot and was refused as
 # `truncated` -- a true sentence about the wrong thing, which would have
 # had somebody looking for a dropped connection instead of a big photo.
-[ "$(wc -c < "$WORK/rest")" -le $(( MAX_MB * 1048576 )) ] \
-  || fail "too_large" "The delivery is over the ${MAX_MB} MB limit."
+if [ "$(wc -c < "$WORK/rest")" -gt $(( MAX_MB * 1048576 )) ]; then
+  # ⚠️ Drained before the answer, and bounded. Refusing the moment the
+  # ceiling was reached left the sender mid-write on a closed channel:
+  # a phone with nine megabytes still to send sat on "running" with no
+  # timeout to save it, and the answer -- the one line that says WHY --
+  # never reached it. The rest is read into nothing, up to four times
+  # the ceiling more, so an honest overshoot finishes and hears the
+  # reason, while a hostile sender still costs reading and not storage,
+  # and still not whatever they felt like sending.
+  head -c $(( MAX_MB * 1048576 * 4 )) > /dev/null
+  fail "too_large" "The delivery is over the ${MAX_MB} MB limit."
+fi
 { printf '%s\n' "$FIRST"; cat "$WORK/rest"; } > "$WORK/stream"
 
 # ⚠️ ONE connection carries the WHOLE post, however many pictures are in
