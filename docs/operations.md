@@ -617,6 +617,18 @@ remote command that failed, so a refusal that exited non-zero reached a
 phone as a bare status with its reason gone -- exactly when the reason
 was the point.)
 
+The body has a deadline of its own, `BLOGSH_BODY_SECONDS` (600): a delivery
+that has not finished by then is dropped and, if the sender is still
+listening, told `timeout`. Two files under one name in one delivery are
+refused (`bad_name`) rather than one silently replacing the other, every
+body is decoded before any file is written, so a refusal on the third
+picture leaves nothing of the first two behind, and a blank line after a
+complete delivery is not held against it. When the engine itself does
+not answer in JSON -- no `env.sh`, no ruby, a configuration that will not
+parse -- the receiver answers for it with `engine_failed` and the words
+the engine printed, and every delivery ends with status 0 once an answer
+has been given; a ceiling that is not a number is `bad_limit`, status 1.
+
 A delivery that goes wrong halfway can simply be repeated. Pictures wait
 in `incoming/` until a text names them, so a refused post leaves them
 where they are and sending it again finds them -- nothing has to be
