@@ -75,6 +75,12 @@ textarea{resize:vertical;line-height:1.6}
 .shot{display:grid;grid-template-columns:4.5rem 1fr;gap:.6rem;padding:.55rem;
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
 .shot img{width:4.5rem;height:4.5rem;object-fit:cover;border-radius:5px;background:var(--sunk)}
+/* A video has no thumbnail here -- nothing on this page decodes it -- so
+   its square says what it is. */
+.shot .clip{width:4.5rem;height:4.5rem;border-radius:5px;background:var(--sunk);display:flex;
+  align-items:center;justify-content:center;font-size:.7rem;color:var(--meta);text-transform:uppercase;
+  letter-spacing:.05em}
+.hint[data-kind="bad"]{color:var(--bad)}
 .shot .side{display:flex;flex-direction:column;gap:.35rem;min-width:0}
 .shot .name{font-size:.75rem;color:var(--meta);word-break:break-all;
   display:flex;gap:.4rem;align-items:baseline;flex-wrap:wrap}
@@ -228,8 +234,9 @@ details.server .field{margin:.8rem 0 .2rem}
     <div class="shots" id="shots"></div>
     <div class="row" style="margin-top:.5rem">
       <button type="button" class="btn ghost" id="pick" data-t="app.add_image"></button>
-      <input type="file" id="file" accept="image/*" multiple hidden>
+      <input type="file" id="file" accept="image/*,video/*" multiple hidden>
     </div>
+    <span class="hint" id="images-hint"></span>
     <span class="hint" id="batch" hidden></span>
   </div>
 

@@ -402,6 +402,19 @@ address -- `https://…`, or a bare domain, which gets its `https://` --
 becomes a link with the words left to type; words become one with the
 address left to type.
 
+A video goes the same way as a picture -- the same button, the same
+card, the same description -- and into the text as `!![description]
+(clip.mp4)`, two marks where a picture has one. Nothing on the page
+shrinks it: it travels as it is, and the blog says on arrival what it
+says of any phone video (see below). What limits it is the receiver's
+ceiling on one delivery, `BLOGSH_MAX_MB` (24): the page carries that
+number in `site.js`, says under the pictures what happens to a picture,
+what to a video and how much the server takes, and turns the batch line
+red the moment the post outgrows it -- before the phone spends the
+upload finding out. The receiver reads the variable in its own
+environment, the forced command's, and the build reads it in the
+build's; raise it in both places or in neither.
+
 *Preview*, under the text, shows the post as the blog would show it --
 in the blog's own stylesheets, which `site.js` names, with the pictures
 in their places. Near enough, not exact: the engine renders the real

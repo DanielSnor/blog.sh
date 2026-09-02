@@ -140,20 +140,29 @@
   }
 
   function addFiles(files) {
-    var list = Array.prototype.filter.call(files, function (f) { return /^image\//.test(f.type); });
+    var list = Array.prototype.filter.call(files, function (f) { return /^(image|video)\//.test(f.type); });
     if (!list.length) return;
     say(t("app.sending") === "" ? "" : "…");
     var asIs = [];
-    function keep(file, ext, dataUrl, w, h) {
+    function keep(file, ext, dataUrl, w, h, kind) {
       state.shots.push({
         name: freeName(safeName(file.name, state.shots.length + 1, ext),
                        state.shots.map(function (s) { return s.name; })),
-        data: dataUrl, w: w, h: h, alt: "", raw: !w, size: file.size
+        data: dataUrl, w: w, h: h, alt: "", raw: !w, size: file.size,
+        type: String(file.type || ""), kind: kind || "image"
       });
       drawShots();
     }
     list.reduce(function (chain, file) {
       return chain.then(function () {
+        // A video goes as it is: nothing on this page can shrink one, and
+        // the blog takes the file whole. The same card, the same button,
+        // one more exclamation mark in the text.
+        if (/^video\//.test(file.type)) {
+          return blobToDataUrl(file).then(function (dataUrl) {
+            keep(file, extensionOf(file), dataUrl, 0, 0, "video");
+          });
+        }
         return shrink(file).then(function (out) {
           return blobToDataUrl(out.blob).then(function (dataUrl) {
             keep(file, "jpg", dataUrl, out.w, out.h);
@@ -240,14 +249,19 @@
           '</div>' +
         '</div>';
       // A passed-through picture has no preview here for the same reason
-      // it could not be shrunk: the browser will not decode it.
-      if (shot.raw) row.querySelector("img").remove();
+      // it could not be shrunk: the browser will not decode it. A video
+      // gets a square that says so.
+      if (shot.kind === "video") {
+        var clip = document.createElement("div");
+        clip.className = "clip";
+        clip.textContent = t("app.video_badge");
+        row.querySelector("img").replaceWith(clip);
+      } else if (shot.raw) row.querySelector("img").remove();
       else row.querySelector("img").src = shot.data;
       var used = usedInText(shot.name);
       var name = row.querySelector(".name");
       name.textContent = shot.name + "  " +
-        (shot.raw ? Math.round((shot.size || 0) / 1024) + " kB"
-                  : shot.w + "×" + shot.h) + " ";
+        (shot.raw ? formatBytes(shot.size || 0) : shot.w + "×" + shot.h) + " ";
       var chip = document.createElement("span");
       chip.className = "chip " + (used ? "ok" : "warn");
       chip.textContent = used ? t("app.used_in_text") : t("app.unused_image");
@@ -318,13 +332,24 @@
   // wait afterwards is not a mystery. The wire carries a third more --
   // the batch is base64 -- and one connection carries all of it.
   function batchSize() {
-    var bytes = 0;
+    var bytes = 0, pictures = 0, videos = 0;
     state.shots.forEach(function (shot) {
       var data = String(shot.data || "");
       bytes += Math.floor((data.length - (data.indexOf(",") + 1)) * 3 / 4);
+      if (shot.kind === "video") videos++; else pictures++;
     });
     bytes += new TextEncoder().encode(markdown()).length;
-    return { pictures: state.shots.length, bytes: bytes };
+    return { pictures: pictures, videos: videos, bytes: bytes };
+  }
+
+  // What the wire carries: the batch is base64, a third more than the
+  // bytes, plus a name and a dot for each file. The receiver measures
+  // THAT against its ceiling, so this is the number to compare.
+  function wireBytes(size) {
+    return Math.ceil(size.bytes * 4 / 3) + (size.pictures + size.videos + 1) * 80;
+  }
+  function overLimit(size, maxMb) {
+    return !!maxMb && wireBytes(size) > maxMb * 1048576;
   }
 
   function formatBytes(n) {
@@ -332,13 +357,18 @@
     return String(Math.round(n / 1024 / 1024 * 10) / 10).replace(".", t("app.decimal")) + " MB";
   }
 
-  // "3 pictures, 4.2 MB" -- with the plural the reader's language wants:
-  // one, a few (two to four, which Czech counts differently), many.
+  // "3 pictures, 1 video, 4.2 MB" -- with the plural the reader's
+  // language wants: one, a few (two to four, which Czech counts
+  // differently), many.
+  function plural(n, what) {
+    return n + " " + t("app." + what + "_" + (n === 1 ? "1" : n < 5 ? "few" : "many"));
+  }
   function describeBatch(size) {
-    var n = size.pictures;
-    var what = n === 0 ? t("app.text_only")
-             : n + " " + t(n === 1 ? "app.pictures_1" : n < 5 ? "app.pictures_few" : "app.pictures_many");
-    return what + ", " + formatBytes(size.bytes);
+    var parts = [];
+    if (size.pictures) parts.push(plural(size.pictures, "pictures"));
+    if (size.videos) parts.push(plural(size.videos, "videos"));
+    if (!parts.length) parts.push(t("app.text_only"));
+    return parts.join(", ") + ", " + formatBytes(size.bytes);
   }
 
   // ----------------------------------------------------------------- zip
@@ -434,9 +464,11 @@
   function buildFiles() {
     var enc = new TextEncoder();
     var files = state.shots.map(function (shot) {
-      // Every picture has been through the canvas, so it is a JPEG
-      // whatever it arrived as, and safeName has already given it a .jpg.
-      return new File([dataUrlToBytes(shot.data)], shot.name, { type: "image/jpeg" });
+      // A picture that went through the canvas is a JPEG whatever it
+      // arrived as, and safeName has given it a .jpg; one passed through
+      // untouched -- a HEIC, a video -- keeps the type it came with.
+      var type = shot.raw ? (shot.type || "application/octet-stream") : "image/jpeg";
+      return new File([dataUrlToBytes(shot.data)], shot.name, { type: type });
     });
     // text/plain rather than text/markdown. iOS decides what a shared file
     // IS from its filename extension and never reads this field, so the .md
@@ -505,7 +537,8 @@
   // with prose is left alone: cutting words out of a sentence is not this
   // button's business.
   function unreference(text, name) {
-    var line = new RegExp("^[ \\t]*!\\[[^\\]]*\\]\\(" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\)[ \\t]*$");
+    // One mark or two: a picture is ![…](name), a video !![…](name).
+    var line = new RegExp("^[ \\t]*!{1,2}\\[[^\\]]*\\]\\(" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\)[ \\t]*$");
     var out = [], lines = text.split("\n");
     for (var i = 0; i < lines.length; i++) {
       if (!line.test(lines[i])) { out.push(lines[i]); continue; }
@@ -564,8 +597,11 @@
       // all reliably produced the one post that cannot be written, and
       // the refusal came back from the far end as nothing at all.
       // Counted, so pressing it twice does not open a chasm.
+      // Two marks for a video, one for a picture: that is how the blog
+      // tells them apart, and the reader never has to know.
+      var bang = shot.kind === "video" ? "!!" : "!";
       body.value = before + spacedMark(before, after,
-                                       "![" + (shot.alt || "") + "](" + shot.name + ")") + after;
+                                       bang + "[" + (shot.alt || "") + "](" + shot.name + ")") + after;
       state.body = body.value;
       drawShots(); save();
     }
@@ -661,6 +697,14 @@
     if (mute.length && !this.dataset.anyway) {
       this.dataset.anyway = "yes";
       say(t("app.alt_missing") + ": " + mute.map(function (s) { return s.name; }).join(", "), "bad");
+      return;
+    }
+    // Over the server's ceiling as this page knows it. A second tap
+    // sends anyway, because the page's number is the build's and the
+    // server's may have been raised since; but the first tap says it.
+    if (overLimit(batchSize(), maxMb()) && !this.dataset.anyway) {
+      this.dataset.anyway = "yes";
+      say(t("app.batch_over_send").replace("{max}", String(maxMb())), "bad");
       return;
     }
     this.dataset.anyway = "";
@@ -1019,6 +1063,18 @@
         html.push("<h" + level + ">" + inlineHtml(m[2]) + "</h" + level + ">");
         i++; continue;
       }
+      if ((m = /^!!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line))) {
+        flush();
+        var clip = byName[m[2]];
+        if (clip && clip.data) {
+          html.push('<figure><video controls playsinline src="' + clip.data + '"></video>' +
+                    (m[1] ? "<figcaption>" + escapeHtml(m[1]) + "</figcaption>" : "") + "</figure>");
+        } else {
+          html.push('<figure><div class="no-preview">' +
+                    escapeHtml(t("app.preview_missing_picture").replace("{name}", m[2])) + "</div></figure>");
+        }
+        i++; continue;
+      }
       if ((m = /^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line))) {
         flush();
         var shot = byName[m[2]];
@@ -1068,7 +1124,7 @@
     var title = state.title.trim() ? "<h1>" + escapeHtml(state.title.trim()) + "</h1>" : "";
     return '<!doctype html><html lang="' + escapeHtml((SITE && SITE.lang) || LANG) + '"><head><meta charset="utf-8">' +
       '<meta name="viewport" content="width=device-width,initial-scale=1"><base href="/">' + links +
-      "<style>body{margin:0;padding:1rem}figure{margin:1rem 0}figure img{max-width:100%;height:auto}" +
+      "<style>body{margin:0;padding:1rem}figure{margin:1rem 0}figure img,figure video{max-width:100%;height:auto}" +
       ".no-preview{padding:1rem;border:1px dashed currentColor;opacity:.6;font-size:.9em}</style></head>" +
       '<body><main><article><div class="post-header">' + title + '</div><div class="post-body">' +
       bodyHtml + "</div></article></main></body></html>";
@@ -1252,6 +1308,8 @@
   }
 
   // --------------------------------------------------------------- start
+  function maxMb() { return (SITE && Number(SITE.max_mb)) || 24; }
+
   function drawBatch() {
     var el = $("batch");
     if (!el) return;
@@ -1259,7 +1317,22 @@
     // Nothing to say about an empty page.
     var empty = !state.shots.length && !state.body.trim();
     el.hidden = empty;
-    el.textContent = empty ? "" : t("app.batch").replace("{what}", describeBatch(size));
+    var text = empty ? "" : t("app.batch").replace("{what}", describeBatch(size));
+    // Said here, in red, the moment the batch outgrows the server's
+    // ceiling -- not after the phone has spent the upload finding out.
+    var over = !empty && overLimit(size, maxMb());
+    if (over) text += " -- " + t("app.batch_over").replace("{max}", String(maxMb()));
+    el.textContent = text;
+    if (over) el.dataset.kind = "bad"; else el.removeAttribute("data-kind");
+  }
+
+  // The legend under the pictures: what happens to a picture, what to a
+  // video, and how much the server takes -- so that nobody can say they
+  // were not told.
+  function drawLegend() {
+    var el = $("images-hint");
+    if (!el) return;
+    el.textContent = t("app.images_hint").replace("{edge}", String(MAX_EDGE)).replace("{max}", String(maxMb()));
   }
 
   function render() {
@@ -1268,6 +1341,7 @@
     $("tags").value = state.tags;
     drawShots();
     drawMode();
+    drawLegend();
     drawBatch();
     drawTags();
     $("kept").hidden = !(state.title || state.body || state.shots.length);

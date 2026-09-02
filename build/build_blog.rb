@@ -3934,6 +3934,11 @@ if SiteConfig.get('write', default: false)
     # The stylesheets a post page wears, in order, so a preview can wear
     # the same ones.
     'css' => ['/assets/css/colors.css', '/assets/css/site.css'] + EXTRA_CSS,
+    # The receiver's ceiling on one delivery, as this build sees it, so the
+    # page can say "too big" before the phone spends the upload finding
+    # out. The receiver reads the same variable in ITS environment -- the
+    # forced command's -- so raise it in both places or in neither.
+    'max_mb' => (ENV['BLOGSH_MAX_MB'] || 24).to_i,
     'tags' => tag_counts
   }
   emit(File.join(PUBLIC_DIR, 'write', 'site.js'),
