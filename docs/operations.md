@@ -376,17 +376,46 @@ needs is the key, and that lives in the shortcut on the phone.
 Pressing send hands the files to iOS: **one for each picture, and one for
 the text**. There is no archive anywhere in this.
 
-**The shortcut builds one text and sends it once.** Loop over the files
-and add three lines to a variable for each of them --
+**Two shortcuts, because the one that receives the files may not open an
+SSH connection.** A shortcut started from the Share Sheet runs in
+Shortcuts' background runner, whose only screen is a banner; *Run Script
+over SSH* asks for a screen there -- the host prompt, the first-run
+privacy question -- and is refused with "This action could not be run
+with the current user interface", before any connection is made. The
+action that would hand the run over to the full app, *Continue in
+Shortcuts App*, is no longer offered. A shortcut started from a URL,
+on the other hand, always runs in the app. So the receiving shortcut
+writes a file and opens a URL, and the sending shortcut does the rest.
 
-    <the file's name>
-    <the file, base64>
-    .
+*Shortcut A* -- "Show in Share Sheet" on, accepting Images and Files;
+"If there's no input": Stop and Respond:
 
--- then, AFTER the loop, put that variable in the **Input** of a single
-*Run Script over SSH*. One connection carries the post however many
-photographs are in it, which is the point: connections are the scarce
-thing, not bytes.
+1. **Repeat with Each** over Shortcut Input, and inside it: Get **Name**,
+   Get **File Extension**, **Base64 Encode** the item, a **Text** of three
+   lines -- `Name.File Extension`, `Base64 Encoded`, `.` -- and **Add to
+   Variable** `batch`.
+2. After the loop: **Combine Text** `batch` with New Lines.
+3. **Save File** the combined text to iCloud Drive, *Ask Where to Save*
+   off, subpath `incoming/batch.txt`, *Overwrite If File Exists* on.
+4. **Open URLs**: `shortcuts://run-shortcut?name=UploadIncoming`.
+
+*Shortcut B*, named exactly `UploadIncoming`, not in the Share Sheet:
+
+1. **Get File** `incoming/batch.txt` from the Shortcuts folder, without
+   the document picker.
+2. **Run Script over SSH** with that file as the **Input**; the script is
+   the receiver, or the wrapper that reaches it.
+3. **Quick Look** the result.
+
+One connection carries the post however many photographs are in it, which
+is the point: connections are the scarce thing, not bytes. The first run
+in the app asks whether the shortcut may send its items to the host --
+answer Always Allow; that is the very question the background runner
+could not put on screen.
+
+The page that sent the files sees the share end in an abort -- that is
+how the hand-off to the app looks from a web page, not a failure -- so it
+says the files have left and where the answer is.
 
 The order inside the batch matters, because the markdown arriving is what
 makes the post and everything its text names has to be on the server by
