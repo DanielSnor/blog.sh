@@ -10,6 +10,35 @@
      shop. It holds nothing private, so this is tidiness rather than a
      defence -- the only key it needs lives on the phone, in the shortcut. -->
 <meta name="robots" content="noindex">
+<!-- What this page may load, and it may load very little. Written here
+     rather than by the build, because the page is copied onto the site as
+     it stands and never goes through the layout that carries the site's
+     own policy -- so it had none at all, on the one page that reads the
+     server's reply out of the address bar and, since it started asking
+     for its receipt, makes a request of its own.
+
+     Each source is here for a reason, and none of them is 'unsafe-inline'
+     for scripts:
+       script-src 'self'   -- i18n.js, site.js, app.js are files; there is
+                              no inline script on this page.
+       style-src            -- one <style> block below, and the preview
+                              writes its own; both are inline, so this one
+                              cannot be tightened without hashing markup
+                              the page composes at runtime.
+       img-src / media-src  -- a picture waits in the browser as a data:
+                              URL and the shrinker works through a blob:,
+                              so both schemes are the page's own bytes,
+                              never somebody else's server.
+       connect-src 'self'   -- the receipt, at an address this page made.
+       frame-src 'self'     -- the preview is an iframe with srcdoc, which
+                              is checked against this and inherits the
+                              policy, so the stylesheets it pulls in have
+                              to be same-origin too. They are: the build
+                              writes them into site.js as site paths.
+       form-action 'none'   -- there is no form here to submit anywhere.
+       object-src 'none', base-uri 'self' -- nothing to embed, and no
+                              rewriting where a relative address points. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <style>
 /* System fonts on purpose: this is used on a train. A webfont that has to
    be fetched is a blank screen exactly where the app is meant to work. */

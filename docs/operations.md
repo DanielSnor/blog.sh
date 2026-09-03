@@ -442,6 +442,16 @@ needs is the key, and that lives in the shortcut on the phone. Add it to
 the home screen and it opens as an app -- that is what the manifest among
 the published files is for.
 
+It also carries a content policy of its own, which is the one thing it
+could not inherit: the page is copied onto the site as a file and never
+goes through the layout every other page is rendered by, so until 1.7 it
+had none. Now it does, and it is a short list -- scripts and styles from
+the blog, pictures and video only as the page's own `data:` and `blob:`
+bytes, one place to connect to (itself, for the receipt), the preview
+frame same-origin, no form action at all, and scripts never inline. A
+reply arriving in the address bar has nowhere to reach even if it
+carried something that ran.
+
 The page is the same file on every site; what is this site's the build
 writes beside it as `write/site.js`: the short name and claim for the
 header, the palette from `colors:` so the page is dressed like the blog,

@@ -117,6 +117,17 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   `site.yml` is a different matter and still rebuilds everything, because
   the stylesheet it generates and the theme colour in every page's head
   both come from it.
+- **`/write/` carries a content policy.** It is the one page the engine
+  publishes as a file rather than rendering, so it never went through the
+  layout that gives every other page its `Content-Security-Policy` -- and
+  it is the page that reads the server's reply out of the address bar and
+  now asks the blog for its receipt. The list is short: scripts and styles
+  from the blog, pictures and video only as the page's own `data:` and
+  `blob:` bytes, one place to connect to, the preview frame same-origin,
+  no form action, and scripts never inline. Checked in a browser against
+  every shape the page uses -- the preview with the blog's stylesheet, a
+  picture and a clip inside it, the receipt -- and against one it must
+  refuse.
 - **`NOTICE`.** The fonts and the brand marks the engine ships belong to
   other people -- Open Sans and JetBrains Mono under the SIL Open Font
   License, the network glyphs from Simple Icons under CC0 -- and nothing
