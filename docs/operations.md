@@ -1035,7 +1035,13 @@ nothing to offer: `icon: globe` for somebody's other site.
 
 `icon_svg` is your own drawing, on the same
 24-unit grid (`viewBox="0 0 24 24"`) and stroked in `currentColor` so it
-follows the light and dark themes. Scripts, styles and event handlers are
+follows the light and dark themes. It does not have to be drawn from
+scratch: open an icon from any set that works on that grid -- Lucide,
+Feather and Tabler all do -- copy the `<path>` elements out of its file
+and paste them between `<svg viewBox="0 0 24 24" width="20" height="20"
+fill="none" stroke="currentColor" stroke-width="2">` and `</svg>`. Mind
+the licence of whatever you take, and if the set fills its shapes rather
+than stroking them, drop the `fill="none"` and take `stroke` out. Scripts, styles and event handlers are
 stripped out of it before it reaches a page -- the same treatment an
 imported embed gets, and for the same reason. `doctor` says when an icon
 name is one the engine does not have, when an `icon_svg` holds no `<svg>`,
