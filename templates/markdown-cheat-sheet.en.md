@@ -384,12 +384,9 @@ Before any other character the backslash stays as it is — so the d8-\ emoticon
 These aren't missing — each was considered and turned down, mostly because
 its cost lands on everyone who *doesn't* use it:
 
-- underscore italics `_like this_` — underscores live inside ordinary text
-  (file_names, snake_case); use asterisks
-- code blocks indented with spaces — collides with nested-list indentation;
-  use the three backticks
-- headings underlined with `===` — a line of dashes already means a
-  horizontal rule and the frontmatter delimiter
+- underscore italics `_like this_` — underscores live inside ordinary text (file_names, snake_case); use asterisks
+- code blocks indented with spaces — collides with nested-list indentation; use the three backticks
+- headings underlined with `===` — a line of dashes already means a horizontal rule and the frontmatter delimiter
 - nested quotes `>>`
 - reference links `[text][id]` and footnotes
 

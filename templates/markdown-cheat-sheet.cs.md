@@ -381,12 +381,9 @@ Před jiným znakem lomítko zůstane, jak je — takže smajlík d8-\ psát nij
 Tohle nechybí — každá položka byla zvážena a odmítnuta, většinou proto, že
 by její cena dopadla na všechny, kdo ji *nepoužívají*:
 
-- podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu
-  (názvy_souborů, snake_case); používejte hvězdičky
-- blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů;
-  používejte tři zpětné apostrofy
-- nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici
-  frontmatteru
+- podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu (názvy_souborů, snake_case); používejte hvězdičky
+- blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů; používejte tři zpětné apostrofy
+- nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici frontmatteru
 - vnořené citace `>>`
 - referenční odkazy `[text][id]` a poznámky pod čarou
 

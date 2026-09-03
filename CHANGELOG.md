@@ -158,6 +158,28 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
   and ffmpeg refuses to write the file it is reading. The suffix is added
   only where it is needed, so the `.mov` case keeps the name it had.
+- **The Android sender trusted the archive it was handed.** `unzip`
+  restores a symlink entry as a symlink and `base64` follows it, so a
+  `post.zip` that reached the downloads folder from anywhere other than the
+  writing page -- a browser download, a messaging app -- turned one tap
+  into "read a file the phone can read and publish it as media on the
+  blog". It now sends regular files only, and says which entry it refused.
+- **A sent delivery is set aside, and a refusal reaches the phone.** The
+  sender kept no record of what it had sent, so a second tap posted the
+  same bundle again; and the blog's answer was captured in a way that made
+  any non-zero exit from the far end kill the script before it could print
+  it -- so the messages that explain what to fix were the ones being
+  discarded, leaving a bare exit code that invited exactly that second tap.
+  It also carries `publish.txt` now, which is what the page saves when the
+  answer card's Publish button is pressed on that road, and the
+  notification names the post instead of showing the closing brace of the
+  JSON.
+- **The cheat sheet's last list rendered as a run-on paragraph.** A list is
+  read all-or-nothing, so one wrapped continuation line turns the whole
+  paragraph back into text with the dashes still in it -- and the engine's
+  own markdown page was written that way, in all three languages, on every
+  site it has ever built. The page that teaches the markdown is now
+  written in it.
 - **A page called "Write" took the writer app off the site.** The build
   copies the phone-authoring page to `/write/` and renders the pages
   afterwards, so a published page with that slug was written over it and
