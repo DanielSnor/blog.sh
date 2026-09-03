@@ -117,6 +117,17 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   `site.yml` is a different matter and still rebuilds everything, because
   the stylesheet it generates and the theme colour in every page's head
   both come from it.
+- **Android sends too, and the page did not have to change.** iOS has two
+  Shortcuts; Android cannot hand several files to a script through the
+  share sheet, so the page saves the post as one archive -- which it has
+  always done for a browser that will not share files -- and
+  `docs/shortcuts/blogsh-send.sh` takes it from the downloads folder,
+  sends it over the same SSH and prints the same answer. Twenty lines,
+  four environment variables, no configuration of its own. It sends in the
+  ARCHIVE's order rather than the alphabet's, because the markdown
+  arriving is what makes the post. The script ships in the repository and
+  the suite runs it against the real receiver, so it cannot go stale in
+  there unnoticed.
 - **`/write/` carries a content policy.** It is the one page the engine
   publishes as a file rather than rendering, so it never went through the
   layout that gives every other page its `Content-Security-Policy` -- and

@@ -622,6 +622,64 @@ command: a leading dash is a flag, and anything outside a slug's own
 alphabet is refused here rather than explained by whatever it hits. The
 page then asks the same receipt again until it says published.
 
+### Sending from Android
+
+The page is the same page. What differs is the last step, and only that:
+iOS has two Shortcuts, Android has a shell.
+
+Android cannot hand several files to a script through the share sheet --
+Termux registers for a shared URL and for opening one file, not for a
+batch -- so the road goes through the downloads folder instead. Press
+Send on a browser that will not share files and the page saves the whole
+post as one `post.zip`; a script takes it from there. Everything the blog
+needs to know is inside the delivery, so the script has no configuration
+of its own: four environment variables and twenty lines.
+
+```bash
+pkg install openssh unzip termux-api        # in Termux
+termux-setup-storage                        # so ~/storage/downloads exists
+mkdir -p ~/.ssh && ssh-keygen -t ed25519 -f ~/.ssh/blogsh   # openssh, so ed25519 is fine here
+cat ~/.ssh/blogsh.pub                       # the line for the server's authorized_keys
+```
+
+The public key goes on the server the same way the iOS one does -- as a
+`restrict,command="…/scripts/receive.sh"` line, see **The key** above.
+The RSA rule from that section does NOT apply here: it is Shortcuts that
+cannot speak ed25519, and this end is openssh. Then:
+
+```bash
+mkdir -p ~/bin
+curl -o ~/bin/blogsh-send \
+  https://raw.githubusercontent.com/DanielSnor/blog.sh/main/docs/shortcuts/blogsh-send.sh
+chmod +x ~/bin/blogsh-send
+export BLOGSH_HOST=blog@your.server        # in ~/.bashrc, with the two below if they differ
+export BLOGSH_PORT=22
+export BLOGSH_KEY=~/.ssh/blogsh
+```
+
+That file is `docs/shortcuts/blogsh-send.sh` in this repository -- read it
+before you run it, it is twenty lines. (The blog itself does not serve it:
+nothing under `docs/` is published, and the key on the phone can run one
+command and nothing else, so it cannot fetch it from the server either.)
+Give it a button with **Termux:Widget** (a shortcut on the
+home screen that runs one file from `~/.shortcuts`), and sending is: write
+on the page, press Send, tap the widget.
+
+It sends the archive's files in the archive's own order, which matters:
+the page packs the pictures first and the markdown last, and the markdown
+arriving is what makes the post. Sorting the names alphabetically instead
+would hand a post called `a-post.md` over before the pictures it names,
+and the blog would answer `missing_images` about a delivery where nothing
+was missing.
+
+The answer comes back on the connection and the script prints it, and
+into a notification if `termux-api` is installed. The page does not need
+it: it asks the blog for the receipt it sent with the post, exactly as it
+does on iOS. Two things to know about Termux itself: it is **not on Google
+Play** (the version there has been abandoned for years) -- install from
+F-Droid or from its GitHub releases -- and `termux-setup-storage` is what
+makes the downloads folder visible to it.
+
 One connection carries the post however many photographs are in it, which
 is the point: connections are the scarce thing, not bytes. The first run
 in the app asks whether the shortcut may send its items to the host --

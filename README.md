@@ -147,7 +147,8 @@ the tags the blog already uses and a preview in the blog's own
 stylesheets. The post arrives as a draft; the page then says what became
 of it -- it asks the blog, rather than only waiting to be told -- and
 offers to publish it, which sends one more file down the same
-connection.
+connection. Two iOS shortcuts do the sending, or a twenty-line script in
+Termux on Android; the page is the same page either way.
 → [operations.md → A post sent from the phone itself](docs/operations.md#a-post-sent-from-the-phone-itself)
 
 **Markdown.** One parser (`lib/markdown_parser.rb`), shared by the build
