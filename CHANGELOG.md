@@ -10,6 +10,111 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
+## 1.7 -- 2026-09-03
+
+A release about the two ends of a post: the phone it may be written on,
+and the file it is written into. Publishing from a phone works now --
+draft, look at it, publish, without a terminal anywhere in the sequence.
+A post can carry a link card written as ordinary front matter, which is
+what release posts have wanted since 1.3. A tag can wear one of about
+fifty drawings the engine now ships instead of an SVG typed into the
+config. A video can be repacked on the way in so it starts playing before
+it has finished downloading. And a stylesheet is no longer a reason to
+rebuild every page on the site.
+
+Nothing to migrate: `git pull`, rebuild, deploy.
+
+### Added
+
+- **Publishing from the phone, and an answer the page can go and get.**
+  A post written at `/write/` arrived as a draft, and putting it out took
+  a terminal -- which is the one thing the person holding the phone does
+  not have. The answer for a draft now carries a Publish button, and it
+  sends one file called `publish.txt` holding the slug, down the same
+  connection and through the same two shortcuts. `scripts/receive.sh`
+  knows that shape and runs `publish <slug> --yes --json` for it instead
+  of storing anything; the slug is checked as hard as a filename, since it
+  becomes an argument to a command.
+- **`publish <slug> --yes --json`.** The same object `add --json` prints
+  -- `slug`, `path`, `state`, `url`, `deploy`, `warnings` -- or a refusal
+  with its reason as a code, and zero either way, because a phone throws
+  away the output of a command that failed. `--json` wants `--yes` beside
+  it: without it the run would stop at the draft dialog, waiting for a
+  keypress no program is going to send.
+- **A receipt, so the page can ask rather than wait.** The road the
+  answer takes back has one break in it that nothing on the server can
+  mend: a page kept on a phone's home screen has storage of its own, so a
+  reply arriving as a URL opens in the browser, where the draft is not.
+  The page now picks a name for its answer before it sends anything
+  (`receipt:` in the front matter, sixteen hex characters), and the build
+  leaves a small JSON file at `/write/r/<receipt>.json` with the slug, the
+  state, the title and the address. The page asks for it every three
+  seconds for five minutes, and says so if it never comes. Written by the
+  build, which is what keeps it true: publishing the post rewrites it,
+  deleting the post stops it being produced and the sweep takes it away.
+- **A link card is written in the front matter.** `link:`, with
+  `link_title:` and `link_description:` beside it, gives a post the card
+  it opens with -- the address it is ABOUT. It had no markdown form at
+  all: the writer dropped the block, so `edit` offered to lose it and
+  `add <file>` could not make one, which is why this project's own release
+  posts stopped being link posts after 1.3. It is a header key rather
+  than a line in the body because a paragraph that is only a link already
+  means something else, and because the card belongs to the post rather
+  than to a paragraph of it. A post with no title of its own is still
+  named by the card.
+- **About fifty drawings, by name.** `tag_icons` could name one of eight
+  icons -- and those eight are the content TYPES, so a tag about bicycles
+  had the choice between the icon for "audio" and writing SVG by hand.
+  The engine now carries a set of line drawings for the things blogs are
+  about (`bike`, `mountain`, `coffee`, `camera`, `terminal`, `paw`,
+  `rocket`...), on the same grid and in the same stroke as the eight, and
+  they are listed in `doctor` when a name is not one of them. A footer
+  link in `social:` can wear one too, where the network marks have nothing
+  to offer. All of them live in `lib/icons.rb`, which is also where doctor
+  now validates from -- it used to keep its own hand-typed copy of the
+  eight names, and a list kept in step by hand is a list that goes out of
+  step.
+- **`media: remux_video: true` repacks a video on the way in.** A
+  recorder writes the index at the END of the file, because it is only
+  complete when the recording is -- so a video from a phone makes a reader
+  wait for the whole download before the first frame. With `ffmpeg` on the
+  machine the engine now moves it to the front and, while it is there,
+  out of the QuickTime container: the picture and the sound are copied
+  across untouched, about a second for a phone video. Off by default, like
+  the HEIC conversion. Unlike it, a failure is never a refusal -- no
+  ffmpeg, or a repack that will not go through, and the post is saved with
+  the file as it arrived: a video in the wrong wrapper still plays for
+  nearly everybody, where a HEIC photo does not.
+- **`check` names a video whose index is at the end**, as something to
+  look at rather than a fault, and the save says the same about a new one
+  -- with the command that fixes it, which now carries `+faststart` in
+  both places it is offered.
+
+### Changed
+
+- **A stylesheet is no longer part of the engine's fingerprint.** Editing
+  `site.css` threw the whole page record away and rebuilt every page in
+  the archive to produce, byte for byte, the pages that were already
+  there -- 47 seconds of it on this project's own, for one line of colour.
+  Pages LINK a stylesheet, they never carry its bytes (there is no `?v=`
+  on that link, on purpose), and assets are compared byte for byte on
+  every build by a path that has never consulted the cache. The palette in
+  `site.yml` is a different matter and still rebuilds everything, because
+  the stylesheet it generates and the theme colour in every page's head
+  both come from it.
+- **`NOTICE`.** The fonts and the brand marks the engine ships belong to
+  other people -- Open Sans and JetBrains Mono under the SIL Open Font
+  License, the network glyphs from Simple Icons under CC0 -- and nothing
+  in the repository said so. Now something does.
+
+### Fixed
+
+- **The `ffmpeg` command the engine suggested could name its own input.**
+  An HEVC video already in an `.mp4` -- which is what a phone records when
+  it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
+  and ffmpeg refuses to write the file it is reading. The suffix is added
+  only where it is needed, so the `.mov` case keeps the name it had.
+
 ## 1.6 -- 2026-09-03
 
 A release about the time between deciding to publish and the site saying

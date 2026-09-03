@@ -249,8 +249,15 @@ cli:
   # wegwerfen darf. Das Präfix „media:“ ist das Verzeichnis, kein Wort zum
   # Übersetzen.
   media_name_taken: "media: %{name} war schon belegt -- die Datei, die dort lag, heißt jetzt %{moved}"
+  receipt_shape: "`receipt:` ist ein Name, den die sendende Seite für ihre Antwort wählt, und er muss aus sechzehn Hexadezimalzeichen bestehen -- daraus wird ein Dateiname auf der Website. Ohne die Zeile wird der Beitrag ohne eine geschrieben."
+  link_without_url: "Ein Beitrag kann eine Linkkarte tragen, aber `link_title:` und `link_description:` sind Zeilen ÜBER eine -- dazu gehört ein `link:` mit der Adresse."
+  link_not_http: "`link: %{url}` ist keine Webadresse. Eine Linkkarte zeigt auf eine Seite irgendwo, also will sie eine http://- oder https://-Adresse; auf eine Datei neben dem Beitrag verweist eine gewöhnliche Linkzeile im Text."
   video_hevc: "⚠️  %{files}: als HEVC aufgenommen -- die meisten Browser spielen das ab, aber nicht alle; die übrigen Leser bekommen statt des Videos einen leeren Player. Gespeichert wird es trotzdem. Neu kodiert läuft es überall (braucht ffmpeg -- auf dem Mac `brew install ffmpeg`):\n     %{command}"
   video_quicktime: "⚠️  %{files}: ein QuickTime-.mov-Container. Das Video darin ist in Ordnung, aber den Container akzeptiert nicht jeder Browser; .mp4 nehmen alle. Gespeichert wird es trotzdem. Das Umpacken kopiert das Video unverändert, ohne neu zu kodieren (braucht ffmpeg):\n     %{command}"
+  video_tail_index: "⚠️  %{files}: der Index steht am Ende der Datei -- anders kann eine Kamera ihn beim Aufnehmen nicht schreiben. Der Browser braucht ihn zum Starten, also wartet der Leser auf das ganze Video statt auf dessen erste Sekunde. Gespeichert wird es trotzdem. Das Umpacken schiebt ihn nach vorn und kopiert das Video unverändert (braucht ffmpeg):\n     %{command}"
+  video_remuxed: "🔄 %{file} → %{target} (umgepackt, Index nach vorn geschoben)."
+  video_remux_no_tool: "⚠️  %{files}: ffmpeg ist nicht installiert, also wurde das von media.remux_video gewünschte Umpacken übersprungen. Gespeichert, wie es ist."
+  video_remux_failed: "⚠️  %{file}: das Umpacken ging nicht durch, die Datei wird so gespeichert, wie sie ankam. Von Hand geht es so:\n     %{command}"
   embed_lookup_working: "🔎 %{url}: frage den Dienst nach seinem Player…"
   embed_lookup_failed: "⚠️  %{url}: kein Player gefunden -- der Dienst hat nicht geantwortet oder bietet für diese Adresse keinen. Gespeichert wurde stattdessen der Link; erneutes Bearbeiten und Speichern versucht es noch einmal."
 
@@ -288,6 +295,9 @@ cli:
       series Name einer Serie; Beiträge mit gleichem Namen bilden eine
       hero   true/false -> Leitbild über dem Titel für diesen Beitrag
       toc    true/false -> Kapitelliste (ab vier Überschriften von selbst)
+      link   https://... -> eine Linkkarte über dem Text: die Adresse,
+             um die es geht; link_title und link_description sind die
+             Worte darauf, ohne eigenen Titel heißt der Beitrag wie sie
 
     Das Veröffentlichungsdatum wird hier nicht gesetzt -- [p] nimmt den
     Moment der Veröffentlichung, [s] fragt nach Datum und Uhrzeit. Zum
@@ -312,7 +322,8 @@ cli:
   add_file_missing_images: "Diese Dateien sind noch nicht da: %{files}. Lade sie zuerst nach %{dir} — es wurde nichts geschrieben. (Das interaktive `add` wartet darauf, hier ist aber niemand zum Warten.)"
   add_json_needs_file: "--json braucht eine Datei zum Lesen: `add <Datei> --json`. Ohne sie öffnet `add` einen Editor, und bis der geschlossen ist, gibt es nichts zu melden."
   add_unknown_option: "Unbekannte Option: %{option}. add kennt eine Datei, --json und --untrusted."
-  publish_unknown_option: "Unbekannte Option: %{option}. publish kennt einen Slug, --yes und --no-announce."
+  publish_unknown_option: "Unbekannte Option: %{option}. publish kennt einen Slug, --yes, --no-announce und --json."
+  publish_json_needs_yes: "`publish --json` will auch `--yes`. Ohne das bleibt der Lauf beim Entwurfsdialog stehen, und dort ist niemand, der antwortet."
   publish_yes_needs_slug: "--yes muss den Beitrag benennen: `publish <slug> --yes`. Ohne Slug bietet publish die Entwürfe zur Auswahl an — und ausgewählt wird vor der Vorschau, nicht einen Tastendruck von einer Ankündigung entfernt, die sich nicht zurückholen lässt."
   no_announce_not_scheduled: "Achtung: --no-announce erreicht die geplante Veröffentlichung nicht. Der Cron richtet sich nach dem Beitrag selbst und kündigt ihn zu seinem Termin an. Soll er still bleiben, veröffentliche ihn von Hand mit --no-announce oder markiere ihn als unlisted."
   publish_yes_ambiguous: "Den Slug %{slug} gibt es in mehr als einem Jahr (%{years}), und --yes hat niemanden, den es fragen könnte. Veröffentliche ihn über `props %{slug}`, wo sie angezeigt und ausgewählt werden können."
@@ -522,7 +533,7 @@ cli:
                                      der Weg für Handy, Skript oder Kurzbefehl (--json meldet das Ergebnis als Daten)
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh props [<slug>]       zeigt Status und Aktionen eines Beitrags (veröffentlichen, zurückziehen, Slug umbenennen, löschen...)
-      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit);
                                      --yes veröffentlicht sofort ohne Rückfrage, --no-announce hält ihn von Mastodon und Bluesky fern
       ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
@@ -1142,6 +1153,8 @@ check:
   media_cause_empty: "sie hat null Bytes"
   media_cause_broken_link: "es ist ein Link auf eine Datei, die es nicht gibt"
   media_unusable_fix: "Ein abgebrochener Download, ein fehlendes Leserecht oder ein Ordner unter dem Namen des Bildes. Lege eine echte Kopie der Datei dorthin; bis dahin zeigt die Seite ein kaputtes Bild."
+  media_tail_index: "%{slug}: das Video %{file} trägt seinen Index am Ende der Datei."
+  media_tail_index_fix: "Es spielt, aber jeder Leser wartet auf die ganze Datei, bevor das erste Bild kommt -- der Player braucht diesen Index zum Starten. Eine Kamera kann ihn nicht anders schreiben; das Umpacken schiebt ihn nach vorn und kopiert das Video unverändert: ffmpeg -i DATEI -c copy -movflags +faststart NEU.mp4. Neue Videos erledigen das beim Speichern mit media.remux_video."
   media_missing_fix: "Der Beitrag fordert sie an, die Seite zeigt ein Loch. Meist ein Import mit fehlgeschlagenem Download -- lege die Datei dorthin oder nimm sie aus dem Beitrag heraus."
   image_degenerate: "%{slug}: Das Bild %{file} ist %{width}x%{height} und wird gar nicht gerendert."
   image_degenerate_fix: "Alles mit 1px oder weniger gilt als Zählpixel und wird MITSAMT Bildunterschrift verworfen, die Seite verliert also beides stillschweigend. Tausche das Bild aus oder entferne den Block."

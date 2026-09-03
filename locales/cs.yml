@@ -243,8 +243,15 @@ cli:
   # nahlas — na cizím souboru není nic, co by říkalo, že se smí zahodit.
   # Předpona „media:“ je adresář, ne slovo k překladu.
   media_name_taken: "media: %{name} už bylo obsazené — soubor, který tam byl, je teď %{moved}"
+  receipt_shape: "`receipt:` je jméno, které si odesílající stránka volí pro svou odpověď, a musí to být šestnáct hexadecimálních znaků — stane se z něj jméno souboru na webu. Bez toho řádku se post zapíše bez účtenky."
+  link_without_url: "Post může nést kartu odkazu, ale `link_title:` a `link_description:` jsou řádky O NÍ — musí u nich být `link:` s adresou."
+  link_not_http: "`link: %{url}` není webová adresa. Karta odkazu míří na nějakou stránku, takže chce adresu http:// nebo https://; na soubor vedle postu se odkazuje obyčejným řádkem s odkazem v textu."
   video_hevc: "⚠️  %{files}: natočeno v HEVC, což většina prohlížečů přehraje, ale ne všechny — zbytek čtenářů uvidí místo videa prázdný přehrávač. Uloženo tak jako tak. Překódování přehraje všude (potřebuje ffmpeg — na Macu `brew install ffmpeg`):\n     %{command}"
   video_quicktime: "⚠️  %{files}: kontejner QuickTime .mov. Video uvnitř je v pořádku, ale kontejner nebere každý prohlížeč; .mp4 berou všechny. Uloženo tak jako tak. Přebalení video jen přenese, nic se nepřekódovává (potřebuje ffmpeg):\n     %{command}"
+  video_tail_index: "⚠️  %{files}: rejstřík je na konci souboru, protože jinam ho kamera při natáčení dát nemůže. Prohlížeč ho potřebuje k rozjezdu, takže čtenář čeká na celé video místo na jeho první vteřinu. Uloženo tak jako tak. Přebalení ho přesune dopředu a video jen přenese (potřebuje ffmpeg):\n     %{command}"
+  video_remuxed: "🔄 %{file} → %{target} (přebaleno, rejstřík přesunut na začátek)."
+  video_remux_no_tool: "⚠️  %{files}: ffmpeg není nainstalovaný, takže se přebalení, o které si říká media.remux_video, přeskočilo. Uloženo tak, jak to přišlo."
+  video_remux_failed: "⚠️  %{file}: přebalení neprošlo, soubor se ukládá tak, jak přišel. Ručně to jde takhle:\n     %{command}"
   embed_lookup_working: "🔎 %{url}: ptám se služby, kde má přehrávač…"
   embed_lookup_failed: "⚠️  %{url}: přehrávač se nenašel — služba neodpověděla, nebo pro tuhle adresu žádný nemá. Uloženo aspoň s odkazem; další editace a uložení to zkusí znovu."
 
@@ -277,6 +284,9 @@ cli:
       series  jméno série; posty se stejným jménem tvoří sérii
       hero    true/false → úvodní obrázek nad titulkem u tohohle postu
       toc     true/false → seznam kapitol (sám naskočí od čtyř nadpisů)
+      link   https://... -> karta odkazu nad textem: adresa, o kterou jde;
+             link_title a link_description jsou slova na ní, a bez
+             vlastního titulku se post jmenuje podle karty
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
@@ -300,7 +310,8 @@ cli:
   add_file_missing_images: "Tyhle soubory tu ještě nejsou: %{files}. Nahraj je nejdřív do %{dir} — nic se nezapsalo. (Interaktivní `add` na ně počká, tady ale není kdo by čekal.)"
   add_json_needs_file: "--json potřebuje soubor ke čtení: `add <soubor> --json`. Bez něj `add` otevře editor a až do jeho zavření není co hlásit."
   add_unknown_option: "Neznámý přepínač: %{option}. add bere soubor, --json a --untrusted, nic jiného."
-  publish_unknown_option: "Neznámý přepínač: %{option}. publish bere slug, --yes a --no-announce, nic jiného."
+  publish_unknown_option: "Neznámý přepínač: %{option}. publish bere slug, --yes, --no-announce a --json, nic jiného."
+  publish_json_needs_yes: "`publish --json` chce i `--yes`. Bez něj se běh zastaví u dialogu draftu a není tam nikdo, kdo by odpověděl."
   publish_yes_needs_slug: "--yes musí pojmenovat post: `publish <slug> --yes`. Bez slugu nabídne publish drafty na výběr — a vybírat se má nad náhledem, ne jedním klávesovým úhozem od oznámení, které nejde vzít zpět."
   no_announce_not_scheduled: "Pozor: --no-announce se do naplánované publikace nepřenese. Cron se řídí samotným postem, takže ho v jeho čase oznámí. Když má zůstat potichu, publikuj ho ručně s --no-announce, nebo ho označ jako unlisted."
   publish_yes_ambiguous: "Slug %{slug} je ve víc než jednom roce (%{years}) a --yes se nemá koho zeptat, který to má být. Publikuj ho přes `props %{slug}`, kde se ukážou a dají vybrat."
@@ -510,7 +521,7 @@ cli:
                                      což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
       ./blog.sh props [<slug>]       ukáže stav postu a jeho akce (publikovat, stáhnout z webu, přejmenovat slug, smazat…)
-      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty);
                                      --yes publikuje rovnou bez ptaní, --no-announce nechá post mimo Mastodon a Bluesky
       ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
@@ -1128,6 +1139,8 @@ check:
   media_cause_empty: "má nula bajtů"
   media_cause_broken_link: "je to odkaz na soubor, který tam není"
   media_unusable_fix: "Přerušené stahování, chybějící právo ke čtení, nebo složka pod jménem obrázku. Nahraj tam skutečnou kopii souboru; do té doby stránka ukazuje rozbitý obrázek."
+  media_tail_index: "%{slug}: video %{file} má rejstřík na konci souboru."
+  media_tail_index_fix: "Přehraje se, ale každý čtenář čeká na celý soubor, než uvidí první snímek — přehrávač ten rejstřík potřebuje k rozjezdu. Kamera ho jinam dát nemůže; přebalení ho přesune dopředu a video jen přenese: ffmpeg -i SOUBOR -c copy -movflags +faststart NOVY.mp4. Nová videa to udělají při uložení, když zapneš media.remux_video."
   media_missing_fix: "Post si o něj říká a na stránce zůstane díra. Obvykle import, kterému selhalo stahování — buď soubor dodej, nebo ho z postu vyhoď."
   image_degenerate: "%{slug}: obrázek %{file} má %{width}x%{height} a vůbec se nevykreslí."
   image_degenerate_fix: "Cokoli 1px a menší se bere jako sledovací pixel a zahodí se I S POPISKEM, takže stránka tiše přijde o obojí. Vyměň obrázek, nebo blok smaž."

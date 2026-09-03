@@ -13,6 +13,7 @@ require_relative 'slug'
 require_relative 'i18n'
 require_relative 'path_glob'
 require_relative 'content_type'
+require_relative 'video_probe'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -655,6 +656,11 @@ module Checker
     clean.b.downcase
   end
 
+  # Kept here rather than borrowed from the markdown parser: this walks an
+  # archive that may hold videos no parser of ours ever wrote, and the
+  # question is only what to open, not what to accept.
+  VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
+
   # A post whose media never arrived. The import summary said so at the
   # time and nothing has said so since, which is why a whole archive can
   # carry these for years without anyone knowing.
@@ -662,6 +668,7 @@ module Checker
     missing = []
     misnamed = []
     unusable = []
+    tail_index = []
     posts.each_with_index do |post, index|
       progress&.call(index + 1, posts.size)
       dir = media_dir_for(root, post)
@@ -682,6 +689,16 @@ module Checker
                        unusable_media_cause(File.join(dir, claim.first))]
         elsif claim.nil?
           missing << [post['slug'], url, post['__year']]
+        elsif claim.last == :exact && VIDEO_EXTENSIONS.include?(File.extname(claim.first).downcase) &&
+              VideoProbe.faststart?(File.join(dir, claim.first)) == false
+          # Not a hole and not a fault -- the video plays. It simply makes
+          # every reader wait for the whole file before the first frame,
+          # because the index a player needs to start sits behind the
+          # picture. A recorder cannot write it anywhere else; a repack
+          # afterwards can. Asked only of a file whose name matched
+          # exactly, so this never opens a file the checks above are
+          # already unhappy about.
+          tail_index << [post['slug'], claim.first, post['__year'], rel_dir]
         elsif claim.last != :exact
           # Whether this post ALSO refers to the correct spelling somewhere
           # else. The repair pass refuses the rename in that case -- two
@@ -694,7 +711,7 @@ module Checker
         end
       end
     end
-    return [] if missing.empty? && misnamed.empty? && unusable.empty?
+    return [] if missing.empty? && misnamed.empty? && unusable.empty? && tail_index.empty?
 
     capped(missing.map do |slug, url, year|
       error(t('media_missing', slug: slug, file: url), t('media_missing_fix'),
@@ -721,6 +738,11 @@ module Checker
         fix = t(in_use ? 'media_misnamed_both_fix' : 'media_misnamed_fix')
         how == :fold ? error(text, fix, kind: :media_misnamed, data: data)
                      : warn(text, fix, kind: :media_misnamed, data: data)
+      end, cap) +
+      capped(tail_index.map do |slug, file, year, rel|
+        warn(t('media_tail_index', slug: slug, file: file), t('media_tail_index_fix'),
+             kind: :media_tail_index,
+             data: { 'slug' => slug, 'file' => file, 'year' => year, 'dir' => rel })
       end, cap)
   end
 

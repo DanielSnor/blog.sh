@@ -258,8 +258,15 @@ cli:
   # named out loud, because nothing about a stray file says it is safe to
   # destroy. The "media:" prefix is the directory, not a word to translate.
   media_name_taken: "media: %{name} was already taken -- the file that was there is now %{moved}"
+  receipt_shape: "`receipt:` is a name the sending page picks for its answer, and it has to be sixteen hexadecimal characters -- it becomes a filename on the site. Leave the line out and the post is written without one."
+  link_without_url: "A post can carry a link card, but `link_title:` and `link_description:` are lines ABOUT one -- there has to be a `link:` with the address."
+  link_not_http: "`link: %{url}` is not a web address. A link card points at a page somewhere, so it wants a http:// or https:// address; for a file next to the post, write it as an ordinary link line in the text."
   video_hevc: "⚠️  %{files}: recorded as HEVC, which most browsers play but not all -- readers on the rest get an empty player instead of the video. Saved either way. Re-encoding it plays everywhere (needs ffmpeg -- `brew install ffmpeg` on a Mac):\n     %{command}"
   video_quicktime: "⚠️  %{files}: a QuickTime .mov container. The video inside is fine, but not every browser accepts the container; .mp4 is the one they all take. Saved either way. Repacking copies the video across untouched, no re-encoding (needs ffmpeg):\n     %{command}"
+  video_tail_index: "⚠️  %{files}: the index sits at the end of the file, which is where a recorder has to put it. A browser needs it to start, so the reader waits for the whole video instead of the first second of it. Saved either way. Repacking moves it to the front and copies the video across untouched (needs ffmpeg):\n     %{command}"
+  video_remuxed: "🔄 %{file} → %{target} (repacked, index moved to the front)."
+  video_remux_no_tool: "⚠️  %{files}: ffmpeg is not installed, so the repack media.remux_video asks for was skipped. Saved as it is."
+  video_remux_failed: "⚠️  %{file}: the repack did not go through, so the file is saved as it arrived. To try it by hand:\n     %{command}"
   embed_lookup_working: "🔎 %{url}: asking the service where its player is…"
   embed_lookup_failed: "⚠️  %{url}: no player found -- the service did not answer, or offers none for this address. Saved with a link to it instead; editing and saving again retries."
 
@@ -294,6 +301,9 @@ cli:
       series name of a series; posts sharing a name form one
       hero   true/false -> lead image above the title for this post
       toc    true/false -> chapter list (appears by itself from four headings)
+      link   https://... -> a link card above the text: the address it
+             is about; link_title and link_description are the words on
+             it, and with no title of its own the post is named by the card
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
     [s]chedule asks for a future date/time when you pick it. To backdate,
@@ -317,7 +327,8 @@ cli:
   add_file_missing_images: "These files are not there yet: %{files}. Upload them to %{dir} first -- nothing was written. (Interactive `add` waits for them; with a file argument there is nobody to wait for.)"
   add_json_needs_file: "--json needs a file to read: `add <file> --json`. Without one, `add` opens an editor and there is nothing to report until it closes."
   add_unknown_option: "Unknown option: %{option}. add takes a file, --json and --untrusted, nothing else."
-  publish_unknown_option: "Unknown option: %{option}. publish takes a slug, --yes and --no-announce, nothing else."
+  publish_unknown_option: "Unknown option: %{option}. publish takes a slug, --yes, --no-announce and --json, nothing else."
+  publish_json_needs_yes: "`publish --json` also wants `--yes`. Without it the run stops at the draft dialog, and there is nobody there to answer it."
   publish_yes_needs_slug: "--yes needs to name the post: `publish <slug> --yes`. Without a slug, publish offers the drafts to choose from -- and choosing is something to do with the preview in front of you, not one keystroke away from an announcement that cannot be recalled."
   no_announce_not_scheduled: "Note: --no-announce does not reach the scheduled publish. The cron works from the post itself, so it will announce this one when its date arrives. To keep it quiet, publish it by hand with --no-announce, or mark it unlisted."
   publish_yes_ambiguous: "The slug %{slug} exists in more than one year (%{years}), and --yes has nobody to ask which. Publish it from `props %{slug}`, which shows them and lets you choose."
@@ -531,7 +542,7 @@ cli:
                                      which is the route for a phone, a script or a shortcut (--json reports it as data)
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh props [<slug>]       shows a post's state and its actions (publish, unpublish, rename the slug, delete...)
-      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
                                      --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
@@ -1159,6 +1170,8 @@ check:
   media_cause_empty: "it is zero bytes"
   media_cause_broken_link: "it is a link pointing at a file that is not there"
   media_unusable_fix: "An interrupted download, a permission bit or a folder under the picture's name. Put a real copy of the file there; the page shows a broken picture until then."
+  media_tail_index: "%{slug}: the video %{file} carries its index at the end of the file."
+  media_tail_index_fix: "It plays, but every reader waits for the whole file before the first frame -- a player needs that index to start. A recorder has to write it last; repacking moves it to the front and copies the video across untouched: ffmpeg -i FILE -c copy -movflags +faststart NEW.mp4. New videos do it on save with media.remux_video."
   media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
   image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."
   image_degenerate_fix: "Anything 1px or smaller is treated as a tracking pixel and dropped WITH its caption, so the page silently loses both. Replace the image or remove the block."

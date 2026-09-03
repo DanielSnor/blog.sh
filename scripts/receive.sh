@@ -272,6 +272,46 @@ while IFS= read -r NAME; do
     || fail "empty_file" "$NAME arrived with its name and its closing dot and nothing between them."
 done < "$WORK/names"
 
+# A delivery of exactly one file called publish.txt is not a post: it is a
+# request to publish one that is already here, and its body is the slug.
+# The page at /write/ sends it after a draft has gone out and been looked
+# at -- which is the one thing that could not be done from a phone at all,
+# because publishing needs a terminal and a phone has none.
+#
+# Nothing is written to incoming/ for it: the slug is a word, not a file,
+# and staging it would leave litter nobody consumes.
+#
+# ⚠️ That word becomes an argument to a command, so it is checked as
+# hard as a filename is. A leading dash is a flag to the engine, and the
+# rest of the alphabet here is the one slugs are made of -- anything else
+# is refused rather than passed on and explained by whatever it hits.
+if [ "$(wc -l < "$WORK/names")" -eq 1 ] && [ "$(head -1 "$WORK/names")" = "publish.txt" ]; then
+  # Carriage returns out (a phone writes them), trailing newlines dropped
+  # by the substitution itself -- but a newline in the MIDDLE stays, and
+  # is refused. Deleting it would have glued two lines into one word and
+  # published whatever that spelled.
+  SLUG=$(LC_ALL=C tr -d '\r' < "$WORK/file-001")
+  case "$SLUG" in
+    '' | -* | *"
+"*) fail "bad_slug" "publish.txt has to hold the slug of a post, and nothing else." ;;
+  esac
+  if [ "${#SLUG}" -gt 200 ] || [ "$SLUG" != "$(printf %s "$SLUG" | LC_ALL=C tr -cd 'a-z0-9-')" ]; then
+    fail "bad_slug" "publish.txt has to hold the slug of a post, and nothing else."
+  fi
+  cd "$INSTALL" || unavailable "no_cd" "Cannot enter $INSTALL."
+  # The same capture as the markdown route below, and for the same reason:
+  # an engine that answers in prose gets answered for.
+  OUT=$(./blog.sh publish "$SLUG" --yes --json 2>"$WORK/engine-err")
+  case "$OUT" in
+    \{*) printf '%s\n' "$OUT" ;;
+    *)
+      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | tail -c 600)
+      printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | tr '\n' ' ')")"
+      ;;
+  esac
+  exit 0
+fi
+
 INDEX=0
 while IFS= read -r NAME; do
   INDEX=$((INDEX + 1))

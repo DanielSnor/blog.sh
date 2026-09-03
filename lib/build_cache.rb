@@ -58,7 +58,24 @@ module BuildCache
   # bytes of a rendered page. Deliberately whole directories rather than a
   # list of files, so a template or a helper added later is covered without
   # anybody remembering to add it here.
-  FINGERPRINT_TREES = %w[templates lib build locales assets config].freeze
+  #
+  # ⚠️ assets/ is deliberately NOT among them, and the reason is the rule
+  # above rather than an exception to it: a page LINKS a stylesheet, a
+  # script and a favicon, it never carries their bytes. There is no ?v=
+  # cache-buster on any of those links -- that is a decision of its own,
+  # written down where the links are made -- so no edit under assets/ can
+  # change the bytes of a rendered page. What assets/ needs instead, it
+  # already has: emit_copy compares every file byte for byte on every
+  # build, before this cache is even opened, and registers it against the
+  # sweep. Including the tree here bought nothing and cost a full rebuild
+  # of every page for a one-line change of colour.
+  #
+  # The one thing under assets/ that DOES reach a page is colors.css, and
+  # it is generated from config/site.yml rather than read from the tree,
+  # so config -- which is in the list -- covers it. If a template is ever
+  # written that inlines the CONTENT of a file under assets/, that content
+  # has to come back into this fingerprint with it.
+  FINGERPRINT_TREES = %w[templates lib build locales config].freeze
 
   class << self
     attr_reader :root, :public_dir
@@ -95,8 +112,10 @@ module BuildCache
       @reuse = reuse
     end
 
-    # The file this build's state will be written to. Exposed for the tests
-    # and for doctor, which reports on it.
+    # The file this build's state will be written to. Read by the build
+    # itself, in load_previous and save!; nothing outside this file asks
+    # for it today -- the comment here used to name doctor and the tests
+    # as consumers, and neither has ever called it.
     attr_reader :path
 
     # Takes the fingerprint and loads the previous state if it matches.

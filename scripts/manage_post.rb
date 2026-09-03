@@ -25,6 +25,7 @@ require_relative '../lib/markdown_writer'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/heic_converter'
 require_relative '../lib/video_probe'
+require_relative '../lib/video_remuxer'
 require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
@@ -144,11 +145,12 @@ end
 # in lib/markdown_writer.rb (used by `blog.sh edit` below). What stays here
 # is authoring validation tied specifically to this CLI.
 
-FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc].freeze
+FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series series_part toc
+                      link link_title link_description].freeze
 # Read by `add <file>` alone. On every other route -- the wizard, edit --
 # the key would be accepted and do nothing, which is the one thing the
 # unknown-key rule below exists to prevent; so it is unknown there.
-FILE_ONLY_FRONTMATTER_KEYS = %w[publish].freeze
+FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt].freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -391,13 +393,15 @@ end
 # Only what this save brings in. A file already sitting in the post's media
 # directory was accepted once; re-refusing it would lock an old post out of
 # editing, and the deploy names it there instead.
-def check_attachment_sizes(media_files)
+def check_attachment_sizes(media_files, names = {})
   # The SOURCE name, like the HEIC refusal uses: media_files maps to the
   # stored name (01.pdf), which the author has never seen and cannot act on.
+  # And after a conversion or a repack the source is ours as well, so
+  # `names` maps it back to what the author attached.
   sized = media_files.filter_map do |src, _filename|
     next unless src && File.exist?(src)
 
-    [File.basename(src), File.size(src)]
+    [names[src] || File.basename(src), File.size(src)]
   end
   return if sized.empty?
 
@@ -427,20 +431,34 @@ end
 # One message per file, not two: an HEVC .mov is both, and the transcode
 # below lands in .mp4 anyway, so saying "repack it" next to "re-encode it"
 # would only offer a command that keeps the codec.
-def check_video_playback(media_files)
+# ⚠️ `names` maps a file this pass is about back to the name the AUTHOR
+# gave it. A repack replaces the source path with a temp file called
+# 01.mp4, and every notice printed after it then talked about a name
+# nobody outside the engine has ever seen -- while offering a command to
+# run on it.
+def check_video_playback(media_files, names = {})
   hevc = []
   quicktime = []
+  tail_index = []
   media_files.each_key do |src|
     next unless src && File.exist?(src) && MarkdownParser.video_path?(src)
 
+    shown = names[src] || File.basename(src)
     if VideoProbe.hevc?(src)
-      hevc << File.basename(src)
+      hevc << shown
     elsif File.extname(src).downcase == '.mov'
-      quicktime << File.basename(src)
+      quicktime << shown
+    # Only asked of a file the two above have nothing to say about: the
+    # repack they already recommend moves the index as well, and a third
+    # sentence about the same file would be a third command to weigh.
+    # nil is "not a movie I can read", which is not a fault to report.
+    elsif VideoProbe.faststart?(src) == false
+      tail_index << shown
     end
   end
   hevc.uniq!
   quicktime.uniq!
+  tail_index.uniq!
 
   # The command names a real file, the way the HEIC refusal does -- a
   # placeholder is one more thing to get wrong at the moment someone is
@@ -448,6 +466,72 @@ def check_video_playback(media_files)
   # the message says where to get it.
   puts t('cli.video_hevc', files: hevc.join(', '), command: transcode_command(hevc.first)) if hevc.any?
   puts t('cli.video_quicktime', files: quicktime.join(', '), command: remux_command(quicktime.first)) if quicktime.any?
+  return if tail_index.empty?
+
+  puts t('cli.video_tail_index', files: tail_index.join(', '),
+                                 command: remux_command(tail_index.first))
+end
+
+# Repacks the videos among the freshly attached media so their index sits
+# at the front and their container is the one every browser takes, by
+# media.remux_video in config/site.yml. Runs before check_video_playback,
+# so a file this fixed is not then complained about, and before
+# fill_image_dimensions, so what gets measured is the file the page will
+# carry.
+#
+# Off by default, and a failure is never a refusal -- see lib/video_remuxer.rb
+# for both reasons. Returns the original files a successful repack consumed,
+# for cleanup_incoming, exactly as the HEIC pass does.
+def remux_video_attachments(blocks, media_files, renamed = {})
+  return [] unless SiteConfig.get('media', 'remux_video', default: false) == true
+
+  candidates = media_files.keys.select do |src|
+    next false unless src && File.exist?(src) && MarkdownParser.video_path?(src)
+
+    File.extname(src).downcase == '.mov' || VideoProbe.faststart?(src) == false
+  end
+  return [] if candidates.empty?
+
+  unless VideoRemuxer.available?
+    puts t('cli.video_remux_no_tool', files: candidates.map { |src| File.basename(src) }.join(', '))
+    return []
+  end
+
+  @remux_tmpdir ||= begin
+    dir = Dir.mktmpdir('blog-sh-remux')
+    at_exit { FileUtils.remove_entry(dir) if Dir.exist?(dir) }
+    dir
+  end
+
+  candidates.filter_map do |src|
+    filename = media_files[src]
+    target = mp4_name(filename)
+    dest = File.join(@remux_tmpdir, target)
+    unless VideoRemuxer.remux(src, dest)
+      # Said, not refused: the video still plays for nearly everybody, and
+      # the sentence is the one the author would have had anyway.
+      #
+      # ⚠️ The command names the file the AUTHOR has -- IMG_4821.mov and
+      # IMG_4821.mp4 -- not the engine's 01.mov. They have never seen the
+      # second name and cannot type it at a file they do not have.
+      puts t('cli.video_remux_failed', file: File.basename(src),
+                                       command: VideoRemuxer.suggested_command(src, mp4_name(File.basename(src))))
+      next nil
+    end
+
+    media_files.delete(src)
+    media_files[dest] = target
+    # The number the media list gave the file is kept; only the extension
+    # follows the bytes -- and the blocks have to be told, or the markdown
+    # goes on naming a file the post no longer has.
+    blocks.each do |b|
+      media = (b['media'] || []).first
+      media['url'] = target if media && media['url'] == filename
+    end
+    puts t('cli.video_remuxed', file: File.basename(src), target: target)
+    renamed[dest] = File.basename(src)
+    src
+  end
 end
 
 # The one thing writing a post does over the network, and it is asked once
@@ -473,16 +557,26 @@ def resolve_embed_lookups(blocks)
   end
 end
 
+# Both carry +faststart, because both write a new file anyway and the
+# index may as well land at the front of it. A recorder has to write that
+# index last; a reader who waits for it waits for the whole download.
 def transcode_command(name)
-  "ffmpeg -i #{name.to_s.shellescape} -c:v libx264 -crf 23 -c:a copy #{mp4_name(name).shellescape}"
+  "ffmpeg -i #{name.to_s.shellescape} -c:v libx264 -crf 23 -c:a copy " \
+    "-movflags +faststart #{mp4_name(name).shellescape}"
 end
 
 def remux_command(name)
-  "ffmpeg -i #{name.to_s.shellescape} -c copy #{mp4_name(name).shellescape}"
+  "ffmpeg -i #{name.to_s.shellescape} -c copy -movflags +faststart #{mp4_name(name).shellescape}"
 end
 
+# ⚠️ Never the name it was handed. An HEVC video already in an .mp4 --
+# which is what a phone records when it is not writing .mov -- turned into
+# `ffmpeg -i klip.mp4 … klip.mp4`, and ffmpeg refuses to write its own
+# input. The suffix is only added where it is needed, so the .mov case
+# keeps the plain name it always had.
 def mp4_name(name)
-  "#{File.basename(name.to_s, File.extname(name.to_s))}.mp4"
+  base = File.basename(name.to_s, File.extname(name.to_s))
+  File.extname(name.to_s).downcase == '.mp4' ? "#{base}-web.mp4" : "#{base}.mp4"
 end
 
 # --- editor round-trip -------------------------------------------------
@@ -766,6 +860,62 @@ def hero_frontmatter_value(post)
   SITE_HERO ? true : nil
 end
 
+# A LINK CARD is the block a link post opens with -- the address it is
+# about, drawn as a card above whatever the post says about it. It has
+# never had a markdown form: the writer dropped it, so `edit` on such a
+# post offered to lose it, and `add <file>` could not make one at all.
+# That is why the release posts of this project stopped being link posts
+# after 1.3 -- the tool changed, not the intent.
+#
+# It lives in the FRONT MATTER rather than in the body, because it is a
+# property of the post and not a paragraph of it -- and because a
+# paragraph that is nothing but a link already means something else: an
+# ordinary link in ordinary prose, which round-trips exactly as it is.
+# Taking that shape for a card would have made the two indistinguishable.
+LINK_CARD_KEYS = %w[link link_title link_description].freeze
+
+# The block the front matter asks for, or nil. Refuses rather than guesses:
+# an address that is not one would render a card linking nowhere, and a
+# title or description with no address behind it is a line somebody
+# expected to see and will not.
+def link_card_from_frontmatter(meta)
+  url = meta['link'].to_s.strip
+  title = meta['link_title'].to_s.strip
+  description = meta['link_description'].to_s.strip
+  if url.empty?
+    return nil if title.empty? && description.empty?
+
+    refuse('bad_link', t('cli.link_without_url'))
+  end
+  refuse('bad_link', t('cli.link_not_http', url: url)) unless url.match?(%r{\Ahttps?://\S+\z}i)
+
+  block = { 'type' => 'link', 'url' => url }
+  block['title'] = title unless title.empty?
+  block['description'] = description unless description.empty?
+  block
+end
+
+# The card a post opens with, taken off the front of its content -- and
+# only off the front. A link block further down came from an import and
+# has no place in the header; it stays in the body, where the save's
+# content-loss guard still asks before markdown drops it.
+def split_link_card(content)
+  blocks = Array(content)
+  first = blocks.first
+  return [nil, blocks] unless first.is_a?(Hash) && first['type'] == 'link'
+
+  [first, blocks.drop(1)]
+end
+
+# A value on its way into the line-based front matter, made safe to put
+# there: every run of whitespace becomes one space. The text is not
+# damaged in any way a reader would notice -- a card description is a
+# sentence or two -- and the alternative is a header that means something
+# other than what the post says.
+def one_header_line(value)
+  value.to_s.gsub(/\s+/, ' ').strip
+end
+
 PAGE_TYPE = 'page'
 
 # `type: page` is how a page is written, because that is how it is thought
@@ -831,10 +981,26 @@ def tags_from_frontmatter(value)
 end
 
 def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
-                      unlisted: nil, series: nil, series_part: nil, toc: nil)
+                      unlisted: nil, series: nil, series_part: nil, toc: nil,
+                      link: nil, link_title: nil, link_description: nil)
   lines = ['---']
   lines << "title: #{title}"
   lines << "tags: #{tags}"
+  # Written out whenever the post has a card, so that saving cannot drop
+  # one: this header is what the post is rebuilt from, and a key left off
+  # it is a field deleted.
+  #
+  # ⚠️ One line each, whatever the post carries. This header is read line
+  # by line and split on the first colon -- it is not YAML, so there is no
+  # quoting to fall back on. An imported card whose description has a
+  # newline in it (Tumblr and Bluesky store the OpenGraph text as it came)
+  # would have written its second line as a header key of its own:
+  # "tags: film" in a description silently becomes the post's tags, and a
+  # line the parser does not know makes the post unsaveable until somebody
+  # deletes it by hand.
+  lines << "link: #{one_header_line(link)}" unless link.nil?
+  lines << "link_title: #{one_header_line(link_title)}" unless link_title.nil?
+  lines << "link_description: #{one_header_line(link_description)}" unless link_description.nil?
   # A page says so on the type line, which is where somebody looks to find
   # out what kind of thing they are editing -- and it is the only line it
   # needs, since a page's content type is never used.
@@ -973,9 +1139,34 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
     refuse('missing_images', t('cli.add_file_missing_images',
                                files: missing.map { |m| File.basename(m) }.join(', '), dir: INCOMING_DIR))
   end
+  # A RECEIPT is a name the sender chose for the answer, so it can come
+  # back and read it. The page at /write/ writes one into the markdown it
+  # sends; the build then leaves a small JSON file at an address computed
+  # from it, and the page asks for that address until it appears.
+  #
+  # Why the sender names it rather than the engine: the answer travels
+  # back through a shortcut and an address bar, and on a phone that road
+  # is broken in one specific way -- a page added to the home screen has
+  # its own storage, so the reply opens in the browser and never reaches
+  # the draft. A name the page knew BEFORE it sent anything is a road that
+  # does not depend on anything coming back.
+  #
+  # Sixteen hex characters, checked: it becomes a filename on the site, and
+  # a name from outside that is not checked is a path from outside.
+  receipt = meta['receipt'].to_s.strip
+  unless receipt.empty? || receipt.match?(/\A[0-9a-f]{16}\z/)
+    refuse('bad_receipt', t('cli.receipt_shape'))
+  end
+
+  # In front of the body, because that is where a link post's card belongs
+  # and because the title, when the post has none, is lifted off it.
+  card = link_card_from_frontmatter(meta)
+  blocks.unshift(card) if card
   heic_consumed = convert_heic_attachments(blocks, media_files)
-  check_attachment_sizes(media_files)
-  check_video_playback(media_files)
+  video_names = {}
+  heic_consumed += remux_video_attachments(blocks, media_files, video_names)
+  check_attachment_sizes(media_files, video_names)
+  check_video_playback(media_files, video_names)
   resolve_embed_lookups(blocks)
   fill_image_dimensions(blocks, media_files)
 
@@ -1038,6 +1229,7 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
     'source' => { 'platform' => 'manual' }
   }
   post['type'] = type if type
+  post['receipt'] = receipt unless receipt.to_s.empty?
   # Was not read here at all before: a page could only be made by editing
   # one into existence, never by writing one.
   post['page'] = true if page
@@ -1292,6 +1484,29 @@ end
 # owes an upload (Publishing leaves a .deploy-pending marker and the next
 # scheduled run finishes it), because that is the difference between "open
 # this URL now" and "open it shortly".
+# What a PUBLISHED post looks like to a program: the six keys `publish
+# --json` answers with, and the ones `add --json` answers with when the
+# file asked to be published. Every key is always present -- a caller that
+# has to test for a missing key is a caller writing its own parser.
+#
+# The draft answer is still built where it is printed, a few lines below,
+# and deliberately: its `url` is the draft's preview address rather than
+# the public one, and its `deploy` is what the rebuild it just ran
+# returned rather than what the marker file says afterwards. Two shapes,
+# one for a post that is out and one for a post that is not.
+def post_answer(path, warnings)
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  {
+    'slug' => post['slug'],
+    'path' => path,
+    'state' => post['state'],
+    'url' => SITE_BASE_URL.to_s.empty? ? '' : published_url(post['slug'], post_time!(post).year,
+                                                            page: PostAddress.page?(post)),
+    'deploy' => File.exist?(Publishing::DEPLOY_PENDING) ? 'pending' : 'done',
+    'warnings' => warnings
+  }
+end
+
 def report_added(path, warnings, json:, publish: false)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
 
@@ -1319,17 +1534,7 @@ def report_added(path, warnings, json:, publish: false)
     warnings += publish_warnings
     path = moved if moved
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
-    deployed = !File.exist?(Publishing::DEPLOY_PENDING)
-    if json
-      puts JSON.pretty_generate(
-        'slug' => post['slug'],
-        'path' => path,
-        'state' => post['state'],
-        'url' => SITE_BASE_URL.to_s.empty? ? '' : published_url(post['slug'], post_time!(post).year, page: PostAddress.page?(post)),
-        'deploy' => deployed ? 'done' : 'pending',
-        'warnings' => warnings
-      )
-    end
+    puts JSON.pretty_generate(post_answer(path, warnings)) if json
     return
   end
 
@@ -1866,8 +2071,13 @@ def find_post_path(slug, ask: true)
   # Guessing the oldest is what this method used to do for everybody, and
   # it acted on posts nobody had chosen.
   unless ask
-    abort t('cli.publish_yes_ambiguous', slug: slug,
-                                         years: matches.map { |m| File.basename(File.dirname(m)) }.join(', '))
+    # refuse, not abort: under --json this is an answer like any other,
+    # and an abort here escaped the whole contract -- prose on a stderr
+    # the phone throws away, and a status of 1 where the caller was
+    # promised an object and a zero. Without --json refuse IS abort.
+    refuse('ambiguous_slug',
+           t('cli.publish_yes_ambiguous', slug: slug,
+                                          years: matches.map { |m| File.basename(File.dirname(m)) }.join(', ')))
   end
 
   RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
@@ -2056,7 +2266,55 @@ end
 # loop as `add`/`edit`, so before a draft is actually sent out, it can still
 # be looked at one more time or sent back to editing. The actual publishing
 # only happens via the [p] choice in draft_decision_loop, which calls publish_draft.
-def cmd_publish(slug, yes: false, announce: true)
+# `publish <slug> --yes --json`: publishing with the answer as one object,
+# for the same callers `add --json` exists for -- a shortcut on a phone, a
+# cron job, a script. The phone is the reason it had to exist at all: a
+# post written there arrives as a draft, and until now the only way to put
+# it out was a terminal.
+#
+# --json without --yes is refused rather than assumed: without it the
+# draft dialog would be waiting for a keypress that a program is never
+# going to send, and a promise that the whole output is one object cannot
+# be kept by a run that stops to ask something.
+def cmd_publish(slug, yes: false, announce: true, json: false)
+  JSON_REFUSALS[:enabled] = json
+  return publish_as_json(slug, announce: announce) if json
+
+  publish_interactively(slug, yes: yes, announce: announce)
+end
+
+# The whole run under one refusal contract: anything that would have been
+# an abort with prose on stderr becomes an object with a code, and the
+# status stays 0 because the object IS the answer. iOS Shortcuts throws
+# away the output of a command that failed, which is the same reason
+# `add --json` leaves with zero.
+def publish_as_json(slug, announce: true)
+  path = find_post_path(slug, ask: false)
+  refuse('not_found', t('cli.post_not_found', slug: slug)) unless path
+
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  unless draft?(post)
+    # Not a failure of the machine and not a success of the request: the
+    # post is out, and the caller asked for something that has already
+    # happened. Named so a phone can say so in its own words.
+    refuse('already_published',
+           t('cli.already_published', slug: slug,
+                                      url: published_url(slug, post_time!(post).year,
+                                                         page: PostAddress.page?(post))))
+  end
+
+  moved, warnings = begin
+    quietly(true) { publish_draft(slug, path: path, announce: announce, asked: false) }
+  rescue SystemExit => e
+    refuse('publish_refused', e.message.to_s)
+  end
+  puts JSON.pretty_generate(post_answer(moved || path, warnings))
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
+end
+
+def publish_interactively(slug, yes: false, announce: true)
   # ask: false is --yes. find_post_path ASKS when a slug lives in more
   # than one year -- backdating makes that ordinary, and the picker is a
   # full-screen menu -- and under --yes there is nobody to work it: on a
@@ -4014,6 +4272,7 @@ def edit_post(slug, path: nil)
   media_dir = File.join(MEDIA_DIR, year, slug)
 
   date = post_time!(post)
+  edited_card, = split_link_card(post['content'])
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
     tags: tags_to_frontmatter(post['tags']),
@@ -4042,9 +4301,18 @@ def edit_post(slug, path: nil)
     # new post suggests every post needs an answer, and almost none do.
     series: post['series'].to_s.strip.empty? ? nil : post['series'].to_s.strip,
     series_part: post['series_part'],
-    toc: post['toc'].nil? ? nil : truthy_frontmatter?(post['toc'])
+    toc: post['toc'].nil? ? nil : truthy_frontmatter?(post['toc']),
+    # Only for a post that opens with one, and then all three lines,
+    # because the header is what the save rebuilds from.
+    link: edited_card&.fetch('url', nil),
+    link_title: edited_card && edited_card['title'].to_s,
+    link_description: edited_card && edited_card['description'].to_s
   )
-  body = MarkdownWriter.blocks_to_markdown(post['content'], media_dir)
+  # The card is in the header above, so the body is what is left after it.
+  # Handing the whole content to the writer would drop the card on the
+  # floor -- markdown has no form for it -- and the save would then ask
+  # whether to lose the thing the author never touched.
+  body = MarkdownWriter.blocks_to_markdown(split_link_card(post['content']).last, media_dir)
 
   # Recovery is offered per post, not per command: text left over from
   # `edit <this slug>` continues here, text from anything else is named
@@ -4078,9 +4346,13 @@ def edit_post(slug, path: nil)
 
   blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
   wait_for_missing_images(missing)
+  new_card = link_card_from_frontmatter(meta)
+  blocks.unshift(new_card) if new_card
   heic_consumed = convert_heic_attachments(blocks, media_files)
-  check_attachment_sizes(media_files)
-  check_video_playback(media_files)
+  video_names = {}
+  heic_consumed += remux_video_attachments(blocks, media_files, video_names)
+  check_attachment_sizes(media_files, video_names)
+  check_video_playback(media_files, video_names)
   fill_image_dimensions(blocks, media_files, media_dir)
   restore_posters(blocks, post['content'])
   restore_media_src(blocks, post['content'])
@@ -4108,8 +4380,15 @@ def edit_post(slug, path: nil)
       spans.each { |f| h["#{f['type']} span"] += 1 }
     end
   end
-  before = counts.call(post['content'])
-  after = counts.call(blocks)
+  # ⚠️ The card the header just created does not stand in for one the body
+  # dropped. Counting by type alone, an edit that ADDS `link:` to a post
+  # whose second link block markdown cannot write keeps the total at one
+  # and says nothing -- the post loses the imported card silently, which
+  # is the exact failure this guard exists to prevent. So the comparison
+  # is made on the blocks as the editor saw them: without the card that
+  # was lifted into the header, and without the one put back from it.
+  before = counts.call(split_link_card(post['content']).last)
+  after = counts.call(new_card ? blocks.drop(1) : blocks)
   lost = before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
   if lost.any?
     puts
@@ -5746,8 +6025,12 @@ else
   when 'publish'
     yes = !ARGV.delete('--yes').nil?
     announce = ARGV.delete('--no-announce').nil?
+    json = !ARGV.delete('--json').nil?
     unknown = ARGV.find { |arg| arg.start_with?('--') }
     abort t('cli.publish_unknown_option', option: unknown) if unknown
+    # An object for an answer means nobody is watching, and the dialog
+    # this skips is the only thing that would ask.
+    abort t('cli.publish_json_needs_yes') if json && !yes
     # --no-announce on its own still shows the dialog; it only says what
     # [p] must not do when it gets there. Refusing the combination would
     # be refusing "let me look first, and keep it off Mastodon".
@@ -5760,7 +6043,7 @@ else
     abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
 
     slug ||= pick_draft_interactively
-    cmd_publish(slug, yes: yes, announce: announce)
+    cmd_publish(slug, yes: yes, announce: announce, json: json)
   when 'schedule'
     slug = ARGV.shift || pick_draft_interactively
     cmd_schedule(slug)

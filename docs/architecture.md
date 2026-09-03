@@ -132,8 +132,11 @@ see it:
   renders a stored post back into editable markdown for `blog.sh edit`.
   The output is always re-parseable, though ties between overlapping
   formatting spans may come out normalized. Content markdown can't
-  express (imported embeds, link cards) is protected by a count-based
-  loss check in the CLI before saving.
+  express (imported embeds; a link card anywhere but the first block) is
+  protected by a count-based loss check in the CLI before saving. The
+  card a post OPENS with is the exception: the CLI lifts it into the
+  front matter as `link:`/`link_title:`/`link_description:` and puts it
+  back on the way in, so it round-trips through the editor untouched.
 - The count-based check compares block types, so it sees a block that
   disappeared but not an attribute that did. Where an attribute has no
   markdown form and cannot be re-typed by the author -- a video's imported
@@ -293,8 +296,9 @@ Three details carry the design:
   with it. The exporter therefore dumps through Psych with
   `line_width: -1` (a folded long title is valid YAML and unreadable).
 - **Blocks markdown cannot write down become HTML, and get counted.**
-  `MarkdownWriter` drops what it has no syntax for -- the link card, an
-  imported embed with no recognisable address -- which is correct for
+  `MarkdownWriter` drops what it has no syntax for -- a link card that is
+  not the post's first block, an imported embed with no recognisable
+  address -- which is correct for
   `edit`, where the CLI's loss guard stands behind it, and wrong for an
   export. So the exporter renders block by block (the writer keeps no
   state between blocks, so this is equivalent) and gives anything that
@@ -463,10 +467,16 @@ A single linear pass, no framework:
    a digest of every file `emit` wrote. A page whose key still matches is
    not rendered; a file whose digest still matches costs one `stat`
    instead of a read-back. The whole record is keyed to a fingerprint of
-   `templates/`, `lib/`, `build/`, `locales/`, `assets/` and `config/`,
-   plus the facts the build works out for itself (the menu, the types
-   present, the page size), so a template edit or a new menu item throws
-   it away. The cache is an optimisation and never an authority: anything
+   `templates/`, `lib/`, `build/`, `locales/` and `config/`, plus the
+   facts the build works out for itself (the menu, the types present, the
+   page size), so a template edit or a new menu item throws it away.
+   `assets/` is deliberately not among them: a page links a stylesheet, a
+   script and a favicon rather than carrying their bytes, and there is no
+   `?v=` on those links, so nothing under `assets/` can change a rendered
+   page. Assets have their own path -- `emit_copy` compares them byte for
+   byte on every build, before the cache is opened -- and `colors.css`,
+   the one asset a page's own colours come from, is generated out of
+   `config/`, which IS in the fingerprint. The cache is an optimisation and never an authority: anything
    it cannot vouch for is rendered and compared the old way, and `--full`
    believes none of it while still recording what it wrote.
 5. **Render.** Per-post pages, then listings: homepage, per-tag,

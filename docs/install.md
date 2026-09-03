@@ -29,6 +29,10 @@ site on the internet.
   (libheif-examples), ImageMagick with the HEIF delegate, or vips.
   Without one, the engine refuses the file with instructions instead of
   breaking; off by default.
+- Optional, only with `media.remux_video: true` (moving a video's index to
+  the front of the file, and out of the QuickTime container, on save):
+  **ffmpeg**. Without it the post is still saved and the engine names the
+  command instead; off by default.
 
 ## Quick start
 
@@ -215,7 +219,7 @@ The example is fully commented. The short version:
   `publishing.slots` (the times posts usually go out, so scheduling stops
   asking for a date --
   [operations.md](operations.md#publishing-slots)),
-  `media` (`convert_heic` and `strip_location`, both discussed under
+  `media` (`convert_heic`, `remux_video` and `strip_location`, all discussed under
   [Writing from a phone](operations.md#writing-from-a-phone)),
   `tag_icons` (an icon a tag carries, on its own listing and on the date
   badge of every post that has it --
@@ -247,9 +251,12 @@ mistake `doctor` names and the build reads as empty, rather than a
 traceback out of an engine file.
 
 `social` is the row of icons in the footer. Each entry takes `name`,
-`url` and either `icon` (a name from the built-in set: mastodon, pixelfed,
-linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky, instagram,
-threads, facebook, x, youtube, rss, email) or `icon_svg`
+`url` and either `icon` (a name from the built-in set: the network marks
+mastodon, pixelfed, linkedin, github, gitea, forgejo, codeberg, gitlab,
+bluesky, instagram, threads, facebook, x, youtube, rss, email -- or any
+of the general drawings the engine ships for tag icons, `globe` for
+somebody's other site among them, [listed in
+operations.md](operations.md#giving-a-tag-its-own-icon)) or `icon_svg`
 (your own markup), plus an optional `rel` that is passed through to the
 rendered link. `rel: "me"` on the Mastodon entry is what gets your site
 verified -- the green check mark next to it on your profile: Mastodon

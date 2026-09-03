@@ -21,7 +21,8 @@ no database, no admin server, no PHP.
 publishing its own documentation -- every page there was built and
 deployed by `./blog.sh` itself.
 
-MIT licensed (see [LICENSE](LICENSE)).
+MIT licensed (see [LICENSE](LICENSE)); the fonts and brand marks it
+ships belong to other people, and [NOTICE](NOTICE) says who.
 
 > **Who it's for:** one person writing their own blog, at home in a
 > terminal, who wants to own the whole archive -- including everything
@@ -143,7 +144,10 @@ shortcut or a script; `--json` turns its answer into one object.
 over one SSH connection, nothing new listening on the network -- and
 `write: true` publishes a page at `/write/` to write the post on, with
 the tags the blog already uses and a preview in the blog's own
-stylesheets.
+stylesheets. The post arrives as a draft; the page then says what became
+of it -- it asks the blog, rather than only waiting to be told -- and
+offers to publish it, which sends one more file down the same
+connection.
 → [operations.md → A post sent from the phone itself](docs/operations.md#a-post-sent-from-the-phone-itself)
 
 **Markdown.** One parser (`lib/markdown_parser.rb`), shared by the build
@@ -338,7 +342,10 @@ iCloud doesn't exist, it's just a name.
   iPhone HEIC photos to JPEG on save), an image tool the machine
   typically already has: `sips` (built into macOS), `heif-convert`,
   ImageMagick or vips. Off by default; without a tool the engine refuses
-  the file with instructions instead of breaking
+  the file with instructions instead of breaking. `media.remux_video`
+  (repacking a phone video so it starts playing before it has finished
+  downloading) asks for ffmpeg in the same spirit: off by default, and
+  without it the post is saved anyway
 
 ## Getting started
 
@@ -407,9 +414,10 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
                                # --untrusted refuses a picture reference that is not a bare filename
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
 ./blog.sh props [<slug>]       # a post's state + actions (publish, rename the slug, delete...)
-./blog.sh publish [<slug>] [--yes] [--no-announce]
+./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                # shows the draft's preview, asks what's next;
-                               # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky
+                               # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky;
+                               # --json (with --yes) answers as one object, for a script or a phone
 ./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/

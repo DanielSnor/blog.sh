@@ -337,6 +337,27 @@ Post, jehož text je jen krátká věta plus přílohy, spadne pod
 **Dokumenty**; delší článek, který k sobě přibalí data, zůstává článkem
 s přílohou.
 
+## Karta odkazu
+
+Post může BÝT O nějaké adrese — o vydání, o cizím článku, o stránce, na
+kterou chceš ukázat. To je karta nad textem, ne řádek v něm, takže se
+píše do hlavičky, ne do těla:
+
+```
+---
+tags: release
+link: https://example.com/o-cem-to-je
+link_title: O čem to je
+---
+
+A tady je, co si o tom myslím.
+```
+
+`link_title` a `link_description` jsou slova na kartě, obojí
+nepovinné; bez vlastního `title:` se post jmenuje podle karty. Odstavec,
+který je jen odkaz, zůstává tím, čím vypadá — obyčejným odkazem
+v obyčejném textu.
+
 ## Escapování
 
 Když chcete napsat znak, který má v markdownu význam, předsaďte mu zpětné lomítko.

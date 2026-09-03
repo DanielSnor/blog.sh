@@ -4,7 +4,7 @@
 #   ./blog.sh add [<file>] [--json]
 #   ./blog.sh edit [<slug>]
 #   ./blog.sh props [<slug>]
-#   ./blog.sh publish [<slug>] [--yes] [--no-announce]
+#   ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
 #   ./blog.sh unpublish [<slug>]
 #   ./blog.sh delete [<slug>]
 #   ./blog.sh restore [<slug>]

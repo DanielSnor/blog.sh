@@ -63,6 +63,14 @@ already carries, so each can be read as well as changed:
   as "a typo, or the first part?" -- so a misspelling doesn't quietly
   found a second series. `check` catches the older ones
   ([below](#checking-the-archive)).
+- **`link:`** gives the post a link card: the address it is about, drawn
+  above the text. `link_title:` and `link_description:` are the words on
+  it, and a post with no `title:` of its own is named by the card. It is a
+  header key rather than a line in the body because a paragraph that is
+  only a link already means something else -- an ordinary link in ordinary
+  prose -- and because the card belongs to the post, not to a paragraph of
+  it. `edit` writes all three lines back out, so a save cannot drop a card
+  the author never touched.
 - **`publish: yes`** publishes the post the moment `add <file>` writes
   it -- the date settled, the announcement sent, the site rebuilt -- the
   road `publish <slug> --yes` takes at a desk. It is the one key only the
@@ -286,8 +294,26 @@ player), or that it is a QuickTime `.mov` (the video inside is usually
 ordinary H.264, but not every browser accepts the container). Both come
 with the `ffmpeg` command that fixes them -- re-encoding for the codec,
 repacking for the container, which copies the video across untouched.
+A third line is about neither: a video whose index sits at the end of the
+file, which is where a recorder has to put it, and which makes a reader
+wait for the whole download before the first frame appears. The same
+repack moves it to the front.
+
+`media: remux_video: true` has the engine do that repack itself, when
+`ffmpeg` is on the machine -- index to the front, `.mov` to `.mp4`, the
+picture and the sound copied across untouched, about a second for a phone
+video. It is off by default, like the HEIC conversion, because it shells
+out to a tool the engine does not ship. Unlike the HEIC conversion it
+never refuses: no `ffmpeg`, or a repack that will not go through, and the
+post is saved with the file as it arrived and the sentence the author
+would have had anyway. A video in the wrong wrapper still plays for
+nearly everybody; a HEIC photo does not.
+
 The post is saved either way; the only hard stop for a video is the
-per-file size limit, and a long 4K clip reaches that on its own.
+per-file size limit, and a long 4K clip reaches that on its own -- a
+phone clip out of the share sheet runs about 1.3 MB a second, so the
+24 MB default is roughly seventeen seconds of it. A longer one wants a
+smaller size chosen in the shortcut's own Encode Media step.
 
 ### Handing over a whole file
 
@@ -330,7 +356,12 @@ front of the world* -- publishing stays a second command:
 ./blog.sh publish <slug> --yes
 ```
 
-`--yes` answers the draft dialog with "publish" in advance.
+`--yes` answers the draft dialog with "publish" in advance. `--json`,
+which needs `--yes` beside it, prints the same object `add --json` does --
+`slug`, `path`, `state`, `url`, `deploy`, `warnings` -- or a refusal with
+its reason as a code (`not_found`, `already_published`, `publish_refused`),
+and leaves with **zero** either way, for the reason `add` does: a phone
+throws away the output of a command that failed.
 `--no-announce` publishes the page and sends nothing to Mastodon or
 Bluesky; it works with or without `--yes`, and because nothing was
 attempted, `./blog.sh toot <slug>` can still send the announcement by
@@ -529,6 +560,34 @@ from a keyboard, and a refusal in the reader's language where the page
 knows the code, in the server's own words where it does not. A post the
 server took is cleared from the device; a refusal keeps everything, so
 it can be mended and sent again.
+
+**And the page asks, as well as waiting.** That road back has one break
+in it that nothing on this end can mend: a page kept on a phone's home
+screen runs with storage of its own, so a reply that arrives as a URL
+opens in the browser, where the draft it is about does not exist -- and
+the draft stays on the home-screen copy, looking unsent. So the page
+picks a name for its answer before it sends anything (`receipt:`, sixteen
+hexadecimal characters, written into the markdown), and the build leaves
+a small JSON file at `/write/r/<receipt>.json` saying the slug, the
+state, the title and the address. The page asks for it every three
+seconds for five minutes, and says so if it never comes. Whichever
+answer arrives first is the one that is shown.
+
+The file is written by the BUILD, which is what keeps it true: publish
+the post and the next build says published and gives the public address;
+delete the post and nothing generates the file, so the sweep takes it
+away. It exists only on a site that serves the page, and only for a post
+that asked for one.
+
+**Publishing from the phone.** The answer for a draft carries a Publish
+button, and it sends one file called `publish.txt` holding the slug --
+down the same connection, through the same two shortcuts. The receiver
+knows that shape: exactly one file, called that, and it runs
+`publish <slug> --yes --json` rather than storing anything. The slug is
+checked as hard as a filename is, because it becomes an argument to a
+command: a leading dash is a flag, and anything outside a slug's own
+alphabet is refused here rather than explained by whatever it hits. The
+page then asks the same receipt again until it says published.
 
 One connection carries the post however many photographs are in it, which
 is the point: connections are the scarce thing, not bytes. The first run
@@ -931,8 +990,27 @@ given FIRST is usually the one an importer added, not a subject: `twitter`
 opens 1256 posts there. So the first entry in this list that a post has is
 the one it wears, and the site owner decides once instead of post by post.
 
-`icon` names one of the eight the engine ships: text, quote, chat, image,
-video, audio, link, document. `icon_svg` is your own drawing, on the same
+`icon` names one the engine ships. Eight of them are the content types
+themselves -- text, quote, chat, image, video, audio, link, document --
+and the rest are the things blogs are about:
+
+| | |
+|---|---|
+| getting about | `bike` `car` `train` `plane` `boat` `walk` |
+| places and weather | `map` `pin` `mountain` `tree` `sun` `cloud` `rain` `snow` |
+| a day | `coffee` `beer` `food` `wine` `clock` `calendar` `home` `heart` `star` `gift` |
+| making things | `pen` `brush` `camera` `film` `mic` `music` `book` `tools` `hammer` |
+| machines | `laptop` `phone` `code` `terminal` `server` `bug` `lock` `key` |
+| living things | `paw` `bird` `leaf` `flower` |
+| ideas | `bulb` `flag` `globe` `eye` `chart` `target` `rocket` `mail` `briefcase` `box` |
+
+They are line drawings on the same grid as the eight, so a badge wearing
+one looks like a badge. `doctor` prints the whole list when a name is not
+among them, which is usually a synonym away -- `bicycle` for `bike`. A
+footer link in `social:` can wear one too, where the network marks have
+nothing to offer: `icon: globe` for somebody's other site.
+
+`icon_svg` is your own drawing, on the same
 24-unit grid (`viewBox="0 0 24 24"`) and stroked in `currentColor` so it
 follows the light and dark themes. Scripts, styles and event handlers are
 stripped out of it before it reaches a page -- the same treatment an
@@ -1014,7 +1092,9 @@ What it looks for, each with a line saying what to do about it:
   included -- usually an import whose download failed. The page renders
   a hole. A file that is there and useless -- empty, unreadable, or a
   folder under the picture's name -- is reported the same way, with a
-  sentence that says which it is.
+  sentence that says which it is; and a video whose index sits at the end
+  of the file is noted, since it plays but makes every reader wait for the
+  whole download before the first frame.
 - **Images stored as 1px or smaller.** The build treats those as tracking
   pixels and drops them *together with their caption*, so the page loses
   both without saying so.
@@ -1242,10 +1322,10 @@ change every page; so does changing `SITE_BASE_URL`, and so does a change
 of timezone -- including the one that happens without you touching
 anything, when a system update rewrites the rules of the zone you publish
 in. A stylesheet is the exception worth knowing: pages link it rather than
-embed it, so editing one changes the stylesheet and nothing else on the
-site. The build after it still renders every page once, because the
-record is keyed to the engine's files and the stylesheet is one of them,
-and it finds nothing new to upload but the one file.
+embed it, so editing one changes the stylesheet and nothing else -- the
+build skips every page it would have rebuilt and the deploy sends the one
+file. The palette in `site.yml` is not that case, since the stylesheet it
+generates and the theme colour in every page's head both come from it.
 
 ```bash
 ./blog.sh rebuild --full        # build every page again, then deploy

@@ -9,6 +9,7 @@ require 'yaml'
 # NoMethodError just as happily.
 require 'time'
 require_relative 'site_config'
+require_relative 'icons'
 require_relative 'i18n'
 require_relative 'media_dimensions'
 require_relative 'exif_location'
@@ -1070,7 +1071,10 @@ module Doctor
     entries = SiteConfig::Chrome.list(data, 'tag_icons')
     return [] if entries.empty?
 
-    known = %w[text quote chat image video audio link document]
+    # Sixty-odd names on one line is a wall, and this message exists to be
+    # read at the moment somebody typed a name that is nearly right --
+    # `bicycle` for `bike`. Eight to a row, indented under the sentence.
+    known = Icons::NAMES.each_slice(8).map { |row| row.join(', ') }.join(",\n     ")
     findings = entries.filter_map do |entry|
       next warn(I18n.t('doctor.tag_icon_shape')) unless entry.is_a?(Hash)
       next warn(I18n.t('doctor.tag_icon_no_tag')) if entry['tag'].to_s.strip.empty?
@@ -1086,9 +1090,9 @@ module Doctor
         # copied from somewhere, and its owner is the one person who can
         # decide whether to keep using that source.
         next warn(I18n.t('doctor.tag_icon_stripped', tag: tag)) if Embed.without_scripts(svg) != svg
-      elsif !known.include?(entry['icon'].to_s)
+      elsif !Icons.find(entry['icon'])
         next warn(I18n.t('doctor.tag_icon_unknown', tag: tag, icon: entry['icon'].to_s,
-                                                    known: known.join(', ')))
+                                                    known: known))
       end
       nil
     end
@@ -1129,10 +1133,15 @@ module Doctor
 
     icon = entry['icon'].to_s
     return warn(I18n.t('doctor.social_icon_missing', name: name)) if icon.empty?
-    return nil if SocialIcons::NAMES.include?(icon)
+    return nil if SocialIcons::NAMES.include?(icon) || Icons.find(icon)
 
+    # ⚠️ Both sets, because both are now accepted. Listing only the brand
+    # marks told somebody who asked for `globe` -- which the engine draws
+    # -- to go and write their own SVG for it.
     warn(I18n.t('doctor.social_icon_unknown', name: name, icon: icon,
-                                              known: SocialIcons::NAMES.join(', ')))
+                                              known: (SocialIcons::NAMES + Icons::NAMES)
+                                                     .each_slice(8).map { |row| row.join(', ') }
+                                                     .join(",\n     ")))
   end
 
   # A share list naming something the engine cannot draw is dropped in

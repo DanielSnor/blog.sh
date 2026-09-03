@@ -338,6 +338,28 @@ Ein Beitrag, dessen Text nur eine kurze Zeile plus Anhänge ist, landet
 unter **Dokumente**; ein ganzer Artikel, der seine Daten anhängt, bleibt
 ein Artikel mit Anhang.
 
+## Die Linkkarte
+
+Ein Beitrag kann VON einer Adresse handeln -- von einer Version, einem
+fremden Artikel, einer Seite, auf die du zeigen willst. Das ist eine
+Karte über dem Text, keine Zeile darin, also steht sie im Kopf und nicht
+im Körper:
+
+```
+---
+tags: release
+link: https://example.com/worum-es-geht
+link_title: Worum es geht
+---
+
+Und hier ist, was ich davon halte.
+```
+
+`link_title` und `link_description` sind die Worte auf der Karte, beide
+optional; ohne eigenes `title:` heißt der Beitrag wie die Karte. Ein
+Absatz, der nur ein Link ist, bleibt, wonach er aussieht -- ein
+gewöhnlicher Link in gewöhnlichem Text.
+
 ## Escaping
 
 Um ein Zeichen zu schreiben, das in Markdown etwas bedeutet, stell ihm einen Backslash voran.

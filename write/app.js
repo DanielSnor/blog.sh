@@ -100,11 +100,15 @@
   // listen for the server's reply: the form stood empty, the buttons
   // wore their labels, and the reply that arrived went nowhere.
   function sane(saved) {
-    var out = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
+    var out = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
     if (!saved || typeof saved !== "object") return out;
     ["title", "body", "tags"].forEach(function (k) { if (typeof saved[k] === "string") out[k] = saved[k]; });
     out.publish = saved.publish === true;
     out.sentAt = typeof saved.sentAt === "number" ? saved.sentAt : 0;
+    // Sixteen hex characters or nothing: it is written into the markdown
+    // and becomes a filename on the blog, so a stored draft is not
+    // allowed to talk this page into asking for some other address.
+    out.receipt = /^[0-9a-f]{16}$/.test(saved.receipt) ? saved.receipt : "";
     if (Array.isArray(saved.shots)) {
       out.shots = saved.shots.filter(function (shot) {
         return shot && typeof shot === "object" && typeof shot.name === "string" && shot.name;
@@ -442,6 +446,11 @@
     // straight out is written down -- and the blog reads it the way it
     // reads `publish <slug> --yes` at a desk: published, and announced.
     if (state.publish) lines.push("publish: yes");
+    // The name this page will ask the answer by. Written into the post
+    // rather than waited for, because the road a reply takes back -- a
+    // shortcut opening a URL -- does not reach a page kept on the home
+    // screen, which has storage of its own. See askReceipt below.
+    if (state.receipt) lines.push("receipt: " + state.receipt);
     // A body that itself opens with --- would be read as front matter by
     // the engine; an empty header in front of it keeps it a body.
     if (!lines.length) return /^---(\n|$)/.test(state.body) ? "---\n---\n\n" : "";
@@ -836,7 +845,7 @@
     clearTimeout(btn._armTimer);
     btn.dataset.arm = ""; btn.textContent = t("app.discard");
     clearTimeout(saveTimer);
-    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
+    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
     try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
     forget(bytesClear());
     render();
@@ -885,6 +894,10 @@
     }
     this.dataset.anyway = "";
     say(t("app.handing").replace("{what}", describeBatch(batchSize())));
+    // Minted before the files are built, because it is written INTO the
+    // markdown they carry. A fresh one per send: an answer belongs to the
+    // post that asked for it.
+    state.receipt = newReceipt();
     var files;
     try { files = buildFiles(); } catch (e) {
       // A picture whose stored bytes will not decode. Said, rather than
@@ -907,7 +920,7 @@
       // enough that the MDN example itself carries the workaround
       // (mdn/content#32019): the files go, everything else is dropped.
       navigator.share({ files: files })
-        .then(function () { say(t("app.bundle_note"), "good"); })
+        .then(function () { say(t("app.bundle_note"), "good"); askReceipt(state.receipt, false); })
         .catch(function (err) {
           // ⚠️ AbortError is the NORMAL end of this path, not a failure.
           // A share-sheet shortcut that hands the run over to the
@@ -917,7 +930,11 @@
           // error also means the person closed the sheet, and the page
           // cannot tell the two apart. So the message claims neither:
           // it says the files left, and where the answer is.
-          if (err && err.name === "AbortError") { say(t("app.share_cancelled"), "good"); return; }
+          if (err && err.name === "AbortError") {
+            say(t("app.share_cancelled"), "good");
+            askReceipt(state.receipt, false);
+            return;
+          }
           try { download(buildBundle()); } catch (e2) { say(t("app.picture_failed"), "bad"); }
         });
     } else {
@@ -925,11 +942,14 @@
     }
   });
 
-  function download(blob) {
+  // The name matters as much as the bytes: the receiver decides what a
+  // delivery IS by the name of the file in it, so a saved publish request
+  // called post.zip is not a publish request at all.
+  function download(blob, name) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "post.zip";
+    a.download = name || "post.zip";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1491,8 +1511,33 @@
       }
       if (post.deploy === "pending") add("p", t("app.result_pending"));
       if (!open) {
-        // No button for it here, on purpose: publishing is a decision the
-        // desk makes with the preview open, and the command is one line.
+        // A button for it, now that there is a road: one file holding the
+        // slug, down the same connection the post took. It appears only
+        // where the answer came back with a receipt to ask by -- which
+        // means the post was sent from THIS page and the blog is the one
+        // that answered.
+        // Either the answer was fetched by receipt (and names the slug it
+        // was about), or it came through the address bar on a page that
+        // had just sent something -- in which case the answer IS about
+        // what this page sent, and the receipt is the one it sent with.
+        var by = lastAnswer && (lastAnswer.slug === null || lastAnswer.slug === post.slug)
+          ? lastAnswer.receipt : "";
+        if (by) {
+          var go = document.createElement("button");
+          go.type = "button";
+          // The same class the Send button wears: this is the one action
+          // the answer offers, and a bare button in a card reads as a
+          // link that failed to become one.
+          go.className = "btn small";
+          go.textContent = t("app.publish_now");
+          go.addEventListener("click", function () {
+            go.disabled = true;
+            publishFromPhone(post.slug, by);
+          });
+          add("p").appendChild(go);
+        }
+        // And the line for a desk, which is still where most of this is
+        // done and where the preview is easier to read.
         var code = document.createElement("code");
         code.textContent = "./blog.sh publish " + post.slug;
         add("p", t("app.result_publish_hint") + " ", "meta").appendChild(code);
@@ -1542,7 +1587,7 @@
     // on arrival.
     if (post && state.sentAt) {
       clearTimeout(saveTimer);
-      state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
+      state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
       try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
       forget(bytesClear());
       render();
@@ -1557,10 +1602,136 @@
     try { return new URL(url).origin === location.origin; } catch (e) { return false; }
   }
 
+  // ---------------------------------------------------------------- asking
+  //
+  // The answer can also be FETCHED, and on a phone it usually has to be.
+  // A page added to the home screen runs as an app with storage of its
+  // own; the reply arrives as a URL, which opens in the browser, where
+  // the draft it is about does not exist. So the page picks a name for
+  // its answer before it sends anything, writes that name into the post,
+  // and afterwards asks the blog for a small file at an address made of
+  // it. The reply through the address bar still works and still wins --
+  // this is the road that does not depend on anything coming back.
+  var pending = null;
+
+  function newReceipt() {
+    var bytes = new Uint8Array(8);
+    if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
+    else for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    return Array.prototype.map.call(bytes, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+  }
+
+  // Asks every three seconds for five minutes. The build writes the file,
+  // so the wait is a build and a deploy of the blog -- seconds on a small
+  // one, a minute on a large one -- and a post sent over a slow
+  // connection can take longer than either. It stops asking when the file
+  // says what it was waiting to hear, and says so if it never does: a
+  // page that gave up in silence would be indistinguishable from a post
+  // that never arrived.
+  function askReceipt(receipt, wantPublished) {
+    if (!/^[0-9a-f]{16}$/.test(receipt)) return;
+    if (pending && pending.timer) clearTimeout(pending.timer);
+    pending = { receipt: receipt, until: Date.now() + 5 * 60 * 1000, timer: 0, published: !!wantPublished };
+    tick();
+
+    function again() {
+      if (pending && pending.receipt === receipt) pending.timer = setTimeout(tick, 3000);
+    }
+
+    function tick() {
+      if (!pending || pending.receipt !== receipt) return;
+      if (Date.now() > pending.until) {
+        pending = null;
+        say(t("app.answer_late"), "bad");
+        return;
+      }
+      // Same origin, and a name this page made: the address cannot come
+      // from anywhere else, so there is nothing here for a crafted link
+      // to reach.
+      fetch("r/" + receipt + ".json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (o) {
+          if (!o || typeof o.slug !== "string") { again(); return; }
+          if (wantPublished && o.state !== "published") { again(); return; }
+
+          pending = null;
+          lastAnswer = { slug: o.slug, receipt: receipt, state: o.state };
+          showAnswer(describeAnswer([o]), JSON.stringify(o));
+        })
+        .catch(function () { again(); });
+    }
+  }
+
+  // What the last answer was about, kept out of the draft state on
+  // purpose: showing an answer CLEARS the draft, and the Publish button
+  // that answer carries needs the slug after that has happened.
+  var lastAnswer = null;
+
+  // Publishing from the phone: one file called publish.txt holding the
+  // slug, down the same road the post itself took. The receiver knows
+  // that shape and runs `publish <slug> --yes --json` for it -- which is
+  // the one thing a phone could not do at all, because publishing lived
+  // in a dialog and a phone has no terminal to answer one.
+  function publishFromPhone(slug, receipt) {
+    var file;
+    try {
+      file = new File([slug], "publish.txt", { type: "text/plain" });
+    } catch (e) {
+      say(t("app.publish_failed"), "bad");
+      return;
+    }
+    function sent() {
+      say(t("app.publish_sent"), "good");
+      // The same receipt, asked again until it says published: the build
+      // rewrites that file when the post goes out.
+      askReceipt(receipt, true);
+    }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] })
+        .then(sent)
+        // AbortError is the ordinary end of a share that handed over to
+        // the Shortcuts app, exactly as it is for the post itself.
+        .catch(function (err) {
+          if (err && err.name === "AbortError") { sent(); return; }
+          say(t("app.publish_failed"), "bad");
+        });
+    } else {
+      // No share sheet -- a desk, mostly. The file still has to reach the
+      // shortcut, and its NAME is the whole signal, so it is saved under
+      // that name and the page says what is left to do rather than
+      // claiming the request has gone.
+      try {
+        download(new Blob([slug], { type: "text/plain" }), "publish.txt");
+        say(t("app.publish_saved"), "good");
+      } catch (e2) { say(t("app.publish_failed"), "bad"); }
+    }
+  }
+
+  // A page reopened while an answer is still on its way picks the asking
+  // back up: the receipt is in the draft, and the draft survives a
+  // reload. Only for a draft that was actually SENT -- a receipt with no
+  // send behind it is a name for an answer nobody is coming to give.
+  function resumeAsking() {
+    if (!state.receipt || !state.sentAt) return;
+    // Five minutes from the send, not from the reload, so a page opened
+    // an hour later does not sit there asking about a post whose answer
+    // was read long ago.
+    if (Date.now() - state.sentAt > 5 * 60 * 1000) return;
+
+    askReceipt(state.receipt, false);
+  }
+
   function answerFromAddress() {
     var raw;
     try { raw = answerIn(location.href); } catch (e) { raw = null; }
     if (raw === null) return;
+
+    // The receipt this page sent with the post, remembered before
+    // showAnswer clears the draft it lives in. Without this the Publish
+    // button appeared only when the answer had been FETCHED -- and the
+    // fetch exists because the reply through the address bar is the road
+    // that does not always arrive, not because it is the rare one.
+    if (state.receipt && state.sentAt) lastAnswer = { receipt: state.receipt, slug: null };
     // Off the address FIRST: whatever showing it does, a reload or a
     // bookmark must not clear a new draft against an old answer.
     try { history.replaceState(null, "", location.pathname); } catch (e) { /* file:, maybe */ }
@@ -1642,12 +1813,16 @@
     if (e.key !== KEY && e.key !== null) return;
     if (e.newValue !== null) return;
     clearTimeout(saveTimer);
-    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0 };
+    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
     render();
     say(t("app.sent_elsewhere"), "good");
   });
   load().then(null, function () { /* the bytes could not be read; the text stands */ }).then(function () {
     try { render(); } catch (e) { /* a draft the page cannot draw must not stop the reply below */ }
+    // The address first: a reply that is already here beats one that has
+    // to be asked for, and it clears the draft this would go on asking
+    // about.
     answerFromAddress();
+    resumeAsking();
   });
 })();

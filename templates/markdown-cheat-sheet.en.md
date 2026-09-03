@@ -340,6 +340,27 @@ A post whose text is just a short line plus attachments is filed under
 **Documents**; a full article that happens to attach its data stays an
 article with a file on it.
 
+## The link card
+
+A post can be ABOUT an address -- a release, somebody else's article, a
+page you want to point at. That is a card above the text rather than a
+line inside it, so it is written in the header, not in the body:
+
+```
+---
+tags: release
+link: https://example.com/what-this-is-about
+link_title: What this is about
+---
+
+And here is what I make of it.
+```
+
+`link_title` and `link_description` are the words on the card, both
+optional; with no `title:` of its own the post takes its name from the
+card. A paragraph that is only a link stays what it looks like -- an
+ordinary link in ordinary text.
+
 ## Escaping
 
 To write a character that means something in Markdown, put a backslash in front of it.
