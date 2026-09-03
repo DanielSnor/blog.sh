@@ -14,6 +14,7 @@ require_relative 'i18n'
 require_relative 'path_glob'
 require_relative 'content_type'
 require_relative 'video_probe'
+require_relative 'yaml_compat'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -85,6 +86,12 @@ module Checker
     I18n.t("check.#{key}", **vars)
   end
 
+  # doctor's strings, by name, for the one file both commands read. See
+  # check_config for why they are shared rather than copied.
+  def dt(key, **vars)
+    I18n.t("doctor.#{key}", **vars)
+  end
+
   def ok(text, kind: nil, data: nil)
     Finding.new(level: :ok, text: text, count: 1, kind: kind, data: data)
   end
@@ -95,6 +102,45 @@ module Checker
 
   def error(text, fix = nil, kind: nil, data: nil)
     Finding.new(level: :error, text: text, fix: fix, count: 1, kind: kind, data: data)
+  end
+
+  # config/site.yml -- the one thing outside the archive this file looks at.
+  #
+  # check is what people run before a build, and for a config the build
+  # would refuse it used to answer that the archive was sound: exit 0, and
+  # "errors": 0 in --json. doctor stops on such a file and so does the
+  # build; check read it only to pick the language it would print in,
+  # swallowed the parse error there and never looked again. Reported from
+  # the outside in issue #48, by somebody who edited site.yml, was told
+  # nothing was wrong, and then watched the rebuild refuse it.
+  #
+  # The strings are doctor's on purpose. Two commands that describe the
+  # same broken file differently are worse than one that says nothing, and
+  # sharing the wording is the only way they stay in step; a test pins that
+  # they still report the same four cases. SiteConfig stays at arm's length
+  # for the reason request() gives -- it aborts the process on exactly the
+  # file this is about.
+  def check_config(root)
+    path = File.join(root, 'config', 'site.yml')
+    unless File.exist?(path)
+      return [error(dt('site_yml_missing'), dt('site_yml_missing_fix'), kind: :config_missing)]
+    end
+
+    data = YamlCompat.load_file(path)
+    return [] if data.is_a?(Hash)
+
+    [error(dt('site_yml_empty'), dt('site_yml_missing_fix'), kind: :config_empty)]
+  rescue Psych::SyntaxError => e
+    [error(dt('site_yml_syntax', message: e.problem.to_s),
+           dt('site_yml_syntax_fix', line: e.line, column: e.column),
+           kind: :config_syntax,
+           data: { 'line' => e.line, 'column' => e.column, 'message' => e.problem.to_s })]
+  rescue SystemCallError => e
+    # Exists but cannot be opened: the wrong owner after a wizard ran under
+    # sudo is the usual story, and it deserves its own sentence rather than
+    # a parse error about a file nobody could read in the first place.
+    [error(dt('site_yml_unreadable', message: e.message), dt('site_yml_unreadable_fix'),
+           kind: :config_unreadable)]
   end
 
   # How many findings of one kind a screen is willing to show. The rest ride
@@ -112,6 +158,10 @@ module Checker
   end
 
   def run(root:, progress: nil, online: false, online_progress: nil, cap: CAP)
+    # First, and carried through the early returns below: an archive with
+    # no posts in it and a config the build refuses is still a config the
+    # build refuses.
+    config = check_config(root)
     posts = load_posts(root)
     # "No posts" only when there is genuinely nothing -- not when every
     # file present was unreadable. load_posts drops the broken ones and
@@ -127,13 +177,13 @@ module Checker
       # is the one case where "no posts yet" is the worst thing to say:
       # it is the answer that sends the author away.
       parked = check_parked_leftovers(root, posts)
-      return unbuildable + parked if unbuildable.any? || parked.any?
+      return config + unbuildable + parked if config.any? || unbuildable.any? || parked.any?
 
       return [warn(t('no_posts'), kind: :no_posts)]
     end
 
     known = known_paths(posts)
-    findings = []
+    findings = config
     findings.concat(check_unbuildable(posts, cap))
     findings.concat(check_parked_leftovers(root, posts))
     findings.concat(check_media(root, posts, progress, cap))

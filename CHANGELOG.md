@@ -158,6 +158,22 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
   and ffmpeg refuses to write the file it is reading. The suffix is added
   only where it is needed, so the `.mov` case keeps the name it had.
+- **`check` called an archive sound while the config would not parse.**
+  Reported from outside the project: a hand-edited `config/site.yml`, a
+  `check` that answered "the archive is sound" and exited 0, and a
+  `rebuild` that then refused the same file. `check` had read the config
+  only to pick the language it printed in and swallowed the parse error
+  there -- so the one command people run before a build was the one that
+  did not know. It now reports the four states `doctor` distinguishes
+  (missing, empty, unparseable, unreadable), in `--json` as well, in the
+  language the config asks for, and in doctor's own words so the two
+  cannot disagree. The hole was as old as `check` itself.
+- **The build answered an unreadable config with a backtrace.**
+  A `config/site.yml` whose permissions were wrong -- the usual story
+  after a wizard ran under `sudo` -- surfaced as eight frames of Psych
+  and no sentence naming the file. It now says which file cannot be read
+  and what to check, the way it already did for a file that will not
+  parse.
 
 ## 1.6 -- 2026-09-03
 

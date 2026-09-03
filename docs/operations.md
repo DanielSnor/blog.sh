@@ -1165,8 +1165,20 @@ before a deploy. `check` reads the content on disk, so it works before a
 build has ever run, and it names a post and a slug for every finding
 rather than a file under `public.nosync`: something to go and fix.
 
+The one thing it looks at outside the archive is `config/site.yml`, and
+for the same reason: this is the command people run before a build, and a
+config the build will refuse is not something to find out afterwards. It
+reports that file in `doctor`'s words, so the two never describe it
+differently.
+
 What it looks for, each with a line saying what to do about it:
 
+- **A `config/site.yml` that is missing, empty, will not parse, or cannot
+  be opened.** The build stops on all four and `doctor` explains all four;
+  `check` used to read the config only to pick the language it printed in
+  and say nothing about it, so an edited config could be answered with
+  "the archive is sound" and an exit code of 0. The parse error carries
+  the line and column Psych knew about.
 - **A post file that will not read, a date nothing can parse, a post whose
   text is not a list of blocks, a slug that is not one path segment
   (a slash or a `..` in it), or a `type:` the engine does not know.** The

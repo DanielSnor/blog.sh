@@ -48,9 +48,11 @@ module SiteConfig
   # YAML feature shouldn't blow up, so allow them; older Psych doesn't know
   # the keyword and allows them anyway.
   def load_yaml(path)
-    YAML.load_file(path, aliases: true) || {}
-  rescue ArgumentError
-    YAML.load_file(path) || {}
+    begin
+      YAML.load_file(path, aliases: true) || {}
+    rescue ArgumentError
+      YAML.load_file(path) || {}
+    end
   rescue Psych::SyntaxError => e
     # A hand-edited config with a stray tab or an unquoted colon used to
     # surface as a Psych backtrace from whichever entry point happened to
@@ -69,6 +71,17 @@ module SiteConfig
           "If that line looks fine, the cause is elsewhere -- most often a commented-out section header " \
           "with its keys left behind, or an unclosed quote earlier. " \
           "Run ./blog.sh doctor for the full picture.")
+  rescue SystemCallError => e
+    # A file that exists but cannot be OPENED. Wrong owner after a wizard
+    # ran under sudo is the usual story, and until this rescue existed the
+    # build answered it with Psych's own backtrace -- eight frames naming
+    # psych.rb and feed_http.rb, and nowhere the sentence "check the
+    # permissions on this one file". doctor had the sentence all along;
+    # this is the same one, said by whoever gets there first.
+    abort("❌ #{path} cannot be read: #{e.message}. " \
+          "Check the file's owner and permissions (ls -l config/site.yml). Usually: " \
+          "chmod 644 config/site.yml -- and if the file is owned by root after a wizard " \
+          "ran under sudo, chown it too. Run ./blog.sh doctor for the full picture.")
   end
 
   # Called once at startup by every entry point (each script under scripts/
