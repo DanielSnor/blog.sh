@@ -158,6 +158,15 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
   and ffmpeg refuses to write the file it is reading. The suffix is added
   only where it is needed, so the `.mov` case keeps the name it had.
+- **A tag list written the YAML way still kept its brackets.** 1.7 folded
+  away `tags: [release]` and `#foto`, and said so -- but the fold ran on
+  each name after the commas were split, so a list bracketed as a whole,
+  `tags: [release, foto]`, left the opening bracket on the first tag and
+  the closing one on the last. The writer page had taken both off since it
+  existed; the header, `add`, `edit` and the new properties screen had
+  only half of it. Each bracket now comes off on its own, so the tag in
+  the middle of a list -- which has neither -- is untouched, and a quoted
+  name keeps the comma somebody typed inside it.
 - **`check` called an archive sound while the config would not parse.**
   Reported from outside the project: a hand-edited `config/site.yml`, a
   `check` that answered "the archive is sound" and exited 0, and a

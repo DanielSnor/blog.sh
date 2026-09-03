@@ -951,7 +951,15 @@ def tags_to_frontmatter(tags)
 end
 
 def tags_from_frontmatter(value)
-  text = value.to_s
+  # The brackets come off the WHOLE line before the walk and off each tag
+  # after it, because both spellings turn up: `[foto, cesty]` out of YAML
+  # habit, and `[foto], [cesty]` from somebody who bracketed each one. With
+  # only the second strip, the first spelling kept the opening bracket on
+  # the first tag and the closing one on the last -- `tags: [release, foto]`
+  # filed a post under "[release" and "foto]". The writer page has done both
+  # since it existed (write/app.js), and this is the line that had been
+  # missing on this side.
+  text = value.to_s.strip.gsub(/\A\[|\]\z/, '')
   tags = []
   current = +''
   in_quotes = false
@@ -977,15 +985,18 @@ def tags_from_frontmatter(value)
     i += 1
   end
   tags << current.strip
-  # ⚠️ A hash and a pair of brackets come off. The header is not YAML and
-  # takes a value literally, so `tags: [release]` filed a post under a tag
-  # CALLED "[release]" -- which reads as a bug in the blog rather than in
-  # what was typed, and did exactly that on this project's own site. The
-  # two spellings people arrive with are the YAML habit (`[a, b]`, caught
-  # by the strip below and by the one on the whole line) and the social
-  # habit (`#foto`); the writer page has folded both away since it existed,
-  # and the header now agrees with it.
-  tags.map { |tag| tag.sub(/\A#/, '').sub(/\A\[(.*)\]\z/, '\\1').gsub(/\A["']|["']\z/, '').strip }
+  # ⚠️ A hash and a bracket come off. The header is not YAML and takes a
+  # value literally, so `tags: [release]` filed a post under a tag CALLED
+  # "[release]" -- which reads as a bug in the blog rather than in what was
+  # typed, and did exactly that on this project's own site. The two
+  # spellings people arrive with are the YAML habit (`[a, b]`) and the
+  # social habit (`#foto`).
+  #
+  # Each bracket is taken off on its own rather than as a matched pair: a
+  # tag in the middle of `[a, b]` has neither, the first has only the
+  # opening one and the last only the closing one, and a rule that demands
+  # both left exactly those two carrying punctuation into the archive.
+  tags.map { |tag| tag.sub(/\A#/, '').gsub(/\A\[|\]\z/, '').gsub(/\A["']|["']\z/, '').strip }
       .reject(&:empty?)
 end
 
@@ -4738,6 +4749,14 @@ def edit_post(slug, path: nil)
   updated['created_at'] = post['created_at'] if post['created_at']
   updated['draft_token'] = post['draft_token'] if post['draft_token']
   updated['scheduled'] = true if post['scheduled']
+  # The receipt is deliberately never written into the markdown the editor
+  # sees (FILE_ONLY_FRONTMATTER_KEYS), so this line is the only way it can
+  # survive an edit -- and without it an edit at the desk swept the answer
+  # a phone was still polling for: the build stopped generating
+  # public/write/r/<receipt>.json and the next prune deleted it, so the page
+  # asked every three seconds for five minutes about a post that had gone
+  # out perfectly well.
+  updated['receipt'] = post['receipt'] if post['receipt']
 
   # Before ANY of the moving, copying and pruning below: if the file changed
   # under the editor -- the scheduled-publish cron runs every 15 minutes --
