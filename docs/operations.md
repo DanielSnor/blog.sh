@@ -1237,11 +1237,15 @@ somebody deleted or damaged in `public.nosync/` by hand comes back on the
 next build, because the record is checked against what is actually on
 disk, and `public.nosync/` is still swept clean of anything the build does
 not produce on every build, cache or no cache. Editing a template, a
-stylesheet, a locale or `site.yml` throws the whole cache away, since any
-of those can change every page; so does changing `SITE_BASE_URL`, and so
-does a change of timezone -- including the one that happens without you
-touching anything, when a system update rewrites the rules of the zone you
-publish in.
+locale or `site.yml` throws the whole cache away, since any of those can
+change every page; so does changing `SITE_BASE_URL`, and so does a change
+of timezone -- including the one that happens without you touching
+anything, when a system update rewrites the rules of the zone you publish
+in. A stylesheet is the exception worth knowing: pages link it rather than
+embed it, so editing one changes the stylesheet and nothing else on the
+site. The build after it still renders every page once, because the
+record is keyed to the engine's files and the stylesheet is one of them,
+and it finds nothing new to upload but the one file.
 
 ```bash
 ./blog.sh rebuild --full        # build every page again, then deploy
