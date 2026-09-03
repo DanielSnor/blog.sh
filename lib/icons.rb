@@ -135,4 +135,26 @@ module Icons
   def find(name)
     ALL[name.to_s]
   end
+
+  # Whether what somebody wrote in `icon_svg` is a drawing at all. A
+  # filename, an address, an emoji or a sentence is not one, and the build
+  # used to paste whatever it found straight into the page where the glyph
+  # goes: the date badge of every post carrying that tag read
+  # `assets/icons/bike.svg` in words, on its own page and on every listing
+  # it appeared in.
+  #
+  # One question in one place, because the build and doctor were asking it
+  # separately and answering differently -- doctor said an `icon_svg`
+  # without an <svg> would draw nothing while the build was drawing the
+  # text of it, which is the one kind of report nobody can act on. Same
+  # rule as NAMES above: what decides lives with the drawings, and both
+  # callers ask it rather than keeping a copy.
+  #
+  # Case-insensitive, and the same `\b` heading_icon_dress matches on: a
+  # browser draws `<SVG>` exactly as it draws `<svg>`, so refusing one
+  # would take away an icon that works today, and doctor's own warning
+  # about it was wrong in the other direction.
+  def own_svg?(value)
+    value.to_s.match?(/<svg\b/i)
+  end
 end

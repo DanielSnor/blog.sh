@@ -1082,7 +1082,10 @@ module Doctor
       tag = entry['tag'].to_s
       if entry['icon_svg']
         svg = entry['icon_svg'].to_s
-        next warn(I18n.t('doctor.tag_icon_not_svg', tag: tag)) unless svg.include?('<svg')
+        # Icons.own_svg?, not a test of doctor's own -- the build refuses
+        # exactly what this line calls undrawable, and the two used to
+        # disagree in both directions at once.
+        next warn(I18n.t('doctor.tag_icon_not_svg', tag: tag)) unless Icons.own_svg?(svg)
         next warn(I18n.t('doctor.tag_icon_scale', tag: tag)) unless svg.match?(/viewBox\s*=\s*["\']0 0 24 24/)
         # Said out loud rather than silently swallowed. The strip runs at
         # render whatever doctor thinks, so the page is safe either way --
@@ -1124,7 +1127,7 @@ module Doctor
     name = entry['name'].to_s
     if entry['icon_svg']
       svg = entry['icon_svg'].to_s
-      return warn(I18n.t('doctor.social_icon_not_svg', name: name)) unless svg.include?('<svg')
+      return warn(I18n.t('doctor.social_icon_not_svg', name: name)) unless Icons.own_svg?(svg)
       return warn(I18n.t('doctor.social_icon_scale', name: name)) unless svg.match?(/viewBox\s*=\s*["']0 0 24 24/)
       return warn(I18n.t('doctor.social_icon_stripped', name: name)) if Embed.without_scripts(svg) != svg
 

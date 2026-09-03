@@ -20,8 +20,11 @@ set -uo pipefail
 
 # CDPATH makes cd PRINT the directory it went to, and a forced command
 # written as a relative path would put that line where the answer goes.
+# The zero is the rule the whole script follows and unavailable() below
+# explains: this line has just printed an answer, so it leaves the way
+# every other answer leaves.
 CDPATH=
-cd "$(dirname "$0")/.." >/dev/null || { printf '{"ok":false,"error":"no_cd","message":"Cannot reach the installation directory."}\n'; exit 1; }
+cd "$(dirname "$0")/.." >/dev/null || { printf '{"ok":false,"error":"no_cd","message":"Cannot reach the installation directory."}\n'; exit 0; }
 INSTALL="${1:-$PWD}"
 MAX_MB="${BLOGSH_MAX_MB:-24}"
 # How long the body may take to arrive, in seconds. The first line has
@@ -79,11 +82,19 @@ fail() {  # an answer, so: 0
   exit 0
 }
 
-# No answer to give: the machine is not set up, the engine is missing.
-unavailable() {
-  printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$(json_escape "$2")"
-  exit 1
-}
+# The machine is not set up: no incoming/, no engine, no temporary
+# directory, no way into the installation, a mistyped ceiling. A different
+# KIND of trouble from a delivery that is wrong -- but the exit status is
+# not where that difference can be kept.
+#
+# ⚠️ These five left with 1, which cost them the one thing they are for.
+# They are what a person meets on the FIRST delivery to a new install, and
+# a phone discards the output of a remote command that failed -- so each
+# arrived as a bare status with its sentence gone, on the delivery where
+# the sentence was the whole of the help. /write/ has all five translated
+# into three languages and never got to show one. The kind of trouble is
+# in the error code, which arrives; the status only said it to nobody.
+unavailable() { fail "$1" "$2"; }
 
 [ -d "$INSTALL/incoming" ] || unavailable "no_incoming" "No incoming/ directory in $INSTALL."
 [ -x "$INSTALL/blog.sh" ] || unavailable "no_engine" "No executable blog.sh in $INSTALL."
@@ -107,6 +118,18 @@ esac
 WORK=$(mktemp -d) || unavailable "no_tmp" "Cannot create a temporary directory."
 # A delivery carries somebody's photographs; they have no business staying
 # in /tmp after a failure -- nor in incoming/, under the staging name.
+# ⚠️ The trap goes on HERE, the line after the directory exists, not once
+# the first byte has been read. Installed forty lines further down it sat
+# past the refusal for an empty delivery, so a connection that opened and
+# sent nothing was answered and left its directory behind -- and a
+# receiver on the internet is dialled by whatever is scanning that day.
+# TMP is emptied first: the trap reads it, under set -u.
+TMP=
+cleanup() {
+  rm -rf "$WORK"
+  [ -n "$TMP" ] && rm -f "$TMP"
+}
+trap cleanup EXIT
 # Read with a deadline. Neither dd nor head has one of its own, so the
 # reader runs in the background -- reading the same stdin, writing the
 # file -- while this shell watches the clock; a sender that has stalled
@@ -144,13 +167,6 @@ bounded() {  # seconds, file, reader...
 bounded 30 "$WORK/first" dd bs=1 count=1 2>/dev/null
 [ -s "$WORK/first" ] \
   || fail "empty_input" "Nothing arrived on standard input, or nothing was sent for thirty seconds."
-
-TMP=
-cleanup() {
-  rm -rf "$WORK"
-  [ -n "$TMP" ] && rm -f "$TMP"
-}
-trap cleanup EXIT
 
 # The rest, bounded and timed: head stops READING at the ceiling, so a
 # hostile sender costs that and not whatever they felt like sending --

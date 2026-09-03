@@ -70,7 +70,10 @@ already carries, so each can be read as well as changed:
   only a link already means something else -- an ordinary link in ordinary
   prose -- and because the card belongs to the post, not to a paragraph of
   it. `edit` writes all three lines back out, so a save cannot drop a card
-  the author never touched.
+  the author never touched. The address is a whole `http://`/`https://`
+  one, or one rooted at this site (`/posts/2026/some-post/`) for a card
+  about another post here -- which is also the shape `check --repair`
+  leaves behind when it straightens a relative link out of an import.
 - **`publish: yes`** publishes the post the moment `add <file>` writes
   it -- the date settled, the announcement sent, the site rebuilt -- the
   road `publish <slug> --yes` takes at a desk. It is the one key only the
@@ -603,9 +606,17 @@ the draft stays on the home-screen copy, looking unsent. So the page
 picks a name for its answer before it sends anything (`receipt:`, sixteen
 hexadecimal characters, written into the markdown), and the build leaves
 a small JSON file at `/write/r/<receipt>.json` saying the slug, the
-state, the title and the address. The page asks for it every three
-seconds for five minutes, and says so if it never comes. Whichever
-answer arrives first is the one that is shown.
+state, the title, the address, and whatever the save had to complain
+about -- a picture whose size could not be read, a video that will make
+the reader wait, a player that was not found. The page draws those the
+way it draws the answer that comes back through the address bar, because
+the phone is the one place with no terminal to read them in. Only what
+was said about the POST: the file is served to anyone who has the
+sixteen characters, so what the run says about the SITE afterwards (a
+missing `base_url`, whatever the rebuild warns about) stays out of it.
+The page asks for it every three seconds for five minutes, and says so
+if it never comes. Whichever answer arrives first is the one that is
+shown.
 
 The file is written by the BUILD, which is what keeps it true: publish
 the post and the next build says published and gives the public address;
@@ -703,12 +714,16 @@ shows a tick -- which is a slow, silent way to learn nothing.
 
 **The exit code answers a different question from the JSON.** Zero means
 an answer arrived -- read the object, which says `"ok"` and, when that is
-false, names the reason. Non-zero means there is no object to read: the
-machine is not set up, or the engine is not there. A refusal is an
-answer, so it leaves with zero. (iOS Shortcuts discards the output of a
-remote command that failed, so a refusal that exited non-zero reached a
+false, names the reason. Non-zero means there is no object to read at
+all: the script was killed, or the shell never got to run it. Everything
+the receiver can put into words leaves with zero, and that includes the
+refusals about the installation rather than the delivery -- no
+`incoming/`, no engine, a ceiling that is not a number. Which kind of
+trouble it is, the error code says. (iOS Shortcuts discards the output of
+a remote command that failed, so a refusal that exited non-zero reached a
 phone as a bare status with its reason gone -- exactly when the reason
-was the point.)
+was the point, and those refusals are the ones a new install meets on its
+very first delivery.)
 
 The body has a deadline of its own, `BLOGSH_BODY_SECONDS` (600): a delivery
 that has not finished by then is dropped and, if the sender is still
@@ -721,7 +736,7 @@ complete delivery is not held against it. When the engine itself does
 not answer in JSON -- no `env.sh`, no ruby, a configuration that will not
 parse -- the receiver answers for it with `engine_failed` and the words
 the engine printed, and every delivery ends with status 0 once an answer
-has been given; a ceiling that is not a number is `bad_limit`, status 1.
+has been given -- a ceiling that is not a number (`bad_limit`) included.
 
 A delivery that goes wrong halfway can simply be repeated. Pictures wait
 in `incoming/` until a text names them, so a refused post leaves them
@@ -1018,6 +1033,12 @@ tag_icons:
     icon_svg: '<svg viewBox="0 0 24 24" ...>...</svg>'
 ```
 
+A tag is matched here by its **address** -- the `/tag/<name>/` its listing
+lives at -- so how the name is spelled, here or in a post, makes no
+difference: `sci-fi`, `Sci Fi` and `sci_fi` are one tag, share one page and
+wear one icon. A tag that leaves nothing to be addressed by, an emoji or a
+piece of punctuation, has no page and takes no icon either.
+
 The order is the priority. Most posts carry more than one tag -- 68% of
 them on the archive this engine was built around -- and the tag a post was
 given FIRST is usually the one an importer added, not a subject: `twitter`
@@ -1056,7 +1077,10 @@ than stroking them, drop the `fill="none"` and take `stroke` out. Scripts, style
 stripped out of it before it reaches a page -- the same treatment an
 imported embed gets, and for the same reason. `doctor` says when an icon
 name is one the engine does not have, when an `icon_svg` holds no `<svg>`,
-and when it is drawn to another scale.
+and when it is drawn to another scale. An `icon_svg` that is not a
+drawing at all -- a filename, an address, an emoji -- is refused rather
+than printed where the glyph goes, and the tag falls back to what it
+would have had with no entry here.
 
 A tag with no entry here changes nothing: its listing keeps the generic
 tag icon and its posts keep the icon of their content type.
@@ -1679,7 +1703,7 @@ whole), but restoring from the archive itself is exact.
 | `HEIC displays only in Safari` when attaching a photo | The iPhone default format. Convert it with the command the message prints, set `media.convert_heic: true` to have the engine do it, or set the phone to Settings → Camera → Formats → Most Compatible. |
 | A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
 | `name_taken` from the receiver | Something in `incoming/` under that name is not a plain file -- a directory, or a symlink. Nothing was replaced; clear the name on the server. |
-| `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the shortcut's command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. All but `write_failed` leave with a non-zero status, which is how a caller tells "no answer" from "refused". |
+| `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the shortcut's command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. Every one of them answers with its code and leaves with a zero status, the same as any other refusal: the phone discards the output of a command that failed, and these are the answers a first delivery to a new install most needs to read. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |
 | sftp deploy hangs | It's waiting for a password -- the sftp backend needs key-based auth (see [install.md](install.md#sftp-hosts-with-neither-rsync-nor-git)). |

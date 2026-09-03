@@ -874,6 +874,27 @@ end
 # Taking that shape for a card would have made the two indistinguishable.
 LINK_CARD_KEYS = %w[link link_title link_description].freeze
 
+# What a card may point at: a whole web address, or one rooted at this
+# site.
+#
+# The second shape is not a convenience -- the engine WRITES it. `check
+# --repair` rewrites a relative link to the address it means (Repair's
+# rewrite_link, through PostAddress.path), and when that link is the
+# card the post opens with, the card comes out as `/posts/2026/slug/`.
+# With only the http shape accepted here, every later `edit` of that post
+# died on this line: the header `edit` had just built was handed straight
+# back to it and refused, blaming the author for a value they never typed
+# and the engine had produced. The build renders it (safe_href passes a
+# schemeless address through untouched) and `check` verifies it against
+# the archive, which is more than an http address gets without --online.
+#
+# One slash, and the character after it is neither a slash nor a
+# backslash: `//host/path` and `/\host/path` read as this site to the eye
+# and as another host entirely to the browser. Nothing the engine writes
+# has that shape, and the card is the one link on a post that carries no
+# words of its own to be judged by.
+LINK_CARD_URL_RE = %r{\Ahttps?://\S+\z|\A/(?![/\\])\S*\z}i
+
 # The block the front matter asks for, or nil. Refuses rather than guesses:
 # an address that is not one would render a card linking nowhere, and a
 # title or description with no address behind it is a line somebody
@@ -887,7 +908,7 @@ def link_card_from_frontmatter(meta)
 
     refuse('bad_link', t('cli.link_without_url'))
   end
-  refuse('bad_link', t('cli.link_not_http', url: url)) unless url.match?(%r{\Ahttps?://\S+\z}i)
+  refuse('bad_link', t('cli.link_not_http', url: url)) unless url.match?(LINK_CARD_URL_RE)
 
   block = { 'type' => 'link', 'url' => url }
   block['title'] = title unless title.empty?
@@ -1265,10 +1286,14 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
   post['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
   part = Integer(meta['series_part'].to_s.strip, exception: false)
   post['series_part'] = part if part
-  if meta.key?('hero')
-    hero_wanted = truthy_frontmatter?(meta['hero'])
-    post['hero'] = hero_wanted unless hero_wanted == SITE_HERO
-  end
+  # Both stored as typed. The template a new post opens with carries no
+  # `hero:` line at all -- there is no post yet whose answer it could show
+  # -- so a hero line in this header was written by hand, in whichever
+  # direction it points, and dropping the ones that happened to agree with
+  # layout.hero lost `hero: false` on every ordinary site. edit_post keeps
+  # it now too; the difference there is that its header offers the line
+  # pre-filled, and only THAT value is read as silence.
+  post['hero'] = truthy_frontmatter?(meta['hero']) if meta.key?('hero') && !meta['hero'].to_s.strip.empty?
   post['toc'] = truthy_frontmatter?(meta['toc']) if meta.key?('toc') && !meta['toc'].to_s.strip.empty?
 
   # The slug was settled before the editor opened, when nobody yet knew
@@ -1408,6 +1433,34 @@ def add_from_file(source, json: false, confined: false)
   # now. Exit 1 either way: nothing was written, and a caller that only
   # reads the status must not read that as success.
   refuse('empty', t('cli.add_file_empty', file: file)) if path.nil?
+
+  # What the save had to say about the post, written INTO the post so that
+  # the receipt can carry it. These sentences are said on a terminal, and
+  # the one road that uses a receipt is a phone, which has no terminal to
+  # say them on: a post that arrived with a video whose index sits at the
+  # end, a picture whose dimensions could not be read, an embed whose
+  # player was not found, looked on the page exactly like one that arrived
+  # with nothing wrong. The build writes the receipt out of the post file
+  # a moment from now, and this list is gone by then, so the file is the
+  # only place it can wait.
+  #
+  # Only what COMPOSING the post said, which is the part that is about
+  # this post. Everything report_added adds below -- the missing base_url,
+  # and whatever the rebuild itself warned about -- is about the SITE, and
+  # public/write/r/ is a world-readable directory: the receipt must not
+  # become a window onto the rest of the blog. (It could not reach it in
+  # any case; the build that writes the receipt is the run that produces
+  # those.)
+  #
+  # Only for a post carrying a receipt, because nothing else will ever
+  # read them back, and only when there is something to say, so an
+  # ordinary post gains no key. Without --json nothing was captured at all
+  # and the author is reading the warnings on their own screen, which is
+  # the situation this exists to make up for.
+  if warnings.any?
+    saved = JSON.parse(File.read(path, encoding: 'utf-8'))
+    AtomicWrite.write_json(path, saved.merge('receipt_warnings' => warnings)) if saved['receipt']
+  end
 
   report_added(path, warnings, json: json, publish: publish)
 rescue Refused => e
@@ -4038,7 +4091,14 @@ def ask_series_part(post)
     updated.delete('series_part')
     return updated
   end
-  return nil unless answer.match?(/\A\d{1,4}\z/)
+  # Digits, and not one that starts at zero: a part number is a POSITION
+  # and a series has no position nought. The build has to do something
+  # with a 0 -- it clamps it to the front -- so this screen would have
+  # gone on saying "part 0" about a post every page of the site calls
+  # part 1. An answer this cannot use changes nothing and leaves the row
+  # showing what the post still carries, the way the rest of the screen
+  # answers one.
+  return nil unless answer.match?(/\A[1-9]\d{0,3}\z/)
 
   updated.merge('series_part' => answer.to_i)
 end
@@ -4666,12 +4726,28 @@ def edit_post(slug, path: nil)
   updated['type'] = new_type if new_type
   updated['pinned'] = true if truthy_frontmatter?(meta['pinned'])
   updated['unlisted'] = true if PostAddress.flag?(meta['unlisted'])
-  # Stored only when it disagrees with the site, so an ordinary post stays
-  # silent and follows layout.hero if that is ever flipped. Deleting the
-  # line is therefore a way to say "no opinion", not a way to lose one.
-  if meta.key?('hero')
+  # Deleting the line is how a post says "no opinion", and the value is
+  # kept whichever way it points -- exactly as `toc` is kept below.
+  #
+  # It used to be dropped whenever it AGREED with layout.hero, which read
+  # `hero: false` on a site that shows no heroes as a post saying nothing:
+  # the properties screen offers three states, and this threw the third one
+  # away on the next edit. Nothing looked different at the time -- the post
+  # renders the same either way while the site agrees -- so the loss showed
+  # up only the day layout.hero was flipped, when every post that had said
+  # "not me" grew a lead image.
+  #
+  # The one value still not written back is the one the header FILLED IN.
+  # hero_frontmatter_value shows the site's answer to a post that has no
+  # opinion of its own, so that the state can be read as well as changed,
+  # and a line left exactly as it was found must not freeze that answer
+  # into the post. Asked of the post as it was READ, not of the value
+  # alone: a post that carries `hero:` typed it itself, whatever it says.
+  # An empty `hero:` is silence too, on the same rule as `toc`.
+  if meta.key?('hero') && !meta['hero'].to_s.strip.empty?
     hero_wanted = truthy_frontmatter?(meta['hero'])
-    updated['hero'] = hero_wanted unless hero_wanted == SITE_HERO
+    filled_in = !post.key?('hero') && hero_frontmatter_value(post) == hero_wanted
+    updated['hero'] = hero_wanted unless filled_in
   end
   updated['page'] = true if new_page
   # Written as typed: the series name is a display name (the slug for its

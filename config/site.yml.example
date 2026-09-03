@@ -48,6 +48,9 @@
 #   footer      links_heading, links, note_heading, note_html, copyright,
 #               social_heading
 #   social      name, url, icon or icon_svg, (rel)
+#   tag_icons   (a list: tag with icon or icon_svg)
+#   share       (the share block: a list of network names)
+#   write       (the /write/ page: true to publish it, off by default)
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
 #   comments    (approval)
@@ -58,8 +61,10 @@
 #
 # The order is the order the page reads, top to bottom -- identity, then
 # the header, the palette and the type, then the regions, the menu, the
-# sidebar, the footer -- and after that the parts with no place on the
-# page at all: the comments network, publishing, media, robots, analytics.
+# sidebar, the footer, the marks beside the tags and the block a reader
+# carries the post away from -- and after that the parts with no place on
+# the page at all: the writing page, the comments network, publishing,
+# media, robots, analytics.
 # ./style.sh walks its own menu the same way.
 
 site:

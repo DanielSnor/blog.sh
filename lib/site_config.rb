@@ -181,7 +181,15 @@ module SiteConfig
     # them -- which is exactly why an unknown name passed the check meant
     # to catch it.
     CARDS = %w[toots pixelfed commits bluesky rss].freeze
-    LISTS = [%w[nav], %w[social], %w[share], %w[footer links]].freeze
+    # Every key the engine reads back with `list` belongs here, or the four
+    # states above do not apply to it and the key falls back to being read
+    # as empty in silence. `share` was missing until the shape check learned
+    # it, and `tag_icons` was the last one left: a mapping under it --
+    # `tag_icons:` with `kolo: bike` indented beneath, which is how half of
+    # site.yml is written -- gave the site no icons, the build no warning
+    # and doctor a clean bill of health. It stays a list because the order
+    # in it is the priority, and a mapping cannot say an order out loud.
+    LISTS = [%w[nav], %w[social], %w[share], %w[footer links], %w[tag_icons]].freeze
     MAPS = [%w[about], %w[footer], %w[widgets], %w[layout]].freeze
     # The chrome's prose. Written as a list or a map it renders as nothing
     # at all -- the page simply loses its about text, and until now without

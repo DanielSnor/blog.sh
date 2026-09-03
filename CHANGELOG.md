@@ -63,10 +63,16 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   The page now picks a name for its answer before it sends anything
   (`receipt:` in the front matter, sixteen hex characters), and the build
   leaves a small JSON file at `/write/r/<receipt>.json` with the slug, the
-  state, the title and the address. The page asks for it every three
-  seconds for five minutes, and says so if it never comes. Written by the
-  build, which is what keeps it true: publishing the post rewrites it,
-  deleting the post stops it being produced and the sweep takes it away.
+  state, the title, the address, and whatever the save had to complain
+  about -- a picture whose size could not be read, a video that will make
+  the reader wait. Without those the card looked identical whether the
+  post had arrived clean or not, and the phone is the one place where
+  nobody can go and read the terminal instead. What the run says about the
+  SITE rather than the post stays out: the file sits at a public address.
+  The page asks for it every three seconds for five minutes, and says so
+  if it never comes. Written by the build, which is what keeps it true:
+  publishing the post rewrites it, deleting the post stops it being
+  produced and the sweep takes it away.
 - **A link card is written in the front matter.** `link:`, with
   `link_title:` and `link_description:` beside it, gives a post the card
   it opens with -- the address it is ABOUT. It had no markdown form at
@@ -142,6 +148,17 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   rather than in what was typed, and did exactly that on this project's
   own site. Both are folded away now, as the writer page has always
   folded them.
+- **`tag_icons:` written as a mapping drew nothing and said nothing.** The
+  key is a list, because the order in it is the priority -- but `kolo:
+  bike` indented under it is the shape half of `site.yml` is written in,
+  and it is the one a person reaches for first. It was read as no entries
+  at all: no icons on any badge, no warning from the build, and doctor
+  called the file sound and exited 0. It was the last of the engine's list
+  keys missing from the shape check, and it is refused now the way the
+  others are -- by the build at the top of the run and by `doctor`, in the
+  site's own language. A mapping is not accepted instead, because a mapping
+  cannot say an order out loud and the order is the whole reason this key
+  is a list.
 - **The `ffmpeg` command the engine suggested could name its own input.**
   An HEVC video already in an `.mp4` -- which is what a phone records when
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
@@ -174,6 +191,41 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   attached in an edit was numbered `01` again, repacked to the same name,
   and copied over its predecessor: no warning, no trash copy, both blocks
   pointing at one file. A stored name now holds the number it starts with.
+- **`hero: false` did not survive the next edit.** The properties screen
+  offers three answers about a lead image -- yes, no, and whatever the
+  site does -- but a post's own answer was written into the JSON only
+  where it DISAGREED with `layout.hero`, so a post saying "not me" on a
+  site that shows no heroes was read back as a post saying nothing and
+  the line was dropped on the next save. Nothing looked different at the
+  time: the two states render alike for as long as the site agrees, and
+  the loss would have shown the day `layout.hero` was turned on, when
+  every post that had opted out grew a lead image. All three states are
+  kept now, through `edit` and through `add <file>`, and what means "no
+  opinion" is an unanswered header line -- no `hero:` at all, or one with
+  nothing after the colon, which is the rule `toc` has always followed.
+  The one value still read as silence is the one the editor fills in
+  itself with the site's answer, for a post that has never had one of
+  its own.
+- **An `icon_svg` that was not a drawing was printed as words.** A tag
+  whose icon was given as a filename, an address or a sentence had that
+  text pasted where the icon goes -- on every badge carrying the tag and
+  in the heading of its listing -- while `doctor` reported the
+  configuration as sound, and while a capital `<SVG>`, which a browser
+  draws exactly as it draws `<svg>`, was refused. The two ask one question
+  in `lib/icons.rb` now. A value that is not a drawing is refused rather
+  than printed, so the tag falls back to what it would have had with no
+  entry at all, and the footer's `social:` icons, which share that code
+  and shared the hole, are refused the same way.
+- **A tag icon could miss the tag it was written for.** The icon was
+  matched against the tag NAME folded, while a tag's page groups its posts
+  by the ADDRESS they share -- so the two agreed only on names the two
+  rules normalize alike, and parted on the space, the underscore, the dot
+  and the ampersand that an address flattens and a fold keeps. `Sci Fi`
+  and `sci-fi` are one page, `/tag/sci-fi/`, and the icon written for it
+  reached only the posts spelled the way `site.yml` spelled it: on that
+  shared page the badges wore the icon and the heading above them did not.
+  Nothing said so -- not the build, not `doctor`. Both ends go by the
+  address now, which is what a tag is everywhere else in the engine.
 - **A tag list written the YAML way still kept its brackets.** 1.7 folded
   away `tags: [release]` and `#foto`, and said so -- but the fold ran on
   each name after the commas were split, so a list bracketed as a whole,
@@ -193,12 +245,44 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   (missing, empty, unparseable, unreadable), in `--json` as well, in the
   language the config asks for, and in doctor's own words so the two
   cannot disagree. The hole was as old as `check` itself.
+- **A fresh install answered the phone with a bare exit code.** The
+  receiver's refusals leave with zero on purpose -- a phone discards the
+  output of a remote command that failed, so the status has to say
+  whether an answer arrived and let the answer say the rest. Five
+  refusals were left out of that rule: no `incoming/`, no `blog.sh`, no
+  temporary directory, an installation directory that could not be
+  entered, and a `BLOGSH_MAX_MB` that is not a number. They are the ones
+  a new install meets on its very first delivery, and the only ones that
+  say which part is not ready -- and they were exactly the ones whose
+  sentence never arrived. `/write/` ships all five translated into all
+  three languages and never got to show one: it said "the server said
+  nothing, it may still have saved the post" about a server that had
+  answered and had saved nothing. Which kind of trouble it is was never
+  in the status anyway; it is in the error code, which arrives.
 - **The build answered an unreadable config with a backtrace.**
   A `config/site.yml` whose permissions were wrong -- the usual story
   after a wizard ran under `sudo` -- surfaced as eight frames of Psych
   and no sentence naming the file. It now says which file cannot be read
   and what to check, the way it already did for a file that will not
   parse.
+- **A part number sent a post to the front of its series instead of to
+  that position.** `series_part` is documented as "the number is for the
+  rare insert" -- parts 1, 2, 4, 5 written in order, then the missing
+  part 3 written last and told `3`. What it did instead was put every
+  numbered post ahead of every unnumbered one, whatever the number said:
+  the latecomer became part 1 and the two real first parts were relabelled
+  2 and 3, on the series listing, in the "part N of M" line on each page
+  and in the links from one part to the next. Meanwhile `props` went on
+  showing the number the post carries, so the CLI said "part 3" about a
+  post the site called part 1. The number is now a position: parts
+  without one keep their dates, and a part that names a position is put
+  there among them. Series where every part is numbered, and series where
+  none is, come out exactly as before. A number the series cannot honour
+  -- below the first, past the last -- takes the nearest position it has,
+  and two parts claiming one slot take it and the one after it, oldest
+  first. The part-number row on the new `[e]` screen stops taking a `0`
+  with it: a series has a first part and no zeroth one, and a 0 was the
+  one number that screen could write which no series can honour.
 
 ## 1.6 -- 2026-09-03
 

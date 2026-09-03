@@ -1649,15 +1649,20 @@
   function askReceipt(receipt, wantPublished) {
     if (!/^[0-9a-f]{16}$/.test(receipt)) return;
     if (pending && pending.timer) clearTimeout(pending.timer);
-    pending = { receipt: receipt, until: Date.now() + 5 * 60 * 1000, timer: 0, published: !!wantPublished };
+    // This asking's OWN record, and what everything below compares itself
+    // against. The receipt cannot do that job: Publish on the answer card
+    // asks again with the SAME receipt, so a receipt tells the second
+    // asking from the first not at all.
+    var mine = { receipt: receipt, until: Date.now() + 5 * 60 * 1000, timer: 0, published: !!wantPublished };
+    pending = mine;
     tick();
 
     function again() {
-      if (pending && pending.receipt === receipt) pending.timer = setTimeout(tick, 3000);
+      if (pending === mine) pending.timer = setTimeout(tick, 3000);
     }
 
     function tick() {
-      if (!pending || pending.receipt !== receipt) return;
+      if (pending !== mine) return;
       if (Date.now() > pending.until) {
         pending = null;
         say(t("app.answer_late"), "bad");
@@ -1669,6 +1674,18 @@
       fetch("r/" + receipt + ".json", { cache: "no-store" })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (o) {
+          // ⚠️ An answer belongs to the asking that fetched it, and this
+          // one may have been superseded while it was in the air -- the
+          // fetch was already gone when `pending` was replaced, and
+          // nothing recalls it. Landing anyway was two failures at once:
+          // it cleared `pending`, which killed the wait Publish had just
+          // started -- the page then sat silent forever, never saying
+          // even that the answer was late -- and it redrew the card as
+          // the draft the post had that moment stopped being. The same
+          // line covers the answer to an EARLIER post arriving after a
+          // second one has been handed over, which showed the wrong post
+          // and cleared the new one's draft with it.
+          if (pending !== mine) return;
           if (!o || typeof o.slug !== "string") { again(); return; }
           if (wantPublished && o.state !== "published") { again(); return; }
 
