@@ -644,12 +644,17 @@
   // hands the files inside to the shortcut. The archive never reaches the
   // server: the receiver has no unpacking in it, and a post.zip sent
   // whole would simply be stored in incoming/ and make nothing.
+  // ⚠️ Same order as buildFiles: pictures first, the markdown LAST. The
+  // markdown arriving is what makes the post, so a sender that walks the
+  // archive in order -- a shell script on Android, taking the zip out of
+  // the downloads folder -- would otherwise hand the text over before the
+  // pictures it names, and the post would arrive with missing_images.
   function buildBundle() {
     var enc = new TextEncoder();
-    var entries = [{ name: slugForFile(), bytes: enc.encode(markdown()) }];
-    state.shots.forEach(function (shot) {
-      entries.push({ name: shot.name, bytes: dataUrlToBytes(shot.data) });
+    var entries = state.shots.map(function (shot) {
+      return { name: shot.name, bytes: dataUrlToBytes(shot.data) };
     });
+    entries.push({ name: slugForFile(), bytes: enc.encode(markdown()) });
     return zip(entries);
   }
 
@@ -935,12 +940,25 @@
             askReceipt(state.receipt, false);
             return;
           }
-          try { download(buildBundle()); } catch (e2) { say(t("app.picture_failed"), "bad"); }
+          try { saveBundle(); } catch (e2) { say(t("app.picture_failed"), "bad"); }
         });
     } else {
-      try { download(buildBundle()); } catch (e) { say(t("app.picture_failed"), "bad"); }
+      try { saveBundle(); } catch (e) { say(t("app.picture_failed"), "bad"); }
     }
   });
+
+  // The road for a browser with no share sheet -- a desk, and Android,
+  // where what takes the bundle from here is a shell script rather than a
+  // share target. It asks for the receipt exactly as the share road does:
+  // the answer does not depend on HOW the files travelled, and a page that
+  // saved a bundle and then never mentioned the post again was the one
+  // road with no way back at all.
+  function saveBundle() {
+    // download() says what it did; this adds the half that matters here --
+    // the page will go on asking what became of the post.
+    download(buildBundle());
+    askReceipt(state.receipt, false);
+  }
 
   // The name matters as much as the bytes: the receiver decides what a
   // delivery IS by the name of the file in it, so a saved publish request
@@ -1702,6 +1720,9 @@
       // claiming the request has gone.
       try {
         download(new Blob([slug], { type: "text/plain" }), "publish.txt");
+        // Said after download's own line, and it is the one that matters:
+        // this file is a request, and it is not a request until the
+        // shortcut has it.
         say(t("app.publish_saved"), "good");
       } catch (e2) { say(t("app.publish_failed"), "bad"); }
     }
