@@ -977,7 +977,16 @@ def tags_from_frontmatter(value)
     i += 1
   end
   tags << current.strip
-  tags.reject(&:empty?)
+  # ⚠️ A hash and a pair of brackets come off. The header is not YAML and
+  # takes a value literally, so `tags: [release]` filed a post under a tag
+  # CALLED "[release]" -- which reads as a bug in the blog rather than in
+  # what was typed, and did exactly that on this project's own site. The
+  # two spellings people arrive with are the YAML habit (`[a, b]`, caught
+  # by the strip below and by the one on the whole line) and the social
+  # habit (`#foto`); the writer page has folded both away since it existed,
+  # and the header now agrees with it.
+  tags.map { |tag| tag.sub(/\A#/, '').sub(/\A\[(.*)\]\z/, '\\1').gsub(/\A["']|["']\z/, '').strip }
+      .reject(&:empty?)
 end
 
 def build_frontmatter(title:, tags:, type:, pinned: nil, hero: nil, page: nil,
@@ -3480,6 +3489,17 @@ end
 
 # Returns the row rather than printing it, so the same builder serves both
 # faces: the frame collects the rows, the piped path prints them.
+# "Nový Sean.cz" on its own, or "Nový Sean.cz, part 3" where the post
+# claims a position of its own -- the number means nothing without the
+# name beside it.
+def series_label(post)
+  name = post['series'].to_s.strip
+  return nil if name.empty?
+
+  part = post['series_part']
+  part.to_s.empty? ? name : t('cli.props_series_part', name: name, part: part)
+end
+
 def props_line(key, value)
   return nil if value.to_s.empty?
 
@@ -3519,6 +3539,9 @@ def props_frame_lines(post, path, slug, year)
   end
   lines << props_line('type', ContentType.dominant(post))
   lines << props_line('tags', (post['tags'] || []).join(', '))
+  # Shown because it can now be changed from here: a field the dialog can
+  # set and does not show is a field somebody sets twice.
+  lines << props_line('series', series_label(post))
   lines << props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
   # The same two predicates the announcer uses, so this screen predicts
   # what publish will DO rather than re-deriving it: announcement_url is
@@ -3674,6 +3697,8 @@ def props_loop(slug, screen)
         props_run(screen) { unschedule_post(path, post, slug, raw: original_raw) }
       when 'r'
         slug = props_run(screen) { rename_post(path, post, raw: original_raw) }
+      when 'e'
+        props_run(screen) { props_properties(path, slug, raw: original_raw) }
       when 'v'
         props_run(screen) { props_versions(path, slug) }
       when 'x'
@@ -3712,6 +3737,8 @@ def props_loop(slug, screen)
         slug = props_run(screen) { rename_post(path, post, raw: original_raw) }
       when 'a'
         props_run(screen) { props_addresses(path, slug) }
+      when 'e'
+        props_run(screen) { props_properties(path, slug, raw: original_raw) }
       when 'v'
         props_run(screen) { props_versions(path, slug) }
       when 'x'
@@ -3856,6 +3883,216 @@ end
 # so a version old enough to name an image the post no longer has would
 # restore a broken reference -- which is what the cap on how many are kept
 # is for, and what the sentence under the list says out loud.
+# The properties a post carries that are not its text: the series it
+# belongs to, what it is tagged with, what kind of post it is, and the
+# three flags that decide where it shows up. Every one of them used to
+# need `edit` -- the whole article open in an editor to change one word
+# about it -- and since the link card arrived, editing a post whose
+# blocks markdown cannot all write down asks whether it may drop them.
+# Changing a property should not cost the text.
+#
+# One rebuild at the end rather than one per change: setting a series and
+# a type is two answers to one question, and on a large archive each
+# rebuild is the better part of a minute.
+def props_properties(path, slug, raw: nil)
+  changed = false
+  loop do
+    post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    rows = property_rows(post)
+    index = properties_pick(rows.map { |r| r[:row] },
+                            [t('cli.properties_heading', slug: slug), ''],
+                            t('cli.properties_hint'))
+    puts
+    break if index.nil? || rows[index].nil?
+
+    updated = rows[index][:set].call(post)
+    next if updated.nil?
+
+    # The same guard every other write in this dialog takes, and for the
+    # same reason: the screen can sit here for minutes while the
+    # scheduled-publish cron runs every fifteen.
+    abort_if_post_changed(path, raw, slug) if raw
+    AtomicWrite.write_json(path, updated)
+    raw = File.read(path, encoding: 'utf-8')
+    changed = true
+    puts t('cli.property_saved')
+    puts
+  end
+  maybe_rebuild if changed
+end
+
+# What the screen offers, and what each row does when it is chosen. The
+# value is shown the way the frame above shows it, so the same word means
+# the same thing in both places.
+def property_rows(post)
+  hero = post.key?('hero') ? truthy_frontmatter?(post['hero']) : nil
+  toc = post['toc'].nil? ? nil : truthy_frontmatter?(post['toc'])
+  [
+    { row: t('cli.property_series', value: property_value(post['series'])),
+      set: ->(p) { ask_series(p) } },
+    { row: t('cli.property_series_part', value: property_value(post['series_part'])),
+      set: ->(p) { ask_series_part(p) } },
+    { row: t('cli.property_tags', value: property_value((post['tags'] || []).join(', '))),
+      set: ->(p) { ask_tags(p) } },
+    { row: t('cli.property_type', value: post['type'].to_s.empty? ?
+                                         t('cli.property_type_derived', type: ContentType.dominant(post)) :
+                                         post['type'].to_s),
+      set: ->(p) { ask_type(p) } },
+    { row: t('cli.property_unlisted', value: t(Publishing.unlisted?(post) ? 'cli.property_yes' : 'cli.property_no')),
+      set: ->(p) { toggle_flag(p, 'unlisted', two_state: true) } },
+    { row: t('cli.property_hero', value: property_flag(hero)),
+      set: ->(p) { toggle_flag(p, 'hero') } },
+    { row: t('cli.property_toc', value: property_flag(toc)),
+      set: ->(p) { toggle_flag(p, 'toc') } }
+  ]
+end
+
+def property_value(value)
+  value.to_s.strip.empty? ? t('cli.property_none') : value.to_s
+end
+
+# Three states, not two: a post that says nothing about hero or toc takes
+# the site's answer, and that is a different thing from saying no. The
+# screen says which of the three it is rather than showing a checkbox
+# that cannot tell them apart.
+def property_flag(value)
+  return t('cli.property_default') if value.nil?
+
+  t(value ? 'cli.property_yes' : 'cli.property_no')
+end
+
+# Both faces, like every other picker in this dialog: a frame where there
+# is a terminal, a numbered list where the answer comes down a pipe.
+def properties_pick(rows, header, hint)
+  return Tui.menu(rows, header: header, hint: hint) if Tui.interactive?
+
+  header.each { |line| puts line }
+  rows.each_with_index { |row, i| puts format('  %<n>d) %<row>s', n: i + 1, row: row) }
+  puts
+  print t('cli.properties_prompt', count: rows.size)
+  line = $stdin.gets.to_s.strip
+  puts
+  return nil if line.empty?
+
+  index = line.to_i - 1
+  index.between?(0, rows.size - 1) ? index : nil
+end
+
+# The series the site already has, with how many posts carry each -- so
+# the answer is usually a keystroke and not a spelling. `check` reports
+# two series that differ by a letter; this is where that stops happening.
+def ask_series(post)
+  known = load_posts_summary.filter_map { |p| p[:series].to_s.strip }
+                            .reject(&:empty?).tally
+                            .sort_by { |name, count| [-count, name.downcase] }
+  rows = [t('cli.series_none_row')] +
+         known.map { |name, count| t('cli.series_row', name: name, count: count) } +
+         [t('cli.series_new_row')]
+  index = properties_pick(rows, [t('cli.series_heading'), ''], t('cli.properties_hint'))
+  return nil if index.nil?
+
+  if index.zero?
+    # The part number goes with it: a number without a series is a field
+    # nothing reads, and leaving it behind is how a post rejoins a series
+    # later carrying a position from another one.
+    updated = post.dup
+    updated.delete('series')
+    updated.delete('series_part')
+    return updated
+  end
+  return post.merge('series' => known[index - 1].first) unless index == rows.size - 1
+
+  print t('cli.series_prompt')
+  name = $stdin.gets&.strip.to_s
+  puts unless Tui.interactive?
+  name.empty? ? nil : post.merge('series' => name)
+end
+
+def ask_series_part(post)
+  if post['series'].to_s.strip.empty?
+    puts t('cli.series_part_needs_series')
+    puts
+    return nil
+  end
+
+  print t('cli.series_part_prompt')
+  answer = $stdin.gets&.strip.to_s
+  puts unless Tui.interactive?
+  return nil if answer.empty?
+
+  # A dash clears it, the way the series row's first entry clears the
+  # series: without one there is no way back to "ordered by date".
+  updated = post.dup
+  if answer == '-'
+    updated.delete('series_part')
+    return updated
+  end
+  return nil unless answer.match?(/\A\d{1,4}\z/)
+
+  updated.merge('series_part' => answer.to_i)
+end
+
+# The tags, as one line -- which is how they are written everywhere else
+# in this engine, and what somebody fixing a typo expects to be handed.
+# The site's own most-used tags are printed above it, because the mistake
+# this screen exists to prevent is a second spelling of a tag that is
+# already there.
+def ask_tags(post)
+  known = load_posts_summary.flat_map { |p| p[:tags] }.map(&:to_s).reject(&:empty?)
+                            .tally.sort_by { |name, count| [-count, name.downcase] }
+  puts t('cli.tags_current', tags: property_value((post['tags'] || []).join(', ')))
+  puts t('cli.tags_known', tags: known.first(15).map(&:first).join(', ')) if known.any?
+  print t('cli.tags_prompt')
+  answer = $stdin.gets&.strip.to_s
+  puts unless Tui.interactive?
+  return nil if answer.empty?
+
+  return post.merge('tags' => []) if answer == '-'
+
+  # Read exactly as the front matter reads them, so a tag typed here and
+  # a tag typed there are the same tag: split on commas, the hash and the
+  # brackets stripped, empties dropped.
+  tags = tags_from_frontmatter(answer)
+  tags.empty? ? nil : post.merge('tags' => tags)
+end
+
+# The eight the engine knows, plus the way back to letting the content
+# decide. A post with no `type` of its own is not typeless -- it is
+# whatever its blocks make it -- so that row says which type that is.
+def ask_type(post)
+  types = ContentType::PRIORITY
+  rows = [t('cli.type_derived_row', type: ContentType.dominant(post.merge('type' => nil)))] +
+         types.map { |name| t('cli.type_row', type: name) }
+  index = properties_pick(rows, [t('cli.type_heading'), ''], t('cli.properties_hint'))
+  return nil if index.nil?
+
+  updated = post.dup
+  if index.zero?
+    updated.delete('type')
+    return updated
+  end
+  updated.merge('type' => types[index - 1])
+end
+
+# unlisted is a yes or a no; hero and toc have a third state -- the
+# site's own answer -- and it has to be reachable, or turning one off
+# here would be a decision nobody can undo from this screen.
+def toggle_flag(post, key, two_state: false)
+  updated = post.dup
+  current = post.key?(key) ? truthy_frontmatter?(post[key]) : nil
+  if two_state
+    current ? updated.delete(key) : updated[key] = true
+    return updated
+  end
+
+  case current
+  when nil then updated[key] = true
+  when true then updated[key] = false
+  else updated.delete(key)
+  end
+  updated
+end
+
 def props_versions(path, slug)
   year = File.basename(File.dirname(path))
   versions = PostVersions.list(slug, year, content_dir: CONTENT_DIR)
@@ -4903,6 +5140,10 @@ def post_summary(file)
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
     state: post['state'] || PUBLISHED, scheduled: post['scheduled'],
+    # Carried so the properties screen can offer the series a site
+    # already has, instead of asking somebody to spell one again -- which
+    # is how an archive grows two series that differ by a capital letter.
+    series: post['series'],
     pinned: truthy_frontmatter?(post['pinned']) }
 rescue JSON::ParserError, SystemCallError => e
   warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])

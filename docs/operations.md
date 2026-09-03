@@ -178,8 +178,31 @@ the announcement -- and offers the guarded actions:
   review the old addresses that redirect here, delete;
 - **draft**: publish, schedule (or reschedule, or cancel the schedule),
   rename the slug, delete;
+- **either**: `[e]` opens the post's properties -- which series it is in
+  and which part of it, its tags, its type, and the three flags (out of
+  the listings, lead image, chapter list);
 - **either, once there is one**: `[v]` restores what the post said before
   one of its recent saves.
+
+**Properties are what the post IS, not what it says**, and until 1.7 the
+only way to change one was `edit` -- the whole article open in an editor
+to add a series somebody forgot. Worse, on a post whose blocks markdown
+cannot all write down (an imported embed, a link card that is not the
+first block) that edit asks whether it may drop them, which is a great
+deal of risk for one word of metadata.
+
+`[e]` writes each answer as it is given and rebuilds once on the way out.
+Two of the rows are pickers rather than prompts, on purpose: the series
+row lists the series the site already has, with how many posts carry
+each, because a series typed a second time is a second series and `check`
+only notices afterwards -- and the type row lists the eight the engine
+knows plus the way back to letting the content decide, which is what a
+post with no `type` of its own has always done. The tags row prints the
+site's most-used tags above the line it asks for, for the same reason.
+
+The lead image and the chapter list have three states, not two: on, off,
+and whatever the site does -- which is what a post that says nothing
+about them takes, and a different thing from saying no.
 
 **Undoing an edit** is what `[v]` is for. Every `edit` keeps the previous
 text first, up to ten of them per post, and `[v]` lists them newest first

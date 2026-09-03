@@ -13,7 +13,8 @@ prints what an installation is running.
 ## 1.7 -- 2026-09-03
 
 A release about the two ends of a post: the phone it may be written on,
-and the file it is written into. Publishing from a phone works now --
+and the file it is written into -- and about changing what a post IS
+without opening what it says. Publishing from a phone works now --
 draft, look at it, publish, without a terminal anywhere in the sequence.
 A post can carry a link card written as ordinary front matter, which is
 what release posts have wanted since 1.3. A tag can wear one of about
@@ -26,6 +27,20 @@ Nothing to migrate: `git pull`, rebuild, deploy.
 
 ### Added
 
+- **A post's properties, without opening the post.** `props` gains `[e]`:
+  the series it belongs to and which part of it, its tags, its type, and
+  three flags -- out of the listings, lead image, chapter list. Every one
+  of those used to need `edit`, the whole article open in an editor to add
+  a series somebody forgot, and on a post whose blocks markdown cannot all
+  write down that edit asks whether it may drop them. A property is not
+  the text and should not cost the text. Two of the rows are pickers
+  rather than prompts: the series row lists the series the site already
+  has with how many posts carry each -- a series typed a second time is a
+  second series, and `check` only notices afterwards -- and the type row
+  lists the eight the engine knows plus the way back to letting the
+  content decide. The lead image and the chapter list keep three states,
+  because "whatever the site does" is not the same answer as "no". One
+  rebuild at the end, not one per change.
 - **Publishing from the phone, and an answer the page can go and get.**
   A post written at `/write/` arrived as a draft, and putting it out took
   a terminal -- which is the one thing the person holding the phone does
@@ -109,6 +124,13 @@ Nothing to migrate: `git pull`, rebuild, deploy.
 
 ### Fixed
 
+- **A tag written `[release]` or `#foto` was filed under that name.** The
+  front matter is not YAML and takes a value literally, so the YAML habit
+  (`tags: [release]`) and the social habit (`#foto`) each minted a tag
+  with the punctuation in its name -- which reads as a bug in the blog
+  rather than in what was typed, and did exactly that on this project's
+  own site. Both are folded away now, as the writer page has always
+  folded them.
 - **The `ffmpeg` command the engine suggested could name its own input.**
   An HEVC video already in an `.mp4` -- which is what a phone records when
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,

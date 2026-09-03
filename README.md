@@ -413,7 +413,7 @@ and whether an upgrade is urgent for you -- is [CHANGELOG.md](CHANGELOG.md);
                                # with a markdown file it asks nothing, and --json answers as data;
                                # --untrusted refuses a picture reference that is not a bare filename
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
-./blog.sh props [<slug>]       # a post's state + actions (publish, rename the slug, delete...)
+./blog.sh props [<slug>]       # a post's state, its properties (series, tags, type, flags) and its actions
 ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                # shows the draft's preview, asks what's next;
                                # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky;
