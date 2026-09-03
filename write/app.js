@@ -645,10 +645,10 @@
   // server: the receiver has no unpacking in it, and a post.zip sent
   // whole would simply be stored in incoming/ and make nothing.
   // ⚠️ Same order as buildFiles: pictures first, the markdown LAST. The
-  // markdown arriving is what makes the post, so a sender that walks the
-  // archive in order -- a shell script on Android, taking the zip out of
-  // the downloads folder -- would otherwise hand the text over before the
-  // pictures it names, and the post would arrive with missing_images.
+  // markdown arriving is what makes the post, so whoever unpacks this
+  // archive and hands the files over has to keep that order -- the text
+  // going first means the blog answers missing_images about a delivery
+  // where nothing was missing.
   function buildBundle() {
     var enc = new TextEncoder();
     var entries = state.shots.map(function (shot) {
@@ -947,9 +947,9 @@
     }
   });
 
-  // The road for a browser with no share sheet -- a desk, and Android,
-  // where what takes the bundle from here is a shell script rather than a
-  // share target. It asks for the receipt exactly as the share road does:
+  // The road for a browser that will not hand files over -- Safari at a
+  // desk is the ordinary case, not the rare one. It asks for the receipt
+  // exactly as the share road does:
   // the answer does not depend on HOW the files travelled, and a page that
   // saved a bundle and then never mentioned the post again was the one
   // road with no way back at all.
