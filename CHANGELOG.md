@@ -158,6 +158,27 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
   and ffmpeg refuses to write the file it is reading. The suffix is added
   only where it is needed, so the `.mov` case keeps the name it had.
+- **A page called "Write" took the writer app off the site.** The build
+  copies the phone-authoring page to `/write/` and renders the pages
+  afterwards, so a published page with that slug was written over it and
+  won -- no warning, a clean exit, nothing from `check` or `doctor`, and
+  the home-screen icon opening a blog page while the receipts went on
+  being built beside it. `write` is a reserved address now, the way
+  `archive` has been since 1.5.
+- **A link card's address could reach a live `href`.** A post with no
+  title of its own borrows the card's as its heading, and that one heading
+  printed the address with escaping alone while the card below it was
+  already defused. A card built by an importer out of somebody else's
+  markup can carry any scheme at all, so it went out live in the post's
+  `<h1>` and in the `<h2>` of every listing. It goes through the same
+  allowlist as every other link now.
+- **A second video could be written over the first.** With
+  `media.remux_video` on, a repacked `.mp4` is stored as `01-web.mp4` --
+  and the rule that stops a new file taking a name already on disk
+  compared the whole stem, where `01-web` is not `01`. So the next video
+  attached in an edit was numbered `01` again, repacked to the same name,
+  and copied over its predecessor: no warning, no trash copy, both blocks
+  pointing at one file. A stored name now holds the number it starts with.
 - **A tag list written the YAML way still kept its brackets.** 1.7 folded
   away `tags: [release]` and `#foto`, and said so -- but the fold ran on
   each name after the commas were split, so a list bracketed as a whole,

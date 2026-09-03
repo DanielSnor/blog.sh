@@ -2106,7 +2106,12 @@ def post_heading_html(post, level, self_href)
   block = link_title_block(post)
   return '' unless block
 
-  %(<#{level}><a href="#{h(block['url'])}">#{h(block['title'])}</a></#{level}>)
+  # safe_href, not h() alone: this is the one heading whose address comes
+  # from a link card, and a card built by an importer out of foreign markup
+  # can carry any scheme at all. The card's own render defuses it one
+  # element lower; without this the same address went out live in the post's
+  # <h1> and in the <h2> of every listing that borrows the card's title.
+  %(<#{level}><a href="#{h(safe_href(block['url']))}">#{h(block['title'])}</a></#{level}>)
 end
 
 def render_post_html(post, template)

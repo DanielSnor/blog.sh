@@ -756,13 +756,20 @@ module MarkdownParser
   # (the kept image can appear in any block, before or after the new one).
   # A brand-new post has no media directory yet, so nothing is skipped there
   # and its images stay numbered 01, 02, 03...
+  #
+  # A name is read for the number it STARTS with rather than compared whole:
+  # a repacked video is stored as `01-web.mp4`, which is not the string
+  # "01", so the number stayed free, the next video attached was numbered 01
+  # again, and the repack turned it back into `01-web.mp4` -- straight over
+  # the file the first block still names. Nothing warned, nothing went to
+  # the trash, and the post then played the second clip twice.
   def free_media_name(counter, ext, media_dir, taken)
     used = taken.dup
     used.concat(Dir.children(media_dir)) if media_dir && Dir.exist?(media_dir)
-    stems = used.map { |name| File.basename(name.to_s, '.*') }
+    numbers = used.filter_map { |name| File.basename(name.to_s, '.*')[/\A(\d+)/, 1]&.to_i }
 
     number = counter
-    number += 1 while stems.include?(format('%02d', number))
+    number += 1 while numbers.include?(number)
     format('%02d%s', number, ext)
   end
 
