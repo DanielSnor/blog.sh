@@ -53,11 +53,56 @@ module Wizard
   end
 
   def context=(rows)
+    # The spans go with the rows they described.
+    @blocks = []
     @context = Array(rows)
   end
 
   def remember(row)
     context << row
+  end
+
+  # Rows that only mean anything whole.
+  #
+  # The record is trimmed from the top when it outgrows the window, which
+  # is right for a list of answers -- the newest are the ones worth
+  # keeping. It is wrong for a picture. A QR code is 15 to 19 rows tall
+  # and the style wizard's menu spends twelve, so on a 24-row terminal --
+  # the ordinary one -- three rows of the code survived, finder patterns
+  # and all trimmed away, under an intact "scan this with your phone".
+  # A code missing its top two thirds scans as nothing.
+  #
+  # So a block is kept whole or not at all. Dropping it costs the picture;
+  # slicing it costs the picture AND tells the reader to photograph the
+  # remains.
+  def remember_block(rows)
+    rows = Array(rows)
+    return if rows.empty?
+
+    blocks << (context.size...(context.size + rows.size))
+    context.concat(rows)
+  end
+
+  def blocks
+    @blocks ||= []
+  end
+
+  # The last `room` rows, except that a block straddling the cut goes
+  # entirely rather than in halves.
+  #
+  # `rows` may be the record with something appended -- confirm adds its
+  # note -- and that is safe: a span counts from the start of the record,
+  # and appending moves nothing that came before.
+  def tail_of_record(room, rows = context)
+    return rows.dup if rows.size <= room
+
+    start = rows.size - room
+    # span.end, not span.last + 1: these are exclusive ranges, so `end` IS
+    # the first row after the block. `last` returns the same number, and
+    # adding one to it skipped the row immediately after -- which here is
+    # the address the whole reordering exists to save.
+    blocks.each { |span| start = span.end if span.cover?(start) }
+    rows[start..] || []
   end
 
   # An answer, in the form it goes back on screen as: the question it
@@ -98,7 +143,7 @@ module Wizard
   # otherwise open the next frame on two.
   def context_above(taken)
     room = [Tui.term_height - taken - 6, 0].max
-    rows = context.size > room ? context.last(room) : context.dup
+    rows = tail_of_record(room)
     rows.pop while !rows.empty? && Tui.strip_ansi(rows.last.to_s).strip.empty?
     rows.empty? ? [] : rows + ['']
   end
@@ -129,7 +174,10 @@ module Wizard
     indented(problem, :red) { |row| tail << row }
     tail << ''
     room = [Tui.term_height - tail.size - 1, 2].max
-    rows = context.size > room ? context.last(room) : context.dup
+    # Through the same trim as context_above and confirm: three places cut
+    # the record, and a rule that holds in two of them is a rule the third
+    # can break.
+    rows = tail_of_record(room)
     rows << '' unless rows.empty?
     Tui.frame(rows + tail, keep_last: tail.size)
   end
@@ -198,7 +246,19 @@ module Wizard
   # is unavailable or the file comes back empty.
   def ask_text(label, current, hint: nil, comment: nil)
     if Tui.interactive?
-      question_frame(label, hint, nil)
+      # ⚠️ Into the RECORD, not painted. This called question_frame, which
+      # paints the label and the hint -- and then confirm below paints its
+      # OWN frame from the record, straight over them. What a person was
+      # left looking at was "Open it in your editor? [y/N]" and nothing
+      # saying what "it" was: the same bare line for the About text and
+      # for the footer note, two different sections of the wizard asking
+      # an identical question. Down a pipe the label, the hint and the
+      # current value all arrive, so the terminal was the poorer of the
+      # two. Remembered, they survive the repaint and stand above the
+      # question they belong to.
+      remember(Tui.paint(label, :bold))
+      indented(hint, :dim) { |row| remember(row) }
+      remember(Tui.paint("   #{t('current_is', value: current.to_s.empty? ? t('empty_value') : current)}", :dim))
     else
       puts Tui.paint(label, :bold)
       puts Tui.paint("   #{hint}", :dim) if hint
@@ -389,7 +449,15 @@ module Wizard
   # which is a confirmation with its reason removed -- the one thing a
   # confirmation is for. Down a pipe there is no frame and nothing to wipe,
   # so it is printed there as before.
-  def confirm(prompt, default: nil, note: nil)
+  # escape: what the Esc key means here. :default is the wizard's promise
+  # -- Esc keeps what is there, same as Enter -- and it is right for every
+  # question about a SETTING. Pass false where a yes does something
+  # instead: Esc is the key people press to back out, and answering it
+  # with the convenient default is how the palette preview came to build
+  # a page and upload it to the live site on the cancel key.
+  ESCAPED = "\e[escaped]"
+
+  def confirm(prompt, default: nil, note: nil, escape: :default)
     lines = context.dup
     if note
       if Tui.interactive?
@@ -420,9 +488,15 @@ module Wizard
     # appended here.
     if Tui.interactive? && !lines.empty?
       room = [Tui.term_height - 4, 2].max
-      Tui.frame((lines.size > room ? lines.last(room) : lines) + ['', ''])
+      # Through the same trim as context_above: both of them cut the
+      # record, and a rule that held in only one of them is a rule the
+      # other can break.
+      Tui.frame(tail_of_record(room, lines) + ['', ''])
     end
-    answer = Tui.key_choice(prompt)
+    # ESCAPED is a value no keypress and no typed line can produce, so it
+    # cannot collide with a real answer.
+    answer = Tui.key_choice(prompt, escape: escape == :default ? '' : ESCAPED)
+    return false if answer == ESCAPED
     return default if default != nil && answer.to_s.empty?
 
     # The key that means yes comes from the locale, the way the prompt

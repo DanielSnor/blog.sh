@@ -1,0 +1,9 @@
+{
+  "name": "blog.sh",
+  "short_name": "blog.sh",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fbfbfa",
+  "theme_color": "#0f6e70",
+  "icons": []
+}

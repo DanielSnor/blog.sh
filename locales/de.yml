@@ -36,6 +36,8 @@ build:
   # irgendeiner Zahl immer falsch; Beschriftung und Doppelpunkt bei keiner.
   summary: "Gebaut nach %{dir} -- Beiträge: %{posts}, Listenseiten: %{pages}, Schlagwortseiten: %{tags}, dazu ein Suchindex, RSS-Feed und Sitemap"
   drafts: "Entwürfe in Arbeit (nur Vorschau, in keiner Liste): %{count}"
+  reused: "Seiten unverändert, nicht neu gebaut: %{count}"
+  full: "Vollständiger Build -- jede Seite gerendert und verglichen."
   two_pages: "⚠️  %{count} Beiträge werden unter /%{slug}/ ausgeliefert, tatsächlich aber nur einer:"
   two_pages_fix: "   Die Site wird weiterhin gebaut, die Adresse behält der ÄLTERE; der andere bleibt\n   in der Sitemap und in der Suche und führt Leser zu fremdem Text.\n   Gib einem von beiden einen anderen Slug (./blog.sh props -> Adresse)."
   # Was der Build über das sagt, was er nicht gebaut hat -- in der
@@ -62,6 +64,9 @@ build:
   # Medienordner nicht hat. Jeder Import, der auf einen toten Bild-Host
   # traf, hinterlässt ein paar davon.
   media_missing: "⚠️  %{slug}: nennt eine Mediendatei, die sein Ordner nicht hat -- %{filename}. Die Seite verlinkt sie weiterhin, diese Adresse bleibt also ein 404, bis die Datei da ist."
+  name_not_ours: "⚠️  %{path} ist ein Name, den bereits eine andere Datei trägt — ein Link oder ein Symlink, den jemand dort gelassen hat. Ein Schreibvorgang würde diese andere Datei treffen, also blieb sie unberührt und diese Seite oder dieses Bild fehlt auf der Website."
+  media_unplaceable: "⚠️  %{path} konnte nicht abgelegt werden (%{reason}). Die Seite verweist weiterhin darauf, diese Adresse bleibt also ein 404."
+  prune_failed: "⚠️  %{path} gehört nicht mehr zur Website, konnte aber nicht entfernt werden (%{reason}). Sie bleibt liegen und wird weiter veröffentlicht, solange etwas sie festhält."
   # Gar nicht die Schuld eines Archivs: der Spickzettel kommt mit der Engine.
   cheat_sheet_missing: "⚠️  %{path} fehlt -- die Spickzettel-Seite /markdown/ wird nicht gebaut. Sie kommt mit der Engine; meist steckt ein schiefgegangener Pull dahinter."
   # Der Schluss der Bilanz, gezählt mit Beschriftung wie alles darüber.
@@ -223,12 +228,15 @@ cli:
   buffer_restored: "Wiederhergestellt -- der Editor öffnet sich mit diesem Text."
   buffer_discarded: "Verworfen."
   buffer_kept_for_now: "Bleibt in %{path} -- sobald du in dieser Sitzung etwas schreibst, wird er ersetzt."
-  buffer_still_kept: "Nichts geändert, der wiederhergestellte Text bleibt also in %{path} -- das nächste add/edit bietet ihn erneut an."
+  buffer_still_kept: "Nichts geändert, der Text in %{path} liegt also weiterhin dort -- das nächste add/edit bietet ihn erneut an."
   image_dimensions_unknown: "⚠️  %{file}: Die Bildgröße ist nicht lesbar, die Seite kann keinen Platz dafür reservieren und springt beim Laden möglicherweise. PNG, JPEG, GIF und WebP werden immer gelesen."
   image_heic_hint: "   HEIC zeigt nur Safari an -- wandle es zuerst um: sips -s format jpeg DATEI --out DATEI.jpg (macOS), heif-convert DATEI DATEI.jpg (Linux)."
   frontmatter_date_invalid: "❌ Das Datum %{value} lässt sich nicht lesen -- erwartet YYYY-MM-DD [HH:MM]. Der Text bleibt im Puffer; öffne den Beitrag nach der Korrektur erneut."
+  frontmatter_date_invalid_file: "❌ Das Datum %{value} ist nicht lesbar -- erwartet wird YYYY-MM-DD [HH:MM]. Es wurde nichts geschrieben; korrigiere das Datum in der Datei und starte es erneut."
   post_changed_while_editing: "❌ '%{slug}' wurde während des Bearbeitens auf der Festplatte geändert (der Cron veröffentlicht geplante Beiträge selbst). Es wurde nichts gespeichert, also ging von dieser Änderung nichts verloren -- öffne den Beitrag erneut und wende deine Änderung auf die aktuelle Fassung an."
   unknown_frontmatter_key: "❌ Unbekannter Schlüssel im Kopf: %{keys}. Bekannt: %{known}. Ein Tippfehler würde beim Speichern still verworfen, also wurde nichts geschrieben -- dein Text bleibt erhalten, siehe unten."
+  publish_key_file_only: "❌ %{keys} wird nur gelesen, wenn ein Beitrag als Datei kommt (./blog.sh add <Datei>). Hier täte er nichts, also wurde nichts gespeichert -- die Zeile entfernen und mit ./blog.sh publish <slug> veröffentlichen."
+  unknown_frontmatter_key_file: "❌ Unbekannter Schlüssel im Kopf: %{keys}. Bekannt sind: %{known}. Ein Tippfehler würde beim Speichern still verworfen, also wurde nichts geschrieben -- korrigiere den Schlüssel in der Datei und starte es erneut."
   heic_refused: "❌ %{files}: HEIC zeigt nur Safari an -- andere Browser würden ein kaputtes Bild zeigen. Es wurde nichts gespeichert, die Datei bleibt, wo sie ist. Wandle sie zuerst um (%{command}), oder setze media.convert_heic: true in config/site.yml und die Engine erledigt das selbst."
   heic_no_tool: "❌ %{files}: media.convert_heic ist an, aber kein Konverter wurde gefunden (versucht: sips, heif-convert, heif-dec, magick/convert, vips). Es wurde nichts gespeichert. Wandle von Hand um: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC umgewandelt via %{tool})."
@@ -294,6 +302,21 @@ cli:
   template_unchanged: "Vorlage unverändert (nicht gespeichert?), es wurde kein Beitrag angelegt."
   empty_content: "Leerer Inhalt, nichts geschrieben."
   wrote_draft: "Als Entwurf gespeichert: %{path}"
+  add_file_not_found: "Keine solche Datei: %{file}. Ein bloßer Name wird in incoming/ gesucht; alles mit einem Verzeichnis darin wird so genommen, wie es dasteht."
+  bad_reference: "Ein Bildverweis nennt einen Pfad: %{reference}. Dieser Lauf folgt keinen Pfaden -- ein Bild muss für sich stehen (foto.jpg), und die Datei muss mit dem Text in incoming/ angekommen sein. Es wurde nichts geschrieben."
+  add_file_not_a_file: "Keine Datei: %{file}. Das ist ein Verzeichnis, ein ins Leere zeigender Link oder etwas anderes, woraus sich kein Beitrag lesen lässt."
+  add_file_unreadable: "Kann %{file} nicht lesen: %{reason}. Kam die Datei per Upload, gehört sie womöglich dem Upload-Konto und nicht diesem -- `chmod 644` hilft, oder die Aufnahme in dessen Gruppe."
+  add_extra_arguments: "Eine Datei nach der anderen. Das hier blieb übrig, und es ist nichts damit geschehen: %{extra}"
+  add_file_not_text: "Nicht als Text lesbar: %{file}. `add` nimmt eine Markdown-Datei — diese ist kein gültiges UTF-8, also vermutlich ein Foto, ein Office-Dokument oder eine unfertige Übertragung."
+  add_file_empty: "Nichts zu schreiben: %{file} hat unter dem Frontmatter keinen Inhalt."
+  add_file_missing_images: "Diese Dateien sind noch nicht da: %{files}. Lade sie zuerst nach %{dir} — es wurde nichts geschrieben. (Das interaktive `add` wartet darauf, hier ist aber niemand zum Warten.)"
+  add_json_needs_file: "--json braucht eine Datei zum Lesen: `add <Datei> --json`. Ohne sie öffnet `add` einen Editor, und bis der geschlossen ist, gibt es nichts zu melden."
+  add_unknown_option: "Unbekannte Option: %{option}. add kennt eine Datei, --json und --untrusted."
+  publish_unknown_option: "Unbekannte Option: %{option}. publish kennt einen Slug, --yes und --no-announce."
+  publish_yes_needs_slug: "--yes muss den Beitrag benennen: `publish <slug> --yes`. Ohne Slug bietet publish die Entwürfe zur Auswahl an — und ausgewählt wird vor der Vorschau, nicht einen Tastendruck von einer Ankündigung entfernt, die sich nicht zurückholen lässt."
+  no_announce_not_scheduled: "Achtung: --no-announce erreicht die geplante Veröffentlichung nicht. Der Cron richtet sich nach dem Beitrag selbst und kündigt ihn zu seinem Termin an. Soll er still bleiben, veröffentliche ihn von Hand mit --no-announce oder markiere ihn als unlisted."
+  publish_yes_ambiguous: "Den Slug %{slug} gibt es in mehr als einem Jahr (%{years}), und --yes hat niemanden, den es fragen könnte. Veröffentliche ihn über `props %{slug}`, wo sie angezeigt und ausgewählt werden können."
+  toot_skipped_old: "Keine Ankündigung: das Datum (%{date}) liegt außerhalb des Frischefensters, und diese Frage kann hier niemand beantworten. Der Beitrag ist veröffentlicht; mit `toot` lässt er sich von Hand ankündigen."
   incoming_not_cleaned: "In incoming/ geblieben: %{files} — die Kopie steckt im Beitrag, das Original ließ sich nicht löschen (keine Schreibrechte auf incoming/). Räume es von Hand weg, damit ein leeres incoming/ weiterhin heißt: nichts steht aus."
   generating_preview: "Erzeuge Vorschau"
   draft_saved_preview_pending: "Der Entwurf ist gespeichert. Die Vorschau erscheint nach einem erfolgreichen Deploy -- dann ./blog.sh edit %{slug} ausführen"
@@ -440,6 +463,22 @@ cli:
 
   edited_label: "Bearbeitet: %{path}"
 
+  empty_trash_none: "Der Papierkorb ist leer."
+
+  empty_trash_confirm: "%{count} Eintrag/Einträge endgültig aus dem Papierkorb löschen und %{size} freigeben? Das lässt sich nicht rückgängig machen. Zur Bestätigung eintippen, wie viele EINTRÄGE gelöscht werden: "
+
+  empty_trash_done: "Papierkorb geleert: %{count} Eintrag/Einträge, %{size} frei."
+
+  empty_versions_none: "Jeder Beitrag behält bereits nur seine letzte Fassung."
+
+  empty_versions_confirm: "%{count} ältere Fassung(en) löschen und %{size} freigeben? Die neueste Fassung jedes Beitrags bleibt. Zur Bestätigung eintippen, wie viele DATEIEN gelöscht werden: "
+
+  empty_versions_done: "Ältere Fassungen entfernt: %{count}, %{size} frei. Jeder Beitrag behält seine neueste."
+
+  empty_cancelled: "Es wurde nichts gelöscht."
+
+  empty_what: "Sag, was geleert werden soll: ./blog.sh empty trash oder ./blog.sh empty versions."
+
   confirm_delete: "'%{slug}' wirklich löschen? Zur Bestätigung den Slug eintippen: "
   delete_takes_announcement: "Dieser Beitrag wurde unter %{url} angekündigt -- beim Löschen verschwindet auch die Ankündigung und alles, was darunter geschrieben wurde. Das Wiederherstellen bringt den Beitrag zurück, den Thread nicht."
   deleted_label: "Gelöscht (im Papierkorb, zurückholen mit ./blog.sh restore %{slug}): %{path}"
@@ -478,18 +517,25 @@ cli:
   header_mode: "Modus: %{mode}"
   usage: |
     Verwendung:
-      ./blog.sh add                  legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht
+      ./blog.sh add [<Datei>]        legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht;
+                                     mit einer Markdown-Datei fragt es gar nichts und schreibt nur den Entwurf --
+                                     der Weg für Handy, Skript oder Kurzbefehl (--json meldet das Ergebnis als Daten)
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh props [<slug>]       zeigt Status und Aktionen eines Beitrags (veröffentlichen, zurückziehen, Slug umbenennen, löschen...)
-      ./blog.sh publish [<slug>]     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit)
+      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+                                     zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit);
+                                     --yes veröffentlicht sofort ohne Rückfrage, --no-announce hält ihn von Mastodon und Bluesky fern
       ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
       ./blog.sh queue                die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
       ./blog.sh delete [<slug>]      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh restore [<slug>]     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt
+      ./blog.sh empty trash          löscht den Papierkorb endgültig; sagt vorher, wie viel darin ist
+      ./blog.sh empty versions       behält je Beitrag die neueste Fassung und entfernt die älteren
       ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
       ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
-      ./blog.sh rebuild              baut und deployt die ganze Seite, unabhängig von einem Beitrag
+      ./blog.sh rebuild [--full]     baut und deployt die ganze Seite, unabhängig von einem Beitrag;
+                                     --full baut jede Seite neu, nicht nur die geänderten
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte
@@ -534,6 +580,7 @@ cli:
   browse_filter_none: "alle"
   browse_state_published: "veröffentlicht"
   browse_state_draft: "in Arbeit"
+  browse_state_unpublished: "noch nicht veröffentlicht"
   browse_state_scheduled: "geplant"
   browse_state_pinned: "angepinnt"
   browse_menu_hint: "↑↓ bewegen · Enter wählen · Esc zurück"
@@ -849,6 +896,21 @@ import:
 # welcher Datei die Einstellung steht, geschweige denn unter welchem
 # Schlüssel.
 doctor:
+  tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."
+  tag_icon_stripped: "Das `icon_svg` des Schlagworts „%{tag}“ enthält etwas, das die Engine vor dem Rendern entfernt — ein Skript, ein Style, einen Event-Handler oder eine javascript:-Adresse. Die Seiten sind sicher; das Symbol ist aber nicht mehr das, woher es kopiert wurde."
+  social_icon_unknown: "Der Link „%{name}“ in der Fußzeile verlangt ein Symbol namens „%{icon}“, das die Engine nicht hat — an seiner Stelle bleibt eine Lücke. Vorhanden sind: %{known}. Ein eigenes SVG gehört in `icon_svg`."
+  social_shape: "Ein Eintrag unter `social:` ist kein Mapping. Jeder braucht `name:`, `url:` und `icon:`; alles andere wird als leer gelesen und reißt den Build mit."
+  social_icon_missing: "Der Link „%{name}“ in der Fußzeile nennt gar kein Symbol und veröffentlicht auf jeder Seite eine leere, nicht anklickbare Stelle."
+  social_icon_not_svg: "Das `icon_svg` des Fußzeilen-Links „%{name}“ ist kein SVG — sein Inhalt erscheint als Text in der Fußzeile jeder Seite."
+  social_icon_scale: "Das `icon_svg` des Fußzeilen-Links „%{name}“ ist nicht auf dem 24er-Raster gezeichnet (`viewBox=\"0 0 24 24\"`) und sitzt daneben schief."
+  social_icon_stripped: "Das `icon_svg` des Fußzeilen-Links „%{name}“ enthält etwas, das die Engine vor dem Rendern entfernt — ein Skript, ein Style, einen Event-Handler oder eine javascript:-Adresse."
+  share_unknown: "`share:` nennt „%{name}“ — dorthin kann die Engine niemanden schicken; der Eintrag entfällt und es erscheint keine Schaltfläche. Bekannt sind: %{known}."
+  tag_icon_shape: "Ein Eintrag unter `tag_icons` ist keine Zuordnung -- jeder braucht ein `tag` und dazu einen `icon`-Namen oder ein eigenes `icon_svg`."
+  tag_icon_no_tag: "Ein Eintrag unter `tag_icons` hat kein `tag`, gehört also zu nichts und zeichnet nichts."
+  tag_icon_unknown: "Das Schlagwort „%{tag}“ verlangt das Symbol „%{icon}“, das diese Engine nicht hat. Bekannt sind: %{known}. Für alles andere nimm ein eigenes `icon_svg`."
+  tag_icon_not_svg: "Das `icon_svg` des Schlagworts „%{tag}“ enthält kein <svg>-Element, es wird also nichts gezeichnet."
+  tag_icon_scale: "Das `icon_svg` des Schlagworts „%{tag}“ ist nicht auf dem 24er-Raster der übrigen Symbole gezeichnet (`viewBox=\"0 0 24 24\"`) und sitzt im Datumsschild schief."
+  trash_holds: "Im Papierkorb liegen %{count} Eintrag/Einträge, %{size} — gelöschte Beiträge und alles, was `check --repair` beiseitegelegt hat. Sie lassen sich noch zurückholen; `./blog.sh empty trash` löscht sie endgültig."
   heading: "Prüfung dieser Installation"
   running_online: "Prüft auch, ob Server und Zugriffstoken noch antworten (--online)"
   summary: "%{errors} Problem(e), %{warnings} zum Nachsehen, %{oks} in Ordnung."
@@ -1096,6 +1158,8 @@ check:
   media_stray: "Beitrag %{slug} nennt die Datei %{file} in seinem Medienverzeichnis nicht mehr."
   media_stray_fix: "Übrig von einem Bild, das die Quelle zwischen Importen entfernt oder umbenannt hat. Der Beitrag verweist nicht darauf; sieh nach und lösche sie selbst."
   address_duplicate: "%{count} Beiträge würden unter /posts/%{year}/%{slug}/ ausgeliefert."
+  post_unknown_type: "Der Beitrag „%{slug}“ verlangt `type: %{type}`, den diese Engine nicht kennt -- er wird gespeichert und von niemandem gelesen, also bekommt der Beitrag keine eigene Liste, keinen Menüeintrag und kein Symbol."
+  post_unknown_type_fix: "Bekannt sind diese acht: text, quote, chat, image, video, audio, link, document. Für einen eigenen Bereich nimm ein SCHLAGWORT und nenne es in `nav:` -- das ergibt eine Liste mit eigener Seitennummerierung, einen Menüeintrag und einen RSS-Feed, was ein Inhaltstyp nicht gibt."
   page_reserved_slug: "Die Seite „%{slug}“ läge auf einer Adresse, die die Engine selbst schreibt (/%{slug}/), deshalb weigert sich der Build -- die Seite steht nicht auf der Website."
   page_reserved_slug_fix: "Benenne sie um. Der Build sagt es bei jedem Durchlauf, aber eine Warnung, die durchrollt, ist genau der Grund, warum eine Seite monatelang fehlt."
   post_unreadable: "%{file} ließ sich nicht lesen (%{reason})."
@@ -1294,6 +1358,7 @@ wizard:
   prompt_with_current: "Jetzt: %{current}\n> "
   prompt_with_suggestion: "Vorschlag: %{current}\n> "
   empty_value: "(nicht gesetzt)"
+  current_is: "Jetzt: %{value}"
   choice_prompt: "Auswahl: "
   menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc aktuellen Wert behalten"
   interrupted: "Abgebrochen. Es wurde nichts geschrieben -- die Konfiguration ist genau wie vorher."
@@ -1536,3 +1601,21 @@ style:
 
 lock:
   busy: "Ein anderer %{who}Lauf ist noch unterwegs%{detail} -- dieser wird übersprungen. Nichts ist kaputt, versuche es gleich noch einmal."
+
+share:
+  heading: "Diesen Beitrag teilen"
+  mastodon: "Auf Mastodon teilen"
+  bluesky: "Auf Bluesky teilen"
+  email: "Per E-Mail teilen"
+  ask_label: "Auf welcher Mastodon-Instanz bist du? Dieser Browser merkt sie sich."
+  ask_go: "Teilen"
+  change_instance: "Instanz ändern"
+  ask_invalid: "Das sieht nicht nach einer Instanz-Adresse aus. Versuche es mit mastodon.social."
+  copy: "Link kopieren"
+  copied: "Link kopiert"
+  copy_failed: "Der Link konnte nicht kopiert werden"
+  system: "Teilen…"
+  facebook: "Auf Facebook teilen"
+  linkedin: "Auf LinkedIn teilen"
+  threads: "Auf Threads teilen"
+  x: "Auf X teilen"

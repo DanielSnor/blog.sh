@@ -25,6 +25,7 @@ from both.
    | `date_format`, `date_time_format` | everyone -- strftime formats for every rendered date |
    | `thousands_separator`, `decimal_point` | nobody reads these as words: they are how a number is written, not a message. English keeps `,` and `.`, German swaps them, Czech separates thousands with a non-breaking space. Only `./blog.sh stats` formats numbers through them |
    | `nav`, `post`, `pagination`, `tag`, `type`, `series`, `index`, `search`, `not_found`, `markdown_page`, `ui`, `redirect` | site visitors -- the chrome, the listings, a post's own furniture (reading time, contents, series navigation), the 404 page and the one line an old address shows while it forwards |
+   | `share` | site visitors -- the row of controls under a post, including the question the Mastodon button asks and the two lines the copy button swaps between |
    | `js` | site visitors -- shipped into the browser for client-rendered strings; `js.date_locale` is a BCP-47 tag (`de-DE`) and must agree with `date_format`, or server- and client-rendered dates diverge |
    | `build` | authors -- what `ruby build/build_blog.rb` says while it renders: both lines it signs off with, and everything it names as not built -- a post, a page, a tag, a redirect, a picture a post's media folder does not hold |
    | `cli` | authors -- `./blog.sh`, the wizard, `$EDITOR` hints |
@@ -37,6 +38,18 @@ from both.
    generated `/markdown/` syntax page. Optional: without it the page falls
    back to English wholesale. Translate the prose, keep the syntax examples
    as they are -- they are what the page exists to show.
+
+3. **`write/locales/<lang>.yml`** -- the strings of the `/write/` page,
+   which is a separate app: it runs in a browser with no Ruby behind it,
+   so its locales are compiled into `write/i18n.js` by
+   `ruby write/build-i18n.rb`. Copy `write/locales/en.yml`, translate the
+   values, run that script, and commit the generated file with them; it
+   reports every key that still falls back to English as it goes. The
+   `error` section is the codes `scripts/receive.sh` and `add --json`
+   return -- the server sends a code, never translated text, and this is
+   where it becomes a sentence. Optional the way the cheat sheet is: a
+   page with no locale of its own falls back to English key by key, and a
+   site without `write: true` never publishes it at all.
 
 That's the whole list. `README.md` and `docs/` stay English.
 

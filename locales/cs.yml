@@ -35,6 +35,8 @@ build:
   # sedí u všech.
   summary: "Postaveno do %{dir} — postů: %{posts}, stránek výpisu: %{pages}, štítkových stránek: %{tags}, k tomu index hledání, RSS a mapa webu"
   drafts: "Rozepsané drafty (jen náhled, v žádném výpisu nejsou): %{count}"
+  reused: "Stránek beze změny, nepřestavěny: %{count}"
+  full: "Úplný build -- každá stránka vyrenderována a porovnána."
   two_pages: "⚠️  Na adrese /%{slug}/ se servíruje víc postů (%{count}), doopravdy ale jen jeden:"
   two_pages_fix: "   Web se postaví a adresu si nechá ten STARŠÍ; ten druhý zůstane v mapě webu\n   i ve vyhledávání a povede čtenáře na cizí text.\n   Dej jednomu z nich jiný slug (./blog.sh props → adresa)."
   # Co build říká o tom, co postavit odmítl, v pořadí, jak na to naráží.
@@ -60,6 +62,9 @@ build:
   # nemá. Každý import, co narazil na mrtvý obrázkový hosting, jich pár
   # zanechá.
   media_missing: "⚠️  %{slug}: jmenuje soubor médií, který ve své složce nemá — %{filename}. Stránka na něj pořád odkazuje, takže ta adresa bude 404, dokud soubor nedodáš."
+  name_not_ours: "⚠️  %{path} je jméno, které už nosí jiný soubor — odkaz, nebo symlink, co tam někdo nechal. Zápis by dosáhl na ten druhý soubor, takže jsme na něj nesáhli a tahle stránka nebo fotka na webu není. Přesuň nebo smaž to, co jméno drží, a spusť build znovu."
+  media_unplaceable: "⚠️  %{path} se nepodařilo umístit (%{reason}). Stránka na něj dál odkazuje, takže ta adresa zůstane 404, dokud zápis nepůjde."
+  prune_failed: "⚠️  %{path} už na web nepatří, ale nešel odstranit (%{reason}). Zůstává, kde je, a deploy ho bude dál publikovat, dokud ho něco drží."
   # Tohle už není věc archivu: taháček chodí s enginem.
   cheat_sheet_missing: "⚠️  %{path} chybí — stránka /markdown/ s taháčkem se nepostaví. Chodí s enginem; nejčastěji za to může nepovedený pull."
   # Konec podpisu buildu, počítaný s popiskem jako všechno nad ním.
@@ -218,12 +223,15 @@ cli:
   buffer_restored: "Obnoveno — editor se otevře s tím textem."
   buffer_discarded: "Zahozeno."
   buffer_kept_for_now: "Zůstává v %{path} — jakmile v tomhle sezení něco napíšeš, přepíše se."
-  buffer_still_kept: "Nic se nezměnilo, obnovený text tedy zůstává v %{path} — další add/edit ho nabídne znovu."
+  buffer_still_kept: "Nic se nezměnilo, text v %{path} tedy pořád leží — další add/edit ho nabídne znovu."
   image_dimensions_unknown: "⚠️  %{file}: rozměry obrázku nejde přečíst, takže mu stránka nemůže rezervovat místo a při načtení může poskočit. PNG, JPEG, GIF a WebP se čtou vždy."
   image_heic_hint: "   HEIC zobrazí jen Safari — nejdřív ho převeď: sips -s format jpeg SOUBOR --out SOUBOR.jpg (macOS), heif-convert SOUBOR SOUBOR.jpg (Linux)."
   frontmatter_date_invalid: "❌ Datum %{value} nejde přečíst — čekám YYYY-MM-DD [HH:MM]. Text je uložený v bufferu, po opravě otevři post znovu."
+  frontmatter_date_invalid_file: "❌ Datum %{value} nejde přečíst — čekám YYYY-MM-DD [HH:MM]. Nic se nezapsalo, oprav datum v souboru a spusť to znovu."
   post_changed_while_editing: "❌ '%{slug}' se během editace změnil na disku (cron publikuje naplánované posty sám). Nic se neuložilo, takže se z té změny nic neztratilo — otevři post znovu a udělej úpravu nad aktuální verzí."
   unknown_frontmatter_key: "❌ Neznámý klíč v hlavičce: %{keys}. Znám: %{known}. Překlep by se při uložení tiše zahodil, takže se nic nezapsalo — text ti zůstal, viz níže."
+  publish_key_file_only: "❌ %{keys} se čte jen u postu, který přišel jako soubor (./blog.sh add <soubor>). Tady by neudělal nic, tak se nic neuložilo -- řádek vymaž a publikuj přes ./blog.sh publish <slug>."
+  unknown_frontmatter_key_file: "❌ Neznámý klíč v hlavičce: %{keys}. Znám: %{known}. Překlep by se při uložení tiše zahodil, takže se nic nezapsalo — oprav klíč v souboru a spusť to znovu."
   heic_refused: "❌ %{files}: HEIC zobrazí jen Safari — ostatní prohlížeče by ukázaly rozbitý obrázek. Nic se neuložilo a soubor zůstává, kde je. Nejdřív ho převeď (%{command}), nebo zapni media.convert_heic: true v config/site.yml a engine to udělá sám."
   heic_no_tool: "❌ %{files}: media.convert_heic je zapnuté, ale žádný převodník se nenašel (zkoušeno sips, heif-convert, heif-dec, magick/convert, vips). Nic se neuložilo. Převeď ručně: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC převeden přes %{tool})."
@@ -282,6 +290,21 @@ cli:
   template_unchanged: "Šablona zůstala beze změny (neuloženo?), post nevznikl."
   empty_content: "Prázdný obsah, nic se nezapsalo."
   wrote_draft: "Zapsáno jako draft: %{path}"
+  add_file_not_found: "Takový soubor není: %{file}. Samotné jméno se hledá v incoming/, cesta s adresářem se bere tak, jak je."
+  bad_reference: "Odkaz na obrázek jmenuje cestu: %{reference}. Tenhle běh cesty nenásleduje — obrázek se musí jmenovat sám za sebe (foto.jpg) a soubor musí přijít do incoming/ spolu s textem. Nic se nezapsalo."
+  add_file_not_a_file: "Tohle není soubor: %{file}. Je to adresář, odkaz do prázdna, nebo něco jiného, z čeho post přečíst nejde."
+  add_file_unreadable: "Nejde přečíst %{file}: %{reason}. Pokud přišel nahráním, může patřit uploadovacímu účtu a ne tomuhle — pomůže `chmod 644`, nebo se přidat do jeho skupiny."
+  add_extra_arguments: "Jeden soubor po druhém. Tohle zbylo a nic se s tím nestalo: %{extra}"
+  add_file_not_text: "Nejde přečíst jako text: %{file}. `add` bere soubor s markdownem — tenhle není platné UTF-8, takže je to nejspíš fotka, dokument z kanceláře, nebo nedokončený přenos."
+  add_file_empty: "Není co zapsat: %{file} nemá pod hlavičkou žádný obsah."
+  add_file_missing_images: "Tyhle soubory tu ještě nejsou: %{files}. Nahraj je nejdřív do %{dir} — nic se nezapsalo. (Interaktivní `add` na ně počká, tady ale není kdo by čekal.)"
+  add_json_needs_file: "--json potřebuje soubor ke čtení: `add <soubor> --json`. Bez něj `add` otevře editor a až do jeho zavření není co hlásit."
+  add_unknown_option: "Neznámý přepínač: %{option}. add bere soubor, --json a --untrusted, nic jiného."
+  publish_unknown_option: "Neznámý přepínač: %{option}. publish bere slug, --yes a --no-announce, nic jiného."
+  publish_yes_needs_slug: "--yes musí pojmenovat post: `publish <slug> --yes`. Bez slugu nabídne publish drafty na výběr — a vybírat se má nad náhledem, ne jedním klávesovým úhozem od oznámení, které nejde vzít zpět."
+  no_announce_not_scheduled: "Pozor: --no-announce se do naplánované publikace nepřenese. Cron se řídí samotným postem, takže ho v jeho čase oznámí. Když má zůstat potichu, publikuj ho ručně s --no-announce, nebo ho označ jako unlisted."
+  publish_yes_ambiguous: "Slug %{slug} je ve víc než jednom roce (%{years}) a --yes se nemá koho zeptat, který to má být. Publikuj ho přes `props %{slug}`, kde se ukážou a dají vybrat."
+  toot_skipped_old: "Bez oznámení: datum (%{date}) je mimo okno čerstvosti a tuhle otázku tu nemá kdo zodpovědět. Post je publikovaný, oznámit se dá ručně přes `toot`."
   incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je v postu, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně, ať dál platí, že prázdné incoming = nic nečeká."
   generating_preview: "Generuji náhled"
   draft_saved_preview_pending: "Draft je uložený. Náhled se ukáže po úspěšném nasazení — pak spusť ./blog.sh edit %{slug}"
@@ -428,6 +451,22 @@ cli:
 
   edited_label: "Upraveno: %{path}"
 
+  empty_trash_none: "Koš je prázdný."
+
+  empty_trash_confirm: "Vysypat koš nadobro — položek: %{count}, uvolní se %{size}? Tohle vzít zpět nejde. Pro potvrzení napiš, kolik položek se maže: "
+
+  empty_trash_done: "Koš vysypán: položek %{count}, uvolněno %{size}."
+
+  empty_versions_none: "Každý post už si drží jen svou poslední verzi."
+
+  empty_versions_confirm: "Smazat starší verze — souborů: %{count}, uvolní se %{size}? Nejnovější verze každého postu zůstane. Pro potvrzení napiš, kolik souborů se maže: "
+
+  empty_versions_done: "Starších verzí odstraněno: %{count}, uvolněno %{size}. Každý post si nechal tu nejnovější."
+
+  empty_cancelled: "Nic se nesmazalo."
+
+  empty_what: "Řekni, co vysypat: ./blog.sh empty trash, nebo ./blog.sh empty versions."
+
   confirm_delete: "Opravdu smazat '%{slug}'? Napiš slug pro potvrzení: "
   delete_takes_announcement: "Tenhle post byl oznámený na %{url} — smazáním zmizí i to oznámení a všechno, co se pod ním napsalo. Obnova vrátí post, vlákno už ne."
   deleted_label: "Smazáno (v koši, obnovíš přes ./blog.sh restore %{slug}): %{path}"
@@ -466,18 +505,25 @@ cli:
   header_mode: "Režim: %{mode}"
   usage: |
     usage:
-      ./blog.sh add                  založí draft, ukáže náhled a zeptá se, co dál
+      ./blog.sh add [<soubor>]       založí draft, ukáže náhled a zeptá se, co dál;
+                                     se souborem s markdownem se nezeptá na nic a jen zapíše draft,
+                                     což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
       ./blog.sh props [<slug>]       ukáže stav postu a jeho akce (publikovat, stáhnout z webu, přejmenovat slug, smazat…)
-      ./blog.sh publish [<slug>]     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty)
+      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+                                     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty);
+                                     --yes publikuje rovnou bez ptaní, --no-announce nechá post mimo Mastodon a Bluesky
       ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
       ./blog.sh queue                fronta naplánovaných postů — pořadí, publikace hned, vyřazení zpět do draftů
       ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
       ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
       ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
+      ./blog.sh empty trash          nadobro smaže všechno v koši; napřed řekne kolik toho je
+      ./blog.sh empty versions       nechá každému postu poslední verzi a starší smaže
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
-      ./blog.sh rebuild              znovu sestaví a nasadí celý web, bez vazby na konkrétní post
+      ./blog.sh rebuild [--full]     znovu sestaví a nasadí celý web, bez vazby na konkrétní post;
+                                     --full sestaví znovu každou stránku, ne jen ty změněné
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      vypíše posty po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
@@ -522,6 +568,7 @@ cli:
   browse_filter_none: "vše"
   browse_state_published: "publikované"
   browse_state_draft: "rozepsané"
+  browse_state_unpublished: "nepublikované"
   browse_state_scheduled: "naplánované"
   browse_state_pinned: "připnuté"
   browse_menu_hint: "↑↓ pohyb · Enter vybrat · Esc zpět"
@@ -837,6 +884,21 @@ import:
 # čte ho někdo, kdo neví, ve kterém souboru to nastavení bydlí, natož pod
 # kterým klíčem.
 doctor:
+  tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."
+  tag_icon_stripped: "`icon_svg` štítku „%{tag}“ nese něco, co engine před vykreslením odstraní — skript, styl, obsluhu události nebo adresu javascript:. Stránky jsou v pořádku; ikona ale není tím, odkud byla zkopírovaná, a jestli tomu zdroji věřit, rozhodne jen ten, kdo ji vkládal."
+  social_icon_unknown: "Odkaz „%{name}“ v patičce chce ikonu „%{icon}“, kterou engine nemá — nakreslí se prázdné místo. Umí tyhle: %{known}. Vlastní SVG patří do `icon_svg`."
+  social_shape: "Položka pod `social:` není mapování. Každá chce `name:`, `url:` a `icon:`; cokoli jiného se čte jako prázdno a shodí s sebou build."
+  social_icon_missing: "Odkaz „%{name}“ v patičce nemá žádnou ikonu, takže na každé stránce publikuje prázdné místo, na které nejde kliknout. Dej mu `icon:` ze seznamu, který engine veze, nebo vlastní `icon_svg:`."
+  social_icon_not_svg: "`icon_svg` odkazu „%{name}“ v patičce není SVG — co v něm je, se vypíše jako text v patičce každé stránky."
+  social_icon_scale: "`icon_svg` odkazu „%{name}“ v patičce není kreslené na mřížce 24 jednotek jako ostatní ikony (`viewBox=\"0 0 24 24\"`), takže bude vedle nich nakřivo."
+  social_icon_stripped: "`icon_svg` odkazu „%{name}“ v patičce nese něco, co engine před vykreslením odstraní — skript, styl, obsluhu události nebo adresu javascript:. Stránky jsou v pořádku; ikona ale není tím, odkud byla zkopírovaná."
+  share_unknown: "`share:` jmenuje „%{name}“, což není místo, kam engine umí čtenáře poslat — vypadne to a žádné tlačítko se neukáže. Umí tohle: %{known}."
+  tag_icon_shape: "Položka v `tag_icons` není mapa — každá potřebuje `tag` a k tomu buď jméno v `icon`, nebo vlastní `icon_svg`."
+  tag_icon_no_tag: "Položka v `tag_icons` nemá `tag`, takže nepatří ničemu a nic nevykreslí."
+  tag_icon_unknown: "Štítek „%{tag}“ si říká o ikonu „%{icon}“, kterou engine nemá. Zná tyhle: %{known}. Na cokoli jiného použij vlastní `icon_svg`."
+  tag_icon_not_svg: "`icon_svg` štítku „%{tag}“ neobsahuje prvek <svg>, takže se nevykreslí nic."
+  tag_icon_scale: "`icon_svg` štítku „%{tag}“ není kreslené na mřížce 24 jednotek jako ostatní ikony (`viewBox=\"0 0 24 24\"`), takže bude v datovém razítku nakřivo."
+  trash_holds: "V koši leží položek: %{count}, celkem %{size} — vyhozené posty a to, co odložil `check --repair`. Pořád se dají vrátit; `./blog.sh empty trash` je smaže nadobro."
   heading: "Kontrola této instalace"
   running_online: "Kontroluju i dostupnost serverů a platnost tokenu (--online)"
   summary: "Problémů: %{errors}, ke zvážení: %{warnings}, v pořádku: %{oks}."
@@ -1082,6 +1144,8 @@ check:
   media_stray: "Post %{slug} už soubor %{file} ve svém adresáři médií nejmenuje."
   media_stray_fix: "Zbylo po obrázku, který zdroj mezi importy odebral nebo přejmenoval. Post na něj neodkazuje; až se podíváš, smaž ho sám."
   address_duplicate: "Na adrese /posts/%{year}/%{slug}/ by se servíroval víc než jeden post (%{count})."
+  post_unknown_type: "Post „%{slug}“ si říká o `type: %{type}`, který engine nezná — uloží se a nikdo ho nečte, takže post nedostane vlastní výpis, položku v menu ani ikonu."
+  post_unknown_type_fix: "Zná těchhle osm: text, quote, chat, image, video, audio, link, document. Na vlastní sekci použij ŠTÍTEK a jmenuj ho v `nav:` — dostaneš výpis s vlastním stránkováním, položku v menu a RSS feed, což by obsahový typ nedal."
   page_reserved_slug: "Stránka „%{slug}“ by seděla na adrese, kterou engine používá sám (/%{slug}/), takže ji build odmítá zapsat — na webu vůbec není."
   page_reserved_slug_fix: "Přejmenuj ji. Build to při každé přestavbě říká, jenže varování, které uteče v terminálu, je přesně to, kvůli čemu stránka chybí měsíce."
   post_unreadable: "Soubor %{file} se nepodařilo přečíst (%{reason})."
@@ -1280,6 +1344,7 @@ wizard:
   prompt_with_current: "Teď: %{current}\n> "
   prompt_with_suggestion: "Návrh: %{current}\n> "
   empty_value: "(nenastaveno)"
+  current_is: "Teď: %{value}"
   choice_prompt: "Volba: "
   menu_hint: "↑↓ pohyb · Enter vybrat · 1-%{count} rychlá volba · Esc nechat současné"
   interrupted: "Zastaveno. Nic se nezapsalo — konfigurace je přesně taková, jaká byla."
@@ -1522,3 +1587,21 @@ style:
 
 lock:
   busy: "Jiný běh %{who}ještě neskončil%{detail} — tenhle se přeskakuje. Nic není rozbité, zkus to za chvíli znovu."
+
+share:
+  heading: "Sdílet tenhle příspěvek"
+  mastodon: "Sdílet na Mastodonu"
+  bluesky: "Sdílet na Bluesky"
+  email: "Poslat e-mailem"
+  ask_label: "Na jaké mastodoní instanci jsi? Tenhle prohlížeč si ji zapamatuje."
+  ask_go: "Sdílet"
+  change_instance: "Změnit instanci"
+  ask_invalid: "Tohle nevypadá jako adresa instance. Zkus třeba mastodon.social."
+  copy: "Zkopírovat odkaz"
+  copied: "Odkaz zkopírován"
+  copy_failed: "Odkaz se nepodařilo zkopírovat"
+  system: "Sdílet…"
+  facebook: "Sdílet na Facebooku"
+  linkedin: "Sdílet na LinkedInu"
+  threads: "Sdílet na Threads"
+  x: "Sdílet na X"

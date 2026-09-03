@@ -345,7 +345,9 @@ footer:
 
 # icon = a name from the built-in set: mastodon, pixelfed, linkedin,
 # github, gitea, forgejo, codeberg, gitlab, bluesky, instagram, threads,
-# facebook, x, youtube, rss, email.
+# facebook, x, youtube, rss, email. A name it does not know draws nothing
+# at all -- a link with an empty space where the icon should be -- so
+# `./blog.sh doctor` says when it finds one.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is
@@ -370,6 +372,71 @@ social:
   - name: "E-mail"
     url: "mailto:you@example.com"
     icon: "email"
+
+# Icons for tags. A tag named here carries its icon in two places: the
+# heading of its own /tag/<name>/ listing, and the date badge of every post
+# that has it -- where it REPLACES the content-type icon rather than
+# joining it. A badge is a small tile with a date and one glyph; the only
+# thing that ever adds a second is a pinned post, and that stays the
+# exception.
+#
+# A LIST, because the order is the priority: most posts carry more than one
+# tag, and the tag a post was given first is usually the one an importer
+# added. The first entry here that a post has is the one it wears.
+#
+# `icon` names one the engine ships: text, quote, chat, image, video,
+# audio, link, document. `icon_svg` is your own -- drawn on the same
+# 24-unit grid (`viewBox="0 0 24 24"`) and stroked in `currentColor`, or it
+# will not follow the light and dark themes. Scripts, styles and event
+# handlers are stripped from it before it reaches a page.
+#
+# tag_icons:
+#   - tag: "fotografie"
+#     icon: "image"
+#   - tag: "kolo"
+#     icon_svg: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="17" r="4"/><circle cx="18" cy="17" r="4"/><path d="M6 17l4-9h5l3 9"/></svg>'
+# --- end of tag_icons ---
+
+# WHERE A READER CAN CARRY A POST AWAY TO. A list of network names; leave
+# it out and no block appears. What gets prefilled is the post's name and
+# its address -- the reader writes the part that is theirs.
+#
+# The names: mastodon, bluesky, email, facebook, linkedin, threads, x --
+# plain links, one address each -- plus copy, which puts the address on the
+# clipboard, and system, which hands the post to the operating system's own
+# share sheet (on a phone that is Signal and WhatsApp and Telegram at once).
+#
+# `mastodon` asks the reader once which instance they are on and remembers
+# it in their own browser; there is no way for a page to know it, and the
+# alternative is sending every reader through somebody else's redirector.
+# Those three -- mastodon, copy and system -- need the browser to
+# co-operate and are not drawn where it will not: copy needs https, system
+# needs a share sheet. A block left with nothing it can draw hides itself.
+#
+# Pixelfed is not on the list: it has no share address to send anyone to,
+# and a post there wants a photograph rather than a link.
+#
+# share:
+#   - mastodon
+#   - bluesky
+#   - email
+# --- end of share ---
+
+# A page at /write/ to write a post on a phone: a title, the text, tags
+# and photographs, and a button that hands the lot to an iOS shortcut,
+# which carries it over SSH to scripts/receive.sh. Nothing new listens on
+# the network and the page holds no secret -- sending needs the key that
+# lives in the shortcut, on the phone.
+#
+# Off by default. It is a page for whoever runs the blog, and a site that
+# writes from a desk has no use for it. Turning it on publishes five files
+# under /write/ and nothing else changes; the page is marked noindex.
+#
+# Setting it up is in docs/operations.md, under "A post sent from the
+# phone itself" -- the key, the forced command, and the shortcut.
+#
+# write: true
+# --- end of write ---
 
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's

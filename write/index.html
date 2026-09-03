@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>blog.sh</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f6e70">
+<!-- Nobody is meant to arrive here from a search: it is the desk, not the
+     shop. It holds nothing private, so this is tidiness rather than a
+     defence -- the only key it needs lives on the phone, in the shortcut. -->
+<meta name="robots" content="noindex">
+<style>
+/* System fonts on purpose: this is used on a train. A webfont that has to
+   be fetched is a blank screen exactly where the app is meant to work. */
+:root{
+  --bg:#fbfbfa; --surface:#ffffff; --sunk:#f2f3f4;
+  --text:#1a1c1e; --meta:#62666b; --border:#e2e4e6;
+  --accent:#0f6e70; --on-accent:#ffffff; --accent-soft:#e3f0f0;
+  --warn:#8a5a12; --bad:#a3341f;
+  --radius:8px;
+  --shadow:0 1px 2px rgba(26,28,30,.06), 0 8px 24px -18px rgba(26,28,30,.4);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#16181a; --surface:#1f2224; --sunk:#26292c;
+    --text:#e4e6e8; --meta:#9aa0a6; --border:#2f3336;
+    --accent:#5cb8ba; --on-accent:#08292a; --accent-soft:#173032;
+    --warn:#d8a657; --bad:#e8836b;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -18px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16181a; --surface:#1f2224; --sunk:#26292c;
+  --text:#e4e6e8; --meta:#9aa0a6; --border:#2f3336;
+  --accent:#5cb8ba; --on-accent:#08292a; --accent-soft:#173032;
+  --warn:#d8a657; --bad:#e8836b;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -18px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);
+  font:400 16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  -webkit-text-size-adjust:100%;
+  /* Room for the bar at the bottom, plus the home indicator on a phone.
+     A first guess only: the bar has a mode row and a message line now
+     and grows with the message, so the script below measures it and
+     sets the real figure. */
+  padding-bottom:calc(9rem + env(safe-area-inset-bottom))}
+.wrap{max-width:42rem;margin:0 auto;padding:1rem 1rem 0}
+
+/* The blog's own mark on the left, then two lines: what this page is, and
+   whose blog it writes to. The second line and the mark come from site.js,
+   which the build writes; without it the header is the first line alone. */
+header{display:flex;align-items:center;gap:.7rem;padding:.5rem 0 1rem}
+header .mark{width:2.4rem;height:2.4rem;border-radius:8px;flex:0 0 auto;object-fit:cover}
+header .titles{display:flex;flex-direction:column;gap:.05rem;min-width:0}
+header .line{display:flex;align-items:baseline;gap:.5rem}
+header h1{font-size:1.1rem;margin:0;letter-spacing:-.01em}
+header .sub{color:var(--meta);font-size:.9rem}
+header .site{color:var(--meta);font-size:.85rem;display:flex;gap:.4rem;flex-wrap:wrap;line-height:1.35}
+header .site-name{font-weight:600;color:var(--text)}
+header .kept{margin-left:auto;color:var(--meta);font-size:.75rem;align-self:flex-start;white-space:nowrap}
+
+.field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:1.1rem}
+.field > label{font-size:.8rem;font-weight:600;letter-spacing:.02em;text-transform:uppercase;
+  color:var(--meta)}
+.field .hint{color:var(--meta);font-size:.82rem;line-height:1.4}
+input[type=text],textarea{width:100%;background:var(--surface);color:var(--text);
+  border:1px solid var(--border);border-radius:var(--radius);padding:.7rem .8rem;
+  font:inherit;font-size:1rem}
+textarea{resize:vertical;line-height:1.6}
+#body{min-height:14rem}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* pictures */
+.shots{display:flex;flex-direction:column;gap:.6rem}
+.shot{display:grid;grid-template-columns:4.5rem 1fr;gap:.6rem;padding:.55rem;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.shot img{width:4.5rem;height:4.5rem;object-fit:cover;border-radius:5px;background:var(--sunk)}
+/* A video has no thumbnail here -- nothing on this page decodes it -- so
+   its square says what it is. */
+.shot .clip{width:4.5rem;height:4.5rem;border-radius:5px;background:var(--sunk);display:flex;
+  align-items:center;justify-content:center;font-size:.7rem;color:var(--meta);text-transform:uppercase;
+  letter-spacing:.05em}
+.hint[data-kind="bad"]{color:var(--bad)}
+.shot .side{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.shot .name{font-size:.75rem;color:var(--meta);word-break:break-all;
+  display:flex;gap:.4rem;align-items:baseline;flex-wrap:wrap}
+.shot textarea{min-height:3rem;font-size:.9rem;background:var(--sunk)}
+.shot .row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.chip{font-size:.7rem;padding:.12rem .4rem;border-radius:99px;white-space:nowrap}
+.chip.ok{background:var(--accent-soft);color:var(--accent)}
+.chip.warn{background:transparent;color:var(--warn);border:1px solid currentColor}
+/* Tags the blog has used, offered as they are typed. Pills, like the tags
+   on the blog itself, each with its count in a quieter colour. */
+.tagrow{display:flex;flex-wrap:wrap;gap:.35rem;margin:.1rem 0}
+.tagrow button{font:inherit;font-size:.8rem;padding:.25rem .65rem;border-radius:99px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.tagrow button b{font-weight:400;color:var(--meta);margin-left:.3rem}
+/* The marks the text takes, in a row above it: a tap wraps what is
+   selected, or puts the pair in with the caret between. Scrolls sideways
+   on a narrow screen rather than wrapping into a second row. */
+.marks{display:flex;gap:.3rem;overflow-x:auto;padding:.1rem 0 .2rem;scrollbar-width:none}
+.marks::-webkit-scrollbar{display:none}
+.marks button{flex:0 0 auto;min-width:2.4rem;height:2.2rem;padding:0 .6rem;font:inherit;
+  font-size:.9rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);
+  color:var(--text);cursor:pointer;touch-action:manipulation}
+.marks button:active{background:var(--accent-soft);border-color:var(--accent)}
+/* The post as the blog would show it, in the blog's own stylesheets: an
+   iframe, because those stylesheets are written for a whole page and would
+   restyle this one. Sized to its content once it has loaded. */
+.hintrow{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline}
+.hintrow .link{white-space:nowrap;flex:0 0 auto}
+.preview{margin-top:.6rem;display:flex;flex-direction:column;gap:.35rem}
+.preview iframe{width:100%;min-height:6rem;border:1px solid var(--border);
+  border-radius:var(--radius);background:#fff}
+.link{background:none;border:none;padding:0;color:var(--accent);font:inherit;
+  font-size:.8rem;text-decoration:underline;cursor:pointer}
+/* The insert is the picture's primary action, so it is a real button --
+   small, but a full tap target. */
+button.btn.small{font-size:.85rem;padding:.5rem .8rem;flex:0 0 auto}
+/* A destructive control looks inactive until it is armed: no border, muted
+   text, pushed to the far right so a thumb heading for Insert does not
+   pass over it. Armed, it becomes a warning-coloured button. */
+.remove,button.btn.ghost[data-arm=""],button.btn.ghost:not([data-arm]){
+  margin-left:auto;background:none;border:1px solid transparent;color:var(--meta);
+  font:inherit;font-size:.85rem;padding:.5rem .8rem;border-radius:8px;cursor:pointer}
+.remove[data-arm="yes"],button.btn.ghost[data-arm="yes"]{
+  color:#fff;background:var(--warn);border-color:var(--warn)}
+
+button.btn{font:inherit;font-weight:600;font-size:.95rem;padding:.8rem 1.1rem;
+  border-radius:var(--radius);border:1px solid var(--accent);background:var(--accent);
+  color:var(--on-accent);cursor:pointer}
+button.btn:disabled{opacity:.5;cursor:not-allowed}
+button.btn.ghost{background:transparent;color:var(--text);border-color:var(--border)}
+button.btn.ghost:hover{border-color:var(--accent)}
+
+details.server{margin-bottom:1.1rem;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:.6rem .8rem}
+details.server summary{cursor:pointer;font-size:.85rem;font-weight:600;color:var(--meta)}
+details.server .field{margin:.8rem 0 .2rem}
+
+/* the bar: thumb reach on a phone, so the main action sits at the bottom */
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);
+  border-top:1px solid var(--border);box-shadow:var(--shadow);
+  padding:.7rem 1rem calc(.7rem + env(safe-area-inset-bottom))}
+.bar .inner{max-width:42rem;margin:0 auto;display:flex;gap:.6rem;align-items:center}
+.bar .btn{flex:1}
+.bar .btn.ghost{flex:0 0 auto}
+/* Draft or public, decided when the post is sent. A segmented pair rather
+   than a checkbox: both words are visible at once, and the one in force
+   is the one that is filled in. */
+.bar .mode{margin-bottom:.5rem;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.bar .seg{flex:1;font:inherit;font-size:.85rem;padding:.55rem .6rem;background:transparent;
+  border:none;color:var(--meta);cursor:pointer}
+.bar .seg.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.say{font-size:.85rem;color:var(--meta);min-height:1.2em;margin:.5rem 0 0;text-align:center}
+.say[data-kind="bad"]{color:var(--bad)}
+.say[data-kind="good"]{color:var(--accent)}
+
+.result{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1rem;margin-bottom:1.1rem}
+.result h2{font-size:.95rem;margin:0 0 .5rem}
+.result ul{margin:.4rem 0 0;padding-left:1.1rem;color:var(--meta);font-size:.88rem}
+.result a{color:var(--accent)}
+.result p{margin:.4rem 0}
+.result .bad{color:var(--bad)}
+.result .meta{color:var(--meta);font-size:.88rem}
+.result code{background:var(--sunk);padding:.1rem .35rem;border-radius:4px;font-size:.9em;word-break:break-all}
+.result pre{white-space:pre-wrap;word-break:break-all;font-size:.8rem;background:var(--sunk);
+  padding:.5rem .6rem;border-radius:6px;margin:.4rem 0}
+.result .close{margin-top:.6rem;font-size:.85rem;padding:.5rem .8rem}
+[hidden]{display:none !important}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="mark" id="mark" alt="" hidden>
+    <div class="titles">
+      <div class="line">
+        <h1 data-t="app.name">blog.sh</h1>
+        <span class="sub" data-t="app.subtitle"></span>
+      </div>
+      <div class="site" id="site" hidden>
+        <span class="site-name" id="site-name"></span>
+        <span class="site-claim" id="site-claim"></span>
+      </div>
+    </div>
+    <span class="kept" id="kept" hidden></span>
+  </header>
+
+  <div class="result" id="result" hidden></div>
+
+  <div class="field">
+    <label for="title" data-t="app.title_label"></label>
+    <input type="text" id="title" autocomplete="off">
+    <span class="hint" data-t="app.title_hint"></span>
+  </div>
+
+  <div class="field">
+    <label for="body" data-t="app.body_label"></label>
+    <div class="marks" id="marks" role="toolbar">
+      <button type="button" data-mark="bold"><b>B</b></button>
+      <button type="button" data-mark="italic"><i>I</i></button>
+      <button type="button" data-mark="strike"><s>S</s></button>
+      <button type="button" data-mark="code">&lt;/&gt;</button>
+      <button type="button" data-mark="link" data-t="app.mark_link_label"></button>
+      <button type="button" data-mark="h2">H</button>
+      <button type="button" data-mark="quote">&#10077;</button>
+      <button type="button" data-mark="ul">&bull;</button>
+      <button type="button" data-mark="ol">1.</button>
+      <button type="button" data-mark="fence">```</button>
+    </div>
+    <textarea id="body"></textarea>
+    <div class="hintrow">
+      <span class="hint" data-t="app.body_hint"></span>
+      <button type="button" class="link" id="preview" data-t="app.preview"></button>
+    </div>
+    <div class="preview" id="preview-box" hidden>
+      <iframe id="preview-frame" sandbox="allow-same-origin"></iframe>
+      <span class="hint" data-t="app.preview_note"></span>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="tags" data-t="app.tags_label"></label>
+    <input type="text" id="tags" autocomplete="off">
+    <div class="tagrow" id="tagrow" hidden></div>
+    <span class="hint" data-t="app.tags_hint"></span>
+  </div>
+
+  <div class="field">
+    <label data-t="app.images_label"></label>
+    <div class="shots" id="shots"></div>
+    <div class="row" style="margin-top:.5rem">
+      <button type="button" class="btn ghost" id="pick" data-t="app.add_image"></button>
+      <input type="file" id="file" accept="image/*,video/*" multiple hidden>
+    </div>
+    <span class="hint" id="images-hint"></span>
+    <span class="hint" id="batch" hidden></span>
+  </div>
+
+</div>
+
+<div class="bar">
+  <div class="inner mode" role="radiogroup" id="mode">
+    <button type="button" class="seg on" data-mode="draft" data-t="app.mode_draft"></button>
+    <button type="button" class="seg" data-mode="publish" data-t="app.mode_publish"></button>
+  </div>
+  <div class="inner">
+    <button type="button" class="btn" id="send" data-t="app.send"></button>
+    <button type="button" class="btn ghost" id="discard" data-t="app.discard"></button>
+  </div>
+  <p class="say" id="say"></p>
+</div>
+
+<script src="i18n.js"></script>
+<script src="site.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -15,6 +15,8 @@
 # written until you have seen the diff and confirmed it, and the file
 # keeps every comment it had.
 set -euo pipefail
+BLOG_SH_PWD="$PWD"
+export BLOG_SH_PWD
 cd "$(dirname "$0")"
 
 case "${1:-}" in

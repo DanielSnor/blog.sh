@@ -36,6 +36,8 @@ build:
   # at some number; a label and a colon reads right at all of them.
   summary: "Built into %{dir} -- posts: %{posts}, listing pages: %{pages}, tag pages: %{tags}, plus a search index, RSS feed and sitemap"
   drafts: "Drafts in progress (preview only, not in any listing): %{count}"
+  reused: "Pages already up to date, not rebuilt: %{count}"
+  full: "Full build -- every page rendered and compared."
   two_pages: "⚠️  %{count} posts are served at /%{slug}/ -- only one of them is:"
   two_pages_fix: "   The site still builds and the OLDER one keeps the address; the other stays\n   in the sitemap and in search, pointing readers at text that is not its own.\n   Give one of them another slug (./blog.sh props -> address)."
   # What the build says about the things it refused to build, in the order
@@ -60,6 +62,9 @@ build:
   # still a literal in the build: a post naming a picture its media folder
   # does not hold. Every import that met a dead image host leaves some.
   media_missing: "⚠️  %{slug}: names a media file its folder does not hold -- %{filename}. The page still links it, so that address stays a 404 until the file arrives."
+  name_not_ours: "⚠️  %{path} is a name another file already wears -- a link, or a symlink somebody left there. Writing it would reach that other file, so it was left alone and this page or picture is not on the site. Move whatever holds the name, or delete it, and build again."
+  media_unplaceable: "⚠️  %{path} could not be placed (%{reason}). The page still links it, so that address stays a 404 until it can be written."
+  prune_failed: "⚠️  %{path} is no longer part of the site but could not be removed (%{reason}). It stays where it is, and the deploy will keep publishing it, until whatever holds it lets go."
   # Not an archive's doing at all: the cheat sheet ships with the engine.
   cheat_sheet_missing: "⚠️  %{path} is missing -- the /markdown/ cheat sheet page is not built. It ships with the engine; a pull that went wrong is the usual reason."
   # The tail of the sign-off, counted the labelled way like everything
@@ -233,12 +238,15 @@ cli:
   buffer_restored: "Restored -- the editor opens with that text."
   buffer_discarded: "Discarded."
   buffer_kept_for_now: "Left in %{path} -- writing anything in this session replaces it."
-  buffer_still_kept: "Nothing changed, so the recovered text stays in %{path} -- the next add/edit offers it again."
+  buffer_still_kept: "Nothing changed, so the text in %{path} is still there -- the next add/edit offers it again."
   image_dimensions_unknown: "⚠️  %{file}: the image size could not be read, so the page cannot reserve space for it and may jump while loading. PNG, JPEG, GIF and WebP are always read."
   image_heic_hint: "   HEIC displays only in Safari -- convert it first: sips -s format jpeg FILE --out FILE.jpg (macOS), heif-convert FILE FILE.jpg (Linux)."
   frontmatter_date_invalid: "❌ Cannot read the date %{value} -- expected YYYY-MM-DD [HH:MM]. Your text is kept in the buffer; reopen the post after fixing it."
+  frontmatter_date_invalid_file: "❌ I cannot read the date %{value} -- I expect YYYY-MM-DD [HH:MM]. Nothing was written; fix the date in the file and run it again."
   post_changed_while_editing: "❌ '%{slug}' changed on disk while you were editing it (the scheduled-publish cron publishes on its own). Nothing was saved, so nothing of that change was lost -- reopen the post and redo your edit on the current version."
   unknown_frontmatter_key: "❌ Unknown key in the header: %{keys}. I know: %{known}. A typo here would be silently dropped on save, so nothing was written -- your text is kept, see below."
+  publish_key_file_only: "❌ %{keys} is read only when a post comes in as a file (./blog.sh add <file>). Here it would do nothing, so nothing was saved -- take the line out and publish with ./blog.sh publish <slug>."
+  unknown_frontmatter_key_file: "❌ Unknown key in the header: %{keys}. I know: %{known}. A typo here would be silently dropped on save, so nothing was written -- fix the key in the file and run it again."
   heic_refused: "❌ %{files}: HEIC displays only in Safari -- other browsers would show a broken image. Nothing was saved and the file stays where it is. Convert it first (%{command}), or set media.convert_heic: true in config/site.yml and the engine will convert it for you."
   heic_no_tool: "❌ %{files}: media.convert_heic is on, but no converter was found (tried sips, heif-convert, heif-dec, magick/convert, vips). Nothing was saved. Convert by hand: %{command}"
   heic_converted: "🔄 %{file} → %{target} (HEIC converted via %{tool})."
@@ -299,6 +307,21 @@ cli:
   template_unchanged: "Template left unchanged (not saved?), no post was created."
   empty_content: "Empty content, nothing was written."
   wrote_draft: "Written as draft: %{path}"
+  add_file_not_found: "No such file: %{file}. A bare name is looked for in incoming/; anything with a directory in it is used as given."
+  bad_reference: "A picture reference names a path: %{reference}. This run does not follow paths -- a picture must be named on its own (photo.jpg), and the file must have arrived in incoming/ with the text. Nothing was written."
+  add_file_not_a_file: "Not a file: %{file}. That is a directory, a link pointing nowhere, or something else the archive cannot read a post out of."
+  add_file_unreadable: "Cannot read %{file}: %{reason}. If it arrived by upload it may belong to the upload account and not to this one -- `chmod 644` on it, or add yourself to its group."
+  add_extra_arguments: "One file at a time. These were left over and nothing was done with them: %{extra}"
+  add_file_not_text: "Not readable as text: %{file}. `add` takes a markdown file -- this one is not valid UTF-8, so it is probably a photo, an office document, or a transfer that has not finished."
+  add_file_empty: "Nothing to write: %{file} has no content below the frontmatter."
+  add_file_missing_images: "These files are not there yet: %{files}. Upload them to %{dir} first -- nothing was written. (Interactive `add` waits for them; with a file argument there is nobody to wait for.)"
+  add_json_needs_file: "--json needs a file to read: `add <file> --json`. Without one, `add` opens an editor and there is nothing to report until it closes."
+  add_unknown_option: "Unknown option: %{option}. add takes a file, --json and --untrusted, nothing else."
+  publish_unknown_option: "Unknown option: %{option}. publish takes a slug, --yes and --no-announce, nothing else."
+  publish_yes_needs_slug: "--yes needs to name the post: `publish <slug> --yes`. Without a slug, publish offers the drafts to choose from -- and choosing is something to do with the preview in front of you, not one keystroke away from an announcement that cannot be recalled."
+  no_announce_not_scheduled: "Note: --no-announce does not reach the scheduled publish. The cron works from the post itself, so it will announce this one when its date arrives. To keep it quiet, publish it by hand with --no-announce, or mark it unlisted."
+  publish_yes_ambiguous: "The slug %{slug} exists in more than one year (%{years}), and --yes has nobody to ask which. Publish it from `props %{slug}`, which shows them and lets you choose."
+  toot_skipped_old: "No announcement: the date (%{date}) is outside the recent window, and that question has nobody to answer it here. The post is published; `toot` still sends it by hand."
   incoming_not_cleaned: "Left in incoming/: %{files} — the copy is in the post, but the staged original could not be deleted (no write permission on incoming/). Remove it by hand, so an empty incoming/ still means nothing is pending."
   generating_preview: "Generating preview"
   draft_saved_preview_pending: "Draft is saved. The preview will show up after a successful deploy -- then run ./blog.sh edit %{slug}"
@@ -449,6 +472,22 @@ cli:
 
   edited_label: "Edited: %{path}"
 
+  empty_trash_none: "The trash is empty."
+
+  empty_trash_confirm: "Delete %{count} item(s) from the trash for good, freeing %{size}? This cannot be undone. Type how many ITEMS are being deleted to confirm: "
+
+  empty_trash_done: "Trash emptied: %{count} item(s), %{size} freed."
+
+  empty_versions_none: "Every post already keeps just its last version."
+
+  empty_versions_confirm: "Delete %{count} older version(s), freeing %{size}? The newest version of each post stays. Type how many FILES are being deleted to confirm: "
+
+  empty_versions_done: "Older versions removed: %{count}, %{size} freed. Each post keeps its newest one."
+
+  empty_cancelled: "Nothing was deleted."
+
+  empty_what: "Say what to empty: ./blog.sh empty trash, or ./blog.sh empty versions."
+
   confirm_delete: "Really delete '%{slug}'? Type the slug to confirm: "
   delete_takes_announcement: "This post was announced at %{url} -- deleting it takes that announcement down too, along with anything said under it. Restore brings the post back, but not the thread."
   deleted_label: "Deleted (in trash, restore with ./blog.sh restore %{slug}): %{path}"
@@ -487,18 +526,25 @@ cli:
   header_mode: "Mode: %{mode}"
   usage: |
     usage:
-      ./blog.sh add                  creates a draft, shows a preview and asks what's next
+      ./blog.sh add [<file>]         creates a draft, shows a preview and asks what's next;
+                                     with a markdown file it asks nothing at all and just writes the draft,
+                                     which is the route for a phone, a script or a shortcut (--json reports it as data)
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh props [<slug>]       shows a post's state and its actions (publish, unpublish, rename the slug, delete...)
-      ./blog.sh publish [<slug>]     shows a draft's preview and asks what's next (without a slug, offers drafts in progress)
+      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+                                     shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
+                                     --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
       ./blog.sh queue                the scheduled-post queue -- reorder, publish now, return a post to the drafts
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
+      ./blog.sh empty trash          deletes everything in the trash for good, after telling you how much
+      ./blog.sh empty versions       keeps each post's newest version and removes the older ones
       ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
       ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
-      ./blog.sh rebuild              rebuilds and deploys the whole site, not tied to a specific post
+      ./blog.sh rebuild [--full]     rebuilds and deploys the whole site, not tied to a specific post;
+                                     --full builds every page again instead of only the ones that changed
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
@@ -543,6 +589,7 @@ cli:
   browse_filter_none: "all"
   browse_state_published: "published"
   browse_state_draft: "in progress"
+  browse_state_unpublished: "not published yet"
   browse_state_scheduled: "scheduled"
   browse_state_pinned: "pinned"
   browse_menu_hint: "↑↓ move · Enter select · Esc back"
@@ -867,6 +914,21 @@ import:
 # its own: it is read by someone who does not know which file the setting
 # lives in, let alone which key.
 doctor:
+  tag_icons_ok: "Tag icons: %{count}, all of them drawable."
+  tag_icon_stripped: "The `icon_svg` of the tag \"%{tag}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from, and whoever wrote it should say whether that source is worth trusting."
+  social_icon_unknown: "The link \"%{name}\" in the footer asks for an icon called \"%{icon}\", which the engine does not have -- it draws an empty space where the icon belongs. The ones it does have: %{known}. Your own SVG goes in `icon_svg` instead."
+  social_shape: "An entry under `social:` is not a mapping. Each one wants a `name:`, a `url:` and an `icon:`; anything else is read as empty and takes the build down with it."
+  social_icon_missing: "The link \"%{name}\" in the footer names no icon at all, so it publishes an empty, unclickable space on every page. Give it an `icon:` from the list the engine ships, or an `icon_svg:` of your own."
+  social_icon_not_svg: "The `icon_svg` of the footer link \"%{name}\" is not an SVG -- whatever is in it prints as words in the footer of every page."
+  social_icon_scale: "The `icon_svg` of the footer link \"%{name}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked beside them."
+  social_icon_stripped: "The `icon_svg` of the footer link \"%{name}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from."
+  share_unknown: "`share:` names \"%{name}\", which is not somewhere this engine can send a reader -- it is dropped and no button appears. The ones it knows: %{known}."
+  tag_icon_shape: "An entry under `tag_icons` is not a mapping -- each one needs a `tag` and either an `icon` name or an `icon_svg`."
+  tag_icon_no_tag: "An entry under `tag_icons` has no `tag`, so it belongs to nothing and draws nothing."
+  tag_icon_unknown: "The tag \"%{tag}\" asks for the icon \"%{icon}\", which this engine does not have. The names it knows: %{known}. For anything else, give it an `icon_svg` of your own."
+  tag_icon_not_svg: "The `icon_svg` of the tag \"%{tag}\" holds no <svg> element, so nothing will be drawn."
+  tag_icon_scale: "The `icon_svg` of the tag \"%{tag}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked in a date badge."
+  trash_holds: "The trash holds %{count} item(s), %{size} -- trashed posts, and anything `check --repair` set aside. They are still restorable; `./blog.sh empty trash` deletes them for good."
   heading: "Checking this install"
   running_online: "Checking hosts and tokens too (--online)"
   summary: "%{errors} problem(s), %{warnings} worth a look, %{oks} fine."
@@ -1113,6 +1175,8 @@ check:
   media_stray: "Post %{slug} no longer names the file %{file} in its media directory."
   media_stray_fix: "Left behind by a picture the source dropped or renamed between imports. The post does not reference it; delete it yourself once you have looked."
   address_duplicate: "%{count} posts would be served at /posts/%{year}/%{slug}/."
+  post_unknown_type: "The post \"%{slug}\" asks for `type: %{type}`, which this engine does not know -- it is stored and read by nobody, so the post gets no listing, no menu entry and no icon of its own."
+  post_unknown_type_fix: "The eight it knows are text, quote, chat, image, video, audio, link and document. For a section of your own, use a TAG and name it in `nav:` -- that gives a listing with its own pagination, a menu entry and an RSS feed, which a content type would not."
   page_reserved_slug: "The page \"%{slug}\" would sit at an address the engine writes itself (/%{slug}/), so the build refuses to write it -- the page is not on the site."
   page_reserved_slug_fix: "Rename the page to something else. The build says so on the terminal at every rebuild, but a scrolled-past warning is how a page stays missing for months."
   post_unreadable: "%{file} could not be read (%{reason})."
@@ -1311,6 +1375,7 @@ wizard:
   prompt_with_current: "Now: %{current}\n> "
   prompt_with_suggestion: "Suggested: %{current}\n> "
   empty_value: "(not set)"
+  current_is: "Now: %{value}"
   choice_prompt: "Choice: "
   menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc keep current"
   interrupted: "Stopped. Nothing was written -- the config is exactly as it was."
@@ -1553,3 +1618,21 @@ style:
 
 lock:
   busy: "Another %{who}run is still going%{detail} -- skipping this one. Nothing is broken; try again in a minute."
+
+share:
+  heading: "Share this post"
+  mastodon: "Share on Mastodon"
+  bluesky: "Share on Bluesky"
+  email: "Share by e-mail"
+  ask_label: "Which Mastodon instance are you on? This browser will remember it."
+  ask_go: "Share"
+  change_instance: "Change instance"
+  ask_invalid: "That does not look like an instance address. Try something like mastodon.social."
+  copy: "Copy the link"
+  copied: "Link copied"
+  copy_failed: "Could not copy the link"
+  system: "Share…"
+  facebook: "Share on Facebook"
+  linkedin: "Share on LinkedIn"
+  threads: "Share on Threads"
+  x: "Share on X"

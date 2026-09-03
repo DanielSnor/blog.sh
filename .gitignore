@@ -8,6 +8,11 @@ env.sh
 .deploy_manifest*.json
 .deploy_manifest*.json.incomplete
 .deploy_baseline.json
+# What the last build wrote, so the next one can skip re-making it
+# (lib/build_cache.rb). Describes THIS machine's public.nosync/ and is
+# always safe to delete -- it belongs no more in the repo than the deploy
+# manifest beside it does.
+.build_cache*.json
 .deploy-pending
 # The scheduler's heartbeat -- one line, rewritten every fifteen minutes.
 .last-scheduled-run

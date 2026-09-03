@@ -457,7 +457,19 @@ A single linear pass, no framework:
 3. **Partition.** Drafts leave the main flow: each gets only its own
    page at `/draft/<token>/<slug>/` with `noindex`, and appears in no
    listing, feed or index.
-4. **Render.** Per-post pages, then listings: homepage, per-tag,
+4. **Consult the record** (`lib/build_cache.rb`). The last build wrote
+   down a key describing the inputs of each page it produced -- the post,
+   the template, the locale, the configuration, the engine itself -- and
+   a digest of every file `emit` wrote. A page whose key still matches is
+   not rendered; a file whose digest still matches costs one `stat`
+   instead of a read-back. The whole record is keyed to a fingerprint of
+   `templates/`, `lib/`, `build/`, `locales/`, `assets/` and `config/`,
+   plus the facts the build works out for itself (the menu, the types
+   present, the page size), so a template edit or a new menu item throws
+   it away. The cache is an optimisation and never an authority: anything
+   it cannot vouch for is rendered and compared the old way, and `--full`
+   believes none of it while still recording what it wrote.
+5. **Render.** Per-post pages, then listings: homepage, per-tag,
    per-content-type -- the last only for types with at least one
    published post (`PRESENT_TYPES`); the nav menu and the sitemap
    follow the same set, so an empty type has no pages, no menu item
@@ -466,7 +478,7 @@ A single linear pass, no framework:
    which splits only after holding 2x the page size. Page boundaries
    therefore never shift, so adding a post rewrites a handful of files
    instead of the whole archive.
-5. **Indexes & feeds.** Client-side search index split into recent
+6. **Indexes & feeds.** Client-side search index split into recent
    (`search-index.json`, newest 500, loaded eagerly) and archive
    (`search-index-archive.json`, loaded on first query). Each entry
    carries one folded blob (title, text and tags together), which is what
@@ -476,7 +488,7 @@ A single linear pass, no framework:
    most `RESULT_LIMIT` of them while reporting the true count;
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
-6. **Assets, colors and the root favicon.** Before `assets/` is copied
+7. **Assets, colors and the root favicon.** Before `assets/` is copied
    into the build, any live name missing under `assets/images/` is seeded
    from the tracked `assets/images/defaults/` -- the live banner and
    favicon are per-install files outside git (see decisions.md), so a
@@ -497,10 +509,11 @@ A single linear pass, no framework:
    without a favicon simply doesn't get the file. ICO's dimension fields
    are one byte each and 0 means 256, so a larger source can't state its
    size -- browsers load it and report 256, immaterial at favicon sizes.
-7. **Write & prune.** `emit` writes a file only when its bytes actually
+8. **Write & prune.** `emit` writes a file only when its bytes actually
    changed and records every generated path; `prune_public` then deletes
    whatever the build didn't produce this run, deepest directories
-   collapsing first.
+   collapsing first. The sweep runs on every build regardless of the
+   cache, because a record can only miss what it once held.
 
 Renders are memoized per post (content HTML, parsed time, dominant
 type, list item) keyed by object identity -- a post appears on its own
@@ -674,6 +687,19 @@ wrote. Then, in load order:
   and by-count, and remembers which the reader chose. The page is built
   alphabetically, so a reader without the script gets the order the
   markup already has rather than a control that does nothing.
+- **Sharing** (`share.js`) drives the three share controls a link cannot
+  be. `mastodon` has no single address to point at -- the destination is
+  the reader's own instance -- so it asks once and remembers the answer in
+  that browser, refusing anything that is not a hostname rather than
+  pasting it into an address. `copy` writes the address to the clipboard
+  and renames itself while it says so. `system` hands the post to the
+  operating system's share sheet. All three of those arrive HIDDEN and are
+  shown only where they can work -- the fediverse button once its script
+  has run, the sheet where the browser has one, the clipboard button where
+  there is a clipboard, which browsers grant over https alone. That is the
+  same promise the copy button below makes and for the same reason. A
+  block left with nothing it can draw hides itself rather than standing a
+  heading over an empty row.
 - **Copy** (`copy-code.js`) puts a copy button on every `code` block --
   built in the script rather than in the markup, so a page whose script
   never runs shows no button instead of a dead one. It refuses to appear
@@ -686,8 +712,9 @@ wrote. Then, in load order:
 ## Security
 
 The threat model is a static site with no server of its own: nothing
-here authenticates anybody, so what remains to get wrong is what the
-pages carry and what the working directory holds.
+here listens on a port, so what remains to get wrong is what the pages
+carry, what the working directory holds, and the one thing that arrives
+from outside -- a post sent over the SSH the machine already has.
 
 - **Content-Security-Policy**, delivered as a meta tag, because a static
   host may not let you set headers. Fonts are self-hosted, so no
@@ -706,6 +733,15 @@ pages carry and what the working directory holds.
   the build writes and the DOM the client builds. The one exception is
   Mastodon's own sanitized status HTML, see
   [The client side](#the-client-side).
+- **Input that came off a wire** enters at one place, `scripts/receive.sh`,
+  which listens on nothing: it runs as the forced command of an SSH key.
+  What a stranger chooses is a filename and a stream of bytes, so a name
+  may carry no path, no leading dot and no control character, the read is
+  bounded by `BLOGSH_MAX_MB` before anything lands, and the markdown is
+  parsed *confined* -- a picture may be named only by a bare filename,
+  because `![](/etc/passwd)` would otherwise be read into the post and
+  published. There is no archive format anywhere in it, which is the whole
+  reason there is nothing to unpack.
 - **`env.sh`** holds the live credentials, stays out of git, and is mode
   `600`. The wizards leave a `.bak` of whatever they rewrote at the same
   mode, so it still holds the previous tokens -- remove it once one has

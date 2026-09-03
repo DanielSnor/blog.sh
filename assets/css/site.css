@@ -1279,6 +1279,132 @@ aside .card { margin-bottom: 1.5rem; }
   overflow-wrap: break-word;
 }
 
+/* Sharing sits between the post and its comments: after the words, before
+   the conversation about them. The button and the links have to be the
+   same shape -- one of the three is a <button>, because the fediverse has
+   no single address to link to and its instance has to be asked for. */
+.share { margin-top: 2rem; }
+.share[hidden] { display: none; }
+
+/* A <p>, not a heading -- see share_links_html. */
+.share__heading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin: 0 0 0.6rem;
+}
+
+.share__links { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* The tile the footer's social icons are: same size, same ground, same
+   corner, no frame. A row of icons offering somewhere to go is a thing
+   this site already has, and sharing had grown a second shape for it --
+   a ringed 2.2rem tile with an 8px corner, on a site whose badges and
+   pills are all 4px. One object, met twice. */
+.share__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--pill-bg);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  transition: 0.3s ease-in-out;
+  /* The button carries the browser's own font otherwise, and sits a
+     pixel off the links beside it. */
+  font: inherit;
+}
+
+/* An author's `display` beats the browser's own [hidden] rule, so the two
+   controls that arrive hidden -- Mastodon until the script runs, the OS
+   share sheet unless there is one -- were drawn anyway, and clicking them
+   did nothing. Caught by looking at a built page rather than by reading
+   the markup. */
+.share__link[hidden] { display: none; }
+
+.share__link svg { width: 20px; height: 20px; }
+
+/* ⚠️ The one place this parts company with the footer, and it has to.
+   Those icons fill with the accent on hover, and nothing about them has
+   a STATE. The copy button does: `is-done` says the address is on the
+   clipboard, and it says it with colour alone -- the script swaps the
+   label and the title, and neither of those is visible. Fill both with
+   the accent and the confirmation arrives under a pointer that is
+   already accent, so clicking produces no visible change whatever. That
+   is precisely the confusion the old ringed tile was written to avoid,
+   and it must not come back with the new shape. Hover borrows the date
+   badge's inversion, which this site already uses everywhere, and the
+   accent is left to mean one thing. */
+.share__link:hover, .share__link:focus-visible {
+  background: var(--hover-invert);
+  color: var(--badge-hover-text);
+}
+.share__link.is-done {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* The row that asks which instance the reader is on. Hidden in the markup
+   and shown by the script, so it is never a form that cannot submit. */
+.share__ask[hidden] { display: none; }
+.share__change[hidden] { display: none; }
+
+/* A quiet way back, not a fifth button: it is only ever useful to the one
+   reader in a hundred who typed the wrong instance or moved to another. */
+.share__change {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  opacity: 0.7;
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.share__change:hover, .share__change:focus-visible { opacity: 1; color: var(--accent); }
+.share__ask { margin-top: 0.75rem; }
+.share__ask-label { display: block; font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.35rem; }
+.share__ask-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.share__ask-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.share__ask-input[aria-invalid="true"] { border-color: var(--accent); }
+
+.share__ask-go {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--pill-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.share__ask-go:hover, .share__ask-go:focus-visible { border-color: var(--accent); color: var(--accent); }
+.share__ask-error { display: block; margin-top: 0.35rem; font-size: 0.8rem; color: var(--accent); }
+.share__ask-error[hidden] { display: none; }
+
 .comments { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 
 .comments-reply { margin: 0 0 1rem; }

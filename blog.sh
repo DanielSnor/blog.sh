@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Runs scripts/manage_post.rb with the environment from env.sh (SITE_BASE_URL, MASTODON_ACCESS_TOKEN).
 # Usage:
-#   ./blog.sh add
+#   ./blog.sh add [<file>] [--json]
 #   ./blog.sh edit [<slug>]
 #   ./blog.sh props [<slug>]
-#   ./blog.sh publish [<slug>]
+#   ./blog.sh publish [<slug>] [--yes] [--no-announce]
 #   ./blog.sh unpublish [<slug>]
 #   ./blog.sh delete [<slug>]
 #   ./blog.sh restore [<slug>]
+#   ./blog.sh empty trash|versions
 #   ./blog.sh toot [<slug>]
-#   ./blog.sh rebuild
+#   ./blog.sh rebuild [--full]
 #   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
 #   ./blog.sh doctor [--online] [--strip-location]
@@ -19,6 +20,12 @@
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
+# Remembered BEFORE the cd, because after it nothing can tell where the
+# caller was standing -- and `add sub/clanek.md` from a script means a
+# file next to the SCRIPT, not one next to the engine. Exported rather
+# than passed so every command gets it without a signature change.
+BLOG_SH_PWD="$PWD"
+export BLOG_SH_PWD
 cd "$(dirname "$0")"
 
 # The one real prerequisite, checked before anything else so a missing or

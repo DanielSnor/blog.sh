@@ -250,8 +250,33 @@ module Embed
   # At RENDER, never on the way in: the archive holds what it was given,
   # and the page shows only what it will honour.
   SCRIPT_RE = %r{<script\b[^>]*>.*?</script\s*>|</?script\b[^>]*>}mi
-  HANDLER_RE = /\s on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/ix
-  JS_URL_RE = /((?:href|src|xlink:href)\s*=\s*["']?)\s*javascript:[^"'>\s]*/i
+  # The separator before an attribute name is whitespace OR a solidus:
+  # `<svg/onload="steal()">` is the same tag to a browser as
+  # `<svg onload="steal()">`, and a rule that knew only whitespace let
+  # exactly that spelling through -- untouched, onto every page drawing
+  # the icon and into the feed, while `doctor` called it fine.
+  #
+  # A solidus is also an ordinary character in a path, though, so this is
+  # applied INSIDE TAGS ONLY. Let loose over the whole document it turns
+  # `<a href="/only=1">x</a>` into `<a href=">x</a>`: the cure eating the
+  # content it was protecting.
+  # A tag, with its quoted values skipped over so that a ">" inside an
+  # attribute does not end it early.
+  TAG_RE = /<[a-z][a-z0-9:-]*(?:[^>"']|"[^"]*"|'[^']*')*>/i
+  # One attribute of a tag: the separator that introduces it, its name,
+  # and its value taken WHOLE when it is quoted. Taking the value whole is
+  # the point -- a pattern hunting for handlers in the tag's text reads
+  # `href="/only=1"` as a solidus, the name "only" and a value, and eats a
+  # perfectly good link. An attribute is a thing; ask it its name.
+  ATTR_RE = /([\s\/]+)([a-z_:][-a-z0-9_:.]*)(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/i
+  HANDLER_NAME_RE = /\Aon[a-z]+\z/i
+  URL_NAME_RE = /\A(?:href|src|xlink:href)\z/i
+  # An SVG animation element exists to change another element's attribute
+  # while the page is open -- `<animate attributeName="href"
+  # values="javascript:alert(1)">` is a script in another spelling, and
+  # the URL it carries sits in an attribute no URL rule would think to
+  # read. Nothing in an icon or an embed needs one.
+  ANIMATE_RE = %r{</?(?:animate|animateTransform|animateMotion|set)\b[^>]*>}mi
   # A style block is not a script, and it acts on the page just the same.
   # The two Instagram embeds in this house's own archive carry
   #
@@ -277,8 +302,44 @@ module Embed
     html.to_s
         .gsub(SCRIPT_RE, '')
         .gsub(STYLE_RE, '')
-        .gsub(HANDLER_RE, '')
-        .gsub(JS_URL_RE) { "#{Regexp.last_match(1)}#" }
+        .gsub(ANIMATE_RE, '')
+        .gsub(TAG_RE) { |tag| tag_without_scripts(tag) }
+  end
+
+  # Handlers and javascript: URLs, removed where attributes actually live.
+  def tag_without_scripts(tag)
+    tag.gsub(ATTR_RE) do |whole|
+      lead = Regexp.last_match(1)
+      name = Regexp.last_match(2)
+      assignment = Regexp.last_match(3)
+      if name.match?(HANDLER_NAME_RE) then ''
+      elsif name.match?(URL_NAME_RE) && assignment && js_url?(assignment.sub(/\A\s*=\s*/, ''))
+        "#{lead}#{name}=\"#\""
+      else
+        whole
+      end
+    end
+  end
+
+  # "javascript:" as a BROWSER reads it, rather than as a regex sees it:
+  # entities decoded, and the whitespace and control characters HTML
+  # tolerates inside a scheme taken out. `href="javascript&#58;bad()"` is
+  # none of those things to a rule looking for a literal colon, and every
+  # one of them to a reader.
+  def js_url?(value)
+    plain = value.to_s.sub(/\A["']/, '').sub(/["']\z/, '')
+    plain = plain.gsub(/&#x0*([0-9a-f]{1,6});/i) { codepoint(Regexp.last_match(1).to_i(16)) }
+                 .gsub(/&#0*(\d{1,7});/) { codepoint(Regexp.last_match(1).to_i) }
+    plain.gsub(/[\s\u0000-\u001f\u007f]/, '').downcase.start_with?('javascript:')
+  end
+
+  # A number that is not a character stays the text it was: this asks
+  # whether an address is a script, and must not raise over a malformed
+  # entity while doing it.
+  def codepoint(number)
+    [number].pack('U')
+  rescue StandardError
+    ''
   end
 
   def frame_origins(block)

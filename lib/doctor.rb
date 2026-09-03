@@ -12,11 +12,15 @@ require_relative 'site_config'
 require_relative 'i18n'
 require_relative 'media_dimensions'
 require_relative 'exif_location'
+require_relative 'embed'
+require_relative 'social_icons'
+require_relative 'share_targets'
 require_relative 'deploy_backend'
 require_relative 'slug'
 require_relative 'account_id'
 require_relative 'forge_address'
 require_relative 'path_glob'
+require_relative 'file_size'
 # For the one thing doctor cannot answer from config alone: whether a
 # menu entry points at an address this archive produces. Sharing the
 # set with check rather than building a second one is the point --
@@ -159,6 +163,10 @@ module Doctor
     findings.concat(check_scheduler)
     findings.concat(check_deploy_pending)
     findings.concat(check_media_location(root))
+    findings.concat(check_tag_icons(data))
+    findings.concat(check_social_icons(data))
+    findings.concat(check_share(data))
+    findings.concat(check_trash(root))
     findings.concat(check_deploy)
     findings.concat(check_online(data)) if online
     findings
@@ -1053,6 +1061,118 @@ module Doctor
   end
 
   # --- deploy --------------------------------------------------------
+
+  # The icons tags may carry. Three ways to get this wrong, and all three
+  # are silent: a name the engine does not have draws nothing, an entry
+  # without a tag belongs to nobody, and an SVG written to another scale
+  # sits crooked in a badge the size of two lines of text.
+  def check_tag_icons(data)
+    entries = SiteConfig::Chrome.list(data, 'tag_icons')
+    return [] if entries.empty?
+
+    known = %w[text quote chat image video audio link document]
+    findings = entries.filter_map do |entry|
+      next warn(I18n.t('doctor.tag_icon_shape')) unless entry.is_a?(Hash)
+      next warn(I18n.t('doctor.tag_icon_no_tag')) if entry['tag'].to_s.strip.empty?
+
+      tag = entry['tag'].to_s
+      if entry['icon_svg']
+        svg = entry['icon_svg'].to_s
+        next warn(I18n.t('doctor.tag_icon_not_svg', tag: tag)) unless svg.include?('<svg')
+        next warn(I18n.t('doctor.tag_icon_scale', tag: tag)) unless svg.match?(/viewBox\s*=\s*["\']0 0 24 24/)
+        # Said out loud rather than silently swallowed. The strip runs at
+        # render whatever doctor thinks, so the page is safe either way --
+        # but an icon that arrives carrying a handler is an icon somebody
+        # copied from somewhere, and its owner is the one person who can
+        # decide whether to keep using that source.
+        next warn(I18n.t('doctor.tag_icon_stripped', tag: tag)) if Embed.without_scripts(svg) != svg
+      elsif !known.include?(entry['icon'].to_s)
+        next warn(I18n.t('doctor.tag_icon_unknown', tag: tag, icon: entry['icon'].to_s,
+                                                    known: known.join(', ')))
+      end
+      nil
+    end
+    return findings unless findings.empty?
+
+    [ok(I18n.t('doctor.tag_icons_ok', count: entries.length))]
+  end
+
+  # A footer icon the engine does not have draws NOTHING -- social_icon
+  # answers '' and the link goes out with an empty space where the icon
+  # belongs. The tag icons have been checked since they existed; these
+  # never were, and a typo in `icon:` is silent on the page and silent
+  # here.
+  def check_social_icons(data)
+    SiteConfig::Chrome.list(data, 'social').filter_map { |entry| social_icon_finding(entry) }
+  end
+
+  # The footer's icons, given the same three questions the tag icons have
+  # been asked since they existed. They are the identical field four lines
+  # of code apart, and this one was answering none of them: junk in
+  # `icon_svg` printed as words in the footer of every page, an entry with
+  # no icon at all published an empty unclickable anchor, and an entry that
+  # was not a mapping walked past here and took the BUILD down instead --
+  # which is precisely the traceback docs/install.md promises doctor names
+  # first.
+  def social_icon_finding(entry)
+    return warn(I18n.t('doctor.social_shape')) unless entry.is_a?(Hash)
+
+    name = entry['name'].to_s
+    if entry['icon_svg']
+      svg = entry['icon_svg'].to_s
+      return warn(I18n.t('doctor.social_icon_not_svg', name: name)) unless svg.include?('<svg')
+      return warn(I18n.t('doctor.social_icon_scale', name: name)) unless svg.match?(/viewBox\s*=\s*["']0 0 24 24/)
+      return warn(I18n.t('doctor.social_icon_stripped', name: name)) if Embed.without_scripts(svg) != svg
+
+      return nil
+    end
+
+    icon = entry['icon'].to_s
+    return warn(I18n.t('doctor.social_icon_missing', name: name)) if icon.empty?
+    return nil if SocialIcons::NAMES.include?(icon)
+
+    warn(I18n.t('doctor.social_icon_unknown', name: name, icon: icon,
+                                              known: SocialIcons::NAMES.join(', ')))
+  end
+
+  # A share list naming something the engine cannot draw is dropped in
+  # silence -- the same hole check_social_icons was written to close, one
+  # key over.
+  def check_share(data)
+    SiteConfig::Chrome.list(data, 'share').filter_map do |name|
+      value = name.to_s.strip.downcase
+      next if value.empty? || ShareTargets::NAMES.include?(value)
+
+      warn(I18n.t('doctor.share_unknown', name: name.to_s,
+                                          known: ShareTargets::NAMES.join(', ')))
+    end
+  end
+
+  # What is in the trash, said out loud once in a while. Not an error: a
+  # trash with posts in it is a trash doing its job, and `restore` is the
+  # reason it exists. But nothing on the site ever mentions it, so it grew
+  # for years on the installation this engine was built around and the only
+  # way to see that was `du` on the server. A note here is how somebody
+  # remembers the command exists.
+  def check_trash(root)
+    dir = File.join(root, 'trash')
+    return [] unless Dir.exist?(dir)
+
+    # By directory rather than by post.json: `check --repair` sets a stray
+    # media file aside in here, without a post beside it, and doctor said
+    # nothing at all about a trash holding only those.
+    held = Dir.children(dir).sort.flat_map do |name|
+      path = File.join(dir, name)
+      next [] unless File.directory?(path)
+      next [path] unless name.match?(/\A\d{4}\z/)
+
+      Dir.children(path).map { |slug| File.join(path, slug) }.select { |d| File.directory?(d) }
+    end
+    return [] if held.empty?
+
+    bytes = PathGlob.under(dir, '**', '*').sum { |f| File.file?(f) ? File.size(f) : 0 }
+    [warn(I18n.t('doctor.trash_holds', count: held.length, size: FileSize.human(bytes)))]
+  end
 
   def check_deploy
     name = ENV['DEPLOY_BACKEND'].to_s

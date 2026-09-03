@@ -177,7 +177,10 @@ the skin was being looked at.
 
 **Click every control at least once, for real.** The theme switch, the
 menu button on a phone width, an image that opens the lightbox, the search
-field, the back-to-top button. Setting state directly -- flipping a data
+field, the back-to-top button, and the share row under a post -- its
+Mastodon button opens a question with an input and an error line, and
+three of the controls are hidden until a script shows them. Setting state
+directly -- flipping a data
 attribute to photograph the dark theme -- proves the CSS and proves
 nothing about whether the control is reachable.
 

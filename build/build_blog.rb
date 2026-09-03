@@ -14,6 +14,8 @@ require_relative '../lib/public_file'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/embed'
+require_relative '../lib/social_icons'
+require_relative '../lib/share_targets'
 require_relative '../lib/post_address'
 require_relative '../lib/slug'
 require_relative '../lib/content_type'
@@ -23,6 +25,7 @@ require_relative '../lib/colors_css'
 require_relative '../lib/post_text'
 require_relative '../lib/card_teaser'
 require_relative '../lib/path_glob'
+require_relative '../lib/build_cache'
 
 SiteConfig.use_site_timezone!
 
@@ -53,6 +56,13 @@ require_relative '../lib/run_lock'
 # caller leaves a .deploy-pending marker behind or tells you to go
 # looking for an error that isn't there.
 RunLock.acquire!(ROOT, label: 'build', busy_exit: 3) unless ENV['BLOG_SH_PUBLIC_DIR']
+
+# Skip the work that would produce bytes already on disk (lib/build_cache.rb).
+# `--full` renders and compares everything the way the build always did --
+# the escape hatch when something looks stale, and the reference a cached
+# build is checked against.
+FULL_BUILD = ARGV.include?('--full') || ENV['BLOG_SH_FULL_BUILD'] == '1'
+BuildCache.setup!(root: ROOT, public_dir: PUBLIC_DIR, reuse: !FULL_BUILD)
 # No ?v= cache-buster on site.css on purpose: a static host that serves every
 # file with `Cache-Control: public, max-age=0` plus an ETag (e.g. Cloudron
 # Surfer) makes browsers revalidate on each load and pick up a changed
@@ -388,27 +398,206 @@ end
 # Icons stay in code, not config -- they're long SVG paths that would clutter
 # it. Config refers to them by name (icon: mastodon) and can supply its own
 # icon_svg for any other network instead.
-SOCIAL_ICONS = {
-  'mastodon' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23.268 5.313c-.35-2.578-2.617-4.61-5.304-5.004C17.51.242 15.792 0 11.813 0h-.03c-3.98 0-4.835.242-5.288.309C3.882.692 1.496 2.518.917 5.127.64 6.412.61 7.837.661 9.143c.074 1.874.088 3.745.26 5.611.118 1.24.325 2.47.62 3.68.55 2.237 2.777 4.098 4.96 4.857 2.336.792 4.849.923 7.256.38.265-.061.527-.132.786-.213.585-.184 1.27-.39 1.774-.753a.057.057 0 0 0 .023-.043v-1.809a.052.052 0 0 0-.02-.041.053.053 0 0 0-.046-.01 20.282 20.282 0 0 1-4.709.545c-2.73 0-3.463-1.284-3.674-1.818a5.593 5.593 0 0 1-.319-1.433.053.053 0 0 1 .066-.054c1.517.363 3.072.546 4.632.546.376 0 .75 0 1.125-.01 1.57-.044 3.224-.124 4.768-.422.038-.008.077-.015.11-.024 2.435-.464 4.753-1.92 4.989-5.604.008-.145.03-1.52.03-1.67.002-.512.167-3.63-.024-5.545zm-3.748 9.195h-2.561V8.29c0-1.309-.55-1.976-1.67-1.976-1.23 0-1.846.79-1.846 2.35v3.403h-2.546V8.663c0-1.56-.617-2.35-1.848-2.35-1.112 0-1.668.668-1.67 1.977v6.218H4.822V8.102c0-1.31.337-2.35 1.011-3.12.696-.77 1.608-1.164 2.74-1.164 1.311 0 2.302.5 2.962 1.498l.638 1.06.638-1.06c.66-.999 1.65-1.498 2.96-1.498 1.13 0 2.043.395 2.74 1.164.675.77 1.012 1.81 1.012 3.12z"/></svg>',
-  'pixelfed' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 24C5.3726 24 0 18.6274 0 12S5.3726 0 12 0s12 5.3726 12 12-5.3726 12-12 12m-.9526-9.3802h2.2014c2.0738 0 3.7549-1.6366 3.7549-3.6554S15.3226 7.309 13.2488 7.309h-3.1772c-1.1964 0-2.1663.9442-2.1663 2.1089v8.208z"/></svg>',
-  'linkedin' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
-  'github' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>',
-  'gitea' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M4.209 4.603c-.247 0-.525.02-.84.088-.333.07-1.28.283-2.054 1.027C-.403 7.25.035 9.685.089 10.052c.065.446.263 1.687 1.21 2.768 1.749 2.141 5.513 2.092 5.513 2.092s.462 1.103 1.168 2.119c.955 1.263 1.936 2.248 2.89 2.367 2.406 0 7.212-.004 7.212-.004s.458.004 1.08-.394c.535-.324 1.013-.893 1.013-.893s.492-.527 1.18-1.73c.21-.37.385-.729.538-1.068 0 0 2.107-4.471 2.107-8.823-.042-1.318-.367-1.55-.443-1.627-.156-.156-.366-.153-.366-.153s-4.475.252-6.792.306c-.508.011-1.012.023-1.512.027v4.474l-.634-.301c0-1.39-.004-4.17-.004-4.17-1.107.016-3.405-.084-3.405-.084s-5.399-.27-5.987-.324c-.187-.011-.401-.032-.648-.032zm.354 1.832h.111s.271 2.269.6 3.597C5.549 11.147 6.22 13 6.22 13s-.996-.119-1.641-.348c-.99-.324-1.409-.714-1.409-.714s-.73-.511-1.096-1.52C1.444 8.73 2.021 7.7 2.021 7.7s.32-.859 1.47-1.145c.395-.106.863-.12 1.072-.12zm8.33 2.554c.26.003.509.127.509.127l.868.422-.529 1.075a.686.686 0 0 0-.614.359.685.685 0 0 0 .072.756l-.939 1.924a.69.69 0 0 0-.66.527.687.687 0 0 0 .347.763.686.686 0 0 0 .867-.206.688.688 0 0 0-.069-.882l.916-1.874a.667.667 0 0 0 .237-.02.657.657 0 0 0 .271-.137 8.826 8.826 0 0 1 1.016.512.761.761 0 0 1 .286.282c.073.21-.073.569-.073.569-.087.29-.702 1.55-.702 1.55a.692.692 0 0 0-.676.477.681.681 0 1 0 1.157-.252c.073-.141.141-.282.214-.431.19-.397.515-1.16.515-1.16.035-.066.218-.394.103-.814-.095-.435-.48-.638-.48-.638-.467-.301-1.116-.58-1.116-.58s0-.156-.042-.27a.688.688 0 0 0-.148-.241l.516-1.062 2.89 1.401s.48.218.583.619c.073.282-.019.534-.069.657-.24.587-2.1 4.317-2.1 4.317s-.232.554-.748.588a1.065 1.065 0 0 1-.393-.045l-.202-.08-4.31-2.1s-.417-.218-.49-.596c-.083-.31.104-.691.104-.691l2.073-4.272s.183-.37.466-.497a.855.855 0 0 1 .35-.077z"/></svg>',
-  'forgejo' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M16.7773 0c1.6018 0 2.9004 1.2986 2.9004 2.9005s-1.2986 2.9004-2.9004 2.9004c-1.0854 0-2.0315-.596-2.5288-1.4787H12.91c-2.3322 0-4.2272 1.8718-4.2649 4.195l-.0007 2.1175a7.0759 7.0759 0 0 1 4.148-1.4205l.1176-.001 1.3385.0002c.4973-.8827 1.4434-1.4788 2.5288-1.4788 1.6018 0 2.9004 1.2986 2.9004 2.9005s-1.2986 2.9004-2.9004 2.9004c-1.0854 0-2.0315-.596-2.5288-1.4787H12.91c-2.3322 0-4.2272 1.8718-4.2649 4.195l-.0007 2.319c.8827.4973 1.4788 1.4434 1.4788 2.5287 0 1.602-1.2986 2.9005-2.9005 2.9005-1.6018 0-2.9004-1.2986-2.9004-2.9005 0-1.0853.596-2.0314 1.4788-2.5287l-.0002-9.9831c0-3.887 3.1195-7.0453 6.9915-7.108l.1176-.001h1.3385C14.7458.5962 15.692 0 16.7773 0ZM7.2227 19.9052c-.6596 0-1.1943.5347-1.1943 1.1943s.5347 1.1943 1.1943 1.1943 1.1944-.5347 1.1944-1.1943-.5348-1.1943-1.1944-1.1943Zm9.5546-10.4644c-.6596 0-1.1944.5347-1.1944 1.1943s.5348 1.1943 1.1944 1.1943c.6596 0 1.1943-.5347 1.1943-1.1943s-.5347-1.1943-1.1943-1.1943Zm0-7.7346c-.6596 0-1.1944.5347-1.1944 1.1943s.5348 1.1943 1.1944 1.1943c.6596 0 1.1943-.5347 1.1943-1.1943s-.5347-1.1943-1.1943-1.1943Z"/></svg>',
-  'codeberg' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M11.999.747A11.974 11.974 0 0 0 0 12.75c0 2.254.635 4.465 1.833 6.376L11.837 6.19c.072-.092.251-.092.323 0l4.178 5.402h-2.992l.065.239h3.113l.882 1.138h-3.674l.103.374h3.86l.777 1.003h-4.358l.135.483h4.593l.695.894h-5.038l.165.589h5.326l.609.785h-5.717l.182.65h6.038l.562.727h-6.397l.183.65h6.717A12.003 12.003 0 0 0 24 12.75 11.977 11.977 0 0 0 11.999.747zm3.654 19.104.182.65h5.326c.173-.204.353-.433.513-.65zm.385 1.377.18.65h3.563c.233-.198.485-.428.712-.65zm.383 1.377.182.648h1.203c.356-.204.685-.412 1.042-.648zz"/></svg>',
-  'gitlab' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0537.8585.8585 0 0 0-.3362.4049L.4332 9.5015l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.03.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.4619-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z"/></svg>',
-  'bluesky' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8Z"/></svg>',
-  'instagram' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zm0 10.162a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>',
-  'threads' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a13.853 13.853 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32L7.734 7.847c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388.108.046.216.094.321.142 1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69c-.242 0-.487.007-.739.021-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221z"/></svg>',
-  'facebook' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>',
-  'x' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>',
-  'youtube' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
-  'rss' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M19.199 24C19.199 13.467 10.533 4.8 0 4.8V0c13.165 0 24 10.835 24 24h-4.801zM3.291 17.415c1.814 0 3.293 1.479 3.293 3.295 0 1.813-1.485 3.29-3.301 3.29C1.47 24 0 22.526 0 20.71s1.475-3.294 3.291-3.295zM15.909 24h-4.665c0-6.169-5.075-11.245-11.244-11.245V8.09c8.727 0 15.909 7.184 15.909 15.91z"/></svg>',
-  'email' => '<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>'
-}.freeze
+SOCIAL_ICONS = SocialIcons::ALL
+
+# An icon somebody wrote in their own config, made safe to inline. The
+# same treatment an imported embed gets, and for the same reason: an SVG
+# can carry <script>, an on* handler or a javascript: href, and this one
+# is pasted into every page that draws it. Social icons went unguarded
+# until tag icons made the hole worth closing -- it was the same hole in
+# the footer all along, only nobody had asked about it.
+def own_icon_svg(svg)
+  Embed.without_scripts(svg.to_s)
+end
 
 def social_icon(entry)
-  entry['icon_svg'] || SOCIAL_ICONS[entry['icon'].to_s] || ''
+  return own_icon_svg(entry['icon_svg']) if entry['icon_svg']
+
+  SOCIAL_ICONS[entry['icon'].to_s] || ''
+end
+
+
+# Where a reader can carry a post's address away to, and say their own
+# thing about it while they do. A LIST of network names in site.yml; an
+# installation that names none gets no block at all, the way widgets and
+# tag icons work.
+#
+# What is prefilled is the post's NAME and its address, leaving the reader
+# the only part that is theirs to write. That is possible at all only
+# since 1.5: before it, a post with no title of its own would have handed
+# them its slug -- `burtiky-opekame-hipstamatic-oggl-jane` where a sentence
+# belongs, on 2,754 posts of 4,418 in the archive this was measured on.
+#
+# Pixelfed is deliberately absent. It has no share endpoint -- the request
+# for one was closed without it -- and a post there needs a photograph
+# rather than a link, so a button would be a promise the platform cannot
+# keep. The list is a list so that adding one is a line, the day that
+# changes.
+# Two of these are not networks at all, and they are the two that cover
+# everything the list does not. `copy` is the universal answer -- no third
+# party, nothing to configure, works where nothing else does. `system`
+# hands the address to the OS share sheet, which on a phone IS Signal and
+# WhatsApp and Telegram and whatever else is installed, without this file
+# having to take a view on any of them.
+SHARE_NETWORKS = ShareTargets::NAMES
+
+# The two the engine draws itself, in the house's own 24-unit grid.
+SHARE_ICONS = {
+  'copy' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" ' \
+            'stroke-width="2" stroke-linecap="round" aria-hidden="true">' \
+            '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/>' \
+            '<path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+  'system' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" ' \
+              'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' \
+              '<path d="M12 3v13"/><path d="M8 7l4-4 4 4"/>' \
+              '<path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>'
+}.freeze
+SHARE = SiteConfig::Chrome.list(SiteConfig.data, 'share')
+                          .map { |name| name.to_s.strip.downcase }
+                          .select { |name| SHARE_NETWORKS.include?(name) }.uniq.freeze
+
+# Mastodon is the one that cannot be a link. Facebook and Bluesky each
+# have ONE address to send a reader to; the fediverse has as many as it
+# has instances, and the page has no way to know which is the reader's.
+# So its control is rendered HIDDEN and the script shows it: without
+# JavaScript there is no dead button sitting there, and the markup stays
+# static, which is what the cache and the golden diff are comparing.
+# A mailto: is not a form. CGI.escape writes the encoding a form body
+# uses, in which a space is "+", and every other target here reads its
+# parameter as exactly that -- bsky, threads, x, facebook and linkedin all
+# turn the "+" back into a space. RFC 6068 gives mailto percent-encoding
+# and nothing else, so there the "+" stays a plus sign and the space it
+# stood for is gone: "Sůl & pepř" reached the compose window as
+# "Sůl+&+pepř", on every post whose name has a space in it.
+#
+# The engine already knew this -- lib/palette_preview.rb carries the same
+# one-liner and the same explanation. This forgot it.
+def mailto_escape(text)
+  CGI.escape(text.to_s).gsub('+', '%20')
+end
+
+def share_anchor(href, title, icon)
+  %(<a class="share__link" href="#{h(href)}" rel="noopener" target="_blank" ) +
+    %(title="#{h(title)}">#{icon}</a>)
+end
+
+# Which controls only appear if the browser lets them: mastodon needs its
+# script, copy needs a clipboard, system needs an OS share sheet. A block
+# made of nothing else can end up as a heading over an empty row, so it
+# arrives hidden and the script decides.
+SHARE_CONDITIONAL = ShareTargets::CONDITIONAL
+
+def share_links_html(post)
+  # unlisted too. The rule is the engine's own and written two hundred
+  # lines above this one: "drafts and unlisted posts must never end up in
+  # search engines or link previews -- for an unlisted post that is the
+  # whole point". Handing a reader a button that posts its address to
+  # Bluesky is the same mistake with better manners, and the Mastodon
+  # importer marks every unlisted-scope status this way, so an imported
+  # archive has thousands of them.
+  return '' if SHARE.empty? || page?(post) || draft?(post) || unlisted?(post)
+
+  share_url = "#{SITE_BASE_URL}#{post_path(post)}"
+  text = "#{post_title_for(post)} #{share_url}"
+  links = SHARE.map do |name|
+    case name
+    when 'bluesky'
+      share_anchor("https://bsky.app/intent/compose?text=#{CGI.escape(text)}",
+                   t('share.bluesky'), SOCIAL_ICONS['bluesky'])
+    when 'email'
+      # No target: a mail client is not a tab. And percent-encoding, not
+      # CGI.escape's form encoding -- see mailto_escape.
+      %(<a class="share__link" href="mailto:?subject=#{h(mailto_escape(post_title_for(post)))}) +
+        %(&amp;body=#{h(mailto_escape(share_url))}" title="#{h(t('share.email'))}">#{SOCIAL_ICONS['email']}</a>)
+    when 'mastodon'
+      # aria-expanded, because this button does not go anywhere on its own:
+      # it opens the row below, and a reader who cannot see that happen is
+      # owed the same news.
+      %(<button type="button" class="share__link" hidden data-share-mastodon ) +
+        %(data-share-text="#{h(text)}" aria-expanded="false" aria-controls="share-ask" ) +
+        %(title="#{h(t('share.mastodon'))}">#{SOCIAL_ICONS['mastodon']}</button>)
+    when 'copy'
+      # Hidden like the other two, and for the same reason: the clipboard
+      # API exists only in a secure context, so on an http:// install --
+      # which this engine supports -- there is nothing behind this button.
+      # The code blocks' own copy button has refused to appear there since
+      # it was written; this one used to be drawn and do nothing.
+      %(<button type="button" class="share__link" hidden data-share-copy ) +
+        %(data-share-url="#{h(share_url)}" data-share-done="#{h(t('share.copied'))}" ) +
+        %(data-share-failed="#{h(t('share.copy_failed'))}" ) +
+        %(title="#{h(t('share.copy'))}" aria-label="#{h(t('share.copy'))}">#{SHARE_ICONS['copy']}</button>)
+    when 'system'
+      # Hidden until the script finds an OS share sheet to hand it to --
+      # most desktops have none, and a button that opens nothing is worse
+      # than no button.
+      %(<button type="button" class="share__link" hidden data-share-system ) +
+        %(data-share-title="#{h(post_title_for(post))}" data-share-url="#{h(share_url)}" ) +
+        %(title="#{h(t('share.system'))}">#{SHARE_ICONS['system']}</button>)
+    when 'facebook'
+      share_anchor("https://www.facebook.com/sharer/sharer.php?u=#{CGI.escape(share_url)}",
+                   t('share.facebook'), SOCIAL_ICONS['facebook'])
+    when 'linkedin'
+      share_anchor("https://www.linkedin.com/sharing/share-offsite/?url=#{CGI.escape(share_url)}",
+                   t('share.linkedin'), SOCIAL_ICONS['linkedin'])
+    when 'threads'
+      share_anchor("https://www.threads.net/intent/post?text=#{CGI.escape(text)}",
+                   t('share.threads'), SOCIAL_ICONS['threads'])
+    when 'x'
+      share_anchor("https://twitter.com/intent/tweet?text=#{CGI.escape(text)}",
+                   t('share.x'), SOCIAL_ICONS['x'])
+    end
+  end
+  # Hidden when every control it holds is a conditional one -- otherwise a
+  # site whose share list is just [system] shows every desktop reader a
+  # heading with nothing under it. share.js unhides it the moment it knows
+  # something is drawable.
+  all_conditional = SHARE.all? { |name| SHARE_CONDITIONAL.include?(name) }
+  # A group with a name, not a HEADING. As an h2 it entered the post's own
+  # outline as a peer of the author's sections -- so a reader moving by
+  # headings met "Share this post" among the things the post is actually
+  # about, and the comments heading below it was dragged under it. The
+  # words stay where they were and still name the block, through
+  # aria-labelledby; they simply stop pretending to be a section of the
+  # writing.
+  %(<div class="share" role="group" aria-labelledby="share-heading"#{all_conditional ? ' hidden' : ''}>) +
+    %(<p class="share__heading" id="share-heading">#{h(t('share.heading'))}</p>) +
+    %(<div class="share__links">#{links.join}</div>#{share_ask_html}</div>\n                )
+end
+
+# Where the reader says which instance is theirs -- on the page, in the
+# site's own type, rather than in a grey modal from the browser.
+#
+# A prompt() was the first answer and it was the wrong one three times
+# over: it looks like something the page did not make, browsers throttle it
+# (Chrome shows none at all in a background tab, Firefox offers to stop
+# asking), and a dialog demanding the name of a server is the exact shape
+# people are taught not to trust.
+#
+# Rendered hidden and shown by the script, like the button that opens it:
+# without JavaScript neither can do anything, so neither is drawn.
+def share_ask_html
+  return '' unless SHARE.include?('mastodon')
+
+  # The way back. Without it a remembered instance is a one-way door: a
+  # reader who fat-fingers something that still looks like a host --
+  # "mastodon.socail" -- or who simply moves instance has every future
+  # share broken and nothing to click. Shown by the script, and only once
+  # there is something to change.
+  %(<button type="button" class="share__change" hidden data-share-change ) +
+    %(aria-controls="share-ask">#{h(t('share.change_instance'))}</button>) +
+    %(<form class="share__ask" id="share-ask" hidden data-share-ask>) +
+    %(<label class="share__ask-label" for="share-ask-instance">#{h(t('share.ask_label'))}</label>) +
+    %(<span class="share__ask-row">) +
+    # aria-describedby ties the message to the field it is about, and
+    # role="alert" is what makes it SPOKEN when it appears. Without both,
+    # a reader submitting by keyboard got a field that quietly refused:
+    # the message was on the page and nowhere in the accessibility tree.
+    %(<input class="share__ask-input" id="share-ask-instance" type="text" inputmode="url" ) +
+    %(autocomplete="off" autocapitalize="off" spellcheck="false" ) +
+    %(aria-describedby="share-ask-error" placeholder="mastodon.social">) +
+    %(<button type="submit" class="share__ask-go">#{h(t('share.ask_go'))}</button></span>) +
+    %(<span class="share__ask-error" id="share-ask-error" role="alert" data-share-error hidden>) +
+    %(#{h(t('share.ask_invalid'))}</span></form>)
 end
 
 def social_links_html
@@ -1080,6 +1269,39 @@ CONTENT_ICONS = {
   'chat' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
 }.freeze
 
+# What a tag may put on its own listing heading and on the date badge of
+# every post carrying it. A LIST rather than a map, because the order in
+# it is the priority: a post has more than one tag on 68% of the archive
+# this was measured against, and the tag it was given FIRST is usually the
+# platform tag an importer added -- `twitter` opens 1256 posts there. So
+# the site owner decides once, here, rather than post by post.
+TAG_ICONS = SiteConfig::Chrome.list(SiteConfig.data, 'tag_icons').filter_map do |entry|
+  next unless entry.is_a?(Hash)
+
+  tag = entry['tag'].to_s
+  next if tag.empty?
+
+  svg = entry['icon_svg'] ? own_icon_svg(entry['icon_svg']) : CONTENT_ICONS[entry['icon'].to_s]
+  next if svg.to_s.empty?
+
+  [Slug.fold(tag), svg]
+  # First entry wins, wholly. to_h keeps the LAST value at the FIRST key's
+  # position, so two entries folding to one tag -- "kolo" and "Kolo",
+  # "škola" and "skola" -- gave that tag the priority of the earlier line
+  # and the icon of the later one, which is neither of the things the file
+  # says. The order in the list is the priority, and the entry that holds
+  # a position is the entry that owns it.
+end.each_with_object({}) { |(tag, svg), acc| acc[tag] ||= svg }
+
+# The icon of the first tag in TAG_ICONS the post carries -- folded, so a
+# tag written two ways is one tag here as it is everywhere else.
+def tag_icon_for(post)
+  return nil if TAG_ICONS.empty?
+
+  folded = (post['tags'] || []).map { |t| Slug.fold(t.to_s) }
+  TAG_ICONS.find { |tag, _| folded.include?(tag) }&.last
+end
+
 # Every post is rendered onto its own page, the index, its content-type
 # listing and each of its tag listings -- with a large enough tag count that
 # can mean rendering the same content several times over, and re-parsing its
@@ -1203,7 +1425,13 @@ end
 # listing the heading is the post title at h2 and the badge beside it is a
 # link to the post, which is a different job.
 def date_badge(post, link: nil, pinned: false, heading: false)
-  icon = CONTENT_ICONS[dominant_content_type(post)]
+  # A tag's icon REPLACES the content type's rather than joining it. The
+  # badge is a small tile carrying a date and one glyph, and the only
+  # thing that ever adds a second is a pinned post -- which earns it by
+  # being the single one on the site. Two glyphs on every tagged post
+  # would make that exception the rule, and on a listing page there are
+  # twenty badges under each other.
+  icon = tag_icon_for(post) || CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
   pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
   inner = "#{icon}<span>#{date}</span>"
@@ -2274,7 +2502,17 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   classes << "listing-heading--#{variant}" if variant
   parts = []
   parts << %(<span class="listing-heading__kind">#{h(kind)}</span>) unless kind.empty?
-  parts << LISTING_HEADING_ICONS[icon] if icon && LISTING_HEADING_ICONS.key?(icon)
+  # A symbol names one of the icons the engine ships; a String IS one --
+  # that is how a tag's own icon reaches its heading without a second
+  # parameter and a second code path drawing the same thing.
+  #
+  # Dressed on the way through, because the two arrive differently: the
+  # engine's own carry the heading class and aria-hidden in their markup,
+  # and somebody's own SVG is whatever they pasted. Undressed it sat at
+  # its natural size instead of the heading's, and a screen reader read it
+  # out as a graphic nobody had named.
+  icon_svg = icon.is_a?(String) ? heading_icon_dress(icon) : LISTING_HEADING_ICONS[icon]
+  parts << icon_svg unless icon_svg.to_s.empty?
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
   parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
@@ -2302,6 +2540,27 @@ end
 # it, so the glyph is hidden from assistive technology rather than given a
 # label that would then be read twice. Same magnifier the nav's search
 # button uses.
+# Somebody's own SVG, given the two things the engine's own icons carry:
+# the class the heading sizes them by, and aria-hidden, because the
+# heading says in words what the icon says in a picture. Added rather than
+# replaced -- an icon that already names its own classes keeps them.
+def heading_icon_dress(svg)
+  markup = svg.to_s
+  return markup unless markup.match?(/\A\s*<svg\b/i)
+
+  markup.sub(/\A(\s*<svg\b)([^>]*)>/i) do
+    head = Regexp.last_match(1)
+    attrs = Regexp.last_match(2)
+    attrs = if attrs.match?(/\bclass\s*=\s*"/i)
+              attrs.sub(/\bclass\s*=\s*"/i, 'class="listing-heading__icon ')
+            else
+              "#{attrs} class=\"listing-heading__icon\""
+            end
+    attrs += ' aria-hidden="true"' unless attrs.match?(/\baria-hidden\s*=/i)
+    "#{head}#{attrs}>"
+  end
+end
+
 LISTING_HEADING_ICONS = {
   search: '<svg class="listing-heading__icon" viewBox="0 0 24 24" width="20" height="20" ' \
           'fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' \
@@ -2408,6 +2667,31 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   oldest_first: false)
   pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
+    out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
+    dest = File.join(out_dir, 'index.html')
+    # A listing page is its slice of posts and the labels around it, and
+    # nothing else. Anchored pagination is what makes this worth doing: a
+    # post added at the top changes the landing page's slice and leaves
+    # every /page/N/ slice alone, so on an ordinary publish 438 of 439
+    # listing pages have identical inputs and none of them is rendered.
+    #
+    # Backdating is the case this does NOT rescue, and honestly cannot: a
+    # post dated 2003 shifts every slice between the landing page and where
+    # it lands, so those pages really did change and really do have to be
+    # rebuilt. Measured on one archive: 766 files for a post dated 2003
+    # against 12 for one dated today.
+    lifted = pinned && number > fixed ? pinned : nil
+    key = Digest::SHA256.hexdigest([
+      base_path, number, fixed, oldest_first, heading, heading_kind, heading_variant,
+      heading_icon, heading_href, feed_path, title, description,
+      lifted ? POST_DIGEST[lifted['__path']] : '',
+      page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
+    ].map(&:to_s).join('|'))
+    if BuildCache.page_fresh?(dest, key)
+      keep(dest)
+      next
+    end
+
     # The landing page shows the pinned post ONCE, at the top: when it
     # would otherwise appear further down that same page, it is lifted out
     # rather than duplicated. Anchored pagination is unaffected either
@@ -2421,7 +2705,6 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
       list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
     end
     pagination = pagination_html(number, fixed, base_path)
-    out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
@@ -2445,7 +2728,8 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # were announced on, hosts the page never actually contacts.
     shown = page_posts
     shown = ([pinned] + page_posts).uniq if pinned && number > fixed
-    emit(File.join(out_dir, 'index.html'),
+    BuildCache.remember_page(dest, key)
+    emit(dest,
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
                            # The landing page of a listing is the highest number and
@@ -2523,9 +2807,48 @@ def make_readable(path)
   PublicFile.make_readable(path)
 end
 
+# A page the build cache vouched for: kept, but not written.
+#
+# Everything emit() does BESIDES writing still has to happen, and the
+# permissions are the half that is easy to forget. A rebuild repairing a
+# public.nosync/ somebody chmod'ed shut is a promise made to a reporter
+# whose imported pictures were 600 and whose rebuild did nothing about it
+# -- "chmod, rebuild, nothing". A cache that skipped the repair along with
+# the write would have quietly taken that promise back on every page it
+# skipped, which is every page of an ordinary publish.
+#
+# Both halves, because they fail separately: a file at 644 behind a
+# directory at 744 is a file nobody can reach. make_traversable remembers
+# the directories it has already opened, so the walk up happens once per
+# directory rather than once per page.
+def keep(path)
+  WRITTEN[path] = true
+  make_traversable(File.dirname(path))
+  make_readable(path) unless world_readable?(path)
+end
+
 def emit(path, content)
   WRITTEN[path] = true
   bytes = content.to_s.b
+  digest = Digest::SHA256.hexdigest(bytes)
+
+  # What the last build left here, if it still is what it left. Hashing the
+  # bytes we already hold in memory is cheaper than reading the file back
+  # to compare it: on a 4,394-post archive the read-back was 2.81 s of an
+  # 11.2 s build, and every byte of it was read to find out nothing had
+  # changed. The record carries size and mtime as well as the digest, so a
+  # file edited outside the build falls through to the honest comparison
+  # below rather than being vouched for.
+  # Through keep(), not a bare return: the directory walk below sits before
+  # the old early return on purpose, and this return is earlier still. A
+  # file at the right bytes and the right mode behind a directory at 744 is
+  # a file nobody can fetch, and that is exactly the shape the walk was
+  # added for.
+  if BuildCache.written?(path, digest)
+    keep(path)
+    return
+  end
+
   dir = File.dirname(path)
   FileUtils.mkdir_p(dir)
   # Before the early return, not after. A file whose bytes AND mode are both
@@ -2553,12 +2876,50 @@ def emit(path, content)
       # sidebar, no search index, no prune, exit 1 -- on a rebuild that had
       # nothing to write in the first place.
       make_readable(path) unless world_readable?(path, stat)
+      BuildCache.record(path, digest)
       return
     end
   end
 
+  # Never THROUGH a second name -- see PublicFile.claim. Media arrive in
+  # public.nosync/ as a link to the archive's own file, so an in-place write
+  # here is a write into media.nosync/. And when the name cannot be made
+  # ours, the answer is to leave it alone and say so: writing anyway is how
+  # an attachment in the archive became a rendered page.
+  unless PublicFile.claim(path)
+    warn t('build.name_not_ours', path: path)
+    return
+  end
+
   File.binwrite(path, bytes)
   make_readable(path)
+  BuildCache.record(path, digest)
+end
+
+# The same bargain as a post page, for the outputs made out of the whole
+# archive rather than out of one post: the feed, the sitemap, the search
+# index, the archive map. Their inputs are a list of posts, so their key is
+# the digests of that list -- and when it has not moved, the block is never
+# called and the work inside it never happens.
+#
+# The block matters as much as the key. Building the search index costs
+# half a second of reading every post's text; passing the finished bytes in
+# and then deciding not to write them would have spent all of it.
+def cached_emit(dest, key)
+  if BuildCache.page_fresh?(dest, key)
+    keep(dest)
+    return
+  end
+
+  BuildCache.remember_page(dest, key)
+  emit(dest, yield)
+end
+
+# The identity of a list of posts, in order. Order is part of it: the feed
+# and the archive both say something different when the same posts are
+# arranged differently.
+def posts_digest(list)
+  Digest::SHA256.hexdigest(list.map { |post| POST_DIGEST[post['__path']] }.join(','))
 end
 
 FAVICON_PNG = File.join(ROOT, 'assets', 'images', 'favicon.png')
@@ -2636,11 +2997,72 @@ def emit_copy(src, dest, compare_content: false)
     # size nor mtime -- it moves ctime, which nothing here was reading -- so
     # a picture copied under a strict umask stayed unreadable through every
     # rebuild that followed.
-    return if same && world_readable?(dest)
+    #
+    # One inode under two names is the cheapest possible answer: nothing to
+    # compare and nothing to write. An archive built before this existed
+    # falls THROUGH here even when its copy is up to date, and is relinked
+    # once -- otherwise it would keep paying twice for every file that
+    # never changes, which for media is all of them.
+    return if File.identical?(src, dest) && world_readable?(dest)
+    return if links_impossible? && same && world_readable?(dest)
   end
 
-  FileUtils.cp(src, dest)
+  place_public(src, dest)
+  # On a link this changes the mode of the ORIGINAL too -- one inode has one
+  # mode. That is the intended direction: a media file the web server cannot
+  # read is the bug this makes impossible, and an original that becomes
+  # readable is what its owner was going to do by hand anyway.
   make_readable(dest)
+end
+
+# The same bytes under two names, paid for once. Measured on one real
+# archive: media.nosync and public.nosync held 1.8 GB each -- the same
+# 1.8 GB twice, and every import doubled again.
+#
+# Nothing in the build ever writes INTO a file under public.nosync: pages
+# are written whole by `emit`, and media arrives only through here. So the
+# two names cannot drift apart, and deleting one of them -- prune, or a
+# deploy with --prune -- only drops that name.
+def place_public(src, dest)
+  # The name is dropped FIRST, and for both routes. It used to be dropped
+  # only on the way to a link, so once one file had failed to link -- one
+  # source owned by another uid, one immutable file, one media directory on
+  # its own mount -- every later media file took the copy route with the
+  # old name still in place. A copy onto an existing link reaches whatever
+  # else wears it; a copy onto the source ITSELF is not a copy at all, and
+  # FileUtils.cp answers that with an ArgumentError, which is not a
+  # SystemCallError and was caught by nothing: the build died where it
+  # stood, with the site half written, no prune and no cache saved.
+  ours = PublicFile.claim(dest)
+  unless links_impossible?
+    begin
+      File.unlink(dest) if ours && File.exist?(dest)
+      File.link(src, dest)
+      return
+    rescue SystemCallError
+      # A volume that refuses the first link will refuse the rest: a
+      # separate mount for public.nosync (EXDEV), a source somebody else
+      # owns (EPERM), a filesystem with a link limit (EMLINK). Asking again
+      # per file would copy the whole archive on every build.
+      @links_impossible = true
+    end
+  end
+
+  unless ours
+    warn t('build.name_not_ours', path: dest)
+    return
+  end
+
+  FileUtils.cp(src, dest) unless File.identical?(src, dest)
+rescue ArgumentError, SystemCallError => e
+  # One picture that cannot be placed is one picture missing from one page.
+  # Saying so and carrying on is the proportionate answer; the alternative
+  # took the entire site down over it.
+  warn t('build.media_unplaceable', path: dest, reason: e.message)
+end
+
+def links_impossible?
+  @links_impossible == true
 end
 
 # Make the directory write the name we are about to record. Only ever a
@@ -2679,8 +3101,20 @@ def prune_public
     if File.directory?(path)
       dirs << path
     elsif !WRITTEN[path]
-      File.delete(path)
-      removed += 1
+      begin
+        File.delete(path)
+        removed += 1
+      rescue SystemCallError => e
+        # One file that will not go is one stale file on the site. It used
+        # not to be able to matter, because the sweep only ran on builds
+        # where something had dropped out of the record -- now it runs on
+        # every build, so a single unlinkable orphan (one Locked in the
+        # Finder, one left behind by a cron that ran as root in an install
+        # that otherwise builds as somebody else) would abort EVERY build
+        # from then on, mid-sweep, with the cache never saved. The rmdir
+        # twelve lines down has always rescued; this never did.
+        warn t('build.prune_failed', path: path, reason: e.message)
+      end
     end
   end
   # Nothing deleted means no directory could have been orphaned.
@@ -2714,6 +3148,26 @@ PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
 
   emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
+# The writer: a page the owner opens on a phone, writes a post in, and
+# hands to a shortcut that carries it to scripts/receive.sh. Off unless a
+# site asks for it -- it is a page for whoever runs the blog, not for the
+# people reading it, and a site with no use for it should not carry the
+# weight or answer for the address.
+#
+# ⚠️ A NAMED LIST, not the directory. write/ also holds the locale sources
+# and the script that turns them into i18n.js, and neither belongs on a
+# public web server; a directory copy would publish whatever anyone ever
+# dropped in there, which is how a note-to-self becomes a URL.
+WRITE_FILES = %w[index.html app.js i18n.js manifest.webmanifest].freeze
+if SiteConfig.get('write', default: false)
+  WRITE_FILES.each do |name|
+    src = File.join(ROOT, 'write', name)
+    next unless File.file?(src)
+
+    emit_copy(src, File.join(PUBLIC_DIR, 'write', name), compare_content: true)
+  end
+end
+
 emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
                         fonts: SiteConfig.get('fonts', default: {}),
@@ -2731,8 +3185,16 @@ index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'
 # thousand files it was, and every listing command failed the same way, so
 # there was no way to find it from inside the tool.
 unreadable = []
+# What each post file said, by path. The build cache asks "is this post
+# still the post it was", and the honest answer is the bytes on disk --
+# not the date, which a correction moves without changing anything else,
+# and not mtime, which a cloud sync or a restore moves without changing
+# anything at all.
+POST_DIGEST = {}
 posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
-  parsed = JSON.parse(File.read(f, encoding: 'utf-8'))
+  raw = File.read(f, encoding: 'utf-8')
+  parsed = JSON.parse(raw)
+  POST_DIGEST[f] = Digest::SHA256.hexdigest(raw) if parsed.is_a?(Hash)
   # Valid JSON of the wrong shape ("[1,2,3]", "null", a bare string) used to
   # sail past this and die much later with a TypeError that named no file --
   # same blindness as an unparseable file, different exception.
@@ -3028,6 +3490,75 @@ end
 NAV_ITEMS = (configured_nav_items || ([['/', t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
+# Everything a page's bytes can depend on that is not the page's own
+# content: the engine and the templates (read off disk), plus the handful
+# of facts the build works out from the archive itself. The menu is the one
+# that matters in practice -- a site publishing its first video grows a
+# menu item on every page it has, and the cache has to know that.
+#
+# From here on a page whose key still matches is not rendered at all. Every
+# emit BEFORE this line -- the assets, the generated stylesheet -- ran
+# without a cache to consult and compared bytes the old way. There are a
+# few dozen of them and they are not what a publish is spent on.
+#
+# SITE_BASE_URL and the timezone are here for a reason the trees above
+# cannot cover: both are allowed to come from env.sh, and env.sh is not a
+# file the fingerprint reads -- it holds tokens, it is never in git, and it
+# is deliberately the one thing this engine does not touch.
+#
+# The address is on every page (canonical, og:url) and in the feed and the
+# sitemap, and docs/install.md tells every new operator to change it after
+# their first build. So the first build after taking that advice was the
+# first build to get it wrong, on every page it did not happen to rebuild.
+#
+# The zone decides the day printed on every badge. site.timezone reaches
+# the fingerprint through config/, but it is ALLOWED to be empty, and then
+# the zone is whatever the process was started with -- which a cron entry
+# and a login shell routinely disagree about.
+#
+# The zone is named by its RULES rather than by the moment -- Time.now.zone
+# would throw the whole cache away twice a year at a DST transition, to
+# render the identical site.
+#
+# The rules are the zoneinfo FILE, hashed. Naming them by what they do at
+# a couple of fixed instants was the first answer and it was too small: the
+# tz database never rewrites the past, so probes standing in 2020 cannot
+# see a rule that changed for 2023. That is not a hypothetical -- Egypt,
+# Chile, Mexico, Iran, Jordan, Greenland and Paraguay have all had theirs
+# rewritten since, and Palestine has one most years. The operator takes
+# the system update, publishes, and every page the cache skips keeps the
+# old times on it.
+#
+# Where there is no zoneinfo to read, the offsets stand in -- but at
+# instants spread across the whole span an archive can hold, and fixed, so
+# that the turn of a year does not buy a full build on its own.
+def timezone_fact
+  zone = ENV['TZ'].to_s.sub(/\A:/, '')
+  # TZ takes three shapes and all three are ordinary: empty (the machine's
+  # own zone), a name from the database, and -- with the leading colon --
+  # a path to a zoneinfo file of one's own.
+  path = if zone.empty? then '/etc/localtime'
+         elsif zone.start_with?('/') then zone
+         else File.join('/usr/share/zoneinfo', zone)
+         end
+  rules = begin
+    File.file?(path) ? Digest::SHA256.file(path).hexdigest : nil
+  rescue SystemCallError
+    nil
+  end
+  # Time.at, not Time.utc: an instant in UTC has an offset of zero whatever
+  # the zone is, so probes built that way measure nothing at all.
+  rules ||= (1970..2035).step(5).flat_map do |year|
+    [Time.at(Time.utc(year, 1, 15).to_i).utc_offset,
+     Time.at(Time.utc(year, 7, 15).to_i).utc_offset]
+  end.join(',')
+  [zone, rules].join(':')
+end
+TIMEZONE_FACT = timezone_fact
+BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
+                 SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
+                 SITE_BASE_URL, TIMEZONE_FACT)
+
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
 # somebody else's archive rather than through anything the author typed.
@@ -3108,6 +3639,68 @@ def referenced_media_filenames(post)
   end.compact
 end
 
+# What a post's own page is built from, beyond the post file itself.
+#
+# Three things reach into a post page from outside it, and all three change
+# without the post changing:
+#
+#   the series -- "part 3 of 7" and the links either side are facts about
+#     the set, so a sibling joining or leaving rewrites this post's page;
+#     so does somebody spelling the series name differently.
+#   its tags -- a tag pill is a link when the tag has a listing page and a
+#     flat pill when it does not, and whether it has one depends on the
+#     OTHER posts carrying it.
+#   its media -- a picture replaced in place changes the page's width and
+#     height attributes without changing a byte of the post.
+#
+# Anything else that could reach in is in the fingerprint already. The
+# media stat is the only cost here, and the loop below stats those same
+# files anyway.
+def post_page_key(post, source_media_dir)
+  slug, in_series, = series_context(post)
+  # Everything this page says about its siblings is made out of the
+  # siblings: the name and "part 3 of 7" at the top, and at the bottom
+  # prev/next carrying each neighbour's ADDRESS and TITLE. The key used to
+  # carry their slugs, which is neither -- so a sibling retitled left stale
+  # words on every other member's page, and a sibling whose date was
+  # corrected across a year left every neighbour linking at a 404, both
+  # without touching the pages that were now wrong.
+  #
+  # Their digests rather than their titles and addresses on purpose: what
+  # the nav shows about a neighbour has grown before and will again, and a
+  # key listing today's fields goes blind the day one is added. A series is
+  # a handful of posts, so the cost of rebuilding all of them when one
+  # changes is a handful of pages.
+  series_bit = if slug
+                 "#{slug}/#{SERIES_NAMES[slug]}:" +
+                   in_series.map { |p| "#{post_path(p)}=#{POST_DIGEST[p['__path']]}" }.join(',')
+               elsif draft?(post) && !post['series'].to_s.strip.empty?
+                 # A draft is not in SERIES_MAP -- "part 3 of 7" is a fact
+                 # about the published set and the draft is not in it -- so
+                 # the branch above never covered it and nothing else did
+                 # either. Its note is built entirely out of things that
+                 # move without the draft being touched: how many of the
+                 # series are published, and how the published ones spell
+                 # its name.
+                 draft_slug = series_slug_of(post)
+                 ['draft', post['series'], draft_slug, SERIES_NAMES[draft_slug],
+                  SERIES_PUBLISHED[draft_slug]].join('/')
+               else
+                 ''
+               end
+  tag_bit = Array(post['tags']).map { |tag| "#{tag_slug(tag)}=#{TAG_PAGES[tag_slug(tag)] ? 1 : 0}" }.join(',')
+  media_bit = referenced_media_filenames(post).map do |name|
+    file = File.join(source_media_dir, File.basename(name.to_s))
+    stat = begin
+      File.stat(file)
+    rescue SystemCallError
+      nil
+    end
+    "#{File.basename(name.to_s)}:#{stat ? "#{stat.size}:#{stat.mtime.to_i}" : '-'}"
+  end.join(',')
+  Digest::SHA256.hexdigest([POST_DIGEST[post['__path']], series_bit, tag_bit, media_bit].join('|'))
+end
+
 (posts + pages + unlisted_posts + drafts).each do |post|
   year = post_time(post).year
   dir = output_dir(post)
@@ -3142,7 +3735,18 @@ end
     end
   end
 
-  emit(File.join(dir, 'index.html'), render_post_html(post, post_template))
+  dest = File.join(dir, 'index.html')
+  key = post_page_key(post, source_media_dir)
+  if BuildCache.page_fresh?(dest, key)
+    # Not rendered, not compared, not written -- the file on disk was built
+    # from these exact inputs by this exact engine and is still untouched.
+    # This is what makes publishing cost the size of the CHANGE rather than
+    # the size of the archive.
+    keep(dest)
+  else
+    emit(dest, render_post_html(post, post_template))
+    BuildCache.remember_page(dest, key)
+  end
 end
 
 # A tiny self-contained page, deliberately not layout(): a reader spends a
@@ -3302,6 +3906,46 @@ overlong_tags.each do |name|
   warn t('build.tag_too_long', name: name)
 end
 
+# What the writer page knows about the blog it belongs to, written beside
+# it as site.js: the name and claim for its header, the palette so it is
+# dressed like the blog, the favicon, and every tag the blog has used with
+# a count, so a tag can be tapped rather than typed -- and typed the way
+# it was typed before, instead of growing a second spelling. Generated
+# here rather than kept in write/, because all of it is this site's, and
+# the page itself is the same file on every site.
+if SiteConfig.get('write', default: false)
+  # Each tag with two counts: all time, and the last twelve months. The
+  # page ranks an empty field by the second -- what the blog is tagging
+  # NOW -- because all time is led by where an archive came from
+  # (twitter, tumblr, an old blog), and nobody tags a new post with
+  # those. Typing searches every tag, ranked by all time.
+  recent_since = Time.now - (365 * 24 * 60 * 60)
+  tag_counts = tags_map.map do |_slug, data|
+    recent = data[:posts].count { |post| post_time(post) >= recent_since }
+    [data[:name].to_s, data[:posts].length, recent]
+  end
+  tag_counts.sort_by! { |name, count, recent| [-recent, -count, name.downcase] }
+  site_facts = {
+    'name' => SITE_SHORT_NAME,
+    'claim' => SiteConfig.get('banner', 'claim', default: nil) || SITE_DESCRIPTION,
+    'lang' => SITE_LANG,
+    'favicon' => (File.file?(FAVICON_PNG) ? '/assets/images/favicon.png' : nil),
+    'colors' => SITE_COLORS,
+    # The stylesheets a post page wears, in order, so a preview can wear
+    # the same ones.
+    'css' => ['/assets/css/colors.css', '/assets/css/site.css'] + EXTRA_CSS,
+    # The receiver's ceiling on one delivery, as this build sees it, so the
+    # page can say "too big" before the phone spends the upload finding
+    # out. The receiver reads the same variable in ITS environment -- the
+    # forced command's -- so raise it in both places or in neither.
+    'max_mb' => (ENV['BLOGSH_MAX_MB'] || 24).to_i,
+    'tags' => tag_counts
+  }
+  emit(File.join(PUBLIC_DIR, 'write', 'site.js'),
+       "// Generated by the build from config/site.yml and the posts -- do not edit.\n" \
+       "window.BLOG_SITE = #{JSON.generate(site_facts)};\n")
+end
+
 # A feed per tag, but only for the tags the site's own menu points at.
 #
 # The alternative is a feed for every tag, and on a real archive that is
@@ -3324,7 +3968,8 @@ tags_map.each do |slug, data|
   end
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
-                heading_kind: t('tag.kind'), heading_variant: 'tag', heading_icon: :tag,
+                heading_kind: t('tag.kind'), heading_variant: 'tag',
+                heading_icon: TAG_ICONS[Slug.fold(data[:name].to_s)] || :tag,
                 # Only when there IS an index to go back to: a site whose
                 # tags all live on drafts builds no /tag/, and a heading
                 # linking there would be the dead menu item doctor refuses.
@@ -3354,6 +3999,9 @@ end
 unless tags_map.empty?
   tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
                            .sort_by { |_, name, _| [Slug.fold(name), name] }
+  # Names and counts are the whole page, so that is the whole key.
+  tag_index_dest = File.join(PUBLIC_DIR, 'tag', 'index.html')
+  tag_index_key = Digest::SHA256.hexdigest(tag_index_rows.map { |row| row.join(':') }.join(','))
   # A letter above each run of names, so seven hundred tags read as a
   # dictionary rather than as a wall. Taken from the FOLDED name, because
   # that is the order the list is in: `škola` belongs under S, where the
@@ -3366,7 +4014,8 @@ unless tags_map.empty?
   # way the archive's month is. The switch to count order takes them back
   # out (see assets/js/tag-index.js).
   last_letter = nil
-  items = tag_index_rows.flat_map do |slug, name, count|
+  build_tag_index_items = lambda do
+    tag_index_rows.flat_map do |slug, name, count|
     letter = Slug.fold(name).to_s[0].to_s.upcase
     letter = '#' unless letter.match?(/[A-Z]/)
     head = if letter == last_letter
@@ -3387,13 +4036,15 @@ unless tags_map.empty?
     head + [%(<li class="tag-index-item" data-count="#{count}">) +
             %(<a class="tag-pill" href="/tag/#{h(slug)}/">#{h(name)}) +
             %(<sup class="tag-index-count">#{count}</sup></a></li>)]
+    end
   end
-  emit(File.join(PUBLIC_DIR, 'tag', 'index.html'),
-       layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
-              %(\n<ul class="tag-index" id="tag-index">\n#{items.join("\n")}\n</ul>),
-              title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
-              description: t('tags.description', site_title: SITE_TITLE),
-              path: '/tag/'))
+  cached_emit(tag_index_dest, tag_index_key) do
+    layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
+           %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
+           title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
+           description: t('tags.description', site_title: SITE_TITLE),
+           path: '/tag/')
+  end
 end
 
 # A series gets a listing of its own, in series order rather than newest
@@ -3558,12 +4209,30 @@ unless archive_by_year.empty?
       %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
   end
 
-  emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
-       layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
-              %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
-              title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
-              description: t('archive.description', site_title: SITE_TITLE),
-              path: ARCHIVE_PATH))
+  # Keyed on the digest of the rows themselves, not on a summary of them.
+  # The summary was "year:count" -- and the map draws MONTHS: a cell per
+  # month, shaded in four steps by how many posts it holds, linking to an
+  # anchor on the year page. So a post whose date moved from March to
+  # January changed the cells at both ends, the shading of one of them and
+  # the anchor the other pointed at, while the year's count sat exactly
+  # where it was and the key never moved. The map then disagreed with the
+  # year page it links to, and kept disagreeing.
+  #
+  # The rows are built above whatever the cache decides, so this costs one
+  # hash of a few kilobytes -- and, unlike a summary, it cannot drift from
+  # what is drawn: anything added to a cell is in the key the same day it
+  # is on the page.
+  #
+  # The YEAR pages below are what this buys something on anyway: 2014 has
+  # not changed since new year's eve 2014 and never will.
+  cached_emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
+              Digest::SHA256.hexdigest(rows.join)) do
+    layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
+           %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
+           title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
+           description: t('archive.description', site_title: SITE_TITLE),
+           path: ARCHIVE_PATH)
+  end
 
   archive_span.each do |year|
     in_year = archive_by_year[year] || []
@@ -3571,6 +4240,13 @@ unless archive_by_year.empty?
     # there is nothing to put on it, and an empty page is an invitation to
     # a dead end.
     next if in_year.empty?
+
+    year_dest = File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html')
+    year_key = posts_digest(in_year)
+    if BuildCache.page_fresh?(year_dest, year_key)
+      keep(year_dest)
+      next
+    end
 
     sections = in_year.group_by { |post| post_time(post).month }.sort.map do |month, in_month|
       # The month heading is a number, the way this site writes dates: two
@@ -3596,7 +4272,8 @@ unless archive_by_year.empty?
         %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
     end
 
-    emit(File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html'),
+    BuildCache.remember_page(year_dest, year_key)
+    emit(year_dest,
          layout(listing_heading_html(t('archive.year_title', year: year),
                                      variant: 'archive', icon: :calendar,
                                      value_href: ARCHIVE_PATH) + "\n" +
@@ -3620,10 +4297,14 @@ end
 # eagerly-loaded half regardless of age -- there are a handful of them,
 # and burying them in the lazy archive would defeat the point.
 searchable = pages + posts
-recent_search_index = searchable.first(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
-archive_search_index = searchable.drop(SEARCH_INDEX_RECENT_LIMIT).map { |post| search_index_entry(post) }
-emit(File.join(PUBLIC_DIR, 'search-index.json'), recent_search_index.to_json)
-emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), archive_search_index.to_json)
+recent_searchable = searchable.first(SEARCH_INDEX_RECENT_LIMIT)
+archive_searchable = searchable.drop(SEARCH_INDEX_RECENT_LIMIT)
+cached_emit(File.join(PUBLIC_DIR, 'search-index.json'), posts_digest(recent_searchable)) do
+  recent_searchable.map { |post| search_index_entry(post) }.to_json
+end
+cached_emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), posts_digest(archive_searchable)) do
+  archive_searchable.map { |post| search_index_entry(post) }.to_json
+end
 
 search_template = ERB.new(File.read(File.join(ROOT, 'templates', 'search.html.erb'), encoding: 'utf-8'))
 emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
@@ -3693,8 +4374,14 @@ end
 # Sidebar.write_all writes its own files (and reads previous content itself
 # as a fallback), so they're only registered here to keep prune_public from
 # deleting them.
-Sidebar.write_all(PUBLIC_DIR)
-Sidebar::FEEDS.each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
+#
+# What it ACTUALLY wrote, not what it might have: write_all answers with an
+# empty hash when the column is switched off, and every key it does answer
+# with is a file it just wrote. Registering the whole FEEDS table instead
+# meant that an author who turned the sidebar off while leaving the widget
+# settings in place kept yesterday's widget JSON on the site for good --
+# protected from the sweep by a build that had not written it.
+Sidebar.write_all(PUBLIC_DIR).each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
 
 # Stats for tooted posts are filled in by cron (scripts/refresh_sidebar.rb) --
 # the build just registers the file so prune doesn't delete it, and creates
@@ -3733,11 +4420,22 @@ WRITTEN[STATS_PATH] = true
 COMMENTS_PATH = File.join(PUBLIC_DIR, 'comments.json')
 WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
 
-emit(File.join(PUBLIC_DIR, 'rss.xml'), render_rss(posts))
+# Only the newest RSS_ITEM_LIMIT posts reach the feed, and its stated
+# <lastBuildDate> is the newest post's own date rather than the clock --
+# so a post dated 2003 changes nothing here, and the feed is not rewritten
+# for readers who would have been handed the same bytes.
+cached_emit(File.join(PUBLIC_DIR, 'rss.xml'), posts_digest(posts.first(RSS_ITEM_LIMIT))) do
+  render_rss(posts)
+end
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-emit(File.join(PUBLIC_DIR, 'sitemap.xml'), render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts))
+cached_emit(File.join(PUBLIC_DIR, 'sitemap.xml'),
+            Digest::SHA256.hexdigest([posts_digest(posts + pages),
+                                      tags_map.keys.join(','),
+                                      PRESENT_TYPES.join(',')].join('|'))) do
+  render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts)
+end
 # The crawlers that collect text to train on, as of this release. A list in
 # the engine goes stale, which is why the free-text key below exists beside
 # it -- but a list nobody has to research is the difference between a site
@@ -3833,10 +4531,44 @@ REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
   end
 end
 
+# Prune walks all 16,000 entries of a large public.nosync/ looking for what
+# the build no longer produces -- a second of every publish, and on an
+# ordinary publish it finds nothing, because an ordinary publish adds pages
+# and drops none.
+#
+# So it is asked first whether anything COULD have been orphaned: is every
+# public.nosync/ is swept on every build, and the cache does not get a say.
+#
+# It used to: when no file the last build wrote had stopped being written,
+# the walk was skipped. That reasoning was sound about outputs and blind to
+# everything else, because a record can only miss what it once held. Three
+# things arrive in public.nosync/ without ever being in it -- the palette
+# preview the style wizard leaves behind (and promises the next build will
+# take down), whatever a build that died halfway had already written, and
+# anything a person or a script put there -- and all three then survived
+# every later build, and every deploy mirrored them onto the live site.
+#
+# The sweep costs 1.2 s on a 4,394-post archive, against 10.3 s that the
+# same publish cost before the cache existed. Correctness at a third of
+# what was saved is a trade worth making, and "the site holds exactly what
+# the archive says" is not a promise to make conditionally.
 removed = prune_public
+
+# Written here and nowhere else: at the end, on the way out of a build that
+# reached the end. An at_exit hook would save this state after a build that
+# died halfway through writing the site, and the next build would then skip
+# the half that never got written -- a site permanently missing pages, with
+# nothing saying so.
+BuildCache.save!
 
 puts
 puts t('build.summary', posts: posts.size, pages: page_count, dir: PUBLIC_DIR, tags: tags_map.size)
+# Said out loud, because a cache nobody can see is a cache nobody can
+# check. When a build takes longer than it should, this line is the first
+# thing to look at: a zero here after an ordinary publish means the cache
+# was thrown away, and the reason is always a fingerprint that moved.
+puts t('build.reused', count: BuildCache.skipped) if BuildCache.skipped.positive?
+puts t('build.full') if FULL_BUILD
 if drafts.any?
   puts
   puts t('build.drafts', count: drafts.size)

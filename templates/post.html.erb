@@ -17,7 +17,7 @@
                 <div class="content">
                   <%= content_html %>
                 </div>
-                <%= series_nav_html(series_slug, series_posts, series_index, :bottom) %><%= tags_html(post) %>
+                <%= series_nav_html(series_slug, series_posts, series_index, :bottom) %><%= tags_html(post) %><%= share_links_html(post) %>
                 <% if post['mastodon_url'] || post['bluesky_uri'] %>
                   <div class="comments">
                     <h3><%= h(t('post.comments_heading')) %></h3>
