@@ -10,7 +10,7 @@ changes configuration, content or the shape of a post file; a minor release
 adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
-## 1.6 -- 2026-08-31
+## 1.6 -- 2026-09-03
 
 A release about the time between deciding to publish and the site saying
 so. The build stopped rebuilding what nobody changed, a photograph
@@ -26,13 +26,14 @@ size of the archive rather than the size of the change: a post dated
 today alters a dozen files, and the build rendered every page in the
 archive and read every one back off disk to find that out. It now
 records what each page was made of and skips the ones whose inputs have
-not moved. Measured on this project's own archive of 6,639 posts and
-13,465 published files, a rebuild that changes nothing costs 44% of what
-it did and an ordinary publish about half; backdating into the early
-2000s still costs four fifths, because a post landing there moves every
-listing page between the front page and where it lands, and there is no
-way around that. On the server that archive lives on, a full first build
-and upload took 197 seconds and the next build 9.
+not moved. Measured on this project's own archive of 6,639 posts, on
+the server it lives on: a rebuild that changes nothing costs a seventh
+of what it did and an ordinary publish about two fifths; backdating into
+the early 2000s still costs four fifths, because a post landing there
+moves every listing page between the front page and where it lands, and
+there is no way around that. The ratio is what travels; the seconds
+behind it are one machine's. On that server the full first build after
+the upgrade, with its upload, took 197 seconds.
 
 Nothing to migrate -- `git pull`, rebuild, deploy. Four things happen by
 themselves on an existing site. The first build after the upgrade is a

@@ -1216,9 +1216,9 @@ whose inputs have not moved. Nothing you do changes: `./blog.sh publish`
 and `./blog.sh rebuild` work exactly as before, only quicker. The summary
 at the end says how many pages were left alone, so you can see it working.
 
-Measured on this project's own archive of 6,639 posts and 13,465 published
-files: a rebuild that changes nothing now costs 44% of what it did, and an
-ordinary publish about half. Backdating is the case it can do least about,
+Measured on this project's own archive of 6,639 posts, on the server it
+lives on: a rebuild that changes nothing now costs a seventh of what it did,
+and an ordinary publish about two fifths. Backdating is the case it can do least about,
 and the measurement says so plainly -- a post dated into the early 2000s
 still costs four fifths of the old build. A post arriving in the middle of
 the archive shifts every listing page between the front page and where it
@@ -1227,10 +1227,9 @@ Importing an archive, which is backdating several thousand times over, is
 a full build for the same reason.
 
 The ratio is what travels; the seconds behind it are one machine's. These
-are our own measurements, on our own archive, on one laptop -- where a
-rebuild that changed nothing went from 19.2 s to 8.4 s. Yours will differ
-with your archive, your disk, and whatever else the machine is doing at
-the time.
+are our own measurements, on our own archive, on its own server. Yours will
+differ with your archive, your disk, and whatever else the machine is doing
+at the time.
 
 The cache is an optimisation and never an authority. Anything it cannot
 vouch for is built the old way -- rendered, read back, compared. A page
