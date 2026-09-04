@@ -12,11 +12,20 @@ built around drafts:
 
 1. **`add`** opens `$EDITOR` with a frontmatter template (title, tags,
    type) -- the in-editor hint links to the `/markdown/` syntax
-   reference on your own site. Saving always creates a **draft**: it
-   builds and deploys immediately, but only onto a hidden
-   `/draft/<token>/<slug>/` address with `noindex` -- invisible in every
-   listing, shareable by URL (that's the point: open the preview on a
-   phone or send it to someone before publishing).
+   reference on your own site. Saving always creates a **draft**, and the
+   draft appears at a hidden `/draft/<token>/<slug>/` address with
+   `noindex` -- invisible in every listing, shareable by URL (that's the
+   point: open the preview on a phone or send it to someone before
+   publishing).
+
+   **Saving a draft builds the site and deploys it.** Not only the draft's
+   own page: the deploy is the ordinary one, so everything the build
+   produced goes to the target, the front page included. It has to -- the
+   preview is a real address on the real site, and so is the answer a
+   phone goes and asks for. There is no way to keep a draft off the
+   target while its preview is expected to work. See
+   [install.md → Pick a deploy target](install.md#6-pick-a-deploy-target)
+   for what that means for a target that already holds something.
 2. The CLI then asks: **publish / schedule / keep as draft / back to
    editing.** Publishing sets the date to that moment (scheduling asks
    for one instead), moves the post to its real URL and -- with a comments

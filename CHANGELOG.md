@@ -164,6 +164,16 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
   and ffmpeg refuses to write the file it is reading. The suffix is added
   only where it is needed, so the `.mov` case keeps the name it had.
+- **The docs said a draft was deployed "only" to its hidden address.**
+  It is deployed to that address, but the deploy is the ordinary one --
+  everything the build produced goes to the target, the front page
+  included -- and the sentence read as a promise that nothing else was
+  touched. Somebody pointed the target at a webroot holding a "coming
+  soon" page and lost it to their first draft. The behaviour is the one
+  the preview needs and has not changed; what it does is now said in both
+  places, and `install.md` says plainly that the target is written to the
+  first time you save anything, not the first time you run the deploy
+  script.
 - **A bullet wrapped onto a second line stopped being a bullet.** A
   paragraph counted as a list only if every line of it was an item, so one
   wrapped continuation line -- the second line of a bullet longer than the

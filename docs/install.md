@@ -468,6 +468,23 @@ already has, while `.deploy_baseline.json` records the shape of the last
 build the safety guards accepted. Both are gitignored and both are
 disposable.
 
+**The first deploy is rarely the one you run by hand.** From here on the
+engine deploys as part of writing: saving a draft builds the site and
+deploys it, because a draft's preview is a real address on the real site
+(see [operations.md → Writing and publishing](operations.md#writing-and-publishing)).
+So the target is written to the first time you save anything -- not the
+first time you type `deploy-web.sh`. Whatever is already at that address
+under a name the build also uses is replaced, and a placeholder page is
+exactly such a name.
+
+If the target still holds something you want to keep -- a "coming soon"
+page, an old site you have not moved yet -- **do not point `env.sh` at it
+until you are ready**. An unedited `env.sh` deploys nowhere and everything
+else works, so a whole site can be written, previewed locally and imported
+into before any address of yours is touched; set the target when the site
+is ready to be seen. Reported from the outside, and it cost somebody their
+placeholder.
+
 One thing to know before you write your first post with a big attachment:
 a single file over 100 MB is refused, at save time and again at deploy
 time. The limit is the same for every backend so the site stays portable
