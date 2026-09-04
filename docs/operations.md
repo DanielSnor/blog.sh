@@ -35,6 +35,13 @@ built around drafts:
 3. **`edit <slug>`** round-trips the stored post back to Markdown in
    your editor. A save that would drop content markdown can't express
    (an imported embed, a link card) warns and asks before proceeding.
+
+   A line reading `//--more--//` splits a post in two: what it says about
+   itself, and what it actually says. The listing card, the link card and
+   the announcement take the first half; the post's own page shows
+   everything. Without the marker a card is cut to fit a size budget,
+   which lands wherever the budget runs out rather than on a sentence you
+   chose.
 4. **`unpublish <slug>`** returns a post to draft and deletes its
    announcement on the network (an announcement pointing at a dead URL
    helps nobody). The next publish gets a fresh date.
