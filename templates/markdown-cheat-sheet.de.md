@@ -115,7 +115,7 @@ Darüber schreibe ich regelmäßig auf https://example.com.
 
 ## Listen
 
-Aufzählungen beginnen mit Bindestrich oder Sternchen, eine nummerierte Liste mit Zahl und Punkt. Keine Leerzeile zwischen den Einträgen — die würde die Liste beenden.
+Aufzählungen beginnen mit Bindestrich oder Sternchen, eine nummerierte Liste mit Zahl und Punkt. Keine Leerzeile zwischen den Einträgen — die würde die Liste beenden. Ein Eintrag, der länger als eine Zeile ist, darf umbrochen werden — den Rest um zwei Leerzeichen einrücken, dann wird er wie ein Umbruch im Absatz zu einem Leerzeichen.
 
 ```
 - erster Punkt

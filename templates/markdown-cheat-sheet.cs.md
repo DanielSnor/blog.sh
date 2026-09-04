@@ -114,7 +114,7 @@ Píšu o tom na https://example.com pravidelně.
 
 ## Seznamy
 
-Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem s tečkou. Mezi položkami nesmí být prázdný řádek — ten by seznam ukončil.
+Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem s tečkou. Mezi položkami nesmí být prázdný řádek — ten by seznam ukončil. Odrážku delší než řádek můžete zalomit: zbytek odsaďte o dvě mezery a slije se do mezery stejně jako zalomení uvnitř odstavce.
 
 ```
 - první odrážka

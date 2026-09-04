@@ -115,7 +115,7 @@ I write about it at https://example.com regularly.
 
 ## Lists
 
-Bullets start with a dash or an asterisk, an ordered list with a number and a period. No blank line between items — that would end the list.
+Bullets start with a dash or an asterisk, an ordered list with a number and a period. No blank line between items — that would end the list. A bullet longer than one line can be wrapped: indent the rest by two spaces and it collapses into a space, the same way a break inside a paragraph does.
 
 ```
 - first bullet

@@ -2114,10 +2114,38 @@ def series_nav_html(slug, in_series, index, position, post = nil)
     return '' if name.empty?
 
     draft_slug = series_slug_of(post)
-    published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || 0) : 0
-    label = if published.positive?
+    published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || []) : []
+    label = if published.any?
               spelled = (defined?(SERIES_NAMES) && SERIES_NAMES[draft_slug]) || name
-              t('post.series_draft_joins', name: spelled, count: published, number: published + 1)
+              # The number is the one the POST PAGE will print once this
+              # is published, so it is asked of the function that decides
+              # that -- the same one the listing and the prev/next chain
+              # read -- rather than counted here. It used to be one more
+              # than the number of published parts, which is the same
+              # answer only while every draft lands at the END of its
+              # series. Since 1.7 a part carrying a number lands AT the
+              # position it names, so a draft told "3" among four
+              # published parts was previewed as part 5 -- wrong in
+              # exactly the case the number is written for, and wrong on
+              # the one screen it is there to be checked on.
+              # Only a draft that CARRIES a number is placed by the
+              # ordering. One that does not is previewed last, as it always
+              # was: publishing a draft whose date was never touched stamps
+              # it with the moment of publication (publish_draft), so the
+              # date this can see is not the date the page will be ordered
+              # by -- a draft written in May and still sitting there when
+              # part four goes out would be previewed third and published
+              # fourth. A number is immune to that, because it decides the
+              # position whatever the date says. `Integer(..., exception:
+              # false)` is the same test series_in_order uses, so "numbered"
+              # means one thing in both places.
+              part = Integer(post['series_part'], exception: false)
+              number = if part
+                         series_in_order(published + [post]).index { |p| p.equal?(post) } + 1
+                       else
+                         published.size + 1
+                       end
+              t('post.series_draft_joins', name: spelled, count: published.size, number: number)
             else
               t('post.series_draft_new', name: name)
             end
@@ -3525,9 +3553,12 @@ SERIES_MAP = posts.group_by { |p| series_slug_of(p) }
 # that is exactly why a draft's preview cannot ask it whether the name it
 # carries joins anything: the one-post series a typo founds is the case
 # it needs to see.
+#
+# The parts themselves rather than how many there are, because the preview
+# needs both: how many to report, and what to run series_in_order over to
+# find out which position the draft would take among them.
 SERIES_PUBLISHED = posts.group_by { |p| series_slug_of(p) }
                         .reject { |slug, _| slug.nil? }
-                        .transform_values(&:size)
                         .freeze
 # The name as it was written, for the heading -- the slug is only an
 # address. The first spelling wins if a series is spelled two ways, with
@@ -3808,9 +3839,17 @@ def post_page_key(post, source_media_dir)
                  # move without the draft being touched: how many of the
                  # series are published, and how the published ones spell
                  # its name.
+                 #
+                 # Their digests and not merely how many there are, for the
+                 # reason the branch above lists its siblings' digests: the
+                 # position the draft is previewed at is worked out from the
+                 # published parts' dates and part numbers, so correcting a
+                 # sibling's date moves the draft's number without changing
+                 # the count, and the cached preview would have kept the old
+                 # one.
                  draft_slug = series_slug_of(post)
                  ['draft', post['series'], draft_slug, SERIES_NAMES[draft_slug],
-                  SERIES_PUBLISHED[draft_slug]].join('/')
+                  Array(SERIES_PUBLISHED[draft_slug]).map { |p| POST_DIGEST[p['__path']] }.join(',')].join('/')
                else
                  ''
                end

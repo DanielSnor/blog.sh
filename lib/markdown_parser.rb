@@ -272,6 +272,12 @@ module MarkdownParser
   UL_ITEM_RE = /\A[-*]\s+(.+)\z/
   OL_ITEM_RE = /\A\d+[.)]\s+(.+)\z/
   BLOCKQUOTE_LINE_RE = /\A>[ \t]?(.*)\z/
+  # The hard break an author asked for, at the end of a line. Neither the
+  # line before one nor the line CARRYING one can join a list item: an item
+  # holds plain text with no newline in it, so the break would be dropped
+  # and its marker published as a stray backslash in the middle of the
+  # bullet. Such a paragraph stays prose, where the break still works.
+  HARD_BREAK_END_RE = /(?<!\\)\\\z/
   TABLE_SEPARATOR_RE = /\A\|?[\s:|-]*-[\s:|-]*\|?\z/
   VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
   AUDIO_EXTENSIONS = %w[.mp3 .m4a .ogg .opus .aac .flac .wav].freeze
@@ -495,9 +501,38 @@ module MarkdownParser
 
   # --- lists ---------------------------------------------------------------
 
+  # A line that carries the rest of the item above it rather than opening
+  # something of its own -- the second line of a bullet longer than the
+  # editor it was typed in, which is how anybody writes a long bullet.
+  #
+  # Everything a reader would see as a new block is refused here, so the
+  # paragraph falls back to prose exactly as it did before rather than
+  # having a heading or a quote quietly swallowed into the bullet above it.
+  # The same set markdown lets end a paragraph with no blank line in front
+  # of it, and the same set Import::Jekyll#interrupts_list? already uses --
+  # they answer the same question and must not drift apart.
+  #
+  # A fence cannot actually reach this far -- split_code_fences takes fenced
+  # segments out of the body before any paragraph is split, and it strips
+  # the line first, so an indented fence is caught there -- but it is listed
+  # anyway: the day that stops being true, a code block would end up as the
+  # tail of a bullet with nothing said about it.
+  def continuation_line?(line)
+    stripped = line.strip
+    return false if stripped.empty?
+    # A new item at any depth belongs to the list, not to the item above:
+    # deeper opens a nested list, same or shallower ends this level.
+    return false if UL_ITEM_RE.match?(stripped) || OL_ITEM_RE.match?(stripped)
+
+    !HEADING_RE.match?(stripped) && !BLOCKQUOTE_LINE_RE.match?(stripped) &&
+      !HR_RE.match?(stripped) && !CODE_FENCE_LINE_RE.match?(stripped) &&
+      !stripped.start_with?('|')
+  end
+
   # Parses one nesting level of a list starting at `lines[idx]`, where every
   # line belonging to this level has exactly `indent` leading spaces (deeper
-  # indentation opens a nested list attached to the preceding item; shallower
+  # indentation opens a nested list attached to the preceding item, or -- when
+  # it is not an item at all -- continues the one above it; shallower
   # indentation, a different marker style at the same indent, or a non-list
   # line ends this level). Returns [list_block, next_idx], or nil if the line
   # at idx isn't a list item at all.
@@ -556,6 +591,58 @@ module MarkdownParser
       break unless m
 
       body = m[1]
+      idx += 1
+
+      # The rest of a wrapped bullet. The item's own line is consumed above,
+      # so this reads forward from the line after it and leaves idx on the
+      # first line that belongs to somebody else.
+      #
+      # A paragraph was a list only if EVERY line of it was an
+      # item, so one continuation line -- an indented line carrying the end
+      # of a sentence too long for the editor's width -- turned the whole
+      # paragraph back into prose with the "- " markers left standing in the
+      # middle of it. The engine's own cheat sheet was written that way, and
+      # published its last section as one run-on paragraph on every site
+      # this engine has ever built, with nothing said by the build or by
+      # `check`.
+      #
+      # Indentation is required. An unindented line under an item is
+      # CommonMark's lazy continuation, and taking it would silently glue a
+      # sentence somebody appended after a list onto its last bullet --
+      # a loss where today's fallback to prose is at least visible. The one
+      # place lazy continuations are read is Import::Jekyll, which joins
+      # them before the markdown ever gets here: kramdown hard-wraps at
+      # column 120, so there the unindented line is a machine's doing and
+      # cannot be a sentence somebody meant to write.
+      #
+      # Joined with a space, not a newline, because a space is what the
+      # engine already means by a wrap (collapse_soft_breaks does the same
+      # to prose) and because an item's text has to survive the way back:
+      # MarkdownWriter writes an item on ONE line, so a newline stored here
+      # would come back out unindented, stop being a continuation, and turn
+      # the list into prose on a post nobody touched.
+      #
+      # Only directly after the item's own line: once a nested list has been
+      # attached, a line belonging to the item above it has nowhere to go
+      # that the writer could put back in the same place, so that shape
+      # keeps falling through to prose rather than being silently reordered.
+      #
+      # A line ending in the hard-break backslash is not continued at all.
+      # An item cannot hold a break -- there is no newline in it that would
+      # survive being written back -- and joining anyway left the marker in
+      # the middle of the text as a visible stray backslash. The paragraph
+      # stays prose, where the break the author asked for actually works.
+      # Trailing SPACES are a different matter and are simply trimmed: they
+      # are markdown's other break marker, but they are far more often a
+      # typo, and refusing there would fall back to prose over whitespace
+      # nobody can see.
+      while idx < lines.length && !HARD_BREAK_END_RE.match?(body) &&
+            lines[idx][/\A */].size > indent && continuation_line?(lines[idx]) &&
+            !HARD_BREAK_END_RE.match?(lines[idx].strip)
+        body = "#{body} #{lines[idx].strip}"
+        idx += 1
+      end
+
       # "- [ ] task" / "- [x] done" -- the marker is consumed here, so the
       # stored text is just the task, and `checked` carries the state.
       checked = nil
@@ -568,14 +655,14 @@ module MarkdownParser
       item['formatting'] = formatting unless formatting.empty?
       item['checked'] = checked unless checked.nil?
       items << item
-      idx += 1
     end
 
     [{ 'type' => 'list', 'style' => style, 'items' => items }, idx]
   end
 
   # A paragraph is a list block when its first line is a list item; nested
-  # (deeper-indented) lines become sub-lists attached to the preceding item.
+  # (deeper-indented) lines become sub-lists attached to the preceding item,
+  # and deeper-indented lines that are not items continue it.
   # If any line is left over once the top level's items are exhausted, the
   # whole paragraph is rejected and falls through to a plain text block --
   # same "must be a clean, fully-consistent list" rule as before.

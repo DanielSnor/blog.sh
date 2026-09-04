@@ -164,6 +164,21 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   it is not writing `.mov` -- produced `ffmpeg -i klip.mp4 … klip.mp4`,
   and ffmpeg refuses to write the file it is reading. The suffix is added
   only where it is needed, so the `.mov` case keeps the name it had.
+- **A bullet wrapped onto a second line stopped being a bullet.** A
+  paragraph counted as a list only if every line of it was an item, so one
+  wrapped continuation line -- the second line of a bullet longer than the
+  editor it was typed in -- turned the whole paragraph back into prose with
+  the `- ` markers left standing in the middle of the sentences. Nothing
+  said so: not the build, not `check`. An indented line that opens nothing
+  of its own now carries on the bullet above it, joined with a space, the
+  way a wrap inside a paragraph already was. A line that is a new item, a
+  heading, a quote, a rule, a fence or a table row still ends the bullet,
+  and a line ending in the hard-break backslash keeps its paragraph as
+  prose -- an item holds no newline, so the break would be dropped and its
+  marker published. An unindented line under a list is still not a
+  continuation: gluing a sentence somebody appended after a list onto its
+  last bullet would be a loss, where falling back to prose is at least
+  visible.
 - **The cheat sheet's last list rendered as a run-on paragraph.** A list is
   read all-or-nothing, so one wrapped continuation line turns the whole
   paragraph back into text with the dashes still in it -- and the engine's
@@ -280,9 +295,15 @@ Nothing to migrate: `git pull`, rebuild, deploy.
   none is, come out exactly as before. A number the series cannot honour
   -- below the first, past the last -- takes the nearest position it has,
   and two parts claiming one slot take it and the one after it, oldest
-  first. The part-number row on the new `[e]` screen stops taking a `0`
-  with it: a series has a first part and no zeroth one, and a 0 was the
-  one number that screen could write which no series can honour.
+  first. A draft's preview counted the same way and is corrected with it:
+  the sentence a draft carrying a series gets -- "published, this would be
+  part N" -- added one to the number of published parts, so a draft told
+  `3` among four published parts was previewed as part 5, on the one
+  screen its number is there to be checked on. It asks the ordering where
+  the post will land now, which is what the page will say once it is
+  published. The part-number row on the new `[e]` screen stops taking a
+  `0` with it: a series has a first part and no zeroth one, and a 0 was
+  the one number that screen could write which no series can honour.
 
 ## 1.6 -- 2026-09-03
 
