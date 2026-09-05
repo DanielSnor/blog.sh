@@ -48,18 +48,23 @@
 #   footer      links_heading, links, note_heading, note_html, copyright,
 #               social_heading
 #   social      name, url, icon or icon_svg, (rel)
+#   tag_icons   (a list: tag with icon or icon_svg)
+#   share       (the share block: a list of network names)
+#   write       (the /write/ page: true to publish it, off by default)
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
 #   comments    (approval)
 #   publishing  (slots)
-#   media       (convert_heic), (strip_location)
+#   media       (convert_heic), (remux_video), (strip_location)
 #   seo         (block_ai_crawlers), (robots_extra)
 #   analytics   (src), (website_id)
 #
 # The order is the order the page reads, top to bottom -- identity, then
 # the header, the palette and the type, then the regions, the menu, the
-# sidebar, the footer -- and after that the parts with no place on the
-# page at all: the comments network, publishing, media, robots, analytics.
+# sidebar, the footer, the marks beside the tags and the block a reader
+# carries the post away from -- and after that the parts with no place on
+# the page at all: the writing page, the comments network, publishing,
+# media, robots, analytics.
 # ./style.sh walks its own menu the same way.
 
 site:
@@ -343,11 +348,14 @@ footer:
   copyright: "All rights reserved &copy; 2026"
   social_heading: "Find me on"
 
-# icon = a name from the built-in set: mastodon, pixelfed, linkedin,
-# github, gitea, forgejo, codeberg, gitlab, bluesky, instagram, threads,
-# facebook, x, youtube, rss, email. A name it does not know draws nothing
-# at all -- a link with an empty space where the icon should be -- so
-# `./blog.sh doctor` says when it finds one.
+# icon = a name from the built-in set. The network marks: mastodon,
+# pixelfed, linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky,
+# instagram, threads, facebook, x, youtube, rss, email. Or any of the
+# general drawings the engine ships for tag_icons -- `globe` for somebody's
+# other site, `mail` for a newsletter (the tag_icons block below lists
+# them). A name it does not know draws nothing at all -- a link with an
+# empty space where the icon should be -- so `./blog.sh doctor` says when
+# it finds one, and names what it does have.
 # For another network, use icon_svg with your own <svg>...</svg> instead.
 #
 # rel = an optional rel attribute for the rendered link. rel: "me" is
@@ -384,8 +392,15 @@ social:
 # tag, and the tag a post was given first is usually the one an importer
 # added. The first entry here that a post has is the one it wears.
 #
-# `icon` names one the engine ships: text, quote, chat, image, video,
-# audio, link, document. `icon_svg` is your own -- drawn on the same
+# `icon` names one the engine ships. Eight are the content types -- text,
+# quote, chat, image, video, audio, link, document -- and about fifty more
+# are the things blogs are about: bike, car, train, plane, boat, walk, map,
+# pin, mountain, tree, sun, cloud, rain, snow, coffee, beer, food, wine,
+# clock, calendar, home, heart, star, gift, pen, brush, camera, film, mic,
+# music, book, tools, hammer, laptop, phone, code, terminal, server, bug,
+# lock, key, paw, bird, leaf, flower, bulb, flag, globe, eye, chart,
+# target, rocket, mail, briefcase, box. `doctor` prints the list when a
+# name is not among them. `icon_svg` is your own -- drawn on the same
 # 24-unit grid (`viewBox="0 0 24 24"`) and stroked in `currentColor`, or it
 # will not follow the light and dark themes. Scripts, styles and event
 # handlers are stripped from it before it reaches a page.
@@ -540,8 +555,18 @@ social:
 # in assets/, where the sidebar's own picture lives -- and `./blog.sh doctor
 # --strip-location` cleans them. Rebuild afterwards: the site is made from
 # those two directories, so that is what carries the change onto it.
+# remux_video moves a video's index to the front of the file and out of the
+# QuickTime container, by copying the picture and the sound across untouched
+# -- a repack, not a re-encode, so it takes a second and changes nothing you
+# can see. A recorder has to write that index last, which makes a reader wait
+# for the whole file before the first frame appears; some browsers decline
+# .mov on the container alone. Off, the engine says so and names the command,
+# as it always has. On, it needs ffmpeg, and if the repack fails or ffmpeg is
+# missing the post is still saved -- unlike a HEIC photo, a video in the wrong
+# wrapper still plays for nearly everybody.
 # media:
 #   convert_heic: true
+#   remux_video: true
 #   strip_location: false
 # --- end of media ---
 

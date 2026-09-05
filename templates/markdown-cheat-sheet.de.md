@@ -115,7 +115,7 @@ Darüber schreibe ich regelmäßig auf https://example.com.
 
 ## Listen
 
-Aufzählungen beginnen mit Bindestrich oder Sternchen, eine nummerierte Liste mit Zahl und Punkt. Keine Leerzeile zwischen den Einträgen — die würde die Liste beenden.
+Aufzählungen beginnen mit Bindestrich oder Sternchen, eine nummerierte Liste mit Zahl und Punkt. Keine Leerzeile zwischen den Einträgen — die würde die Liste beenden. Ein Eintrag, der länger als eine Zeile ist, darf umbrochen werden — den Rest um zwei Leerzeichen einrücken, dann wird er wie ein Umbruch im Absatz zu einem Leerzeichen.
 
 ```
 - erster Punkt
@@ -338,6 +338,28 @@ Ein Beitrag, dessen Text nur eine kurze Zeile plus Anhänge ist, landet
 unter **Dokumente**; ein ganzer Artikel, der seine Daten anhängt, bleibt
 ein Artikel mit Anhang.
 
+## Die Linkkarte
+
+Ein Beitrag kann VON einer Adresse handeln -- von einer Version, einem
+fremden Artikel, einer Seite, auf die du zeigen willst. Das ist eine
+Karte über dem Text, keine Zeile darin, also steht sie im Kopf und nicht
+im Körper:
+
+```
+---
+tags: release
+link: https://example.com/worum-es-geht
+link_title: Worum es geht
+---
+
+Und hier ist, was ich davon halte.
+```
+
+`link_title` und `link_description` sind die Worte auf der Karte, beide
+optional; ohne eigenes `title:` heißt der Beitrag wie die Karte. Ein
+Absatz, der nur ein Link ist, bleibt, wonach er aussieht -- ein
+gewöhnlicher Link in gewöhnlichem Text.
+
 ## Escaping
 
 Um ein Zeichen zu schreiben, das in Markdown etwas bedeutet, stell ihm einen Backslash voran.
@@ -361,12 +383,9 @@ Vor jedem anderen Zeichen bleibt der Backslash stehen, wie er ist — das Emotic
 Das fehlt nicht — jedes wurde abgewogen und abgelehnt, meist weil seine
 Kosten alle träfen, die es *nicht* benutzen:
 
-- Kursiv mit Unterstrichen `_so_` — Unterstriche stecken in normalem Text
-  (datei_namen, snake_case); nimm Sternchen
-- mit Leerzeichen eingerückte Codeblöcke — kollidiert mit der Einrückung
-  verschachtelter Listen; nimm die drei Backticks
-- mit `===` unterstrichene Überschriften — eine Strichzeile bedeutet schon
-  Trennlinie und Frontmatter-Grenze
+- Kursiv mit Unterstrichen `_so_` — Unterstriche stecken in normalem Text (datei_namen, snake_case); nimm Sternchen
+- mit Leerzeichen eingerückte Codeblöcke — kollidiert mit der Einrückung verschachtelter Listen; nimm die drei Backticks
+- mit `===` unterstrichene Überschriften — eine Strichzeile bedeutet schon Trennlinie und Frontmatter-Grenze
 - verschachtelte Zitate `>>`
 - Referenzlinks `[text][id]` und Fußnoten
 

@@ -1,0 +1,62 @@
+./blog.sh is MIT licensed -- see LICENSE. Three things it carries were
+made by other people, under licences of their own. They are listed here
+because a repository that ships somebody else's work should say so, and
+because anyone packaging this needs to know what travels with it.
+
+--------------------------------------------------------------------
+Open Sans
+  assets/fonts/open-sans-latin.woff2
+  assets/fonts/open-sans-latin-ext.woff2
+
+  SIL Open Font License 1.1. Designed by Steve Matteson.
+  https://fonts.google.com/specimen/Open+Sans
+  https://openfontlicense.org
+
+  Self-hosted rather than fetched from a font CDN, so that reading a
+  page built with this engine tells a third party nothing.
+--------------------------------------------------------------------
+JetBrains Mono
+  assets/fonts/jetbrains-mono-latin.woff2
+  assets/fonts/jetbrains-mono-latin-ext.woff2
+
+  SIL Open Font License 1.1. Copyright JetBrains s.r.o.
+  https://www.jetbrains.com/lp/mono/
+  https://openfontlicense.org
+
+  Self-hosted for the same reason.
+--------------------------------------------------------------------
+Brand marks in lib/social_icons.rb
+
+  The glyphs that stand for Mastodon, Bluesky, GitHub and the other
+  networks are drawn from Simple Icons (https://simpleicons.org),
+  released into the public domain under CC0 1.0.
+
+  The trademarks themselves belong to their owners, and being able to
+  draw a mark is not permission to imply a relationship with the
+  company behind it.
+--------------------------------------------------------------------
+
+Line drawings in lib/icons.rb
+
+  Drawn on a 24-unit grid, stroked in currentColor, in the style the
+  eight content-type icons have used since 1.0. Several of them -- the
+  ordinary shapes an icon set converges on, such as the speech bubble,
+  the pen and the spanner -- are the same paths as in Feather Icons
+  (https://feathericons.com), MIT licensed, copyright (c) 2013-2023
+  Cole Bemis, and are used under that licence:
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use, copy,
+    modify, merge, publish, distribute, sublicense, and/or sell copies
+    of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions: the above
+    copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+  The rest of the set is the project's own.
+--------------------------------------------------------------------
+
+Everything else -- the templates, the stylesheets and the code -- is the
+project's own.

@@ -114,7 +114,7 @@ Píšu o tom na https://example.com pravidelně.
 
 ## Seznamy
 
-Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem s tečkou. Mezi položkami nesmí být prázdný řádek — ten by seznam ukončil.
+Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem s tečkou. Mezi položkami nesmí být prázdný řádek — ten by seznam ukončil. Odrážku delší než řádek můžete zalomit: zbytek odsaďte o dvě mezery a slije se do mezery stejně jako zalomení uvnitř odstavce.
 
 ```
 - první odrážka
@@ -337,6 +337,27 @@ Post, jehož text je jen krátká věta plus přílohy, spadne pod
 **Dokumenty**; delší článek, který k sobě přibalí data, zůstává článkem
 s přílohou.
 
+## Karta odkazu
+
+Post může BÝT O nějaké adrese — o vydání, o cizím článku, o stránce, na
+kterou chceš ukázat. To je karta nad textem, ne řádek v něm, takže se
+píše do hlavičky, ne do těla:
+
+```
+---
+tags: release
+link: https://example.com/o-cem-to-je
+link_title: O čem to je
+---
+
+A tady je, co si o tom myslím.
+```
+
+`link_title` a `link_description` jsou slova na kartě, obojí
+nepovinné; bez vlastního `title:` se post jmenuje podle karty. Odstavec,
+který je jen odkaz, zůstává tím, čím vypadá — obyčejným odkazem
+v obyčejném textu.
+
 ## Escapování
 
 Když chcete napsat znak, který má v markdownu význam, předsaďte mu zpětné lomítko.
@@ -360,12 +381,9 @@ Před jiným znakem lomítko zůstane, jak je — takže smajlík d8-\ psát nij
 Tohle nechybí — každá položka byla zvážena a odmítnuta, většinou proto, že
 by její cena dopadla na všechny, kdo ji *nepoužívají*:
 
-- podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu
-  (názvy_souborů, snake_case); používejte hvězdičky
-- blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů;
-  používejte tři zpětné apostrofy
-- nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici
-  frontmatteru
+- podtržítková kurzíva `_takhle_` — podtržítka žijí v běžném textu (názvy_souborů, snake_case); používejte hvězdičky
+- blok kódu odsazený mezerami — koliduje s odsazením vnořených seznamů; používejte tři zpětné apostrofy
+- nadpis podtržený `===` — řádek pomlček už znamená oddělovač a hranici frontmatteru
 - vnořené citace `>>`
 - referenční odkazy `[text][id]` a poznámky pod čarou
 

@@ -13,6 +13,8 @@ require_relative 'slug'
 require_relative 'i18n'
 require_relative 'path_glob'
 require_relative 'content_type'
+require_relative 'video_probe'
+require_relative 'yaml_compat'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -84,6 +86,12 @@ module Checker
     I18n.t("check.#{key}", **vars)
   end
 
+  # doctor's strings, by name, for the one file both commands read. See
+  # check_config for why they are shared rather than copied.
+  def dt(key, **vars)
+    I18n.t("doctor.#{key}", **vars)
+  end
+
   def ok(text, kind: nil, data: nil)
     Finding.new(level: :ok, text: text, count: 1, kind: kind, data: data)
   end
@@ -94,6 +102,45 @@ module Checker
 
   def error(text, fix = nil, kind: nil, data: nil)
     Finding.new(level: :error, text: text, fix: fix, count: 1, kind: kind, data: data)
+  end
+
+  # config/site.yml -- the one thing outside the archive this file looks at.
+  #
+  # check is what people run before a build, and for a config the build
+  # would refuse it used to answer that the archive was sound: exit 0, and
+  # "errors": 0 in --json. doctor stops on such a file and so does the
+  # build; check read it only to pick the language it would print in,
+  # swallowed the parse error there and never looked again. Reported from
+  # the outside in issue #48, by somebody who edited site.yml, was told
+  # nothing was wrong, and then watched the rebuild refuse it.
+  #
+  # The strings are doctor's on purpose. Two commands that describe the
+  # same broken file differently are worse than one that says nothing, and
+  # sharing the wording is the only way they stay in step; a test pins that
+  # they still report the same four cases. SiteConfig stays at arm's length
+  # for the reason request() gives -- it aborts the process on exactly the
+  # file this is about.
+  def check_config(root)
+    path = File.join(root, 'config', 'site.yml')
+    unless File.exist?(path)
+      return [error(dt('site_yml_missing'), dt('site_yml_missing_fix'), kind: :config_missing)]
+    end
+
+    data = YamlCompat.load_file(path)
+    return [] if data.is_a?(Hash)
+
+    [error(dt('site_yml_empty'), dt('site_yml_missing_fix'), kind: :config_empty)]
+  rescue Psych::SyntaxError => e
+    [error(dt('site_yml_syntax', message: e.problem.to_s),
+           dt('site_yml_syntax_fix', line: e.line, column: e.column),
+           kind: :config_syntax,
+           data: { 'line' => e.line, 'column' => e.column, 'message' => e.problem.to_s })]
+  rescue SystemCallError => e
+    # Exists but cannot be opened: the wrong owner after a wizard ran under
+    # sudo is the usual story, and it deserves its own sentence rather than
+    # a parse error about a file nobody could read in the first place.
+    [error(dt('site_yml_unreadable', message: e.message), dt('site_yml_unreadable_fix'),
+           kind: :config_unreadable)]
   end
 
   # How many findings of one kind a screen is willing to show. The rest ride
@@ -111,6 +158,10 @@ module Checker
   end
 
   def run(root:, progress: nil, online: false, online_progress: nil, cap: CAP)
+    # First, and carried through the early returns below: an archive with
+    # no posts in it and a config the build refuses is still a config the
+    # build refuses.
+    config = check_config(root)
     posts = load_posts(root)
     # "No posts" only when there is genuinely nothing -- not when every
     # file present was unreadable. load_posts drops the broken ones and
@@ -126,13 +177,13 @@ module Checker
       # is the one case where "no posts yet" is the worst thing to say:
       # it is the answer that sends the author away.
       parked = check_parked_leftovers(root, posts)
-      return unbuildable + parked if unbuildable.any? || parked.any?
+      return config + unbuildable + parked if config.any? || unbuildable.any? || parked.any?
 
       return [warn(t('no_posts'), kind: :no_posts)]
     end
 
     known = known_paths(posts)
-    findings = []
+    findings = config
     findings.concat(check_unbuildable(posts, cap))
     findings.concat(check_parked_leftovers(root, posts))
     findings.concat(check_media(root, posts, progress, cap))
@@ -655,6 +706,11 @@ module Checker
     clean.b.downcase
   end
 
+  # Kept here rather than borrowed from the markdown parser: this walks an
+  # archive that may hold videos no parser of ours ever wrote, and the
+  # question is only what to open, not what to accept.
+  VIDEO_EXTENSIONS = %w[.mp4 .mov .m4v].freeze
+
   # A post whose media never arrived. The import summary said so at the
   # time and nothing has said so since, which is why a whole archive can
   # carry these for years without anyone knowing.
@@ -662,6 +718,7 @@ module Checker
     missing = []
     misnamed = []
     unusable = []
+    tail_index = []
     posts.each_with_index do |post, index|
       progress&.call(index + 1, posts.size)
       dir = media_dir_for(root, post)
@@ -682,6 +739,16 @@ module Checker
                        unusable_media_cause(File.join(dir, claim.first))]
         elsif claim.nil?
           missing << [post['slug'], url, post['__year']]
+        elsif claim.last == :exact && VIDEO_EXTENSIONS.include?(File.extname(claim.first).downcase) &&
+              VideoProbe.faststart?(File.join(dir, claim.first)) == false
+          # Not a hole and not a fault -- the video plays. It simply makes
+          # every reader wait for the whole file before the first frame,
+          # because the index a player needs to start sits behind the
+          # picture. A recorder cannot write it anywhere else; a repack
+          # afterwards can. Asked only of a file whose name matched
+          # exactly, so this never opens a file the checks above are
+          # already unhappy about.
+          tail_index << [post['slug'], claim.first, post['__year'], rel_dir]
         elsif claim.last != :exact
           # Whether this post ALSO refers to the correct spelling somewhere
           # else. The repair pass refuses the rename in that case -- two
@@ -694,7 +761,7 @@ module Checker
         end
       end
     end
-    return [] if missing.empty? && misnamed.empty? && unusable.empty?
+    return [] if missing.empty? && misnamed.empty? && unusable.empty? && tail_index.empty?
 
     capped(missing.map do |slug, url, year|
       error(t('media_missing', slug: slug, file: url), t('media_missing_fix'),
@@ -721,6 +788,11 @@ module Checker
         fix = t(in_use ? 'media_misnamed_both_fix' : 'media_misnamed_fix')
         how == :fold ? error(text, fix, kind: :media_misnamed, data: data)
                      : warn(text, fix, kind: :media_misnamed, data: data)
+      end, cap) +
+      capped(tail_index.map do |slug, file, year, rel|
+        warn(t('media_tail_index', slug: slug, file: file), t('media_tail_index_fix'),
+             kind: :media_tail_index,
+             data: { 'slug' => slug, 'file' => file, 'year' => year, 'dir' => rel })
       end, cap)
   end
 

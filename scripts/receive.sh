@@ -20,8 +20,11 @@ set -uo pipefail
 
 # CDPATH makes cd PRINT the directory it went to, and a forced command
 # written as a relative path would put that line where the answer goes.
+# The zero is the rule the whole script follows and unavailable() below
+# explains: this line has just printed an answer, so it leaves the way
+# every other answer leaves.
 CDPATH=
-cd "$(dirname "$0")/.." >/dev/null || { printf '{"ok":false,"error":"no_cd","message":"Cannot reach the installation directory."}\n'; exit 1; }
+cd "$(dirname "$0")/.." >/dev/null || { printf '{"ok":false,"error":"no_cd","message":"Cannot reach the installation directory."}\n'; exit 0; }
 INSTALL="${1:-$PWD}"
 MAX_MB="${BLOGSH_MAX_MB:-24}"
 # How long the body may take to arrive, in seconds. The first line has
@@ -79,11 +82,19 @@ fail() {  # an answer, so: 0
   exit 0
 }
 
-# No answer to give: the machine is not set up, the engine is missing.
-unavailable() {
-  printf '{"ok":false,"error":"%s","message":"%s"}\n' "$1" "$(json_escape "$2")"
-  exit 1
-}
+# The machine is not set up: no incoming/, no engine, no temporary
+# directory, no way into the installation, a mistyped ceiling. A different
+# KIND of trouble from a delivery that is wrong -- but the exit status is
+# not where that difference can be kept.
+#
+# ⚠️ These five left with 1, which cost them the one thing they are for.
+# They are what a person meets on the FIRST delivery to a new install, and
+# a phone discards the output of a remote command that failed -- so each
+# arrived as a bare status with its sentence gone, on the delivery where
+# the sentence was the whole of the help. /write/ has all five translated
+# into three languages and never got to show one. The kind of trouble is
+# in the error code, which arrives; the status only said it to nobody.
+unavailable() { fail "$1" "$2"; }
 
 [ -d "$INSTALL/incoming" ] || unavailable "no_incoming" "No incoming/ directory in $INSTALL."
 [ -x "$INSTALL/blog.sh" ] || unavailable "no_engine" "No executable blog.sh in $INSTALL."
@@ -107,6 +118,18 @@ esac
 WORK=$(mktemp -d) || unavailable "no_tmp" "Cannot create a temporary directory."
 # A delivery carries somebody's photographs; they have no business staying
 # in /tmp after a failure -- nor in incoming/, under the staging name.
+# ⚠️ The trap goes on HERE, the line after the directory exists, not once
+# the first byte has been read. Installed forty lines further down it sat
+# past the refusal for an empty delivery, so a connection that opened and
+# sent nothing was answered and left its directory behind -- and a
+# receiver on the internet is dialled by whatever is scanning that day.
+# TMP is emptied first: the trap reads it, under set -u.
+TMP=
+cleanup() {
+  rm -rf "$WORK"
+  [ -n "$TMP" ] && rm -f "$TMP"
+}
+trap cleanup EXIT
 # Read with a deadline. Neither dd nor head has one of its own, so the
 # reader runs in the background -- reading the same stdin, writing the
 # file -- while this shell watches the clock; a sender that has stalled
@@ -144,13 +167,6 @@ bounded() {  # seconds, file, reader...
 bounded 30 "$WORK/first" dd bs=1 count=1 2>/dev/null
 [ -s "$WORK/first" ] \
   || fail "empty_input" "Nothing arrived on standard input, or nothing was sent for thirty seconds."
-
-TMP=
-cleanup() {
-  rm -rf "$WORK"
-  [ -n "$TMP" ] && rm -f "$TMP"
-}
-trap cleanup EXIT
 
 # The rest, bounded and timed: head stops READING at the ceiling, so a
 # hostile sender costs that and not whatever they felt like sending --
@@ -271,6 +287,46 @@ while IFS= read -r NAME; do
   [ -s "$FILE" ] \
     || fail "empty_file" "$NAME arrived with its name and its closing dot and nothing between them."
 done < "$WORK/names"
+
+# A delivery of exactly one file called publish.txt is not a post: it is a
+# request to publish one that is already here, and its body is the slug.
+# The page at /write/ sends it after a draft has gone out and been looked
+# at -- which is the one thing that could not be done from a phone at all,
+# because publishing needs a terminal and a phone has none.
+#
+# Nothing is written to incoming/ for it: the slug is a word, not a file,
+# and staging it would leave litter nobody consumes.
+#
+# ⚠️ That word becomes an argument to a command, so it is checked as
+# hard as a filename is. A leading dash is a flag to the engine, and the
+# rest of the alphabet here is the one slugs are made of -- anything else
+# is refused rather than passed on and explained by whatever it hits.
+if [ "$(wc -l < "$WORK/names")" -eq 1 ] && [ "$(head -1 "$WORK/names")" = "publish.txt" ]; then
+  # Carriage returns out (a phone writes them), trailing newlines dropped
+  # by the substitution itself -- but a newline in the MIDDLE stays, and
+  # is refused. Deleting it would have glued two lines into one word and
+  # published whatever that spelled.
+  SLUG=$(LC_ALL=C tr -d '\r' < "$WORK/file-001")
+  case "$SLUG" in
+    '' | -* | *"
+"*) fail "bad_slug" "publish.txt has to hold the slug of a post, and nothing else." ;;
+  esac
+  if [ "${#SLUG}" -gt 200 ] || [ "$SLUG" != "$(printf %s "$SLUG" | LC_ALL=C tr -cd 'a-z0-9-')" ]; then
+    fail "bad_slug" "publish.txt has to hold the slug of a post, and nothing else."
+  fi
+  cd "$INSTALL" || unavailable "no_cd" "Cannot enter $INSTALL."
+  # The same capture as the markdown route below, and for the same reason:
+  # an engine that answers in prose gets answered for.
+  OUT=$(./blog.sh publish "$SLUG" --yes --json 2>"$WORK/engine-err")
+  case "$OUT" in
+    \{*) printf '%s\n' "$OUT" ;;
+    *)
+      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | tail -c 600)
+      printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | tr '\n' ' ')")"
+      ;;
+  esac
+  exit 0
+fi
 
 INDEX=0
 while IFS= read -r NAME; do

@@ -29,6 +29,10 @@ site on the internet.
   (libheif-examples), ImageMagick with the HEIF delegate, or vips.
   Without one, the engine refuses the file with instructions instead of
   breaking; off by default.
+- Optional, only with `media.remux_video: true` (moving a video's index to
+  the front of the file, and out of the QuickTime container, on save):
+  **ffmpeg**. Without it the post is still saved and the engine names the
+  command instead; off by default.
 
 ## Quick start
 
@@ -215,7 +219,7 @@ The example is fully commented. The short version:
   `publishing.slots` (the times posts usually go out, so scheduling stops
   asking for a date --
   [operations.md](operations.md#publishing-slots)),
-  `media` (`convert_heic` and `strip_location`, both discussed under
+  `media` (`convert_heic`, `remux_video` and `strip_location`, all discussed under
   [Writing from a phone](operations.md#writing-from-a-phone)),
   `tag_icons` (an icon a tag carries, on its own listing and on the date
   badge of every post that has it --
@@ -247,9 +251,12 @@ mistake `doctor` names and the build reads as empty, rather than a
 traceback out of an engine file.
 
 `social` is the row of icons in the footer. Each entry takes `name`,
-`url` and either `icon` (a name from the built-in set: mastodon, pixelfed,
-linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky, instagram,
-threads, facebook, x, youtube, rss, email) or `icon_svg`
+`url` and either `icon` (a name from the built-in set: the network marks
+mastodon, pixelfed, linkedin, github, gitea, forgejo, codeberg, gitlab,
+bluesky, instagram, threads, facebook, x, youtube, rss, email -- or any
+of the general drawings the engine ships for tag icons, `globe` for
+somebody's other site among them, [listed in
+operations.md](operations.md#giving-a-tag-its-own-icon)) or `icon_svg`
 (your own markup), plus an optional `rel` that is passed through to the
 rendered link. `rel: "me"` on the Mastodon entry is what gets your site
 verified -- the green check mark next to it on your profile: Mastodon
@@ -460,6 +467,23 @@ Every later deploy uploads only new/changed files -- a SHA-256 manifest
 already has, while `.deploy_baseline.json` records the shape of the last
 build the safety guards accepted. Both are gitignored and both are
 disposable.
+
+**The first deploy is rarely the one you run by hand.** From here on the
+engine deploys as part of writing: saving a draft builds the site and
+deploys it, because a draft's preview is a real address on the real site
+(see [operations.md → Writing and publishing](operations.md#writing-and-publishing)).
+So the target is written to the first time you save anything -- not the
+first time you type `deploy-web.sh`. Whatever is already at that address
+under a name the build also uses is replaced, and a placeholder page is
+exactly such a name.
+
+If the target still holds something you want to keep -- a "coming soon"
+page, an old site you have not moved yet -- **do not point `env.sh` at it
+until you are ready**. An unedited `env.sh` deploys nowhere and everything
+else works, so a whole site can be written, previewed locally and imported
+into before any address of yours is touched; set the target when the site
+is ready to be seen. Reported from the outside, and it cost somebody their
+placeholder.
 
 One thing to know before you write your first post with a big attachment:
 a single file over 100 MB is refused, at save time and again at deploy

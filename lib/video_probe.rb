@@ -32,6 +32,28 @@ module VideoProbe
     HEVC_CODECS.include?(codec(path))
   end
 
+  # Whether the index is at the FRONT of the file. A player needs the moov
+  # box before it can show a frame, and a recorder can only write it when
+  # the recording is over -- so a phone, and the share sheet that repacks
+  # what a phone recorded, put it last. The reader then waits for the
+  # whole file where they could have waited for the first second of it,
+  # and on a slow connection that is the difference between a video and a
+  # spinner.
+  #
+  # nil, not false, when the question does not arise: a file with no moov
+  # or no mdat is not a movie this can say anything about, and a caller
+  # must not read "unknown" as "badly ordered". Top level only -- both
+  # boxes are the file's own, and finding them means reading a handful of
+  # headers rather than the gigabyte between them.
+  def faststart?(path)
+    order = File.open(path, 'rb') { |f| top_level_order(f) }
+    return nil unless order.include?('moov') && order.include?('mdat')
+
+    order.index('moov') < order.index('mdat')
+  rescue StandardError
+    nil
+  end
+
   # The four-character code of the first VIDEO track's sample description
   # ("hvc1", "avc1", ...), or nil for anything unreadable or not a movie.
   # Unreadable is not an error here, exactly as in MediaDimensions: a file
@@ -41,6 +63,38 @@ module VideoProbe
     File.open(path, 'rb') { |f| walk(f, 0, f.size, 0, nil) }
   rescue StandardError
     nil
+  end
+
+  # The four-character types of the top-level boxes, in the order the file
+  # carries them. Its own reader rather than a mode of walk: walk descends,
+  # and descending is exactly what this must not do -- an mdat holds
+  # gigabytes that are not boxes at all, and a moov nested inside a
+  # fragment is not the file's index. Sixty-four is a ceiling on a list
+  # that is normally four entries long; a file that hands out more headers
+  # than that has stopped being a movie and the answer is "unknown".
+  def top_level_order(file)
+    order = []
+    offset = 0
+    limit = file.size
+    while offset < limit && order.size < 64
+      file.seek(offset)
+      header = file.read(8)
+      break unless header && header.bytesize == 8
+
+      size = header.byteslice(0, 4).unpack1('N').to_i
+      order << header.byteslice(4, 4).to_s.force_encoding('UTF-8')
+      if size == 1
+        large = file.read(8)
+        break unless large && large.bytesize == 8
+
+        size = large.unpack1('Q>').to_i
+      end
+      size = limit - offset if size.zero?
+      break if size < 8
+
+      offset += size
+    end
+    order
   end
 
   # `track` carries whether the trak being walked is the video one -- the

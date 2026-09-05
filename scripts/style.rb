@@ -25,6 +25,7 @@ require 'rbconfig'
 require 'English'
 require_relative '../lib/run_lock'
 require_relative '../lib/social_icons'
+require_relative '../lib/icons'
 require_relative '../lib/site_config'
 require_relative '../lib/account_id'
 
@@ -86,7 +87,11 @@ HEX = /\A#(\h{3}|\h{6})\z/.freeze
 # Read from the engine's own list rather than written out again: this was
 # a second copy kept in step by hand, and an icon the engine can draw but
 # the wizard never offers is one nobody finds.
-ICONS = SocialIcons::NAMES
+# Both sets, in the order a footer asks for them: the network marks
+# first, then the general drawings -- which the build accepts here since
+# 1.7, and which is how a link to somebody's other site gets `globe`
+# instead of a hand-written SVG.
+ICONS = (SocialIcons::NAMES + Icons::NAMES).freeze
 
 # current.dig blows up the moment a key holds something other than a
 # mapping -- a hand-edited config with `widgets:` as a list, say -- and

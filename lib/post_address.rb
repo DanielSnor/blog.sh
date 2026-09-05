@@ -125,7 +125,13 @@ module PostAddress
   # lives here rather than in the build because `check` has to refuse the
   # same names: two copies of it is how a page ends up unbuilt on a site
   # whose check calls the archive sound.
-  RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page
+  # `write` is here for the reason `archive` is: the build copies the writer
+  # app to public/write/ and then renders the pages, so a published page
+  # slugged "write" was emitted over it and won. The app came off the site
+  # with no warning, exit 0 from the build, nothing from check or doctor --
+  # and the home-screen icon opened the blog page instead, with any unsent
+  # draft still sitting in that origin's storage and no way back to it.
+  RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page write
                               rss.xml sitemap.xml robots.txt 404 favicon.ico].freeze
   REDIRECT_SEGMENT_MAX_BYTES = 255
 

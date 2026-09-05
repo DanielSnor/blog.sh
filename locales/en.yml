@@ -258,8 +258,15 @@ cli:
   # named out loud, because nothing about a stray file says it is safe to
   # destroy. The "media:" prefix is the directory, not a word to translate.
   media_name_taken: "media: %{name} was already taken -- the file that was there is now %{moved}"
+  receipt_shape: "`receipt:` is a name the sending page picks for its answer, and it has to be sixteen hexadecimal characters -- it becomes a filename on the site. Leave the line out and the post is written without one."
+  link_without_url: "A post can carry a link card, but `link_title:` and `link_description:` are lines ABOUT one -- there has to be a `link:` with the address."
+  link_not_http: "`link: %{url}` is not an address a card can point at. It wants a whole http:// or https:// address, or one rooted at this site (`/posts/2026/some-post/`); for a file next to the post, write it as an ordinary link line in the text."
   video_hevc: "⚠️  %{files}: recorded as HEVC, which most browsers play but not all -- readers on the rest get an empty player instead of the video. Saved either way. Re-encoding it plays everywhere (needs ffmpeg -- `brew install ffmpeg` on a Mac):\n     %{command}"
   video_quicktime: "⚠️  %{files}: a QuickTime .mov container. The video inside is fine, but not every browser accepts the container; .mp4 is the one they all take. Saved either way. Repacking copies the video across untouched, no re-encoding (needs ffmpeg):\n     %{command}"
+  video_tail_index: "⚠️  %{files}: the index sits at the end of the file, which is where a recorder has to put it. A browser needs it to start, so the reader waits for the whole video instead of the first second of it. Saved either way. Repacking moves it to the front and copies the video across untouched (needs ffmpeg):\n     %{command}"
+  video_remuxed: "🔄 %{file} → %{target} (repacked, index moved to the front)."
+  video_remux_no_tool: "⚠️  %{files}: ffmpeg is not installed, so the repack media.remux_video asks for was skipped. Saved as it is."
+  video_remux_failed: "⚠️  %{file}: the repack did not go through, so the file is saved as it arrived. To try it by hand:\n     %{command}"
   embed_lookup_working: "🔎 %{url}: asking the service where its player is…"
   embed_lookup_failed: "⚠️  %{url}: no player found -- the service did not answer, or offers none for this address. Saved with a link to it instead; editing and saving again retries."
 
@@ -294,6 +301,9 @@ cli:
       series name of a series; posts sharing a name form one
       hero   true/false -> lead image above the title for this post
       toc    true/false -> chapter list (appears by itself from four headings)
+      link   https://... -> a link card above the text: the address it
+             is about; link_title and link_description are the words on
+             it, and with no title of its own the post is named by the card
 
     Publish date isn't set here -- [p]ublish uses the moment you publish,
     [s]chedule asks for a future date/time when you pick it. To backdate,
@@ -317,7 +327,8 @@ cli:
   add_file_missing_images: "These files are not there yet: %{files}. Upload them to %{dir} first -- nothing was written. (Interactive `add` waits for them; with a file argument there is nobody to wait for.)"
   add_json_needs_file: "--json needs a file to read: `add <file> --json`. Without one, `add` opens an editor and there is nothing to report until it closes."
   add_unknown_option: "Unknown option: %{option}. add takes a file, --json and --untrusted, nothing else."
-  publish_unknown_option: "Unknown option: %{option}. publish takes a slug, --yes and --no-announce, nothing else."
+  publish_unknown_option: "Unknown option: %{option}. publish takes a slug, --yes, --no-announce and --json, nothing else."
+  publish_json_needs_yes: "`publish --json` also wants `--yes`. Without it the run stops at the draft dialog, and there is nobody there to answer it."
   publish_yes_needs_slug: "--yes needs to name the post: `publish <slug> --yes`. Without a slug, publish offers the drafts to choose from -- and choosing is something to do with the preview in front of you, not one keystroke away from an announcement that cannot be recalled."
   no_announce_not_scheduled: "Note: --no-announce does not reach the scheduled publish. The cron works from the post itself, so it will announce this one when its date arrives. To keep it quiet, publish it by hand with --no-announce, or mark it unlisted."
   publish_yes_ambiguous: "The slug %{slug} exists in more than one year (%{years}), and --yes has nobody to ask which. Publish it from `props %{slug}`, which shows them and lets you choose."
@@ -530,8 +541,8 @@ cli:
                                      with a markdown file it asks nothing at all and just writes the draft,
                                      which is the route for a phone, a script or a shortcut (--json reports it as data)
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
-      ./blog.sh props [<slug>]       shows a post's state and its actions (publish, unpublish, rename the slug, delete...)
-      ./blog.sh publish [<slug>] [--yes] [--no-announce]
+      ./blog.sh props [<slug>]       a post's state, its properties (series, tags, type, flags) and its actions
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
                                      --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
@@ -603,10 +614,41 @@ cli:
   browse_preview_no_caption: "no caption"
   browse_preview_tags: "tags: %{tags}"
   edit_what_prompt: "Edit what? [Enter] the text  [v] properties and actions  [anything else] back: "
+  properties_heading: "Properties of %{slug} -- what the post is, not what it says:"
+  properties_hint: "↑↓ choose  ·  Enter open  ·  Esc back"
+  properties_prompt: "Which one (1-%{count}), or Enter to go back: "
+  property_saved: "Saved."
+  property_series: "series          %{value}"
+  property_series_part: "part of series  %{value}"
+  property_tags: "tags            %{value}"
+  property_type: "type            %{value}"
+  property_type_derived: "%{type} (from the content)"
+  property_unlisted: "unlisted        %{value}"
+  property_hero: "lead image      %{value}"
+  property_toc: "chapter list    %{value}"
+  property_none: "(none)"
+  property_yes: "yes"
+  property_no: "no"
+  property_default: "(the site's own)"
+  series_heading: "Which series does this post belong to?"
+  series_none_row: "(no series)"
+  series_row: "%{name} -- %{count} post(s)"
+  series_new_row: "a series that is not here yet..."
+  series_prompt: "Name of the series: "
+  series_part_prompt: "Which part is it (a number, or - to let the date decide): "
+  series_part_needs_series: "A part number wants a series first -- pick one in the row above."
+  tags_current: "Now: %{tags}"
+  tags_known: "Most used here: %{tags}"
+  tags_prompt: "Tags, separated by commas (- for none, Enter to leave them): "
+  type_heading: "What kind of post is this?"
+  type_derived_row: "let the content decide (now: %{type})"
+  type_row: "%{type}"
   props_label_state: "state"
   props_label_scheduled: "scheduled"
   props_label_type: "type"
   props_label_tags: "tags"
+  props_label_series: "series"
+  props_series_part: "%{name}, part %{part}"
   props_label_pinned: "pinned"
   props_label_unlisted: "unlisted"
   props_label_announced: "announced"
@@ -618,11 +660,11 @@ cli:
   props_announces_on_publish: "not yet -- goes out when the post publishes"
   props_announces_never_unlisted: "never -- an unlisted post is not announced"
   props_not_announced: "not announced"
-  props_attributes_hint: "Type and tags are edited in the header when you edit the text."
-  props_actions_draft: "[p] publish  [s] schedule  [r] rename slug  [x] delete  [Enter] back: "
-  props_actions_scheduled: "[p] publish now  [s] reschedule  [n] cancel the schedule  [r] rename slug  [x] delete  [Enter] back: "
-  props_actions_published: "[u] unpublish  [t] announce (%{network})  [c] pin/unpin  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
-  props_actions_published_plain: "[u] unpublish  [c] pin/unpin  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
+  props_attributes_hint: "Type, tags and the series are changed with [e]; the text itself with edit."
+  props_actions_draft: "[p] publish  [s] schedule  [e] properties  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_scheduled: "[p] publish now  [s] reschedule  [n] cancel the schedule  [e] properties  [r] rename slug  [x] delete  [Enter] back: "
+  props_actions_published: "[u] unpublish  [t] announce (%{network})  [c] pin/unpin  [e] properties  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
+  props_actions_published_plain: "[u] unpublish  [c] pin/unpin  [e] properties  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
   props_action_versions: "[v] earlier versions  "
   versions_none: "This post has no earlier versions yet -- one is kept each time it is edited."
   versions_heading: "What the post %{slug} said before its recent saves:"
@@ -919,14 +961,14 @@ doctor:
   social_icon_unknown: "The link \"%{name}\" in the footer asks for an icon called \"%{icon}\", which the engine does not have -- it draws an empty space where the icon belongs. The ones it does have: %{known}. Your own SVG goes in `icon_svg` instead."
   social_shape: "An entry under `social:` is not a mapping. Each one wants a `name:`, a `url:` and an `icon:`; anything else is read as empty and takes the build down with it."
   social_icon_missing: "The link \"%{name}\" in the footer names no icon at all, so it publishes an empty, unclickable space on every page. Give it an `icon:` from the list the engine ships, or an `icon_svg:` of your own."
-  social_icon_not_svg: "The `icon_svg` of the footer link \"%{name}\" is not an SVG -- whatever is in it prints as words in the footer of every page."
+  social_icon_not_svg: "The `icon_svg` of the footer link \"%{name}\" is not an SVG, so the engine refuses it -- the link goes out with an empty space where the icon belongs. Give it an `icon:` from the list the engine ships, or an `<svg>...</svg>` of your own."
   social_icon_scale: "The `icon_svg` of the footer link \"%{name}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked beside them."
   social_icon_stripped: "The `icon_svg` of the footer link \"%{name}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from."
   share_unknown: "`share:` names \"%{name}\", which is not somewhere this engine can send a reader -- it is dropped and no button appears. The ones it knows: %{known}."
   tag_icon_shape: "An entry under `tag_icons` is not a mapping -- each one needs a `tag` and either an `icon` name or an `icon_svg`."
   tag_icon_no_tag: "An entry under `tag_icons` has no `tag`, so it belongs to nothing and draws nothing."
   tag_icon_unknown: "The tag \"%{tag}\" asks for the icon \"%{icon}\", which this engine does not have. The names it knows: %{known}. For anything else, give it an `icon_svg` of your own."
-  tag_icon_not_svg: "The `icon_svg` of the tag \"%{tag}\" holds no <svg> element, so nothing will be drawn."
+  tag_icon_not_svg: "The `icon_svg` of the tag \"%{tag}\" holds no <svg> element, so the engine refuses it -- the tag gets no icon of its own, a post carrying it keeps the icon of its content type, and its listing keeps the generic tag icon."
   tag_icon_scale: "The `icon_svg` of the tag \"%{tag}\" is not drawn on the 24-unit grid the other icons use (`viewBox=\"0 0 24 24\"`), so it will sit crooked in a date badge."
   trash_holds: "The trash holds %{count} item(s), %{size} -- trashed posts, and anything `check --repair` set aside. They are still restorable; `./blog.sh empty trash` deletes them for good."
   heading: "Checking this install"
@@ -1159,6 +1201,8 @@ check:
   media_cause_empty: "it is zero bytes"
   media_cause_broken_link: "it is a link pointing at a file that is not there"
   media_unusable_fix: "An interrupted download, a permission bit or a folder under the picture's name. Put a real copy of the file there; the page shows a broken picture until then."
+  media_tail_index: "%{slug}: the video %{file} carries its index at the end of the file."
+  media_tail_index_fix: "It plays, but every reader waits for the whole file before the first frame -- a player needs that index to start. A recorder has to write it last; repacking moves it to the front and copies the video across untouched: ffmpeg -i FILE -c copy -movflags +faststart NEW.mp4. New videos do it on save with media.remux_video."
   media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
   image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."
   image_degenerate_fix: "Anything 1px or smaller is treated as a tracking pixel and dropped WITH its caption, so the page silently loses both. Replace the image or remove the block."

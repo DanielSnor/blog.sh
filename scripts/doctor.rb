@@ -17,30 +17,18 @@
 # on a broken config, and the abort would replace the diagnosis with the
 # first symptom of it.
 
-require 'yaml'
-require_relative '../lib/yaml_compat'
+require_relative '../lib/config_lang'
 require_relative '../lib/site_config'
 
 ROOT = File.expand_path('..', __dir__)
 
 # The language, dug out of the file the way doctor promises -- tolerating
-# failure, because the one scenario doctor exists for is a config that
-# will not parse, and a full YamlCompat.load_file fails on exactly that,
-# forcing English over the cs/de diagnosis of the very syntax error it is
-# about to report. So the parse is tried first (it reads a quoted value
-# faithfully), and a raw scan of the `lang:` line is the fallback.
+# failure, because the one scenario doctor exists for is a config that will
+# not parse, and a parse fails on exactly that, forcing English over the
+# cs/de diagnosis of the very syntax error it is about to report. How that
+# is dug out, and why check needs the same, is in lib/config_lang.rb.
 site_yml = File.join(ROOT, 'config', 'site.yml')
-lang = begin
-  data = YamlCompat.load_file(site_yml)
-  data.is_a?(Hash) ? data.dig('site', 'lang') : nil
-rescue StandardError
-  nil
-end
-if lang.to_s.empty? && File.exist?(site_yml)
-  raw = File.read(site_yml, encoding: 'utf-8') rescue ''
-  m = raw[/^\s*lang:\s*["']?([A-Za-z]{2,8})/, 1]
-  lang = m if m
-end
+lang = ConfigLang.of(site_yml)
 
 require_relative '../lib/i18n'
 I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)

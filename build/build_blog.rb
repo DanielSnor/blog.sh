@@ -15,6 +15,7 @@ require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/embed'
 require_relative '../lib/social_icons'
+require_relative '../lib/icons'
 require_relative '../lib/share_targets'
 require_relative '../lib/post_address'
 require_relative '../lib/slug'
@@ -406,14 +407,71 @@ SOCIAL_ICONS = SocialIcons::ALL
 # is pasted into every page that draws it. Social icons went unguarded
 # until tag icons made the hole worth closing -- it was the same hole in
 # the footer all along, only nobody had asked about it.
+#
+# Refused outright when it is not a drawing at all. Whatever stood there
+# used to be pasted where the icon goes and printed as words -- a badge
+# reading `assets/icons/bike.svg` on every post carrying that tag, and the
+# same in the heading of its listing. Answering '' hands each caller the
+# empty icon it already knows what to do with: the entry is dropped, so a
+# post keeps the icon of its content type and a listing the generic tag
+# icon. The question is Icons.own_svg?, so doctor's report about an
+# `icon_svg` and this refusal cannot say different things about one value.
 def own_icon_svg(svg)
-  Embed.without_scripts(svg.to_s)
+  return '' unless Icons.own_svg?(svg)
+
+  Embed.without_scripts(without_xml_prologue(svg.to_s))
+end
+
+# What stands in front of the drawing in a FILE, taken off. An icon copied
+# out of a .svg rather than out of a snippet in somebody's documentation
+# arrives with the byte order mark an editor wrote, the XML declaration,
+# a DOCTYPE and whatever the export tool signed its work with in a
+# comment -- and none of that is markup a page can use. An HTML parser
+# reads `<?xml version="1.0"?>` inside an <h1> as a comment and the
+# DOCTYPE as nothing at all, so it is invisible litter on every page the
+# icon is drawn on.
+#
+# It also cost the icon its dressing, which is the part nothing said out
+# loud: heading_icon_dress looks for `<svg` at the FRONT of the string,
+# a prologue puts it further along, and a tag icon pasted from a file
+# therefore reached its listing heading with neither the class the
+# heading styles it by nor aria-hidden. It drew at whatever size and
+# colour it was exported at, and a screen reader read it out as a
+# graphic nobody had named, while doctor -- which asks only whether an
+# <svg> is in there somewhere -- called the configuration sound.
+#
+# One construct at a time rather than cutting to the first `<svg`,
+# because a comment is the one of them that may legitimately contain
+# angle brackets and the word svg. A DOCTYPE may carry an internal
+# subset in brackets, whose own ">" must not be mistaken for its end.
+#
+# The internal subset is `[^\]]*` rather than a lazy `.*?` so that every
+# character has exactly one way to be read. A lazy dot can also swallow a
+# "]" and run on to a later one, which gives a DOCTYPE full of bracket
+# groups and no closing ">" two readings per group: on the oldest Ruby the
+# README promises, thirty groups took fifty seconds to fail and every
+# further pair doubled it. Nothing legitimate is lost -- a lazy match stops
+# at the first "]" too, on its first attempt.
+XML_PROLOGUE_RE = /\A(?:[\s\u{FEFF}]+|<\?.*?\?>|<!DOCTYPE\b(?:[^\[>]|\[[^\]]*\])*>|<!--.*?-->)/mi
+
+def without_xml_prologue(svg)
+  markup = svg.to_s
+  # Repeatedly, because a real export carries several of them in a row and
+  # an unterminated one simply stops the loop -- leaving the string exactly
+  # as it arrived, which is what happened before this existed.
+  markup = markup.sub(XML_PROLOGUE_RE, '') while markup.match?(XML_PROLOGUE_RE)
+  markup
 end
 
 def social_icon(entry)
   return own_icon_svg(entry['icon_svg']) if entry['icon_svg']
 
-  SOCIAL_ICONS[entry['icon'].to_s] || ''
+  # The networks first, then the general set: a footer holds a link to
+  # somebody's other site or their newsletter as often as it holds a
+  # network, and `icon: globe` should not have to be written out as SVG
+  # when the engine is carrying that drawing anyway. A brand mark wins a
+  # name clash, because that is the one a reader recognises.
+  SOCIAL_ICONS[entry['icon'].to_s] || Icons.find(entry['icon']) || ''
 end
 
 
@@ -1258,16 +1316,11 @@ def render_content(blocks, media_prefix, lifted: nil)
   html.reject(&:empty?).join("\n")
 end
 
-CONTENT_ICONS = {
-  'text' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>',
-  'image' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/></svg>',
-  'video' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 9l4-2v10l-4-2"/></svg>',
-  'link' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66l1-1"/></svg>',
-  'audio' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 6a8.5 8.5 0 010 12"/></svg>',
-  'quote' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2 1 1 0 011 1v1a2 2 0 01-2 2 1 1 0 00-1 1v2a1 1 0 001 1 6 6 0 006-6V5a2 2 0 00-2-2z"/></svg>',
-  'document' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>',
-  'chat' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'
-}.freeze
+# The eight that name a kind of post. The drawings live in lib/icons.rb
+# with the rest of what the engine ships -- doctor validates a configured
+# name against that same file, which is what stopped the two lists from
+# drifting apart.
+CONTENT_ICONS = Icons::CONTENT
 
 # What a tag may put on its own listing heading and on the date badge of
 # every post carrying it. A LIST rather than a map, because the order in
@@ -1275,31 +1328,46 @@ CONTENT_ICONS = {
 # this was measured against, and the tag it was given FIRST is usually the
 # platform tag an importer added -- `twitter` opens 1256 posts there. So
 # the site owner decides once, here, rather than post by post.
+#
+# Keyed by the SLUG, which is what a tag IS everywhere else in the build:
+# its page is addressed by it and its posts are grouped into it. Keyed by
+# the fold instead, this list agreed with the pages only for names the two
+# rules normalize alike, and parted company on everything the slug flattens
+# and the fold keeps -- a space, an underscore, a dot, an ampersand.
+# `Sci Fi` and `sci-fi` are one page, /tag/sci-fi/, and the icon written
+# for it reached only the posts spelled the way site.yml spelled it: on the
+# shared page the badges wore the icon and the heading above them did not.
+# Nothing said so -- not the build, not doctor.
+#
+# A tag that slugifies to nothing (emoji only, punctuation only -- Tumblr
+# and Instagram hand those over verbatim) is dropped here rather than
+# keyed on the empty string, which every such tag would answer to.
 TAG_ICONS = SiteConfig::Chrome.list(SiteConfig.data, 'tag_icons').filter_map do |entry|
   next unless entry.is_a?(Hash)
 
-  tag = entry['tag'].to_s
+  tag = Slug.slugify(entry['tag'].to_s)
   next if tag.empty?
 
-  svg = entry['icon_svg'] ? own_icon_svg(entry['icon_svg']) : CONTENT_ICONS[entry['icon'].to_s]
+  svg = entry['icon_svg'] ? own_icon_svg(entry['icon_svg']) : Icons.find(entry['icon'])
   next if svg.to_s.empty?
 
-  [Slug.fold(tag), svg]
+  [tag, svg]
   # First entry wins, wholly. to_h keeps the LAST value at the FIRST key's
-  # position, so two entries folding to one tag -- "kolo" and "Kolo",
+  # position, so two entries landing on one tag -- "kolo" and "Kolo",
   # "škola" and "skola" -- gave that tag the priority of the earlier line
   # and the icon of the later one, which is neither of the things the file
   # says. The order in the list is the priority, and the entry that holds
   # a position is the entry that owns it.
 end.each_with_object({}) { |(tag, svg), acc| acc[tag] ||= svg }
 
-# The icon of the first tag in TAG_ICONS the post carries -- folded, so a
-# tag written two ways is one tag here as it is everywhere else.
+# The icon of the first tag in TAG_ICONS the post carries -- by slug, so a
+# tag written two ways is one tag here as it is on the page those two
+# spellings share.
 def tag_icon_for(post)
   return nil if TAG_ICONS.empty?
 
-  folded = (post['tags'] || []).map { |t| Slug.fold(t.to_s) }
-  TAG_ICONS.find { |tag, _| folded.include?(tag) }&.last
+  slugs = (post['tags'] || []).map { |t| Slug.slugify(t.to_s) }
+  TAG_ICONS.find { |tag, _| slugs.include?(tag) }&.last
 end
 
 # Every post is rendered onto its own page, the index, its content-type
@@ -1510,12 +1578,53 @@ def series_slug_of(post)
   slug.empty? ? nil : slug
 end
 
-def series_order_key(post)
-  part = Integer(post['series_part'], exception: false)
-  # Posts with an explicit number come first, in that order; the rest keep
-  # their chronology after them. Mixing the two by pretending an absent
-  # number is zero would put every undated part at the front.
-  [part ? 0 : 1, part || 0, post_time(post)]
+# The reading order of one series: the parts that carry no number keep
+# their chronology, and a part that names a position is put AT that
+# position among them.
+#
+# Until 1.7 this was a sort key, [has-a-number, the-number, date], which
+# read the number as "ahead of everything undated" rather than as a
+# position. The case the number exists for came out backwards: the docs'
+# own scenario -- parts 1, 2, 4, 5 written in order, then the missing
+# part 3 written last and told "3" -- put part 3 at the front and
+# relabelled the two real first parts 2 and 3. The listing, the "part N
+# of M" note and the prev/next chain all read this list, so all three
+# said it, and the CLI went on showing the number the post actually
+# carries, which is what let the two disagree out loud.
+#
+# Insertion rather than a sort key, because a position is a fact about
+# the list and not about the post: with two numbered parts in a series,
+# "3" means the third slot once "2" has taken the second, and no key
+# computed from one post alone can know that.
+def series_in_order(group)
+  # The archive's own tiebreak (see the sort of `posts` below), so that
+  # two parts stamped the same second cannot swap places between builds.
+  by_date = ->(post) { [post_time(post), post['slug'].to_s] }
+  claimed = group.group_by { |post| Integer(post['series_part'], exception: false) }
+  ordered = (claimed.delete(nil) || []).sort_by(&by_date)
+  # Ascending, so each insertion lands in a list whose earlier slots are
+  # already filled -- part 5 has to count the post that part 2 put in
+  # front of it. A whole equal-numbered group at once, so that two posts
+  # claiming the same slot keep their own date order instead of the
+  # second shoving the first aside.
+  #
+  # The floor is the slot after the last number already placed, and it is
+  # what keeps a bigger number from landing in front of a smaller one
+  # when the numbers do not add up: parts 1, 1 and 2 have three posts for
+  # two slots, and without it part 2 took the slot the second part 1 was
+  # standing in. It is also what makes this identical to the old sort for
+  # a series where every part is numbered -- there the floor is always
+  # the end of the list, so every group is simply appended in order.
+  # A number below the first position, or past the last, is one the
+  # series does not have; the clamp gives it the nearest one it does.
+  floor = 0
+  claimed.sort_by(&:first).each do |part, claimants|
+    at = (part - 1).clamp(floor, ordered.size)
+    claimants = claimants.sort_by(&by_date)
+    ordered.insert(at, *claimants)
+    floor = at + claimants.size
+  end
+  ordered
 end
 
 # A page is a post that does not belong in the stream: About, Contact, the
@@ -2005,10 +2114,38 @@ def series_nav_html(slug, in_series, index, position, post = nil)
     return '' if name.empty?
 
     draft_slug = series_slug_of(post)
-    published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || 0) : 0
-    label = if published.positive?
+    published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || []) : []
+    label = if published.any?
               spelled = (defined?(SERIES_NAMES) && SERIES_NAMES[draft_slug]) || name
-              t('post.series_draft_joins', name: spelled, count: published, number: published + 1)
+              # The number is the one the POST PAGE will print once this
+              # is published, so it is asked of the function that decides
+              # that -- the same one the listing and the prev/next chain
+              # read -- rather than counted here. It used to be one more
+              # than the number of published parts, which is the same
+              # answer only while every draft lands at the END of its
+              # series. Since 1.7 a part carrying a number lands AT the
+              # position it names, so a draft told "3" among four
+              # published parts was previewed as part 5 -- wrong in
+              # exactly the case the number is written for, and wrong on
+              # the one screen it is there to be checked on.
+              # Only a draft that CARRIES a number is placed by the
+              # ordering. One that does not is previewed last, as it always
+              # was: publishing a draft whose date was never touched stamps
+              # it with the moment of publication (publish_draft), so the
+              # date this can see is not the date the page will be ordered
+              # by -- a draft written in May and still sitting there when
+              # part four goes out would be previewed third and published
+              # fourth. A number is immune to that, because it decides the
+              # position whatever the date says. `Integer(..., exception:
+              # false)` is the same test series_in_order uses, so "numbered"
+              # means one thing in both places.
+              part = Integer(post['series_part'], exception: false)
+              number = if part
+                         series_in_order(published + [post]).index { |p| p.equal?(post) } + 1
+                       else
+                         published.size + 1
+                       end
+              t('post.series_draft_joins', name: spelled, count: published.size, number: number)
             else
               t('post.series_draft_new', name: name)
             end
@@ -2105,7 +2242,12 @@ def post_heading_html(post, level, self_href)
   block = link_title_block(post)
   return '' unless block
 
-  %(<#{level}><a href="#{h(block['url'])}">#{h(block['title'])}</a></#{level}>)
+  # safe_href, not h() alone: this is the one heading whose address comes
+  # from a link card, and a card built by an importer out of foreign markup
+  # can carry any scheme at all. The card's own render defuses it one
+  # element lower; without this the same address went out live in the post's
+  # <h1> and in the <h2> of every listing that borrows the card's title.
+  %(<#{level}><a href="#{h(safe_href(block['url']))}">#{h(block['title'])}</a></#{level}>)
 end
 
 def render_post_html(post, template)
@@ -2551,12 +2693,24 @@ def heading_icon_dress(svg)
   markup.sub(/\A(\s*<svg\b)([^>]*)>/i) do
     head = Regexp.last_match(1)
     attrs = Regexp.last_match(2)
-    attrs = if attrs.match?(/\bclass\s*=\s*"/i)
-              attrs.sub(/\bclass\s*=\s*"/i, 'class="listing-heading__icon ')
+    # Either quote, because an SVG is XML and its class arrives quoted but
+    # not always the way ours are written. Matching only the double one
+    # appended a SECOND class attribute beside `class='moje'`, and a parser
+    # keeps the first of two and throws the rest away -- so the icon went
+    # out wearing its own class and none of ours, which is the very thing
+    # this dressing exists to prevent, spelled differently.
+    #
+    # The separator in front of the name is required so that `data-class`
+    # is not read as `class` and rewritten into an attribute no stylesheet
+    # names. Same for aria-hidden below.
+    attrs = if attrs.match?(/(?:\A|[\s\/])class\s*=\s*["']/i)
+              attrs.sub(/((?:\A|[\s\/])class\s*=\s*["'])/i) do
+                "#{Regexp.last_match(1)}listing-heading__icon "
+              end
             else
               "#{attrs} class=\"listing-heading__icon\""
             end
-    attrs += ' aria-hidden="true"' unless attrs.match?(/\baria-hidden\s*=/i)
+    attrs += ' aria-hidden="true"' unless attrs.match?(/(?:\A|[\s\/])aria-hidden\s*=/i)
     "#{head}#{attrs}>"
   end
 end
@@ -3392,16 +3546,19 @@ CONTENT_TYPE_LABELS = {
 # facts about the set, not about the post.
 SERIES_MAP = posts.group_by { |p| series_slug_of(p) }
                   .reject { |slug, group| slug.nil? || group.size < 2 }
-                  .transform_values { |group| group.sort_by { |p| series_order_key(p) } }
+                  .transform_values { |group| series_in_order(group) }
                   .freeze
 # Published parts per series slug, singletons included -- SERIES_MAP
 # deliberately drops groups under two (a "series" of one is a post), and
 # that is exactly why a draft's preview cannot ask it whether the name it
 # carries joins anything: the one-post series a typo founds is the case
 # it needs to see.
+#
+# The parts themselves rather than how many there are, because the preview
+# needs both: how many to report, and what to run series_in_order over to
+# find out which position the draft would take among them.
 SERIES_PUBLISHED = posts.group_by { |p| series_slug_of(p) }
                         .reject { |slug, _| slug.nil? }
-                        .transform_values(&:size)
                         .freeze
 # The name as it was written, for the heading -- the slug is only an
 # address. The first spelling wins if a series is spelled two ways, with
@@ -3682,9 +3839,17 @@ def post_page_key(post, source_media_dir)
                  # move without the draft being touched: how many of the
                  # series are published, and how the published ones spell
                  # its name.
+                 #
+                 # Their digests and not merely how many there are, for the
+                 # reason the branch above lists its siblings' digests: the
+                 # position the draft is previewed at is worked out from the
+                 # published parts' dates and part numbers, so correcting a
+                 # sibling's date moves the draft's number without changing
+                 # the count, and the cached preview would have kept the old
+                 # one.
                  draft_slug = series_slug_of(post)
                  ['draft', post['series'], draft_slug, SERIES_NAMES[draft_slug],
-                  SERIES_PUBLISHED[draft_slug]].join('/')
+                  Array(SERIES_PUBLISHED[draft_slug]).map { |p| POST_DIGEST[p['__path']] }.join(',')].join('/')
                else
                  ''
                end
@@ -3944,6 +4109,43 @@ if SiteConfig.get('write', default: false)
   emit(File.join(PUBLIC_DIR, 'write', 'site.js'),
        "// Generated by the build from config/site.yml and the posts -- do not edit.\n" \
        "window.BLOG_SITE = #{JSON.generate(site_facts)};\n")
+
+  # A RECEIPT for a post that arrived carrying one: a small answer at an
+  # address the sender knew before it sent anything, so the page that
+  # wrote the post can ask what became of it.
+  #
+  # It exists because the road the answer takes today has one break in it
+  # that nothing on this end can mend: a page added to a phone's home
+  # screen has storage of its own, and the reply -- which arrives as a URL
+  # -- opens in the browser instead, where the draft it is about is not.
+  # So the page asks rather than waits.
+  #
+  # Written by the BUILD rather than by the save, which is what makes it
+  # keep up: publish the post and the next build says published and gives
+  # the public address; delete it and the file stops being produced, and
+  # the sweep takes it away like any other page nothing generates.
+  (posts + drafts + pages + unlisted_posts).each do |post|
+    name = post['receipt'].to_s
+    next unless name.match?(/\A[0-9a-f]{16}\z/)
+
+    # `warnings` under the same name the engine's own `add --json` answer
+    # uses, because the page renders both with the same lines. Without it
+    # a post that arrived with a complaint -- an unreadable picture, a
+    # video that will make the reader wait -- looked identical on the
+    # phone to one that arrived clean, and the phone is the one place
+    # where nobody can go and read the terminal instead.
+    #
+    # Whatever the save left in the post, and nothing gathered here: the
+    # build's own warnings are about the whole site (another post's tag,
+    # somebody else's dead link), and this file is served to anyone who
+    # has the sixteen characters.
+    emit(File.join(PUBLIC_DIR, 'write', 'r', "#{name}.json"),
+         "#{JSON.generate('slug' => post['slug'].to_s,
+                          'state' => post['state'].to_s,
+                          'title' => post_title_for(post).to_s,
+                          'url' => SITE_BASE_URL.empty? ? '' : "#{SITE_BASE_URL}#{post_path(post)}",
+                          'warnings' => Array(post['receipt_warnings']).map(&:to_s))}\n")
+  end
 end
 
 # A feed per tag, but only for the tags the site's own menu points at.
@@ -3969,7 +4171,11 @@ tags_map.each do |slug, data|
   write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
                 base_path: "/tag/#{slug}", heading: data[:name],
                 heading_kind: t('tag.kind'), heading_variant: 'tag',
-                heading_icon: TAG_ICONS[Slug.fold(data[:name].to_s)] || :tag,
+                # The page's own slug, not its display name: the name is
+                # whichever spelling the archive used first, and looking
+                # the icon up by that made the heading depend on which
+                # post happened to come first.
+                heading_icon: TAG_ICONS[slug] || :tag,
                 # Only when there IS an index to go back to: a site whose
                 # tags all live on drafts builds no /tag/, and a heading
                 # linking there would be the dead menu item doctor refuses.
