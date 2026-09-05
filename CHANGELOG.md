@@ -11,7 +11,7 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.7 -- 2026-09-03
+## 1.7 -- 2026-09-05
 
 The release about finishing a post rather than sending one. 1.6 got a post from a phone to the
 blog and left it there as a draft, so the last step still wanted a terminal; this one publishes
