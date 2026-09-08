@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require_relative '../path_safety'
 
 module DeployBackend
   # Copies the build into a directory on this machine -- for a site served
@@ -61,6 +62,13 @@ module DeployBackend
 
       def upload(path, logger: nil, remote_name: nil)
         dest = File.join(@root, remote_name || File.basename(path))
+        # The remote name is a path relative to the site's output, and it
+        # is composed from what the build wrote -- so it carries whatever
+        # a post file put in an address. Held to the target root here
+        # because this backend's copy is a plain filesystem write: nothing
+        # between it and the disk would notice a name that climbs out of
+        # the directory the operator pointed the deploy at.
+        PathSafety.contained!(@root, dest, 'deploy target')
         FileUtils.mkdir_p(File.dirname(dest))
         FileUtils.cp(path, dest)
         logger&.call("  ✅ copy -> #{dest}")
@@ -74,6 +82,9 @@ module DeployBackend
       # the target-side mirror of prune_public's directory collapsing.
       def delete(remote_name, logger: nil)
         path = File.join(@root, remote_name)
+        # A delete is the half that cannot be taken back, and the loop
+        # below walks UP from it removing directories it empties.
+        PathSafety.contained!(@root, path, 'deploy target')
         return :missing unless File.exist?(path)
 
         File.delete(path)
