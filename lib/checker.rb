@@ -9,6 +9,7 @@ require 'timeout'
 require 'time'
 require_relative 'entity_text'
 require_relative 'post_address'
+require_relative 'path_safety'
 require_relative 'slug'
 require_relative 'i18n'
 require_relative 'path_glob'
@@ -362,11 +363,13 @@ module Checker
       # A slug is one path segment. A hand-edited or imported one carrying a
       # slash or a `..` turns the post's address into a path that climbs
       # out of where the build writes -- the build chokes on it while check
-      # called the archive sound. The engine's own slugs are [a-z0-9-];
-      # only the genuinely dangerous shapes are flagged, so a unicode slug
-      # from an import is left alone.
+      # called the archive sound. Asked of PathSafety, which is the same
+      # question the writer now refuses on, so the two cannot drift into
+      # disagreeing about what an archive may hold. A unicode slug from an
+      # import is still left alone: only the shapes a path cannot survive
+      # are flagged.
       slug = post['slug'].to_s
-      if slug.include?('/') || slug.split(/[\\\/]/).include?('..') || slug.start_with?('.') || slug.include?("\0")
+      unless PathSafety.safe_segment?(slug)
         findings << error(t('post_bad_slug', file: short_path(post['__path'].to_s), slug: slug.inspect),
                           t('post_bad_slug_fix'), kind: :post_bad_slug,
                           data: { 'file' => post['__path'].to_s, 'slug' => slug })
@@ -1090,6 +1093,22 @@ module Checker
              t("redirect_from_#{refusal}_fix"),
              kind: :"redirect_from_#{refusal}",
              data: { 'slug' => post['slug'].to_s, 'entry' => origin.to_s,
+                     'year' => PostAddress.file_year(post).to_s })
+      end
+    end
+    # The other list of old addresses, asked the same way. The build has
+    # always refused the entries it cannot make a directory of, one warn
+    # per entry in the middle of a build log -- and check, which is where
+    # somebody would go looking, did not ask at all: an archive carrying
+    # a former slug that will never be served was called sound.
+    findings += posts.flat_map do |post|
+      Array(post['former_slugs']).filter_map do |former|
+        next if PostAddress.former_slug_refusal(former).nil?
+
+        warn(t('former_slug_unusable', slug: post['slug'].to_s, entry: former.to_s),
+             t('former_slug_unusable_fix'),
+             kind: :former_slug_unusable,
+             data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s,
                      'year' => PostAddress.file_year(post).to_s })
       end
     end

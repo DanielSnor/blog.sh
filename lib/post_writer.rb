@@ -12,6 +12,7 @@ require_relative 'media_dimensions'
 require_relative 'site_config'
 require_relative 'i18n'
 require_relative 'path_glob'
+require_relative 'path_safety'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
@@ -31,6 +32,7 @@ module PostWriter
     media_files = media_files.to_a
     date = Time.parse(post.fetch('date'))
     year = date.year.to_s
+    check_names!(post, year)
 
     # A post already imported from this exact source item is UPDATED, not
     # duplicated -- "matched on their source id" is a promise README and the
@@ -110,6 +112,48 @@ module PostWriter
     raise
   end
 
+  # Asked before anything is looked up, claimed or created, because every
+  # step after this one joins these values onto a directory: find_by_source
+  # and claim_slug both build paths, the media directory is made out of the
+  # year and the slug, and AddressGuard asks about a name it composes the
+  # same way.
+  #
+  # Refused, never repaired. File.basename would turn "../evil" into
+  # "evil" and publish the post at an address nobody chose, with no
+  # redirect from the one it was supposed to have -- a post's address is
+  # its public identity, and quietly moving it is worse than declining to
+  # write it. Raised rather than aborted, like the address clash in write:
+  # an import's per-item rescue counts it, names the item and carries on.
+  #
+  # The engine's own slugs cannot fail this -- Slug.slugify emits
+  # [a-z0-9-] -- and the importers hand theirs through the same function.
+  # What this catches is the one path that does not: an export of ours
+  # being read back in, where the slug is taken at face value on the
+  # grounds that we wrote it, and a hand-edited post file.
+  def self.check_names!(post, year)
+    slug = post['slug'].to_s
+    unless PathSafety.safe_segment?(slug)
+      raise "cannot write #{slug.inspect}: a slug is one segment of a path, and this one " \
+            'would not stay inside the archive -- fix the slug in the source or by hand'
+    end
+    unless year.to_s.match?(/\A\d{4}\z/)
+      raise "cannot write '#{slug}': #{year.to_s.inspect} is not a year"
+    end
+
+    token = post['draft_token'].to_s
+    return if token.empty? || PathSafety.safe_segment?(token)
+
+    # Asked as a path segment rather than as the exact shape the engine
+    # issues (16 hex). A token that is merely unusual -- an archive from
+    # before tokens were random, a fixture, a person who typed one -- is
+    # a guessable preview address and nothing worse, and refusing to save
+    # a post over it would be refusing the wrong thing. A token with a
+    # separator in it is a different matter: it is a directory the build
+    # would make somewhere else.
+    raise "cannot write '#{slug}': its draft token is not one segment of a path, " \
+          'and the preview address is built out of it'
+  end
+
   # media.strip_location, on unless a site says otherwise. On by default
   # because the cost of the wrong default is asymmetric: a photographer who
   # wants coordinates in their archive notices they are missing and turns
@@ -131,6 +175,21 @@ module PostWriter
   # where it starts.
   def self.copy_media(media_files, year, slug)
     return if media_files.empty?
+
+    # Every name first, before a directory is made or a byte is copied.
+    # By construction these are bare names the importer allocated
+    # ("01.jpg"), and by construction is not a guarantee: the same list
+    # arrives from a phone delivery and from a hand-edited post, and
+    # File.join honours a separator in one without comment. Refused up
+    # front for the reason the address clash is: a write that is refused
+    # has to leave the archive exactly as it found it, and a media
+    # directory made for a post that was then declined is an orphan the
+    # next run counts as an occupied name.
+    media_files.each do |_src_path, filename|
+      unless PathSafety.safe_segment?(filename.to_s)
+        raise ArgumentError, "#{filename.inspect} is not a media filename"
+      end
+    end
 
     media_dir = File.join(MEDIA_DIR, year, slug)
     FileUtils.mkdir_p(media_dir)
@@ -163,6 +222,18 @@ module PostWriter
   # why); a person attaching a file to their own post under a name that is
   # already in the folder means to replace it, and always has.
   def self.copy_media_file(src_path, dest, replace: false)
+    # Asked here as well as in copy_media, because `edit` reaches this one
+    # directly with a destination it composed itself. Only the last
+    # component is asked about, and deliberately: the rest of the path is
+    # the caller's media directory, made of a year and a slug that
+    # check_names! refused before anything got this far, and holding this
+    # one to MEDIA_DIR instead would be holding it to the directory the
+    # ENGINE was loaded from -- which is not always the archive being
+    # written. A test that drives the library against a site of its own
+    # made that difference visible.
+    unless PathSafety.safe_segment?(File.basename(dest.to_s))
+      raise ArgumentError, "#{dest.inspect} does not end in a media filename"
+    end
     return if !replace && File.exist?(dest)
     # A directory or a device is not a picture, and FileUtils.cp on one
     # dies halfway through the save with a raw EISDIR.
@@ -843,8 +914,16 @@ module PostWriter
       # owes the post the same journey -- left behind, the [v] dialog went
       # silent and the orphaned directory waited to be inherited by a
       # future post under the same year/slug.
-      PostVersions.move(slug, old_year, from_content_dir: CONTENT_DIR,
-                        to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
+      moved = PostVersions.move(slug, old_year, from_content_dir: CONTENT_DIR,
+                                to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
+      # Not worth refusing the save over -- the post and its pictures are
+      # the thing being saved -- but not worth swallowing either. Silently,
+      # all this looks like is a [v] dialog that has gone quiet, with
+      # nothing anywhere to say when or why.
+      unless moved
+        warn I18n.t('cli.versions_not_moved', slug: slug, year: year,
+                                              path: File.join('content.nosync', 'versions', old_year, slug))
+      end
     end
 
     media_files = reconcile_media_names(post, old, year, slug, media_files)

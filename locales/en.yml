@@ -258,6 +258,7 @@ cli:
   # named out loud, because nothing about a stray file says it is safe to
   # destroy. The "media:" prefix is the directory, not a word to translate.
   media_name_taken: "media: %{name} was already taken -- the file that was there is now %{moved}"
+  versions_not_moved: "versions: the edit history of %{slug} did not follow it to %{year} -- look for it under %{path}"
   receipt_shape: "`receipt:` is a name the sending page picks for its answer, and it has to be sixteen hexadecimal characters -- it becomes a filename on the site. Leave the line out and the post is written without one."
   link_without_url: "A post can carry a link card, but `link_title:` and `link_description:` are lines ABOUT one -- there has to be a `link:` with the address."
   link_not_http: "`link: %{url}` is not an address a card can point at. It wants a whole http:// or https:// address, or one rooted at this site (`/posts/2026/some-post/`); for a file next to the post, write it as an ordinary link line in the text."
@@ -1247,6 +1248,8 @@ check:
   redirect_from_reserved_fix: "The build refuses it and says so once, in the middle of a log nobody keeps, so the old address quietly 404s. Point it somewhere outside the site's own namespace (posts, page, tag, type, assets, search, markdown), or take the entry out."
   redirect_from_unusable: "%{slug}: the redirect_from %{entry} will not be served -- the build can make no directory of that shape."
   redirect_from_unusable_fix: "A query, a fragment, a . or .. segment, or a segment too long for a filename. Expected a site-root path like \"/old-post/\". Correct it, or take the entry out."
+  former_slug_unusable: "%{slug}: the former_slugs entry %{entry} will not be served -- the build can make no directory of that shape."
+  former_slug_unusable_fix: "Expected year/slug: two segments, neither hidden, neither carrying a separator, neither longer than a filename allows. Correct it, or take the entry out."
   and_more: "...and %{count} more of the same kind, not listed."
   summary: "%{errors} problem(s), %{warnings} thing(s) worth a look."
   summary_clean: "The archive is sound."

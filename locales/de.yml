@@ -249,6 +249,7 @@ cli:
   # wegwerfen darf. Das Präfix „media:“ ist das Verzeichnis, kein Wort zum
   # Übersetzen.
   media_name_taken: "media: %{name} war schon belegt -- die Datei, die dort lag, heißt jetzt %{moved}"
+  versions_not_moved: "versions: die Bearbeitungshistorie von %{slug} ist ihm nicht ins Jahr %{year} gefolgt -- suche sie unter %{path}"
   receipt_shape: "`receipt:` ist ein Name, den die sendende Seite für ihre Antwort wählt, und er muss aus sechzehn Hexadezimalzeichen bestehen -- daraus wird ein Dateiname auf der Website. Ohne die Zeile wird der Beitrag ohne eine geschrieben."
   link_without_url: "Ein Beitrag kann eine Linkkarte tragen, aber `link_title:` und `link_description:` sind Zeilen ÜBER eine -- dazu gehört ein `link:` mit der Adresse."
   link_not_http: "`link: %{url}` ist keine Adresse, auf die eine Karte zeigen kann. Sie will eine vollständige http://- oder https://-Adresse oder eine, die an der Wurzel dieser Website beginnt (`/posts/2026/ein-beitrag/`); auf eine Datei neben dem Beitrag verweist eine gewöhnliche Linkzeile im Text."
@@ -1230,6 +1231,8 @@ check:
   redirect_from_reserved_fix: "Der Build lehnt es ab und sagt es einmal, mitten in einem Log, das niemand aufhebt -- die alte Adresse liefert also stillschweigend 404. Zeige woandershin als in den eigenen Namensraum der Website (posts, page, tag, type, assets, search, markdown), oder nimm den Eintrag heraus."
   redirect_from_unusable: "%{slug}: das redirect_from %{entry} wird nicht ausgeliefert -- aus dieser Form kann der Build kein Verzeichnis machen."
   redirect_from_unusable_fix: "Eine Query, ein Fragment, ein Segment . oder .., oder ein Segment, das für einen Dateinamen zu lang ist. Erwartet wird ein Pfad ab der Wurzel wie \"/alter-beitrag/\". Korrigiere ihn, oder nimm den Eintrag heraus."
+  former_slug_unusable: "%{slug}: der former_slugs-Eintrag %{entry} wird nicht ausgeliefert -- aus dieser Form kann der Build kein Verzeichnis machen."
+  former_slug_unusable_fix: "Erwartet wird Jahr/Slug: zwei Segmente, keines versteckt, keines mit einem Trennzeichen, keines länger als ein Dateiname erlaubt. Korrigiere ihn, oder nimm den Eintrag heraus."
   and_more: "...und %{count} weitere derselben Art, nicht aufgeführt."
   summary: "%{errors} Problem(e), %{warnings} Sache(n) zum Nachsehen."
   summary_clean: "Das Archiv ist in Ordnung."

@@ -34,6 +34,7 @@ require_relative '../lib/post_text'
 require_relative '../lib/search_query'
 require_relative '../lib/post_address'
 require_relative '../lib/address_guard'
+require_relative '../lib/path_safety'
 require_relative '../lib/publishing'
 require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
@@ -1195,9 +1196,7 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
   # Sixteen hex characters, checked: it becomes a filename on the site, and
   # a name from outside that is not checked is a path from outside.
   receipt = meta['receipt'].to_s.strip
-  unless receipt.empty? || receipt.match?(/\A[0-9a-f]{16}\z/)
-    refuse('bad_receipt', t('cli.receipt_shape'))
-  end
+  refuse('bad_receipt', t('cli.receipt_shape')) unless receipt.empty? || PathSafety.hex_token?(receipt)
 
   # In front of the body, because that is where a link post's card belongs
   # and because the title, when the post has none, is lifted off it.

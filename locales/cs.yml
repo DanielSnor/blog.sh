@@ -243,6 +243,7 @@ cli:
   # nahlas — na cizím souboru není nic, co by říkalo, že se smí zahodit.
   # Předpona „media:“ je adresář, ne slovo k překladu.
   media_name_taken: "media: %{name} už bylo obsazené — soubor, který tam byl, je teď %{moved}"
+  versions_not_moved: "versions: historie úprav postu %{slug} ho do roku %{year} nenásledovala — hledej ji v %{path}"
   receipt_shape: "`receipt:` je jméno, které si odesílající stránka volí pro svou odpověď, a musí to být šestnáct hexadecimálních znaků — stane se z něj jméno souboru na webu. Bez toho řádku se post zapíše bez účtenky."
   link_without_url: "Post může nést kartu odkazu, ale `link_title:` a `link_description:` jsou řádky O NÍ — musí u nich být `link:` s adresou."
   link_not_http: "`link: %{url}` není adresa, na kterou může karta mířit. Chce celou adresu http:// nebo https://, nebo adresu od kořene tohohle webu (`/posts/2026/nejaky-post/`); na soubor vedle postu se odkazuje obyčejným řádkem s odkazem v textu."
@@ -1216,6 +1217,8 @@ check:
   redirect_from_reserved_fix: "Build ji odmítne a řekne to jednou, uprostřed logu, který si nikdo neschovává, takže stará adresa tiše hlásí 404. Nasměruj ji mimo vlastní jmenný prostor webu (posts, page, tag, type, assets, search, markdown), nebo záznam vyhoď."
   redirect_from_unusable: "%{slug}: redirect_from %{entry} se obsluhovat nebude — z takového tvaru build žádný adresář neudělá."
   redirect_from_unusable_fix: "Dotaz, kotva, část . nebo .., anebo část delší, než unese jméno souboru. Čekala se cesta od kořene webu, třeba \"/stary-post/\". Oprav ji, nebo záznam vyhoď."
+  former_slug_unusable: "%{slug}: položka former_slugs %{entry} se obsluhovat nebude — z takového tvaru build žádný adresář neudělá."
+  former_slug_unusable_fix: "Čeká se rok/slug: dvě části, žádná skrytá, žádná s oddělovačem, žádná delší, než unese jméno souboru. Oprav ji, nebo záznam vyhoď."
   and_more: "...a dalších %{count} téhož druhu, nevypsaných."
   summary: "Problémů: %{errors}, věcí ke kouknutí: %{warnings}."
   summary_clean: "Archiv je v pořádku."
