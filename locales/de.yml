@@ -54,6 +54,7 @@ build:
   page_size_unusable: "⚠️  site.page_size ist %{value}, womit sich nicht blättern lässt -- gebraucht wird eine ganze Zahl größer als null. Gebaut wird mit 10; `./blog.sh doctor` sagt dasselbe dazu."
   archive_span_absurd: "⚠️  Das Archiv reicht von %{from} bis %{to} -- fast sicher ein Tippfehler und kein Datum. Die Übersicht zeigt daher nur Jahre mit Inhalt; korrigiere das Datum, dann kommen die leeren Jahre zurück."
   former_slug_unusable: "⚠️  %{slug}: unbrauchbarer former_slugs-Eintrag %{entry} -- erwartet wird „Jahr/Slug“."
+  unusable_slug: "⚠️  %{file}: der Slug %{slug} ist kein einzelnes Pfadsegment -- dieser Beitrag bleibt aus dem Build heraus."
   former_slug_taken: "⚠️  %{slug}: Weiterleitung von %{former} übersprungen -- diese Adresse ist schon belegt (eine lebende Seite oder die Weiterleitung eines früheren Beitrags)."
   redirect_from_unusable: "⚠️  %{slug}: unbrauchbarer redirect_from-Eintrag %{entry} -- erwartet wird ein Pfad ab der Wurzel der Website, etwa „/alter-beitrag/“."
   redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} übersprungen -- /%{segment}/ gehört der Website selbst."

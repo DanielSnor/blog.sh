@@ -52,6 +52,7 @@ build:
   page_size_unusable: "⚠️  site.page_size je %{value}, podle čehož se stránkovat nedá — potřebuje to celé číslo větší než nula. Stavím s 10; `./blog.sh doctor` říká o téhle hodnotě totéž."
   archive_span_absurd: "⚠️  Archiv sahá od roku %{from} do %{to} — to skoro jistě není datum, ale překlep. Mapa archivu proto ukáže jen roky, ve kterých něco je; oprav to datum a vrátí se i prázdné roky."
   former_slug_unusable: "⚠️  %{slug}: nepoužitelná položka former_slugs %{entry} — čeká se tvar „rok/slug“."
+  unusable_slug: "⚠️  %{file}: slug %{slug} není jedna část cesty — tenhle post build vynechá."
   former_slug_taken: "⚠️  %{slug}: přesměrování z %{former} přeskočeno — ta adresa je už obsazená (živá stránka, nebo přesměrování dřívějšího postu)."
   redirect_from_unusable: "⚠️  %{slug}: nepoužitelná položka redirect_from %{entry} — čeká se cesta od kořene webu, třeba „/stary-post/“."
   redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} přeskočeno — /%{segment}/ patří webu samotnému."

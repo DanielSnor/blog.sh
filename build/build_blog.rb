@@ -26,6 +26,8 @@ require_relative '../lib/colors_css'
 require_relative '../lib/post_text'
 require_relative '../lib/card_teaser'
 require_relative '../lib/path_glob'
+require_relative '../lib/path_safety'
+require_relative '../lib/atomic_write'
 require_relative '../lib/build_cache'
 
 SiteConfig.use_site_timezone!
@@ -1221,12 +1223,21 @@ def render_block(block, media_prefix, seen = {}, title_lifted: false)
   end
 end
 
+TABLE_ALIGNMENTS = %w[left center right].freeze
+
 # A wrapper with its own scrollbar: a wide table has to scroll within itself,
 # not stretch the page -- same treatment as code blocks get on mobile.
 def render_table(block)
   align = block['align'] || []
   cell = lambda do |c, i, tag|
-    style = align[i] && align[i] != 'left' ? %( style="text-align:#{align[i]}") : ''
+    # The three the markdown parser emits, and nothing else. This value
+    # goes into a style attribute unescaped, and a table arrives from an
+    # import or a post file somebody edited as readily as from the
+    # parser. Dropped rather than escaped, because there is no fourth
+    # thing a column could be aligned to: an unknown value is a mistake,
+    # and the default is what a mistake should look like.
+    where = TABLE_ALIGNMENTS.include?(align[i]) ? align[i] : nil
+    style = where && where != 'left' ? %( style="text-align:#{where}") : ''
     "<#{tag}#{style}>#{apply_formatting(c['text'], c['formatting'])}</#{tag}>"
   end
   # No header key, no <thead>: a table that never had one (a Wix table with
@@ -2982,6 +2993,13 @@ def keep(path)
 end
 
 def emit(path, content)
+  # Every generated artefact comes through here, and the ones belonging to
+  # a post carry its slug or its draft token in the path -- values that
+  # come off a post file. A path that climbs out of public.nosync is a
+  # file prune can never reach, and further up it is not the site's file
+  # at all. The media loop below already guards its own filenames; the
+  # directory those filenames are joined onto was never asked about.
+  PathSafety.contained!(PUBLIC_DIR, path, 'build output')
   WRITTEN[path] = true
   bytes = content.to_s.b
   digest = Digest::SHA256.hexdigest(bytes)
@@ -3045,7 +3063,16 @@ def emit(path, content)
     return
   end
 
-  File.binwrite(path, bytes)
+  # Not File.binwrite: that truncates the target first and finds out
+  # afterwards whether it can write, so a full volume or a container
+  # stopped mid-build left a page, a feed or the search index on disk at
+  # half its length -- served, and byte-for-byte wrong. A sibling temp
+  # renamed into place is either the old file or the new one. It also
+  # means the write can no longer go THROUGH a hardlink into the media
+  # archive: a rename replaces the name, it does not touch what the other
+  # name still points at. PublicFile.claim above stays as the thing that
+  # says so out loud rather than the only thing preventing it.
+  AtomicWrite.binwrite(path, bytes)
   make_readable(path)
   BuildCache.record(path, digest)
 end
@@ -3386,6 +3413,21 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # however far apart their dates are, and "/about/ (2x)" leaves the reader
   # grepping the archive for the pair they have to choose between.
   parsed['__path'] = f
+  # A slug is one segment of a path, and everything below builds addresses
+  # out of it -- output_dir joins it onto public.nosync and the media loop
+  # joins filenames onto that. One carrying a separator or a ".." puts the
+  # build's output where prune can never reach it. Left out with a warning
+  # rather than aborted: refusing to build was tried on the duplicate-page
+  # collision and turned every path that writes a post into a way to take
+  # the site down, the scheduler's cron included, where nobody is at the
+  # keyboard to read the error. check calls this an error and the writer
+  # refuses to create it; a site that already has one keeps being served,
+  # one post short and saying so on every build.
+  unless PathSafety.safe_segment?(parsed['slug'].to_s)
+    warn t('build.unusable_slug', file: f, slug: parsed['slug'].to_s.inspect)
+    next nil
+  end
+
   parsed
 rescue JSON::ParserError, SystemCallError => e
   unreadable << "  #{f}: #{e.message.lines.first.to_s.strip[0, 100]}"
@@ -3438,16 +3480,18 @@ end
 # somebody notices the site has stopped updating. `check` calls this an
 # error and the guards refuse to create it; a site that already has one
 # keeps being served, one page short and saying so on every build.
+# The pages that lost such a collision, by path. Gathered here and acted
+# on where `pages` exists, a few dozen lines down.
+DUPLICATE_PAGE_LOSERS = {}
 at_the_root.each do |(_, slug), dupes|
   # Which one survives is worth saying out loud: posts are written newest
   # first, so the page that stays is the OLDER of the two -- the opposite
-  # of what somebody who just wrote the second one expects. And the loser
-  # does not disappear quietly: it keeps its entry in the sitemap and in
-  # the search index, both of which then point a reader at the winner's
-  # text under the loser's title.
+  # of what somebody who just wrote the second one expects.
   warn("#{t('build.two_pages', count: dupes.size, slug: slug)}\n" \
        "#{dupes.map { |p| "      #{p['__path']}" }.join("\n")}\n" \
        "#{t('build.two_pages_fix')}")
+  # Everything but the last, which is the one that gets written.
+  dupes[0..-2].each { |p| DUPLICATE_PAGE_LOSERS[p['__path']] = true }
 end
 
 # Slug is a tiebreaker, not decoration: sort_by isn't stable, and posts
@@ -3499,6 +3543,13 @@ pages.reject! do |page|
   warn t('build.page_reserved_name', slug: page['slug'])
   true
 end
+# The losing half of a duplicate address. Only one page is written at
+# /<slug>/, and until now the other one stayed in this list -- so the
+# sitemap advertised its address and the search index carried its title,
+# and both sent a reader to the winner's text under the loser's name. The
+# warning above says which file was dropped; this is what dropping it
+# means for the two things `pages` still feeds.
+pages.reject! { |page| DUPLICATE_PAGE_LOSERS[page['__path']] }
 # `unlisted` on a PAGE means the same as it does on a post, and pages are
 # the likeliest thing to be marked with it: a migration leaves behind a
 # "Sample Page" and a "Privacy Policy" nobody wrote, and unlisted is what
@@ -3920,7 +3971,14 @@ end
 # page whose entire job is to leave. noindex keeps it out of search
 # results in favour of the canonical target.
 def redirect_stub_html(post)
-  url = "#{SITE_BASE_URL}#{post_path(post)}"
+  # Escaped in every attribute it appears in, not only in the text of the
+  # link. The address is built out of the post's slug or its draft token,
+  # which are values from a post file -- the writer refuses the shapes
+  # that would climb out of the archive, but a quote in one only has to
+  # close the attribute to put markup on the page. draft_banner, forty
+  # lines up, has always done it this way; this stub had three places
+  # where it did not.
+  url = h("#{SITE_BASE_URL}#{post_path(post)}")
   <<~HTML
     <!doctype html>
     <html lang="#{SITE_LANG}">
@@ -3932,7 +3990,7 @@ def redirect_stub_html(post)
     <title>#{h(post_title_for(post))}</title>
     </head>
     <body>
-    <p>#{h(t('redirect.moved'))} <a href="#{url}">#{h(url)}</a></p>
+    <p>#{h(t('redirect.moved'))} <a href="#{url}">#{url}</a></p>
     </body>
     </html>
   HTML
@@ -4006,16 +4064,18 @@ NAME_MAX_BYTES = 255
 
 (posts + pages + unlisted_posts).each do |post|
   Array(post['former_slugs']).each do |former|
-    parts = former.to_s.split('/').reject(&:empty?)
-    # "." and ".." can only arrive via a hand-edited JSON (slugify never
-    # emits them), but hand-edited JSON is exactly where this list lives
-    # -- and a ".." here would write the stub outside posts/, up to and
-    # including over the homepage or above public.nosync entirely.
-    unless parts.size == 2 && parts.none? { |p| p == '.' || p == '..' } &&
-           parts.none? { |p| p.bytesize > NAME_MAX_BYTES }
+    # Asked of PostAddress, which is where redirect_from's own refusal
+    # already lived. The rule was written out here and nowhere else, so
+    # `check` -- which is where somebody goes to find out whether their
+    # archive is sound -- did not know it: an entry the build refuses
+    # every time it runs was called sound, in a report that names
+    # redirects specifically.
+    unless PostAddress.former_slug_refusal(former).nil?
       warn t('build.former_slug_unusable', slug: post['slug'], entry: former.inspect)
       next
     end
+
+    parts = former.to_s.split('/').reject(&:empty?)
 
     dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
     if written_already?(dest)
@@ -4126,7 +4186,9 @@ if SiteConfig.get('write', default: false)
   # the sweep takes it away like any other page nothing generates.
   (posts + drafts + pages + unlisted_posts).each do |post|
     name = post['receipt'].to_s
-    next unless name.match?(/\A[0-9a-f]{16}\z/)
+    # The same predicate the CLI checks the incoming receipt with. It was
+    # this regex, written out in both places.
+    next unless PathSafety.hex_token?(name)
 
     # `warnings` under the same name the engine's own `add --json` answer
     # uses, because the page renders both with the same lines. Without it
