@@ -44,7 +44,7 @@ module PostWriter
     # The existing slug is kept on purpose: the URL is published, links and
     # announcement toots point at it, and a re-import must never move it
     # just because a title was edited at the source.
-    existing_path = find_by_source(post['source'])
+    existing_path = find_by_source(post['source']) || find_by_receipt(post['receipt'])
     if existing_path
       post = post.merge('slug' => File.basename(existing_path, '.json'))
       return update_matched(existing_path, post, year, media_files)
@@ -94,6 +94,10 @@ module PostWriter
 
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
+    # Kept current for the same reason the source index is: an import or a
+    # delivery run that writes several posts in one process must recognise
+    # what it wrote a moment ago, not just what was on disk when it started.
+    receipts[post['receipt'].to_s] = path if PathSafety.hex_token?(post['receipt'].to_s)
     path
   rescue Exception # rubocop:disable Lint/RescueException -- a signal must not leave the reservation behind either
     # A write that is refused has to leave the archive exactly as it found
@@ -935,6 +939,7 @@ module PostWriter
     AtomicWrite.write_json(new_path, post)
     File.delete(existing_path) if File.expand_path(new_path) != File.expand_path(existing_path)
     index[source_key(post['source'])] = new_path if source_key(post['source'])
+    receipts[post['receipt'].to_s] = new_path if PathSafety.hex_token?(post['receipt'].to_s)
     new_path
   end
 
@@ -1002,6 +1007,32 @@ module PostWriter
     @index
   end
 
+  # receipt id -> path of the post that was written for it.
+  #
+  # The one identity a post written on a phone has. `source` cannot give
+  # it one: everything typed by a person is {platform: manual} with no
+  # original_id, and matching two of those to each other would overwrite
+  # one piece of somebody's writing with another. A receipt is different
+  # -- the page mints it per SEND, immediately before building the files
+  # it is written into, so two deliveries carrying one receipt are one
+  # send that reached this machine twice.
+  #
+  # Which does happen: the delivery is a pipe that can break after the
+  # bytes have arrived and before the answer gets back, and both the
+  # shortcut and the Termux script retry. Without this the retry made a
+  # second post, the receipt answered with the first one, and the copy
+  # sat in the archive with nothing pointing at it -- invisible to the
+  # person who wrote it, because their phone was told about the other one.
+  #
+  # Pressing send twice is NOT this: the page mints a fresh receipt each
+  # time, so those are two posts, which is what asking twice means.
+  def self.receipts
+    return @receipts if @receipts
+
+    each_post { |_path, _post| nil }
+    @receipts
+  end
+
   # Every post in the archive, parsed once: yields [path, post hash].
   #
   # Two maps are built from exactly these bytes -- this one, and the
@@ -1019,6 +1050,7 @@ module PostWriter
   def self.each_post(content_dir: CONTENT_DIR)
     building = @index.nil?
     acc = {}
+    receipts = {}
     PathGlob.under(content_dir, '*', '*.json').each do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
       next unless post.is_a?(Hash)
@@ -1026,13 +1058,20 @@ module PostWriter
       if building
         key = source_key(post['source'])
         acc[key] = file if key
+        # Same pass, same bytes: a second walk over a few thousand files
+        # to answer a second question is a wait for nothing.
+        receipt = post['receipt'].to_s
+        receipts[receipt] = file if PathSafety.hex_token?(receipt)
       end
       yield file, post
     end
     # Only once the pass finished: a block that raised halfway would
     # otherwise leave a half-built index memoized for the rest of the
     # process, and matching re-imports against it would duplicate posts.
-    @index = acc if building && content_dir == CONTENT_DIR
+    if building && content_dir == CONTENT_DIR
+      @index = acc
+      @receipts = receipts
+    end
   end
 
   # Where a post's media lives, derived from the post's own JSON path --
@@ -1084,6 +1123,16 @@ module PostWriter
     return nil unless key
 
     path = index[key]
+    path if path && File.exist?(path)
+  end
+
+  # See `receipts`. Asked after the source, never instead of it: an
+  # imported post has a real identity and that one wins.
+  def self.find_by_receipt(receipt)
+    id = receipt.to_s
+    return nil unless PathSafety.hex_token?(id)
+
+    path = receipts[id]
     path if path && File.exist?(path)
   end
 
