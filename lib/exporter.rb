@@ -4,6 +4,7 @@ require 'json'
 require 'fileutils'
 require 'time'
 require 'yaml'
+require_relative 'site_config'
 require_relative 'markdown_writer'
 require_relative 'embed'
 require_relative 'file_size'
@@ -54,12 +55,42 @@ module Exporter
                         fallbacks: Hash.new(0), collisions: 0)
     taken = {}
 
+    write_site_identity(target) unless dry_run
+
     posts.each_with_index do |post, index|
       export_post(post, root: root, target: target, taken: taken,
                   dry_run: dry_run, result: result)
       progress&.call(index + 1, posts.size)
     end
     result
+  end
+
+  # Who the tree belongs to, in the file a Jekyll site keeps it in.
+  #
+  # An export used to say nothing about where it came from, and the
+  # importer's answer to "which blog is this" then fell back to the
+  # DIRECTORY the tree happened to be sitting in. That is not an
+  # identity: it changes when the folder is renamed or the export is
+  # unpacked somewhere else, and a post's identity changing is a post the
+  # archive can no longer recognise as one it already has. Importing an
+  # export into an archive that already held it therefore wrote every
+  # post a second time, under a serial slug, and left the two of them
+  # claiming one address.
+  #
+  # `url` and `title` are the two keys the importer reads for this, in
+  # the file it reads them from -- so a tree that goes to Jekyll is also
+  # a slightly more complete Jekyll site than it was, which is the
+  # direction this export is supposed to point anyway.
+  def write_site_identity(target)
+    url = SiteConfig.get('site', 'base_url', default: '').to_s.strip
+    title = SiteConfig.get('site', 'title', default: '').to_s.strip
+    return if url.empty? && title.empty?
+
+    FileUtils.mkdir_p(target)
+    config = {}
+    config['url'] = url unless url.empty?
+    config['title'] = title unless title.empty?
+    File.write(File.join(target, '_config.yml'), YAML.dump(config), encoding: 'utf-8')
   end
 
   # The same walk lib/checker.rb makes, kept separate on purpose: that

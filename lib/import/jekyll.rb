@@ -371,7 +371,26 @@ module Import
 
       OWN_NESTED_KEYS.each do |key|
         value = own[key]
-        post[key] = value unless value.nil?
+        next if value.nil?
+        # The exported source is the post's provenance and it wins --
+        # except when it cannot say WHICH post it is. Everything somebody
+        # typed carries {platform: manual} and nothing else, and
+        # PostWriter refuses to match on that on purpose: two manual
+        # posts matched to each other would overwrite one person's
+        # writing with another's.
+        #
+        # Restoring it unconditionally meant a post came home with no
+        # identity at all, so importing an export into an archive that
+        # already held it wrote every post again under a serial slug --
+        # 1200 posts became 2400, and both halves then claimed one
+        # address. The adapter's own source says jekyll plus this tree
+        # plus this file, which is stable across re-imports of the same
+        # export, so keeping it is what makes the second import a no-op.
+        # A post that came from Ghost or an RSS feed still carries THAT,
+        # because that source has a key and wins here.
+        next if key == 'source' && PostWriter.source_key(value).nil?
+
+        post[key] = value
       end
     end
 

@@ -748,6 +748,7 @@ def run_import(adapter)
     puts
     puts t('import.cancelled')
     puts
+    @cancelled = true
     return
   end
 
@@ -808,6 +809,18 @@ end
 # `cancelled`, not `interrupted`: the message at the foot talks about
 # posts already on disk, and at this point there are none. Nothing has
 # been read, nothing chosen, nothing written.
+# What a cancelled wizard should leave behind for whoever called it.
+#
+# A person who walks out of the menu has decided something, and deciding
+# is not failing: zero. Nobody at the keyboard is a different matter. A
+# script, a cron line or a test that pipes in a path and no answers gets
+# the menu, an EOF, "nothing was written" -- and, until this existed, a
+# zero, which is the one thing a caller actually reads and which says
+# the import worked. It did not; nothing was even chosen.
+def cancelled_status
+  Tui.interactive? ? 0 : 1
+end
+
 begin
   source = ask_source
 rescue Interrupt
@@ -825,7 +838,7 @@ if source.nil?
   puts
   puts t('import.cancelled')
   puts
-  exit 0
+  exit cancelled_status
 end
 
 # The adapter build asks for the export's path, so it is the second place
@@ -842,12 +855,14 @@ if adapter.nil?
   puts
   puts t('import.cancelled')
   puts
-  exit 0
+  exit cancelled_status
 end
 
 begin
   run_import(adapter)
-  exit 1 if @lost
+  # @cancelled covers the third way out: the preview was shown and the
+  # confirmation did not match. Same reasoning as cancelled_status.
+  exit 1 if @lost || (@cancelled && !Tui.interactive?)
 rescue Interrupt
   # Ctrl-C during an hours-long run: say what state things are in, because
   # a half-finished import leaves real posts on disk.
