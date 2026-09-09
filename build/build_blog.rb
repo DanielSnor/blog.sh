@@ -29,6 +29,9 @@ require_relative '../lib/path_glob'
 require_relative '../lib/path_safety'
 require_relative '../lib/atomic_write'
 require_relative '../lib/build_cache'
+require_relative 'blocks'
+require_relative 'feeds'
+require_relative 'output'
 
 SiteConfig.use_site_timezone!
 
@@ -763,7 +766,7 @@ def config_line_html(text)
   # written without it, so a hard break inside a link title published a
   # private-use character into a title= attribute.
   formatting.each { |f| f['title'] = f['title'].gsub(MarkdownParser::BREAK_SENTINEL, "\n") if f['title'] }
-  with_breaks(apply_formatting(body.gsub(MarkdownParser::BREAK_SENTINEL, "\n"), formatting, escape: false))
+  Blocks.with_breaks(Blocks.apply_formatting(body.gsub(MarkdownParser::BREAK_SENTINEL, "\n"), formatting, escape: false))
 end
 
 def config_blocks(text)
@@ -831,15 +834,15 @@ def render_config_block(block)
           elsif block['subtype'] == 'quote' then 'blockquote'
           else 'p'
           end
-    inner = with_breaks(apply_formatting(block['text'], block['formatting'], escape: false))
+    inner = Blocks.with_breaks(Blocks.apply_formatting(block['text'], block['formatting'], escape: false))
     inner += %(<cite>— #{h(block['cite'])}</cite>) if tag == 'blockquote' && block['cite']
     "<#{tag}>#{inner}</#{tag}>"
   when 'list'
     tag = block['style'] == 'ol' ? 'ol' : 'ul'
     items = (block['items'] || []).map do |it|
-      child = nested_list(it['children'])
+      child = Blocks.nested_list(it['children'])
       nested = child ? render_config_block(child) : ''
-      body = apply_formatting(it['text'], it['formatting'], escape: false)
+      body = Blocks.apply_formatting(it['text'], it['formatting'], escape: false)
       if it.key?('checked')
         box = %(<input type="checkbox" disabled#{it['checked'] ? ' checked' : ''}>)
         %(<li class="task-item">#{box} #{body}#{nested}</li>)
@@ -879,453 +882,20 @@ def banner_claim_html
   BANNER['claim'] ? config_line_html(BANNER['claim']) : h(SITE_DESCRIPTION)
 end
 
-def wrap_tag(chunk, format)
-  case format['type']
-  when 'bold' then "<b>#{chunk}</b>"
-  when 'italic' then "<i>#{chunk}</i>"
-  when 'strikethrough' then "<s>#{chunk}</s>"
-  when 'code' then "<code>#{chunk}</code>"
-  when 'small' then "<small>#{chunk}</small>"
-  when 'link'
-    title = format['title'] ? %( title="#{CGI.escapeHTML(format['title'].to_s)}") : ''
-    %(<a href="#{CGI.escapeHTML(safe_href(format['url']))}"#{title}>#{chunk}</a>)
-  when 'mention' then %(<a href="#{CGI.escapeHTML(safe_href(format.dig('blog', 'url')))}">#{chunk}</a>)
-  when 'color' then %(<span style="color:#{CGI.escapeHTML(format['hex'].to_s)}">#{chunk}</span>)
-  else chunk
-  end
+
+# Templates call this one, and a template is a file somebody may have
+# copied into their own skin -- docs/skinning.md says so. Moving it out
+# of reach would break those skins silently, at the next build, in
+# somebody else`s repository. The implementation lives with its family
+# in build/blocks.rb; this is the name that must not move.
+def size_attrs(entry)
+  Blocks.size_attrs(entry)
 end
 
-AUTOLINK_RE = %r{https?://[^\s<>"']+}
-# Trailing punctuation at the end of a sentence doesn't belong in the address.
-TRAILING_PUNCT_RE = /[.,;:!?»"'“”]+\z/
+# The block renderers moved to build/blocks.rb -- see the note at the top
+# of that file. size_attrs keeps a wrapper below, because a template
+# calls it and templates are somebody else`s file.
 
-# A URL written directly in the text (without a markdown link) turns itself
-# into a link. Useful for content imported from platforms/eras where authors
-# just typed addresses straight into a sentence instead of linking them.
-def autolink(raw)
-  result = +''
-  pos = 0
-  raw.to_enum(:scan, AUTOLINK_RE).each do
-    match = Regexp.last_match
-    result << CGI.escapeHTML(raw[pos...match.begin(0)])
-    url, trailing = split_trailing_punctuation(match[0])
-    result << %(<a href="#{CGI.escapeHTML(url)}">#{CGI.escapeHTML(url)}</a>)
-    result << CGI.escapeHTML(trailing)
-    pos = match.end(0)
-  end
-  result << CGI.escapeHTML(raw[pos..].to_s)
-  result
-end
-
-def split_trailing_punctuation(url)
-  trailing = +''
-  if (m = url.match(TRAILING_PUNCT_RE))
-    trailing = m[0].dup
-    url = url[0...-m[0].length]
-  end
-  # An unpaired closing parenthesis at the end belongs to the sentence, not
-  # the address -- but a paired one (e.g. in a Wikipedia URL) stays in the link.
-  while url.end_with?(')') && url.count('(') < url.count(')')
-    trailing = ")#{trailing}"
-    url = url[0..-2]
-  end
-  [url, trailing]
-end
-
-# NPF formatting offsets are Unicode-codepoint based, same as Ruby's default
-# String indexing, so no conversion is needed before slicing `text`.
-#
-# `escape: false` is for the site's own chrome (see config_html below), where
-# the text comes from site.yml -- owner-edited config, never visitor input --
-# and raw HTML in it has always been passed through. Autolinking goes off with
-# it, and must: a bare address inside an href= attribute would otherwise be
-# turned into a second link in the middle of the first one.
-def apply_formatting(text, formatting, escape: true)
-  plain = ->(s) { escape ? autolink(s.to_s) : s.to_s }
-  return plain.call(text) if formatting.nil? || formatting.empty?
-
-  # A stored span can point past the end of its text: importers used to
-  # compute offsets against the raw HTML text and store the collapsed one
-  # (fixed in lib/import/html_blocks.rb, but posts written before that keep
-  # their numbers). Clamping costs nothing and stops one such post from
-  # aborting the whole build with a TypeError that names no post at all.
-  formatting = formatting.filter_map do |f|
-    s = f['start'].to_i.clamp(0, text.length)
-    e = f['end'].to_i.clamp(0, text.length)
-    next if s >= e
-
-    f.merge('start' => s, 'end' => e)
-  end
-  return plain.call(text) if formatting.empty?
-
-  boundaries = ([0, text.length] + formatting.flat_map { |f| [f['start'], f['end']] }).uniq.sort
-
-  boundaries.each_cons(2).map do |s, e|
-    next '' if s == e
-
-    active = formatting.select { |f| f['start'] <= s && f['end'] >= e }
-    # No autolinking inside an existing link, or it would produce a link
-    # inside a link.
-    linked = active.any? { |f| %w[link mention].include?(f['type']) }
-    chunk = if !escape then text[s...e]
-            elsif linked then CGI.escapeHTML(text[s...e])
-            else autolink(text[s...e])
-            end
-    active.sort_by { |f| f['end'] - f['start'] }.each { |f| chunk = wrap_tag(chunk, f) }
-    chunk
-  end.join
-end
-
-# A newline stored in block text is a hard break. Applied after escaping and
-# span-wrapping, so the <br> can't collide with either; a chunk never
-# contains markup newlines of its own.
-def with_breaks(html)
-  html.gsub("\n", '<br>')
-end
-
-# Local files get the native player; an imported embed (Spotify and the
-# like) is passed through like an imported video embed. No dimensions
-# anywhere -- degenerate_image? is about images reserving layout space, an
-# <audio> element has a fixed height of its own.
-def render_audio(block, media_prefix)
-  local_media = (block['media'] || []).first
-  if local_media
-    %(<audio controls preload="metadata" src="#{media_src(media_prefix, local_media['url'])}"></audio>)
-  elsif (src = Embed.src(block))
-    embed_iframe(src, block)
-  elsif block['embed_html'] && !block['embed_html'].strip.empty?
-    Embed.without_scripts(block['embed_html'])
-  elsif block['url']
-    # A player that could not be looked up (offline at save time, or a
-    # service with none for that address) still leaves the address, and a
-    # link to it beats a dead end -- the same courtesy the video branch has
-    # always shown.
-    # safe_href, like the video fallback five lines of comment below --
-    # the address comes from an import or a hand-edited post, which is
-    # exactly the input a javascript: URL arrives in. The two branches are
-    # the same shape and only one of them was filtering.
-    %(<p class="audio-unavailable">#{h(t('post.audio_unavailable'))} <a href="#{h(safe_href(block['url']))}">#{h(block['url'])}</a></p>)
-  else
-    "<p><em>#{CGI.escapeHTML(t('post.audio_unavailable'))}</em></p>"
-  end
-end
-
-# The players the engine builds itself, out of a provider and an id it
-# validated (lib/embed.rb) -- never out of the platform's own embed code.
-# Audio widgets are a fixed-height strip, video is 16:9 in the same
-# responsive box YouTube uses.
-def embed_iframe(src, block)
-  provider = block['provider'].to_s
-  title = h(provider.tr('_', '.'))
-  common = %(loading="lazy" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen)
-  if (height = Embed::AUDIO_HEIGHTS[provider])
-    %(<iframe class="embed-audio" src="#{h(src)}" title="#{title}" width="100%" height="#{height}" #{common}></iframe>)
-  else
-    %(<div class="embed-responsive"><iframe src="#{h(src)}" title="#{title}" #{common}></iframe></div>)
-  end
-end
-
-def render_video(block, media_prefix)
-  local_media = (block['media'] || []).first
-  if local_media
-    %(<video controls preload="metadata"#{size_attrs(local_media)} src="#{media_src(media_prefix, local_media['url'])}"></video>)
-  elsif block['embed_html'] && !block['embed_html'].strip.empty?
-    # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
-    # other providers (e.g. Instagram) ship their own responsive blockquote/script.
-    if block['provider'] == 'youtube'
-      %(<div class="embed-responsive">#{Embed.without_scripts(block['embed_html'])}</div>)
-    else
-      Embed.without_scripts(block['embed_html'])
-    end
-  elsif (id = block['youtube_id'])
-    # Hand-written videos carry url + youtube_id, and the iframe is built
-    # here so no foreign HTML ends up in the data. youtube-nocookie serves
-    # the same player, just without tracking cookies until the visitor
-    # actually starts playback.
-    #
-    # The condition is deliberately youtube_id, not parsing url: some
-    # imports can leave blocks with provider=youtube and a url but empty
-    # embed_html, because those videos have since disappeared from YouTube.
-    # Those don't have a youtube_id and fall through to the polite notice
-    # below instead of a broken player.
-    %(<div class="embed-responsive"><iframe src="https://www.youtube-nocookie.com/embed/#{CGI.escapeHTML(id)}" ) +
-      %(title="YouTube" frameborder="0" loading="lazy" ) +
-      %(allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ) +
-      %(allowfullscreen></iframe></div>)
-  elsif (src = Embed.src(block))
-    embed_iframe(src, block)
-  else
-    # Escaped, both times. The address here comes from an import or a
-    # hand-edited post, which is exactly the input that cannot be trusted:
-    # unescaped it closed the href and wrote markup of its own into every
-    # page the post appears on -- and into the RSS feed, which carries the
-    # same rendered HTML.
-    %(<p class="video-unavailable">#{h(t('post.video_unavailable'))} <a href="#{h(safe_href(block['url']))}">#{h(block['url'])}</a></p>)
-  end
-end
-
-# Headings get an id derived from their text, so a section can be linked to
-# both from a table of contents at the top of the post and from outside it.
-# `seen` guards against two identically-named headings in one post getting
-# the same id.
-def heading_id(text, seen)
-  base = tag_slug(text)
-  base = 'section' if base.empty?
-  seen[base] = seen.fetch(base, 0) + 1
-  seen[base] > 1 ? "#{base}-#{seen[base]}" : base
-end
-
-# A list item's `children` is a nested list -- whatever shape the producer that
-# wrote it happened to use. Three have shipped and all three are in archives
-# now: markdown_parser writes a whole list block, html_blocks writes
-# {style, items} with no type at all, and wix wrote the bare items ARRAY.
-#
-# Only the first rendered. The second fell through `case block['type']` to the
-# unknown-type fallback, so a nested bullet imported from HTML -- Tumblr,
-# Ghost, WordPress, a feed, a rescued page -- printed as raw JSON in a <pre>
-# on the published page. The third reached `case` as an Array and took the
-# WHOLE BUILD down with a TypeError: not one page on the site regenerated,
-# `check` calling the archive sound, and `edit` refusing the post too, so the
-# archive was stuck.
-#
-# A nested list is a list. This is the one place that has to know it, and it
-# has to keep knowing it, because the two older shapes are already written.
-def nested_list(children)
-  return nil if children.nil?
-  return { 'type' => 'list', 'items' => children } if children.is_a?(Array)
-  return nil unless children.is_a?(Hash)
-
-  children['type'] ? children : children.merge('type' => 'list')
-end
-
-def render_block(block, media_prefix, seen = {}, title_lifted: false)
-  case block['type']
-  when 'text'
-    heading = block['subtype'].to_s[/\Aheading([1-6])\z/, 1]
-    tag = if heading then "h#{heading}"
-          elsif block['subtype'] == 'quote' then 'blockquote'
-          else 'p'
-          end
-    id = heading ? %( id="#{h(heading_id(block['text'].to_s, seen))}") : ''
-    inner = with_breaks(apply_formatting(block['text'], block['formatting']))
-    # A quote's attribution renders inside the blockquote as a <cite> line,
-    # so the pairing survives copy-paste and reader modes.
-    inner += %(<cite>— #{h(block['cite'])}</cite>) if tag == 'blockquote' && block['cite']
-    "<#{tag}#{id}>#{inner}</#{tag}>"
-  when 'list'
-    tag = block['style'] == 'ol' ? 'ol' : 'ul'
-    items = (block['items'] || []).map do |it|
-      child = nested_list(it['children'])
-      nested = child ? render_block(child, media_prefix, seen) : ''
-      # A task item gets a real (disabled) checkbox and drops the bullet via
-      # the class -- the checkbox is the bullet.
-      if it.key?('checked')
-        box = %(<input type="checkbox" disabled#{it['checked'] ? ' checked' : ''}>)
-        %(<li class="task-item">#{box} #{apply_formatting(it['text'], it['formatting'])}#{nested}</li>)
-      else
-        "<li>#{apply_formatting(it['text'], it['formatting'])}#{nested}</li>"
-      end
-    end.join
-    "<#{tag}>#{items}</#{tag}>"
-  when 'table'
-    render_table(block)
-  when 'hr'
-    '<hr>'
-  when 'teaser_end'
-    # Where the teaser stops. The post's own page shows everything, so the
-    # marker itself renders as nothing; it exists for the toot, the link
-    # card and the listing, which is where a post has to introduce itself.
-    ''
-  when 'code'
-    lang_class = block['lang'].to_s.empty? ? '' : %( class="language-#{CGI.escapeHTML(block['lang'])}")
-    # Same class as the chrome's own code blocks render with, for the same
-    # reason -- see render_chrome_block. But NOT when this copy was cut to
-    # fit a listing card: the button copies what the block holds, and what
-    # a cut block holds is the truncation. A reader lifting a shell script
-    # off the front page would get the first lines of it, run them, and
-    # never be told the rest existed. With no class there is no button,
-    # and the card's "read more" is what leads to the whole thing.
-    cls = block['cut'] ? '' : ' class="code-block"'
-    %(<pre#{cls}><code#{lang_class}>#{CGI.escapeHTML(block['text'].to_s)}</code></pre>)
-  when 'file'
-    file = (block['media'] || []).first || {}
-    # Nothing attached: the card used to link the post's own directory
-    # with a `download` attribute on it, which downloads an HTML page
-    # named after the post. There is no file, so there is no card.
-    return '' if file['url'].to_s.empty?
-
-    label = block['label'].to_s.empty? ? file['url'].to_s : block['label']
-    ext = File.extname(file['url'].to_s).delete('.').upcase
-    ext = 'FILE' if ext.empty?
-    size = human_size(file['size'])
-    sub = [ext, size].compact.reject(&:empty?).join(' · ')
-    %(<a class="file-card" href="#{media_src(media_prefix, file['url'])}" download>) +
-      %(<span class="file-icon">#{h(ext[0, 4])}</span>) +
-      %(<span class="file-meta"><span class="file-label">#{h(label)}</span>) +
-      %(<span class="file-sub">#{h(sub)}</span></span>) +
-      '<svg class="file-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' \
-      'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M6 12l6 6 6-6"/>' \
-      '<path d="M5 21h14"/></svg></a>'
-  when 'image'
-    media = (block['media'] || []).first || {}
-    # An image block with no media at all renders <img src="/posts/2026/x/">
-    # -- the post's own directory -- which the browser fetches and draws as
-    # a broken picture, and check called the archive clean. There is
-    # nothing to show, so nothing is shown.
-    return '' if media['url'].to_s.empty?
-    caption = block['caption'] ? "<figcaption>#{CGI.escapeHTML(block['caption'])}</figcaption>" : ''
-    # Listing pages ship the full post and let CSS clip it at 500px, so most
-    # images on them are never actually seen -- lazy loading is what keeps
-    # them from being downloaded anyway.
-    # Omitted rather than empty when the size is unknown: width="" is not a
-    # valid HTML integer attribute, and an image that can't reserve space is
-    # better off saying nothing than saying nothing-shaped-like-a-number.
-    %(<figure><img src="#{media_src(media_prefix, media['url'])}"#{size_attrs(media)} alt="#{CGI.escapeHTML(block['alt_text'].to_s)}" loading="lazy" decoding="async">#{caption}</figure>)
-  when 'video'
-    # <figure> is only added when a caption exists, so imported videos
-    # without one don't get an unwanted layout change.
-    caption = block['caption'].to_s.strip
-    inner = render_video(block, media_prefix)
-    return inner if caption.empty?
-
-    %(<figure>#{inner}<figcaption>#{CGI.escapeHTML(caption)}</figcaption></figure>)
-  when 'audio'
-    caption = block['caption'].to_s.strip
-    inner = render_audio(block, media_prefix)
-    return inner if caption.empty?
-
-    %(<figure>#{inner}<figcaption>#{CGI.escapeHTML(caption)}</figcaption></figure>)
-  when 'chat'
-    # A dialogue as a definition list: speaker as <dt>, line as <dd> --
-    # semantic enough for reader modes, styled compactly by site.css.
-    rows = (block['lines'] || []).map do |line|
-      dt = line['name'] ? "<dt>#{CGI.escapeHTML(line['name'])}</dt>" : ''
-      "#{dt}<dd>#{with_breaks(CGI.escapeHTML(line['text'].to_s))}</dd>"
-    end.join
-    %(<dl class="chat">#{rows}</dl>)
-  when 'link'
-    title = CGI.escapeHTML((block['title'] || block['url']).to_s)
-    description = CGI.escapeHTML(block['description'].to_s)
-    if title_lifted
-      # The title is the post's heading now, and the heading is the link.
-      # What is left here is the description -- and a link block that had
-      # none has nothing left to draw at all.
-      description.empty? ? '' : %(<p class="link-block">#{description}</p>)
-    else
-      %(<p class="link-block"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
-    end
-  else
-    # Escaped. architecture.md promises an unknown type renders "as its
-    # raw JSON in a <pre> -- loud, not silent", and raw is what it was: a
-    # "<" anywhere in the block left the <pre> and became markup on the
-    # page. Loud is the point; live is not.
-    "<pre>#{h(block.to_json)}</pre>"
-  end
-end
-
-TABLE_ALIGNMENTS = %w[left center right].freeze
-
-# A wrapper with its own scrollbar: a wide table has to scroll within itself,
-# not stretch the page -- same treatment as code blocks get on mobile.
-def render_table(block)
-  align = block['align'] || []
-  cell = lambda do |c, i, tag|
-    # The three the markdown parser emits, and nothing else. This value
-    # goes into a style attribute unescaped, and a table arrives from an
-    # import or a post file somebody edited as readily as from the
-    # parser. Dropped rather than escaped, because there is no fourth
-    # thing a column could be aligned to: an unknown value is a mistake,
-    # and the default is what a mistake should look like.
-    where = TABLE_ALIGNMENTS.include?(align[i]) ? align[i] : nil
-    style = where && where != 'left' ? %( style="text-align:#{where}") : ''
-    "<#{tag}#{style}>#{apply_formatting(c['text'], c['formatting'])}</#{tag}>"
-  end
-  # No header key, no <thead>: a table that never had one (a Wix table with
-  # rowHeader off, an HTML table with no <thead>) used to hand its first row
-  # of data to a <th>, which is a heading to a screen reader and to anyone
-  # reading the page.
-  thead = if block['header']
-            "<thead><tr>#{block['header'].each_with_index.map { |c, i| cell.call(c, i, 'th') }.join}</tr></thead>"
-          else
-            ''
-          end
-  body = (block['rows'] || []).map do |row|
-    "<tr>#{row.each_with_index.map { |c, i| cell.call(c, i, 'td') }.join}</tr>"
-  end.join
-  %(<div class="table-wrap"><table>#{thead}<tbody>#{body}</tbody></table></div>)
-end
-
-def render_photo_grid(images, media_prefix, seen = {})
-  items = images.map { |b| render_block(b, media_prefix, seen) }
-  items[-1] = items[-1].sub('<figure>', '<figure class="span-2">') if items.length.odd?
-  %(<div class="photo-grid">#{items.join}</div>)
-end
-
-# A 1x1 image is a tracking pixel an import dragged in, not a photo, and it
-# gets dropped from the page. "Dimensions unknown" is a different thing
-# entirely and used to land in the same branch, because nil.to_i is 0: any
-# format MediaDimensions can't read (GIF and WebP until now, HEIC still)
-# made the image AND its caption disappear from every rendered page without
-# a word. Unknown dimensions now render -- the page can jump a little on
-# load, which is a far smaller problem than a photo silently missing.
-# Both attributes or neither, and only when the stored size is a number at
-# all. `Integer(…, exception: false)` rather than `is_a?(Integer)` on
-# purpose: imports from before dimensions were normalised stored them as
-# strings ("640"), and 126 media blocks on the reference archive still do --
-# an Integer-only test silently stripped width/height off every one of them.
-# And rather than plain `.to_i`, because that raises on the `false` a broken
-# header reader could once produce.
-# Bytes as something a reader can weigh a click against. Shared with the
-# deploy script and the size limit it enforces, so a size reads the same
-# on an attachment card and in the message that refuses one.
-def human_size(bytes)
-  FileSize.human(bytes)
-end
-
-def size_attrs(media)
-  w = Integer(media['width'], exception: false)
-  h = Integer(media['height'], exception: false)
-  return '' unless w&.positive? && h&.positive?
-
-  %( width="#{w}" height="#{h}")
-end
-
-def degenerate_image?(block)
-  return false unless block['type'] == 'image'
-
-  media = (block['media'] || []).first || {}
-  w = Integer(media['width'], exception: false)
-  h = Integer(media['height'], exception: false)
-  # Unknown size (including a value that is not a number) renders; only a
-  # real 1x1 is the tracking pixel this is here to drop.
-  return false if w.nil? || h.nil?
-
-  w <= 1 || h <= 1
-end
-
-# `lifted` is the one block whose title has been promoted to the post's
-# heading (see link_title_block); it is compared by identity, so a second
-# link block with the same title still renders in full.
-def render_content(blocks, media_prefix, lifted: nil)
-  blocks = blocks.reject { |b| degenerate_image?(b) }
-  seen = {}
-  html = []
-  i = 0
-  while i < blocks.length
-    if blocks[i]['type'] == 'image'
-      group = []
-      while i < blocks.length && blocks[i]['type'] == 'image'
-        group << blocks[i]
-        i += 1
-      end
-      html << (group.length > 1 ? render_photo_grid(group, media_prefix, seen) : render_block(group.first, media_prefix, seen))
-    else
-      html << render_block(blocks[i], media_prefix, seen, title_lifted: blocks[i].equal?(lifted))
-      i += 1
-    end
-  end
-  html.reject(&:empty?).join("\n")
-end
 
 # The eight that name a kind of post. The drawings live in lib/icons.rb
 # with the rest of what the engine ships -- doctor validates a configured
@@ -1447,7 +1017,7 @@ def toc_entries(post)
     text = block['text'].to_s
     next if text.strip.empty?
 
-    { 'level' => level.to_i, 'text' => text, 'id' => heading_id(text, seen) }
+    { 'level' => level.to_i, 'text' => text, 'id' => Blocks.heading_id(text, seen) }
   end
 end
 
@@ -1710,7 +1280,7 @@ end
 # The media prefix is post_path either way, so the rendered content is
 # identical on the post's own page and in every listing it appears in.
 def post_content_html(post)
-  CONTENT_CACHE[post] ||= render_content(post['content'], post_path(post), lifted: link_title_block(post))
+  CONTENT_CACHE[post] ||= Blocks.render_content(post['content'], post_path(post), lifted: link_title_block(post))
 end
 
 def plain_text_length(post)
@@ -1814,10 +1384,10 @@ def build_list_item(post, pinned: false)
   # changes -- 77% of this archive is in that case.
   cut = false
   content = if teaser
-              render_content(teaser, prefix, lifted: link_title_block(post))
+              Blocks.render_content(teaser, prefix, lifted: link_title_block(post))
             else
               kept, cut = CardTeaser.blocks(post['content'])
-              cut ? render_content(kept, prefix, lifted: link_title_block(post)) : post_content_html(post)
+              cut ? Blocks.render_content(kept, prefix, lifted: link_title_block(post)) : post_content_html(post)
             end
   # Heading anchors belong to the post's own page. A listing stacks ten
   # posts' bodies into ONE document, so two posts that both have a
@@ -1856,7 +1426,7 @@ end
 # preview -- without og:image that would be bare text. Uses the post's first
 # non-degenerate image; text posts fall back to the site banner.
 def post_og_image(post)
-  block = post['content'].find { |b| b['type'] == 'image' && !degenerate_image?(b) }
+  block = post['content'].find { |b| b['type'] == 'image' && !Blocks.degenerate_image?(b) }
   media = block && (block['media'] || []).first
   return DEFAULT_OG_IMAGE unless media && media['url']
 
@@ -2014,7 +1584,7 @@ def hero_for(post)
   return nil unless wanted
 
   block = (post['content'] || []).find do |b|
-    b.is_a?(Hash) && b['type'] == 'image' && !degenerate_image?(b)
+    b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
   end
   return nil unless block
 
@@ -2277,7 +1847,7 @@ def render_post_html(post, template)
   # caption) lost BOTH copies when hero_for lifted the first one.
   content_html = if hero_block
                    rest = post['content'].reject { |b| b.equal?(hero_block) }
-                   render_content(rest, post_path(post), lifted: link_title_block(post))
+                   Blocks.render_content(rest, post_path(post), lifted: link_title_block(post))
                  else
                    post_content_html(post)
                  end
@@ -2301,138 +1871,8 @@ def render_post_html(post, template)
          comment_origins: comment_origins_for([post]))
 end
 
-def rss_item(post)
-  url = "#{SITE_BASE_URL}#{post_path(post)}"
-  title = CGI.escapeHTML(post_title_for(post))
-  pub_date = post_time(post).rfc2822
-  description = render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}")
-  # A post's rendered HTML goes into the feed inside CDATA, and CDATA has
-  # exactly one way to end. A post carrying "]]>" -- which an imported
-  # embed_html can, since it is stored verbatim -- closed the section
-  # early and the rest of it was read as feed markup: a reader could be
-  # handed a <title> and <link> of the post's choosing, in an item that
-  # still validated. The sequence is split across two CDATA sections, the
-  # standard way, so it survives as text.
-  # The same visibility rule the pills follow (a tag that slugs to nothing
-  # is dropped), and the same coercion every other escape in this file
-  # uses -- a non-string tag out of a hand-edited JSON used to end the
-  # whole build in CGI.escapeHTML.
-  categories = (post['tags'] || []).reject { |t| tag_slug(t).empty? }
-                                   .map { |t| "<category>#{h(t)}</category>" }.join
-  <<~ITEM
-    <item>
-      <title>#{xml_text(title)}</title>
-      <link>#{url}</link>
-      <guid isPermaLink="true">#{url}</guid>
-      <pubDate>#{pub_date}</pubDate>
-      <description><![CDATA[#{cdata_safe(description)}]]></description>
-      #{categories}
-    </item>
-  ITEM
-end
+# The feed and the sitemap moved to build/feeds.rb.
 
-def render_rss(posts, path: '/rss.xml', title: SITE_TITLE, description: SITE_DESCRIPTION,
-               link: "#{SITE_BASE_URL}/")
-  items = posts.first(RSS_ITEM_LIMIT).map { |post| rss_item(post) }.join
-  # The newest post's date, not Time.now -- otherwise rss.xml differs on
-  # every build and gets re-uploaded even when nothing changed.
-  # RSS 2.0 wants an RFC-822 date-time here, and an empty element is not
-  # one: a site with nothing in the stream yet published
-  # <lastBuildDate></lastBuildDate>, which strict readers refuse along with
-  # the whole feed. The build's own clock is the honest answer to "when was
-  # this feed last built" when no post can answer it.
-  last_build = (posts.first ? post_time(posts.first) : Time.now).rfc2822
-  <<~XML
-    <?xml version="1.0" encoding="UTF-8"?>
-    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-      <channel>
-        <title>#{h(xml_text(title))}</title>
-        <link>#{link}</link>
-        <atom:link href="#{SITE_BASE_URL}#{path}" rel="self" type="application/rss+xml" />
-        <description>#{h(xml_text(description))}</description>
-        <language>#{SITE_LANG}</language>
-        <lastBuildDate>#{last_build}</lastBuildDate>
-        #{items}
-      </channel>
-    </rss>
-  XML
-end
-
-def sitemap_url(loc, lastmod = nil)
-  lastmod_tag = lastmod ? "<lastmod>#{lastmod}</lastmod>" : ''
-  "<url><loc>#{loc}</loc>#{lastmod_tag}</url>"
-end
-
-# `entries`, not `posts`: the caller hands this posts AND pages, and the name
-# it used to have is what produced the defect below. Everything with an
-# address belongs on a sitemap, so the combined list is right for the URL
-# list -- but the archive is built from the STREAM alone, so it is given the
-# stream rather than left to guess from a list that is not one.
-def render_sitemap(entries, tags_map, content_types, stream)
-  urls = [sitemap_url("#{SITE_BASE_URL}/", entries.first && post_time(entries.first).iso8601)]
-
-  entries.each do |entry|
-    urls << sitemap_url("#{SITE_BASE_URL}#{post_path(entry)}", post_time(entry).iso8601)
-  end
-
-  # max_by post_time, not max_by the stored STRING. The comment on the post
-  # sort spells out why a lexical compare is wrong here: a post written
-  # "2026-08-22 10:00" sorts above one written "2026-08-22T09:00+02:00"
-  # because a space is below a T, and an offset moves an instant without
-  # moving its text. Three lastmods were picked that way -- so a crawler
-  # could be told a listing was last touched by the wrong post.
-  tags_map.each do |slug, data|
-    latest = data[:posts].max_by { |p| post_time(p) }
-    urls << sitemap_url("#{SITE_BASE_URL}/tag/#{slug}/", latest && post_time(latest).iso8601)
-  end
-
-  content_types.each do |type|
-    # From the stream, not from the combined list: /type/<t>/ shows posts
-    # and never pages, so a page could hand the listing a lastmod for
-    # something that listing does not contain. The archive block below was
-    # given `stream` for exactly this reason, and says so.
-    type_posts = stream.select { |entry| dominant_content_type(entry) == type }
-    latest = type_posts.max_by { |p| post_time(p) }
-    urls << sitemap_url("#{SITE_BASE_URL}/type/#{type}/", latest && post_time(latest).iso8601)
-  end
-
-  # Every series listing, for the same reason as a tag's: the build writes
-  # it, every post in the series links to it, and the sitemap was the one
-  # place that had never heard of it.
-  SERIES_MAP.each do |slug, in_series|
-    next unless Slug.pageable?(slug)
-
-    latest = in_series.max_by { |p| post_time(p) }
-    urls << sitemap_url("#{SITE_BASE_URL}/series/#{slug}/", latest && post_time(latest).iso8601)
-  end
-
-  # The tag index: one entry, and only when there is at least one tag with a
-  # page of its own -- a site with no tags builds no index and must not be
-  # advertising one.
-  urls << sitemap_url("#{SITE_BASE_URL}/tag/", entries.first && post_time(entries.first).iso8601) if tags_map.any?
-
-  # The archive index and one entry per year that has posts in it, from the
-  # stream and only the stream -- the same list the map itself is grouped
-  # from. Grouping the combined list sent crawlers to /archive/<year>/ for
-  # every year that held nothing but a page: an About page older than the
-  # oldest post, or a Contact page added to a blog whose last post was two
-  # years ago. The root was worse -- written unconditionally, while the build
-  # skips the whole map when the stream is empty.
-  unless stream.empty?
-    urls << sitemap_url("#{SITE_BASE_URL}/archive/", stream.first && post_time(stream.first).iso8601)
-    stream.group_by { |post| post_time(post).year }.each do |year, in_year|
-      latest = in_year.max_by { |p| post_time(p) }
-      urls << sitemap_url("#{SITE_BASE_URL}/archive/#{year}/", latest && post_time(latest).iso8601)
-    end
-  end
-
-  <<~XML
-    <?xml version="1.0" encoding="UTF-8"?>
-    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-      #{urls.join("\n  ")}
-    </urlset>
-  XML
-end
 
 # Pages are sliced starting from the OLDEST post, so a page's contents never
 # change once written. Slicing from the newest end (the obvious way) shifts
@@ -2853,7 +2293,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
       page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
     ].map(&:to_s).join('|'))
     if BuildCache.page_fresh?(dest, key)
-      keep(dest)
+      Output.keep(dest)
       next
     end
 
@@ -2894,7 +2334,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     shown = page_posts
     shown = ([pinned] + page_posts).uniq if pinned && number > fixed
     BuildCache.remember_page(dest, key)
-    emit(dest,
+    Output.emit(dest,
          layout(main_html, title: page_title, description: description,
                            path: page_url(number, fixed, base_path),
                            # The landing page of a listing is the highest number and
@@ -2927,388 +2367,22 @@ WRITTEN = {}
 PUBLIC_READABLE = PublicFile::READABLE
 PUBLIC_TRAVERSABLE = PublicFile::TRAVERSABLE
 
-def world_readable?(path, stat = nil)
-  PublicFile.readable?(path, stat)
-end
-
-# A file nobody can reach is as good as unreadable, so the directories on
-# the way to it get the same treatment -- read AND execute, since a
-# directory without +x cannot be entered even when it can be listed.
-#
-# Directories this run has already put right, so the walk below costs one
-# hash lookup per file after the first time it climbs a given branch.
-TRAVERSED = {}
-
-# Walks up to PUBLIC_DIR, stopping only at a directory THIS RUN has already
-# handled.
-#
-# It used to stop at the first directory that merely LOOKED right, on the
-# grounds that everything above it was made by the same code. That is false
-# the moment a new directory is created inside an old one that is wrong:
-# mkdir_p mints the new leaf at 0777 & ~umask, so publishing a post into a
-# year directory left at 0700 made a correct new page behind a shut gate --
-# the walk stopped on the child it had just created and never looked up.
-# The author then saw a 404 for the post they had just published, rebuilt,
-# and the build said "Postaveno" and changed nothing.
-def make_traversable(dir)
-  path = File.expand_path(dir)
-  root = File.expand_path(PUBLIC_DIR)
-  while path.start_with?(root)
-    break if TRAVERSED[path]
-
-    mode = File.stat(path).mode & 0o7777
-    File.chmod(mode | PUBLIC_TRAVERSABLE, path) unless (mode & PUBLIC_TRAVERSABLE) == PUBLIC_TRAVERSABLE
-    TRAVERSED[path] = true
-    parent = File.dirname(path)
-    break if parent == path
-
-    path = parent
-  end
-rescue SystemCallError
-  nil
-end
-
-def make_readable(path)
-  PublicFile.make_readable(path)
-end
-
-# A page the build cache vouched for: kept, but not written.
-#
-# Everything emit() does BESIDES writing still has to happen, and the
-# permissions are the half that is easy to forget. A rebuild repairing a
-# public.nosync/ somebody chmod'ed shut is a promise made to a reporter
-# whose imported pictures were 600 and whose rebuild did nothing about it
-# -- "chmod, rebuild, nothing". A cache that skipped the repair along with
-# the write would have quietly taken that promise back on every page it
-# skipped, which is every page of an ordinary publish.
-#
-# Both halves, because they fail separately: a file at 644 behind a
-# directory at 744 is a file nobody can reach. make_traversable remembers
-# the directories it has already opened, so the walk up happens once per
-# directory rather than once per page.
-def keep(path)
-  WRITTEN[path] = true
-  make_traversable(File.dirname(path))
-  make_readable(path) unless world_readable?(path)
-end
-
-def emit(path, content)
-  # Every generated artefact comes through here, and the ones belonging to
-  # a post carry its slug or its draft token in the path -- values that
-  # come off a post file. A path that climbs out of public.nosync is a
-  # file prune can never reach, and further up it is not the site's file
-  # at all. The media loop below already guards its own filenames; the
-  # directory those filenames are joined onto was never asked about.
-  PathSafety.contained!(PUBLIC_DIR, path, 'build output')
-  WRITTEN[path] = true
-  bytes = content.to_s.b
-  digest = Digest::SHA256.hexdigest(bytes)
-
-  # What the last build left here, if it still is what it left. Hashing the
-  # bytes we already hold in memory is cheaper than reading the file back
-  # to compare it: on a 4,394-post archive the read-back was 2.81 s of an
-  # 11.2 s build, and every byte of it was read to find out nothing had
-  # changed. The record carries size and mtime as well as the digest, so a
-  # file edited outside the build falls through to the honest comparison
-  # below rather than being vouched for.
-  # Through keep(), not a bare return: the directory walk below sits before
-  # the old early return on purpose, and this return is earlier still. A
-  # file at the right bytes and the right mode behind a directory at 744 is
-  # a file nobody can fetch, and that is exactly the shape the walk was
-  # added for.
-  if BuildCache.written?(path, digest)
-    keep(path)
-    return
-  end
-
-  dir = File.dirname(path)
-  FileUtils.mkdir_p(dir)
-  # Before the early return, not after. A file whose bytes AND mode are both
-  # right can still sit behind a directory nobody can enter, and that is
-  # precisely what `chmod -R a+r public.nosync` leaves behind: read without
-  # execute, every directory at 744, every file at 644. The build was then
-  # permanently blind to it -- it returned here on the matching bytes and
-  # never reached the walk -- while rsync -az carried the 744 to the server
-  # verbatim. Directories were half of what PUBLIC_TRAVERSABLE was added for
-  # and the half that never got repaired.
-  make_traversable(dir)
-  # Permissions count as "up to date" too. Without this the fix below could
-  # never reach a file that already exists with the wrong ones -- which is
-  # what happened to the reporter: chmod, rebuild, nothing, because the
-  # bytes matched and the build had nothing else to look at.
-  if File.exist?(path)
-    stat = File.stat(path)
-    if File.binread(path) == bytes
-      # The bytes are already right, so there is nothing to write and only
-      # the mode can be wrong -- and make_readable is both the thing that
-      # fixes it and the thing that forgives a file we do not own. Falling
-      # through to binwrite here performed an UNRESCUED write purely to
-      # carry a chmod, so a file we could not chmod (a foreign owner, uchg)
-      # killed the build mid-loop with an Errno backtrace: no sitemap, no
-      # sidebar, no search index, no prune, exit 1 -- on a rebuild that had
-      # nothing to write in the first place.
-      make_readable(path) unless world_readable?(path, stat)
-      BuildCache.record(path, digest)
-      return
-    end
-  end
-
-  # Never THROUGH a second name -- see PublicFile.claim. Media arrive in
-  # public.nosync/ as a link to the archive's own file, so an in-place write
-  # here is a write into media.nosync/. And when the name cannot be made
-  # ours, the answer is to leave it alone and say so: writing anyway is how
-  # an attachment in the archive became a rendered page.
-  unless PublicFile.claim(path)
-    warn t('build.name_not_ours', path: path)
-    return
-  end
-
-  # Not File.binwrite: that truncates the target first and finds out
-  # afterwards whether it can write, so a full volume or a container
-  # stopped mid-build left a page, a feed or the search index on disk at
-  # half its length -- served, and byte-for-byte wrong. A sibling temp
-  # renamed into place is either the old file or the new one. It also
-  # means the write can no longer go THROUGH a hardlink into the media
-  # archive: a rename replaces the name, it does not touch what the other
-  # name still points at. PublicFile.claim above stays as the thing that
-  # says so out loud rather than the only thing preventing it.
-  AtomicWrite.binwrite(path, bytes)
-  make_readable(path)
-  BuildCache.record(path, digest)
-end
-
-# The same bargain as a post page, for the outputs made out of the whole
-# archive rather than out of one post: the feed, the sitemap, the search
-# index, the archive map. Their inputs are a list of posts, so their key is
-# the digests of that list -- and when it has not moved, the block is never
-# called and the work inside it never happens.
-#
-# The block matters as much as the key. Building the search index costs
-# half a second of reading every post's text; passing the finished bytes in
-# and then deciding not to write them would have spent all of it.
-def cached_emit(dest, key)
-  if BuildCache.page_fresh?(dest, key)
-    keep(dest)
-    return
-  end
-
-  BuildCache.remember_page(dest, key)
-  emit(dest, yield)
-end
-
-# The identity of a list of posts, in order. Order is part of it: the feed
-# and the archive both say something different when the same posts are
-# arranged differently.
-def posts_digest(list)
-  Digest::SHA256.hexdigest(list.map { |post| POST_DIGEST[post['__path']] }.join(','))
-end
-
+# Where the site keeps its favicon. Above the writing layer rather than
+# inside it: build/output.rb holds the code that MAKES the .ico, but the
+# head of every page asks whether the .png is there, and a constant that
+# moved into a module would have stopped answering that question.
 FAVICON_PNG = File.join(ROOT, 'assets', 'images', 'favicon.png')
 
-# The site's favicon PNG wrapped in an ICO container, for /favicon.ico.
-#
-# Pages link the PNG directly, which every browser prefers anyway -- this
-# exists for the clients that never read the link and just request
-# /favicon.ico from the root: bots, feed readers, link-preview services,
-# older browsers. Without it each of those is a 404 in the log.
-#
-# An ICO may carry a PNG payload verbatim (a 22-byte header, then the file),
-# so this needs no image library and no second source file to keep in sync --
-# in the spirit of lib/qr_code.rb, the smallest correct slice of a format
-# rather than a dependency. Returns nil when there's no PNG to wrap, so a
-# site without a favicon simply doesn't get the file.
+
+# A template asks for this one, and a template may live in somebody
+# else`s skin -- see the note on size_attrs above. The .ico itself is
+# built in build/output.rb; this is the name that must not move.
 def build_favicon_ico
-  return nil unless File.exist?(FAVICON_PNG)
-
-  png = File.binread(FAVICON_PNG)
-  return nil unless png.start_with?("\x89PNG\r\n\x1a\n".b)
-
-  # IHDR is the first chunk of every PNG: width and height are big-endian
-  # 32-bit at offset 16. The ICO dimension fields are a single byte each and
-  # 0 means 256, so anything larger can't be stated exactly -- browsers load
-  # such a file fine but report it as 256, which for something drawn at
-  # 16-32px is a distinction without a difference.
-  width, height = png[16, 8].unpack('N2')
-  header = [0, 1, 1].pack('v3') # reserved, type 1 = icon, one image
-  entry = [
-    width >= 256 ? 0 : width, height >= 256 ? 0 : height,
-    0, 0,   # palette size (0 = not paletted), reserved
-    1, 32,  # colour planes, bits per pixel
-    png.bytesize, header.bytesize + 16
-  ].pack('C4v2V2')
-
-  header + entry + png
+  Output.build_favicon_ico
 end
 
-# Media is content-addressed by the migration/import step, so hashing every
-# file on every build would cost more than the copy it saves. Size alone used
-# to stand in for that -- on the stated grounds that media is never edited in
-# place, which stopped being true the moment `doctor --strip-location`
-# existed. That rewrites a photo where it lies AND keeps its exact byte
-# length on purpose, so the two assumptions met: the build saw the same size,
-# skipped the copy, and public.nosync kept the coordinates the archive had
-# just lost. The deploy then had nothing to upload and doctor reported the
-# site clean while the published photo still carried the place it was taken.
-# mtime costs one more stat of a file already being stat'd, and catches any
-# in-place edit rather than only that one.
-def emit_copy(src, dest, compare_content: false)
-  WRITTEN[dest] = true
-  dir = File.dirname(dest)
-  FileUtils.mkdir_p(dir)
-  # Before the early return, for the reason emit gives: a picture whose
-  # bytes and mode are both right is still unreachable behind a directory
-  # nobody can enter, and the return below never reached the walk.
-  make_traversable(dir)
-  if File.exist?(dest)
-    # On a volume that ignores letter case or unicode form, File.exist?
-    # answers yes for a file the directory writes differently -- and then
-    # the copy is skipped, WRITTEN records the name we asked for, and
-    # prune_public (which reads the REAL name from the directory) deletes
-    # the file as an orphan. The page keeps its <img> and loses its
-    # picture, on the site as well as here, because deploy --prune repeats
-    # the deletion. So the file is renamed to the name being recorded
-    # before anything else is decided.
-    settle_name(dest)
-    same = if compare_content
-             File.binread(dest) == File.binread(src)
-           else
-             File.size(dest) == File.size(src) && File.mtime(dest) >= File.mtime(src)
-           end
-    # ...and readable, for the reason emit gives. A chmod changes neither
-    # size nor mtime -- it moves ctime, which nothing here was reading -- so
-    # a picture copied under a strict umask stayed unreadable through every
-    # rebuild that followed.
-    #
-    # One inode under two names is the cheapest possible answer: nothing to
-    # compare and nothing to write. An archive built before this existed
-    # falls THROUGH here even when its copy is up to date, and is relinked
-    # once -- otherwise it would keep paying twice for every file that
-    # never changes, which for media is all of them.
-    return if File.identical?(src, dest) && world_readable?(dest)
-    return if links_impossible? && same && world_readable?(dest)
-  end
+# The writing and sweeping layer moved to build/output.rb.
 
-  place_public(src, dest)
-  # On a link this changes the mode of the ORIGINAL too -- one inode has one
-  # mode. That is the intended direction: a media file the web server cannot
-  # read is the bug this makes impossible, and an original that becomes
-  # readable is what its owner was going to do by hand anyway.
-  make_readable(dest)
-end
-
-# The same bytes under two names, paid for once. Measured on one real
-# archive: media.nosync and public.nosync held 1.8 GB each -- the same
-# 1.8 GB twice, and every import doubled again.
-#
-# Nothing in the build ever writes INTO a file under public.nosync: pages
-# are written whole by `emit`, and media arrives only through here. So the
-# two names cannot drift apart, and deleting one of them -- prune, or a
-# deploy with --prune -- only drops that name.
-def place_public(src, dest)
-  # The name is dropped FIRST, and for both routes. It used to be dropped
-  # only on the way to a link, so once one file had failed to link -- one
-  # source owned by another uid, one immutable file, one media directory on
-  # its own mount -- every later media file took the copy route with the
-  # old name still in place. A copy onto an existing link reaches whatever
-  # else wears it; a copy onto the source ITSELF is not a copy at all, and
-  # FileUtils.cp answers that with an ArgumentError, which is not a
-  # SystemCallError and was caught by nothing: the build died where it
-  # stood, with the site half written, no prune and no cache saved.
-  ours = PublicFile.claim(dest)
-  unless links_impossible?
-    begin
-      File.unlink(dest) if ours && File.exist?(dest)
-      File.link(src, dest)
-      return
-    rescue SystemCallError
-      # A volume that refuses the first link will refuse the rest: a
-      # separate mount for public.nosync (EXDEV), a source somebody else
-      # owns (EPERM), a filesystem with a link limit (EMLINK). Asking again
-      # per file would copy the whole archive on every build.
-      @links_impossible = true
-    end
-  end
-
-  unless ours
-    warn t('build.name_not_ours', path: dest)
-    return
-  end
-
-  FileUtils.cp(src, dest) unless File.identical?(src, dest)
-rescue ArgumentError, SystemCallError => e
-  # One picture that cannot be placed is one picture missing from one page.
-  # Saying so and carrying on is the proportionate answer; the alternative
-  # took the entire site down over it.
-  warn t('build.media_unplaceable', path: dest, reason: e.message)
-end
-
-def links_impossible?
-  @links_impossible == true
-end
-
-# Make the directory write the name we are about to record. Only ever a
-# case-or-form rename of one and the same file: the entry is found by
-# identity (dev+ino), never by string comparison.
-def settle_name(dest)
-  dir = File.dirname(dest)
-  wanted = File.basename(dest)
-  children = Dir.children(dir)
-  return if children.include?(wanted)
-
-  actual = children.find { |name| File.identical?(File.join(dir, name), dest) }
-  return if actual.nil?
-
-  source = File.join(dir, actual)
-  File.rename(source, dest)
-  # On a case-sensitive volume a rename between two unicode forms of one
-  # name is a no-op: the directory still writes the old one, and
-  # prune_public would then delete it as an orphan. Copy under the name we
-  # mean, and take the old entry away.
-  return if Dir.children(dir).include?(File.basename(dest))
-
-  FileUtils.cp(source, dest)
-  File.delete(source) unless File.identical?(source, dest)
-rescue SystemCallError
-  nil
-end
-
-# A single pass over public/ -- walking it twice (files separately from
-# directories) costs real time once there are thousands of entries, since
-# stat-ing each one isn't free, especially on a cloud-synced volume.
-def prune_public
-  dirs = []
-  removed = 0
-  PathGlob.under(PUBLIC_DIR, '**', '*', flags: File::FNM_DOTMATCH).each do |path|
-    if File.directory?(path)
-      dirs << path
-    elsif !WRITTEN[path]
-      begin
-        File.delete(path)
-        removed += 1
-      rescue SystemCallError => e
-        # One file that will not go is one stale file on the site. It used
-        # not to be able to matter, because the sweep only ran on builds
-        # where something had dropped out of the record -- now it runs on
-        # every build, so a single unlinkable orphan (one Locked in the
-        # Finder, one left behind by a cron that ran as root in an install
-        # that otherwise builds as somebody else) would abort EVERY build
-        # from then on, mid-sweep, with the cache never saved. The rmdir
-        # twelve lines down has always rescued; this never did.
-        warn t('build.prune_failed', path: path, reason: e.message)
-      end
-    end
-  end
-  # Nothing deleted means no directory could have been orphaned.
-  return 0 if removed.zero?
-
-  # Deepest directories first, so emptied trees collapse all the way up.
-  dirs.sort_by { |d| -d.length }.each do |dir|
-    Dir.rmdir(dir) if Dir.empty?(dir)
-  rescue SystemCallError
-    nil
-  end
-  removed
-end
 
 FileUtils.mkdir_p(PUBLIC_DIR)
 
@@ -3327,7 +2401,7 @@ PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
   next unless File.file?(src)
   next if src.start_with?("#{DEFAULT_IMAGES_DIR}/")
 
-  emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
+  Output.emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
 # The writer: a page the owner opens on a phone, writes a post in, and
 # hands to a shortcut that carries it to scripts/receive.sh. Off unless a
@@ -3345,16 +2419,16 @@ if SiteConfig.get('write', default: false)
     src = File.join(ROOT, 'write', name)
     next unless File.file?(src)
 
-    emit_copy(src, File.join(PUBLIC_DIR, 'write', name), compare_content: true)
+    Output.emit_copy(src, File.join(PUBLIC_DIR, 'write', name), compare_content: true)
   end
 end
 
-emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
+Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
                         fonts: SiteConfig.get('fonts', default: {}),
                         fonts_dir: File.join(ROOT, 'assets', 'fonts')))
 ico = build_favicon_ico
-emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
+Output.emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
 
 post_template = ERB.new(File.read(File.join(ROOT, 'templates', 'post.html.erb'), encoding: 'utf-8'))
 index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'), encoding: 'utf-8'))
@@ -3939,7 +3013,7 @@ end
     src = File.join(source_media_dir, filename)
     dest = File.join(dir, filename)
     if File.exist?(src)
-      emit_copy(src, dest)
+      Output.emit_copy(src, dest)
     else
       warn t('build.media_missing', slug: post['slug'], filename: filename)
       # The page still links this file, so a copy already in public.nosync
@@ -3958,9 +3032,9 @@ end
     # from these exact inputs by this exact engine and is still untouched.
     # This is what makes publishing cost the size of the CHANGE rather than
     # the size of the archive.
-    keep(dest)
+    Output.keep(dest)
   else
-    emit(dest, render_post_html(post, post_template))
+    Output.emit(dest, render_post_html(post, post_template))
     BuildCache.remember_page(dest, key)
   end
 end
@@ -4083,7 +3157,7 @@ NAME_MAX_BYTES = 255
       next
     end
 
-    emit(dest, redirect_stub_html(post))
+    Output.emit(dest, redirect_stub_html(post))
   end
 end
 
@@ -4166,7 +3240,7 @@ if SiteConfig.get('write', default: false)
     'max_mb' => (ENV['BLOGSH_MAX_MB'] || 24).to_i,
     'tags' => tag_counts
   }
-  emit(File.join(PUBLIC_DIR, 'write', 'site.js'),
+  Output.emit(File.join(PUBLIC_DIR, 'write', 'site.js'),
        "// Generated by the build from config/site.yml and the posts -- do not edit.\n" \
        "window.BLOG_SITE = #{JSON.generate(site_facts)};\n")
 
@@ -4201,7 +3275,7 @@ if SiteConfig.get('write', default: false)
     # build's own warnings are about the whole site (another post's tag,
     # somebody else's dead link), and this file is served to anyone who
     # has the sixteen characters.
-    emit(File.join(PUBLIC_DIR, 'write', 'r', "#{name}.json"),
+    Output.emit(File.join(PUBLIC_DIR, 'write', 'r', "#{name}.json"),
          "#{JSON.generate('slug' => post['slug'].to_s,
                           'state' => post['state'].to_s,
                           'title' => post_title_for(post).to_s,
@@ -4224,8 +3298,8 @@ FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _| href[%r{\A/tag/([^/]+)/\z}, 1]
 
 tags_map.each do |slug, data|
   if FEED_TAG_SLUGS.include?(slug)
-    emit(File.join(PUBLIC_DIR, 'tag', slug, 'rss.xml'),
-         render_rss(data[:posts], path: "/tag/#{slug}/rss.xml",
+    Output.emit(File.join(PUBLIC_DIR, 'tag', slug, 'rss.xml'),
+         Feeds.render_rss(data[:posts], path: "/tag/#{slug}/rss.xml",
                     title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
                     description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
                     link: "#{SITE_BASE_URL}/tag/#{slug}/"))
@@ -4306,7 +3380,7 @@ unless tags_map.empty?
             %(<sup class="tag-index-count">#{count}</sup></a></li>)]
     end
   end
-  cached_emit(tag_index_dest, tag_index_key) do
+  Output.cached_emit(tag_index_dest, tag_index_key) do
     layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
            %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
            title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
@@ -4493,7 +3567,7 @@ unless archive_by_year.empty?
   #
   # The YEAR pages below are what this buys something on anyway: 2014 has
   # not changed since new year's eve 2014 and never will.
-  cached_emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
+  Output.cached_emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
               Digest::SHA256.hexdigest(rows.join)) do
     layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
            %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
@@ -4510,9 +3584,9 @@ unless archive_by_year.empty?
     next if in_year.empty?
 
     year_dest = File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html')
-    year_key = posts_digest(in_year)
+    year_key = Output.posts_digest(in_year)
     if BuildCache.page_fresh?(year_dest, year_key)
-      keep(year_dest)
+      Output.keep(year_dest)
       next
     end
 
@@ -4541,7 +3615,7 @@ unless archive_by_year.empty?
     end
 
     BuildCache.remember_page(year_dest, year_key)
-    emit(year_dest,
+    Output.emit(year_dest,
          layout(listing_heading_html(t('archive.year_title', year: year),
                                      variant: 'archive', icon: :calendar,
                                      value_href: ARCHIVE_PATH) + "\n" +
@@ -4567,15 +3641,15 @@ end
 searchable = pages + posts
 recent_searchable = searchable.first(SEARCH_INDEX_RECENT_LIMIT)
 archive_searchable = searchable.drop(SEARCH_INDEX_RECENT_LIMIT)
-cached_emit(File.join(PUBLIC_DIR, 'search-index.json'), posts_digest(recent_searchable)) do
+Output.cached_emit(File.join(PUBLIC_DIR, 'search-index.json'), Output.posts_digest(recent_searchable)) do
   recent_searchable.map { |post| search_index_entry(post) }.to_json
 end
-cached_emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), posts_digest(archive_searchable)) do
+Output.cached_emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), Output.posts_digest(archive_searchable)) do
   archive_searchable.map { |post| search_index_entry(post) }.to_json
 end
 
 search_template = ERB.new(File.read(File.join(ROOT, 'templates', 'search.html.erb'), encoding: 'utf-8'))
-emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
+Output.emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
      layout(search_template.result(binding),
             title: t('search.page_title', site_title: SITE_TITLE),
             description: t('search.page_description'),
@@ -4615,7 +3689,7 @@ NOT_FOUND_SIGN =
   %(<line x1="46" y1="98" x2="74" y2="98"/>) +
   %(</svg>)
 
-emit(File.join(PUBLIC_DIR, '404.html'),
+Output.emit(File.join(PUBLIC_DIR, '404.html'),
      layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
             %(        #{NOT_FOUND_SIGN}\n) +
             %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
@@ -4628,9 +3702,9 @@ if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))
   cheat_blocks, = MarkdownParser.parse_body(cheat_body, nil)
   cheat_title = cheat_meta['title'] || t('markdown_page.default_title')
-  content_html = render_content(cheat_blocks, CHEAT_SHEET_PATH)
+  content_html = Blocks.render_content(cheat_blocks, CHEAT_SHEET_PATH)
   cheat_sheet_template = ERB.new(File.read(File.join(ROOT, 'templates', 'markdown_cheat_sheet.html.erb'), encoding: 'utf-8'))
-  emit(File.join(PUBLIC_DIR, 'markdown', 'index.html'),
+  Output.emit(File.join(PUBLIC_DIR, 'markdown', 'index.html'),
        layout(cheat_sheet_template.result(binding),
               title: "#{cheat_title} – #{SITE_SHORT_NAME}",
               description: t('markdown_page.description'),
@@ -4663,9 +3737,9 @@ STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
 # stats row that quietly showed nothing.
 unless File.exist?(STATS_PATH)
   File.write(STATS_PATH, '{}')
-  make_readable(STATS_PATH)
+  Output.make_readable(STATS_PATH)
 end
-make_readable(STATS_PATH) unless world_readable?(STATS_PATH)
+Output.make_readable(STATS_PATH) unless Output.world_readable?(STATS_PATH)
 WRITTEN[STATS_PATH] = true
 
 # The approved comments, written by the same cron and needing the same
@@ -4692,17 +3766,17 @@ WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
 # <lastBuildDate> is the newest post's own date rather than the clock --
 # so a post dated 2003 changes nothing here, and the feed is not rewritten
 # for readers who would have been handed the same bytes.
-cached_emit(File.join(PUBLIC_DIR, 'rss.xml'), posts_digest(posts.first(RSS_ITEM_LIMIT))) do
-  render_rss(posts)
+Output.cached_emit(File.join(PUBLIC_DIR, 'rss.xml'), Output.posts_digest(posts.first(RSS_ITEM_LIMIT))) do
+  Feeds.render_rss(posts)
 end
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-cached_emit(File.join(PUBLIC_DIR, 'sitemap.xml'),
-            Digest::SHA256.hexdigest([posts_digest(posts + pages),
+Output.cached_emit(File.join(PUBLIC_DIR, 'sitemap.xml'),
+            Digest::SHA256.hexdigest([Output.posts_digest(posts + pages),
                                       tags_map.keys.join(','),
                                       PRESENT_TYPES.join(',')].join('|'))) do
-  render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts)
+  Feeds.render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts)
 end
 # The crawlers that collect text to train on, as of this release. A list in
 # the engine goes stale, which is why the free-text key below exists beside
@@ -4736,7 +3810,7 @@ def robots_txt
   "#{lines.join("\n")}\n"
 end
 
-emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
+Output.emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
 
 # An imported post keeps answering at the addresses its previous platform
 # gave it: redirect_from is a list of site-root paths ("/bitwarden/",
@@ -4795,7 +3869,7 @@ REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
       next
     end
 
-    emit(dest, redirect_stub_html(post))
+    Output.emit(dest, redirect_stub_html(post))
   end
 end
 
@@ -4820,7 +3894,7 @@ end
 # same publish cost before the cache existed. Correctness at a third of
 # what was saved is a trade worth making, and "the site holds exactly what
 # the archive says" is not a promise to make conditionally.
-removed = prune_public
+removed = Output.prune_public
 
 # Written here and nowhere else: at the end, on the way out of a build that
 # reached the end. An at_exit hook would save this state after a build that
