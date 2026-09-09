@@ -32,6 +32,9 @@ require_relative '../lib/build_cache'
 require_relative 'blocks'
 require_relative 'feeds'
 require_relative 'output'
+require_relative 'discovery'
+require_relative 'cards'
+require_relative 'series'
 
 SiteConfig.use_site_timezone!
 
@@ -1135,78 +1138,8 @@ def draft?(post)
   post['state'] == 'draft'
 end
 
-# Which series a post belongs to, the posts in it, and where this one sits
-# -- filled in after the archive is read (SERIES_MAP below), so a post
-# rendered before that knows nothing and simply has no series.
-#
-# Ordered by date unless a post says otherwise with series_part. Publishing
-# out of order is rare enough that the date is the right default and wrong
-# often enough that there has to be a way to say so.
-def series_context(post)
-  slug = series_slug_of(post)
-  return [nil, [], nil] if slug.nil? || !defined?(SERIES_MAP)
+# What a series is and what order it goes in moved to build/series.rb.
 
-  in_series = SERIES_MAP[slug] || []
-  index = in_series.index { |p| p.equal?(post) }
-  index ? [slug, in_series, index] : [nil, [], nil]
-end
-
-def series_slug_of(post)
-  name = post['series'].to_s.strip
-  return nil if name.empty?
-
-  slug = Slug.slugify(name)
-  slug.empty? ? nil : slug
-end
-
-# The reading order of one series: the parts that carry no number keep
-# their chronology, and a part that names a position is put AT that
-# position among them.
-#
-# Until 1.7 this was a sort key, [has-a-number, the-number, date], which
-# read the number as "ahead of everything undated" rather than as a
-# position. The case the number exists for came out backwards: the docs'
-# own scenario -- parts 1, 2, 4, 5 written in order, then the missing
-# part 3 written last and told "3" -- put part 3 at the front and
-# relabelled the two real first parts 2 and 3. The listing, the "part N
-# of M" note and the prev/next chain all read this list, so all three
-# said it, and the CLI went on showing the number the post actually
-# carries, which is what let the two disagree out loud.
-#
-# Insertion rather than a sort key, because a position is a fact about
-# the list and not about the post: with two numbered parts in a series,
-# "3" means the third slot once "2" has taken the second, and no key
-# computed from one post alone can know that.
-def series_in_order(group)
-  # The archive's own tiebreak (see the sort of `posts` below), so that
-  # two parts stamped the same second cannot swap places between builds.
-  by_date = ->(post) { [post_time(post), post['slug'].to_s] }
-  claimed = group.group_by { |post| Integer(post['series_part'], exception: false) }
-  ordered = (claimed.delete(nil) || []).sort_by(&by_date)
-  # Ascending, so each insertion lands in a list whose earlier slots are
-  # already filled -- part 5 has to count the post that part 2 put in
-  # front of it. A whole equal-numbered group at once, so that two posts
-  # claiming the same slot keep their own date order instead of the
-  # second shoving the first aside.
-  #
-  # The floor is the slot after the last number already placed, and it is
-  # what keeps a bigger number from landing in front of a smaller one
-  # when the numbers do not add up: parts 1, 1 and 2 have three posts for
-  # two slots, and without it part 2 took the slot the second part 1 was
-  # standing in. It is also what makes this identical to the old sort for
-  # a series where every part is numbered -- there the floor is always
-  # the end of the list, so every group is simply appended in order.
-  # A number below the first position, or past the last, is one the
-  # series does not have; the clamp gives it the nearest one it does.
-  floor = 0
-  claimed.sort_by(&:first).each do |part, claimants|
-    at = (part - 1).clamp(floor, ordered.size)
-    claimants = claimants.sort_by(&by_date)
-    ordered.insert(at, *claimants)
-    floor = at + claimants.size
-  end
-  ordered
-end
 
 # A page is a post that does not belong in the stream: About, Contact, the
 # colophon. It keeps a permanent address and stays findable -- it is in the
@@ -1346,171 +1279,11 @@ def comments_attrs(post)
   end
 end
 
-def render_list_item(post, pinned: false)
-  # The pinned copy is rendered separately and NOT cached under the same
-  # key: it differs from the post's ordinary appearance by exactly the
-  # badge mark, and caching one over the other would leak the mark into
-  # the chronological copy (or lose it from the pinned one).
-  return build_list_item(post, pinned: true) if pinned
+# The listing card moved to build/cards.rb.
 
-  LIST_ITEM_CACHE[post] ||= build_list_item(post)
-end
 
-def build_list_item(post, pinned: false)
-  prefix = post_path(post)
-  # A post that wrote its own teaser shows exactly that here, and nothing
-  # below it: the listing is where the site invites, and an author who wrote
-  # the invitation should not have it padded with the first 500px of the
-  # article. The CSS clip is dropped with it -- there is nothing left to
-  # clip, and a fade over a finished sentence reads as damage. "Read more"
-  # stays, because the post does continue.
-  #
-  # An empty teaser is honoured in the toot but not here: a card with a
-  # heading and no words looks like a build that went wrong, and nobody
-  # asking for a quiet announcement is asking for that.
-  teaser = PostText.teaser_blocks(post['content'])
-  teaser = nil unless teaser&.any?
-  # `lifted:` on this branch too. A post's own page passes it so the link
-  # block renders WITHOUT the title the heading borrowed from it; the
-  # teaser branch did not, so a card printed the borrowed headline twice
-  # -- once as its <h2> and again in the body under it -- while the post's
-  # own page printed it once.
-  # Without a teaser of its own the card is cut HERE rather than by the
-  # stylesheet: blocks until the budget, never through one, and the first
-  # one always. See lib/card_teaser.rb for what that costs and why the
-  # budget is measured in height rather than in characters.
-  #
-  # A post that fits whole reuses the memoized render, so nothing about it
-  # changes -- 77% of this archive is in that case.
-  cut = false
-  content = if teaser
-              Blocks.render_content(teaser, prefix, lifted: link_title_block(post))
-            else
-              kept, cut = CardTeaser.blocks(post['content'])
-              cut ? Blocks.render_content(kept, prefix, lifted: link_title_block(post)) : post_content_html(post)
-            end
-  # Heading anchors belong to the post's own page. A listing stacks ten
-  # posts' bodies into ONE document, so two posts that both have a
-  # "Co dal?" section put id="co-dal" on the page twice -- 105 pages of a
-  # real archive carried duplicate ids, which makes the document invalid
-  # and sends any same-page anchor to whichever came first. heading_id
-  # de-duplicates within a post; nothing could de-duplicate across them,
-  # because each post's HTML is rendered (and cached) on its own.
-  content = content.gsub(%r{<(h[1-6])([^>]*) id="[^"]*"}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2)}" }
-  # The link is there exactly when a block did not fit -- or when the
-  # author wrote a teaser, which says the same thing about the post. It
-  # used to follow a separate rule (400 characters, or more than one
-  # picture), so it could sit under a card that showed everything.
-  read_more = teaser || cut ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
-  title = post_heading_html(post, 'h2', prefix)
-  stats = post_meta_html(post, reading_labels(post))
-  <<~HTML
-    <div class="card post-list-item">
-      <div class="post-header">
-        #{date_badge(post, link: prefix, pinned: pinned)}
-        <div class="post-body">
-          #{title}
-          #{stats}
-          <div class="content">
-            #{content}
-          </div>
-          #{read_more}
-          #{tags_html(post)}
-        </div>
-      </div>
-    </div>
-  HTML
-end
+# What a post tells crawlers and cards moved to build/discovery.rb.
 
-# Every post is automatically tooted to Mastodon, where the link shows a
-# preview -- without og:image that would be bare text. Uses the post's first
-# non-degenerate image; text posts fall back to the site banner.
-def post_og_image(post)
-  block = post['content'].find { |b| b['type'] == 'image' && !Blocks.degenerate_image?(b) }
-  media = block && (block['media'] || []).first
-  return DEFAULT_OG_IMAGE unless media && media['url']
-
-  # Basename, the same as the page's own <img> uses: this address goes into
-  # og:image and into the JSON-LD, and a name carrying "../" pointed both
-  # of them outside the post -- at whatever happens to sit there.
-  # Percent-encoded, like the page's own <img>. 83baf51 escaped the URL
-  # in the markup and left these two behind, so the picture on the page
-  # pointed at foto%20%231.jpg while og:image pointed at "foto #1.jpg" --
-  # where a scraper reads everything from the # as a fragment, requests
-  # "foto " and gets a 404. The link card on Mastodon and Bluesky and the
-  # search engine's thumbnail were then blank for exactly the pictures
-  # whose names needed the encoding most.
-  "#{SITE_BASE_URL}#{post_path(post)}#{media_name_encoded(media['url'])}"
-end
-
-def post_description(post)
-  # A teaser the author wrote is what the post says about itself, so it wins
-  # over the cut here too. The empty teaser is the one place this parts ways
-  # with the toot: there, "marker on the first line" means "announce with the
-  # title and link alone" and an empty perex honours it. A description is not
-  # a message but standing metadata -- it is what a search engine quotes
-  # months later -- so an empty one would cost the post something without
-  # anybody having asked for that, and the cut stands in.
-  # A link card shows the title above the description, so when the title was
-  # taken from the post's own opening the description has to carry on from
-  # there. Otherwise the card reads the same sentence twice -- which did not
-  # happen while the title was a slug, and would have arrived with this
-  # release as a new defect rather than a fix.
-  # ...but only while there IS something after the name. A post short enough
-  # to be named in full leaves nothing behind it, and taking that emptiness
-  # at face value cost 286 posts on one real archive their own description
-  # and gave them the site's instead -- a card that stopped saying what the
-  # post is and started saying what the site is. Repeating the text under
-  # the title is the lesser of the two: it still describes this post.
-  name, rest = PostText.name_and_rest(post)
-  text = if name && !rest.to_s.strip.empty? && name_stands_as_title?(post)
-           rest
-         else
-           teaser = PostText.teaser_blocks(post['content'])
-           raw = teaser&.any? ? PostText.plain({ 'content' => teaser }) : plain_text_for_search(post)
-           without_borrowed_title(raw, post)
-         end
-  text = post['title'].to_s if text.to_s.strip.empty?
-  text = SITE_DESCRIPTION if text.strip.empty?
-  truncate_excerpt(text, META_DESCRIPTION_LENGTH)
-end
-
-# What a crawler is told about a post beyond the OG basics: the article's
-# time and tags as og meta, and the same facts once more as schema.org
-# JSON-LD, which is what rich results actually read. Only for published
-# posts -- a draft's date is bookkeeping and the page is noindex anyway.
-#
-# The JSON-LD block is data, not script: CSP's script-src governs
-# execution, and a text/ld+json block never executes, so the strict
-# policy above needs no widening. "</" is escaped so post text can never
-# close the script element from inside the JSON.
-def post_structured_head(post)
-  published = post_display_time(post).iso8601
-  tags = post['tags'] || []
-  lines = [%(<meta property="article:published_time" content="#{h(published)}">)]
-  lines += tags.map { |tag| %(<meta property="article:tag" content="#{h(tag)}">) }
-
-  data = {
-    '@context' => 'https://schema.org',
-    '@type' => 'BlogPosting',
-    'headline' => post_title_for(post),
-    'datePublished' => published,
-    'url' => "#{SITE_BASE_URL}#{post_path(post)}",
-    'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_path(post)}",
-    'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR },
-    'image' => post_og_image(post),
-    'description' => post_description(post)
-  }
-  data['keywords'] = tags.join(', ') unless tags.empty?
-  # Both sequences that can end a script block from inside a JSON string:
-  # "</" closes it, and "<!--" opens an HTML comment whose scope runs to the
-  # next "-->" -- so a post whose text held an unterminated comment followed
-  # by another "<script" swallowed the rest of the page and rendered blank.
-  # Escaping the "<" is invisible once the JSON is parsed and stops both.
-  json_ld = JSON.generate(data).gsub('</', '<\/').gsub('<!--', '<\u0021--')
-  lines << %(<script type="application/ld+json">#{json_ld}</script>)
-  lines.map { |line| "\n  #{line}" }.join
-end
 
 # The post's lead image, when the site shows one: the first image whose
 # size is known and sane, together with the media entry the markup needs.
@@ -1694,7 +1467,7 @@ def series_nav_html(slug, in_series, index, position, post = nil)
     name = post['series'].to_s.strip
     return '' if name.empty?
 
-    draft_slug = series_slug_of(post)
+    draft_slug = Series.series_slug_of(post)
     published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || []) : []
     label = if published.any?
               spelled = (defined?(SERIES_NAMES) && SERIES_NAMES[draft_slug]) || name
@@ -1722,7 +1495,7 @@ def series_nav_html(slug, in_series, index, position, post = nil)
               # means one thing in both places.
               part = Integer(post['series_part'], exception: false)
               number = if part
-                         series_in_order(published + [post]).index { |p| p.equal?(post) } + 1
+                         Series.series_in_order(published + [post]).index { |p| p.equal?(post) } + 1
                        else
                          published.size + 1
                        end
@@ -1833,7 +1606,7 @@ end
 
 def render_post_html(post, template)
   toc = toc_for(post)
-  series_slug, series_posts, series_index = series_context(post)
+  series_slug, series_posts, series_index = Series.series_context(post)
   hero_block, hero_media = hero_for(post)
   # Rendered without the lifted block, or the same photo appears twice --
   # once as the lead and once where it was written. Only the hero path
@@ -1854,9 +1627,9 @@ def render_post_html(post, template)
   draft_banner = draft?(post) ? draft_banner(post) : ''
   layout(template.result(binding),
          title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),
-         description: post_description(post),
+         description: Discovery.post_description(post),
          path: post_path(post),
-         image: post_og_image(post),
+         image: Discovery.post_og_image(post),
          og_type: 'article',
          # Drafts and unlisted posts must never end up in search engines
          # or link previews -- for an unlisted post that is the whole
@@ -1865,7 +1638,7 @@ def render_post_html(post, template)
          extra_head: if draft?(post) || unlisted?(post)
                        %(\n  <meta name="robots" content="noindex, nofollow">)
                      else
-                       post_structured_head(post)
+                       Discovery.post_structured_head(post)
                      end,
          frame_origins: Embed.frame_origins_for(post['content']),
          comment_origins: comment_origins_for([post]))
@@ -2304,10 +2077,10 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # its item count identical, so no /page/N/ boundary moves.
     if pinned && number > fixed
       rest = page_posts.reject { |post| post.equal?(pinned) }
-      list_html = ([render_list_item(pinned, pinned: true)] +
-                   rest.map { |post| render_list_item(post) }).join("\n")
+      list_html = ([Cards.render_list_item(pinned, pinned: true)] +
+                   rest.map { |post| Cards.render_list_item(post) }).join("\n")
     else
-      list_html = page_posts.map { |post| render_list_item(post) }.join("\n")
+      list_html = page_posts.map { |post| Cards.render_list_item(post) }.join("\n")
     end
     pagination = pagination_html(number, fixed, base_path)
     # Without this distinction, every listing page would share one identical <title>.
@@ -2669,9 +2442,9 @@ CONTENT_TYPE_LABELS = {
 # Built once, before any post renders, because every post in a series needs
 # to know about all the others -- "part 3 of 7" and the link onwards are
 # facts about the set, not about the post.
-SERIES_MAP = posts.group_by { |p| series_slug_of(p) }
+SERIES_MAP = posts.group_by { |p| Series.series_slug_of(p) }
                   .reject { |slug, group| slug.nil? || group.size < 2 }
-                  .transform_values { |group| series_in_order(group) }
+                  .transform_values { |group| Series.series_in_order(group) }
                   .freeze
 # Published parts per series slug, singletons included -- SERIES_MAP
 # deliberately drops groups under two (a "series" of one is a post), and
@@ -2682,7 +2455,7 @@ SERIES_MAP = posts.group_by { |p| series_slug_of(p) }
 # The parts themselves rather than how many there are, because the preview
 # needs both: how many to report, and what to run series_in_order over to
 # find out which position the draft would take among them.
-SERIES_PUBLISHED = posts.group_by { |p| series_slug_of(p) }
+SERIES_PUBLISHED = posts.group_by { |p| Series.series_slug_of(p) }
                         .reject { |slug, _| slug.nil? }
                         .freeze
 # The name as it was written, for the heading -- the slug is only an
@@ -2694,7 +2467,7 @@ SERIES_PUBLISHED = posts.group_by { |p| series_slug_of(p) }
 # be read first. Now the address only names the series when nobody
 # anywhere spelled it out.
 SERIES_NAMES = posts.each_with_object({}) do |post, acc|
-  slug = series_slug_of(post)
+  slug = Series.series_slug_of(post)
   next unless slug && SERIES_MAP.key?(slug)
 
   name = post['series'].to_s.strip
@@ -2939,7 +2712,7 @@ end
 # media stat is the only cost here, and the loop below stats those same
 # files anyway.
 def post_page_key(post, source_media_dir)
-  slug, in_series, = series_context(post)
+  slug, in_series, = Series.series_context(post)
   # Everything this page says about its siblings is made out of the
   # siblings: the name and "part 3 of 7" at the top, and at the bottom
   # prev/next carrying each neighbour's ADDRESS and TITLE. The key used to
@@ -2972,7 +2745,7 @@ def post_page_key(post, source_media_dir)
                  # sibling's date moves the draft's number without changing
                  # the count, and the cached preview would have kept the old
                  # one.
-                 draft_slug = series_slug_of(post)
+                 draft_slug = Series.series_slug_of(post)
                  ['draft', post['series'], draft_slug, SERIES_NAMES[draft_slug],
                   Array(SERIES_PUBLISHED[draft_slug]).map { |p| POST_DIGEST[p['__path']] }.join(',')].join('/')
                else
