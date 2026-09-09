@@ -36,6 +36,28 @@ require_relative 'discovery'
 require_relative 'cards'
 require_relative 'series'
 
+# ⚠️ Before moving a method out of this file: the templates in templates/
+# are rendered against this script's binding, so every helper they call
+# has to exist as a TOP-LEVEL method here. Move one into a module without
+# leaving the name behind and the build stops -- loudly, on the first page
+# it renders, which is how size_attrs and build_favicon_ico ended up with
+# the two wrappers further down.
+#
+# Which ones that is, today:
+#
+#   ruby -e 'names = Dir["build/*.rb"].flat_map { |f| File.readlines(f) } \
+#              .grep(/^\s*def /).map { |l| l[/def ([a-z_0-9?!]+)/, 1] }.uniq
+#            erb = Dir["templates/**/*.erb"].map { |f| File.read(f) }.join
+#            puts names.select { |n| erb.match?(/(?<![a-z_.])#{n}\b/) }.sort'
+#
+# Thirty-five of them at the time of the split -- including two whose
+# names end in a question mark, which is worth saying because a pattern
+# written with \b misses exactly those and answers thirty-three.
+# Not a promised interface:
+# nothing in docs/ invites anybody to fork a template, and a fork of one
+# has the same problem an edited site.css has -- a conflict on every
+# update. It is simply what this script owes the files it renders.
+
 SiteConfig.use_site_timezone!
 
 ROOT = File.expand_path('..', __dir__)
