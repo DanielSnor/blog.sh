@@ -34,7 +34,7 @@ require_relative 'feeds'
 require_relative 'output'
 require_relative 'discovery'
 require_relative 'cards'
-require_relative 'series'
+require_relative '../lib/series'
 
 # ⚠️ Before moving a method out of this file: the templates in templates/
 # are rendered against this script's binding, so every helper they call
@@ -1160,7 +1160,7 @@ def draft?(post)
   post['state'] == 'draft'
 end
 
-# What a series is and what order it goes in moved to build/series.rb.
+# What a series is and what order it goes in moved to lib/series.rb.
 
 
 # A page is a post that does not belong in the stream: About, Contact, the

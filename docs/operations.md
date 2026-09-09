@@ -79,6 +79,14 @@ already carries, so each can be read as well as changed:
   as "a typo, or the first part?" -- so a misspelling doesn't quietly
   found a second series. `check` catches the older ones
   ([below](#checking-the-archive)).
+
+  A number is a claim on a slot, not a label: the part is inserted at the
+  position it names among the ones ordered by date, so a series whose
+  numbers don't add up -- two parts both told `2`, a number past the last
+  part -- gives one of them a different place than it asked for. `props`
+  says so where it happens, showing the number the post carries and, after
+  it, the place the page will actually give it. Where the two agree, which
+  is the ordinary case, only the number is shown.
 - **`link:`** gives the post a link card: the address it is about, drawn
   above the text. `link_title:` and `link_description:` are the words on
   it, and a post with no `title:` of its own is named by the card. It is a

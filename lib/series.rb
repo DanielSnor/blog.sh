@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
-# build/series.rb -- which posts belong together, and in what order.
+require 'time'
+require_relative 'slug'
+
+# lib/series.rb -- which posts belong together, and in what order.
 #
 # A series is the one relationship in this archive that a post declares
 # about OTHER posts, so it is the one thing here that cannot be worked
@@ -12,7 +15,15 @@
 # file: a numbered part is INSERTED at the position it claims among the
 # unnumbered ones, rather than sorted with them, and three places in the
 # engine have to agree about that -- the build, the CLI and the draft
-# preview. This is where the build`s answer lives.
+# preview.
+#
+# It lives in lib/ rather than build/ for exactly that reason. While it
+# sat next to the build and read the build's own post_time, the CLI could
+# not load it at all: the one file whose whole purpose was to stop three
+# places disagreeing was reachable from one of them. So the CLI went on
+# printing the number a post CARRIES while the page printed the position
+# it GETS, and with two parts claiming one slot those are different
+# numbers -- said out loud, on two screens, about the same post.
 module Series
   module_function
 
@@ -58,10 +69,17 @@ module Series
   # the list and not about the post: with two numbered parts in a series,
   # "3" means the third slot once "2" has taken the second, and no key
   # computed from one post alone can know that.
+  # The archive's own tiebreak, kept here rather than borrowed from the
+  # build: the build caches its post_time by object identity across a whole
+  # run, which is worth it there and pointless for one series read once.
+  # What matters is that both parse the same field the same way, so an
+  # ordering asked for outside a build is the ordering a build would give.
+  def sort_key(post)
+    [Time.parse(post['date'].to_s), post['slug'].to_s]
+  end
+
   def series_in_order(group)
-    # The archive's own tiebreak (see the sort of `posts` below), so that
-    # two parts stamped the same second cannot swap places between builds.
-    by_date = ->(post) { [post_time(post), post['slug'].to_s] }
+    by_date = ->(post) { sort_key(post) }
     claimed = group.group_by { |post| Integer(post['series_part'], exception: false) }
     ordered = (claimed.delete(nil) || []).sort_by(&by_date)
     # Ascending, so each insertion lands in a list whose earlier slots are

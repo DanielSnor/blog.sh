@@ -630,6 +630,8 @@ cli:
   props_label_tags: "štítky"
   props_label_series: "série"
   props_series_part: "%{name}, díl %{part}"
+  props_series_part_moved: "%{label} — na webu %{position}. z %{total}"
+  props_series_part_after: "%{label} — po publikaci %{position}. z %{total}"
   props_label_pinned: "připnutí"
   props_label_unlisted: "nezalistován"
   props_label_announced: "oznámení"

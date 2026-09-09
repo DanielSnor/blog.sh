@@ -642,6 +642,8 @@ cli:
   props_label_tags: "Tags"
   props_label_series: "Serie"
   props_series_part: "%{name}, Teil %{part}"
+  props_series_part_moved: "%{label} -- auf der Website %{position} von %{total}"
+  props_series_part_after: "%{label} -- veröffentlicht %{position} von %{total}"
   props_label_pinned: "angepinnt"
   props_label_unlisted: "ungelistet"
   props_label_announced: "Ankündigung"
