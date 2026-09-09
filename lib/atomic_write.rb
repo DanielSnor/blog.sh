@@ -29,7 +29,27 @@ module AtomicWrite
   # longer read. Left unsaid, the target's own mode is kept, and a file
   # that did not exist yet gets the umask's answer, exactly as a plain
   # File.write would have given it.
-  def write(path, content, permissions: nil, binary: false)
+  # durable: whether to wait for the disk before calling the write done.
+  #
+  # Two different promises live in this method and they are worth telling
+  # apart. ATOMICITY -- a sibling temp renamed into place -- costs almost
+  # nothing and protects against the common disaster: a process killed
+  # mid-write, a full volume, a container stopped. DURABILITY, the two
+  # fsyncs, protects against a much rarer one: the machine losing power
+  # between the write and the disk actually taking it. It is not free.
+  # Measured over a thousand-post archive, the fsyncs made a cold build
+  # 25% slower -- every page, feed and index waiting twice for a disk.
+  #
+  # So the archive pays and the output does not. A post is the only copy
+  # of something somebody wrote; if the power goes during a save, nothing
+  # brings it back. public.nosync is derived: if the power goes during a
+  # build, the next build writes it again, which is a thing that happens
+  # anyway. Buying insurance against losing what can be regenerated in two
+  # seconds is how a build ends up slower for no one's benefit.
+  #
+  # Atomicity stays on both paths, because a half-written page is served
+  # to readers and a rename is what makes that impossible.
+  def write(path, content, permissions: nil, binary: false, durable: true)
     dir = File.dirname(path)
     FileUtils.mkdir_p(dir)
     tmp = temp_name(path, dir)
@@ -46,11 +66,11 @@ module AtomicWrite
         # power cut or a hard container stop can leave the new name
         # pointing at an empty file -- the very outcome this exists to
         # prevent.
-        f.fsync
+        f.fsync if durable
       end
       File.chmod(mode, tmp) if mode
       File.rename(tmp, path)
-      sync_dir(dir)
+      sync_dir(dir) if durable
     rescue StandardError
       File.delete(tmp) if File.exist?(tmp)
       raise
@@ -62,8 +82,11 @@ module AtomicWrite
   # What File.binwrite was for, without its truncate-first bargain: the
   # bytes go down untranslated, and a failure leaves the previous file
   # whole. The build's pages, feeds and indexes are written through here.
-  def binwrite(path, content, permissions: nil)
-    write(path, content, permissions: permissions, binary: true)
+  # durable: false by default, and this is the one caller that wants it
+  # that way -- see write. Everything written through here is the build's
+  # own output, which the next build produces again from the archive.
+  def binwrite(path, content, permissions: nil, durable: false)
+    write(path, content, permissions: permissions, binary: true, durable: durable)
   end
 
   def write_json(path, data, permissions: nil)
