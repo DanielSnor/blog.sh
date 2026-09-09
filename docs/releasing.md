@@ -36,7 +36,19 @@ rewritten slug, a stub that stopped being emitted.
 **4. `./blog.sh check` on that archive is clean.** An archive the engine
 itself will not vouch for is not a release, whatever the tests say.
 
-**5. The version and the changelog agree.** `lib/version.rb` and the top
+**5. The build has not got slower.** `ruby tests/bench.rb <last tag>`
+builds one generated archive with the engine at that tag and with the
+working copy, back to back on this machine, and prints the difference.
+Absolute seconds from a laptop mean nothing a month later; the difference
+between two engines measured a minute apart means everything. Two
+identical engines report within about 3%, so anything past that is real.
+
+Read the three rows separately. A cold build getting slower is a cost
+paid once per full rebuild. An UNCHANGED rebuild getting slower is the
+expensive one: that is the build cache doing less than it did, and it is
+paid on every publish, forever.
+
+**6. The version and the changelog agree.** `lib/version.rb` and the top
 entry of `CHANGELOG.md` name the same version, and the entry is dated the
 day the tag is actually cut. There is a test for this pair; run it last,
 after the date is right.
@@ -48,16 +60,16 @@ not from a later one, however harmless the difference looks.
 
 ## After the tag
 
-**6. The installations get it.** They pull; nothing is pushed to them.
+**7. The installations get it.** They pull; nothing is pushed to them.
 
-**7. The release notes go out the same day.** Hand-written, in the form
+**8. The release notes go out the same day.** Hand-written, in the form
 the earlier releases use -- an opening line that says what the release is
 about, bold headings, em dashes, the licence and links at the foot. They
 are not generated from the changelog: the changelog says what changed and
 the notes say why somebody should care, and a generator can only ever
 produce the first one wearing the second one's clothes.
 
-**8. The post announcing it is part of the release, not a follow-up.**
+**9. The post announcing it is part of the release, not a follow-up.**
 Same day, on the project's own blog, in the same voice as the rest of it.
 
 ## What is deliberately not here
@@ -68,7 +80,7 @@ keep honest, and the honest state of it would be "untested". If a release
 ever needs fixing without the release after it, that is the moment to
 make one -- not before.
 
-**No release-notes generator.** See point 7.
+**No release-notes generator.** See point 8.
 
 **No CI badge on the public repository.** The suite is not public, so a
 badge would either be a link to something nobody can open or a claim
