@@ -44,6 +44,18 @@ stays a pattern: a slug, a filename or a typed directory that lands there
 goes through `PathGlob.literal` first, which escapes the metacharacters so
 the name stands for itself.
 
+The question one step before that -- may this value become a path at all?
+-- has one answer, in `lib/path_safety.rb`. A slug typed at the CLI, a
+media filename off an import, a deploy target read from config and a
+directory named in a redirect all used to decide it for themselves, in
+four places with four sets of rules, which is three places to forget. It
+answers whether a string may be one path segment (`safe_segment?`) or a
+relative path (`safe_relative_path?`), and whether a resolved path is
+inside a directory it must not leave (`within?`, `contained!`).
+Containment resolves the deepest directory that exists rather than
+comparing strings, so a symlink pointing out of the archive is caught
+where a prefix check would have waved it through.
+
 ### Field reference
 
 The authoritative schema for anyone writing an importer -- new
@@ -452,6 +464,20 @@ time -- two places telling a reader how long something takes must not
 disagree.
 
 ## Build pipeline (`build/build_blog.rb`)
+
+The script is the pass itself; the domains it calls live beside it, one
+file each -- `build/blocks.rb` (a content block becomes HTML),
+`build/output.rb` (writing, pruning, and getting a file into
+`public.nosync`), `build/feeds.rb` (RSS, Atom, JSON Feed, sitemap),
+`build/discovery.rb` (the search index and what feeds it),
+`build/cards.rb` (link and social cards) and `lib/series.rb` (what a
+series is and what order its parts go in, which the CLI needs too).
+
+⚠️ Moving a method out of `build_blog.rb` is not a free refactor: the
+templates in `templates/` are rendered against the script's own binding,
+so every helper they call has to stay reachable from there. A helper that
+moves into a module keeps a one-line wrapper at the top level, or the
+build dies on the first page that uses it.
 
 A single linear pass, no framework:
 

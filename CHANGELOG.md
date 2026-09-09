@@ -11,6 +11,40 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.8 -- 2026-09-09
+
+The release about what happens when something goes wrong. A page is written whole or not at all, a
+delivery that arrives twice is one post, and a name that was never meant to be a path is refused
+rather than repaired into an address nobody chose. Nothing to configure and nothing to migrate: on a
+site where nothing goes wrong, the one change you will see is a line on `props`.
+
+### Added
+
+- **`props` says where a numbered part will actually stand.** Only when that differs from its number.
+- **A release checklist.** `docs/releasing.md`, nine steps, the build's speed among them.
+
+### Changed
+
+- **Every page, feed and index is written to a temp file and renamed.** A reader never meets half of one.
+- **A cold build costs about a fifth more.** Cached rebuilds are unchanged, so publishing costs the same.
+- **An export says which blog it came from.** `_config.yml`, so re-importing it recognises its own posts.
+- **A cancelled import leaves with 1.** Zero no longer means "nobody answered".
+- **`check` has one more thing to say.** An existing archive may report a `former_slugs` entry it cannot use.
+- **The build's domains live beside it.** `blocks`, `output`, `feeds`, `discovery`, `cards`, and `lib/series.rb`.
+
+### Fixed
+
+- **A save interrupted by a full volume left the post at 0 bytes.** The old text gone, the new one never written.
+- **A build stopped mid-write left a page, a feed or the search index at half its length.** Served that way.
+- **The same delivery arriving twice made two posts.** The second one invisible to whoever wrote it.
+- **Re-importing this engine's own export wrote every post again.** 1200 posts became 2400.
+- **A slug, a media name or a redirect target carrying `../` reached `mkdir`.** From a hand-edited post or somebody else's export.
+- **A local deploy could write and delete files above the directory it was pointed at.** Both reported as done.
+- **A feed's redirect could send the fetch to localhost or a private address.**
+- **Undoing an edit could delete a post's history rather than step it aside.**
+- **A replaced file came back wearing the temp file's permissions.** Under a strict umask, a page the server cannot read.
+- **Two writes in one process could meet on one temp name.**
+
 ## 1.7 -- 2026-09-05
 
 The release about finishing a post rather than sending one. 1.6 got a post from a phone to the

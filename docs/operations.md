@@ -658,6 +658,18 @@ command: a leading dash is a flag, and anything outside a slug's own
 alphabet is refused here rather than explained by whatever it hits. The
 page then asks the same receipt again until it says published.
 
+**A delivery that arrives twice is one post.** The receipt is minted once
+per send, immediately before the files it names are built, so two
+deliveries carrying the same one are the same send arriving twice --
+which is what a connection that breaks after the bytes have gone but
+before the answer comes back produces, and both the shortcut and the
+Termux script retry. The second delivery updates the post the first one
+wrote instead of founding another beside it. Pressing send again is not
+that: the page mints a fresh receipt each time, so a second send is a
+second post. A delivery carrying no receipt at all -- anything
+hand-rolled -- has nothing to be recognised by, and a repeat of one is
+two posts as it always was.
+
 One connection carries the post however many photographs are in it, which
 is the point: connections are the scarce thing, not bytes. The first run
 in the app asks whether the shortcut may send its items to the host --
@@ -943,6 +955,11 @@ migration -- one `scripts/migrate_<source>.rb` each, e.g.
 `scripts/migrate_feed.rb <export.xml | feed-url>`.
 Those skip the preview and write immediately; see
 [the README](../README.md#importing-existing-content).
+
+**A wizard that wrote nothing says so with its exit code.** Cancelling
+leaves with 1, and so does reaching the end of the input without an
+answer -- which is what a script, a cron line or a pipe does. Zero means
+the import ran; it never means "nobody answered, so nothing happened".
 
 Two things to expect on a real archive:
 
