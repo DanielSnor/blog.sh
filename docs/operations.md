@@ -352,7 +352,9 @@ repack moves it to the front.
 `media: remux_video: true` has the engine do that repack itself, when
 `ffmpeg` is on the machine -- index to the front, `.mov` to `.mp4`, the
 picture and the sound copied across untouched, about a second for a phone
-video. It is off by default, like the HEIC conversion, because it shells
+video. Every video and sound track comes across, not just the first of
+each, and so does the recording time; the metadata tracks an iPhone adds
+to a `.mov` do not, because an MP4 has nowhere to keep them. It is off by default, like the HEIC conversion, because it shells
 out to a tool the engine does not ship. Unlike the HEIC conversion it
 never refuses: no `ffmpeg`, or a repack that will not go through, and the
 post is saved with the file as it arrived and the sentence the author

@@ -29,6 +29,30 @@ require 'shellwords'
 module VideoRemuxer
   module_function
 
+  # What the repack asks ffmpeg for, in one place, because it used to live
+  # in two -- here and in the sentence check prints -- and each was wrong
+  # in the same way without the other noticing.
+  #
+  # Every choice below was measured on a real phone video, not reasoned
+  # about:
+  #
+  # * `-map 0:v -map 0:a?`, not ffmpeg's default. Left to itself ffmpeg
+  #   takes ONE video and ONE audio stream; a second sound track (a
+  #   commentary, a second language) was dropped without a word.
+  # * ...but not `-map 0` either, which would be the obvious fix. An
+  #   iPhone .mov carries five `Core Media Metadata` data streams, MP4 has
+  #   nowhere to put them, and ffmpeg answers "Could not write header" --
+  #   so every phone video would have stopped repacking at all and been
+  #   saved as the .mov it arrived as. Those streams are left behind on
+  #   purpose: the target container cannot hold them.
+  # * The `?` on the audio map makes it optional. A silent clip has no
+  #   audio stream, and a plain `0:a` fails with "matches no streams".
+  # * `-map_metadata 0` and `use_metadata_tags` keep the recording time.
+  #   Without them the repacked file lost `creation_time` from the file
+  #   and every stream -- nothing a reader sees, but the only record of
+  #   when the video was shot.
+  REPACK_ARGS = %w[-map 0:v -map 0:a? -map_metadata 0 -c copy -movflags +faststart+use_metadata_tags].freeze
+
   # ffmpeg or nothing. There is no second tool for this: the repack is one
   # flag of one program, and a half-implemented fallback (a Ruby box
   # rewriter of our own) would be a new parser between somebody's video
@@ -51,7 +75,7 @@ module VideoRemuxer
   # question the wizard asked.
   def remux(src, dest)
     ok = system('ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', src.to_s,
-                '-c', 'copy', '-movflags', '+faststart', dest.to_s,
+                *REPACK_ARGS, dest.to_s,
                 out: File::NULL, err: File::NULL)
     return true if ok && File.exist?(dest) && File.size(dest).positive?
 
@@ -60,9 +84,11 @@ module VideoRemuxer
   end
 
   # What to type when the engine cannot do it for you. Names the real
-  # file, like the HEIC refusal does.
+  # file, like the HEIC refusal does. The arguments are escaped too: `0:a?`
+  # is a glob to a shell, and zsh -- the default on a Mac -- stops the
+  # whole command with "no matches found" rather than passing it on.
   def suggested_command(src, dest)
-    "ffmpeg -i #{File.basename(src.to_s).shellescape} -c copy -movflags +faststart " \
+    "ffmpeg -i #{File.basename(src.to_s).shellescape} #{Shellwords.join(REPACK_ARGS)} " \
       "#{File.basename(dest.to_s).shellescape}"
   end
 end

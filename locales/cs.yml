@@ -1176,7 +1176,7 @@ check:
   media_cause_broken_link: "je to odkaz na soubor, který tam není"
   media_unusable_fix: "Přerušené stahování, chybějící právo ke čtení, nebo složka pod jménem obrázku. Nahraj tam skutečnou kopii souboru; do té doby stránka ukazuje rozbitý obrázek."
   media_tail_index: "%{slug}: video %{file} má rejstřík na konci souboru."
-  media_tail_index_fix: "Přehraje se, ale každý čtenář čeká na celý soubor, než uvidí první snímek — přehrávač ten rejstřík potřebuje k rozjezdu. Kamera ho jinam dát nemůže; přebalení ho přesune dopředu a video jen přenese: ffmpeg -i SOUBOR -c copy -movflags +faststart NOVY.mp4. Nová videa to udělají při uložení, když zapneš media.remux_video."
+  media_tail_index_fix: "Přehraje se, ale každý čtenář čeká na celý soubor, než uvidí první snímek — přehrávač ten rejstřík potřebuje k rozjezdu. Kamera ho jinam dát nemůže; přebalení ho přesune dopředu a video jen přenese: ffmpeg -i SOUBOR -map 0:v -map '0:a?' -map_metadata 0 -c copy -movflags +faststart+use_metadata_tags NOVY.mp4. Nová videa to udělají při uložení, když zapneš media.remux_video."
   media_missing_fix: "Post si o něj říká a na stránce zůstane díra. Obvykle import, kterému selhalo stahování — buď soubor dodej, nebo ho z postu vyhoď."
   image_degenerate: "%{slug}: obrázek %{file} má %{width}x%{height} a vůbec se nevykreslí."
   image_degenerate_fix: "Cokoli 1px a menší se bere jako sledovací pixel a zahodí se I S POPISKEM, takže stránka tiše přijde o obojí. Vyměň obrázek, nebo blok smaž."

@@ -1207,7 +1207,7 @@ check:
   media_cause_broken_link: "it is a link pointing at a file that is not there"
   media_unusable_fix: "An interrupted download, a permission bit or a folder under the picture's name. Put a real copy of the file there; the page shows a broken picture until then."
   media_tail_index: "%{slug}: the video %{file} carries its index at the end of the file."
-  media_tail_index_fix: "It plays, but every reader waits for the whole file before the first frame -- a player needs that index to start. A recorder has to write it last; repacking moves it to the front and copies the video across untouched: ffmpeg -i FILE -c copy -movflags +faststart NEW.mp4. New videos do it on save with media.remux_video."
+  media_tail_index_fix: "It plays, but every reader waits for the whole file before the first frame -- a player needs that index to start. A recorder has to write it last; repacking moves it to the front and copies the video across untouched: ffmpeg -i FILE -map 0:v -map '0:a?' -map_metadata 0 -c copy -movflags +faststart+use_metadata_tags NEW.mp4. New videos do it on save with media.remux_video."
   media_missing_fix: "The post asks for it and the page renders a hole. Usually an import whose download failed -- put the file there, or edit the post to drop it."
   image_degenerate: "%{slug}: the image %{file} is %{width}x%{height} and will not be rendered at all."
   image_degenerate_fix: "Anything 1px or smaller is treated as a tracking pixel and dropped WITH its caption, so the page silently loses both. Replace the image or remove the block."

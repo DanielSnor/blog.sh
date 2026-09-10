@@ -46,6 +46,7 @@ site where nothing goes wrong, the one change you will see is a line on `props`.
 - **Undoing an edit could delete a post's history rather than step it aside.**
 - **A replaced file came back wearing the temp file's permissions.** Under a strict umask, a page the server cannot read.
 - **Two writes in one process could meet on one temp name.**
+- **Repacking a video dropped its recording time.** And every sound track but the first.
 
 ## 1.7 -- 2026-09-05
 
