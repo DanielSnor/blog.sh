@@ -14,6 +14,9 @@ require_relative '../markdown_parser'
 # Only the postscript needs these, and only to say where a page actually
 # landed -- the same pair (and the same reason) as feed.rb.
 require_relative '../post_writer'
+# For the note below: the only question that needs the TARGET's own
+# identity rather than the tree's.
+require_relative '../site_config'
 require_relative 'html_blocks'
 require_relative 'pages_note'
 require_relative 'permalinks'
@@ -116,8 +119,75 @@ module Import
       collisions = @slugs.count { |_, paths| paths.length > 1 }
       notes << I18n.t('import.note.ssg_slug_collisions', count: collisions) if collisions.positive?
       notes << I18n.t('import.note.ssg_author_dropped', count: @authored.length) unless @authored.empty?
+      # First in the list rather than last: it is the only note that can
+      # mean "do not answer yes to the next question".
+      notes.unshift(I18n.t('import.note.ssg_same_site')) if exported_from_this_site?
       notes.compact!
       notes.empty? ? nil : notes.join("\n  ")
+    end
+
+    # Whether this tree came out of the archive it is about to be written
+    # into. `export` writes `_config.yml` with the site's own url and
+    # title, so a tree that names them is this blog's own export.
+    #
+    # Worth saying out loud because a re-import here is NOT the no-op the
+    # wizard's preview suggests. A post that carries a real source --
+    # imported from Twitter, Ghost, an RSS feed -- is matched and updated
+    # in place. Everything somebody TYPED carries {platform: manual} and
+    # nothing else, and PostWriter refuses to match two of those on
+    # purpose: pairing them would overwrite one person's writing with
+    # another's. So every hand-written post is written again under a
+    # serial slug, `check` finds nothing to complain about (the copy has
+    # its own address), and on a blog whose posts are all hand-written
+    # that is the whole archive, twice.
+    #
+    # The url is the strong signal; a title alone is only trusted when
+    # neither side declares a url, because two unrelated blogs can share
+    # one title far more easily than one address.
+    def exported_from_this_site?
+      names = own_export_names
+      return false if names.empty?
+
+      url = SiteConfig.get('site', 'base_url', default: '').to_s.strip.sub(%r{/+\z}, '')
+      title = SiteConfig.get('site', 'title', default: '').to_s.strip
+      return names.any? { |n| n.casecmp?(url) } unless url.empty?
+
+      !title.empty? && names.any? { |n| n.casecmp?(title) }
+    rescue StandardError
+      # An unreadable configuration on either side costs the note and
+      # nothing else -- an import must not fail over a warning.
+      false
+    end
+
+    # The tree's OWN url and title, read straight out of its
+    # configuration -- deliberately NOT through declared_identity.
+    #
+    # 🪤 That function exists to tell two trees apart, so it drops the
+    # values `jekyll new` and `hugo new site` leave behind: two untouched
+    # skeletons would otherwise declare the same name. `https://example.com`
+    # is one of those, and it is also what `config/site.yml.example` ships
+    # with -- so on a site that has not set its own address yet, asking
+    # declared_identity whether the tree names THIS blog got a tree with no
+    # url at all and answered no. The question here is not "which tree is
+    # this" but "does it name me", and for that the skeleton values are
+    # exactly as good as any other.
+    def own_export_names
+      (HUGO_CONFIGS + JEKYLL_CONFIGS).flat_map do |name|
+        path = File.join(@dir, name)
+        next [] unless File.file?(path)
+
+        raw = File.read(path, encoding: 'utf-8')
+        data = path.end_with?('.toml') ? toml_subset(raw) : config_yaml(raw)
+        next [] unless data.is_a?(Hash)
+
+        lower = data.each_with_object({}) { |(key, value), out| out[key.to_s.downcase] = value }
+        (HUGO_IDENTITY_KEYS + JEKYLL_IDENTITY_KEYS).uniq.filter_map do |key|
+          value = lower[key].to_s.strip.sub(%r{/+\z}, '')
+          value.empty? ? nil : value
+        end
+      end
+    rescue StandardError
+      []
     end
 
     def label

@@ -1024,12 +1024,24 @@ Three things are worth knowing before you rely on the result:
   lived on the platform it came from, and where it lived here before a
   rename. On a Jekyll site with that plugin, every address the post has
   ever had goes on answering.
-- **An export can be imported back.** `./import.sh` → *Markdown tree*
-  reads the `blogsh:` block the export writes, so posts keep their
-  identity (`source`), their series, their redirects and their
-  announcement URLs. That is the supported way to move an installation
-  to another machine or another host -- and, run against a scratch
-  copy, the way to check that an export really did come out whole.
+- **An export can be imported back, into an EMPTY archive.** `./import.sh`
+  → *Markdown tree* reads the `blogsh:` block the export writes, so posts
+  keep their series, their redirects and their announcement URLs. That is
+  the supported way to move an installation to another machine or another
+  host, and -- run against a scratch copy -- the way to check that an
+  export really did come out whole.
+
+  ⚠️ **Not into an archive that already holds those posts.** A post that
+  carries an identity of its own -- imported from Twitter, Ghost, a feed --
+  is matched by it and updated in place. Everything you typed yourself
+  carries `{platform: manual}` and nothing else, and the engine refuses to
+  match two of those on purpose: pairing them would overwrite one person's
+  writing with another's. So each hand-written post is written AGAIN under
+  a serial slug, and `check` will not report it, because the copy has an
+  address of its own. On a blog whose posts are all hand-written that is
+  the whole archive, twice. The wizard says so before it asks for
+  confirmation when it recognises the tree as this site's own export, but
+  the rule is simpler than the warning: the target should be empty.
 
 ## Reading the archive
 
