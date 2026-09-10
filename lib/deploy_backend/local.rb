@@ -55,9 +55,23 @@ module DeployBackend
       # deploy warned about on every tick from then on. Setting
       # Encoding.default_external does not reach ENV, so the label has to
       # be fixed here.
+      #
+      # And normalised here rather than trusted to the caller. `delete`
+      # walks UP from what it removed, taking out the directories it
+      # empties, and stops on `dir != @root` -- a comparison of STRINGS. A
+      # root handed over as "/var/www/blog/" is never equal to what
+      # File.dirname produces, so the walk went past it and removed the
+      # deploy target itself, and kept going while the parents were empty.
+      # The one caller in the engine passes File.expand_path(dir), which
+      # trims the slash, so nothing reached it -- but that was an
+      # agreement written nowhere, and a class whose delete can remove the
+      # directory it was built around should not depend on one.
+      # expand_path keeps a binary string's bytes, so the encoding repair
+      # below still sees what cron handed over.
       def initialize(root)
-        @root = root.dup.force_encoding(Encoding::UTF_8)
-        @root = root.dup.force_encoding(Encoding::ASCII_8BIT) unless @root.valid_encoding?
+        expanded = File.expand_path(root)
+        @root = expanded.dup.force_encoding(Encoding::UTF_8)
+        @root = expanded.dup.force_encoding(Encoding::ASCII_8BIT) unless @root.valid_encoding?
       end
 
       def upload(path, logger: nil, remote_name: nil)

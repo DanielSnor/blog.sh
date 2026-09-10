@@ -1254,6 +1254,8 @@ check:
   redirect_from_unusable_fix: "A query, a fragment, a . or .. segment, or a segment too long for a filename. Expected a site-root path like \"/old-post/\". Correct it, or take the entry out."
   former_slug_unusable: "%{slug}: the former_slugs entry %{entry} will not be served -- the build can make no directory of that shape."
   former_slug_unusable_fix: "Expected year/slug: two segments, neither hidden, neither carrying a separator, neither longer than a filename allows. Correct it, or take the entry out."
+  duplicate_post: "%{year}/%{copy} looks like a copy of %{year}/%{original} -- same title, same date, same text. That is what importing an export back into an archive that already held it leaves behind."
+  duplicate_post_fix: "If it is a copy, delete the numbered one; the original keeps its address and everything that links to it. If both are meant to exist, give one of them a different title and this goes away."
   and_more: "...and %{count} more of the same kind, not listed."
   summary: "%{errors} problem(s), %{warnings} thing(s) worth a look."
   summary_clean: "The archive is sound."

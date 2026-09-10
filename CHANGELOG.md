@@ -22,6 +22,7 @@ site where nothing goes wrong, the one change you will see is a line on `props`.
 
 - **`props` says where a numbered part will actually stand.** Only when that differs from its number.
 - **A release checklist.** `docs/releasing.md`, nine steps, the build's speed among them.
+- **Importing a site's own export says so first.** Typed posts would otherwise be written a second time.
 
 ### Changed
 
@@ -29,7 +30,7 @@ site where nothing goes wrong, the one change you will see is a line on `props`.
 - **A cold build costs about a fifth more.** Cached rebuilds are unchanged, so publishing costs the same.
 - **An export says which blog it came from.** `_config.yml`, so re-importing it recognises its own posts.
 - **A cancelled import leaves with 1.** Zero no longer means "nobody answered".
-- **`check` has one more thing to say.** An existing archive may report a `former_slugs` entry it cannot use.
+- **`check` has two more things to say.** An unusable `former_slugs` entry, and a post that looks like a copy.
 - **The build's domains live beside it.** `blocks`, `output`, `feeds`, `discovery`, `cards`, and `lib/series.rb`.
 
 ### Fixed
@@ -37,6 +38,7 @@ site where nothing goes wrong, the one change you will see is a line on `props`.
 - **A save interrupted by a full volume left the post at 0 bytes.** The old text gone, the new one never written.
 - **A build stopped mid-write left a page, a feed or the search index at half its length.** Served that way.
 - **The same delivery arriving twice made two posts.** The second one invisible to whoever wrote it.
+- **Two deliveries of one receipt arriving together made two posts.** A retry that overtook the first attempt.
 - **Re-importing this engine's own export wrote every post again.** 1200 posts became 2400.
 - **A slug, a media name or a redirect target carrying `../` reached `mkdir`.** From a hand-edited post or somebody else's export.
 - **A local deploy could write and delete files above the directory it was pointed at.** Both reported as done.

@@ -1223,6 +1223,8 @@ check:
   redirect_from_unusable_fix: "Dotaz, kotva, část . nebo .., anebo část delší, než unese jméno souboru. Čekala se cesta od kořene webu, třeba \"/stary-post/\". Oprav ji, nebo záznam vyhoď."
   former_slug_unusable: "%{slug}: položka former_slugs %{entry} se obsluhovat nebude — z takového tvaru build žádný adresář neudělá."
   former_slug_unusable_fix: "Čeká se rok/slug: dvě části, žádná skrytá, žádná s oddělovačem, žádná delší, než unese jméno souboru. Oprav ji, nebo záznam vyhoď."
+  duplicate_post: "%{year}/%{copy} vypadá jako kopie %{year}/%{original} — stejný titulek, stejné datum i text. Takhle to po sobě nechá import exportu zpátky do archivu, který ty posty už držel."
+  duplicate_post_fix: "Jestli je to kopie, smaž tu s číslem; původní si nechá adresu i všechno, co na ni odkazuje. Jestli mají existovat oba, dej jednomu jiný titulek a hlášení zmizí."
   and_more: "...a dalších %{count} téhož druhu, nevypsaných."
   summary: "Problémů: %{errors}, věcí ke kouknutí: %{warnings}."
   summary_clean: "Archiv je v pořádku."

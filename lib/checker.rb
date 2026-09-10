@@ -197,6 +197,7 @@ module Checker
     findings.concat(check_redirect_entries(posts, cap))
     findings.concat(check_series_names(posts, cap))
     findings.concat(check_duplicate_addresses(posts))
+    findings.concat(check_duplicate_posts(posts, cap))
     findings.concat(check_html_entities(posts, cap))
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
@@ -955,6 +956,57 @@ module Checker
   # at all in this state (it would write one over the other and mix their
   # media), so a check that calls the archive sound is telling the author
   # the opposite of what they are about to find out.
+  # A post that looks like a second copy of another: `x-2` beside `x` in
+  # the same year, with the same title, the same moment and the same text.
+  #
+  # That is the shape importing an export back into the archive it came
+  # out of leaves behind. A post carrying a real source is matched by it,
+  # but everything typed by hand carries {platform: manual} and nothing
+  # else, and PostWriter will not match two of those -- so each one is
+  # written again under a serial slug. The copy has an address of its own,
+  # which is why nothing above this ever objected.
+  #
+  # 🪤 Deliberately narrow. A slug ending in a number beside the same slug
+  # without one is ORDINARY: an importer that puts the source's post id in
+  # the slug (b2evolution does) produces exactly that, and one archive
+  # measured before this was written holds 43 such pairs, not one of them
+  # a copy -- same title often, different day always. Asking only "is
+  # there an x beside x-2" would have greeted that site with 43 false
+  # alarms. So all four have to agree: the slug shape, the title, the
+  # instant (parsed, not compared as text, since an export writes its own
+  # spelling of it), and the words. A warning, never an error: it is a
+  # likeness, and two posts are allowed to be alike.
+  def check_duplicate_posts(posts, cap = CAP)
+    by_address = {}
+    posts.each { |post| by_address[[post['__year'].to_s, post['slug'].to_s]] = post }
+
+    findings = posts.filter_map do |post|
+      m = post['slug'].to_s.match(/\A(.+)-(\d+)\z/)
+      next unless m
+
+      year = post['__year'].to_s
+      original = by_address[[year, m[1]]]
+      next unless original && likeness(original) && likeness(original) == likeness(post)
+
+      warn(t('duplicate_post', year: year, copy: post['slug'].to_s, original: original['slug'].to_s),
+           t('duplicate_post_fix'),
+           kind: :duplicate_post,
+           data: { 'year' => year, 'copy' => post['slug'].to_s, 'original' => original['slug'].to_s })
+    end
+    capped(findings, cap)
+  end
+
+  # What two posts must share to be called copies of each other. nil when
+  # the date cannot be read, so an unparseable post is never matched.
+  def likeness(post)
+    instant = Time.parse(post['date'].to_s)
+    words = Array(post['content']).select { |b| b.is_a?(Hash) && b['type'] == 'text' }
+                                  .map { |b| b['text'].to_s }.join("\n").strip
+    [post['title'].to_s.strip, instant.to_i, words]
+  rescue ArgumentError, TypeError
+    nil
+  end
+
   def check_duplicate_addresses(posts, cap = CAP)
     # Grouped by EVERY key a post can collide on, and drafts included --
     # both of them mirroring what the build actually refuses to run on.

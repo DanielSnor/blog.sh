@@ -29,6 +29,75 @@ module PostWriter
   # distinct file of the author's own. Names are unique either way; only
   # sources may repeat.
   def self.write(post, media_files: {})
+    return write_unlocked(post, media_files: media_files) unless PathSafety.hex_token?(post['receipt'].to_s)
+
+    with_receipt_lock { write_unlocked(post, media_files: media_files) }
+  end
+
+  # Everything a receipt-carrying write does, one at a time.
+  #
+  # Matching a delivery to the post an earlier one already wrote is
+  # "look in the receipts map, then write" -- two steps, with a media copy
+  # between them. Two deliveries of ONE receipt that overlap both looked,
+  # both saw nothing, and both wrote: a second post nothing pointed at,
+  # which is the very defect the receipt match exists to prevent, reached
+  # by a race instead of in sequence. It happens when a client retries
+  # before its first attempt has finished writing -- several photographs
+  # over a slow link, which is exactly the situation the retry is for.
+  # claim_slug already solves the same race for the NAME, by creating the
+  # file rather than checking it is free; a receipt has no file of its own
+  # to create, so the writes that carry one take turns instead.
+  #
+  # BLOCKING, unlike RunLock, which answers BUSY and leaves: a second
+  # delivery that gave up here would report a failure to a phone whose
+  # post is in fact about to exist. Waiting is the right answer -- it
+  # finds the first one's post and updates it.
+  #
+  # The memoised maps are dropped once the lock is held. A process that
+  # built them before waiting built them from an archive without the post
+  # it was waiting for, and matching against that is the race again. Only
+  # writes that carry a receipt pay this, and those are one post at a time
+  # from a phone, never an import of thousands.
+  #
+  # A filesystem without flock degrades to no lock, as RunLock does.
+  RECEIPT_LOCK = File.join(ROOT, '.blog-sh-receipt.lock')
+
+  def self.with_receipt_lock
+    # A holder passes straight through, as RunLock's does. flock belongs to
+    # the open FILE, not to the process -- on macOS a second File.open in
+    # the same process gets a lock of its own, and LOCK_EX on it waits for
+    # the first, which is this very process: a write that nested inside
+    # another would wait for itself, silently and for ever. Nothing nests
+    # today; this is so that nothing can.
+    return yield if @receipt_lock_held
+
+    file = begin
+      File.open(RECEIPT_LOCK, File::RDWR | File::CREAT, 0o644)
+    rescue SystemCallError
+      nil
+    end
+    return yield if file.nil?
+
+    begin
+      file.flock(File::LOCK_EX)
+    rescue NotImplementedError, SystemCallError
+      file.close
+      return yield
+    end
+
+    begin
+      @receipt_lock_held = true
+      @index = nil
+      @receipts = nil
+      yield
+    ensure
+      @receipt_lock_held = false
+      file.flock(File::LOCK_UN)
+      file.close
+    end
+  end
+
+  def self.write_unlocked(post, media_files: {})
     media_files = media_files.to_a
     date = Time.parse(post.fetch('date'))
     year = date.year.to_s

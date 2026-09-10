@@ -17,6 +17,7 @@ env.sh
 # The scheduler's heartbeat -- one line, rewritten every fifteen minutes.
 .last-scheduled-run
 .blog-sh.lock
+.blog-sh-receipt.lock
 .last-edit.md
 .last-edit.meta
 .stats_full_refresh_at

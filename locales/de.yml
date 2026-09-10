@@ -1237,6 +1237,8 @@ check:
   redirect_from_unusable_fix: "Eine Query, ein Fragment, ein Segment . oder .., oder ein Segment, das für einen Dateinamen zu lang ist. Erwartet wird ein Pfad ab der Wurzel wie \"/alter-beitrag/\". Korrigiere ihn, oder nimm den Eintrag heraus."
   former_slug_unusable: "%{slug}: der former_slugs-Eintrag %{entry} wird nicht ausgeliefert -- aus dieser Form kann der Build kein Verzeichnis machen."
   former_slug_unusable_fix: "Erwartet wird Jahr/Slug: zwei Segmente, keines versteckt, keines mit einem Trennzeichen, keines länger als ein Dateiname erlaubt. Korrigiere ihn, oder nimm den Eintrag heraus."
+  duplicate_post: "%{year}/%{copy} sieht aus wie eine Kopie von %{year}/%{original} -- gleicher Titel, gleiches Datum, gleicher Text. So etwas bleibt zurück, wenn ein Export in das Archiv zurückimportiert wird, das diese Beiträge schon enthielt."
+  duplicate_post_fix: "Ist es eine Kopie, lösche die nummerierte; das Original behält seine Adresse und alles, was darauf verweist. Sollen beide bestehen, gib einem einen anderen Titel, dann verschwindet der Hinweis."
   and_more: "...und %{count} weitere derselben Art, nicht aufgeführt."
   summary: "%{errors} Problem(e), %{warnings} Sache(n) zum Nachsehen."
   summary_clean: "Das Archiv ist in Ordnung."

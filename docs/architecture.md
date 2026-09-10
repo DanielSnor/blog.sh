@@ -358,7 +358,7 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Fourteen questions, in one pass: a `config/site.yml` that is missing, empty,
+Fifteen questions, in one pass: a `config/site.yml` that is missing, empty,
 unparseable or unopenable -- the one question about something outside the
 archive, asked because this is what people run before a build and the build
 refuses all four; files the checker cannot read at all, posts
@@ -384,7 +384,12 @@ which is usually one series and a typo; one old address claimed by
 two posts, where whichever renders last wins and the others' readers land
 on it; and two posts that would be served at one address, which the build
 refuses to run on at all -- so an archive in that state used to be called
-sound by the one tool whose job is to say otherwise; and a `redirect_from`
+sound by the one tool whose job is to say otherwise; a post that looks like
+a copy of another -- `x-2` beside `x` in the same year with the same title,
+moment and words, which is what importing an export back into an archive
+that already held it leaves behind, each copy under an address of its own
+so that nothing else here objects, and asked narrowly because a slug that
+ends in a number beside the same slug without one is ordinary; and a `redirect_from`
 the build will refuse to serve, which it says once in the middle of a build
 log and which the checker used to count among the addresses this site
 answers at, so a link into one passed as sound.

@@ -664,7 +664,9 @@ deliveries carrying the same one are the same send arriving twice --
 which is what a connection that breaks after the bytes have gone but
 before the answer comes back produces, and both the shortcut and the
 Termux script retry. The second delivery updates the post the first one
-wrote instead of founding another beside it. Pressing send again is not
+wrote instead of founding another beside it -- and that holds when the
+retry arrives while the first is still being written, because writes
+carrying a receipt take turns. Pressing send again is not
 that: the page mints a fresh receipt each time, so a second send is a
 second post. A delivery carrying no receipt at all -- anything
 hand-rolled -- has nothing to be recognised by, and a repeat of one is
@@ -1254,6 +1256,15 @@ What it looks for, each with a line saying what to do about it:
 - **Two posts that would be served at one address.** The build refuses to
   run at all in this state, so this is the one finding that stands between
   you and a site that cannot be rebuilt.
+- **A post that looks like a copy of another** -- `x-2` beside `x` in the
+  same year, with the same title, the same moment and the same words. That
+  is what importing an export back into an archive that already held it
+  leaves behind: every hand-written post a second time, each under its own
+  address, so nothing else here would object. A warning, not an error, and
+  deliberately narrow -- a slug that ends in a number beside the same slug
+  without one is ordinary (an importer that keeps the source's post id in
+  the slug makes exactly that), so all four have to agree before it says
+  anything. Delete the numbered copy; the original keeps its address.
 - **A `redirect_from` the build will not serve** -- one whose first segment
   belongs to the site itself (`/tag/...`, `/posts/...`), or whose shape no
   directory can be made of. The build says so once, in the middle of a log
