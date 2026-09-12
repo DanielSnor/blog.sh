@@ -1620,6 +1620,25 @@ def report_added(path, warnings, json:, publish: false)
   deployed, rebuild_warnings = quietly(json) { rebuild_and_deploy(t('cli.generating_preview')) }
   warnings += rebuild_warnings
 
+  # A delivery that arrives a second time after the post was published
+  # comes back pointing at that post: PostWriter hands the published file
+  # over untouched rather than rewriting it into a draft. The draft answer
+  # below cannot describe it. Its url is built from a draft token the post
+  # no longer has -- "/draft//z-telefonu/", a link to nowhere -- and the
+  # phone showed exactly that, under state "published", as if the retry had
+  # put something new on the site.
+  unless PostAddress.draft?(post)
+    if json
+      puts JSON.pretty_generate(post_answer(path, warnings))
+    else
+      puts t('cli.already_published', slug: post['slug'],
+                                      url: published_url(post['slug'], post_time!(post).year,
+                                                         page: PostAddress.page?(post)))
+      puts
+    end
+    return
+  end
+
   unless json
     puts t('cli.wrote_draft', path: path)
     # ⚠️ Only where there is a page at that address. The wizard prints

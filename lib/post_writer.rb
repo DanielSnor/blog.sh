@@ -69,13 +69,17 @@ module PostWriter
     # the first, which is this very process: a write that nested inside
     # another would wait for itself, silently and for ever. Nothing nests
     # today; this is so that nothing can.
-    return yield if @receipt_lock_held
+    #
+    # On the THREAD, not on the class. flock is held by the file, and a
+    # second thread of this process opening it gets a lock of its own --
+    # so a class-level flag says "already held" to a thread that holds
+    # nothing and waves it straight past the lock. Nothing today writes
+    # from a thread (the preview server only serves files), which is why
+    # this is written down rather than measured in the wild; but a flag
+    # that is meant to make nesting safe must not make sharing unsafe.
+    return yield if Thread.current[:blog_sh_receipt_lock]
 
-    file = begin
-      File.open(RECEIPT_LOCK, File::RDWR | File::CREAT, 0o644)
-    rescue SystemCallError
-      nil
-    end
+    file = open_receipt_lock
     return yield if file.nil?
 
     begin
@@ -86,15 +90,46 @@ module PostWriter
     end
 
     begin
-      @receipt_lock_held = true
+      Thread.current[:blog_sh_receipt_lock] = true
       @index = nil
       @receipts = nil
       yield
     ensure
-      @receipt_lock_held = false
+      Thread.current[:blog_sh_receipt_lock] = false
       file.flock(File::LOCK_UN)
       file.close
     end
+  end
+
+  # The same shape RunLock arrived at, for the same reason it did.
+  #
+  # 0644 and RDWR were two ways to lose the lock in silence. flock needs no
+  # write permission at all, but File::RDWR demands one -- so a lock file
+  # left behind by a run under another user (cron as root is the ordinary
+  # case) answers EACCES, the old code turned that into nil, and the ONLY
+  # protection 1.8 added for concurrent deliveries switched itself off
+  # without a word. Worse, it stayed off: the file survives, so every run
+  # after it is unprotected too.
+  #
+  # 0666 so the next user can open it, a read-only handle when the mode
+  # still says no, and a LOUD line when even that fails. Running unlocked
+  # is the compatible floor; doing it quietly is how two deliveries end up
+  # as two posts with nobody told why.
+  def self.open_receipt_lock
+    File.open(RECEIPT_LOCK, File::CREAT | File::RDWR, 0o666)
+  rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
+    begin
+      File.open(RECEIPT_LOCK, File::RDONLY)
+    rescue SystemCallError => e
+      unlocked_warning(e)
+    end
+  rescue SystemCallError => e
+    unlocked_warning(e)
+  end
+
+  def self.unlocked_warning(error)
+    warn("⚠️  Cannot use the delivery lock at #{RECEIPT_LOCK} (#{error.class}) -- running without it.")
+    nil
   end
 
   def self.write_unlocked(post, media_files: {})
@@ -113,7 +148,32 @@ module PostWriter
     # The existing slug is kept on purpose: the URL is published, links and
     # announcement toots point at it, and a re-import must never move it
     # just because a title was edited at the source.
-    existing_path = find_by_source(post['source']) || find_by_receipt(post['receipt'])
+    # A receipt is not a source, and what follows must not treat it like
+    # one. update_matched is written for a RE-IMPORT, where the source is
+    # the authority and its state wins -- said in its own comment. A
+    # delivery that arrives a second time is the opposite case: it is an
+    # older copy of something this machine may have moved on from, and it
+    # cannot know what happened after it was sent.
+    #
+    # Measured before this guard existed: deliver, publish, then let the
+    # retry land -- the post went back to draft, lost the date publishing
+    # had stamped it with and the address it was announced under, got a
+    # fresh draft token, and the deploy put all of that on the live site.
+    # The phone was answered ok:true with a draft URL. The window is the
+    # one receipts exist for: the answer is lost on the way back, the page
+    # asks again, offers Publish, somebody taps it -- and only then does
+    # the retry the shortcut is still holding arrive.
+    #
+    # So a receipt that matches a post which is already OUT is a delivery
+    # that has nothing left to do. Its path is handed back unchanged: the
+    # caller answers the phone with the published post, and nothing is
+    # written, versioned or deployed.
+    existing_path = find_by_source(post['source'])
+    if existing_path.nil? && (by_receipt = find_by_receipt(post['receipt']))
+      return by_receipt if published?(by_receipt)
+
+      existing_path = by_receipt
+    end
     if existing_path
       post = post.merge('slug' => File.basename(existing_path, '.json'))
       return update_matched(existing_path, post, year, media_files)
@@ -158,6 +218,10 @@ module PostWriter
     end
 
     media_files = reconcile_media_names(post, previous, year, slug, media_files)
+    # Named here rather than inside copy_media, because the rescue below
+    # has to know which directory this write was filling even when it
+    # never got to copy a byte into it.
+    media_dir = File.join(MEDIA_DIR, year, slug)
     copy_media(media_files, year, slug)
     sync_media_dimensions(post, year, slug, previous: previous)
 
@@ -175,13 +239,29 @@ module PostWriter
     # onto a serial nobody asked for. Exception, not StandardError: Ctrl-C
     # in the middle of the media copy is not a StandardError, and it left
     # exactly the orphan this rescue promises never to leave. And the
-    # media directory the copy had begun goes too, when it is empty --
-    # compose_post takes a directory that exists for a name that is taken.
+    # media directory the copy had begun goes too -- compose_post takes a
+    # directory that exists for a name that is taken.
+    #
+    # The whole directory, not only an empty one. Emptiness was the wrong
+    # question: a delivery of two photos whose second source vanished
+    # between them (a full disk, Ctrl-C, a damaged JPEG -- the copy can
+    # stop anywhere) left the first photo sitting there, and a non-empty
+    # directory survived this clean-up. claim_slug then counted the name
+    # as taken, so the retry -- which a phone makes BY ITSELF -- landed on
+    # z-telefonu-2, an address nobody chose and which is painful to
+    # correct once it is public, while z-telefonu stood free and the first
+    # photo stayed behind for good.
+    #
+    # Taking the whole directory is safe precisely BECAUSE the name was
+    # claimed: claim_slug refuses a candidate whose media directory holds
+    # any visible file (that is an orphan, and inheriting a stranger's
+    # pictures is its own bug), so at the moment this write took the name
+    # there was nothing in there to lose -- at most a .part from a run
+    # that was killed mid-copy. Everything else under it, this write put
+    # there. Without the claim the directory belongs to a post that
+    # already exists, and then nothing here touches it.
     File.delete(path) if claimed && path && File.exist?(path)
-    if claimed && slug
-      dir_started = File.join(MEDIA_DIR, year, slug)
-      Dir.rmdir(dir_started) if Dir.exist?(dir_started) && Dir.empty?(dir_started)
-    end
+    FileUtils.rm_rf(media_dir) if claimed && media_dir
     raise
   end
 
@@ -1203,6 +1283,15 @@ module PostWriter
 
     path = receipts[id]
     path if path && File.exist?(path)
+  end
+
+  # Whether the post at this path has already been published. Read off the
+  # file rather than kept in the receipts map: the map is built once per
+  # run, and publishing happens between runs.
+  def self.published?(path)
+    JSON.parse(File.read(path, encoding: 'utf-8'))['state'].to_s == 'published'
+  rescue StandardError
+    false
   end
 
   # Settles the name AND takes it, in one step that cannot be interleaved.

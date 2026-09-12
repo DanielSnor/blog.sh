@@ -668,7 +668,13 @@ before the answer comes back produces, and both the shortcut and the
 Termux script retry. The second delivery updates the post the first one
 wrote instead of founding another beside it -- and that holds when the
 retry arrives while the first is still being written, because writes
-carrying a receipt take turns. Pressing send again is not
+carrying a receipt take turns. Once the post is **published**, a late
+retry stops updating anything at all: it is answered with the published
+post, at its public address, and the file is left exactly as it stands.
+The copy the phone is still holding was made before publishing happened
+and cannot know about it, so letting it write would put the post back to
+draft -- with a new address, a new date and the announcement pointing at
+nothing. Pressing send again is not
 that: the page mints a fresh receipt each time, so a second send is a
 second post. A delivery carrying no receipt at all -- anything
 hand-rolled -- has nothing to be recognised by, and a repeat of one is
