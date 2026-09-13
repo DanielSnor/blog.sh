@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'cgi'
+require 'digest'
 require 'json'
 require 'fileutils'
 require_relative 'entity_text'
@@ -35,7 +36,18 @@ require_relative 'path_glob'
 #   false; the layout is the promise.
 #
 #   Nothing happens twice. A second run over a repaired archive proposes
-#   nothing, because the finding it would have proposed for is gone.
+#   nothing, because the finding it would have proposed for is gone -- with
+#   one honest exception, said out loud when it happens: text an import
+#   escaped more than once (Twitter does) comes back from one decoding
+#   still carrying entities, and the next run offers the next layer as its
+#   own decision. Decoding until nothing is left would have taken an
+#   entity somebody typed on purpose all the way down in one keypress.
+#
+#   And nothing is written over a post that changed after it was looked
+#   at. A pass through a hundred findings is a conversation that lasts
+#   minutes; a post edited meanwhile -- in another window, from a phone --
+#   is refused with a sentence, not repaired on the strength of a scan it
+#   no longer matches.
 module Repair
   # A repair, as data rather than a closure: it can be printed, counted,
   # tested and applied by something other than whoever proposed it.
@@ -48,6 +60,13 @@ module Repair
   RESERVED = PostAddress::REDIRECT_RESERVED
 
   module_function
+
+  # A sentence about the last apply! beyond yes or no, as a locale key and
+  # its values -- nil when there is nothing more to say. Kept as data so
+  # the terminal decides how it looks, as it does for everything else here.
+  def last_note
+    @last_note
+  end
 
   # A slug names a post only if it names exactly one. It is unique within a
   # year, not across the archive -- sean.cz carries two pairs that repeat
@@ -180,8 +199,20 @@ module Repair
       # decision the reader is being asked for is whether those entities
       # were meant literally -- which is why this is offered one post at a
       # time rather than swept.
+      #
+      # ...and why the offer now carries what it will change and a record
+      # of what it looked at. One post at a time is still all-or-nothing
+      # INSIDE the post: an entity left by an import and one written on
+      # purpose are offered as one decision, so the reader is shown how
+      # many places change and the first of them. And the record lets the
+      # write refuse a post that is no longer the one on screen.
+      post = entity_post(idx, data)
+      fields = post ? entity_fields(post) : []
+      before, after = fields.first ? [fields.first.last, EntityText.decode(fields.first.last, []).first] : ['', '']
       Proposal.new(action: :decode_entities,
-                   data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s })
+                   data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s,
+                           'count' => fields.size, 'seen' => fingerprint(fields),
+                           'before' => snippet(before), 'after' => snippet(after) })
     when :media_orphan
       Proposal.new(action: :trash, data: { 'path' => File.join('media.nosync', data['dir'].to_s) })
     when :media_stray
@@ -277,6 +308,7 @@ module Repair
   # session that was about to fix ninety others -- and the caller counts a
   # false, so nothing is passed over in silence either.
   def apply!(proposal, root)
+    @last_note = nil
     apply_one(proposal, root)
   rescue StandardError => e
     warn "repair failed (#{proposal.action}): #{e.message}"
@@ -303,6 +335,16 @@ module Repair
     return false unless File.exist?(path)
 
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
+    # The post has to be the one the offer was made about. Decoding
+    # whatever the file holds now wrote over text the finding was never
+    # about: a paragraph added meanwhile, explaining that in HTML an
+    # ampersand is written &amp;, lost its point and the run counted it as
+    # applied. A proposal without a record (an older --json dump) is taken
+    # as it always was.
+    if data.key?('seen') && fingerprint(entity_fields(post)) != data['seen']
+      @last_note = ['check.repair_decode_changed', {}]
+      return false
+    end
     changed = false
     Array(post['content']).each do |block|
       next unless block.is_a?(Hash)
@@ -341,9 +383,53 @@ module Repair
     return false unless keep_version(path, root)
 
     AtomicWrite.write_json(path, post)
+    # One layer, and said so when another is left: the finding for this
+    # post will not be gone, and without this the next run reads as a new
+    # defect rather than the rest of the same one.
+    left = entity_fields(post)
+    unless left.empty?
+      found = left.map { |_, text| text[EntityText::ANY_ENTITY] }.compact.uniq.first(3).join(' ')
+      @last_note = ['check.repair_decode_another_layer', { entities: found }]
+    end
     true
   rescue StandardError
     false
+  end
+
+  # Every place in a post that carries an entity, in a fixed order, as
+  # [where, text] -- the same places check_html_entities looks at and
+  # decode_entities writes: a text block's text, a link card's title and
+  # description, the post's title.
+  def entity_fields(post)
+    fields = []
+    Array(post['content']).each_with_index do |block, i|
+      next unless block.is_a?(Hash)
+
+      fields << ["#{i}.text", block['text'].to_s] if block['type'] == 'text' && EntityText.entities?(block['text'])
+      next unless block['type'] == 'link'
+
+      %w[title description].each do |key|
+        fields << ["#{i}.#{key}", block[key].to_s] if EntityText.entities?(block[key])
+      end
+    end
+    fields << ['title', post['title'].to_s] if EntityText.entities?(post['title'])
+    fields
+  end
+
+  def fingerprint(fields)
+    Digest::SHA256.hexdigest(JSON.generate(fields))
+  end
+
+  def snippet(text)
+    flat = text.to_s.gsub(/\s+/, ' ').strip
+    flat.length > 60 ? "#{flat[0, 59]}…" : flat
+  end
+
+  # The post a post_entities finding is about, as the scan read it. By
+  # year as well as slug: a slug is unique within a year, not across the
+  # archive.
+  def entity_post(idx, data)
+    Array(idx['by_slug'][data['slug'].to_s]).find { |post| post['__year'].to_s == data['year'].to_s }
   end
 
   def post_file(root, year, slug)

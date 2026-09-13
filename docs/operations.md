@@ -1347,14 +1347,22 @@ post references is moved to the trash the engine already uses --
 back; the repair pass never deletes anything. A file whose name differs
 from the one on disk only in letter case or unicode form is not a leftover
 at all: the pass offers to write the name the directory actually uses into
-the post, and never touches the file.
+the post, and never touches the file. Text carrying HTML entities is
+decoded one post at a time, and the offer says how many places in that post
+change and shows the first -- it is one decision for the whole post, so a
+post with an imported `&amp;` and a deliberate one is worth a look first. A
+post that changed after it was checked (edited in another window, or from
+the phone) is refused with a sentence rather than decoded on the strength
+of a scan it no longer matches.
 
 Where the right answer is a matter of judgement -- two posts claiming one
 old address, an image the author has to look at, a link to something this
 archive never had, a slug two posts share across two years, or a target
 that is still a draft -- it says so and passes over. A second run proposes
-nothing, because the findings it repaired are gone; run `./blog.sh rebuild`
-afterwards to put the changes on the site.
+nothing, because the findings it repaired are gone -- except for text an
+import escaped more than once, which comes off one layer per decision; the
+run says so when a layer is left, and the next one offers it. Run
+`./blog.sh rebuild` afterwards to put the changes on the site.
 
 The screen shows at most twenty findings of a kind and totals the rest in
 a "...and N more" line, which is right for reading and useless for acting
