@@ -387,7 +387,23 @@ module Output
       return
     end
 
-    FileUtils.cp(src, dest) unless File.identical?(src, dest)
+    unless File.identical?(src, dest)
+      FileUtils.cp(src, dest)
+      # The copy carries the original's timestamp. emit_copy decides a copy
+      # is current when size AND mtime are equal, and cp gives the copy the
+      # moment it was made -- so without this no copy was ever current, and
+      # an installation that cannot hardlink copied every picture again on
+      # every build, the whole media archive, for nothing. (The comparison
+      # was `>=` until 1.8, which hid this and let a picture restored from a
+      # backup, with its older timestamp, never reach the site.) Equal
+      # times make both right: an untouched picture is skipped, and one
+      # whose original changed in either direction is copied.
+      begin
+        File.utime(File.atime(src), File.mtime(src), dest)
+      rescue SystemCallError
+        nil
+      end
+    end
   rescue ArgumentError, SystemCallError => e
     # One picture that cannot be placed is one picture missing from one page.
     # Saying so and carrying on is the proportionate answer; the alternative
