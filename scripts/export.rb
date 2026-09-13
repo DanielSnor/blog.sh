@@ -65,8 +65,10 @@ puts
 # Not empty and not asked twice: an export is a directory somebody will
 # hand to another engine, and mixing two of them produces a site that is
 # neither. Nothing is ever deleted here -- --force writes alongside what
-# is already there, which the message says out loud so nobody expects a
-# clean slate.
+# is already there, refreshes only the files an earlier export of this site
+# wrote, and leaves everything else as it found it, naming it at the end.
+# It used to promise "nothing is touched" while replacing a cloned site's
+# own _config.yml and any post whose file name happened to match.
 #
 # Dir.children rather than Dir.glob('*'): a glob without FNM_DOTMATCH does
 # not see entries that begin with a dot, so a directory holding nothing but
@@ -100,11 +102,20 @@ result = Exporter.run(root: ROOT, target: target, drafts: drafts,
 print("\r\e[K") if tty
 puts unless tty
 
+# Named before anything else, and before the "nothing to export" answer
+# below: an archive whose only posts all failed has written nothing, and
+# telling that person there was nothing to export would be the one wrong
+# sentence available.
+unless result.failed.empty?
+  names = result.failed.first(10).map { |file, reason| "\n   - #{file}: #{reason}" }.join
+  warn Tui.paint(I18n.t('export.failed', count: result.failed.size, files: names), :red)
+end
+
 written = result.posts + result.drafts + result.pages
 if written.zero?
-  puts I18n.t('export.no_posts')
+  puts I18n.t('export.no_posts') if result.failed.empty?
   puts
-  exit 0
+  exit(result.failed.empty? ? 0 : 1)
 end
 
 size = FileSize.human(result.bytes) || '0 B'
@@ -119,7 +130,17 @@ unless result.fallbacks.empty?
 end
 
 puts Tui.paint(I18n.t('export.collisions', count: result.collisions), :yellow) if result.collisions.positive?
+# Said because the directory is copied whole and a re-import brings home
+# what the blocks name: counted as exported, these would not come back.
+puts Tui.paint(I18n.t('export.unnamed', count: result.unnamed), :dim) if result.unnamed.positive?
+unless result.kept.empty?
+  puts Tui.paint(I18n.t('export.kept', count: result.kept.size, files: result.kept.first(5).join(', ')), :yellow)
+end
 
 puts
 puts Tui.paint(I18n.t('export.next_steps'), :dim)
 puts
+# A post that did not come out is a loss the exit code has to carry, as it
+# does for an import: a backup made by cron is only ever looked at through
+# its status.
+exit 1 unless result.failed.empty?

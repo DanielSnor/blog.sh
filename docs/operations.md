@@ -1022,7 +1022,17 @@ pages at the root, media copied under `assets/<year>/<slug>/`. Without a
 directory it writes to `tmp/export`. A directory that already has
 something in it is refused until you repeat the command with `--force`,
 which writes alongside what is there -- an export never deletes
-anything, at either end.
+anything, at either end. With `--force`, files an earlier export of this
+site wrote are refreshed in place; anything else -- a cloned site's own
+`_config.yml`, a post of somebody else's under the same file name, a
+different picture under the same path -- is left exactly as it is, the
+post of ours goes beside it under another name, and the summary lists what
+was left alone.
+
+A post that cannot be written -- a stray byte from an old import, a slug
+that is not one path segment -- is named at the end and the rest of the
+archive still comes out; the command then exits 1, so a backup made by
+cron is seen to be short.
 
 It reads only the archive on disk -- deliberately, so it works on an
 installation whose `env.sh` is gone or whose config no longer parses.
@@ -1035,7 +1045,12 @@ Three things are worth knowing before you rely on the result:
   image to everybody else's markdown parser. Every engine that passes
   HTML through renders them properly, and importing the tree back gives
   them again as blocks -- each carries its own definition in a comment
-  above it, which other engines ignore.
+  above it and a closing `<!-- /blogsh:block -->` line under it, both of
+  which other engines ignore. (Trees exported before 1.8 have no closing
+  line and are still read; an embed with a blank line inside it came home
+  from those with part of its markup as text.) It also says how many of
+  the media files copied no block names: they are in the tree, but an
+  import back brings home only what the posts refer to.
 - **`redirect_from` is written in the shape `jekyll-redirect-from`
   reads,** and it merges both kinds of old address -- where the post
   lived on the platform it came from, and where it lived here before a
@@ -1054,11 +1069,16 @@ Three things are worth knowing before you rely on the result:
   carries `{platform: manual}` and nothing else, and the engine refuses to
   match two of those on purpose: pairing them would overwrite one person's
   writing with another's. So each hand-written post is written AGAIN under
-  a serial slug, and `check` will not report it, because the copy has an
-  address of its own. On a blog whose posts are all hand-written that is
-  the whole archive, twice. The wizard says so before it asks for
-  confirmation when it recognises the tree as this site's own export, but
-  the rule is simpler than the warning: the target should be empty.
+  a serial slug. Every other rule in `check` lets the copy pass, because it
+  has an address of its own; only its "looks like a copy of another"
+  finding catches it, and only after the fact. On a blog whose posts are all hand-written that is
+  the whole archive, twice. The wizard recognises this site's own export by
+  its posts -- the `blogsh:` key every exported post carries, and slugs
+  this archive already has -- which works for exports made by any version,
+  and says so before it asks for confirmation. A tree of ours going into an
+  archive that already holds posts is also asked about outright, with no
+  as the default. But the rule is simpler than the warning: the target
+  should be empty.
 
 ## Reading the archive
 

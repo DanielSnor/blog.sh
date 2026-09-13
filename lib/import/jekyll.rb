@@ -7,6 +7,7 @@ require 'time'
 require 'yaml'
 # For the run's postscript below -- the other adapters that speak in the
 # summary require it the same way.
+require 'set'
 require_relative '../i18n'
 require_relative '../slug'
 require_relative '../path_glob'
@@ -90,6 +91,17 @@ module Import
       # Files the tree names but does not hold, keyed by path for the
       # two-pass reason again -- the postscript says how many.
       @missing_media = {}
+      # Slugs of the posts in this tree that carry `blogsh:` -- the mark
+      # every post ./blog.sh export writes has carried from the start --
+      # keyed by path for the two-pass reason.
+      @own_shaped = {}
+      # Posts whose front-matter date nothing could read, keyed by path.
+      @bad_dates = {}
+      # The archive as it stood BEFORE this import wrote anything. Taken
+      # here, once: the wizard's real run follows its preview in the same
+      # adapter, and a question asked afterwards would find the posts the
+      # run itself had just written and answer yes about every tree.
+      @archive_slugs = archive_slugs
     end
 
     # The directory this export lives in. Media#from_file refuses any path
@@ -119,6 +131,10 @@ module Import
       collisions = @slugs.count { |_, paths| paths.length > 1 }
       notes << I18n.t('import.note.ssg_slug_collisions', count: collisions) if collisions.positive?
       notes << I18n.t('import.note.ssg_author_dropped', count: @authored.length) unless @authored.empty?
+      unless @bad_dates.empty?
+        notes << I18n.t('import.note.ssg_bad_date', count: @bad_dates.length,
+                                                    files: @bad_dates.keys.map { |f| File.basename(f) }.first(5).join(', '))
+      end
       # First in the list rather than last: it is the only note that can
       # mean "do not answer yes to the next question".
       notes.unshift(I18n.t('import.note.ssg_same_site')) if exported_from_this_site?
@@ -144,19 +160,47 @@ module Import
     # The url is the strong signal; a title alone is only trusted when
     # neither side declares a url, because two unrelated blogs can share
     # one title far more easily than one address.
+    #
+    # 🪤 Asked of the POSTS since 1.8, not of _config.yml. The file was
+    # added to the export after v1.7 was tagged, so every export anybody
+    # already had -- and the backups people restore are, by their nature,
+    # the old ones -- declared nothing, the note never came, and the
+    # archive doubled. Pointing the wizard at _posts/ (which its own
+    # "wrong folder" message recommends) hid the file too. And a skeleton
+    # tree whose url was https://example.com was "this site's own export"
+    # to a fresh install whose url was the same placeholder.
+    #
+    # So two questions, both about what is actually in the tree: do its
+    # posts carry `blogsh:`, the mark every post ./blog.sh export has
+    # written from the start; and are those slugs ALREADY in this archive.
+    # The second is what the note is about -- a tree of ours going into an
+    # empty archive is the supported way to move a site, and says nothing.
     def exported_from_this_site?
-      names = own_export_names
-      return false if names.empty?
+      mine = @own_shaped.values.uniq
+      return false if mine.empty? || @archive_slugs.empty?
 
-      url = SiteConfig.get('site', 'base_url', default: '').to_s.strip.sub(%r{/+\z}, '')
-      title = SiteConfig.get('site', 'title', default: '').to_s.strip
-      return names.any? { |n| n.casecmp?(url) } unless url.empty?
-
-      !title.empty? && names.any? { |n| n.casecmp?(title) }
+      mine.any? { |slug| @archive_slugs.include?(slug) }
     rescue StandardError
-      # An unreadable configuration on either side costs the note and
-      # nothing else -- an import must not fail over a warning.
+      # An unreadable archive costs the note and nothing else -- an import
+      # must not fail over a warning.
       false
+    end
+
+    # Whether the wizard should ask before writing: a tree of ours going
+    # into an archive that already holds posts. Wider than the note above
+    # on purpose -- a slug renamed since the export, or an archive that
+    # holds some of the tree under other names, is exactly what the slug
+    # comparison cannot see, and one question is cheap next to an archive
+    # written twice.
+    def same_site?
+      @own_shaped.any? && !@archive_slugs.empty?
+    end
+
+    def archive_slugs
+      dir = PostWriter::CONTENT_DIR
+      PathGlob.under(dir, '*', '*.json').map { |path| File.basename(path, '.json') }.to_set
+    rescue StandardError
+      Set.new
     end
 
     # The tree's OWN url and title, read straight out of its
@@ -316,6 +360,7 @@ module Import
       date = item_date(meta, path)
       slug = slug_of(meta, path)
       @slugs[slug] |= [path]
+      @own_shaped[path] = slug if own_tree
       @authored |= [path] unless meta['author'].to_s.strip.empty?
       title = clean_title(meta['title'])
 
@@ -1249,7 +1294,15 @@ module Import
     #
     # Anybody else's HTML comments are untouched: the marker is specific,
     # and a tree that never came from here simply has none.
-    OWN_BLOCK_RE = /^<!-- blogsh:block (\{.*?\}) -->\n.*?(?=\n\n|\z)/m
+    #
+    # Since 1.8 the exporter closes the HTML with a line of its own
+    # (Exporter::BLOCK_END), and that is read first: the HTML may hold
+    # blank lines -- a third-party embed usually does -- and "to the blank
+    # line" stopped inside it, leaving the rest on the page as text; and a
+    # spacer, with no HTML under its comment, ran on through the NEXT
+    # paragraph and took it away. A tree written before 1.8 has no closing
+    # line and is read the old way, which is the best that shape allows.
+    OWN_BLOCK_RE = %r{^<!-- blogsh:block (\{.*?\}) -->\n(?:(?:(?!<!-- blogsh:block ).)*?<!-- /blogsh:block -->[ \t]*$|.*?(?=\n\n|\z))}m
     OWN_BLOCK_SENTINEL = %r{\A@@blogsh-block:([A-Za-z0-9+/=]+)@@\z}
 
     def own_blocks_to_sentinels(body)
@@ -1276,7 +1329,12 @@ module Import
     def own_block(packed, media)
       block = JSON.parse(packed.unpack1('m'))
       return nil unless block.is_a?(Hash)
-      return nil unless OWN_BLOCK_TYPES.include?(block['type'].to_s)
+      # A spacer -- an empty text block -- is the one other thing the
+      # exporter writes through this channel, and nothing more than that:
+      # an empty text cannot invent anything the markdown path would not
+      # produce, which is the reason the list above exists.
+      spacer = block['type'].to_s == 'text' && block['text'].to_s.strip.empty?
+      return nil unless OWN_BLOCK_TYPES.include?(block['type'].to_s) || spacer
 
       # ⚠️ What this does NOT close: `embed_html` is rendered raw by the
       # build (build/build_blog.rb, the video branch), so a crafted tree
@@ -1508,7 +1566,20 @@ module Import
     end
 
     def item_date(meta, path)
-      return Time.parse(meta['date'].to_s) if meta['date'] && !meta['date'].to_s.empty?
+      if meta['date'] && !meta['date'].to_s.empty?
+        begin
+          return Time.parse(meta['date'].to_s)
+        rescue ArgumentError
+          # A date nothing can read went straight to the file's own
+          # timestamp -- which for a tree just copied or unpacked is TODAY.
+          # The post moved years, from its place in the archive and every
+          # listing, and nothing said so: a MISSING date was handled better
+          # than a broken one, because that one at least tried the
+          # filename. It tries the filename now too, and either way the
+          # postscript names the post.
+          @bad_dates[path] = true
+        end
+      end
 
       if (m = File.basename(path).match(DATED_NAME))
         # Noon, not midnight: a date-only value read at UTC midnight can

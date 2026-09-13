@@ -743,6 +743,22 @@ def run_import(adapter)
     return
   end
 
+  # A tree this engine exported, going into an archive that already holds
+  # posts, is asked about outright, before the count. The note above says
+  # what happens; this is the one place it can still stop it. Default no:
+  # a wrong yes writes every hand-written post a second time under a
+  # serial slug, a wrong no costs a second run.
+  if adapter.respond_to?(:same_site?) && adapter.same_site?
+    puts
+    unless Tui.yes?(Tui.key_choice(t('import.same_site_prompt')))
+      puts
+      puts t('import.cancelled')
+      puts
+      @cancelled = true
+      return
+    end
+  end
+
   puts
   unless confirmed?(preview.written)
     puts
