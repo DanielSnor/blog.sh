@@ -1210,15 +1210,22 @@ What it looks for, each with a line saying what to do about it:
   "the archive is sound" and an exit code of 0. The parse error carries
   the line and column Psych knew about.
 - **A post file that will not read, a date nothing can parse, a post whose
-  text is not a list of blocks, a slug that is not one path segment
-  (a slash or a `..` in it), or a `type:` the engine does not know.** The
-  build refuses to run on the first four, or writes the page nowhere
-  good, so check says so first: without this it counted the archive minus
+  text is not a list of blocks, a slug or a draft token that is not one
+  path segment (a slash or a `..` in it), tags that are not a list, a
+  block whose pictures, poster, list items or formatting are not a list,
+  or a `type:` the engine does not know.** The build refuses to run on all
+  but the last, or writes the page nowhere good, so check says so first: without this it counted the archive minus
   the broken file and called the rest sound. The unknown type is stored
   on the post and read by nobody -- no listing, no menu entry, no icon --
   and the fix line points at the tag route, which is usually what
   somebody reaching for a ninth type wanted: a tag named in `nav:` has a
   listing, pagination, a menu entry and a feed.
+- **A post file the build never reads.** Posts are read from exactly
+  `content.nosync/posts/<folder>/<post>.json`; one lying directly in
+  `posts/` or a level deeper -- an rsync with the wrong trailing slash, an
+  export unpacked one folder too far in -- is in the archive and on no
+  page, and neither the build nor check used to say so. A warning, with
+  the path. Hidden files are left alone.
 - **A file a queue move stepped aside and a crash left parked.** The
   parking name is dotted precisely so no listing shows it -- which also
   means nothing would ever find one again without this. What to do with
@@ -1250,7 +1257,10 @@ What it looks for, each with a line saying what to do about it:
   own page is the point of it.
 - **Media directories no post owns** -- left by a deleted or renamed post,
   or an import that ran twice. Nothing links to them; they cost disk, not
-  correctness, which is why they are a warning.
+  correctness, which is why they are a warning. Names are compared the way
+  macOS and iCloud compare them, ignoring letter case and unicode form, so
+  a directory restored in another form is not called orphaned while the
+  post is reading its pictures from it.
 - **Files in a post's own media directory that the post no longer
   names** -- a source that dropped a picture leaves its file behind,
   because an import only ever adds. A warning too; dotfiles are left
@@ -1263,21 +1273,32 @@ What it looks for, each with a line saying what to do about it:
   and the other's readers land on it.
 - **Two posts that would be served at one address.** The build refuses to
   run at all in this state, so this is the one finding that stands between
-  you and a site that cannot be rebuilt.
+  you and a site that cannot be rebuilt. Two addresses that differ only in
+  letter case or in how an accent is encoded (`Praha` and `praha`) are
+  reported as well, as a warning: on a Linux server they are two, on macOS
+  and in iCloud they are one folder, and one of the posts is missing from
+  the site.
 - **A post that looks like a copy of another** -- `x-2` beside `x` in the
-  same year, with the same title, the same moment and the same words. That
+  same year, with the same title, the same moment and the same content
+  (text compared by its words, every other block -- a link, a quote, a
+  list, a picture -- compared whole). That
   is what importing an export back into an archive that already held it
   leaves behind: every hand-written post a second time, each under its own
   address, so nothing else here would object. A warning, not an error, and
   deliberately narrow -- a slug that ends in a number beside the same slug
   without one is ordinary (an importer that keeps the source's post id in
   the slug makes exactly that), so all four have to agree before it says
-  anything. Delete the numbered copy; the original keeps its address.
+  anything. Two link posts that open with the same line and point at
+  different articles are not copies, and are not reported. Delete the
+  numbered copy; the original keeps its address.
 - **A `redirect_from` the build will not serve** -- one whose first segment
   belongs to the site itself (`/tag/...`, `/posts/...`), or whose shape no
   directory can be made of. The build says so once, in the middle of a log
   nobody keeps, and the old address quietly 404s; worse, a link pointing at
-  it used to pass as sound.
+  it used to pass as sound. The same goes for an old address -- in
+  `redirect_from` or `former_slugs` -- that a live post or page now stands
+  at: the build serves the live one and skips the redirect in one line of
+  its log, so every link to the old address reaches the wrong post.
 
 - **Text carrying HTML entities instead of the characters they stand
   for.** `journalists &amp; writers` reads as `journalists &amp; writers`

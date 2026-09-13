@@ -358,15 +358,19 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Fifteen questions, in one pass: a `config/site.yml` that is missing, empty,
+Sixteen questions, in one pass: a `config/site.yml` that is missing, empty,
 unparseable or unopenable -- the one question about something outside the
 archive, asked because this is what people run before a build and the build
 refuses all four; files the checker cannot read at all, posts
-whose date nothing can parse, posts whose text is not a list of blocks, and
-posts whose slug is not one path segment -- all of them states the BUILD
+whose date nothing can parse, posts whose text is not a list of blocks or
+whose blocks carry a picture, a poster, list items or formatting that is not
+a list, tags that are not a list, and posts whose slug or draft token is not
+one path segment -- all of them states the BUILD
 refuses to run on (or, for the slug, misplaces the page for), so a check that stayed
 quiet about them was calling an archive sound that was about to stop the
-site; files a queue move stepped aside and a crash left parked, which no
+site; post files lying where the build never reads a post (directly in
+`posts/`, or a level too deep), which are in the archive and on no page;
+files a queue move stepped aside and a crash left parked, which no
 listing shows and whose repair depends on whether the post inside them is
 still in the archive anywhere else; media a post asks for and hasn't got
 -- or has in a shape no reader can use, or has under a spelling that is not
@@ -386,13 +390,22 @@ on it; and two posts that would be served at one address, which the build
 refuses to run on at all -- so an archive in that state used to be called
 sound by the one tool whose job is to say otherwise; a post that looks like
 a copy of another -- `x-2` beside `x` in the same year with the same title,
-moment and words, which is what importing an export back into an archive
+moment and content (every block, not only the text), which is what importing an export back into an archive
 that already held it leaves behind, each copy under an address of its own
 so that nothing else here objects, and asked narrowly because a slug that
 ends in a number beside the same slug without one is ordinary; and a `redirect_from`
 the build will refuse to serve, which it says once in the middle of a build
 log and which the checker used to count among the addresses this site
-answers at, so a link into one passed as sound.
+answers at, so a link into one passed as sound -- including an old address
+a live post has since taken.
+
+A question that raises is **one finding, not the end of the run**: every
+question is asked through a guard that turns an exception into an error
+naming the question and the exception, and the rest are still asked. One
+post whose `media` was an object once took the whole run down before it had
+reported anything -- and under `--json` left not even a document to parse.
+The finding is an error, so the exit code says so; it also names the
+exception, because this is also how a bug in the checker itself would show.
 
 Two rules shape the plain run. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value
