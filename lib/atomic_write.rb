@@ -71,9 +71,22 @@ module AtomicWrite
       File.chmod(mode, tmp) if mode
       File.rename(tmp, path)
       sync_dir(dir) if durable
-    rescue StandardError
+    rescue Exception => e # rubocop:disable Lint/RescueException -- a signal must not leave a .tmp behind either
+      # Exception, not StandardError, for the reason PostWriter's rescue
+      # gives: Ctrl-C is not a StandardError, and an interrupted save left
+      # a .<name>.tmp<pid>.<hex> lying in the archive next to the post --
+      # a file nothing ever collects, because the next run's temp carries
+      # a different random tail.
       File.delete(tmp) if File.exist?(tmp)
-      raise
+      raise unless e.is_a?(SystemCallError)
+
+      # Named by the file somebody was trying to write, not by the
+      # sibling temp. The temp is an implementation detail, it is deleted
+      # one line above, and an operator handed
+      # ".index.html.tmp18686.3cff2aa4" cannot find it, grep it, or fix
+      # its directory -- while the name that IS the problem, index.html,
+      # did not appear in the message at all.
+      raise e.class, path, e.backtrace
     end
 
     path

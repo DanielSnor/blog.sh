@@ -64,6 +64,8 @@ build:
   # does not hold. Every import that met a dead image host leaves some.
   media_missing: "⚠️  %{slug}: names a media file its folder does not hold -- %{filename}. The page still links it, so that address stays a 404 until the file arrives."
   name_not_ours: "⚠️  %{path} is a name another file already wears -- a link, or a symlink somebody left there. Writing it would reach that other file, so it was left alone and this page or picture is not on the site. Move whatever holds the name, or delete it, and build again."
+  unwritten_summary: "❌ Pages that could not be written: %{count}. The site is incomplete -- see the warnings above."
+  page_unwritable: "⚠️  %{path} could not be written (%{reason}). It is not on the site; the rest of the build carried on."
   media_unplaceable: "⚠️  %{path} could not be placed (%{reason}). The page still links it, so that address stays a 404 until it can be written."
   prune_failed: "⚠️  %{path} is no longer part of the site but could not be removed (%{reason}). It stays where it is, and the deploy will keep publishing it, until whatever holds it lets go."
   # Not an archive's doing at all: the cheat sheet ships with the engine.
@@ -638,6 +640,7 @@ cli:
   series_new_row: "a series that is not here yet..."
   series_prompt: "Name of the series: "
   series_part_prompt: "Which part is it (a number, or - to let the date decide): "
+  series_part_unreadable: "⚠️  Could not read %{value} as a part number, so it was not saved."
   series_part_needs_series: "A part number wants a series first -- pick one in the row above."
   tags_current: "Now: %{tags}"
   tags_known: "Most used here: %{tags}"

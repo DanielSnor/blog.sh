@@ -1284,8 +1284,16 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
   # and hero/toc are presence-based: only stored where they carry an
   # opinion of their own.
   post['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
-  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  part = Series.part_number(meta['series_part'])
   post['series_part'] = part if part
+  # Said out loud rather than swallowed. A number that could not be read
+  # used to vanish without a word, and the post then sat in the series
+  # wherever its date put it -- which is the one thing the author was
+  # writing the number to prevent. Not a refusal: the post itself is fine,
+  # and `add --json` carries what the save complained about back to the
+  # phone in `warnings` (stderr is folded into that list).
+  warn t('cli.series_part_unreadable', value: meta['series_part'].to_s.strip) if part.nil? &&
+                                                                                !meta['series_part'].to_s.strip.empty?
   # Both stored as typed. The template a new post opens with carries no
   # `hero:` line at all -- there is no post yet whose answer it could show
   # -- so a hero line in this header was written by hand, in whichever
@@ -3605,7 +3613,7 @@ def series_position(post, path)
   # it carries a number, and last when it does not -- publishing stamps an
   # untouched draft with that moment, so its date is not the date the page
   # will order it by. See the draft branch of series_note in the build.
-  if draft?(post) && Integer(post['series_part'], exception: false).nil?
+  if draft?(post) && Series.part_number(post['series_part']).nil?
     return [published.size + 1, published.size + 1]
   end
 
@@ -4835,8 +4843,10 @@ def edit_post(slug, path: nil)
   # address is derived at build time), and the part number is an override
   # for the rare post published out of order.
   updated['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
-  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  part = Series.part_number(meta['series_part'])
   updated['series_part'] = part if part
+  warn t('cli.series_part_unreadable', value: meta['series_part'].to_s.strip) if part.nil? &&
+                                                                                 !meta['series_part'].to_s.strip.empty?
   # Only stored when it disagrees with the engine's own judgement, so the
   # ordinary post carries no line about a table of contents it was never
   # going to have.

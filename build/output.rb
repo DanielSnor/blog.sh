@@ -21,6 +21,14 @@
 module Output
   module_function
 
+  # The errno values that mean "this volume does not do hardlinks", as
+  # opposed to "this file, this time". Built by name because not every
+  # platform defines every one of them.
+  VOLUME_CANNOT_LINK = %i[EXDEV EPERM EMLINK ENOSYS ENOTSUP EOPNOTSUPP]
+                       .filter_map { |name| Errno.const_get(name) if Errno.const_defined?(name) }
+                       .uniq.freeze
+
+
   def world_readable?(path, stat = nil)
     PublicFile.readable?(path, stat)
   end
@@ -166,9 +174,32 @@ module Output
     # archive: a rename replaces the name, it does not touch what the other
     # name still points at. PublicFile.claim above stays as the thing that
     # says so out loud rather than the only thing preventing it.
-    AtomicWrite.binwrite(path, bytes)
+    begin
+      AtomicWrite.binwrite(path, bytes)
+    rescue SystemCallError => e
+      # One page that cannot be written is one page missing, and the
+      # branch a few lines up already says so in its own comment: a file
+      # this build could not chmod used to kill it mid-loop -- no sitemap,
+      # no sidebar, no search index, no prune, exit 1, on a rebuild that
+      # had almost nothing to do. That was fixed where nothing is written
+      # and left standing where something is. The same answer as
+      # place_public gives a picture it cannot place: say which file and
+      # why, carry on, and count it so the end of the build can say how
+      # many there were.
+      warn t('build.page_unwritable', path: path, reason: e.message)
+      unwritten << path
+      return
+    end
     make_readable(path)
     BuildCache.record(path, digest)
+  end
+
+  # Pages this build could not write. Named at the end rather than only in
+  # passing: a warning in the middle of a thousand lines of output is a
+  # warning nobody sees, and a build that finishes with pages missing must
+  # not read as a build that finished.
+  def unwritten
+    @unwritten ||= []
   end
 
   # The same bargain as a post page, for the outputs made out of the whole
@@ -265,7 +296,17 @@ module Output
       same = if compare_content
                File.binread(dest) == File.binread(src)
              else
-               File.size(dest) == File.size(src) && File.mtime(dest) >= File.mtime(src)
+               # == and not >=. "The public copy is not older, so it is
+               # current" assumes the archive only ever moves forward, and
+               # a restore does not: rsync -a, tar -p, cp -p, Time Machine
+               # and a file carried back from another machine all bring the
+               # ORIGINAL mtime, which is older than the one cp gave the
+               # public copy. With the same length -- and --strip-location
+               # keeps the length deliberately, which is why mtime was
+               # brought into this comparison at all -- the new picture was
+               # skipped and the site kept serving the old one, with
+               # nothing anywhere to say so.
+               File.size(dest) == File.size(src) && File.mtime(dest) == File.mtime(src)
              end
       # ...and readable, for the reason emit gives. A chmod changes neither
       # size nor mtime -- it moves ctime, which nothing here was reading -- so
@@ -308,17 +349,36 @@ module Output
     # SystemCallError and was caught by nothing: the build died where it
     # stood, with the site half written, no prune and no cache saved.
     ours = PublicFile.claim(dest)
+    # Asked BEFORE the link is attempted. Linking onto a name that is not
+    # ours can only answer EEXIST -- the name is still there, because the
+    # unlink below is what ours gates -- and EEXIST used to be read as
+    # "this volume cannot do links", which turned one unclaimable address
+    # into a whole build's worth of copies.
+    if !ours && File.exist?(dest)
+      warn t('build.name_not_ours', path: dest)
+      return
+    end
+
     unless links_impossible?
       begin
         File.unlink(dest) if ours && File.exist?(dest)
         File.link(src, dest)
         return
-      rescue SystemCallError
-        # A volume that refuses the first link will refuse the rest: a
-        # separate mount for public.nosync (EXDEV), a source somebody else
-        # owns (EPERM), a filesystem with a link limit (EMLINK). Asking again
-        # per file would copy the whole archive on every build.
-        @links_impossible = true
+      rescue SystemCallError => e
+        # Two very different failures used to share this branch. A volume
+        # that refuses the FIRST link refuses every later one -- a separate
+        # mount for public.nosync (EXDEV), a source somebody else owns
+        # (EPERM), a filesystem with a link limit (EMLINK) -- and asking
+        # again per file would copy the whole archive on every build. But
+        # ENOENT (the source went away between the plan and the link, which
+        # a delivery running alongside can do) or EACCES in one directory
+        # says nothing about the volume, and treating it as if it did cost
+        # the second 1.8 GB this whole mechanism exists to save -- and
+        # opened the door to the size-and-mtime comparison above, which is
+        # the weaker of the two answers.
+        raise unless e.is_a?(SystemCallError)
+
+        @links_impossible = true if VOLUME_CANNOT_LINK.any? { |kind| e.is_a?(kind) }
       end
     end
 

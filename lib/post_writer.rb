@@ -1035,6 +1035,25 @@ module PostWriter
             "at that address (#{taken}) -- resolve the slug clash by hand"
     end
 
+    # What the archive looked like before this save touched it. The steps
+    # below move a post's pictures and its history into another year and
+    # only THEN write the post -- and until 1.8 nothing put them back when
+    # the write failed in between. Measured: a re-import whose date moved
+    # a post across a New Year, interrupted, left the post in 2025 with
+    # its pictures in 2026, so the next build served the page with the
+    # picture missing and the deploy put that on the live site. The [v]
+    # dialog went quiet at the same time, because the history had moved
+    # too. write_unlocked has had that clean-up all along (and catches
+    # Exception, because Ctrl-C in the middle is not a StandardError);
+    # this is the same promise for the path that moves more.
+    versions_before = PostVersions.list(slug, old_year, content_dir: CONTENT_DIR)
+    old_media = File.join(MEDIA_DIR, old_year, slug)
+    new_media = File.join(MEDIA_DIR, year, slug)
+    carried = Dir.exist?(old_media) ? Dir.children(old_media) : nil
+    moved_media = false
+    moved_versions = false
+    wrote = false
+
     PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
 
     # A re-import that moves where a post is served vacates the address it
@@ -1062,13 +1081,15 @@ module PostWriter
 
     if File.expand_path(new_path) != File.expand_path(existing_path)
       FileUtils.mkdir_p(new_dir)
-      move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
+      moved_media = true
+      move_media_dir(old_media, new_media)
       # The edit history is keyed by year/slug exactly like the media, and
       # owes the post the same journey -- left behind, the [v] dialog went
       # silent and the orphaned directory waited to be inherited by a
       # future post under the same year/slug.
       moved = PostVersions.move(slug, old_year, from_content_dir: CONTENT_DIR,
                                 to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
+      moved_versions = moved
       # Not worth refusing the save over -- the post and its pictures are
       # the thing being saved -- but not worth swallowing either. Silently,
       # all this looks like is a [v] dialog that has gone quiet, with
@@ -1086,10 +1107,67 @@ module PostWriter
     # a failure in between leaves the post twice (recoverable) rather than
     # not at all.
     AtomicWrite.write_json(new_path, post)
+    # Past this line the save has happened, and the rescue below keeps its
+    # hands off: if the delete that follows fails, the post stands in both
+    # years, which the ordering above chose ON PURPOSE as the recoverable
+    # half of that pair. Undoing the moves here would be undoing a save
+    # that went through.
+    wrote = true
     File.delete(existing_path) if File.expand_path(new_path) != File.expand_path(existing_path)
     index[source_key(post['source'])] = new_path if source_key(post['source'])
     receipts[post['receipt'].to_s] = new_path if PathSafety.hex_token?(post['receipt'].to_s)
     new_path
+  rescue Exception # rubocop:disable Lint/RescueException -- a signal must not leave the post and its pictures in different years
+    unless wrote
+      undo_move(slug: slug, old_year: old_year, year: year, carried: carried,
+                old_media: old_media, new_media: new_media,
+                moved_media: moved_media, moved_versions: moved_versions,
+                versions_before: versions_before)
+    end
+    raise
+  end
+
+  # Puts back what the interrupted half of update_matched moved.
+  #
+  # Best effort, and deliberately narrow about it: pictures that were in
+  # the old year go back to the old year, everything else this save put
+  # in the new directory goes away, and the version this save kept goes
+  # with it. What it does NOT try to undo is move_media_dir's merging
+  # branch -- a destination that already held a file of the same name has
+  # had it renamed aside, and guessing which `.displaced2` belonged to
+  # whom would be inventing history rather than restoring it. That branch
+  # is the rare one (an orphan already sitting under the new year), and a
+  # file moved aside is still a file the archive can see.
+  def self.undo_move(slug:, old_year:, year:, carried:, old_media:, new_media:,
+                     moved_media:, moved_versions:, versions_before:)
+    if moved_versions
+      PostVersions.move(slug, year, from_content_dir: CONTENT_DIR,
+                        to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), old_year, slug))
+    end
+    # The copy this save kept is a copy of a post nobody ended up
+    # changing, and the next save would skip keeping the real "before"
+    # because this one already matches it.
+    (PostVersions.list(slug, old_year, content_dir: CONTENT_DIR) - versions_before).each do |v|
+      File.delete(v)
+    rescue SystemCallError
+      nil
+    end
+
+    return unless moved_media && Dir.exist?(new_media)
+
+    Dir.children(new_media).each do |f|
+      next if carried.to_a.include?(f)
+
+      FileUtils.rm_rf(File.join(new_media, f))
+    end
+    if carried.nil?
+      FileUtils.rm_rf(new_media)
+    else
+      move_media_dir(new_media, old_media)
+    end
+  rescue StandardError
+    # The failure being cleaned up after is the one worth reporting.
+    nil
   end
 
   # Every draft carries a token, no matter which path wrote it. The

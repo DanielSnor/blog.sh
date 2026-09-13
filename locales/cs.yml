@@ -64,6 +64,8 @@ build:
   # zanechá.
   media_missing: "⚠️  %{slug}: jmenuje soubor médií, který ve své složce nemá — %{filename}. Stránka na něj pořád odkazuje, takže ta adresa bude 404, dokud soubor nedodáš."
   name_not_ours: "⚠️  %{path} je jméno, které už nosí jiný soubor — odkaz, nebo symlink, co tam někdo nechal. Zápis by dosáhl na ten druhý soubor, takže jsme na něj nesáhli a tahle stránka nebo fotka na webu není. Přesuň nebo smaž to, co jméno drží, a spusť build znovu."
+  unwritten_summary: "❌ Nezapsaných stránek: %{count}. Web je proto neúplný — podívej se na varování výš."
+  page_unwritable: "⚠️  Stránku %{path} se nepodařilo zapsat (%{reason}). Na webu proto není a ostatní stránky se staví dál."
   media_unplaceable: "⚠️  %{path} se nepodařilo umístit (%{reason}). Stránka na něj dál odkazuje, takže ta adresa zůstane 404, dokud zápis nepůjde."
   prune_failed: "⚠️  %{path} už na web nepatří, ale nešel odstranit (%{reason}). Zůstává, kde je, a deploy ho bude dál publikovat, dokud ho něco drží."
   # Tohle už není věc archivu: taháček chodí s enginem.
@@ -617,6 +619,7 @@ cli:
   series_new_row: "série, která tu ještě není…"
   series_prompt: "Jméno série: "
   series_part_prompt: "Kolikátý je to díl (číslo, nebo - ať rozhodne datum): "
+  series_part_unreadable: "⚠️  Číslo dílu %{value} jsem nepřečetl jako číslo, tak jsem ho nezapsal."
   series_part_needs_series: "Číslo dílu chce nejdřív sérii — vyber ji o řádek výš."
   tags_current: "Teď: %{tags}"
   tags_known: "Nejčastější tady: %{tags}"

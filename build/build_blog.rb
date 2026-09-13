@@ -1512,10 +1512,11 @@ def series_nav_html(slug, in_series, index, position, post = nil)
               # by -- a draft written in May and still sitting there when
               # part four goes out would be previewed third and published
               # fourth. A number is immune to that, because it decides the
-              # position whatever the date says. `Integer(..., exception:
-              # false)` is the same test series_in_order uses, so "numbered"
-              # means one thing in both places.
-              part = Integer(post['series_part'], exception: false)
+              # position whatever the date says. Series.part_number is the
+              # same test series_in_order uses, so "numbered" means one
+              # thing in both places -- including that 08 is eight and not
+              # an octal digit nobody wrote.
+              part = Series.part_number(post['series_part'])
               number = if part
                          Series.series_in_order(published + [post]).index { |p| p.equal?(post) } + 1
                        else
@@ -3705,6 +3706,10 @@ puts t('build.summary', posts: posts.size, pages: page_count, dir: PUBLIC_DIR, t
 # thing to look at: a zero here after an ordinary publish means the cache
 # was thrown away, and the reason is always a fingerprint that moved.
 puts t('build.reused', count: BuildCache.skipped) if BuildCache.skipped.positive?
+# A build that could not write some of its pages finished, but it did not
+# do what it was asked. The warnings for these went by hundreds of lines
+# ago; this is the line somebody actually reads.
+warn t('build.unwritten_summary', count: Output.unwritten.size) if Output.unwritten.any?
 puts t('build.full') if FULL_BUILD
 if drafts.any?
   puts

@@ -78,9 +78,28 @@ module Series
     [Time.parse(post['date'].to_s), post['slug'].to_s]
   end
 
+  # What part number a post claims, read the same way wherever it is asked.
+  #
+  # Base ten, said out loud. Integer("08") is OCTAL in Ruby, and eight is
+  # not an octal digit -- so a part written as 08 or 09 came back nil while
+  # 01 through 07 came back as themselves. With `exception: false` there
+  # was no error either, just a number that quietly was not there: the
+  # author numbered the parts 01..12 the way anyone numbers things, and the
+  # eighth and ninth dropped out of the numbering, taking the series into
+  # an order nobody asked for while every other part kept its label.
+  #
+  # A value that is already a number stays one (the archive stores an
+  # Integer; only what a person typed is a string), and Integer() refuses a
+  # base for anything but a string, so the two cases cannot be folded.
+  def part_number(value)
+    return value.to_i if value.is_a?(Numeric)
+
+    Integer(value.to_s.strip, 10, exception: false)
+  end
+
   def series_in_order(group)
     by_date = ->(post) { sort_key(post) }
-    claimed = group.group_by { |post| Integer(post['series_part'], exception: false) }
+    claimed = group.group_by { |post| part_number(post['series_part']) }
     ordered = (claimed.delete(nil) || []).sort_by(&by_date)
     # Ascending, so each insertion lands in a list whose earlier slots are
     # already filled -- part 5 has to count the post that part 2 put in
