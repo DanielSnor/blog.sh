@@ -22,7 +22,14 @@ module Feeds
     url = "#{SITE_BASE_URL}#{post_path(post)}"
     title = CGI.escapeHTML(post_title_for(post))
     pub_date = post_time(post).rfc2822
-    description = Blocks.render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}")
+    # lifted: like the post page and the card. The item's <title> already
+    # IS the link block's title (post_title_for takes it from there), so
+    # rendering the block whole printed that headline a second time, in
+    # bold, right under it -- in every feed item of every link post that
+    # has no title of its own. cards.rb records exactly this as fixed for
+    # the teaser; the feed was the caller that fix never reached.
+    description = Blocks.render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}",
+                                        lifted: link_title_block(post))
     # A post's rendered HTML goes into the feed inside CDATA, and CDATA has
     # exactly one way to end. A post carrying "]]>" -- which an imported
     # embed_html can, since it is stored verbatim -- closed the section

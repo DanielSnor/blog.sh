@@ -1533,6 +1533,14 @@ def series_nav_html(slug, in_series, index, position, post = nil)
 
   if position == :top
     label = t('post.series_part', name: h(SERIES_NAMES[slug].to_s), number: index + 1, total: in_series.size)
+    # A link only where the listing is written. A series whose name will
+    # not fit an address gets no page (Slug.pageable?, refused out loud
+    # further down), and every part still linked to it: a 404 in the head
+    # of each post, under a build warning that promised "everything else
+    # about the series works". Tags have had this other half all along --
+    # a tag with no page is a pill that is not a link.
+    return %(<p class="series-note">#{label}</p>\n                ) unless Slug.pageable?(slug)
+
     return %(<p class="series-note"><a href="/series/#{h(slug)}/">#{label}</a></p>\n                )
   end
 
@@ -1696,9 +1704,15 @@ end
 #
 # Mirrored rather than reversed. Reversing the list would have fixed the
 # paging by breaking the reading order; anchoring the fixed pages at the
-# FRONT -- where the parts that will never change again are -- keeps both,
-# and needs no new numbering and no new labels: page 1 is still the far
-# end of the walk and the landing page is still the flexible one.
+# FRONT -- where the parts that will never change again are -- keeps both.
+#
+# What that left wrong was where the series is ENTERED. The landing page
+# stayed the flexible one, as on a timeline, and for a series the flexible
+# slice is the far end of the book: from twenty parts on, /series/<slug>/
+# opened at the last parts with an "Older" button. So the slicing here is
+# unchanged, and the landing is decided in landing_page? instead -- page 1
+# for a series, the flexible page for a timeline -- with labels that speak
+# of parts rather than of time (pagination_html).
 def anchored_pages(posts, oldest_first: false)
   fixed = posts.length < 2 * PAGE_SIZE ? 0 : (posts.length / PAGE_SIZE) - 1
   flexible_length = posts.length - fixed * PAGE_SIZE
@@ -1719,8 +1733,15 @@ def anchored_pages(posts, oldest_first: false)
   [pages, fixed]
 end
 
-def page_url(number, fixed, base_path)
-  return base_path.empty? ? '/' : "#{base_path}/" if number > fixed
+# Which page of a listing lives at its base path. A timeline is entered
+# at its newest slice, the flexible one numbered past the fixed pages. A
+# series is entered at part one.
+def landing_page?(number, fixed, oldest_first: false)
+  oldest_first ? number == 1 : number > fixed
+end
+
+def page_url(number, fixed, base_path, oldest_first: false)
+  return base_path.empty? ? '/' : "#{base_path}/" if landing_page?(number, fixed, oldest_first: oldest_first)
 
   "#{base_path}/page/#{number}/"
 end
@@ -1728,8 +1749,19 @@ end
 # No "x / total" counter: the total changes whenever a new page is created,
 # which would put a differing byte on every single page again -- the very
 # churn the oldest-anchored slicing above exists to avoid.
-def pagination_html(number, fixed, base_path = '')
+def pagination_html(number, fixed, base_path = '', oldest_first: false)
   return '' if fixed.zero?
+
+  # A series reads forwards. Its pages are numbered in reading order, the
+  # first one is the entrance, and the links say "next parts" and
+  # "previous parts" -- "older" and "newer" measure time, and in a series
+  # the reader is not asking when a part was written but which comes next.
+  if oldest_first
+    last = fixed + 1
+    back = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path, oldest_first: true)}">#{h(t('pagination.series_previous'))}</a>) : ''
+    on = number < last ? %(<a href="#{page_url(number + 1, fixed, base_path, oldest_first: true)}">#{h(t('pagination.series_next'))}</a>) : ''
+    return %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{back}<span>#{h(t('pagination.page', number: number))}</span>#{on}</nav>)
+  end
 
   newer = number <= fixed ? %(<a href="#{page_url(number + 1, fixed, base_path)}">#{h(t('pagination.newer'))}</a>) : ''
   older = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path)}">#{h(t('pagination.older'))}</a>) : ''
@@ -2068,7 +2100,16 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   oldest_first: false)
   pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
-    out_dir = number > fixed ? out_root : File.join(out_root, 'page', number.to_s)
+    # The landing page is the newest slice for a timeline and part one for
+    # a series. It used to be the flexible slice for both, which for a
+    # series is the far end of the book: from twenty parts on, the "Part 1
+    # of 30" link every post carries opened parts 21 to 30 with an "Older"
+    # button, while this listing exists "because a series is meant to be
+    # read from the start". Nothing on a fixed page moves either way --
+    # a new part lands on the last page, which is now at the end of the
+    # reading order as well as the numbering.
+    landing = landing_page?(number, fixed, oldest_first: oldest_first)
+    out_dir = landing ? out_root : File.join(out_root, 'page', number.to_s)
     dest = File.join(out_dir, 'index.html')
     # A listing page is its slice of posts and the labels around it, and
     # nothing else. Anchored pagination is what makes this worth doing: a
@@ -2105,9 +2146,9 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     else
       list_html = page_posts.map { |post| Cards.render_list_item(post) }.join("\n")
     end
-    pagination = pagination_html(number, fixed, base_path)
+    pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first)
     # Without this distinction, every listing page would share one identical <title>.
-    page_title = number > fixed ? title : "#{title} – #{t('pagination.page', number: number)}"
+    page_title = landing ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
                                         icon: heading_icon, value_href: heading_href)
     # Tags, series and content types all name themselves; the landing page is
@@ -2132,11 +2173,11 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     BuildCache.remember_page(dest, key)
     Output.emit(dest,
          layout(main_html, title: page_title, description: description,
-                           path: page_url(number, fixed, base_path),
+                           path: page_url(number, fixed, base_path, oldest_first: oldest_first),
                            # The landing page of a listing is the highest number and
                            # lives at the base path; everything below it is a
                            # continuation. See layout for why both are named.
-                           body_class: number > fixed ? 'page-first' : 'page-cont',
+                           body_class: landing ? 'page-first' : 'page-cont',
                            # So a reader who wants only this subject can be handed it by
                            # their feed reader, which looks for exactly this link.
                            extra_head: feed_path ? %(\n  <link rel="alternate" type="application/rss+xml" title="#{h(page_title)}" href="#{h(feed_path)}">) : '',
@@ -2224,7 +2265,7 @@ Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
                         fonts: SiteConfig.get('fonts', default: {}),
                         fonts_dir: File.join(ROOT, 'assets', 'fonts')))
 ico = build_favicon_ico
-Output.emit(File.join(PUBLIC_DIR, 'favicon.ico'), ico) if ico
+Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:favicon]), ico) if ico
 
 post_template = ERB.new(File.read(File.join(ROOT, 'templates', 'post.html.erb'), encoding: 'utf-8'))
 index_template = ERB.new(File.read(File.join(ROOT, 'templates', 'index.html.erb'), encoding: 'utf-8'))
@@ -3437,10 +3478,10 @@ end
 searchable = pages + posts
 recent_searchable = searchable.first(SEARCH_INDEX_RECENT_LIMIT)
 archive_searchable = searchable.drop(SEARCH_INDEX_RECENT_LIMIT)
-Output.cached_emit(File.join(PUBLIC_DIR, 'search-index.json'), Output.posts_digest(recent_searchable)) do
+Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:search_index]), Output.posts_digest(recent_searchable)) do
   recent_searchable.map { |post| search_index_entry(post) }.to_json
 end
-Output.cached_emit(File.join(PUBLIC_DIR, 'search-index-archive.json'), Output.posts_digest(archive_searchable)) do
+Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:search_index_archive]), Output.posts_digest(archive_searchable)) do
   archive_searchable.map { |post| search_index_entry(post) }.to_json
 end
 
@@ -3485,7 +3526,7 @@ NOT_FOUND_SIGN =
   %(<line x1="46" y1="98" x2="74" y2="98"/>) +
   %(</svg>)
 
-Output.emit(File.join(PUBLIC_DIR, '404.html'),
+Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:not_found]),
      layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
             %(        #{NOT_FOUND_SIGN}\n) +
             %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
@@ -3525,7 +3566,7 @@ Sidebar.write_all(PUBLIC_DIR).each_key { |name| WRITTEN[File.join(PUBLIC_DIR, na
 # the build just registers the file so prune doesn't delete it, and creates
 # an empty one if it doesn't exist yet. Fetching it on every build would mean
 # two Mastodon requests per tooted post.
-STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
+STATS_PATH = File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:stats])
 # Written directly rather than through emit, because cron owns the contents
 # and the build only guarantees the file exists -- but it is served to the
 # same browsers as everything else, so it needs the same permissions. It was
@@ -3555,20 +3596,20 @@ WRITTEN[STATS_PATH] = true
 # not exist yet means the cron has not run, and inventing an empty one
 # would tell the page there is nothing to show rather than nothing to
 # read.
-COMMENTS_PATH = File.join(PUBLIC_DIR, 'comments.json')
+COMMENTS_PATH = File.join(PUBLIC_DIR, PostAddress::CRON_FILES[:comments])
 WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
 
 # Only the newest RSS_ITEM_LIMIT posts reach the feed, and its stated
 # <lastBuildDate> is the newest post's own date rather than the clock --
 # so a post dated 2003 changes nothing here, and the feed is not rewritten
 # for readers who would have been handed the same bytes.
-Output.cached_emit(File.join(PUBLIC_DIR, 'rss.xml'), Output.posts_digest(posts.first(RSS_ITEM_LIMIT))) do
+Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:feed]), Output.posts_digest(posts.first(RSS_ITEM_LIMIT))) do
   Feeds.render_rss(posts)
 end
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-Output.cached_emit(File.join(PUBLIC_DIR, 'sitemap.xml'),
+Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:sitemap]),
             Digest::SHA256.hexdigest([Output.posts_digest(posts + pages),
                                       tags_map.keys.join(','),
                                       PRESENT_TYPES.join(',')].join('|'))) do
@@ -3606,7 +3647,7 @@ def robots_txt
   "#{lines.join("\n")}\n"
 end
 
-Output.emit(File.join(PUBLIC_DIR, 'robots.txt'), robots_txt)
+Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:robots]), robots_txt)
 
 # An imported post keeps answering at the addresses its previous platform
 # gave it: redirect_from is a list of site-root paths ("/bitwarden/",

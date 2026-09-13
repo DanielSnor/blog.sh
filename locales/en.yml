@@ -100,6 +100,8 @@ post:
   draft_banner_notice: "Not visible anywhere on the blog and can't be reached except through this URL:"
 
 pagination:
+  series_previous: "← Previous parts"
+  series_next: "Next parts →"
   nav_label: "Pages"
   newer: "← Newer"
   older: "Older →"

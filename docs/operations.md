@@ -67,7 +67,14 @@ already carries, so each can be read as well as changed:
 - **`series: Name`** files the post into a series. A series with two or
   more published parts gets a listing of its own at `/series/<slug>/` --
   a series of one is just a post, and the listing appears when the
-  second part does. The build puts "Part 2 of 5"
+  second part does. The listing reads from part one: a long series is
+  paged in reading order, `/series/<slug>/` holds the first parts and
+  `/series/<slug>/page/2/`, `/page/3/`… the ones after, so the "Part 1 of
+  30" link on every post opens where the series starts. (Up to 1.7 a
+  series of twenty parts or more opened at its last page instead, and its
+  `/page/N/` addresses held other parts than they do now.) A series whose
+  name is too long to fit an address gets no listing; its parts still say
+  which part they are, without a link. The build puts "Part 2 of 5"
   on each post in it, with the way to the part before and the part after
   -- within the series only, since a post's chronological neighbours
   across a whole archive are rarely what a reader wants next. Parts are

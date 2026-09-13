@@ -101,6 +101,8 @@ post:
   draft_banner_notice: "Nirgendwo im Blog sichtbar und nur über diese URL erreichbar:"
 
 pagination:
+  series_previous: "← Vorherige Teile"
+  series_next: "Nächste Teile →"
   nav_label: "Seiten"
   newer: "← Neuere"
   older: "Ältere →"

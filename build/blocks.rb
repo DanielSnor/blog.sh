@@ -250,6 +250,16 @@ module Blocks
             elsif block['subtype'] == 'quote' then 'blockquote'
             else 'p'
             end
+      # A heading with nothing in it is not drawn. toc_entries skips one --
+      # there is nothing to list -- and this used to give it an id anyway,
+      # which spent the fallback base `section` from a `seen` the table of
+      # contents keeps separately: every later anchor on that base was one
+      # heading off, and the contents sent the reader to an empty <h2>
+      # rather than to the heading it names. Skipping it on both sides
+      # keeps the two walks the same walk, and a heading with no
+      # accessible name is not a thing a page should carry anyway.
+      return '' if heading && block['text'].to_s.strip.empty?
+
       id = heading ? %( id="#{h(heading_id(block['text'].to_s, seen))}") : ''
       inner = with_breaks(apply_formatting(block['text'], block['formatting']))
       # A quote's attribution renders inside the blockquote as a <cite> line,

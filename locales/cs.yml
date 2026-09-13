@@ -99,6 +99,8 @@ post:
   draft_banner_notice: "Není nikde na blogu vidět a jinak než přes toto URL jej nelze zobrazit:"
 
 pagination:
+  series_previous: "← Předchozí díly"
+  series_next: "Další díly →"
   nav_label: "Stránky"
   newer: "← Novější"
   older: "Starší →"
