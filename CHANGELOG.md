@@ -11,27 +11,42 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.8 -- 2026-09-09
+## 1.8 -- 2026-09-14
 
 The release about what happens when something goes wrong. A page is written whole or not at all, a
-delivery that arrives twice is one post, and a name that was never meant to be a path is refused
-rather than repaired into an address nobody chose. Nothing to configure and nothing to migrate: on a
-site where nothing goes wrong, the one change you will see is a line on `props`.
+delivery that arrives twice is one post, a name that was never meant to be a path is refused rather
+than repaired into an address nobody chose -- and `check` asks what the build asks, so an archive it
+calls sound is one the build can run on. Before the tag, five narrow review passes went through the
+write paths, the build's output, import and export, `check` and the series; everything they found
+is fixed here. Nothing to configure and nothing to migrate. Two things look different: a series of
+twenty parts or more opens at part one, and a tree exported from blog.sh asks before it goes into an
+archive that already has posts.
 
 ### Added
 
 - **`props` says where a numbered part will actually stand.** Only when that differs from its number.
 - **A release checklist.** `docs/releasing.md`, nine steps, the build's speed among them.
-- **Importing a site's own export says so first.** Typed posts would otherwise be written a second time.
+- **Importing a site's own export says so first, and asks.** Recognised by its posts, so exports made by any version count.
+- **`check` finds a post file the build never reads.** One lying directly in `posts/`, or a folder too deep.
 
 ### Changed
 
 - **Every page, feed and index is written to a temp file and renamed.** A reader never meets half of one.
 - **A cold build costs about a fifth more.** Cached rebuilds are unchanged, so publishing costs the same.
-- **An export says which blog it came from.** `_config.yml`, so re-importing it recognises its own posts.
+- **A long series opens at part one.** `/series/<slug>/` holds the first parts, `/page/2/` on the ones after -- other parts than in 1.7.
+- **`export --force` refreshes only what an export of this site wrote.** A cloned site's `_config.yml` and anyone else's files are left alone and listed.
+- **An export closes each HTML block with `<!-- /blogsh:block -->`.** Trees exported before 1.8 are still read.
+- **An export says which blog it came from.** `_config.yml`, unless the target already has one of its own.
+- **An export that could not write a post leaves with 1.** The rest of the archive still comes out, and the post is named.
+- **An export says how many media files no block names.** A re-import brings home only what the posts refer to.
 - **A cancelled import leaves with 1.** Zero no longer means "nobody answered".
-- **`check` has two more things to say.** An unusable `former_slugs` entry, and a post that looks like a copy.
+- **`check` has more to say.** An unusable `former_slugs` entry, a post that looks like a copy, an old address a live post has taken, two addresses that are one folder on macOS.
+- **A question `check` cannot ask is one finding, not the end of the run.** It names the question and the error.
+- **`--repair` shows what an entity fix will change.** And says when text escaped twice still has a layer left.
+- **A page the build cannot write is a warning and a count at the end.** The rest of the site is still built.
+- **The names the engine keeps in the site's root are one list.** Measured against what the build writes; `series` is among them now.
 - **The build's domains live beside it.** `blocks`, `output`, `feeds`, `discovery`, `cards`, and `lib/series.rb`.
+- **The cheat sheet says how pictures end up side by side.**
 
 ### Fixed
 
@@ -47,6 +62,26 @@ site where nothing goes wrong, the one change you will see is a line on `props`.
 - **A replaced file came back wearing the temp file's permissions.** Under a strict umask, a page the server cannot read.
 - **Two writes in one process could meet on one temp name.**
 - **Repacking a video dropped its recording time.** And every sound track but the first.
+- **A refused write left its first picture behind, and the retry landed on `slug-2`.** An address nobody chose.
+- **A re-import stopped halfway through a change of year left the post in one year and its pictures in the other.**
+- **A part numbered `08` or `09` lost its number.** Read as octal; the series fell out of order.
+- **A picture restored from a backup never reached the site.** Where the build copies rather than links.
+- **One address the build could not claim switched every later picture from a link to a copy.**
+- **An interrupted save left a temp file in the archive.** And a refused write named the temp file, not the target.
+- **Cron's files in `public/` were emptied before they were written.** A run that died left a blank `stats.json` live.
+- **A page slugged `index.html` or `search-index.json` stopped every build.** Twelve root names were missing from the reserved list.
+- **`check` died on a post whose `media` was an object.** Before it had reported anything.
+- **`check` called an archive sound over six shapes the build dies on.** A draft token climbing out of the site among them.
+- **`check --json` gave at most twenty address collisions.** The rest as a bare count, with nothing to find them by.
+- **`--repair` decoded text it had never been offered.** A paragraph written meanwhile about HTML lost its point.
+- **A media directory in another unicode form was called orphaned.** And `--repair` offered to trash live pictures.
+- **A series whose name did not fit an address linked every part to a 404.**
+- **A link post's borrowed title was printed twice in the feed.**
+- **An empty heading sent the contents list one heading off.**
+- **One broken post stopped the whole export.** Everything after it in alphabetical order stayed at home.
+- **A page slug carrying `../` was exported above the target directory.**
+- **A spacer took the next paragraph with it on the way home.** And an embed with a blank line left its markup on the page.
+- **A post whose date nobody could read was dated by its file's timestamp.** For a tree just copied, the day of the import; the file name decides now, and the import says so.
 
 ## 1.7 -- 2026-09-05
 
