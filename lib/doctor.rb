@@ -643,7 +643,7 @@ module Doctor
     return [] unless entries.is_a?(Array) && entries.any?
 
     posts = Checker.load_posts(root)
-    known = Checker.known_paths(posts)
+    known = Checker.known_paths(posts, root: root)
     # Asked of Checker, because the build only writes a tag page for a tag
     # some post in the STREAM carries: counting a draft's tag as known let
     # doctor tick a menu whose items 404 on every page of the site.

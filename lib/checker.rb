@@ -198,7 +198,7 @@ module Checker
     findings.concat(guard(:unbuildable) { check_unbuildable(posts, cap) })
     findings.concat(guard(:parked_leftovers) { check_parked_leftovers(root, posts) })
     findings.concat(guard(:misplaced_posts) { check_misplaced_posts(root) })
-    findings.concat(guard(:known_paths) { known = known_paths(posts); [] })
+    findings.concat(guard(:known_paths) { known = known_paths(posts, root: root); [] })
     findings.concat(guard(:media) { check_media(root, posts, progress, cap) })
     findings.concat(guard(:degenerate_images) { check_degenerate_images(posts, cap) })
     # Without the set of known addresses every internal link would look
@@ -241,6 +241,17 @@ module Checker
     reason = "#{e.class}: #{e.message.to_s.lines.first.to_s.strip[0, 120]}"
     [error(t('check_failed', check: name.to_s, reason: reason), t('check_failed_fix'),
            kind: :check_failed, data: { 'check' => name.to_s, 'error' => e.class.to_s })]
+  end
+
+  # Whether the build publishes the writing app. Read with YamlCompat
+  # rather than through SiteConfig, for the reason check_config gives: this
+  # module must survive the very config file it may be reporting on, and an
+  # unreadable one simply answers no here.
+  def write_app?(root)
+    data = YamlCompat.load_file(File.join(root, 'config', 'site.yml'))
+    data.is_a?(Hash) && data['write'] ? true : false
+  rescue StandardError, Psych::SyntaxError
+    false
   end
 
   # --- reading the archive ------------------------------------------------
@@ -635,8 +646,17 @@ module Checker
          .select { |slug| Slug.pageable?(slug) }.to_set
   end
 
-  def known_paths(posts)
+  # `root:` is where to read config/site.yml, for the one address the
+  # configuration rather than the posts decides.
+  def known_paths(posts, root: nil)
     paths = Set.new(FIXED_PATHS)
+    # The writing app, which the build publishes at /write/ when the site
+    # asks for it (write: true) and not otherwise -- the same condition,
+    # read the same way. Left out, a post pointing people at the app, or a
+    # menu item for it, was a dead link to check and to doctor on exactly
+    # the sites where the address answers: blogsh.app carried one, error
+    # and all, through two releases.
+    paths << '/write/' if root && write_app?(root)
     # How many posts in the STREAM carry each series -- the same set the
     # build groups into SERIES_MAP, so drafts, pages and unlisted posts do
     # not count towards a series page existing.
