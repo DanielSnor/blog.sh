@@ -67,7 +67,14 @@ already carries, so each can be read as well as changed:
 - **`series: Name`** files the post into a series. A series with two or
   more published parts gets a listing of its own at `/series/<slug>/` --
   a series of one is just a post, and the listing appears when the
-  second part does. The build puts "Part 2 of 5"
+  second part does. The listing reads from part one: a long series is
+  paged in reading order, `/series/<slug>/` holds the first parts and
+  `/series/<slug>/page/2/`, `/page/3/`… the ones after, so the "Part 1 of
+  30" link on every post opens where the series starts. (Up to 1.7 a
+  series of twenty parts or more opened at its last page instead, and its
+  `/page/N/` addresses held other parts than they do now.) A series whose
+  name is too long to fit an address gets no listing; its parts still say
+  which part they are, without a link. The build puts "Part 2 of 5"
   on each post in it, with the way to the part before and the part after
   -- within the series only, since a post's chronological neighbours
   across a whole archive are rarely what a reader wants next. Parts are
@@ -79,6 +86,14 @@ already carries, so each can be read as well as changed:
   as "a typo, or the first part?" -- so a misspelling doesn't quietly
   found a second series. `check` catches the older ones
   ([below](#checking-the-archive)).
+
+  A number is a claim on a slot, not a label: the part is inserted at the
+  position it names among the ones ordered by date, so a series whose
+  numbers don't add up -- two parts both told `2`, a number past the last
+  part -- gives one of them a different place than it asked for. `props`
+  says so where it happens, showing the number the post carries and, after
+  it, the place the page will actually give it. Where the two agree, which
+  is the ordinary case, only the number is shown.
 - **`link:`** gives the post a link card: the address it is about, drawn
   above the text. `link_title:` and `link_description:` are the words on
   it, and a post with no `title:` of its own is named by the card. It is a
@@ -344,7 +359,9 @@ repack moves it to the front.
 `media: remux_video: true` has the engine do that repack itself, when
 `ffmpeg` is on the machine -- index to the front, `.mov` to `.mp4`, the
 picture and the sound copied across untouched, about a second for a phone
-video. It is off by default, like the HEIC conversion, because it shells
+video. Every video and sound track comes across, not just the first of
+each, and so does the recording time; the metadata tracks an iPhone adds
+to a `.mov` do not, because an MP4 has nowhere to keep them. It is off by default, like the HEIC conversion, because it shells
 out to a tool the engine does not ship. Unlike the HEIC conversion it
 never refuses: no `ffmpeg`, or a repack that will not go through, and the
 post is saved with the file as it arrived and the sentence the author
@@ -650,6 +667,26 @@ command: a leading dash is a flag, and anything outside a slug's own
 alphabet is refused here rather than explained by whatever it hits. The
 page then asks the same receipt again until it says published.
 
+**A delivery that arrives twice is one post.** The receipt is minted once
+per send, immediately before the files it names are built, so two
+deliveries carrying the same one are the same send arriving twice --
+which is what a connection that breaks after the bytes have gone but
+before the answer comes back produces, and both the shortcut and the
+Termux script retry. The second delivery updates the post the first one
+wrote instead of founding another beside it -- and that holds when the
+retry arrives while the first is still being written, because writes
+carrying a receipt take turns. Once the post is **published**, a late
+retry stops updating anything at all: it is answered with the published
+post, at its public address, and the file is left exactly as it stands.
+The copy the phone is still holding was made before publishing happened
+and cannot know about it, so letting it write would put the post back to
+draft -- with a new address, a new date and the announcement pointing at
+nothing. Pressing send again is not
+that: the page mints a fresh receipt each time, so a second send is a
+second post. A delivery carrying no receipt at all -- anything
+hand-rolled -- has nothing to be recognised by, and a repeat of one is
+two posts as it always was.
+
 One connection carries the post however many photographs are in it, which
 is the point: connections are the scarce thing, not bytes. The first run
 in the app asks whether the shortcut may send its items to the host --
@@ -936,6 +973,11 @@ migration -- one `scripts/migrate_<source>.rb` each, e.g.
 Those skip the preview and write immediately; see
 [the README](../README.md#importing-existing-content).
 
+**A wizard that wrote nothing says so with its exit code.** Cancelling
+leaves with 1, and so does reaching the end of the input without an
+answer -- which is what a script, a cron line or a pipe does. Zero means
+the import ran; it never means "nobody answered, so nothing happened".
+
 Two things to expect on a real archive:
 
 - **It is slow, and it says so.** Media is downloaded per post, so a few
@@ -980,7 +1022,17 @@ pages at the root, media copied under `assets/<year>/<slug>/`. Without a
 directory it writes to `tmp/export`. A directory that already has
 something in it is refused until you repeat the command with `--force`,
 which writes alongside what is there -- an export never deletes
-anything, at either end.
+anything, at either end. With `--force`, files an earlier export of this
+site wrote are refreshed in place; anything else -- a cloned site's own
+`_config.yml`, a post of somebody else's under the same file name, a
+different picture under the same path -- is left exactly as it is, the
+post of ours goes beside it under another name, and the summary lists what
+was left alone.
+
+A post that cannot be written -- a stray byte from an old import, a slug
+that is not one path segment -- is named at the end and the rest of the
+archive still comes out; the command then exits 1, so a backup made by
+cron is seen to be short.
 
 It reads only the archive on disk -- deliberately, so it works on an
 installation whose `env.sh` is gone or whose config no longer parses.
@@ -993,18 +1045,40 @@ Three things are worth knowing before you rely on the result:
   image to everybody else's markdown parser. Every engine that passes
   HTML through renders them properly, and importing the tree back gives
   them again as blocks -- each carries its own definition in a comment
-  above it, which other engines ignore.
+  above it and a closing `<!-- /blogsh:block -->` line under it, both of
+  which other engines ignore. (Trees exported before 1.8 have no closing
+  line and are still read; an embed with a blank line inside it came home
+  from those with part of its markup as text.) It also says how many of
+  the media files copied no block names: they are in the tree, but an
+  import back brings home only what the posts refer to.
 - **`redirect_from` is written in the shape `jekyll-redirect-from`
   reads,** and it merges both kinds of old address -- where the post
   lived on the platform it came from, and where it lived here before a
   rename. On a Jekyll site with that plugin, every address the post has
   ever had goes on answering.
-- **An export can be imported back.** `./import.sh` → *Markdown tree*
-  reads the `blogsh:` block the export writes, so posts keep their
-  identity (`source`), their series, their redirects and their
-  announcement URLs. That is the supported way to move an installation
-  to another machine or another host -- and, run against a scratch
-  copy, the way to check that an export really did come out whole.
+- **An export can be imported back, into an EMPTY archive.** `./import.sh`
+  → *Markdown tree* reads the `blogsh:` block the export writes, so posts
+  keep their series, their redirects and their announcement URLs. That is
+  the supported way to move an installation to another machine or another
+  host, and -- run against a scratch copy -- the way to check that an
+  export really did come out whole.
+
+  ⚠️ **Not into an archive that already holds those posts.** A post that
+  carries an identity of its own -- imported from Twitter, Ghost, a feed --
+  is matched by it and updated in place. Everything you typed yourself
+  carries `{platform: manual}` and nothing else, and the engine refuses to
+  match two of those on purpose: pairing them would overwrite one person's
+  writing with another's. So each hand-written post is written AGAIN under
+  a serial slug. Every other rule in `check` lets the copy pass, because it
+  has an address of its own; only its "looks like a copy of another"
+  finding catches it, and only after the fact. On a blog whose posts are all hand-written that is
+  the whole archive, twice. The wizard recognises this site's own export by
+  its posts -- the `blogsh:` key every exported post carries, and slugs
+  this archive already has -- which works for exports made by any version,
+  and says so before it asks for confirmation. A tree of ours going into an
+  archive that already holds posts is also asked about outright, with no
+  as the default. But the rule is simpler than the warning: the target
+  should be empty.
 
 ## Reading the archive
 
@@ -1163,15 +1237,22 @@ What it looks for, each with a line saying what to do about it:
   "the archive is sound" and an exit code of 0. The parse error carries
   the line and column Psych knew about.
 - **A post file that will not read, a date nothing can parse, a post whose
-  text is not a list of blocks, a slug that is not one path segment
-  (a slash or a `..` in it), or a `type:` the engine does not know.** The
-  build refuses to run on the first four, or writes the page nowhere
-  good, so check says so first: without this it counted the archive minus
+  text is not a list of blocks, a slug or a draft token that is not one
+  path segment (a slash or a `..` in it), tags that are not a list, a
+  block whose pictures, poster, list items or formatting are not a list,
+  or a `type:` the engine does not know.** The build refuses to run on all
+  but the last, or writes the page nowhere good, so check says so first: without this it counted the archive minus
   the broken file and called the rest sound. The unknown type is stored
   on the post and read by nobody -- no listing, no menu entry, no icon --
   and the fix line points at the tag route, which is usually what
   somebody reaching for a ninth type wanted: a tag named in `nav:` has a
   listing, pagination, a menu entry and a feed.
+- **A post file the build never reads.** Posts are read from exactly
+  `content.nosync/posts/<folder>/<post>.json`; one lying directly in
+  `posts/` or a level deeper -- an rsync with the wrong trailing slash, an
+  export unpacked one folder too far in -- is in the archive and on no
+  page, and neither the build nor check used to say so. A warning, with
+  the path. Hidden files are left alone.
 - **A file a queue move stepped aside and a crash left parked.** The
   parking name is dotted precisely so no listing shows it -- which also
   means nothing would ever find one again without this. What to do with
@@ -1203,7 +1284,10 @@ What it looks for, each with a line saying what to do about it:
   own page is the point of it.
 - **Media directories no post owns** -- left by a deleted or renamed post,
   or an import that ran twice. Nothing links to them; they cost disk, not
-  correctness, which is why they are a warning.
+  correctness, which is why they are a warning. Names are compared the way
+  macOS and iCloud compare them, ignoring letter case and unicode form, so
+  a directory restored in another form is not called orphaned while the
+  post is reading its pictures from it.
 - **Files in a post's own media directory that the post no longer
   names** -- a source that dropped a picture leaves its file behind,
   because an import only ever adds. A warning too; dotfiles are left
@@ -1216,12 +1300,32 @@ What it looks for, each with a line saying what to do about it:
   and the other's readers land on it.
 - **Two posts that would be served at one address.** The build refuses to
   run at all in this state, so this is the one finding that stands between
-  you and a site that cannot be rebuilt.
+  you and a site that cannot be rebuilt. Two addresses that differ only in
+  letter case or in how an accent is encoded (`Praha` and `praha`) are
+  reported as well, as a warning: on a Linux server they are two, on macOS
+  and in iCloud they are one folder, and one of the posts is missing from
+  the site.
+- **A post that looks like a copy of another** -- `x-2` beside `x` in the
+  same year, with the same title, the same moment and the same content
+  (text compared by its words, every other block -- a link, a quote, a
+  list, a picture -- compared whole). That
+  is what importing an export back into an archive that already held it
+  leaves behind: every hand-written post a second time, each under its own
+  address, so nothing else here would object. A warning, not an error, and
+  deliberately narrow -- a slug that ends in a number beside the same slug
+  without one is ordinary (an importer that keeps the source's post id in
+  the slug makes exactly that), so all four have to agree before it says
+  anything. Two link posts that open with the same line and point at
+  different articles are not copies, and are not reported. Delete the
+  numbered copy; the original keeps its address.
 - **A `redirect_from` the build will not serve** -- one whose first segment
   belongs to the site itself (`/tag/...`, `/posts/...`), or whose shape no
   directory can be made of. The build says so once, in the middle of a log
   nobody keeps, and the old address quietly 404s; worse, a link pointing at
-  it used to pass as sound.
+  it used to pass as sound. The same goes for an old address -- in
+  `redirect_from` or `former_slugs` -- that a live post or page now stands
+  at: the build serves the live one and skips the redirect in one line of
+  its log, so every link to the old address reaches the wrong post.
 
 - **Text carrying HTML entities instead of the characters they stand
   for.** `journalists &amp; writers` reads as `journalists &amp; writers`
@@ -1270,14 +1374,22 @@ post references is moved to the trash the engine already uses --
 back; the repair pass never deletes anything. A file whose name differs
 from the one on disk only in letter case or unicode form is not a leftover
 at all: the pass offers to write the name the directory actually uses into
-the post, and never touches the file.
+the post, and never touches the file. Text carrying HTML entities is
+decoded one post at a time, and the offer says how many places in that post
+change and shows the first -- it is one decision for the whole post, so a
+post with an imported `&amp;` and a deliberate one is worth a look first. A
+post that changed after it was checked (edited in another window, or from
+the phone) is refused with a sentence rather than decoded on the strength
+of a scan it no longer matches.
 
 Where the right answer is a matter of judgement -- two posts claiming one
 old address, an image the author has to look at, a link to something this
 archive never had, a slug two posts share across two years, or a target
 that is still a draft -- it says so and passes over. A second run proposes
-nothing, because the findings it repaired are gone; run `./blog.sh rebuild`
-afterwards to put the changes on the site.
+nothing, because the findings it repaired are gone -- except for text an
+import escaped more than once, which comes off one layer per decision; the
+run says so when a layer is left, and the next one offers it. Run
+`./blog.sh rebuild` afterwards to put the changes on the site.
 
 The screen shows at most twenty findings of a kind and totals the rest in
 a "...and N more" line, which is right for reading and useless for acting

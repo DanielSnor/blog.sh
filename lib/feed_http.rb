@@ -50,6 +50,45 @@ module FeedHttp
     Process.clock_gettime(Process::CLOCK_MONOTONIC)
   end
 
+  # Where a request is allowed to END UP, as opposed to where it was sent.
+  #
+  # The engine's own addresses are the operator's business: a Mastodon or
+  # GoToSocial instance on the same container network, a feed behind the
+  # same firewall, a widget pointed at a machine on the LAN are all
+  # legitimate things to put in a config, and refusing them would be
+  # refusing somebody's own setup. What is nobody's setup is a REDIRECT
+  # that leaves the public internet: a Location is chosen by the remote
+  # host, and no feed, API or picture out there redirects to 127.0.0.1,
+  # to a private range, or to the link-local address cloud providers
+  # answer their credentials on.
+  #
+  # Asked of the resolved addresses rather than of the name, because a
+  # name is not a promise: a host that answers with 169.254.169.254
+  # reaches the same place whatever it is called. A name that does not
+  # resolve is refused too -- the request could not have worked anyway,
+  # and this is the one place that has to decide.
+  def public_target?(uri)
+    # Required here rather than at the top of the file: this module is
+    # loaded by the CLI on every invocation, and resolv is a fair amount
+    # of Ruby to parse for a question only a redirect ever asks.
+    require 'resolv'
+    require 'ipaddr'
+
+    addresses = Resolv.getaddresses(uri.host.to_s)
+    return false if addresses.empty?
+
+    addresses.none? do |address|
+      begin
+        ip = IPAddr.new(address)
+      rescue StandardError
+        next true
+      end
+      ip.loopback? || ip.private? || ip.link_local? || ip.to_s == '0.0.0.0' || ip.to_s == '::'
+    end
+  rescue StandardError
+    false
+  end
+
   # Returns the response body as a String; raises RuntimeError on a non-2xx
   # response so the calling fetcher can catch it and return an empty list.
   # max_body: nil lifts the ceiling for callers that legitimately fetch a
@@ -110,6 +149,16 @@ module FeedHttp
       # a redirect names is chosen by the remote host, not by this site.
       target = URI.join(url, res['location'])
       raise "refusing a #{target.scheme.inspect} redirect (#{url})" unless %w[http https].include?(target.scheme)
+      # Only a redirect that LEAVES the public internet. A fetch already
+      # aimed at a private address is the operator's own -- an instance on
+      # the container network, a feed on the LAN, the local server a test
+      # runs against -- and a hop within that is theirs too. What no feed
+      # anywhere does is answer a request from the public internet by
+      # sending it to 127.0.0.1 or to the address a cloud answers its
+      # credentials on.
+      if public_target?(uri) && !public_target?(target)
+        raise "refusing a redirect off the public internet (#{url} -> #{target})"
+      end
 
       same_host = target.host == uri.host && target.scheme == uri.scheme && target.port == uri.port
       # accept survives every redirect: it is a media-type preference,

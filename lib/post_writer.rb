@@ -12,6 +12,7 @@ require_relative 'media_dimensions'
 require_relative 'site_config'
 require_relative 'i18n'
 require_relative 'path_glob'
+require_relative 'path_safety'
 
 module PostWriter
   ROOT = File.expand_path('..', __dir__)
@@ -28,9 +29,114 @@ module PostWriter
   # distinct file of the author's own. Names are unique either way; only
   # sources may repeat.
   def self.write(post, media_files: {})
+    return write_unlocked(post, media_files: media_files) unless PathSafety.hex_token?(post['receipt'].to_s)
+
+    with_receipt_lock { write_unlocked(post, media_files: media_files) }
+  end
+
+  # Everything a receipt-carrying write does, one at a time.
+  #
+  # Matching a delivery to the post an earlier one already wrote is
+  # "look in the receipts map, then write" -- two steps, with a media copy
+  # between them. Two deliveries of ONE receipt that overlap both looked,
+  # both saw nothing, and both wrote: a second post nothing pointed at,
+  # which is the very defect the receipt match exists to prevent, reached
+  # by a race instead of in sequence. It happens when a client retries
+  # before its first attempt has finished writing -- several photographs
+  # over a slow link, which is exactly the situation the retry is for.
+  # claim_slug already solves the same race for the NAME, by creating the
+  # file rather than checking it is free; a receipt has no file of its own
+  # to create, so the writes that carry one take turns instead.
+  #
+  # BLOCKING, unlike RunLock, which answers BUSY and leaves: a second
+  # delivery that gave up here would report a failure to a phone whose
+  # post is in fact about to exist. Waiting is the right answer -- it
+  # finds the first one's post and updates it.
+  #
+  # The memoised maps are dropped once the lock is held. A process that
+  # built them before waiting built them from an archive without the post
+  # it was waiting for, and matching against that is the race again. Only
+  # writes that carry a receipt pay this, and those are one post at a time
+  # from a phone, never an import of thousands.
+  #
+  # A filesystem without flock degrades to no lock, as RunLock does.
+  RECEIPT_LOCK = File.join(ROOT, '.blog-sh-receipt.lock')
+
+  def self.with_receipt_lock
+    # A holder passes straight through, as RunLock's does. flock belongs to
+    # the open FILE, not to the process -- on macOS a second File.open in
+    # the same process gets a lock of its own, and LOCK_EX on it waits for
+    # the first, which is this very process: a write that nested inside
+    # another would wait for itself, silently and for ever. Nothing nests
+    # today; this is so that nothing can.
+    #
+    # On the THREAD, not on the class. flock is held by the file, and a
+    # second thread of this process opening it gets a lock of its own --
+    # so a class-level flag says "already held" to a thread that holds
+    # nothing and waves it straight past the lock. Nothing today writes
+    # from a thread (the preview server only serves files), which is why
+    # this is written down rather than measured in the wild; but a flag
+    # that is meant to make nesting safe must not make sharing unsafe.
+    return yield if Thread.current[:blog_sh_receipt_lock]
+
+    file = open_receipt_lock
+    return yield if file.nil?
+
+    begin
+      file.flock(File::LOCK_EX)
+    rescue NotImplementedError, SystemCallError
+      file.close
+      return yield
+    end
+
+    begin
+      Thread.current[:blog_sh_receipt_lock] = true
+      @index = nil
+      @receipts = nil
+      yield
+    ensure
+      Thread.current[:blog_sh_receipt_lock] = false
+      file.flock(File::LOCK_UN)
+      file.close
+    end
+  end
+
+  # The same shape RunLock arrived at, for the same reason it did.
+  #
+  # 0644 and RDWR were two ways to lose the lock in silence. flock needs no
+  # write permission at all, but File::RDWR demands one -- so a lock file
+  # left behind by a run under another user (cron as root is the ordinary
+  # case) answers EACCES, the old code turned that into nil, and the ONLY
+  # protection 1.8 added for concurrent deliveries switched itself off
+  # without a word. Worse, it stayed off: the file survives, so every run
+  # after it is unprotected too.
+  #
+  # 0666 so the next user can open it, a read-only handle when the mode
+  # still says no, and a LOUD line when even that fails. Running unlocked
+  # is the compatible floor; doing it quietly is how two deliveries end up
+  # as two posts with nobody told why.
+  def self.open_receipt_lock
+    File.open(RECEIPT_LOCK, File::CREAT | File::RDWR, 0o666)
+  rescue Errno::EACCES, Errno::EPERM, Errno::EROFS
+    begin
+      File.open(RECEIPT_LOCK, File::RDONLY)
+    rescue SystemCallError => e
+      unlocked_warning(e)
+    end
+  rescue SystemCallError => e
+    unlocked_warning(e)
+  end
+
+  def self.unlocked_warning(error)
+    warn("⚠️  Cannot use the delivery lock at #{RECEIPT_LOCK} (#{error.class}) -- running without it.")
+    nil
+  end
+
+  def self.write_unlocked(post, media_files: {})
     media_files = media_files.to_a
     date = Time.parse(post.fetch('date'))
     year = date.year.to_s
+    check_names!(post, year)
 
     # A post already imported from this exact source item is UPDATED, not
     # duplicated -- "matched on their source id" is a promise README and the
@@ -42,7 +148,32 @@ module PostWriter
     # The existing slug is kept on purpose: the URL is published, links and
     # announcement toots point at it, and a re-import must never move it
     # just because a title was edited at the source.
+    # A receipt is not a source, and what follows must not treat it like
+    # one. update_matched is written for a RE-IMPORT, where the source is
+    # the authority and its state wins -- said in its own comment. A
+    # delivery that arrives a second time is the opposite case: it is an
+    # older copy of something this machine may have moved on from, and it
+    # cannot know what happened after it was sent.
+    #
+    # Measured before this guard existed: deliver, publish, then let the
+    # retry land -- the post went back to draft, lost the date publishing
+    # had stamped it with and the address it was announced under, got a
+    # fresh draft token, and the deploy put all of that on the live site.
+    # The phone was answered ok:true with a draft URL. The window is the
+    # one receipts exist for: the answer is lost on the way back, the page
+    # asks again, offers Publish, somebody taps it -- and only then does
+    # the retry the shortcut is still holding arrive.
+    #
+    # So a receipt that matches a post which is already OUT is a delivery
+    # that has nothing left to do. Its path is handed back unchanged: the
+    # caller answers the phone with the published post, and nothing is
+    # written, versioned or deployed.
     existing_path = find_by_source(post['source'])
+    if existing_path.nil? && (by_receipt = find_by_receipt(post['receipt']))
+      return by_receipt if published?(by_receipt)
+
+      existing_path = by_receipt
+    end
     if existing_path
       post = post.merge('slug' => File.basename(existing_path, '.json'))
       return update_matched(existing_path, post, year, media_files)
@@ -87,11 +218,19 @@ module PostWriter
     end
 
     media_files = reconcile_media_names(post, previous, year, slug, media_files)
+    # Named here rather than inside copy_media, because the rescue below
+    # has to know which directory this write was filling even when it
+    # never got to copy a byte into it.
+    media_dir = File.join(MEDIA_DIR, year, slug)
     copy_media(media_files, year, slug)
     sync_media_dimensions(post, year, slug, previous: previous)
 
     AtomicWrite.write_json(path, post)
     index[source_key(post['source'])] = path if source_key(post['source'])
+    # Kept current for the same reason the source index is: an import or a
+    # delivery run that writes several posts in one process must recognise
+    # what it wrote a moment ago, not just what was on disk when it started.
+    receipts[post['receipt'].to_s] = path if PathSafety.hex_token?(post['receipt'].to_s)
     path
   rescue Exception # rubocop:disable Lint/RescueException -- a signal must not leave the reservation behind either
     # A write that is refused has to leave the archive exactly as it found
@@ -100,14 +239,72 @@ module PostWriter
     # onto a serial nobody asked for. Exception, not StandardError: Ctrl-C
     # in the middle of the media copy is not a StandardError, and it left
     # exactly the orphan this rescue promises never to leave. And the
-    # media directory the copy had begun goes too, when it is empty --
-    # compose_post takes a directory that exists for a name that is taken.
+    # media directory the copy had begun goes too -- compose_post takes a
+    # directory that exists for a name that is taken.
+    #
+    # The whole directory, not only an empty one. Emptiness was the wrong
+    # question: a delivery of two photos whose second source vanished
+    # between them (a full disk, Ctrl-C, a damaged JPEG -- the copy can
+    # stop anywhere) left the first photo sitting there, and a non-empty
+    # directory survived this clean-up. claim_slug then counted the name
+    # as taken, so the retry -- which a phone makes BY ITSELF -- landed on
+    # z-telefonu-2, an address nobody chose and which is painful to
+    # correct once it is public, while z-telefonu stood free and the first
+    # photo stayed behind for good.
+    #
+    # Taking the whole directory is safe precisely BECAUSE the name was
+    # claimed: claim_slug refuses a candidate whose media directory holds
+    # any visible file (that is an orphan, and inheriting a stranger's
+    # pictures is its own bug), so at the moment this write took the name
+    # there was nothing in there to lose -- at most a .part from a run
+    # that was killed mid-copy. Everything else under it, this write put
+    # there. Without the claim the directory belongs to a post that
+    # already exists, and then nothing here touches it.
     File.delete(path) if claimed && path && File.exist?(path)
-    if claimed && slug
-      dir_started = File.join(MEDIA_DIR, year, slug)
-      Dir.rmdir(dir_started) if Dir.exist?(dir_started) && Dir.empty?(dir_started)
-    end
+    FileUtils.rm_rf(media_dir) if claimed && media_dir
     raise
+  end
+
+  # Asked before anything is looked up, claimed or created, because every
+  # step after this one joins these values onto a directory: find_by_source
+  # and claim_slug both build paths, the media directory is made out of the
+  # year and the slug, and AddressGuard asks about a name it composes the
+  # same way.
+  #
+  # Refused, never repaired. File.basename would turn "../evil" into
+  # "evil" and publish the post at an address nobody chose, with no
+  # redirect from the one it was supposed to have -- a post's address is
+  # its public identity, and quietly moving it is worse than declining to
+  # write it. Raised rather than aborted, like the address clash in write:
+  # an import's per-item rescue counts it, names the item and carries on.
+  #
+  # The engine's own slugs cannot fail this -- Slug.slugify emits
+  # [a-z0-9-] -- and the importers hand theirs through the same function.
+  # What this catches is the one path that does not: an export of ours
+  # being read back in, where the slug is taken at face value on the
+  # grounds that we wrote it, and a hand-edited post file.
+  def self.check_names!(post, year)
+    slug = post['slug'].to_s
+    unless PathSafety.safe_segment?(slug)
+      raise "cannot write #{slug.inspect}: a slug is one segment of a path, and this one " \
+            'would not stay inside the archive -- fix the slug in the source or by hand'
+    end
+    unless year.to_s.match?(/\A\d{4}\z/)
+      raise "cannot write '#{slug}': #{year.to_s.inspect} is not a year"
+    end
+
+    token = post['draft_token'].to_s
+    return if token.empty? || PathSafety.safe_segment?(token)
+
+    # Asked as a path segment rather than as the exact shape the engine
+    # issues (16 hex). A token that is merely unusual -- an archive from
+    # before tokens were random, a fixture, a person who typed one -- is
+    # a guessable preview address and nothing worse, and refusing to save
+    # a post over it would be refusing the wrong thing. A token with a
+    # separator in it is a different matter: it is a directory the build
+    # would make somewhere else.
+    raise "cannot write '#{slug}': its draft token is not one segment of a path, " \
+          'and the preview address is built out of it'
   end
 
   # media.strip_location, on unless a site says otherwise. On by default
@@ -131,6 +328,21 @@ module PostWriter
   # where it starts.
   def self.copy_media(media_files, year, slug)
     return if media_files.empty?
+
+    # Every name first, before a directory is made or a byte is copied.
+    # By construction these are bare names the importer allocated
+    # ("01.jpg"), and by construction is not a guarantee: the same list
+    # arrives from a phone delivery and from a hand-edited post, and
+    # File.join honours a separator in one without comment. Refused up
+    # front for the reason the address clash is: a write that is refused
+    # has to leave the archive exactly as it found it, and a media
+    # directory made for a post that was then declined is an orphan the
+    # next run counts as an occupied name.
+    media_files.each do |_src_path, filename|
+      unless PathSafety.safe_segment?(filename.to_s)
+        raise ArgumentError, "#{filename.inspect} is not a media filename"
+      end
+    end
 
     media_dir = File.join(MEDIA_DIR, year, slug)
     FileUtils.mkdir_p(media_dir)
@@ -163,6 +375,18 @@ module PostWriter
   # why); a person attaching a file to their own post under a name that is
   # already in the folder means to replace it, and always has.
   def self.copy_media_file(src_path, dest, replace: false)
+    # Asked here as well as in copy_media, because `edit` reaches this one
+    # directly with a destination it composed itself. Only the last
+    # component is asked about, and deliberately: the rest of the path is
+    # the caller's media directory, made of a year and a slug that
+    # check_names! refused before anything got this far, and holding this
+    # one to MEDIA_DIR instead would be holding it to the directory the
+    # ENGINE was loaded from -- which is not always the archive being
+    # written. A test that drives the library against a site of its own
+    # made that difference visible.
+    unless PathSafety.safe_segment?(File.basename(dest.to_s))
+      raise ArgumentError, "#{dest.inspect} does not end in a media filename"
+    end
     return if !replace && File.exist?(dest)
     # A directory or a device is not a picture, and FileUtils.cp on one
     # dies halfway through the save with a raw EISDIR.
@@ -811,6 +1035,25 @@ module PostWriter
             "at that address (#{taken}) -- resolve the slug clash by hand"
     end
 
+    # What the archive looked like before this save touched it. The steps
+    # below move a post's pictures and its history into another year and
+    # only THEN write the post -- and until 1.8 nothing put them back when
+    # the write failed in between. Measured: a re-import whose date moved
+    # a post across a New Year, interrupted, left the post in 2025 with
+    # its pictures in 2026, so the next build served the page with the
+    # picture missing and the deploy put that on the live site. The [v]
+    # dialog went quiet at the same time, because the history had moved
+    # too. write_unlocked has had that clean-up all along (and catches
+    # Exception, because Ctrl-C in the middle is not a StandardError);
+    # this is the same promise for the path that moves more.
+    versions_before = PostVersions.list(slug, old_year, content_dir: CONTENT_DIR)
+    old_media = File.join(MEDIA_DIR, old_year, slug)
+    new_media = File.join(MEDIA_DIR, year, slug)
+    carried = Dir.exist?(old_media) ? Dir.children(old_media) : nil
+    moved_media = false
+    moved_versions = false
+    wrote = false
+
     PostVersions.keep(existing_path, content_dir: CONTENT_DIR)
 
     # A re-import that moves where a post is served vacates the address it
@@ -838,13 +1081,23 @@ module PostWriter
 
     if File.expand_path(new_path) != File.expand_path(existing_path)
       FileUtils.mkdir_p(new_dir)
-      move_media_dir(File.join(MEDIA_DIR, old_year, slug), File.join(MEDIA_DIR, year, slug))
+      moved_media = true
+      move_media_dir(old_media, new_media)
       # The edit history is keyed by year/slug exactly like the media, and
       # owes the post the same journey -- left behind, the [v] dialog went
       # silent and the orphaned directory waited to be inherited by a
       # future post under the same year/slug.
-      PostVersions.move(slug, old_year, from_content_dir: CONTENT_DIR,
-                        to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
+      moved = PostVersions.move(slug, old_year, from_content_dir: CONTENT_DIR,
+                                to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, slug))
+      moved_versions = moved
+      # Not worth refusing the save over -- the post and its pictures are
+      # the thing being saved -- but not worth swallowing either. Silently,
+      # all this looks like is a [v] dialog that has gone quiet, with
+      # nothing anywhere to say when or why.
+      unless moved
+        warn I18n.t('cli.versions_not_moved', slug: slug, year: year,
+                                              path: File.join('content.nosync', 'versions', old_year, slug))
+      end
     end
 
     media_files = reconcile_media_names(post, old, year, slug, media_files)
@@ -854,9 +1107,67 @@ module PostWriter
     # a failure in between leaves the post twice (recoverable) rather than
     # not at all.
     AtomicWrite.write_json(new_path, post)
+    # Past this line the save has happened, and the rescue below keeps its
+    # hands off: if the delete that follows fails, the post stands in both
+    # years, which the ordering above chose ON PURPOSE as the recoverable
+    # half of that pair. Undoing the moves here would be undoing a save
+    # that went through.
+    wrote = true
     File.delete(existing_path) if File.expand_path(new_path) != File.expand_path(existing_path)
     index[source_key(post['source'])] = new_path if source_key(post['source'])
+    receipts[post['receipt'].to_s] = new_path if PathSafety.hex_token?(post['receipt'].to_s)
     new_path
+  rescue Exception # rubocop:disable Lint/RescueException -- a signal must not leave the post and its pictures in different years
+    unless wrote
+      undo_move(slug: slug, old_year: old_year, year: year, carried: carried,
+                old_media: old_media, new_media: new_media,
+                moved_media: moved_media, moved_versions: moved_versions,
+                versions_before: versions_before)
+    end
+    raise
+  end
+
+  # Puts back what the interrupted half of update_matched moved.
+  #
+  # Best effort, and deliberately narrow about it: pictures that were in
+  # the old year go back to the old year, everything else this save put
+  # in the new directory goes away, and the version this save kept goes
+  # with it. What it does NOT try to undo is move_media_dir's merging
+  # branch -- a destination that already held a file of the same name has
+  # had it renamed aside, and guessing which `.displaced2` belonged to
+  # whom would be inventing history rather than restoring it. That branch
+  # is the rare one (an orphan already sitting under the new year), and a
+  # file moved aside is still a file the archive can see.
+  def self.undo_move(slug:, old_year:, year:, carried:, old_media:, new_media:,
+                     moved_media:, moved_versions:, versions_before:)
+    if moved_versions
+      PostVersions.move(slug, year, from_content_dir: CONTENT_DIR,
+                        to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), old_year, slug))
+    end
+    # The copy this save kept is a copy of a post nobody ended up
+    # changing, and the next save would skip keeping the real "before"
+    # because this one already matches it.
+    (PostVersions.list(slug, old_year, content_dir: CONTENT_DIR) - versions_before).each do |v|
+      File.delete(v)
+    rescue SystemCallError
+      nil
+    end
+
+    return unless moved_media && Dir.exist?(new_media)
+
+    Dir.children(new_media).each do |f|
+      next if carried.to_a.include?(f)
+
+      FileUtils.rm_rf(File.join(new_media, f))
+    end
+    if carried.nil?
+      FileUtils.rm_rf(new_media)
+    else
+      move_media_dir(new_media, old_media)
+    end
+  rescue StandardError
+    # The failure being cleaned up after is the one worth reporting.
+    nil
   end
 
   # Every draft carries a token, no matter which path wrote it. The
@@ -923,6 +1234,32 @@ module PostWriter
     @index
   end
 
+  # receipt id -> path of the post that was written for it.
+  #
+  # The one identity a post written on a phone has. `source` cannot give
+  # it one: everything typed by a person is {platform: manual} with no
+  # original_id, and matching two of those to each other would overwrite
+  # one piece of somebody's writing with another. A receipt is different
+  # -- the page mints it per SEND, immediately before building the files
+  # it is written into, so two deliveries carrying one receipt are one
+  # send that reached this machine twice.
+  #
+  # Which does happen: the delivery is a pipe that can break after the
+  # bytes have arrived and before the answer gets back, and both the
+  # shortcut and the Termux script retry. Without this the retry made a
+  # second post, the receipt answered with the first one, and the copy
+  # sat in the archive with nothing pointing at it -- invisible to the
+  # person who wrote it, because their phone was told about the other one.
+  #
+  # Pressing send twice is NOT this: the page mints a fresh receipt each
+  # time, so those are two posts, which is what asking twice means.
+  def self.receipts
+    return @receipts if @receipts
+
+    each_post { |_path, _post| nil }
+    @receipts
+  end
+
   # Every post in the archive, parsed once: yields [path, post hash].
   #
   # Two maps are built from exactly these bytes -- this one, and the
@@ -940,6 +1277,7 @@ module PostWriter
   def self.each_post(content_dir: CONTENT_DIR)
     building = @index.nil?
     acc = {}
+    receipts = {}
     PathGlob.under(content_dir, '*', '*.json').each do |file|
       post = JSON.parse(File.read(file, encoding: 'utf-8')) rescue nil
       next unless post.is_a?(Hash)
@@ -947,13 +1285,20 @@ module PostWriter
       if building
         key = source_key(post['source'])
         acc[key] = file if key
+        # Same pass, same bytes: a second walk over a few thousand files
+        # to answer a second question is a wait for nothing.
+        receipt = post['receipt'].to_s
+        receipts[receipt] = file if PathSafety.hex_token?(receipt)
       end
       yield file, post
     end
     # Only once the pass finished: a block that raised halfway would
     # otherwise leave a half-built index memoized for the rest of the
     # process, and matching re-imports against it would duplicate posts.
-    @index = acc if building && content_dir == CONTENT_DIR
+    if building && content_dir == CONTENT_DIR
+      @index = acc
+      @receipts = receipts
+    end
   end
 
   # Where a post's media lives, derived from the post's own JSON path --
@@ -1006,6 +1351,25 @@ module PostWriter
 
     path = index[key]
     path if path && File.exist?(path)
+  end
+
+  # See `receipts`. Asked after the source, never instead of it: an
+  # imported post has a real identity and that one wins.
+  def self.find_by_receipt(receipt)
+    id = receipt.to_s
+    return nil unless PathSafety.hex_token?(id)
+
+    path = receipts[id]
+    path if path && File.exist?(path)
+  end
+
+  # Whether the post at this path has already been published. Read off the
+  # file rather than kept in the receipts map: the map is built once per
+  # run, and publishing happens between runs.
+  def self.published?(path)
+    JSON.parse(File.read(path, encoding: 'utf-8'))['state'].to_s == 'published'
+  rescue StandardError
+    false
   end
 
   # Settles the name AND takes it, in one step that cannot be interleaved.

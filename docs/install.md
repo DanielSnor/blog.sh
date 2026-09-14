@@ -34,6 +34,32 @@ site on the internet.
   **ffmpeg**. Without it the post is still saved and the engine names the
   command instead; off by default.
 
+### All of that as one table
+
+The same thing in a form you can scan before installing anything. The
+right-hand column is what happens if it is missing, because that is the
+question worth answering: almost nothing here stops the engine, it just
+switches something off and says so.
+
+| What | Version | Needed for | Without it |
+| --- | --- | --- | --- |
+| Ruby | 2.7+, 3.x on the real deployments | everything | `blog.sh` refuses to start and says the version it found |
+| bash | any | the `blog.sh`, `deploy-web.sh` and `refresh-sidebar.sh` wrappers | no CLI; on Windows this is what WSL2 is for |
+| macOS | any current release | — | — |
+| Linux | any distro | — | — |
+| Windows | via WSL2 | — | there is no native cmd/PowerShell path |
+| cron | any | scheduled publishing, sidebar refresh, comment moderation | those three; everything else is unaffected |
+| ffmpeg | any | `media.remux_video: true` | the post is saved anyway and the engine prints the command to run by hand |
+| `sips`, `heif-convert`, ImageMagick with HEIF, or vips | any | `media.convert_heic: true` | the HEIC is refused with instructions rather than half-converted |
+| rsync | any | the `rsync` deploy backend | that backend only |
+| ssh + sftp | any | the `sftp` backend | that backend only |
+| git | any | the `git` backend (Pages) | that backend only |
+| rclone | any | the `rclone` backend (S3, R2, B2, WebDAV) | that backend only |
+| nothing extra | — | the `surfer` and `local` backends | — |
+
+No gems, no Bundler, no lockfile: the engine is the standard library and
+these binaries, which is why an upgrade is a `git pull` and nothing else.
+
 ## Quick start
 
 Each block below is the whole path for one platform: prerequisites,
@@ -366,6 +392,44 @@ the build refuses it out loud instead.
 Worth setting once, before the first deploy: pagination is anchored to the
 oldest post precisely so page contents never change as new posts arrive,
 and changing the size later renumbers every page in the archive.
+
+### Four starting points
+
+Every key above is optional except the handful in `site:` and `banner:`,
+which is easy to say and hard to act on when you are looking at six
+hundred commented lines for the first time. So: four kinds of site, and
+the keys each one actually turns on. Everything not named stays at its
+default, and a default is a working site.
+
+Written here rather than shipped as four `site.yml` variants on purpose.
+A copy of the config is a copy that goes stale the first time a key is
+added, and then somebody starts from a file that quietly disagrees with
+the engine. The reference is `config/site.yml.example`; this is a
+reading order through it.
+
+**A plain blog.** `site:` (title, author, `base_url`, `lang`, `timezone`)
+and `banner:`. That is the whole minimum, and the file says so at the
+top. Add `about:`, `footer:` and `social:` when you want the chrome
+filled in.
+
+**A photo blog.** As above, plus `media.convert_heic: true` if the
+pictures come off an iPhone, and `media.remux_video: true` if there are
+videos and `ffmpeg` is on the machine. Leave `media.strip_location`
+alone: it is on by default and that is the setting that keeps your
+address out of the pictures. Consider a smaller `site.page_size` -- a
+listing card is measured in height, not characters, so a page of photo
+posts is several times taller than a page of text ones.
+
+**A newsletter.** `publishing.slots:` so posts go out on a schedule
+rather than when you happen to be at the keyboard, and cron to run it
+(see [operations](operations.md)). The announce settings live in
+`env.sh`, not here. `comments.approval: fav` if replies should appear
+only once you have favourited them.
+
+**A Fediverse-facing site.** `comments:` pointed at your instance,
+`widgets:` for the sidebar, and the Mastodon or Bluesky credentials in
+`env.sh`. `seo.block_ai_crawlers: true` if you would rather the text was
+not scraped for training; it writes the robots rules and nothing else.
 
 ## 3. Configure the environment -- `env.sh`
 

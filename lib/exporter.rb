@@ -4,11 +4,14 @@ require 'json'
 require 'fileutils'
 require 'time'
 require 'yaml'
+require_relative 'site_config'
 require_relative 'markdown_writer'
 require_relative 'embed'
 require_relative 'file_size'
 require_relative 'post_address'
 require_relative 'path_glob'
+require_relative 'path_safety'
+require_relative 'atomic_write'
 
 # lib/exporter.rb -- the archive as a tree of markdown files: what
 # `./blog.sh export` writes, and the mirror of lib/import/. The engine
@@ -31,8 +34,17 @@ module Exporter
   # out, and what did not survive the format. `fallbacks` is a Hash of
   # block type => count (see html_fallback), `collisions` the number of
   # files that had to be renamed to avoid overwriting each other.
+  #
+  # `failed` is [[file, reason], ...] for posts that could not be written,
+  # `kept` the paths of files already in the target that no export of
+  # this site wrote and that were therefore left alone, and `unnamed` the
+  # media files copied that no block names -- which a re-import does not
+  # bring back.
   Result = Struct.new(:posts, :drafts, :pages, :media, :bytes, :fallbacks,
-                      :collisions, keyword_init: true)
+                      :collisions, :failed, :kept, :unnamed, keyword_init: true)
+
+  # The line that closes a block comment's HTML (see block_comment).
+  BLOCK_END = '<!-- /blogsh:block -->'
 
   # Where a post's media lives in the export, relative to its root. The
   # year is the archive's own directory rather than the post's date:
@@ -51,15 +63,94 @@ module Exporter
     posts = load_posts(root)
     posts = posts.reject { |p| draft?(p) } unless drafts
     result = Result.new(posts: 0, drafts: 0, pages: 0, media: 0, bytes: 0,
-                        fallbacks: Hash.new(0), collisions: 0)
+                        fallbacks: Hash.new(0), collisions: 0, failed: [], kept: [], unnamed: 0)
     taken = {}
 
+    write_site_identity(target, result) unless dry_run
+
     posts.each_with_index do |post, index|
-      export_post(post, root: root, target: target, taken: taken,
-                  dry_run: dry_run, result: result)
+      # One post that cannot be written is one post missing, named in the
+      # summary and in the exit code -- not the end of the export. The
+      # loop used to have no rescue at all: a stray byte from an old
+      # latin-2 import took the whole run down at the first post that
+      # carried one, everything after it in alphabetical order stayed at
+      # home, no summary was written to say so, and the half-filled
+      # directory then refused a second attempt without --force. An
+      # export is what somebody runs when something is already wrong;
+      # load_posts has skipped an unparseable file for exactly that reason
+      # all along, and this is the same courtesy one step further in.
+      begin
+        export_post(post, root: root, target: target, taken: taken,
+                    dry_run: dry_run, result: result)
+      rescue StandardError => e
+        result.failed << [File.join(post['__year'].to_s, "#{post['slug']}.json"),
+                          "#{e.class}: #{e.message.to_s.lines.first.to_s.strip[0, 120]}"]
+      end
       progress&.call(index + 1, posts.size)
     end
     result
+  end
+
+  # Who the tree belongs to, in the file a Jekyll site keeps it in.
+  #
+  # An export used to say nothing about where it came from, and the
+  # importer's answer to "which blog is this" then fell back to the
+  # DIRECTORY the tree happened to be sitting in. That is not an
+  # identity: it changes when the folder is renamed or the export is
+  # unpacked somewhere else, and a post's identity changing is a post the
+  # archive can no longer recognise as one it already has. Importing an
+  # export into an archive that already held it therefore wrote every
+  # post a second time, under a serial slug, and left the two of them
+  # claiming one address.
+  #
+  # `url` and `title` are the two keys the importer reads for this, in
+  # the file it reads them from -- so a tree that goes to Jekyll is also
+  # a slightly more complete Jekyll site than it was, which is the
+  # direction this export is supposed to point anyway.
+  #
+  # Never over a _config.yml this export did not write. The most likely
+  # target of all is a freshly cloned repository of the site being moved
+  # to, and its _config.yml is that whole site's configuration -- plugins,
+  # permalinks, markdown engine -- which --force replaced with two lines
+  # while the message promised nothing would be touched. A file that holds
+  # only the two keys written here is ours to refresh; anything else is
+  # left exactly as it is and named in the summary. The importer no longer
+  # needs this file to recognise its own tree (the posts say so), so
+  # leaving it out costs nothing but the tidier identity.
+  def write_site_identity(target, result)
+    url = SiteConfig.get('site', 'base_url', default: '').to_s.strip
+    title = SiteConfig.get('site', 'title', default: '').to_s.strip
+    return if url.empty? && title.empty?
+
+    FileUtils.mkdir_p(target)
+    config = {}
+    config['url'] = url unless url.empty?
+    config['title'] = title unless title.empty?
+    path = File.join(target, '_config.yml')
+    if File.exist?(path) && !own_config?(path)
+      result.kept << '_config.yml'
+      return
+    end
+
+    AtomicWrite.write(path, YAML.dump(config), durable: false)
+  end
+
+  def own_config?(path)
+    data = YAML.safe_load(File.read(path, encoding: 'utf-8'))
+    data.is_a?(Hash) && !data.empty? && (data.keys.map(&:to_s) - %w[url title]).empty?
+  rescue StandardError
+    false
+  end
+
+  # A post file an export of this engine wrote: front matter whose native
+  # half sits under `blogsh:`, which every post this module writes carries
+  # (its state is always there). Read as text rather than parsed -- the
+  # question is only whose file it is.
+  def own_post_file?(path)
+    head = File.read(path, 64_000, encoding: 'utf-8').to_s.scrub
+    head.start_with?("---\n") && head.match?(/^blogsh:\s*$/)
+  rescue StandardError
+    false
   end
 
   # The same walk lib/checker.rb makes, kept separate on purpose: that
@@ -103,20 +194,34 @@ module Exporter
   def export_post(post, root:, target:, taken:, dry_run:, result:)
     year = post['__year'].to_s
     slug = post['slug'].to_s
-    dir = dir_for(post)
-    name = file_name(post, slug, dir, taken, result)
-    path = File.join(target, *dir, name)
-    media_rel = "/#{ASSETS}/#{year}/#{slug}"
-
-    body, fallbacks = render_blocks(post['content'], media_rel)
-    fallbacks.each { |type, count| result.fallbacks[type] += count }
-
-    unless dry_run
-      FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, "#{front_matter(post)}#{body}\n", encoding: 'utf-8')
+    # The slug and the year become a path, and a hand-edited archive can
+    # carry a slug with a separator or a `..` in it. Joined as it stood,
+    # "../../../x" wrote a file above the directory somebody pointed the
+    # export at, and "a/../../x" put a post at the root of the tree, where
+    # a re-import reads it as a PAGE. Refused and named, like any post
+    # that cannot be written: such a slug cannot be built either.
+    unless PathSafety.safe_segment?(slug) && year.match?(/\A\d{4}\z/)
+      raise ArgumentError, "#{slug.inspect} is not a slug that can be a file name"
     end
 
-    copy_media(root, target, year, slug, dry_run: dry_run, result: result)
+    dir = dir_for(post)
+    # Rendered before a name is claimed: a post that fails here must not
+    # leave its name taken, or the next post of the same name gets a -2
+    # for a file that was never written.
+    media_rel = "/#{ASSETS}/#{year}/#{slug}"
+    body, fallbacks = render_blocks(post['content'], media_rel)
+    text = "#{front_matter(post)}#{body}\n"
+
+    name = file_name(post, slug, dir, taken, result, target: dry_run ? nil : target)
+    path = File.join(target, *dir, name)
+    fallbacks.each { |type, count| result.fallbacks[type] += count }
+
+    # Through a sibling temp and a rename: an export interrupted mid-post
+    # leaves the previous file or nothing, never half of one that a
+    # re-import would take at face value.
+    AtomicWrite.write(path, text, durable: false) unless dry_run || (File.exist?(path) && File.read(path, encoding: 'utf-8') == text)
+
+    copy_media(root, target, year, slug, dry_run: dry_run, result: result, named: named_media(post))
 
     if page?(post) then result.pages += 1
     elsif draft?(post) then result.drafts += 1
@@ -133,7 +238,11 @@ module Exporter
     draft?(post) ? ['_drafts'] : ['_posts']
   end
 
-  def file_name(post, slug, dir, taken, result)
+  # `target:` (nil on a dry run) is where a name already in use by a file
+  # nobody here wrote is stepped around, the way a name taken earlier in
+  # this run is: a post of ours goes beside a stranger's file, never over
+  # it. A file an earlier export of this site wrote is ours to refresh.
+  def file_name(post, slug, dir, taken, result, target: nil)
     base = if page?(post) || draft?(post)
              slug
            else
@@ -147,7 +256,14 @@ module Exporter
     # collision reported where there is none.
     name = base
     suffix = 1
-    while taken[File.join(*dir, name)]
+    foreign = lambda do |candidate|
+      next false if target.nil?
+
+      existing = File.join(target, *dir, "#{candidate}.md")
+      File.exist?(existing) && !own_post_file?(existing)
+    end
+    while taken[File.join(*dir, name)] || foreign.call(name)
+      result.kept << File.join(*dir, "#{name}.md") if foreign.call(name) && !result.kept.include?(File.join(*dir, "#{name}.md"))
       suffix += 1
       name = "#{base}-#{suffix}"
       result.collisions += 1
@@ -170,7 +286,17 @@ module Exporter
   # type learns to carry all live here, and an export that copied only
   # what today's writer happens to reference would quietly thin the
   # archive out. Copies, never moves: the original stays where it is.
-  def copy_media(root, target, year, slug, dry_run:, result:)
+  #
+  # Counted twice over, because the whole directory is not the whole story
+  # on the way back: Import::Jekyll brings home what a block names, and a
+  # file no block names -- a deleted video's poster, an attachment taken
+  # out of the post -- stays in the tree. The summary used to count those
+  # as exported, which on a round trip they are not; it says how many now.
+  #
+  # And never over a different file already in the target. A file with
+  # the same bytes is left as it is; one with other bytes is not this
+  # export's to replace and is named in the summary.
+  def copy_media(root, target, year, slug, dry_run:, result:, named: [])
     source = File.join(root, 'media.nosync', year, slug)
     return unless Dir.exist?(source)
 
@@ -181,7 +307,29 @@ module Exporter
 
       result.media += 1
       result.bytes += File.size(file)
-      FileUtils.cp(file, File.join(dest, File.basename(file))) unless dry_run
+      result.unnamed += 1 unless named.include?(File.basename(file))
+      next if dry_run
+
+      out = File.join(dest, File.basename(file))
+      if File.exist?(out)
+        next if File.size(out) == File.size(file) && FileUtils.compare_file(out, file)
+
+        result.kept << File.join(ASSETS, year, slug, File.basename(file))
+        next
+      end
+      FileUtils.cp(file, out)
+    end
+  end
+
+  # The file names a post's blocks refer to -- the set a re-import brings
+  # back.
+  def named_media(post)
+    Array(post['content']).flat_map do |block|
+      next [] unless block.is_a?(Hash)
+
+      %w[media poster].flat_map do |key|
+        Array(block[key]).filter_map { |entry| entry['url'].to_s if entry.is_a?(Hash) && !entry['url'].to_s.empty? }
+      end
     end
   end
 
@@ -243,11 +391,11 @@ module Exporter
         # The comment still goes, with no HTML under it: it costs one line
         # every engine drops on the floor, and it is what brings the
         # spacer home again on a re-import.
-        next block_comment(block, media_rel) if spacer?(block)
+        next "#{block_comment(block, media_rel)}\n#{BLOCK_END}" if spacer?(block)
       end
 
       fallbacks[type] += 1
-      "#{block_comment(block, media_rel)}\n#{html_fallback(block, media_rel)}"
+      "#{block_comment(block, media_rel)}\n#{html_fallback(block, media_rel)}\n#{BLOCK_END}"
     end
     [parts.reject { |p| p.to_s.empty? }.join("\n\n"), fallbacks]
   end
@@ -271,6 +419,17 @@ module Exporter
   # "--" is escaped as a JSON string escape (still the same string to any
   # JSON reader): a caption containing "-->" would otherwise close the
   # comment early and spill markup into the page.
+  #
+  # Closed by BLOCK_END on the line after the HTML, since 1.8. The reader
+  # used to take the HTML as running "to the blank line", and HTML is
+  # allowed blank lines: an Instagram or Twitter embed from Tumblr, or a
+  # link card whose description had two paragraphs, came home with the
+  # rest of its markup as a paragraph of visible text -- on the page, in
+  # og:description, in the toot. And a spacer, which has no HTML under
+  # its comment at all, took the NEXT paragraph with it. A closing line
+  # ends the block wherever the HTML does. It sits against the HTML with
+  # no blank line, so to any markdown parser it is part of the same HTML
+  # block and as invisible as the opening comment.
   def block_comment(block, media_rel)
     json = JSON.generate(with_export_paths(block, media_rel)).gsub('--', '-\\u002d')
     "<!-- blogsh:block #{json} -->"

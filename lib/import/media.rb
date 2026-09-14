@@ -3,6 +3,7 @@
 require 'net/http'
 require 'uri'
 require 'fileutils'
+require_relative '../feed_http'
 require_relative '../media_dimensions'
 
 module Import
@@ -35,6 +36,22 @@ module Import
     # asked for. Same shape here.
     RETRIES = 4
     RETRY_BACKOFF = 15
+
+    # Net::HTTP.get_response reads the whole body before anybody can
+    # object, so a remote that answers with an endless stream -- or with
+    # a merely enormous one -- decided how much memory an import takes.
+    # Reading in chunks and stopping at a ceiling caps that at the
+    # ceiling plus one read. The number is far above any picture and
+    # above the videos these importers meet in real exports; a file
+    # legitimately bigger than this wants fetching by hand rather than in
+    # the middle of a run that takes hours.
+    MAX_BODY = 256 * 1024 * 1024
+    # Net::HTTP's own defaults are 60 s each and there is no total bound,
+    # so a host that answers slowly enough could hold an import open for
+    # as long as it liked. THROTTLED already treats both of these as
+    # "not now" and retries them.
+    OPEN_TIMEOUT = 15
+    READ_TIMEOUT = 30
 
     # The failures worth waiting that long for: the server is there and
     # saying "not now". A name that does not resolve is a host that has
@@ -478,7 +495,7 @@ module Import
 
       res =
         begin
-          Net::HTTP.get_response(uri)
+          get_response(uri)
         rescue StandardError => e
           if retries.positive?
             sleep backoff(retries, throttled: THROTTLED.any? { |kind| e.is_a?(kind) })
@@ -498,6 +515,17 @@ module Import
         rescue StandardError
           res['location']
         end
+        # The same rule the sidebar's transport keeps: an import is
+        # pointed at somebody else's archive on purpose, and the address
+        # it was pointed at is the operator's business -- but the host at
+        # the other end does not get to send the fetch to 127.0.0.1 or to
+        # the address a cloud answers its credentials on.
+        parsed_target = parse_url(target.to_s)
+        if parsed_target && FeedHttp.public_target?(uri) && !FeedHttp.public_target?(parsed_target)
+          warn "  fetch refused #{target}: a redirect off the public internet"
+          return nil
+        end
+
         fetch(target, redirects: redirects - 1, retries: retries)
       when Net::HTTPSuccess then res.body
       when Net::HTTPServerError, Net::HTTPTooManyRequests
@@ -528,6 +556,28 @@ module Import
     end
 
     ESCAPER = defined?(URI::RFC2396_PARSER) ? URI::RFC2396_PARSER : URI::DEFAULT_PARSER
+
+    # What Net::HTTP.get_response was doing, with a bound on how long it
+    # may take and on how much it may hand back. The response object is
+    # the same one the case below matches on, with its body already read
+    # -- so nothing downstream has to know the bytes arrived in pieces.
+    def self.get_response(uri)
+      Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https',
+                                          open_timeout: OPEN_TIMEOUT,
+                                          read_timeout: READ_TIMEOUT) do |http|
+        http.request(Net::HTTP::Get.new(uri)) do |response|
+          if response.is_a?(Net::HTTPSuccess)
+            body = +''
+            response.read_body do |chunk|
+              body << chunk
+              raise "response too large (over #{MAX_BODY} bytes)" if body.bytesize > MAX_BODY
+            end
+            response.body = body
+          end
+          return response
+        end
+      end
+    end
 
     def self.parse_url(url)
       URI(url)

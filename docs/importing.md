@@ -367,6 +367,18 @@ nothing is lost to an HTML round-trip. `.html` bodies take the HTML
 path instead. Liquid `{% highlight %}` becomes a code block; other
 Liquid tags are dropped.
 
+**This is also the way back in for blog.sh's own export -- into an EMPTY
+archive.** The export writes a `_config.yml` naming the site it came
+from, so the wizard recognises its own tree and says so before it asks
+for confirmation. Heed it: a post that carries an identity of its own
+(imported from Twitter, Ghost, a feed) is matched by it and updated in
+place, but everything typed by hand carries `{platform: manual}` and
+nothing else, and two of those are never matched to each other -- pairing
+them would overwrite one person's writing with another's. Into an archive
+that already holds those posts, every hand-written one is written again
+under a serial slug, and `check` will not report it: the copy has an
+address of its own.
+
 **Images come from the tree where the tree has them.** A root-relative
 path resolves against the site root and a relative one against the post,
 and neither needs the network: that half works for a site that died years

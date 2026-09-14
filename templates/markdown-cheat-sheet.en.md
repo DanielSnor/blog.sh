@@ -291,6 +291,14 @@ An exclamation mark, alt text in square brackets, path in round ones. A title in
 
 An image has to sit on its own line, separated by blank lines. It can't be written mid-paragraph — saving stops and warns in that case.
 
+Two or more images in a row, with nothing but blank lines between them, become a gallery on the site: two side by side, an odd last one across the full width. Photos in one row get the same height and whatever sticks out is cropped — a landscape photo next to a portrait one loses its edges. To keep images one under another, put some text between them.
+
+```
+![First photo](first.jpg)
+
+![Second photo](second.jpg)
+```
+
 The path can point anywhere on disk, the file gets copied automatically. A bare filename with no path is looked up in the `incoming/` directory — handy when writing from a phone: upload the photo over SFTP and reference it by name alone.
 
 ## Video

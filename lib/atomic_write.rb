@@ -2,6 +2,7 @@
 
 require 'json'
 require 'fileutils'
+require 'securerandom'
 
 # lib/atomic_write.rb -- replace a file's contents, or leave the file
 # exactly as it was.
@@ -21,31 +22,111 @@ require 'fileutils'
 module AtomicWrite
   module_function
 
-  def write(path, content)
+  # permissions: the mode the finished file must end up with. A rename
+  # REPLACES the target, mode and all, so without saying so a file that
+  # was 0644 comes back as whatever the umask allowed the temp -- and
+  # under a strict umask (0077) that is a page the web server can no
+  # longer read. Left unsaid, the target's own mode is kept, and a file
+  # that did not exist yet gets the umask's answer, exactly as a plain
+  # File.write would have given it.
+  # durable: whether to wait for the disk before calling the write done.
+  #
+  # Two different promises live in this method and they are worth telling
+  # apart. ATOMICITY -- a sibling temp renamed into place -- costs almost
+  # nothing and protects against the common disaster: a process killed
+  # mid-write, a full volume, a container stopped. DURABILITY, the two
+  # fsyncs, protects against a much rarer one: the machine losing power
+  # between the write and the disk actually taking it. It is not free.
+  # Measured over a thousand-post archive, the fsyncs made a cold build
+  # 25% slower -- every page, feed and index waiting twice for a disk.
+  #
+  # So the archive pays and the output does not. A post is the only copy
+  # of something somebody wrote; if the power goes during a save, nothing
+  # brings it back. public.nosync is derived: if the power goes during a
+  # build, the next build writes it again, which is a thing that happens
+  # anyway. Buying insurance against losing what can be regenerated in two
+  # seconds is how a build ends up slower for no one's benefit.
+  #
+  # Atomicity stays on both paths, because a half-written page is served
+  # to readers and a rename is what makes that impossible.
+  def write(path, content, permissions: nil, binary: false, durable: true)
     dir = File.dirname(path)
     FileUtils.mkdir_p(dir)
-    tmp = File.join(dir, ".#{File.basename(path)}.tmp#{Process.pid}")
+    tmp = temp_name(path, dir)
+    mode = permissions || current_mode(path)
 
     begin
-      File.open(tmp, 'w') do |f|
+      # EXCL so this can never write THROUGH a name something else made:
+      # the temp file is ours or the write does not happen at all.
+      File.open(tmp, File::WRONLY | File::CREAT | File::EXCL) do |f|
+        f.binmode if binary
         f.write(content)
         f.flush
         # Without fsync the rename can land before the data does, so a
         # power cut or a hard container stop can leave the new name
         # pointing at an empty file -- the very outcome this exists to
         # prevent.
-        f.fsync
+        f.fsync if durable
       end
+      File.chmod(mode, tmp) if mode
       File.rename(tmp, path)
-    rescue StandardError
+      sync_dir(dir) if durable
+    rescue Exception => e # rubocop:disable Lint/RescueException -- a signal must not leave a .tmp behind either
+      # Exception, not StandardError, for the reason PostWriter's rescue
+      # gives: Ctrl-C is not a StandardError, and an interrupted save left
+      # a .<name>.tmp<pid>.<hex> lying in the archive next to the post --
+      # a file nothing ever collects, because the next run's temp carries
+      # a different random tail.
       File.delete(tmp) if File.exist?(tmp)
-      raise
+      raise unless e.is_a?(SystemCallError)
+
+      # Named by the file somebody was trying to write, not by the
+      # sibling temp. The temp is an implementation detail, it is deleted
+      # one line above, and an operator handed
+      # ".index.html.tmp18686.3cff2aa4" cannot find it, grep it, or fix
+      # its directory -- while the name that IS the problem, index.html,
+      # did not appear in the message at all.
+      raise e.class, path, e.backtrace
     end
 
     path
   end
 
-  def write_json(path, data)
-    write(path, JSON.pretty_generate(data))
+  # What File.binwrite was for, without its truncate-first bargain: the
+  # bytes go down untranslated, and a failure leaves the previous file
+  # whole. The build's pages, feeds and indexes are written through here.
+  # durable: false by default, and this is the one caller that wants it
+  # that way -- see write. Everything written through here is the build's
+  # own output, which the next build produces again from the archive.
+  def binwrite(path, content, permissions: nil, durable: false)
+    write(path, content, permissions: permissions, binary: true, durable: durable)
+  end
+
+  def write_json(path, data, permissions: nil)
+    write(path, JSON.pretty_generate(data), permissions: permissions)
+  end
+
+  # A name nothing else can be holding. ".<name>.tmp<pid>" was not one:
+  # two writers inside a single process share the pid, and a pid is
+  # handed out again after the run that left a temp behind is gone.
+  def temp_name(path, dir)
+    File.join(dir, ".#{File.basename(path)}.tmp#{Process.pid}.#{SecureRandom.hex(6)}")
+  end
+
+  def current_mode(path)
+    File.stat(path).mode & 0o7777
+  rescue SystemCallError
+    nil
+  end
+
+  # The fsync above makes the file's CONTENT durable; the rename that
+  # gives it its name is a change to the DIRECTORY, and a hard stop can
+  # lose the name while the bytes sit safely on the disk. Not every
+  # platform implements it, and a directory that cannot be synced is not
+  # worth failing an otherwise finished write over.
+  def sync_dir(dir)
+    Dir.open(dir, &:fsync)
+  rescue NotImplementedError, StandardError
+    nil
   end
 end

@@ -189,6 +189,13 @@ if repair
         failed += 1
         puts Tui.paint("   #{I18n.t('check.repair_failed')}", :red)
       end
+      # What the repair had to add beyond yes or no -- the post changed
+      # under the run, or one layer of entities came off and another is
+      # left. "Could not be applied" with no reason is a sentence nobody
+      # can act on.
+      if done != RunLock::BUSY && (note = Repair.last_note)
+        puts Tui.paint("   #{I18n.t(note[0], **note[1])}", :dim)
+      end
     else
       skipped += 1
     end

@@ -9,6 +9,7 @@ require 'timeout'
 require 'time'
 require_relative 'entity_text'
 require_relative 'post_address'
+require_relative 'path_safety'
 require_relative 'slug'
 require_relative 'i18n'
 require_relative 'path_glob'
@@ -170,33 +171,54 @@ module Checker
     # build dies on "empty" and exited 0, the exact silent drop the
     # @unreadable machinery exists to prevent.
     if posts.empty?
-      unbuildable = check_unbuildable(posts, cap)
+      unbuildable = guard(:unbuildable) { check_unbuildable(posts, cap) }
       # Parked leftovers are asked about here too. A crash mid-swap can
       # leave every post in the archive standing under a parking name, and
       # an archive that reads as empty ONLY because its posts are hidden
       # is the one case where "no posts yet" is the worst thing to say:
-      # it is the answer that sends the author away.
-      parked = check_parked_leftovers(root, posts)
+      # it is the answer that sends the author away. Misplaced posts for
+      # the same reason: an archive copied one folder too deep holds every
+      # post it ever had and reads as empty.
+      parked = guard(:parked_leftovers) { check_parked_leftovers(root, posts) } +
+               guard(:misplaced_posts) { check_misplaced_posts(root) }
       return config + unbuildable + parked if config.any? || unbuildable.any? || parked.any?
 
       return [warn(t('no_posts'), kind: :no_posts)]
     end
 
-    known = known_paths(posts)
     findings = config
-    findings.concat(check_unbuildable(posts, cap))
-    findings.concat(check_parked_leftovers(root, posts))
-    findings.concat(check_media(root, posts, progress, cap))
-    findings.concat(check_degenerate_images(posts, cap))
-    findings.concat(check_internal_links(posts, known, cap))
-    findings.concat(check_relative_links(posts, cap))
-    findings.concat(check_orphan_media(root, posts, cap))
-    findings.concat(check_stray_media(root, posts, cap))
-    findings.concat(check_redirects(posts, cap))
-    findings.concat(check_redirect_entries(posts, cap))
-    findings.concat(check_series_names(posts, cap))
-    findings.concat(check_duplicate_addresses(posts))
-    findings.concat(check_html_entities(posts, cap))
+    # Every question is asked through guard, so one that raises is one
+    # finding and not the end of the run. A post whose `media` was an
+    # object rather than a list took check down with a raw TypeError
+    # before it had reported anything -- no findings, no summary, and
+    # under --json not even a document to parse -- which over a thousand
+    # posts hid the state of all the others behind one broken file. The
+    # build at least got as far as another post.
+    known = nil
+    findings.concat(guard(:unbuildable) { check_unbuildable(posts, cap) })
+    findings.concat(guard(:parked_leftovers) { check_parked_leftovers(root, posts) })
+    findings.concat(guard(:misplaced_posts) { check_misplaced_posts(root) })
+    findings.concat(guard(:known_paths) { known = known_paths(posts); [] })
+    findings.concat(guard(:media) { check_media(root, posts, progress, cap) })
+    findings.concat(guard(:degenerate_images) { check_degenerate_images(posts, cap) })
+    # Without the set of known addresses every internal link would look
+    # dead, and a wall of false reds is worse than the one finding that
+    # says this question could not be asked.
+    findings.concat(guard(:internal_links) { known ? check_internal_links(posts, known, cap) : [] })
+    findings.concat(guard(:relative_links) { check_relative_links(posts, cap) })
+    findings.concat(guard(:orphan_media) { check_orphan_media(root, posts, cap) })
+    findings.concat(guard(:stray_media) { check_stray_media(root, posts, cap) })
+    findings.concat(guard(:redirects) { check_redirects(posts, cap) })
+    findings.concat(guard(:redirect_entries) { check_redirect_entries(posts, cap) })
+    findings.concat(guard(:series_names) { check_series_names(posts, cap) })
+    # cap passed like everywhere else. Its absence meant the default of
+    # twenty applied even under --json, which passes nil precisely to get
+    # everything: 25 real address collisions came out as 20 and an
+    # `and_more` with nothing but a count in it -- errors the build dies
+    # on, five of them impossible to find from the document.
+    findings.concat(guard(:duplicate_addresses) { check_duplicate_addresses(posts, cap) })
+    findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
+    findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
 
@@ -206,6 +228,19 @@ module Checker
       cache.save
     end
     findings
+  end
+
+  # One question that raises becomes one finding naming the question and
+  # the exception, and the run goes on. Named loudly on purpose: this can
+  # also be a bug in this file, and a rescue that said nothing would hide
+  # exactly that. An error, so check exits non-zero and no all_clear is
+  # printed over it.
+  def guard(name)
+    yield
+  rescue StandardError => e
+    reason = "#{e.class}: #{e.message.to_s.lines.first.to_s.strip[0, 120]}"
+    [error(t('check_failed', check: name.to_s, reason: reason), t('check_failed_fix'),
+           kind: :check_failed, data: { 'check' => name.to_s, 'error' => e.class.to_s })]
   end
 
   # --- reading the archive ------------------------------------------------
@@ -362,14 +397,59 @@ module Checker
       # A slug is one path segment. A hand-edited or imported one carrying a
       # slash or a `..` turns the post's address into a path that climbs
       # out of where the build writes -- the build chokes on it while check
-      # called the archive sound. The engine's own slugs are [a-z0-9-];
-      # only the genuinely dangerous shapes are flagged, so a unicode slug
-      # from an import is left alone.
+      # called the archive sound. Asked of PathSafety, which is the same
+      # question the writer now refuses on, so the two cannot drift into
+      # disagreeing about what an archive may hold. A unicode slug from an
+      # import is still left alone: only the shapes a path cannot survive
+      # are flagged.
       slug = post['slug'].to_s
-      if slug.include?('/') || slug.split(/[\\\/]/).include?('..') || slug.start_with?('.') || slug.include?("\0")
+      unless PathSafety.safe_segment?(slug)
         findings << error(t('post_bad_slug', file: short_path(post['__path'].to_s), slug: slug.inspect),
                           t('post_bad_slug_fix'), kind: :post_bad_slug,
                           data: { 'file' => post['__path'].to_s, 'slug' => slug })
+      end
+      # The draft token is the other half of a draft's address
+      # (/draft/<token>/<slug>/), and the writer asks PathSafety about BOTH
+      # before it saves -- this asked about the slug alone. A token of
+      # "../../elsewhere" was called sound while the build died on it at
+      # PathSafety.contained!, which is the drift the comment above says
+      # asking the same question prevents. safe_segment?, not hex_token?:
+      # an unusual token is a guessable preview address and nothing worse,
+      # and the writer accepts it for that reason.
+      token = post['draft_token'].to_s
+      unless token.empty? || PathSafety.safe_segment?(token)
+        findings << error(t('post_bad_draft_token', file: short_path(post['__path'].to_s), token: token.inspect),
+                          t('post_bad_draft_token_fix'), kind: :post_bad_draft_token,
+                          data: { 'file' => post['__path'].to_s, 'token' => token })
+      end
+      # Tags are walked as a list by the page, the tag listings and the
+      # structured head; a string or an object there was sound to check and
+      # a raw NoMethodError to the build. nil is an absent list and fine.
+      unless post['tags'].nil? || post['tags'].is_a?(Array)
+        findings << error(t('post_tags_unreadable', file: short_path(post['__path'].to_s), value: post['tags'].class.to_s),
+                          t('post_tags_unreadable_fix'), kind: :post_tags_unreadable,
+                          data: { 'file' => post['__path'].to_s })
+      end
+      # ...and one level into the blocks, where the same hole was. The four
+      # collections the build walks element by element and reads keys out
+      # of: a picture's media and poster, a list's items, a text's
+      # formatting spans. Each must be a list of objects or absent -- the
+      # exact shapes that made the build stop on an Array#[] TypeError while
+      # this tool called the archive sound, and that took check_degenerate_
+      # images down with them.
+      Array(post['content']).each_with_index do |block, index|
+        next unless block.is_a?(Hash)
+
+        BLOCK_COLLECTIONS.each do |key, entries_are_objects|
+          value = block[key]
+          next if value.nil?
+          next if value.is_a?(Array) && (!entries_are_objects || value.all? { |v| v.is_a?(Hash) })
+
+          findings << error(t('post_block_unreadable', file: short_path(post['__path'].to_s), block: index + 1,
+                                                       key: key, value: value.class.to_s),
+                            t('post_block_unreadable_fix'), kind: :post_block_unreadable,
+                            data: { 'file' => post['__path'].to_s, 'block' => index + 1, 'key' => key })
+        end
       end
       next if parseable_date?(post['date'])
 
@@ -379,6 +459,40 @@ module Checker
                         data: { 'file' => post['__path'].to_s })
     end
     capped(findings, cap)
+  end
+
+  # Each of these must be a list or absent: the build takes .first of it,
+  # or maps over it, and an object or a string there stops it. Whether
+  # each ENTRY must be an object is kept per key and only where the build
+  # dies without one: a list item is asked .key? and a string has no such
+  # method, while a picture given as a bare string merely renders nothing
+  # (String#[] answers nil) -- a broken post, but not an unbuildable one,
+  # and this question promises the second.
+  BLOCK_COLLECTIONS = { 'media' => false, 'poster' => false, 'items' => true, 'formatting' => false }.freeze
+
+  # A post file the build never reads. Posts are read from exactly
+  # content.nosync/posts/<dir>/<file>.json -- two levels, nothing else --
+  # so one sitting directly in posts/ or a level deeper (an rsync with the
+  # wrong trailing slash, an export unpacked one folder too far in, a cp
+  # into the wrong place) is in the archive and on no page. Neither this
+  # tool nor the build said a word, and the report ended "the archive is
+  # sound (2 posts)" over four. Hidden names are left alone: a parking
+  # name is check_parked_leftovers' to report, and a dotfile is nobody's
+  # post.
+  def check_misplaced_posts(root)
+    dir = File.join(root, 'content.nosync', 'posts')
+    return [] unless Dir.exist?(dir)
+
+    read = PathGlob.under(dir, '*', '*.json').to_set
+    PathGlob.under(dir, '**', '*.json').sort.filter_map do |path|
+      next if read.include?(path)
+
+      rel = path.sub("#{dir}/", '')
+      next if rel.split('/').any? { |part| part.start_with?('.') }
+
+      warn(t('post_misplaced', file: File.join('content.nosync', 'posts', rel)), t('post_misplaced_fix'),
+           kind: :post_misplaced, data: { 'file' => path })
+    end
   end
 
   # Files a queue move stepped aside and a crash left behind. The parking
@@ -804,7 +918,13 @@ module Checker
       (Array(post['content']) || []).filter_map do |block|
         next unless block.is_a?(Hash) && block['type'] == 'image'
 
-        media = (block['media'] || []).first || {}
+        # A shape check_unbuildable reports is skipped here rather than
+        # read: surviving it is this question's job, naming it is that one's.
+        next unless block['media'].nil? || block['media'].is_a?(Array)
+
+        media = Array(block['media']).first || {}
+        next unless media.is_a?(Hash)
+
         w = Integer(media['width'], exception: false)
         h = Integer(media['height'], exception: false)
         next if w.nil? || h.nil?
@@ -899,13 +1019,22 @@ module Checker
     # and the build reads media from either -- so counting only the folder
     # called a directory the site is serving from "orphaned", and
     # --repair then offered to put a live photograph in the trash.
+    #
+    # Folded on both sides. macOS and iCloud compare names without regard
+    # to letter case or unicode form, so a media directory written in NFD
+    # (restored from an HFS+ backup, rsynced from Linux, unpacked from
+    # another machine) is the very directory the NFC slug reads its
+    # pictures from -- and compared as strings it was "orphaned": check
+    # reported it on every run, --repair offered the trash, the offer
+    # failed without a reason, and the next run said it again. Folding
+    # cannot lose a real orphan; it only stops calling a live one dead.
     owned = posts.flat_map do |post|
       slug = post['slug'].to_s
-      [File.join(post['__year'].to_s, slug), File.join(PostAddress.date_year(post), slug)]
+      [File.join(post['__year'].to_s, slug), File.join(PostAddress.date_year(post), slug)].map { |rel| fold_name(rel) }
     end.to_set
     orphans = PathGlob.under(media_root, '*', '*').select { |p| File.directory?(p) }.filter_map do |dir|
       rel = dir.sub("#{media_root}/", '')
-      rel unless owned.include?(rel)
+      rel unless owned.include?(fold_name(rel))
     end
     return [] if orphans.empty?
 
@@ -952,6 +1081,84 @@ module Checker
   # at all in this state (it would write one over the other and mix their
   # media), so a check that calls the archive sound is telling the author
   # the opposite of what they are about to find out.
+  # A post that looks like a second copy of another: `x-2` beside `x` in
+  # the same year, with the same title, the same moment and the same text.
+  #
+  # That is the shape importing an export back into the archive it came
+  # out of leaves behind. A post carrying a real source is matched by it,
+  # but everything typed by hand carries {platform: manual} and nothing
+  # else, and PostWriter will not match two of those -- so each one is
+  # written again under a serial slug. The copy has an address of its own,
+  # which is why nothing above this ever objected.
+  #
+  # 🪤 Deliberately narrow. A slug ending in a number beside the same slug
+  # without one is ORDINARY: an importer that puts the source's post id in
+  # the slug (b2evolution does) produces exactly that, and one archive
+  # measured before this was written holds 43 such pairs, not one of them
+  # a copy -- same title often, different day always. Asking only "is
+  # there an x beside x-2" would have greeted that site with 43 false
+  # alarms. So all four have to agree: the slug shape, the title, the
+  # instant (parsed, not compared as text, since an export writes its own
+  # spelling of it), and the words. A warning, never an error: it is a
+  # likeness, and two posts are allowed to be alike.
+  def check_duplicate_posts(posts, cap = CAP)
+    by_address = {}
+    posts.each { |post| by_address[[post['__year'].to_s, post['slug'].to_s]] = post }
+
+    findings = posts.filter_map do |post|
+      m = post['slug'].to_s.match(/\A(.+)-(\d+)\z/)
+      next unless m
+
+      year = post['__year'].to_s
+      original = by_address[[year, m[1]]]
+      next unless original && likeness(original) && likeness(original) == likeness(post)
+
+      warn(t('duplicate_post', year: year, copy: post['slug'].to_s, original: original['slug'].to_s),
+           t('duplicate_post_fix'),
+           kind: :duplicate_post,
+           data: { 'year' => year, 'copy' => post['slug'].to_s, 'original' => original['slug'].to_s })
+    end
+    capped(findings, cap)
+  end
+
+  # What two posts must share to be called copies of each other. nil when
+  # the date cannot be read, so an unparseable post is never matched.
+  #
+  # The WHOLE content, not only the text blocks. Everything else -- a
+  # link, a quote, a list, a picture -- used to be left out of the
+  # comparison, so two link posts that opened with the same line and
+  # pointed at different articles, or two quote posts with no text block
+  # at all, came out as "same title, same date, same text" with the advice
+  # to delete the numbered one. That is a real post, and the tool that
+  # exists to be believed told somebody to throw it away.
+  #
+  # Text blocks are still compared by their words alone: an export read
+  # back in re-parses Markdown, and the spans and subtypes it arrives with
+  # need not match the ones it left with, while the words do. Every other
+  # block is compared whole, with its keys in a fixed order and without
+  # `src` -- where an importer found the file, which is a fact about the
+  # import and not about the post.
+  def likeness(post)
+    instant = Time.parse(post['date'].to_s)
+    blocks = Array(post['content']).select { |b| b.is_a?(Hash) }
+    words = blocks.select { |b| b['type'] == 'text' }.map { |b| b['text'].to_s }.join("\n").strip
+    rest = blocks.reject { |b| b['type'] == 'text' }.map { |b| comparable(b) }
+    [post['title'].to_s.strip, instant.to_i, words, rest]
+  rescue ArgumentError, TypeError
+    nil
+  end
+
+  IMPORT_ONLY_KEYS = %w[src].freeze
+
+  def comparable(value)
+    case value
+    when Hash then value.reject { |k, _| IMPORT_ONLY_KEYS.include?(k) }.sort.map { |k, v| [k, comparable(v)] }
+    when Array then value.map { |v| comparable(v) }
+    when String then value.strip
+    else value
+    end
+  end
+
   def check_duplicate_addresses(posts, cap = CAP)
     # Grouped by EVERY key a post can collide on, and drafts included --
     # both of them mirroring what the build actually refuses to run on.
@@ -965,7 +1172,6 @@ module Checker
       PostAddress.collision_keys(post).each { |key| (ordered[key] ||= []) << post }
     end
     colliding = ordered.select { |_, group| group.size > 1 }
-    return [] if colliding.empty?
 
     # Two pages of one slug dated in one year collide on both of their
     # keys. Report the pair once, under the key that names the address a
@@ -975,8 +1181,39 @@ module Checker
       files = group.map { |post| post['__path'].to_s }.sort
       by_files[files] = [key, group] if by_files[files].nil? || key.first == 'page'
     end
+    findings = by_files.values.map { |key, group| duplicate_finding(key, group) }
 
-    capped(by_files.values.map { |key, group| duplicate_finding(key, group) }, cap)
+    # The same question for two spellings a filesystem may treat as one.
+    # Praha and praha, or ř in NFC and in NFD, are two addresses as strings
+    # and one directory on macOS and on iCloud: the build wrote both into
+    # it, the second post was on no page, its address served the first
+    # one's text -- and both check and the build ended in zero. A warning
+    # rather than an error, because on a case-sensitive server they really
+    # are two; but an archive that syncs through iCloud to such a server is
+    # exactly the one where they will not stay two.
+    folded = {}
+    posts.each do |post|
+      PostAddress.collision_keys(post).each do |key|
+        (folded[[key.first, fold_name(key.last)]] ||= []) << [key.last, post]
+      end
+    end
+    seen = Set.new
+    folded.each_value do |pairs|
+      next if pairs.map(&:first).uniq.size < 2
+
+      group = pairs.map(&:last).uniq
+      files = group.map { |post| post['__path'].to_s }.sort
+      next if group.size < 2 || seen.include?(files)
+
+      seen << files
+      where = files.map { |file| "\n   - #{File.join(File.basename(File.dirname(file)), File.basename(file))}" }.join
+      findings << warn(t('address_fold_duplicate', slugs: group.map { |post| post['slug'].to_s }.uniq.join(', ')),
+                       t('address_fold_duplicate_fix') + where,
+                       kind: :address_fold_duplicate,
+                       data: { 'slugs' => group.map { |post| post['slug'].to_s }.uniq, 'files' => files })
+    end
+
+    capped(findings, cap)
   end
 
   # A page has no year in its address, so a message built from one sends
@@ -1091,6 +1328,67 @@ module Checker
              kind: :"redirect_from_#{refusal}",
              data: { 'slug' => post['slug'].to_s, 'entry' => origin.to_s,
                      'year' => PostAddress.file_year(post).to_s })
+      end
+    end
+    # The other list of old addresses, asked the same way. The build has
+    # always refused the entries it cannot make a directory of, one warn
+    # per entry in the middle of a build log -- and check, which is where
+    # somebody would go looking, did not ask at all: an archive carrying
+    # a former slug that will never be served was called sound.
+    findings += posts.flat_map do |post|
+      Array(post['former_slugs']).filter_map do |former|
+        next if PostAddress.former_slug_refusal(former).nil?
+
+        warn(t('former_slug_unusable', slug: post['slug'].to_s, entry: former.to_s),
+             t('former_slug_unusable_fix'),
+             kind: :former_slug_unusable,
+             data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s,
+                     'year' => PostAddress.file_year(post).to_s })
+      end
+    end
+
+    # And whether the address is still FREE. Both halves above ask about
+    # an entry's shape; neither asked whether a live post or page now
+    # stands at it. former_slugs is written at the moment an address is
+    # vacated, and anything that takes it afterwards -- a new post with
+    # that slug and year, an import, a restore from the trash -- leaves an
+    # old address the build will not serve: it says so in one line in the
+    # middle of its log ("already taken") and moves on, and every link and
+    # announcement pointing there is a 404 from then on. check was clean.
+    #
+    # Asked against the pages the build writes before any redirect stub,
+    # folded the way the build folds what it has written, and never
+    # against the post itself: a post that still holds its own current
+    # address among its former ones is served, by itself.
+    live = {}
+    posts.each do |post|
+      next if draft?(post)
+
+      live[fold_name(post_path(post))] ||= post
+    end
+    posts.each do |post|
+      Array(post['former_slugs']).each do |former|
+        next unless PostAddress.former_slug_refusal(former).nil?
+
+        holder = live[fold_name("/posts/#{former.to_s.split('/').reject(&:empty?).join('/')}/")]
+        next if holder.nil? || holder.equal?(post)
+
+        findings << warn(t('former_slug_taken', slug: post['slug'].to_s, entry: former.to_s, holder: holder['slug'].to_s),
+                         t('former_slug_taken_fix', holder: holder['slug'].to_s), kind: :former_slug_taken,
+                         data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'holder' => holder['slug'].to_s })
+      end
+      Array(post['redirect_from']).each do |origin|
+        next unless PostAddress.redirect_refusal(origin).nil?
+
+        parts = origin.to_s.split('/').reject(&:empty?)
+        next if parts.empty? || parts.last.match?(/\.html?\z/i)
+
+        holder = live[fold_name("/#{parts.join('/')}/")]
+        next if holder.nil? || holder.equal?(post)
+
+        findings << warn(t('redirect_from_taken', slug: post['slug'].to_s, entry: origin.to_s, holder: holder['slug'].to_s),
+                         t('redirect_from_taken_fix', holder: holder['slug'].to_s), kind: :redirect_from_taken,
+                         data: { 'slug' => post['slug'].to_s, 'entry' => origin.to_s, 'holder' => holder['slug'].to_s })
       end
     end
     capped(findings, cap)

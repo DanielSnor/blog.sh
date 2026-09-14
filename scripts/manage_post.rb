@@ -34,6 +34,8 @@ require_relative '../lib/post_text'
 require_relative '../lib/search_query'
 require_relative '../lib/post_address'
 require_relative '../lib/address_guard'
+require_relative '../lib/path_safety'
+require_relative '../lib/series'
 require_relative '../lib/publishing'
 require_relative '../lib/run_lock'
 require_relative '../lib/publish_slots'
@@ -1195,9 +1197,7 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
   # Sixteen hex characters, checked: it becomes a filename on the site, and
   # a name from outside that is not checked is a path from outside.
   receipt = meta['receipt'].to_s.strip
-  unless receipt.empty? || receipt.match?(/\A[0-9a-f]{16}\z/)
-    refuse('bad_receipt', t('cli.receipt_shape'))
-  end
+  refuse('bad_receipt', t('cli.receipt_shape')) unless receipt.empty? || PathSafety.hex_token?(receipt)
 
   # In front of the body, because that is where a link post's card belongs
   # and because the title, when the post has none, is lifted off it.
@@ -1284,8 +1284,16 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
   # and hero/toc are presence-based: only stored where they carry an
   # opinion of their own.
   post['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
-  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  part = Series.part_number(meta['series_part'])
   post['series_part'] = part if part
+  # Said out loud rather than swallowed. A number that could not be read
+  # used to vanish without a word, and the post then sat in the series
+  # wherever its date put it -- which is the one thing the author was
+  # writing the number to prevent. Not a refusal: the post itself is fine,
+  # and `add --json` carries what the save complained about back to the
+  # phone in `warnings` (stderr is folded into that list).
+  warn t('cli.series_part_unreadable', value: meta['series_part'].to_s.strip) if part.nil? &&
+                                                                                !meta['series_part'].to_s.strip.empty?
   # Both stored as typed. The template a new post opens with carries no
   # `hero:` line at all -- there is no post yet whose answer it could show
   # -- so a hero line in this header was written by hand, in whichever
@@ -1619,6 +1627,25 @@ def report_added(path, warnings, json:, publish: false)
   warnings += [t('cli.base_url_missing_preview')] if no_base
   deployed, rebuild_warnings = quietly(json) { rebuild_and_deploy(t('cli.generating_preview')) }
   warnings += rebuild_warnings
+
+  # A delivery that arrives a second time after the post was published
+  # comes back pointing at that post: PostWriter hands the published file
+  # over untouched rather than rewriting it into a draft. The draft answer
+  # below cannot describe it. Its url is built from a draft token the post
+  # no longer has -- "/draft//z-telefonu/", a link to nowhere -- and the
+  # phone showed exactly that, under state "published", as if the retry had
+  # put something new on the site.
+  unless PostAddress.draft?(post)
+    if json
+      puts JSON.pretty_generate(post_answer(path, warnings))
+    else
+      puts t('cli.already_published', slug: post['slug'],
+                                      url: published_url(post['slug'], post_time!(post).year,
+                                                         page: PostAddress.page?(post)))
+      puts
+    end
+    return
+  end
 
   unless json
     puts t('cli.wrote_draft', path: path)
@@ -3551,17 +3578,79 @@ end
 # operations that each used to be its own wizard menu item -- gathering
 # them under the post is what let the menu shrink to activities.
 
+# Where this post will actually STAND in its series, and how many parts
+# that series has -- or nil when it is in none, or when the archive cannot
+# be read for one.
+#
+# A number is a claim, not a position: series_in_order INSERTS a numbered
+# part at the slot it names among the unnumbered ones, so a claim the
+# series cannot honour -- two posts saying "2", a number past the end, a
+# hand-edited 0 -- comes out as some other number on the page. That is the
+# whole reason this exists. Asked of the same function the build and the
+# draft preview ask, so all three say one thing about one series.
+#
+# Costs a walk over the archive, which is why nothing above it does: only
+# a post that is IN a series pays, and an archive without series never
+# calls this at all. The post in hand rather than its file, because it may
+# carry an unsaved change -- and it is put back at its own path, so that
+# the identity lookup below finds this object and not its copy on disk.
+#
+# Anything unreadable -- a sibling with a broken date, a file half-written
+# by another process -- gives up and says nothing. A props screen must not
+# fail to draw because some other post is ill.
+def series_position(post, path)
+  slug = Series.series_slug_of(post)
+  return nil if slug.nil?
+
+  published = []
+  PostWriter.each_post do |other_path, other|
+    next if draft?(other) || other_path == path
+
+    published << other if Series.series_slug_of(other) == slug
+  end
+
+  # A draft is placed the way its preview places it: by the ordering when
+  # it carries a number, and last when it does not -- publishing stamps an
+  # untouched draft with that moment, so its date is not the date the page
+  # will order it by. See the draft branch of series_note in the build.
+  if draft?(post) && Series.part_number(post['series_part']).nil?
+    return [published.size + 1, published.size + 1]
+  end
+
+  ordered = Series.series_in_order(published + [post])
+  at = ordered.index { |p| p.equal?(post) }
+  return nil if at.nil?
+
+  [at + 1, ordered.size]
+rescue StandardError
+  nil
+end
+
 # Returns the row rather than printing it, so the same builder serves both
 # faces: the frame collects the rows, the piped path prints them.
 # "Nový Sean.cz" on its own, or "Nový Sean.cz, part 3" where the post
 # claims a position of its own -- the number means nothing without the
 # name beside it.
-def series_label(post)
+#
+# And where the claim and the position differ, BOTH, because each answers a
+# different question: the number is what to correct, the position is what a
+# reader gets. Showing only the number left this screen agreeing with the
+# file and disagreeing with the page -- two parts both told "part 2" here
+# while the site called one of them the third -- and showing only the
+# position would hide the typo that caused it.
+def series_label(post, path = nil)
   name = post['series'].to_s.strip
   return nil if name.empty?
 
   part = post['series_part']
-  part.to_s.empty? ? name : t('cli.props_series_part', name: name, part: part)
+  return name if part.to_s.empty?
+
+  label = t('cli.props_series_part', name: name, part: part)
+  position, total = path ? series_position(post, path) : nil
+  return label if position.nil? || position.to_s == part.to_s.strip
+
+  key = draft?(post) ? 'cli.props_series_part_after' : 'cli.props_series_part_moved'
+  t(key, label: label, position: position, total: total)
 end
 
 def props_line(key, value)
@@ -3605,7 +3694,7 @@ def props_frame_lines(post, path, slug, year)
   lines << props_line('tags', (post['tags'] || []).join(', '))
   # Shown because it can now be changed from here: a field the dialog can
   # set and does not show is a field somebody sets twice.
-  lines << props_line('series', series_label(post))
+  lines << props_line('series', series_label(post, path))
   lines << props_line('pinned', truthy_frontmatter?(post['pinned']) ? t('cli.props_pinned_yes') : nil)
   # The same two predicates the announcer uses, so this screen predicts
   # what publish will DO rather than re-deriving it: announcement_url is
@@ -4754,8 +4843,10 @@ def edit_post(slug, path: nil)
   # address is derived at build time), and the part number is an override
   # for the rare post published out of order.
   updated['series'] = meta['series'].to_s.strip unless meta['series'].to_s.strip.empty?
-  part = Integer(meta['series_part'].to_s.strip, exception: false)
+  part = Series.part_number(meta['series_part'])
   updated['series_part'] = part if part
+  warn t('cli.series_part_unreadable', value: meta['series_part'].to_s.strip) if part.nil? &&
+                                                                                 !meta['series_part'].to_s.strip.empty?
   # Only stored when it disagrees with the engine's own judgement, so the
   # ordinary post carries no line about a table of contents it was never
   # going to have.

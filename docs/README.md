@@ -13,6 +13,7 @@ guides that go deeper:
 | [importing.md](importing.md) | How do I bring an old blog in -- per-source guides, what gets kept, how to undo? |
 | [skinning.md](skinning.md) | How do I make it look like something else -- without forking the engine? |
 | [localization.md](localization.md) | How do I translate the engine into my language? |
+| [releasing.md](releasing.md) | What has to be true before a tag, and what happens after it? |
 
 ## Where to start, by situation
 

@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require_relative 'i18n'
+require_relative 'atomic_write'
 
 # lib/public_file.rb -- a file on its way to a web server.
 #
@@ -83,15 +84,29 @@ module PublicFile
     false
   end
 
-  # File.write, then the mode -- in that order, because the mode of a file
-  # that does not exist yet is not a thing that can be set.
+  # Through AtomicWrite, like every other write into public.nosync.
+  #
+  # This was the last one that was not, and the files it writes are the
+  # ones a reader's browser fetches on its own: the sidebar's items, the
+  # stats and the comments, refreshed by cron while the site is being
+  # read. File.write opens with "w" -- it truncates first and finds out
+  # afterwards whether it can write -- so a cron run that lost the disk,
+  # the mount or its container left a 0-byte stats.json on the live site,
+  # and the page that fetches it got nothing until the next run. A
+  # sibling temp renamed into place is either the old file or the new one.
+  #
+  # durable: false, for the reason AtomicWrite gives about the build's own
+  # output -- these files are derived from the archive and the next run
+  # writes them again. make_readable stays where it was: AtomicWrite keeps
+  # the target's own mode across the rename, and make_readable is both
+  # what adds the readable bits and what forgives a file we do not own.
   def write(path, content)
     unless claim(path)
       warn I18n.t('build.name_not_ours', path: path)
       return path
     end
 
-    File.write(path, content)
+    AtomicWrite.write(path, content, durable: false)
     make_readable(path)
     path
   end

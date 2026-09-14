@@ -3,6 +3,7 @@
 require 'json'
 require_relative 'site_config'
 require_relative 'public_file'
+require_relative 'post_address'
 require_relative 'pixelfed_fetcher'
 require_relative 'mastodon_fetcher'
 require_relative 'commits_fetcher'
@@ -23,12 +24,15 @@ require_relative 'rss_fetcher'
 # Written by both build/build_blog.rb (every build) and
 # scripts/refresh_sidebar.rb (cron, without rebuilding the whole site).
 module Sidebar
+  # Named from PostAddress, because these land in the root of the site next
+  # to the build's own files, and a page slugged like one of them is a page
+  # this module overwrites every time cron runs.
   ALL_FEEDS = {
-    'pixelfed.json' => PixelfedFetcher,
-    'toots.json' => MastodonFetcher,
-    'commits.json' => CommitsFetcher,
-    'bluesky.json' => BlueskyFetcher,
-    'rss.json' => RssFetcher
+    PostAddress::CRON_FILES[:pixelfed] => PixelfedFetcher,
+    PostAddress::CRON_FILES[:toots] => MastodonFetcher,
+    PostAddress::CRON_FILES[:commits] => CommitsFetcher,
+    PostAddress::CRON_FILES[:bluesky] => BlueskyFetcher,
+    PostAddress::CRON_FILES[:rss] => RssFetcher
   }.freeze
   FEEDS = ALL_FEEDS.select { |_, fetcher| fetcher.configured? }.freeze
 

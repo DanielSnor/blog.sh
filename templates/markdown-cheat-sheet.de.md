@@ -292,6 +292,14 @@ Ein Ausrufezeichen, Alt-Text in eckigen Klammern, Pfad in runden. Nach dem Pfad 
 
 Ein Bild braucht seine eigene Zeile, mit Leerzeilen davor und danach. Mitten im Absatz geht es nicht — das Speichern hält dann an und warnt.
 
+Zwei oder mehr Bilder direkt hintereinander, nur durch Leerzeilen getrennt, werden auf der Website zur Galerie: je zwei nebeneinander, ein ungerades letztes über die volle Breite. Fotos in einer Reihe bekommen dieselbe Höhe, was übersteht, wird abgeschnitten — ein Querformat neben einem Hochformat verliert seine Ränder. Wer die Bilder untereinander haben will, setzt Text dazwischen.
+
+```
+![Erstes Foto](erstes.jpg)
+
+![Zweites Foto](zweites.jpg)
+```
+
 Der Pfad darf irgendwohin auf der Platte zeigen, die Datei wird automatisch kopiert. Ein bloßer Dateiname ohne Pfad wird im Verzeichnis `incoming/` gesucht — praktisch beim Schreiben vom Handy: das Foto per SFTP hochladen und nur beim Namen nennen.
 
 ## Video

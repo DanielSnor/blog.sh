@@ -44,6 +44,18 @@ stays a pattern: a slug, a filename or a typed directory that lands there
 goes through `PathGlob.literal` first, which escapes the metacharacters so
 the name stands for itself.
 
+The question one step before that -- may this value become a path at all?
+-- has one answer, in `lib/path_safety.rb`. A slug typed at the CLI, a
+media filename off an import, a deploy target read from config and a
+directory named in a redirect all used to decide it for themselves, in
+four places with four sets of rules, which is three places to forget. It
+answers whether a string may be one path segment (`safe_segment?`) or a
+relative path (`safe_relative_path?`), and whether a resolved path is
+inside a directory it must not leave (`within?`, `contained!`).
+Containment resolves the deepest directory that exists rather than
+comparing strings, so a symlink pointing out of the archive is caught
+where a prefix check would have waved it through.
+
 ### Field reference
 
 The authoritative schema for anyone writing an importer -- new
@@ -346,15 +358,19 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Fourteen questions, in one pass: a `config/site.yml` that is missing, empty,
+Sixteen questions, in one pass: a `config/site.yml` that is missing, empty,
 unparseable or unopenable -- the one question about something outside the
 archive, asked because this is what people run before a build and the build
 refuses all four; files the checker cannot read at all, posts
-whose date nothing can parse, posts whose text is not a list of blocks, and
-posts whose slug is not one path segment -- all of them states the BUILD
+whose date nothing can parse, posts whose text is not a list of blocks or
+whose blocks carry a picture, a poster, list items or formatting that is not
+a list, tags that are not a list, and posts whose slug or draft token is not
+one path segment -- all of them states the BUILD
 refuses to run on (or, for the slug, misplaces the page for), so a check that stayed
 quiet about them was calling an archive sound that was about to stop the
-site; files a queue move stepped aside and a crash left parked, which no
+site; post files lying where the build never reads a post (directly in
+`posts/`, or a level too deep), which are in the archive and on no page;
+files a queue move stepped aside and a crash left parked, which no
 listing shows and whose repair depends on whether the post inside them is
 still in the archive anywhere else; media a post asks for and hasn't got
 -- or has in a shape no reader can use, or has under a spelling that is not
@@ -372,10 +388,24 @@ which is usually one series and a typo; one old address claimed by
 two posts, where whichever renders last wins and the others' readers land
 on it; and two posts that would be served at one address, which the build
 refuses to run on at all -- so an archive in that state used to be called
-sound by the one tool whose job is to say otherwise; and a `redirect_from`
+sound by the one tool whose job is to say otherwise; a post that looks like
+a copy of another -- `x-2` beside `x` in the same year with the same title,
+moment and content (every block, not only the text), which is what importing an export back into an archive
+that already held it leaves behind, each copy under an address of its own
+so that nothing else here objects, and asked narrowly because a slug that
+ends in a number beside the same slug without one is ordinary; and a `redirect_from`
 the build will refuse to serve, which it says once in the middle of a build
 log and which the checker used to count among the addresses this site
-answers at, so a link into one passed as sound.
+answers at, so a link into one passed as sound -- including an old address
+a live post has since taken.
+
+A question that raises is **one finding, not the end of the run**: every
+question is asked through a guard that turns an exception into an error
+naming the question and the exception, and the rest are still asked. One
+post whose `media` was an object once took the whole run down before it had
+reported anything -- and under `--json` left not even a document to parse.
+The finding is an error, so the exit code says so; it also names the
+exception, because this is also how a bug in the checker itself would show.
 
 Two rules shape the plain run. **It only ever reports** -- nothing here
 deletes an orphaned directory or rewrites a post, because the whole value
@@ -452,6 +482,20 @@ time -- two places telling a reader how long something takes must not
 disagree.
 
 ## Build pipeline (`build/build_blog.rb`)
+
+The script is the pass itself; the domains it calls live beside it, one
+file each -- `build/blocks.rb` (a content block becomes HTML),
+`build/output.rb` (writing, pruning, and getting a file into
+`public.nosync`), `build/feeds.rb` (RSS, Atom, JSON Feed, sitemap),
+`build/discovery.rb` (the search index and what feeds it),
+`build/cards.rb` (link and social cards) and `lib/series.rb` (what a
+series is and what order its parts go in, which the CLI needs too).
+
+⚠️ Moving a method out of `build_blog.rb` is not a free refactor: the
+templates in `templates/` are rendered against the script's own binding,
+so every helper they call has to stay reachable from there. A helper that
+moves into a module keeps a one-line wrapper at the top level, or the
+build dies on the first page that uses it.
 
 A single linear pass, no framework:
 

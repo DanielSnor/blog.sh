@@ -10,9 +10,11 @@
 # address the site never answers at.
 #
 # The module deliberately holds no state and requires nothing beyond the
-# standard library's date parsing: the build, the checker and the repair
-# pass can all depend on it without depending on each other.
+# standard library's date parsing and PathSafety, which is a leaf of its
+# own: the build, the checker and the repair pass can all depend on it
+# without depending on each other.
 require 'time'
+require_relative 'path_safety'
 
 module PostAddress
   module_function
@@ -131,14 +133,54 @@ module PostAddress
   # with no warning, exit 0 from the build, nothing from check or doctor --
   # and the home-screen icon opened the blog page instead, with any unsent
   # draft still sitting in that origin's storage and no way back to it.
-  RESERVED_ROOT_SEGMENTS = %w[posts tag type draft search markdown archive assets page write
-                              rss.xml sitemap.xml robots.txt 404 favicon.ico].freeze
+  #
+  # 🪤 The list drifted, and it drifted the same way every time: somebody
+  # added a root write and nobody added the name. `archive` and `write`
+  # are the two the comments above remember. Measured in 1.8 it was twelve
+  # more: 404.html, index.html, search-index.json, search-index-archive.json,
+  # stats.json and comments.json from the build, the five widget files cron
+  # writes beside them, and series/ -- while it carried a `404` the build
+  # has never written. A page slugged index.html sat where the front page
+  # goes, the build died on EISDIR, and so did every build after it; check
+  # read this same list and called the archive sound.
+  #
+  # So the names are grouped by who writes them, the reserved set is
+  # derived from the groups, and tests/test_reserved_roots.rb builds a site
+  # with everything switched on and fails the moment what lands in the root
+  # of public.nosync and what this says part company, in either direction.
+  # Adding a root write without adding its name here is now a red suite,
+  # not a quiet gap.
+  ROOT_DIRS = %w[posts tag type series draft page search markdown archive assets write].freeze
+  # Written by the build. stats.json is refreshed by cron as well, but the
+  # build creates it, so it is the build's name.
+  ROOT_FILES = {
+    home: 'index.html', not_found: '404.html', feed: 'rss.xml', sitemap: 'sitemap.xml',
+    robots: 'robots.txt', favicon: 'favicon.ico',
+    search_index: 'search-index.json', search_index_archive: 'search-index-archive.json',
+    stats: 'stats.json'
+  }.freeze
+  # Written only by cron -- the widget files by lib/sidebar.rb, comments.json
+  # by scripts/refresh_sidebar.rb while moderation is on (the build merely
+  # keeps it from being pruned) -- into the same root.
+  CRON_FILES = {
+    pixelfed: 'pixelfed.json', toots: 'toots.json', commits: 'commits.json',
+    bluesky: 'bluesky.json', rss: 'rss.json', comments: 'comments.json'
+  }.freeze
+  RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
   REDIRECT_SEGMENT_MAX_BYTES = 255
 
   def redirect_refusal(origin)
-    parts = origin.to_s.split('/').reject(&:empty?)
+    text = origin.to_s
+    # Broken bytes cannot be matched against without raising, and a
+    # segment nobody can print is not an address anybody typed. A leading
+    # dot is deliberately still allowed: /.well-known/... is a real
+    # address a real site redirects from.
+    return :unusable unless text.valid_encoding?
+
+    parts = text.split('/').reject(&:empty?)
     return :unusable if parts.empty?
     return :unusable if parts.any? { |p| p == '.' || p == '..' || p.match?(/[?#]/) }
+    return :unusable if parts.any? { |p| p.match?(PathSafety::UNSAFE_IN_SEGMENT) }
     return :unusable if parts.any? { |p| p.bytesize > REDIRECT_SEGMENT_MAX_BYTES }
     # Folded, because the volume folds. `/Tag/pokus/` and `/Search/` sailed
     # past a byte-exact comparison and then landed on
@@ -148,6 +190,25 @@ module PostAddress
     # about the segments the engine owns, and an imported address that
     # only differs from one by letter case is not an address anybody meant.
     return :reserved if REDIRECT_RESERVED.include?(parts.first.to_s.downcase)
+
+    nil
+  end
+
+  # A former_slugs entry is "<year>/<slug>", and the build makes a
+  # directory of it to stand a redirect stub in. Only the build was
+  # asking whether it can -- inline, at the point of writing the stub --
+  # so `check` called an archive sound whose stubs the build then refused
+  # to write, and said nothing about which entry or why. Same shape of
+  # answer as redirect_refusal above: nil means the build will write it.
+  #
+  # Stricter than redirect_refusal about a leading dot, and right to be:
+  # a redirect origin is an address somebody else's site once served, and
+  # /.well-known/ is one of those. A former slug is an address THIS engine
+  # issued, and it issues no hidden names.
+  def former_slug_refusal(entry)
+    parts = entry.to_s.split('/').reject(&:empty?)
+    return :unusable unless parts.size == 2
+    return :unusable unless parts.all? { |p| PathSafety.safe_segment?(p, max_bytes: REDIRECT_SEGMENT_MAX_BYTES) }
 
     nil
   end

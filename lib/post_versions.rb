@@ -4,6 +4,7 @@ require 'fileutils'
 require 'json'
 require_relative 'i18n'
 require_relative 'path_glob'
+require_relative 'path_safety'
 
 # The undo the engine did not have. Deleting a post has always been
 # reversible -- it goes to trash/ and `restore` brings it back -- but
@@ -81,9 +82,27 @@ module PostVersions
   # Versions travel with the post. Without this, restoring a post from the
   # trash would bring it back with amnesia -- and deleting one would leave
   # its history orphaned in a directory nothing points at.
+  # True when the destination holds what it should -- including when the
+  # post had no history and the answer is "nothing". False is a failure,
+  # and callers may say so; it used to mean either, which is why the one
+  # caller that cared could not tell them apart and none of the four said
+  # anything at all.
   def move(slug, year, from_content_dir:, to_dir:)
+    # The year and the slug are joined into a path here and the next
+    # thing that happens to that path is a move. They come off a post
+    # file, which is a file people edit.
+    unless PathSafety.safe_segment?(slug.to_s) && year.to_s.match?(/\A\d{4}\z/)
+      raise PathSafety::Escape,
+            "versions move refused: #{year.to_s.inspect}/#{slug.to_s.inspect} is not a year and a slug"
+    end
+
     src = File.join(versions_root(from_content_dir), year.to_s, slug.to_s)
     return true if File.expand_path(src) == File.expand_path(to_dir)
+
+    # The archive rather than the versions tree: delete moves a post's
+    # history into trash/<year>/<slug>/versions, which is a destination
+    # outside it and a legitimate one.
+    PathSafety.contained!(File.dirname(File.dirname(from_content_dir)), to_dir, 'versions destination')
 
     # The destination is cleared even when there is nothing to move. An
     # orphaned history already sitting there is somebody else's past, and
@@ -91,14 +110,43 @@ module PostVersions
     # stranger's versions and restore would write a stranger's text over
     # the post. The early return used to come first, which preserved
     # exactly that for the one shape of post with no history of its own.
-    FileUtils.rm_rf(to_dir)
-    return false unless Dir.exist?(src)
+    #
+    # Cleared by PARKING it rather than deleting it, because from here a
+    # stranger's history and this post's own look exactly alike. A move
+    # interrupted after the history had crossed leaves it sitting at the
+    # destination, and the re-run that follows -- re-importing is the
+    # thing people do over and over -- finds no source, and deleted what
+    # the first run had carried over. Parking clears the name either way,
+    # and leaves the bytes where `check` reports them.
+    park(to_dir)
+    return true unless Dir.exist?(src)
 
     FileUtils.mkdir_p(File.dirname(to_dir))
     FileUtils.mv(src, to_dir)
     true
   rescue SystemCallError, IOError
     false
+  end
+
+  # The archive has one parking name for "a move stepped this aside", and
+  # `check` looks for exactly that shape -- so this uses it rather than a
+  # second one of its own. A parked directory nothing reports is a
+  # history nobody will find again.
+  def park(dir)
+    return nil unless Dir.exist?(dir)
+
+    base = File.basename(dir)
+    n = 0
+    loop do
+      suffix = n.zero? ? '' : "-#{n}"
+      candidate = File.join(File.dirname(dir), ".#{base}.queue-move.#{Process.pid}#{suffix}")
+      unless File.exist?(candidate)
+        FileUtils.mv(dir, candidate)
+        return candidate
+      end
+
+      n += 1
+    end
   end
 
   def stamp

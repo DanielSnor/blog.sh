@@ -10,6 +10,7 @@
 # isn't fetched by the visitor's browser, but server-side (see lib/sidebar.rb).
 
 require_relative '../lib/sidebar'
+require_relative '../lib/post_address'
 require_relative '../lib/public_file'
 require_relative '../lib/post_stats'
 require_relative '../lib/site_config'
@@ -61,8 +62,12 @@ puts sidebar_line unless sidebar_line.strip.empty?
 # full refresh is kept outside public.nosync/ (the build/deploy don't delete
 # it there, but it lives alongside .deploy_manifest.json for consistency),
 # so it survives a restart.
-STATS_PATH = File.join(PUBLIC_DIR, 'stats.json')
-COMMENTS_PATH = File.join(PUBLIC_DIR, 'comments.json')
+# Named from PostAddress, like everything else written into the root of
+# public.nosync: a page slugged like one of these is a page this script
+# overwrites every time cron runs, and the build refuses such a page only
+# because the name is on that list.
+STATS_PATH = File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:stats])
+COMMENTS_PATH = File.join(PUBLIC_DIR, PostAddress::CRON_FILES[:comments])
 FULL_REFRESH_PATH = File.join(ROOT, '.stats_full_refresh_at')
 FULL_REFRESH_INTERVAL = 7 * 24 * 60 * 60 # 1 week
 
