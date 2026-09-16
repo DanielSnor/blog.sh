@@ -82,6 +82,31 @@ module Embed
     'funkwhale' => 150, 'bandcamp' => 400
   }.freeze
 
+  # What every player the engine puts on a page is told to say about who
+  # is embedding it.
+  #
+  # A site served with `Referrer-Policy: same-origin` -- which is what
+  # Cloudron's Surfer sends, and a sensible default -- makes the browser
+  # send NO Referer on a cross-origin subresource. The iframe arrives at
+  # YouTube anonymous, and YouTube refuses to play for an embedder it
+  # cannot identify: the player draws a black rectangle reading "Error
+  # 153", and its own answer names the reason,
+  # PLAYABILITY_ERROR_CODE_EMBEDDER_IDENTITY_MISSING_REFERRER. Measured
+  # against the live service, not read in documentation: the same embed
+  # answers cleanly the moment a Referer is sent.
+  #
+  # An element's own referrerpolicy overrides the document's, and it is
+  # the only end of this the engine owns -- the header belongs to whoever
+  # serves the site, and a blog.sh that quietly needed a looser one would
+  # be a broken player on every host that tightened it.
+  #
+  # strict-origin-when-cross-origin, not the bare origin: it is the
+  # narrowest policy that still identifies the site. The provider learns
+  # `https://example.com/` and never which post the reader was on, and a
+  # visitor who arrived over plain http has nothing sent for them at all.
+  REFERRER_POLICY = 'strict-origin-when-cross-origin'
+  REFERRER_ATTR = %(referrerpolicy="#{REFERRER_POLICY}").freeze
+
   module_function
 
   # The block fields for a URL this module recognises, or nil. Only the
@@ -340,6 +365,32 @@ module Embed
     [number].pack('U')
   rescue StandardError
     ''
+  end
+
+  # The iframe an import brought with it, told to identify its embedder.
+  #
+  # The players the engine builds itself get REFERRER_ATTR written into
+  # them where they are built (build/blocks.rb, lib/exporter.rb). This is
+  # for the one branch whose markup is not ours: `embed_html`, stored
+  # verbatim from a Tumblr or Ghost export, where the iframe already
+  # exists and the attribute has to be added to it in place.
+  #
+  # An embed that chose a policy of its own keeps it, whatever case it
+  # spelled the attribute in -- the provider knowing what its own player
+  # needs beats a default, and two of them on one tag is the browser's
+  # coin toss rather than a decision.
+  IFRAME_TAG_RE = %r{<iframe\b(?:[^>"']|"[^"]*"|'[^']*')*>}i
+  HAS_REFERRER_RE = /[\s\/]referrerpolicy\s*=/i
+
+  def with_referrer_policy(html)
+    html.to_s.gsub(IFRAME_TAG_RE) do |tag|
+      next tag if tag.match?(HAS_REFERRER_RE)
+
+      # The solidus of a self-closing tag is kept where it belongs, after
+      # the attribute rather than swallowed by it: `... /foo>` is an
+      # attribute named "foo" to a browser, not the end of a tag.
+      tag.sub(%r{\s*(/?)>\z}) { " #{REFERRER_ATTR}#{Regexp.last_match(1)}>" }
+    end
   end
 
   def frame_origins(block)

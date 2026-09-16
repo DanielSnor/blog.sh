@@ -11,6 +11,20 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.8.1.pre -- 2026-09-16
+
+A bug-fix release about two things a live site found. Every embedded player -- YouTube, Vimeo,
+Spotify, all of them -- refused to play on a host that sends a tight `Referrer-Policy`, which is
+what Cloudron's Surfer sends by default: the player never learned who was embedding it, and drew a
+black rectangle instead. And `check` called a link to the writing app a dead link on exactly the
+sites where that address answers. Nothing to configure and nothing to migrate -- but the player
+fix lives in the rendered page, so it reaches a site on the next full rebuild and deploy.
+
+### Fixed
+
+- **Every embedded player drew a black rectangle on a site with a tight referrer policy.** YouTube called it "Error 153".
+- **`check` called a link to `/write/` dead on the sites that publish the app.** And `doctor`'s menu question with it.
+
 ## 1.8 -- 2026-09-14
 
 The release about what happens when something goes wrong. A page is written whole or not at all, a

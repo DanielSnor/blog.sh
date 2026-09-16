@@ -138,7 +138,7 @@ module Blocks
     elsif (src = Embed.src(block))
       embed_iframe(src, block)
     elsif block['embed_html'] && !block['embed_html'].strip.empty?
-      Embed.without_scripts(block['embed_html'])
+      imported_embed(block['embed_html'])
     elsif block['url']
       # A player that could not be looked up (offline at save time, or a
       # service with none for that address) still leaves the address, and a
@@ -154,6 +154,13 @@ module Blocks
     end
   end
 
+  # An imported embed: the parts that execute taken out, and the iframe it
+  # brought with it told to identify its embedder -- the same thing the
+  # players built below say, in markup the engine did not write.
+  def imported_embed(html)
+    Embed.with_referrer_policy(Embed.without_scripts(html))
+  end
+
   # The players the engine builds itself, out of a provider and an id it
   # validated (lib/embed.rb) -- never out of the platform's own embed code.
   # Audio widgets are a fixed-height strip, video is 16:9 in the same
@@ -161,7 +168,8 @@ module Blocks
   def embed_iframe(src, block)
     provider = block['provider'].to_s
     title = h(provider.tr('_', '.'))
-    common = %(loading="lazy" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen)
+    common = %(loading="lazy" frameborder="0" #{Embed::REFERRER_ATTR} ) +
+             %(allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen)
     if (height = Embed::AUDIO_HEIGHTS[provider])
       %(<iframe class="embed-audio" src="#{h(src)}" title="#{title}" width="100%" height="#{height}" #{common}></iframe>)
     else
@@ -177,9 +185,9 @@ module Blocks
       # Only YouTube's embed is a plain iframe at a fixed size (356x200, 16:9) --
       # other providers (e.g. Instagram) ship their own responsive blockquote/script.
       if block['provider'] == 'youtube'
-        %(<div class="embed-responsive">#{Embed.without_scripts(block['embed_html'])}</div>)
+        %(<div class="embed-responsive">#{imported_embed(block['embed_html'])}</div>)
       else
-        Embed.without_scripts(block['embed_html'])
+        imported_embed(block['embed_html'])
       end
     elsif (id = block['youtube_id'])
       # Hand-written videos carry url + youtube_id, and the iframe is built
@@ -193,7 +201,7 @@ module Blocks
       # Those don't have a youtube_id and fall through to the polite notice
       # below instead of a broken player.
       %(<div class="embed-responsive"><iframe src="https://www.youtube-nocookie.com/embed/#{CGI.escapeHTML(id)}" ) +
-        %(title="YouTube" frameborder="0" loading="lazy" ) +
+        %(title="YouTube" frameborder="0" loading="lazy" #{Embed::REFERRER_ATTR} ) +
         %(allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ) +
         %(allowfullscreen></iframe></div>)
     elsif (src = Embed.src(block))

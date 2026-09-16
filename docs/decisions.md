@@ -413,6 +413,23 @@ raw string -- `https://good.example@evil.test/w/x` reads as the good host to
 a careless regex and as the evil one to the browser. *Cost:* a page's CSP is
 no longer a constant, and a new provider has to say which origins it needs.
 
+**Every player carries its own referrer policy, because the site's belongs
+to whoever serves it.** A host that sends `Referrer-Policy: same-origin` --
+Cloudron's Surfer does, and it is a sensible default -- makes the browser
+send no Referer at all on a cross-origin subresource. The iframe reaches
+YouTube anonymous, and YouTube will not play for an embedder it cannot
+identify: a black rectangle reading "Error 153", which the service's own
+answer explains as `EMBEDDER_IDENTITY_MISSING_REFERRER`. An element's
+`referrerpolicy` overrides the document's, so the players the engine builds
+carry `strict-origin-when-cross-origin` and an imported `embed_html` has it
+added to the iframe it brought (`Embed::REFERRER_POLICY`). The alternative
+was to need a looser header, which is a broken player on every host that
+tightens one and a thing no README can make people read.
+*Cost:* the provider learns the site's origin, which is the least that
+identifies it -- never the path, never the query, and nothing at all for a
+reader who arrived over plain http. An embed that chose a policy of its own
+keeps it: the provider knows what its player needs.
+
 **A phone video is mentioned, not refused -- the opposite of HEIC, and
 for a measurable reason.** A HEIC photo displays in Safari and nowhere
 else; HEVC video plays in the large majority of browsers, so refusing it
