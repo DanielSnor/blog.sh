@@ -1382,6 +1382,8 @@ setup:
   h_instance: "Just the name of the server your account is on -- mastodon.social, not https://mastodon.social/@you."
   e_instance: "The host name only, with no https:// and no path."
   token_where: "The token is the key that lets the blog post announcements in your name. Make one on %{instance}: Preferences -> Development -> New application, tick the write:statuses scope, and copy the access token here -- not the client key or the client secret above it."
+  secret_received: "Received: length %{length}."
+  secret_received_tail: "Received: length %{length}, ends in …%{tail}."
   q_token: "Access token (Enter to skip -- it is not shown as you type): "
   token_skipped: "No token. The site works; it just never announces anything until you add one to env.sh."
   checking_token: "Asking the instance whether the token works"

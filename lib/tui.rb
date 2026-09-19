@@ -469,6 +469,17 @@ module Tui
     value
   end
 
+  # What may be shown of a value `password` read: its last two characters,
+  # and only when there are enough of them to spare two. The end rather
+  # than the start, because tokens often share a fixed prefix (ghp_,
+  # xoxb-) that would read the same on every one of them.
+  SECRET_TAIL_MIN = 8
+
+  def secret_tail(value)
+    value = value.to_s
+    value.length >= SECRET_TAIL_MIN ? value[-2..] : nil
+  end
+
   # Clamps a scrolling window of `window` items (out of `total`) so that
   # `selected` stays inside it, moving the window by the minimum amount
   # rather than re-centering it. Wraparound (selected jumping from the

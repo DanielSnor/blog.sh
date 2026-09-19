@@ -476,6 +476,7 @@ def ask_mastodon(site, env, current)
   # arrived hard against the question, and in a terminal a blank line above
   # it. One shape or the other, not one per stream.
   puts unless Tui.interactive?
+  acknowledge_secret(token)
   puts
   if token.empty?
     puts Tui.paint(t('token_skipped'), :dim)
@@ -529,6 +530,7 @@ def ask_bluesky(site, env, current)
 
   password = Tui.password(t('q_app_password'))
   puts unless Tui.interactive? # see the note by the Mastodon token above
+  acknowledge_secret(password)
   puts
   if password.empty?
     puts Tui.paint(t('password_skipped'), :dim)
@@ -554,6 +556,23 @@ BACKENDS = [
 ].freeze
 
 SECRET_VALUES = %w[SURFER_TOKEN].freeze
+
+# The secret prompts show nothing, so this says what went in: the length,
+# and the last two characters when there are enough to spare them. A
+# Mastodon client key, client secret and access token are all long random
+# strings, and comparing the end with the page is how somebody tells which
+# one they pasted.
+def acknowledge_secret(value)
+  return if value.to_s.empty?
+
+  tail = Tui.secret_tail(value)
+  line = if tail
+           t('secret_received_tail', length: value.length, tail: tail)
+         else
+           t('secret_received', length: value.length)
+         end
+  puts Tui.paint(line, :dim)
+end
 
 def ask_deploy(env, _current)
   say(t('section_deploy'), :bold)
@@ -589,6 +608,7 @@ def ask_deploy(env, _current)
       puts t('surfer_token_where') if name == 'SURFER_TOKEN'
       value = Tui.password(t("q_#{name.downcase}"))
       puts unless Tui.interactive? # see the note by the Mastodon token above
+      acknowledge_secret(value)
       puts
     else
       value = ask(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}"))
