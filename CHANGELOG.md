@@ -11,7 +11,7 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.8.1.pre -- 2026-09-16
+## 1.9.pre -- 2026-09-16
 
 A bug-fix release about two things a live site found. Every embedded player -- YouTube, Vimeo,
 Spotify, all of them -- refused to play on a host that sends a tight `Referrer-Policy`, which is
