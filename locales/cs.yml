@@ -1349,7 +1349,7 @@ setup:
   q_instance: "Mastodon instance"
   h_instance: "Jen jméno serveru, na kterém máš účet — mastodonczech.cz, ne https://mastodonczech.cz/@ty."
   e_instance: "Jen jméno serveru, bez https:// a bez cesty."
-  token_where: "Token je klíč, kterým smí blog publikovat oznámení tvým jménem. Vytvoř si ho na %{instance}: Nastavení -> Pro vývojáře -> Nová aplikace, zaškrtni rozsah write:statuses a přístupový token zkopíruj sem."
+  token_where: "Token je klíč, kterým smí blog publikovat oznámení tvým jménem. Vytvoř si ho na %{instance}: Nastavení -> Pro vývojáře -> Nová aplikace, zaškrtni rozsah write:statuses a přístupový token zkopíruj sem, ne klientský klíč ani klientský secret nad ním."
   q_token: "Přístupový token (Enter přeskočí — při psaní se nezobrazuje): "
   token_skipped: "Bez tokenu. Web funguje, jen nikdy nic neoznámí, dokud token nedoplníš do env.sh."
   checking_token: "Ptám se instance, jestli token funguje"

@@ -454,12 +454,17 @@ module Tui
     # terminal echoed the access token in clear text, into the scrollback
     # and over anybody's shoulder. The question is whether the keyboard is
     # a terminal, and only that.
+    # strip, not chomp: a token pasted with a space on either side was saved
+    # with it, the instance refused it, and nothing on screen could say why
+    # -- the one thing this prompt is for is never showing the value. Every
+    # caller reads a token or an app password, and an edge space is never
+    # part of either (#53).
     unless $stdin.tty?
-      value = $stdin.gets.to_s.chomp
+      value = $stdin.gets.to_s.strip
       return value
     end
 
-    value = $stdin.noecho(&:gets).to_s.chomp
+    value = $stdin.noecho(&:gets).to_s.strip
     puts
     value
   end

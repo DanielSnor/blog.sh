@@ -1363,7 +1363,7 @@ setup:
   q_instance: "Mastodon-Instanz"
   h_instance: "Nur der Name des Servers, auf dem dein Konto liegt -- mastodon.social, nicht https://mastodon.social/@du."
   e_instance: "Nur der Hostname, ohne https:// und ohne Pfad."
-  token_where: "Der Token ist der Schlüssel, mit dem der Blog Ankündigungen in deinem Namen posten darf. Erstelle ihn auf %{instance}: Einstellungen -> Entwicklung -> Neue Anwendung, die Berechtigung write:statuses ankreuzen und den Zugriffstoken hierher kopieren."
+  token_where: "Der Token ist der Schlüssel, mit dem der Blog Ankündigungen in deinem Namen posten darf. Erstelle ihn auf %{instance}: Einstellungen -> Entwicklung -> Neue Anwendung, die Berechtigung write:statuses ankreuzen und den Zugriffstoken hierher kopieren, nicht den Client-Schlüssel oder das Client-Geheimnis darüber."
   q_token: "Zugriffstoken (Enter überspringt -- die Eingabe wird nicht angezeigt): "
   token_skipped: "Kein Token. Die Website funktioniert, sie kündigt nur nie etwas an, bis du einen in env.sh einträgst."
   checking_token: "Frage die Instanz, ob der Token funktioniert"
