@@ -6399,141 +6399,153 @@ if HEADER_MODES.include?(command) && $stdout.tty? && !ARGV.include?('--json')
   puts
 end
 
-if command.nil?
-  run_wizard
-else
-  case command
-  when 'add'
-    # Read here rather than inside cmd_add, the way `rebuild` reads --full:
-    # the dispatcher is where this file turns a command line into
-    # arguments, and the wizard calls cmd_add with none.
-    json = !ARGV.delete('--json').nil?
-    # --untrusted says the markdown did not come from somebody with a
-    # shell. Everything an author at their own desk may do -- naming any
-    # path on the machine in a picture reference -- stops being allowed,
-    # because over a wire that is how a stranger reads /etc/passwd into a
-    # post. The receiver (scripts/receive.sh) passes it always.
-    untrusted = !ARGV.delete('--untrusted').nil?
-    # Before the shift, so a mistyped flag is refused instead of being
-    # taken for the name of a file to read (and reported as "no such
-    # file: --yes", which sends the reader looking in the wrong place).
-    unknown = ARGV.find { |arg| arg.start_with?('--') }
-    abort t('cli.add_unknown_option', option: unknown) if unknown
-    file = ARGV.shift
-    # One file, one post. A second name was shifted off into nothing: the
-    # run wrote the first, said not a word about the rest, and exited 0 --
-    # so a script looping wrongly lost posts it believed it had made.
-    abort t('cli.add_extra_arguments', extra: ARGV.join(', ')) unless ARGV.empty?
-
-    if file
-      add_from_file(file, json: json, confined: untrusted)
-    else
-      # There is nothing to print as JSON when the post is still being
-      # typed, and an editor session that ends by printing a machine's
-      # answer would be a promise this cannot keep.
-      abort t('cli.add_json_needs_file') if json
-
-      cmd_add
-    end
-  when 'edit'
-    slug = ARGV.shift || pick_slug_interactively
-    cmd_edit(slug)
-  when 'props'
-    slug = ARGV.shift || pick_slug_interactively
-    cmd_props(slug)
-  when 'delete'
-    slug = ARGV.shift || pick_slug_interactively
-    cmd_delete(slug)
-  when 'restore'
-    slug = ARGV.shift || pick_trash_interactively
-    cmd_restore(slug)
-  when 'empty'
-    cmd_empty(ARGV.shift)
-  when 'publish'
-    yes = !ARGV.delete('--yes').nil?
-    announce = ARGV.delete('--no-announce').nil?
-    json = !ARGV.delete('--json').nil?
-    unknown = ARGV.find { |arg| arg.start_with?('--') }
-    abort t('cli.publish_unknown_option', option: unknown) if unknown
-    # An object for an answer means nobody is watching, and the dialog
-    # this skips is the only thing that would ask.
-    abort t('cli.publish_json_needs_yes') if json && !yes
-    # --no-announce on its own still shows the dialog; it only says what
-    # [p] must not do when it gets there. Refusing the combination would
-    # be refusing "let me look first, and keep it off Mastodon".
-    slug = ARGV.shift
-    # ⚠️ --yes has to name its post. Without a slug this fell into the
-    # draft picker and then published WITHOUT the dialog -- so one Enter
-    # over a highlighted row published a post and announced it, with no
-    # preview and no confirmation anywhere in between. The picker is for
-    # people who are about to be shown what they picked.
-    abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
-
-    slug ||= pick_draft_interactively
-    cmd_publish(slug, yes: yes, announce: announce, json: json)
-  when 'schedule'
-    slug = ARGV.shift || pick_draft_interactively
-    cmd_schedule(slug)
-  when 'queue'
-    cmd_queue
-  when 'unpublish'
-    slug = ARGV.shift || pick_published_interactively
-    cmd_unpublish(slug)
-  when 'toot'
-    slug = ARGV.shift || pick_published_interactively
-    cmd_toot(slug)
-  when 'bluesky'
-    slug = ARGV.shift || pick_published_interactively
-    cmd_bluesky(slug)
-  when 'rebuild'
-    # Read here rather than inside cmd_rebuild, the way `list` and `browse`
-    # read their filters: the dispatcher is where this file turns a command
-    # line into arguments, and the wizard calls cmd_rebuild with none.
-    cmd_rebuild(full: ARGV.include?('--full'))
-  when 'preview'
-    # A local static server over the build output -- the quickest way to
-    # look at the site before deploying anywhere.
-    unless Dir.exist?(File.join(ROOT, 'public.nosync'))
-      abort t('cli.preview_missing_public')
-    end
-    # "preview draft" is a thing somebody types, and to_i turned it into
-    # port 0 -- the system then handed out a random port and the line on
-    # screen said http://localhost:0/, which is not where it is listening.
-    asked = ARGV.shift || '8000'
-    abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
-
-    port = asked.to_i
-    puts t('cli.preview_serving', url: "http://localhost:#{port}/")
-    # The serve loop below blocks forever -- with stdout piped (not a TTY)
-    # the URL line would sit in the buffer the whole time, so push it out.
-    $stdout.flush
-    PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
-  when 'list', 'browse'
-    filters = {}
-    ARGV.each do |arg|
-      # ⚠️ force_encoding, because ARGV arrives in the encoding the
-      # ENVIRONMENT declares -- and with LANG unset that is ASCII-8BIT.
-      # LANG unset is not exotic: it is `docker exec` without -e LANG,
-      # which is how this engine is operated, and it is cron, systemd and
-      # launchd. `browse --tag=kočky` then reached Slug.fold, whose
-      # unicode_normalize refuses a binary string, and the terminal died
-      # with a stack trace; down a pipe the comparison is a plain downcase
-      # that does not raise, so it quietly matched nothing instead. The
-      # bytes are UTF-8 either way -- only the label on them was wrong.
-      filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
-      filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
-      filters[:drafts] = true if arg == '--drafts'
-    end
-    # Same filters, two ways to read the answer: `list` prints it,
-    # `browse` puts you inside it. Down a pipe they are the same command,
-    # because a screen you can't press keys in is just a list.
-    command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
-  when 'help'
-    print_usage
-  when 'version', '--version', '-v'
-    puts "blog.sh #{BlogSh::VERSION}"
+# Ctrl+C in a raw-mode screen arrives as a byte, and Tui.read_key turns it
+# back into an Interrupt. setup.sh, style.sh and import.sh each catch it;
+# this dispatcher did not, so leaving any screen of ./blog.sh that way
+# printed a backtrace and died on signal 2 (#54). One catch here covers
+# every screen, since they all come through this one place. 130 is what a
+# shell reports for a run stopped by Ctrl+C, and it is what the wizards say.
+begin
+  if command.nil?
+    run_wizard
   else
-    print_usage
-    exit 1
+    case command
+    when 'add'
+      # Read here rather than inside cmd_add, the way `rebuild` reads --full:
+      # the dispatcher is where this file turns a command line into
+      # arguments, and the wizard calls cmd_add with none.
+      json = !ARGV.delete('--json').nil?
+      # --untrusted says the markdown did not come from somebody with a
+      # shell. Everything an author at their own desk may do -- naming any
+      # path on the machine in a picture reference -- stops being allowed,
+      # because over a wire that is how a stranger reads /etc/passwd into a
+      # post. The receiver (scripts/receive.sh) passes it always.
+      untrusted = !ARGV.delete('--untrusted').nil?
+      # Before the shift, so a mistyped flag is refused instead of being
+      # taken for the name of a file to read (and reported as "no such
+      # file: --yes", which sends the reader looking in the wrong place).
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.add_unknown_option', option: unknown) if unknown
+      file = ARGV.shift
+      # One file, one post. A second name was shifted off into nothing: the
+      # run wrote the first, said not a word about the rest, and exited 0 --
+      # so a script looping wrongly lost posts it believed it had made.
+      abort t('cli.add_extra_arguments', extra: ARGV.join(', ')) unless ARGV.empty?
+
+      if file
+        add_from_file(file, json: json, confined: untrusted)
+      else
+        # There is nothing to print as JSON when the post is still being
+        # typed, and an editor session that ends by printing a machine's
+        # answer would be a promise this cannot keep.
+        abort t('cli.add_json_needs_file') if json
+
+        cmd_add
+      end
+    when 'edit'
+      slug = ARGV.shift || pick_slug_interactively
+      cmd_edit(slug)
+    when 'props'
+      slug = ARGV.shift || pick_slug_interactively
+      cmd_props(slug)
+    when 'delete'
+      slug = ARGV.shift || pick_slug_interactively
+      cmd_delete(slug)
+    when 'restore'
+      slug = ARGV.shift || pick_trash_interactively
+      cmd_restore(slug)
+    when 'empty'
+      cmd_empty(ARGV.shift)
+    when 'publish'
+      yes = !ARGV.delete('--yes').nil?
+      announce = ARGV.delete('--no-announce').nil?
+      json = !ARGV.delete('--json').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.publish_unknown_option', option: unknown) if unknown
+      # An object for an answer means nobody is watching, and the dialog
+      # this skips is the only thing that would ask.
+      abort t('cli.publish_json_needs_yes') if json && !yes
+      # --no-announce on its own still shows the dialog; it only says what
+      # [p] must not do when it gets there. Refusing the combination would
+      # be refusing "let me look first, and keep it off Mastodon".
+      slug = ARGV.shift
+      # ⚠️ --yes has to name its post. Without a slug this fell into the
+      # draft picker and then published WITHOUT the dialog -- so one Enter
+      # over a highlighted row published a post and announced it, with no
+      # preview and no confirmation anywhere in between. The picker is for
+      # people who are about to be shown what they picked.
+      abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
+
+      slug ||= pick_draft_interactively
+      cmd_publish(slug, yes: yes, announce: announce, json: json)
+    when 'schedule'
+      slug = ARGV.shift || pick_draft_interactively
+      cmd_schedule(slug)
+    when 'queue'
+      cmd_queue
+    when 'unpublish'
+      slug = ARGV.shift || pick_published_interactively
+      cmd_unpublish(slug)
+    when 'toot'
+      slug = ARGV.shift || pick_published_interactively
+      cmd_toot(slug)
+    when 'bluesky'
+      slug = ARGV.shift || pick_published_interactively
+      cmd_bluesky(slug)
+    when 'rebuild'
+      # Read here rather than inside cmd_rebuild, the way `list` and `browse`
+      # read their filters: the dispatcher is where this file turns a command
+      # line into arguments, and the wizard calls cmd_rebuild with none.
+      cmd_rebuild(full: ARGV.include?('--full'))
+    when 'preview'
+      # A local static server over the build output -- the quickest way to
+      # look at the site before deploying anywhere.
+      unless Dir.exist?(File.join(ROOT, 'public.nosync'))
+        abort t('cli.preview_missing_public')
+      end
+      # "preview draft" is a thing somebody types, and to_i turned it into
+      # port 0 -- the system then handed out a random port and the line on
+      # screen said http://localhost:0/, which is not where it is listening.
+      asked = ARGV.shift || '8000'
+      abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
+
+      port = asked.to_i
+      puts t('cli.preview_serving', url: "http://localhost:#{port}/")
+      # The serve loop below blocks forever -- with stdout piped (not a TTY)
+      # the URL line would sit in the buffer the whole time, so push it out.
+      $stdout.flush
+      PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
+    when 'list', 'browse'
+      filters = {}
+      ARGV.each do |arg|
+        # ⚠️ force_encoding, because ARGV arrives in the encoding the
+        # ENVIRONMENT declares -- and with LANG unset that is ASCII-8BIT.
+        # LANG unset is not exotic: it is `docker exec` without -e LANG,
+        # which is how this engine is operated, and it is cron, systemd and
+        # launchd. `browse --tag=kočky` then reached Slug.fold, whose
+        # unicode_normalize refuses a binary string, and the terminal died
+        # with a stack trace; down a pipe the comparison is a plain downcase
+        # that does not raise, so it quietly matched nothing instead. The
+        # bytes are UTF-8 either way -- only the label on them was wrong.
+        filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
+        filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
+        filters[:drafts] = true if arg == '--drafts'
+      end
+      # Same filters, two ways to read the answer: `list` prints it,
+      # `browse` puts you inside it. Down a pipe they are the same command,
+      # because a screen you can't press keys in is just a list.
+      command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
+    when 'help'
+      print_usage
+    when 'version', '--version', '-v'
+      puts "blog.sh #{BlogSh::VERSION}"
+    else
+      print_usage
+      exit 1
+    end
   end
+rescue Interrupt
+  puts
+  puts t('cli.interrupted')
+  exit 130
 end

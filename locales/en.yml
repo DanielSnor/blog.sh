@@ -226,6 +226,7 @@ js:
 # (downcased) -- if you translate it, users must type the translated word to
 # cancel a wait loop.
 cli:
+  interrupted: "Stopped."
   cancel_word: "cancel"
   confirm_word: "yes"
   missing_images_wait: "Missing %{count} image(s), waiting for you to upload them to incoming/:"

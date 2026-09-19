@@ -211,6 +211,7 @@ js:
   copy_failed: "Zkopírovat se nepovedlo"
 
 cli:
+  interrupted: "Přerušeno."
   cancel_word: "zrušit"
   confirm_word: "ano"
   missing_images_wait: "Chybí obrázky (%{count}), počkám, až je nahraješ do incoming/:"

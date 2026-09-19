@@ -26,6 +26,7 @@ fix lives in the rendered page, so it reaches a site on the next full rebuild an
 - **`check` called a link to `/write/` dead on the sites that publish the app.** And `doctor`'s menu question with it.
 - **The import menu did not say WordPress takes a file.** Its entry now says so, as the prompt after it always did.
 - **A token pasted with a space on either side was saved with it.** The instance refused it and the hidden prompt could not show why; setup now trims it, and the hint says the access token is not the client key or secret beside it.
+- **Ctrl+C in any screen of `./blog.sh` ended in a stack trace.** It now stops the run with one line and status 130, as setup, style and import always did.
 
 ## 1.8 -- 2026-09-14
 

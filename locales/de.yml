@@ -216,6 +216,7 @@ js:
   copy_failed: "Kopieren nicht möglich"
 
 cli:
+  interrupted: "Abgebrochen."
   cancel_word: "abbrechen"
   confirm_word: "ja"
   missing_images_wait: "Es fehlen %{count} Bild(er), warte auf den Upload nach incoming/:"
