@@ -54,7 +54,7 @@ switches something off and says so.
 | rsync | any | the `rsync` deploy backend | that backend only |
 | ssh + sftp | any | the `sftp` backend | that backend only |
 | git | any | the `git` backend (Pages) | that backend only |
-| rclone | any | the `rclone` backend (S3, R2, B2, WebDAV) | that backend only |
+| rclone | any | the `rclone` backend (S3, R2, B2, WebDAV, FTP) | that backend only |
 | nothing extra | — | the `surfer` and `local` backends | — |
 
 No gems, no Bundler, no lockfile: the engine is the standard library and
@@ -606,7 +606,7 @@ Every deploy force-pushes the build as a single-commit snapshot; a custom domain
 `GIT_PAGES_CNAME` (the host stores it as a CNAME file *in the branch*,
 which a snapshot push would otherwise wipe).
 
-### rclone (S3, R2, B2, WebDAV, ...)
+### rclone (S3, R2, B2, WebDAV, FTP, ...)
 
 ```bash
 export DEPLOY_BACKEND=rclone
@@ -617,6 +617,20 @@ export RCLONE_ARGS="--s3-acl public-read"   # optional provider flags
 Run `rclone config` once to set up the remote -- credentials live in
 rclone's own config, never in env.sh. Needs the `rclone` binary
 installed.
+
+A plain **FTP** host -- the kind a shared hosting plan gives you, with no
+SSH to it at all -- goes through rclone as well. In `rclone config` pick
+the type `ftp` and give it the host, the user and the password; then
+
+```bash
+export DEPLOY_BACKEND=rclone
+export RCLONE_TARGET=myftp:public_html   # remote name : the directory the host serves
+```
+
+Nothing else is needed: the engine tells rclone exactly which files to
+send and which to delete, so it never asks the server for checksums,
+which FTP cannot give. If the host offers FTPS, turn it on in `rclone
+config` (`explicit_tls`) -- plain FTP sends the password in the clear.
 
 ### sftp (hosts with neither rsync nor git)
 

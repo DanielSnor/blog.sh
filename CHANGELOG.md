@@ -27,6 +27,7 @@ fix lives in the rendered page, so it reaches a site on the next full rebuild an
 - **The import menu did not say WordPress takes a file.** Its entry now says so, as the prompt after it always did.
 - **A token pasted with a space on either side was saved with it.** The instance refused it and the hidden prompt could not show why; setup now trims it, and the hint says the access token is not the client key or secret beside it.
 - **Ctrl+C in any screen of `./blog.sh` ended in a stack trace.** It now stops the run with one line and status 130, as setup, style and import always did.
+- **FTP was nowhere in the docs.** The rclone backend has always reached a plain FTP host; `install.md` and `env.sh.example` now say how.
 
 ## 1.8 -- 2026-09-14
 
