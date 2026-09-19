@@ -873,7 +873,7 @@ import:
     wayback: "Wayback Machine (rescue a dead blog)"
     wix: "Wix (blog CSV export)"
     twitter: "Twitter/X (archive export)"
-    feed: "WordPress export or RSS/Atom feed"
+    feed: "WordPress export file or RSS/Atom feed"
   poll:
     heading: "Poll (voters: %{voters})"
     option: "%{name} -- %{votes}"

@@ -843,7 +843,7 @@ import:
     wayback: "Wayback Machine (záchrana mrtvého blogu)"
     wix: "Wix (CSV export blogu)"
     twitter: "Twitter/X (rozbalený archiv)"
-    feed: "Export z WordPressu nebo RSS/Atom feed"
+    feed: "Soubor exportu z WordPressu nebo RSS/Atom feed"
   poll:
     heading: "Anketa (hlasujících: %{voters})"
     option: "%{name} — %{votes}"

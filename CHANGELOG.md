@@ -24,6 +24,7 @@ fix lives in the rendered page, so it reaches a site on the next full rebuild an
 
 - **Every embedded player drew a black rectangle on a site with a tight referrer policy.** YouTube called it "Error 153".
 - **`check` called a link to `/write/` dead on the sites that publish the app.** And `doctor`'s menu question with it.
+- **The import menu did not say WordPress takes a file.** Its entry now says so, as the prompt after it always did.
 
 ## 1.8 -- 2026-09-14
 
