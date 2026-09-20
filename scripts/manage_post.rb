@@ -4653,6 +4653,79 @@ def rename_post(path, post, raw: nil)
   new_slug
 end
 
+# Writing a post's other language: the WORDS, and nothing else.
+#
+# The metadata belong to the post and not to a language (lib/translations.rb)
+# -- date, tags, series, state, the pin -- so this editor never shows them.
+# The frontmatter here is one line, the title, and everything below it is
+# the body. Editing those is `props` and `edit`, in the post's own language,
+# and what they change is true in every language at once.
+#
+# Removing every word saves nothing under that language rather than an
+# empty entry: a language a post has no words in must look exactly like a
+# language it was never offered in, or the build would give it a page with
+# the wrong text in it.
+def cmd_translate(slug, lang)
+  path = find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  offered = ([own] + Array(SiteConfig.get('site', 'locales', default: nil)).map { |c| c.to_s.strip }).uniq.reject(&:empty?)
+  abort t('cli.translate_needs_locales') if offered.length < 2
+  abort t('cli.translate_own_language', lang: lang) if lang == own
+  abort t('cli.translate_unknown_language', lang: lang, known: (offered - [own]).join(', ')) unless offered.include?(lang)
+
+  original_raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(original_raw)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+
+  entry = post.dig('translations', lang)
+  entry = {} unless entry.is_a?(Hash)
+  opened_with = "---\ntitle: #{entry['title']}\n---\n\n" +
+                MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+  raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
+                       { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" })
+  if raw == opened_with
+    puts t('cli.no_changes')
+    puts
+    return
+  end
+
+  meta, body = MarkdownParser.parse_frontmatter(raw)
+  blocks, media_files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: INCOMING_DIR)
+  wait_for_missing_images(missing)
+  # A boundary rather than half of a feature: pictures belong to the post
+  # and are copied in by `edit`, which knows how to convert, remux and
+  # measure them. A translation that could bring its own would put files
+  # in one language's copy of a post whose media the other language shares.
+  abort t('cli.translate_media_unsupported') unless media_files.empty?
+
+  title = meta['title'].to_s.strip
+  translations = post['translations'].is_a?(Hash) ? post['translations'].dup : {}
+  if title.empty? && blocks.empty?
+    translations.delete(lang)
+    said = t('cli.translate_removed', lang: lang, slug: slug)
+  else
+    one = {}
+    one['title'] = title unless title.empty?
+    one['content'] = blocks unless blocks.empty?
+    translations[lang] = one
+    said = t('cli.translate_saved', lang: lang, slug: slug)
+  end
+  updated = post.dup
+  translations.empty? ? updated.delete('translations') : updated['translations'] = translations
+
+  # The same guard every editor-backed save carries: the cron may have
+  # published this post while the editor sat open.
+  abort_if_post_changed(path, original_raw, slug)
+  AtomicWrite.write_json(path, updated)
+  discard_editor_buffer
+  puts
+  puts said
+  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+end
+
 def cmd_edit(slug)
   edit_post(slug)
   # Re-resolved AFTER the edit on purpose: a rename inside the editor moves
@@ -6414,7 +6487,7 @@ SiteConfig.data unless ['help', '--help', '-h', 'version', '--version', '-v'].in
 # clear reprints) its own copy, `version`'s output IS the identity,
 # help puts it above the usage, and a piped stdout gets data only:
 # `./blog.sh list | wc -l` must keep counting posts, not banner lines.
-HEADER_MODES = %w[add edit props publish unpublish schedule queue delete
+HEADER_MODES = %w[add edit translate props publish unpublish schedule queue delete
                   restore toot bluesky rebuild preview list browse].freeze
 # ⚠️ ...and neither does a run that promised its whole output would be
 # one JSON object. The tty guard above reads as "a person is watching",
@@ -6470,6 +6543,20 @@ begin
 
         cmd_add
       end
+    when 'translate'
+      # `--lang de`, or the second word: a translation is always OF a post
+      # INTO a language, so both are required and neither has a default.
+      args = ARGV.dup
+      lang = args.find { |arg| arg.start_with?('--lang=') }&.delete_prefix('--lang=')
+      args.reject! { |arg| arg.start_with?('--lang=') }
+      if lang.nil? && (at = args.index('--lang'))
+        lang = args[at + 1]
+        args.slice!(at, 2)
+      end
+      slug = args.shift || pick_slug_interactively
+      lang ||= args.shift
+      abort t('cli.translate_needs_language') if lang.to_s.strip.empty?
+      cmd_translate(slug, lang.to_s.strip)
     when 'edit'
       slug = ARGV.shift || pick_slug_interactively
       cmd_edit(slug)

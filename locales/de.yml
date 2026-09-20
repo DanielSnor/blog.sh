@@ -283,6 +283,14 @@ cli:
     die --- Zeilen aus dem eingefügten Text und übertrag dessen Werte in
     den oberen.
 
+  translate_hint: "<!--\nÜBERSETZUNG nach %{lang}, Beitrag: %{title}\nHier stehen nur die Worte. Datum, Schlagwörter, Serie und Status gehören zum Beitrag -- die ändert `props` oder `edit`, und sie gelten in jeder Sprache.\nTitel leer lassen und den Text löschen nimmt diese Sprache vom Beitrag; er sieht dann aus wie vor der Übersetzung.\nZeilen, die mit // beginnen, werden beim Speichern entfernt.\n-->"
+  translate_saved: "Gespeichert: der %{lang}-Text von „%{slug}“."
+  translate_removed: "Entfernt: der %{lang}-Text von „%{slug}“."
+  translate_own_language: "„%{lang}“ ist die Sprache, in der der Beitrag geschrieben ist -- die ändert `./blog.sh edit`."
+  translate_unknown_language: "Diese Website veröffentlicht „%{lang}“ nicht. Sie veröffentlicht: %{known}. Trage die Sprache zuerst in `site.locales` in config/site.yml ein."
+  translate_needs_language: "In welche Sprache? `./blog.sh translate <slug> --lang de`."
+  translate_needs_locales: "Diese Website veröffentlicht eine Sprache. Nenne die anderen zuerst in `site.locales` in config/site.yml."
+  translate_media_unsupported: "Eine Übersetzung trägt Worte, keine Bilder: die Medien gehören zum Beitrag und werden von seinen Sprachen geteilt. Füge das Bild mit `./blog.sh edit` hinzu und verweise hier darauf."
   frontmatter_hint: |
     <!--
     HINWEIS -- dieser Block und Zeilen, die mit // beginnen, werden beim
@@ -542,6 +550,8 @@ cli:
                                      mit einer Markdown-Datei fragt es gar nichts und schreibt nur den Entwurf --
                                      der Weg für Handy, Skript oder Kurzbefehl (--json meldet das Ergebnis als Daten)
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+      ./blog.sh translate <slug> --lang <code>
+                                     schreibt den Text des Beitrags in einer weiteren Sprache der Website
       ./blog.sh props [<slug>]       Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit);

@@ -291,6 +291,14 @@ cli:
     Keep only one header: either delete the empty one at the top, or remove
     the --- lines from the pasted text and copy its values into the one above.
 
+  translate_hint: "<!--\nTRANSLATION into %{lang} of: %{title}\nOnly the words are here. The date, the tags, the series and the state belong to the post itself -- change those with `props` or `edit`, and they hold in every language.\nLeave the title empty and delete the body to take this language off the post; it then looks exactly as it did before the translation existed.\nLines starting with // are removed on save.\n-->"
+  translate_saved: "Saved the %{lang} text of '%{slug}'."
+  translate_removed: "Took the %{lang} text off '%{slug}'."
+  translate_own_language: "'%{lang}' is the language the post is already written in -- edit that with `./blog.sh edit`."
+  translate_unknown_language: "This site does not publish '%{lang}'. It publishes: %{known}. Add the language to `site.locales` in config/site.yml first."
+  translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."
+  translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
+  translate_media_unsupported: "A translation carries words, not pictures: the post's media belong to the post and are shared by its languages. Add the picture with `./blog.sh edit` and refer to it here."
   frontmatter_hint: |
     <!--
     GUIDE -- this block and lines starting with // are removed on save, they never end up in the post.
@@ -551,6 +559,8 @@ cli:
                                      with a markdown file it asks nothing at all and just writes the draft,
                                      which is the route for a phone, a script or a shortcut (--json reports it as data)
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
+      ./blog.sh translate <slug> --lang <code>
+                                     writes that post's text in another language the site publishes
       ./blog.sh props [<slug>]       a post's state, its properties (series, tags, type, flags) and its actions
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);

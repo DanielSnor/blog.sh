@@ -275,6 +275,14 @@ cli:
     Nech jen jednu hlavičku: buď smaž tu prázdnou nahoře, nebo z vloženého
     textu odeber řádky mezi --- a hodnoty přepiš do té horní.
 
+  translate_hint: "<!--\nPŘEKLAD do %{lang}, post: %{title}\nJsou tu jen slova. Datum, štítky, série i stav patří postu — ty se mění přes `props` nebo `edit` a platí ve všech jazycích.\nNech titulek prázdný a smaž tělo, a jazyk z postu zmizí; bude to vypadat přesně jako předtím, než překlad vznikl.\nŘádky začínající // se při uložení zahodí.\n-->"
+  translate_saved: "Uloženo: %{lang} text postu „%{slug}“."
+  translate_removed: "Odebráno: %{lang} text postu „%{slug}“."
+  translate_own_language: "„%{lang}“ je jazyk, ve kterém je post napsaný — ten se edituje přes `./blog.sh edit`."
+  translate_unknown_language: "Tenhle web „%{lang}“ nepublikuje. Publikuje: %{known}. Nejdřív jazyk doplň do `site.locales` v config/site.yml."
+  translate_needs_language: "Do jakého jazyka? `./blog.sh translate <slug> --lang de`."
+  translate_needs_locales: "Tenhle web publikuje jeden jazyk. Nejdřív ostatní vyjmenuj v `site.locales` v config/site.yml."
+  translate_media_unsupported: "Překlad nese slova, ne obrázky: média patří postu a jazyky je sdílejí. Přidej obrázek přes `./blog.sh edit` a tady se na něj odkaž."
   frontmatter_hint: |
     <!--
     NÁVOD — tenhle blok i řádky začínající // se při uložení smažou, do postu se nedostanou.
@@ -530,6 +538,8 @@ cli:
                                      se souborem s markdownem se nezeptá na nic a jen zapíše draft,
                                      což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
       ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
+      ./blog.sh translate <slug> --lang <kód>
+                                     napíše text toho postu v dalším jazyce, který web publikuje
       ./blog.sh props [<slug>]       stav postu, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty);
