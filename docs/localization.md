@@ -172,6 +172,14 @@ today, so nothing has to be migrated:
 }
 ```
 
+A language counts as written when it has a BODY. A title with nothing
+under it is a translation somebody started: it stays in the archive and
+`check --languages` shows it as started, but the language is not offered
+for that post and no page is built there -- a headline in one language
+over the text of another is the page nobody wants. Words with no title of
+their own are fine: that is an untitled post, named from its own first
+sentence, in its own language.
+
 A translation may carry `title`, `content` and `excerpt`, and nothing
 else. The date, the tags, the series, the pin and the state belong to the
 post and hold in every language at once -- so a post cannot be published

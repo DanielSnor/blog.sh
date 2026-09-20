@@ -53,13 +53,18 @@ module Translations
     return post unless entry.is_a?(Hash)
 
     wanted = ([lang.to_s] + Array(chain).map(&:to_s)).uniq
-    one = wanted.filter_map { |code| entry[code] }.find { |value| value.is_a?(Hash) }
+    one = wanted.filter_map { |code| entry[code] }.find { |value| written?(value) }
     return post unless one.is_a?(Hash)
 
     text = one.slice(*TEXT_KEYS).reject { |_, value| value.nil? }
     return post if text.empty?
 
     merged = post.merge(text)
+    # A translation with words and no title of its own is an UNTITLED post
+    # in that language, not a post wearing the other language's headline:
+    # the engine names an untitled post from its own first sentence, and
+    # that sentence is now in this language (lib/post_text.rb).
+    merged['title'] = nil unless one['title'].to_s.strip.empty? == false
     address = one[ADDRESS_KEY].to_s.strip
     merged['address_slug'] = address unless address.empty?
     merged
@@ -73,6 +78,16 @@ module Translations
     entry = post.is_a?(Hash) ? post['translations'] : nil
     return [] unless entry.is_a?(Hash)
 
-    entry.select { |_, one| one.is_a?(Hash) && !one.slice(*TEXT_KEYS).compact.empty? }.keys
+    entry.select { |_, one| written?(one) }.keys
+  end
+
+  # What counts as HAVING a language: words. A title with nothing under it
+  # is a translation somebody started, and treating it as a language built
+  # a page with that headline over the other language's text -- which
+  # three separate review passes flagged independently (Daniel, 20. 9.
+  # 2026: it counts when it has a body). It stays in the archive and the
+  # matrix in `check --languages` shows it as started.
+  def written?(one)
+    one.is_a?(Hash) && !Array(one['content']).empty?
   end
 end
