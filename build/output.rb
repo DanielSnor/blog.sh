@@ -447,7 +447,12 @@ module Output
   def prune_public
     dirs = []
     removed = 0
-    PathGlob.under(PUBLIC_DIR, '**', '*', flags: File::FNM_DOTMATCH).each do |path|
+    PathGlob.under(prune_root, '**', '*', flags: File::FNM_DOTMATCH).each do |path|
+      # Another language's tree was written by another run of this build,
+      # which is the only reason it is not in WRITTEN. Sweeping it is how
+      # one language carries off the other (build_blog.rb's prune_root).
+      next if outside_this_language?(path)
+
       if File.directory?(path)
         dirs << path
       elsif !WRITTEN[path]

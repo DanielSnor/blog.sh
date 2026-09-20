@@ -526,7 +526,9 @@ module Publishing
     puts "#{reason}…"
     build = [File.join(ROOT, 'build', 'build_blog.rb')]
     build << '--full' if full
-    unless system('ruby', *build)
+    unless run_build(build)
+      return false if @stopped_on_busy_lock
+
       finish_later('build', $CHILD_STATUS)
       return false
     end
@@ -537,6 +539,42 @@ module Publishing
     end
 
     finish_later('deploy', $CHILD_STATUS)
+    false
+  end
+
+  # Which languages a rebuild produces: the site's own, and every other one
+  # `site.locales` names. One run per language, all of them into the SAME
+  # public.nosync -- the tree is the merge (build_blog.rb's CONTENT_ROOT),
+  # so the deploy that follows sees one site and nothing has to be copied
+  # or reconciled afterwards.
+  def publish_languages
+    own = SiteConfig.get('site', 'lang', default: 'en').to_s
+    named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
+    ([own] + named.reject(&:empty?)).uniq
+  end
+
+  # One build, or one per language under a single lock.
+  #
+  # 🪤 The lock is the orchestrator's here. A build takes its own -- unless
+  # it was told where to write, which is exactly what each language run is
+  # told -- so without this the runs would go unguarded while a scheduled
+  # publish walked in between two of them and deployed half a site.
+  def run_build(build)
+    langs = publish_languages
+    return system('ruby', *build) if langs.length < 2
+
+    public_dir = File.join(ROOT, 'public.nosync')
+    held = RunLock.hold(ROOT, label: 'build') do
+      langs.all? do |lang|
+        system({ 'BLOG_SH_PUBLIC_DIR' => public_dir, 'BLOG_SH_LANG' => lang }, 'ruby', *build)
+      end
+    end
+    return held unless held == RunLock::BUSY
+
+    @stopped_on_busy_lock = true
+    warn I18n.t('cli.build_busy')
+    mark_deploy_pending
+    warn I18n.t('cli.deploy_pending_marked')
     false
   end
 

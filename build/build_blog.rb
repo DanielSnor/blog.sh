@@ -94,7 +94,17 @@ RunLock.acquire!(ROOT, label: 'build', busy_exit: 3) unless ENV['BLOG_SH_PUBLIC_
 # the escape hatch when something looks stale, and the reference a cached
 # build is checked against.
 FULL_BUILD = ARGV.include?('--full') || ENV['BLOG_SH_FULL_BUILD'] == '1'
-BuildCache.setup!(root: ROOT, public_dir: PUBLIC_DIR, reuse: !FULL_BUILD)
+# Two languages are two runs into ONE tree, so they must not share this:
+# a record of what the OTHER run wrote is worse than no record at all --
+# the same reason a build writing somewhere else gets its own file. The
+# language is read from the environment rather than from SITE_LANG because
+# the cache is set up before the config is.
+BUILD_CACHE_DIR = if ENV['BLOG_SH_LANG'].to_s.strip.empty?
+                    PUBLIC_DIR
+                  else
+                    File.join(PUBLIC_DIR, ENV['BLOG_SH_LANG'].to_s.strip)
+                  end
+BuildCache.setup!(root: ROOT, public_dir: BUILD_CACHE_DIR, reuse: !FULL_BUILD)
 # No ?v= cache-buster on site.css on purpose: a static host that serves every
 # file with `Cache-Control: public, max-age=0` plus an ETag (e.g. Cloudron
 # Surfer) makes browsers revalidate on each load and pick up a changed
@@ -303,6 +313,27 @@ end
 SITE_LOCALES = begin
   named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
   ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq.freeze
+end
+
+# Which part of the tree this run's sweep owns.
+#
+# The sweep takes down whatever the build did not write, and two languages
+# are two runs -- so without this the second one carries off the first
+# one's site. A run in another language owns its own root and nothing else;
+# the site's own run owns the tree except the roots that belong to the
+# other languages. Everything else about the sweep is unchanged: an orphan
+# inside a language still goes on the next build OF THAT LANGUAGE.
+def prune_root
+  LANG_ROOT.empty? ? PUBLIC_DIR : CONTENT_ROOT
+end
+
+def foreign_language_roots
+  @foreign_language_roots ||= (SITE_LOCALES - [SITE_LANG]).reject { |lang| lang == SITE_OWN_LANG }
+                                                          .map { |lang| File.join(PUBLIC_DIR, lang) }
+end
+
+def outside_this_language?(path)
+  foreign_language_roots.any? { |root| path == root || path.start_with?("#{root}/") }
 end
 
 def lang_root_for(lang)
