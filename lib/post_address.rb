@@ -166,7 +166,17 @@ module PostAddress
     pixelfed: 'pixelfed.json', toots: 'toots.json', commits: 'commits.json',
     bluesky: 'bluesky.json', rss: 'rss.json', comments: 'comments.json'
   }.freeze
-  RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
+  # Every language this installation has a locale file for is a root the
+  # build may write: a site published in more than one renders each into
+  # /<lang>/, and a page slugged `de` would be emitted over the German
+  # tree -- the incident described above, one language further in. Read
+  # from the locales directory rather than listed here, because adding a
+  # language is data and not code (docs/localization.md), and a list kept
+  # by hand is exactly how `archive` and `write` went missing from the one
+  # above.
+  LOCALE_ROOTS = Dir.glob(File.join(__dir__, '..', 'locales', '*.yml'))
+                    .map { |path| File.basename(path, '.yml') }.sort.freeze
+  RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + LOCALE_ROOTS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
   REDIRECT_SEGMENT_MAX_BYTES = 255
 
   def redirect_refusal(origin)
