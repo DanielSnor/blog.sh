@@ -2603,7 +2603,12 @@ end
 # their dates are, and this used to build both and keep whichever it wrote
 # last, silently.
 collisions = {}
-posts.each do |p|
+# Only what this run will actually write. A post with no text in this
+# language writes nothing here, so its address is not taken here -- and
+# counting it stopped the whole language dead on a collision that does not
+# exist, with `check` calling the archive sound because it asks the same
+# question of the posts that are really built.
+posts.select { |p| translated_here?(p) }.each do |p|
   PostAddress.collision_keys(p, year: post_time(p).year).each { |key| (collisions[key] ||= []) << p }
 end
 duplicates = collisions.select { |_, v| v.size > 1 }
