@@ -731,13 +731,21 @@ module Checker
       # to redirect TO -- so counting its former addresses as known let a
       # link to one pass as sound while the reader gets a 404.
       if in_stream || !draft?(post)
-        Array(post['former_slugs']).each { |former| paths << "/posts/#{former}/" }
-        # ...and only the ones the build will actually serve. It refuses a
-        # redirect_from whose first segment belongs to the site itself, or
-        # whose shape it cannot make a directory of, and says so once in
-        # the middle of a build log. Counting those among the addresses
-        # the site answers at passed every link to them as sound -- under
-        # a closing sentence that names redirects by name.
+        # ...and only the ones the build will actually serve, which is the
+        # rule the redirects below already kept: a former slug whose shape
+        # no directory can be made of is reported by its own check two
+        # screens down, and was counted here all the same -- so a link to
+        # it passed as sound in the same run that said the entry is
+        # unusable.
+        Array(post['former_slugs']).each do |former|
+          paths << "/posts/#{former}/" if PostAddress.former_slug_refusal(former).nil?
+        end
+        # The same question of a redirect_from, which the build refuses
+        # when its first segment belongs to the site itself or when its
+        # shape cannot be made into a directory, saying so once in the
+        # middle of a build log. Counting those among the addresses the
+        # site answers at passed every link to them as sound -- under a
+        # closing sentence that names redirects by name.
         Array(post['redirect_from']).each do |origin|
           paths << origin.to_s if PostAddress.redirect_refusal(origin).nil?
         end
