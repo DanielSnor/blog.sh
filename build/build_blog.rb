@@ -3428,7 +3428,15 @@ end
 #
 # A site with the default type menu gets none, and that is the intended
 # answer rather than an oversight: it has not named any subject yet.
-FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _| href[%r{\A/tag/([^/]+)/\z}, 1] }.freeze
+#
+# 🪤 Read off the menu's own hrefs, which under a language carry its root,
+# so the pattern has to allow for it: matched without one, every language
+# but the site's own published no tag feed at all -- the menu said "this
+# is a subject I publish on" in German and offered no way to follow it.
+FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _|
+  bare = LANG_ROOT.empty? ? href : href.delete_prefix(LANG_ROOT)
+  bare[%r{\A/tag/([^/]+)/\z}, 1]
+}.freeze
 
 tags_map.each do |slug, data|
   if FEED_TAG_SLUGS.include?(slug)
@@ -3436,7 +3444,11 @@ tags_map.each do |slug, data|
          Feeds.render_rss(data[:posts], path: loc("/tag/#{slug}/rss.xml"),
                     title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
                     description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
-                    link: "#{SITE_BASE_URL}/tag/#{slug}/"))
+                    # The page this feed belongs to, in the language the
+                    # feed is written in -- the site root was every
+                    # language's answer, which sent a German subscriber
+                    # to the Czech page.
+                    link: "#{SITE_BASE_URL}#{loc("/tag/#{slug}/")}"))
   end
   write_listing(data[:posts], index_template, File.join(CONTENT_ROOT, 'tag', slug),
                 base_path: loc("/tag/#{slug}"), heading: data[:name],
