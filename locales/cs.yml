@@ -1190,6 +1190,7 @@ check:
   language_address_taken_fix: "Dej jednomu z nich jinou adresu: řádek `slug:` v hlavičce, kterou otevře `./blog.sh translate <slug> --lang %{lang}`."
   language_address_taken: "V jazyce %{lang} chtějí %{slugs} tutéž adresu %{address} — build jednoho vysází a druhého zahodí."
   languages_legend: "Fajfka je napsáno, půlkolečko titulek bez textu, tečka znamená, že jazyk nemá nic — druhý jazyk post stejně ukáže a odkáže na tu jednu kopii."
+  languages_alone: "check --languages tiskne tabulku, kdežto --json a --repair ne; chtěj je po jednom."
   languages_none: "Tenhle web publikuje jeden jazyk, není co tabelovat. Ostatní vyjmenuj v `site.locales` v config/site.yml."
   unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, --json, --languages a --repair, nic jiného."
   heading: "Kontrola archivu"

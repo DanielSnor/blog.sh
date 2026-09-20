@@ -34,7 +34,8 @@
 # (brackets) is optional and commented out where it lives; the rest of
 # this file explains each one where it stands.
 #
-#   site        title, short_name, description, author, lang, locale,
+#   site        title, short_name, description, author, lang, locale, locales,
+#               fallback,
 #               timezone, base_url, (page_size), (extra_css)
 #   banner      src, alt, width, height, (show_title), (show_claim), (claim)
 #   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,

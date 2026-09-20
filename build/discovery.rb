@@ -37,7 +37,7 @@ module Discovery
     # "foto " and gets a 404. The link card on Mastodon and Bluesky and the
     # search engine's thumbnail were then blank for exactly the pictures
     # whose names needed the encoding most.
-    "#{SITE_BASE_URL}#{post_path(post)}#{media_name_encoded(media['url'])}"
+    "#{SITE_BASE_URL}#{post_href(post)}#{media_name_encoded(media['url'])}"
   end
 
   def post_description(post)
@@ -92,8 +92,8 @@ module Discovery
       '@type' => 'BlogPosting',
       'headline' => post_title_for(post),
       'datePublished' => published,
-      'url' => "#{SITE_BASE_URL}#{post_path(post)}",
-      'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_path(post)}",
+      'url' => "#{SITE_BASE_URL}#{post_href(post)}",
+      'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_href(post)}",
       'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR },
       'image' => post_og_image(post),
       'description' => post_description(post)

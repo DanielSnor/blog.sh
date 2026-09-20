@@ -3,7 +3,7 @@
             <div class="post-header">
               <% if hero_media %><div class="post-hero">
                 <div class="post-hero__media"><%# Not lazy: this is the largest thing above the fold, and deferring it means the page draws itself around a hole. %>
-                  <img src="<%= h("#{post_path(post)}#{hero_media['url']}") %>"<%= size_attrs(hero_media) %> alt="<%= h(hero_block['alt_text'].to_s) %>" decoding="async" fetchpriority="high">
+                  <img src="<%= h("#{post_href(post)}#{hero_media['url']}") %>"<%= size_attrs(hero_media) %> alt="<%= h(hero_block['alt_text'].to_s) %>" decoding="async" fetchpriority="high">
                 </div>
                 <div class="post-hero__content">
                   <%# An untitled post's date is its heading, so with a hero it moves up here from the byline rather than being printed in both places -- see date_badge. It cannot stay in the byline and be a heading: that paragraph is a <p>, and an h1 inside one is closed by the browser before it starts. %>

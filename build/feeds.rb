@@ -19,7 +19,7 @@ module Feeds
   module_function
 
   def rss_item(post)
-    url = "#{SITE_BASE_URL}#{post_path(post)}"
+    url = "#{SITE_BASE_URL}#{post_href(post)}"
     title = CGI.escapeHTML(post_title_for(post))
     pub_date = post_time(post).rfc2822
     # lifted: like the post page and the card. The item's <title> already
@@ -28,7 +28,7 @@ module Feeds
     # bold, right under it -- in every feed item of every link post that
     # has no title of its own. cards.rb records exactly this as fixed for
     # the teaser; the feed was the caller that fix never reached.
-    description = Blocks.render_content(post['content'], "#{SITE_BASE_URL}#{post_path(post)}",
+    description = Blocks.render_content(post['content'], "#{SITE_BASE_URL}#{post_href(post)}",
                                         lifted: link_title_block(post))
     # A post's rendered HTML goes into the feed inside CDATA, and CDATA has
     # exactly one way to end. A post carrying "]]>" -- which an imported
@@ -55,8 +55,11 @@ module Feeds
     ITEM
   end
 
-  def render_rss(posts, path: '/rss.xml', title: SITE_TITLE, description: SITE_DESCRIPTION,
-                 link: "#{SITE_BASE_URL}/")
+  # `path` and `link` default to THIS language's own feed and front page:
+  # a feed that advertises itself at the site root tells every reader who
+  # subscribed from the German page that they are reading the Czech one.
+  def render_rss(posts, path: loc('/rss.xml'), title: SITE_TITLE, description: SITE_DESCRIPTION,
+                 link: "#{SITE_BASE_URL}#{loc('/')}")
     items = posts.first(RSS_ITEM_LIMIT).map { |post| rss_item(post) }.join
     # The newest post's date, not Time.now -- otherwise rss.xml differs on
     # every build and gets re-uploaded even when nothing changed.
@@ -96,7 +99,7 @@ module Feeds
     urls = [sitemap_url("#{SITE_BASE_URL}/", entries.first && post_time(entries.first).iso8601)]
 
     entries.each do |entry|
-      urls << sitemap_url("#{SITE_BASE_URL}#{post_path(entry)}", post_time(entry).iso8601)
+      urls << sitemap_url("#{SITE_BASE_URL}#{post_href(entry)}", post_time(entry).iso8601)
     end
 
     # max_by post_time, not max_by the stored STRING. The comment on the post

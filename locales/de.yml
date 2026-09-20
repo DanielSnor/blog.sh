@@ -1204,6 +1204,7 @@ check:
   language_address_taken_fix: "Gib einem davon eine andere Adresse: die `slug:`-Zeile im Kopf, den `./blog.sh translate <slug> --lang %{lang}` öffnet."
   language_address_taken: "In %{lang} wollen %{slugs} beide %{address} -- der Build liefert einen davon aus und lässt den anderen fallen."
   languages_legend: "Ein Haken heißt geschrieben, ein Halbkreis ein Titel ohne Text, ein Punkt, dass diese Sprache nichts hat -- die andere Sprache zeigt den Beitrag und verlinkt die eine Fassung."
+  languages_alone: "check --languages druckt eine Tabelle, --json und --repair tun das nicht; verlange sie einzeln."
   languages_none: "Diese Website veröffentlicht eine Sprache, es gibt nichts zu tabellieren. Nenne die anderen in `site.locales` in config/site.yml."
   unknown_option: "Unbekannte Option: %{option}. check nimmt --online, --json, --languages und --repair, sonst nichts."
   heading: "Archiv wird geprüft"

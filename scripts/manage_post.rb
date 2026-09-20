@@ -717,6 +717,9 @@ def buffer_command(origin)
   case origin && origin['kind']
   when 'add' then './blog.sh add'
   when 'edit' then "./blog.sh edit #{origin['slug']}"
+  when 'translate'
+    slug, lang = origin['slug'].to_s.split('@')
+    "./blog.sh translate #{slug} --lang #{lang}"
   else t('cli.buffer_unknown_origin')
   end
 end
@@ -2477,12 +2480,14 @@ def cmd_schedule(slug, allow_partial: false)
   post = JSON.parse(raw)
   # Asked here as well as at publish: scheduling IS publishing, only later
   # and with nobody watching when it happens.
-  refuse_partial!(post, slug, allow_partial) unless post['scheduled']
   unless draft?(post)
     puts t('cli.schedule_only_drafts', slug: slug)
     puts
     return
   end
+  # After the draft question, not before it: a published post is not
+  # missing a translation, it is simply not something you schedule.
+  refuse_partial!(post, slug, allow_partial) unless post['scheduled']
 
   if post['scheduled']
     # The same exit code cmd_rebuild answers a held lock with: somebody
@@ -4687,6 +4692,15 @@ def refuse_partial!(post, slug, allow_partial, json: false)
   json ? refuse('partial_translation', said) : abort(said)
 end
 
+# The address a post will be served at once it is out, in the language
+# whose `address_slug` it carries. Drafts live under a token until they are
+# published, and comparing tokens answers nothing about collisions.
+def published_address(post, address = nil)
+  out = post.reject { |key, _| key == 'draft_token' }.merge('state' => 'published')
+  out['address_slug'] = address.to_s unless address.to_s.strip.empty?
+  PostAddress.path(out)
+end
+
 # Writing a post's other language: the WORDS, and nothing else.
 #
 # The metadata belong to the post and not to a language (lib/translations.rb)
@@ -4716,11 +4730,17 @@ def cmd_translate(slug, lang)
 
   entry = post.dig('translations', lang)
   entry = {} unless entry.is_a?(Hash)
+  # Offered back the way `add` and `edit` offer theirs: this command writes
+  # a buffer on every abort (a taken address, a reserved root, a post that
+  # changed underneath), and a buffer nobody is ever offered is a promise
+  # the next successful save of any post quietly breaks.
+  restored = offer_editor_buffer('translate', "#{slug}@#{lang}")
   # The address line is shown with what it is, so it can be read as well as
   # changed -- and left alone it stays exactly as it was, which is what an
   # address is for.
   opened_with = "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
                 MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+  opened_with = restored || opened_with
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
                        { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" })
   if raw == opened_with
@@ -4761,6 +4781,15 @@ def cmd_translate(slug, lang)
                 Slug.slugify(title)
               end
     address = post['slug'].to_s if address.empty?
+    # The same 200-byte ceiling `add` and `rename` keep, and for the reason
+    # they both wrote down: past it mkdir dies with a raw ENAMETOOLONG in
+    # the middle of writing the site, naming no post. Cut on a word
+    # boundary where there is one, exactly as cmd_add cuts.
+    if address.bytesize > 200
+      address = address[0, 200]
+      address = address.sub(/-[^-]*\z/, '') if address.rindex('-')&.>(120)
+      address = address.sub(/-+\z/, '')
+    end
     one['slug'] = address
     # A PAGE lives in the root of its language, which is where the engine
     # keeps its own names: a page addressed `assets` in German would be
@@ -4774,7 +4803,12 @@ def cmd_translate(slug, lang)
     # in this language the other posts' addresses are their own translated
     # ones. Refused rather than made unique behind the author's back: they
     # chose these words, and the header is where they can choose others.
-    wanted = PostAddress.path(post.merge('address_slug' => address))
+    # 🪤 Asked of the address the post will have when it is OUT, not of the
+    # one it has now: a draft is served under its token, so comparing
+    # today's addresses found nothing for exactly the posts people
+    # translate -- drafts -- and the collision then stopped the next build
+    # instead, in the language being built and with the site undeployable.
+    wanted = published_address(post, address)
     clash = PathGlob.under(CONTENT_DIR, '*', '*.json').find do |file|
       other = begin
         JSON.parse(File.read(file, encoding: 'utf-8'))
@@ -4783,7 +4817,8 @@ def cmd_translate(slug, lang)
       end
       next false unless other.is_a?(Hash) && other['slug'].to_s != post['slug'].to_s
 
-      PostAddress.path(Translations.for_lang(other, lang)) == wanted
+      localized = Translations.for_lang(other, lang)
+      published_address(localized, localized['address_slug']) == wanted
     end
     abort t('cli.translate_address_taken', address: address, slug: File.basename(clash.to_s, '.json')) if clash
     translations[lang] = one

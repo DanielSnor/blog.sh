@@ -753,9 +753,15 @@ module Checker
   # INVENTS is worse than one it misses, because it makes an archive read
   # sound while a reader gets a 404.
   def with_languages(paths, posts, root: nil)
-    own = root ? ConfigLang.of(File.join(root, 'config', 'site.yml')) : nil
-    langs = posts.flat_map { |post| Translations.languages(post) }.uniq
-    langs -= [own.to_s] unless own.to_s.empty?
+    # 🪤 From `site.locales`, NOT from the posts -- the BUILD decides which
+    # languages exist from the config (Publishing#publish_languages), so
+    # anything else here disagrees with what is actually written. Both
+    # directions were wrong: a translation into a language the config does
+    # not name made check invent a whole tree the build never writes, and a
+    # language the config names but nobody has translated into yet made it
+    # call the listings of that language dead -- on the first day after
+    # adding a language, which is exactly when somebody looks.
+    langs = published_languages(root)
     return paths if langs.empty?
 
     # A POST's address exists in a language only if the post has words in

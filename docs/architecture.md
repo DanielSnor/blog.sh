@@ -397,7 +397,15 @@ ends in a number beside the same slug without one is ordinary; and a `redirect_f
 the build will refuse to serve, which it says once in the middle of a build
 log and which the checker used to count among the addresses this site
 answers at, so a link into one passed as sound -- including an old address
-a live post has since taken.
+a live post has since taken; text carrying HTML entities where the
+characters themselves belong; and, on a site that publishes more than one
+language, two posts asking for one address inside one of them -- which the
+build resolves by serving one of the pair and dropping the other.
+
+The addresses a site answers at are worked out per language on the same
+terms the build uses: every listing exists in every language `site.locales`
+names, a POST exists in a language only if it has words there, and
+`/assets/` and `/write/` are shared and have no copy per language.
 
 A question that raises is **one finding, not the end of the run**: every
 question is asked through a guard that turns an exception into an error

@@ -258,7 +258,11 @@ LOCALE_FOR_LANG = { 'cs' => 'cs_CZ', 'de' => 'de_DE', 'en' => 'en_US' }.freeze
 # the locale pinned in config belongs to the site's own language. Honouring
 # it there would ship `og:locale="en_US"` on every page of the German half
 # of a site -- the exact defect described above, one language further in.
-SITE_LOCALE = if ENV['BLOG_SH_LANG'].to_s.strip.empty?
+# 🪤 Compared against the site's OWN language, not against "was the
+# variable set": `rebuild` sets BLOG_SH_LANG for every run, the site's own
+# included, so asking about the variable threw away a pinned en_GB/pt_BR
+# the day a site added its second language.
+SITE_LOCALE = if I18n.lang.to_s == SiteConfig.get('site', 'lang', default: 'en').to_s
                 SiteConfig.get('site', 'locale',
                                default: LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US'))
               else
@@ -557,6 +561,10 @@ end
 # locales/*.yml directly -- that only happens at build time, in Ruby.
 def client_i18n_json
   {
+    # Where this language's own copies live: the scripts fetch the search
+    # index and the comments by address, and a German page fetching the
+    # Czech index searched the wrong site quietly.
+    lang_root: LANG_ROOT,
     date_locale: t('js.date_locale'),
     tags_sort_alpha: t('tags.sort_alpha'),
     tags_sort_count: t('tags.sort_count'),

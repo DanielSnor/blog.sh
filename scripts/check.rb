@@ -83,6 +83,15 @@ if as_json && repair
   exit 2
 end
 
+# Same rule, same reason: both of these end the run before the matrix is
+# printed, so accepting the pair would answer "done" about a table nobody
+# was shown -- which is exactly what the refusal of an unknown switch
+# above exists to prevent.
+if languages && (as_json || repair)
+  warn(I18n.t('check.languages_alone'))
+  exit 2
+end
+
 if as_json
   require 'json'
   progress = nil
