@@ -26,13 +26,16 @@ the player never learned who was embedding it; and `check` called a link to the 
 exactly the sites where that address answers. Nothing to configure and nothing to migrate -- but the
 player fix lives in the rendered page, so it reaches a site on the next full rebuild and deploy.
 
+### Added
+
+- **Setup says what went into a prompt that shows nothing.** The length of the secret and its last two characters -- enough to tell an access token from the client key beside it, too little to give either away.
+
 ### Fixed
 
 - **Every embedded player drew a black rectangle on a site with a tight referrer policy.** YouTube called it "Error 153".
 - **`check` called a link to `/write/` dead on the sites that publish the app.** And `doctor`'s menu question with it.
 - **The import menu did not say WordPress takes a file.** Its entry now says so, as the prompt after it always did.
 - **A token pasted with a space on either side was saved with it.** The instance refused it and the hidden prompt could not show why; setup now trims it, and the hint says the access token is not the client key or secret beside it.
-- **A secret went in and nothing said what it was.** Setup now shows its length and last two characters -- enough to tell an access token from the client key beside it, too little to give either away.
 - **Ctrl+C in any screen of `./blog.sh` ended in a stack trace.** It now stops the run with one line and status 130, as setup, style and import always did.
 - **FTP was nowhere in the docs.** The rclone backend has always reached a plain FTP host; `install.md` and `env.sh.example` now say how.
 
