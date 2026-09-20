@@ -114,6 +114,9 @@ module Publishing
     updated = post.merge('state' => 'published', 'date' => date.iso8601)
     updated.delete('draft_token')
     updated.delete('scheduled')
+    # The date a plan overwrote: the post is going out with the slot it
+    # was given, so there is nothing left to put back.
+    updated.delete('date_before_schedule')
     # A post that was unpublished and renamed while a draft comes back
     # under a new address; the marker cmd_unpublish left behind becomes a
     # redirect from the old one. Coming back under the SAME address just

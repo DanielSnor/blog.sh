@@ -2506,7 +2506,21 @@ def unschedule_post(path, post, slug, raw: nil)
     abort_if_post_changed(path, raw, slug) if raw
     updated = post.dup
     updated.delete('scheduled')
-    AtomicWrite.write_json(path, updated)
+    # Back to the date the plan overwrote. created_at would be the wrong
+    # answer for a draft that was backdated on purpose: its date is not
+    # its created_at, and that date is exactly what it must get back.
+    back = updated.delete('date_before_schedule')
+    updated['date'] = back if back
+    when_to_file = begin
+      Time.parse(updated['date'].to_s)
+    rescue StandardError
+      nil
+    end
+    if when_to_file
+      write_in_year_of(path, updated, when_to_file, slug: slug)
+    else
+      AtomicWrite.write_json(path, updated)
+    end
   end
   # false, not a bare return: the queue screen decides whether to offer
   # compacting the slots behind this post by this answer, and a decline
@@ -2550,29 +2564,43 @@ end
 # apply_queue_moves (RunLock.hold yields straight through for a holder), so
 # the queue screen pays nothing for it. Returns nil without writing when a
 # publish is running; callers treat that like any other declined prompt.
+# A post's folder IS its year, so a write that changes the date can move
+# the file -- and the media with it, because the build derives both the
+# address and the media lookup from the date. Scheduling always knew this;
+# cancelling a plan did not, and left the post in the year of a slot it no
+# longer had. One function, so the two cannot drift apart again.
+def write_in_year_of(path, updated, date, slug:)
+  new_year = date.year.to_s
+  new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
+  # Asked whether or not the file moves: a date that stays inside the
+  # year can still land the post on an address another post is served
+  # at, and the old guard only looked when the folder changed.
+  taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
+                                slug: slug, except: path, path: new_path)
+  abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+
+  if File.expand_path(new_path) != File.expand_path(path)
+    FileUtils.mkdir_p(File.dirname(new_path))
+    Publishing.relocate_media(slug, File.basename(File.dirname(path)), new_year)
+    AtomicWrite.write_json(new_path, updated)
+    File.delete(path)
+  else
+    AtomicWrite.write_json(new_path, updated)
+  end
+  new_path
+end
+
 def write_scheduled_date(path, post, date, raw: nil, slug: nil)
   held = RunLock.hold(ROOT, label: 'queue') do
     abort_if_post_changed(path, raw, slug || post['slug']) if raw
     updated = post.merge('date' => date.iso8601, 'scheduled' => true)
-    new_year = date.year.to_s
-    new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
-    # Asked whether or not the file moves: a date that stays inside the
-    # year can still land the post on an address another post is served
-    # at, and the old guard only looked when the folder changed.
-    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
-                                  slug: post['slug'], except: path, path: new_path)
-    abort t('cli.post_already_exists', slug: post['slug'], path: taken) if taken
-
-    if File.expand_path(new_path) != File.expand_path(path)
-
-      FileUtils.mkdir_p(File.dirname(new_path))
-      Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
-      AtomicWrite.write_json(new_path, updated)
-      File.delete(path)
-    else
-      AtomicWrite.write_json(new_path, updated)
-    end
-    new_path
+    # The date the slot is about to overwrite, kept so cancelling the plan
+    # can give it back. Only on the way IN: rescheduling an already planned
+    # post would otherwise remember a slot instead of the post's own date.
+    # A post scheduled by an older version has none, and cancelling leaves
+    # it as it always did -- there is nothing to put back.
+    updated['date_before_schedule'] = post['date'] unless post['scheduled']
+    write_in_year_of(path, updated, date, slug: post['slug'])
   end
   if held == RunLock::BUSY
     warn t('cli.queue_busy')
