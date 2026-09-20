@@ -2046,11 +2046,19 @@ end
 # listing when you aren't. Tag pages and the search page have no item to
 # point at at all.
 def nav_active_for(path)
-  return '/' if path == '/' || path.start_with?('/page/')
+  # The paths that arrive here are the ones the pages are written at, so
+  # under a language they carry its root. Every shape below is matched
+  # WITHOUT it and localized on the way out: matching the whole path lit
+  # nothing up in another language except a listing's own first page --
+  # the menu went dead on the home page and on every continuation of
+  # every listing.
+  bare = LANG_ROOT.empty? ? path : path.delete_prefix(LANG_ROOT)
+  bare = '/' if bare.empty?
+  return loc('/') if bare == '/' || bare.start_with?('/page/')
 
   # Pagination lives under the type ('/type/video/page/2/'), so the item is
   # the first two segments rather than the whole path.
-  type = path[%r{\A/type/([^/]+)/}, 1]
+  type = bare[%r{\A/type/([^/]+)/}, 1]
   return loc("/type/#{type}/") if type
 
   # A tag listing (and its pagination) belongs under the tag's own item,
@@ -2060,8 +2068,8 @@ def nav_active_for(path)
   # than returned unconditionally, because the answer becomes a
   # PARTIAL_RESULTS key: returning every path would give each of thousands
   # of tag and post pages its own cache entry for an identical menu.
-  tag = path[%r{\A/tag/([^/]+)/}, 1]
-  candidate = tag ? "/tag/#{tag}/" : path
+  tag = bare[%r{\A/tag/([^/]+)/}, 1]
+  candidate = tag ? loc("/tag/#{tag}/") : path
   NAV_ITEM_HREFS.include?(candidate) ? candidate : nil
 end
 
@@ -2843,6 +2851,25 @@ end.freeze
 # menu, while the same emptiness under `links:` meant no links -- one
 # editing accident, two opposite answers. A key that is written down now
 # speaks for itself everywhere.
+# Where a hand-written `url:` in the menu points from THIS language.
+#
+# Three kinds of destination, and only one of them can be prefixed:
+# a post or a page follows the piece itself (its address in another
+# language is a different slug, not the same one with a root in front);
+# a listing the engine builds has one copy per language; anything else --
+# an address off the site, or a file the author put there by hand -- is
+# taken exactly as written, because the build knows nothing about it.
+def nav_url(url)
+  return url if LANG_ROOT.empty? || !url.start_with?('/')
+  return url if SHARED_ROOTS.any? { |root| url.start_with?(root) }
+
+  known = NAV_POSTS_BY_ADDRESS[url] || NAV_POSTS_BY_ADDRESS["#{url}/"]
+  return post_href(known) if known
+
+  first = url.split('/').reject(&:empty?).first.to_s
+  PostAddress::ROOT_DIRS.include?(first) ? loc(url) : url
+end
+
 def configured_nav_items
   return nil unless SiteConfig.key?('nav')
 
@@ -2856,13 +2883,21 @@ def configured_nav_items
 
     label = entry['label'].to_s.strip
     slug = entry['tag'].to_s.strip
-    href = slug.empty? ? entry['url'].to_s.strip : loc("/tag/#{slug}/")
+    href = slug.empty? ? nav_url(entry['url'].to_s.strip) : loc("/tag/#{slug}/")
     next if label.empty? || href.empty?
 
     [href, label]
   end
 end
 
+# The archive by the address each piece has in the language the site is
+# WRITTEN in -- which is the language a `url:` in config/site.yml is
+# written in too. Pages are the ones this is really for (a menu points at
+# `About` far more often than at a post), and by here they have been
+# partitioned off, so all three lists are asked. Not drafts: one is served
+# under a token, and a menu item pointing into a token is not a menu item.
+NAV_POSTS_BY_ADDRESS = (pages + posts + unlisted_posts)
+                       .to_h { |p| [address_of(p, SITE_OWN_LANG), p] }.freeze
 NAV_ITEMS = (configured_nav_items || ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
