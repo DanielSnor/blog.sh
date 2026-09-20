@@ -276,7 +276,7 @@ cli:
     Nech jen jednu hlavičku: buď smaž tu prázdnou nahoře, nebo z vloženého
     textu odeber řádky mezi --- a hodnoty přepiš do té horní.
 
-  translate_hint: "<!--\nPŘEKLAD do %{lang}, post: %{title}\nJsou tu jen slova. Datum, štítky, série i stav patří postu — ty se mění přes `props` nebo `edit` a platí ve všech jazycích.\nNech titulek prázdný a smaž tělo, a jazyk z postu zmizí; bude to vypadat přesně jako předtím, než překlad vznikl.\nŘádky začínající // se při uložení zahodí.\n-->"
+  translate_hint: "<!--\nPŘEKLAD do %{lang}, post: %{title}\nJsou tu jen slova. Datum, štítky, série i stav patří postu — ty se mění přes `props` nebo `edit` a platí ve všech jazycích.\nNech titulek prázdný a smaž tělo, a jazyk z postu zmizí; bude to vypadat přesně jako předtím, než překlad vznikl.\nŘádky začínající // se při uložení zahodí.\n-->\n"
   translate_saved: "Uloženo: %{lang} text postu „%{slug}“."
   translate_removed: "Odebráno: %{lang} text postu „%{slug}“."
   translate_own_language: "„%{lang}“ je jazyk, ve kterém je post napsaný — ten se edituje přes `./blog.sh edit`."
@@ -618,6 +618,14 @@ cli:
   browse_preview_no_caption: "bez popisku"
   browse_preview_tags: "štítky: %{tags}"
   edit_what_prompt: "Co upravit? [Enter] text  [v] vlastnosti a akce  [cokoliv jiného] zpět: "
+  edit_what_prompt_one: "Co upravit? [Enter] text  [j] jazyk: %{language}  [v] vlastnosti a akce  [cokoliv jiného] zpět: "
+  edit_what_prompt_many: "Co upravit? [Enter] text  [j] jazyky  [v] vlastnosti a akce  [cokoliv jiného] zpět: "
+  translation_key: "j"
+  language_heading: "Do jakého jazyka?"
+  language_row: "%{mark} %{name} — %{state}"
+  language_state_written: "napsáno"
+  language_state_started: "jen titulek, text pod ním žádný"
+  language_state_none: "zatím nic"
   properties_heading: "Vlastnosti postu %{slug} — čím post je, ne co v něm stojí:"
   properties_hint: "↑↓ vybrat  ·  Enter otevřít  ·  Esc zpět"
   properties_prompt: "Kterou (1-%{count}), nebo Enter zpět: "

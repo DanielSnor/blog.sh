@@ -284,7 +284,7 @@ cli:
     die --- Zeilen aus dem eingefügten Text und übertrag dessen Werte in
     den oberen.
 
-  translate_hint: "<!--\nÜBERSETZUNG nach %{lang}, Beitrag: %{title}\nHier stehen nur die Worte. Datum, Schlagwörter, Serie und Status gehören zum Beitrag -- die ändert `props` oder `edit`, und sie gelten in jeder Sprache.\nTitel leer lassen und den Text löschen nimmt diese Sprache vom Beitrag; er sieht dann aus wie vor der Übersetzung.\nZeilen, die mit // beginnen, werden beim Speichern entfernt.\n-->"
+  translate_hint: "<!--\nÜBERSETZUNG nach %{lang}, Beitrag: %{title}\nHier stehen nur die Worte. Datum, Schlagwörter, Serie und Status gehören zum Beitrag -- die ändert `props` oder `edit`, und sie gelten in jeder Sprache.\nTitel leer lassen und den Text löschen nimmt diese Sprache vom Beitrag; er sieht dann aus wie vor der Übersetzung.\nZeilen, die mit // beginnen, werden beim Speichern entfernt.\n-->\n"
   translate_saved: "Gespeichert: der %{lang}-Text von „%{slug}“."
   translate_removed: "Entfernt: der %{lang}-Text von „%{slug}“."
   translate_own_language: "„%{lang}“ ist die Sprache, in der der Beitrag geschrieben ist -- die ändert `./blog.sh edit`."
@@ -630,6 +630,14 @@ cli:
   browse_preview_no_caption: "ohne Bildunterschrift"
   browse_preview_tags: "Schlagwörter: %{tags}"
   edit_what_prompt: "Was bearbeiten? [Enter] den Text  [v] Eigenschaften und Aktionen  [alles andere] zurück: "
+  edit_what_prompt_one: "Was bearbeiten? [Enter] den Text  [f] Sprache: %{language}  [v] Eigenschaften und Aktionen  [alles andere] zurück: "
+  edit_what_prompt_many: "Was bearbeiten? [Enter] den Text  [f] Sprachfassungen  [v] Eigenschaften und Aktionen  [alles andere] zurück: "
+  translation_key: "f"
+  language_heading: "In welche Sprache?"
+  language_row: "%{mark} %{name} -- %{state}"
+  language_state_written: "geschrieben"
+  language_state_started: "nur ein Titel, kein Text darunter"
+  language_state_none: "noch nichts"
   properties_heading: "Eigenschaften von %{slug} -- was der Beitrag IST, nicht was er sagt:"
   properties_hint: "↑↓ wählen  ·  Enter öffnen  ·  Esc zurück"
   properties_prompt: "Welche (1-%{count}), oder Enter für zurück: "

@@ -4676,6 +4676,36 @@ def missing_translations(post)
   (named - [own]) - Translations.languages(post)
 end
 
+# Every language the site publishes except the one it is written in --
+# the languages a post can be translated INTO. Empty on a site that names
+# no `site.locales`, which is what keeps every screen below unchanged for
+# the sites that publish one language.
+def other_languages
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
+  (named.reject(&:empty?) - [own]).uniq
+end
+
+# A language's name in its own language, which is the only name somebody
+# looking for it recognises -- and the code itself when the engine has no
+# file for it, rather than a blank where a name should be.
+def language_name(code)
+  return code.to_s unless I18n.locale_file?(code.to_s)
+
+  name = I18n.load_locale(code.to_s)['language_name'].to_s
+  name.empty? ? code.to_s : name
+end
+
+# What a post has in a language: words, a title somebody started and left,
+# or nothing. The same three states `check --languages` prints, worked out
+# the same way -- a language counts when it has a BODY.
+def language_state(post, lang)
+  entry = post['translations'].is_a?(Hash) ? post['translations'][lang.to_s] : nil
+  return :none unless entry.is_a?(Hash) && entry.slice(*Translations::TEXT_KEYS).compact.any?
+
+  Array(entry['content']).empty? ? :started : :written
+end
+
 # Refuses a post the site cannot show in every language it publishes --
 # where somebody is watching, and nowhere else.
 #
@@ -4690,6 +4720,15 @@ def refuse_partial!(post, slug, allow_partial, json: false)
 
   said = t('cli.publish_partial', slug: slug, langs: missing.join(', '))
   json ? refuse('partial_translation', said) : abort(said)
+end
+
+# The post's own words, as lines the editor drops on save. Its title
+# rides along in the same shape, because the title is the first thing
+# anybody translates and the one the address is made of.
+def original_as_notes(post, media_dir)
+  body = MarkdownWriter.blocks_to_markdown(Array(post['content']), media_dir)
+  lines = ["// #{post['title']}", '//'] + body.split("\n", -1).map { |line| line.empty? ? '//' : "// #{line}" }
+  "#{lines.join("\n").rstrip}\n"
 end
 
 # The address a post will be served at once it is out, in the language
@@ -4738,12 +4777,23 @@ def cmd_translate(slug, lang)
   # The address line is shown with what it is, so it can be read as well as
   # changed -- and left alone it stays exactly as it was, which is what an
   # address is for.
-  opened_with = "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
-                MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
-  opened_with = restored || opened_with
+  skeleton = "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
+             MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+  # Nothing written in this language yet: the post's own words come in as
+  # `//` lines, which the editor drops on the way back like every other
+  # note. Translating with the original in the buffer beats translating
+  # from a second window -- and because the lines are dropped, a
+  # translation left half-done cannot save the original text as if it
+  # were this language's.
+  opened_with = restored || (entry.empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
                        { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" })
-  if raw == opened_with
+  # 🪤 Against the buffer WITHOUT the notes as well: the editor strips
+  # `//` lines on the way back, so a buffer that was carrying the original
+  # NEVER returns the bytes it went in with -- and an untouched editor
+  # then read as "everything was deleted", which takes the language off
+  # the post and rebuilds the site to say so.
+  if raw == opened_with || raw == skeleton
     puts t('cli.no_changes')
     puts
     return
@@ -6446,13 +6496,50 @@ def post_crossroads(slug)
   summary = post_summary(path)
   puts summary_row(summary) if summary
   puts
-  case Tui.key_choice(t('cli.edit_what_prompt'))
+  # The third way is offered only where there is a language to offer: a
+  # site that publishes one sees exactly the prompt it always saw.
+  langs = other_languages
+  prompt = case langs.size
+           when 0 then t('cli.edit_what_prompt')
+           when 1 then t('cli.edit_what_prompt_one', language: language_name(langs.first))
+           else t('cli.edit_what_prompt_many')
+           end
+  case Tui.key_choice(prompt)
   when '', 'e' then cmd_edit(slug)
   when 'v' then cmd_props(slug)
+  when t('cli.translation_key')
+    # Nothing to translate into means the key is not a key: a site that
+    # publishes one language never had it on the prompt, and a letter that
+    # does something invisible is worse than one that does nothing.
+    if langs.empty?
+      puts t('cli.cancelled')
+      puts
+    else
+      chosen = langs.size == 1 ? langs.first : pick_language_interactively(path, langs)
+      chosen ? cmd_translate(slug, chosen) : (puts t('cli.cancelled'); puts)
+    end
   else
     puts t('cli.cancelled')
     puts
   end
+end
+
+# Which language to write, when the site publishes more than one. The row
+# says what is already there, in the three states `check --languages`
+# prints: a language with words, one somebody started, one with nothing.
+def pick_language_interactively(path, langs)
+  post = begin
+    JSON.parse(File.read(path, encoding: 'utf-8'))
+  rescue StandardError
+    {}
+  end
+  marks = { written: '✅', started: '◐', none: '·' }
+  rows = langs.map do |lang|
+    t('cli.language_row', mark: marks[language_state(post, lang)], name: language_name(lang),
+                          state: t("cli.language_state_#{language_state(post, lang)}"))
+  end
+  index = properties_pick(rows, [t('cli.language_heading'), ''], t('cli.properties_hint'))
+  index.nil? ? nil : langs[index]
 end
 
 def run_wizard_choice(command)
