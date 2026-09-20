@@ -366,11 +366,27 @@ def language_links(path, post: nil)
     has = post.nil? || lang == SITE_OWN_LANG || Translations.languages(post).include?(lang)
     href = if !has
              "#{root}/"
+           elsif post
+             # 🪤 Asked of the POST, never worked out from the address being
+             # read: the other language serves it under a slug of its own
+             # (lib/translations.rb), so rewriting this one would offer an
+             # address in the right language and the wrong words.
+             "#{root}#{address_of(post, lang)}"
            else
              bare == '/' ? "#{root}/" : "#{root}#{bare}"
            end
     { 'lang' => lang, 'href' => href, 'has' => has }
   end
+end
+
+# A post's address in one language, without the language on it. The post's
+# own language answers with the post's own slug, which is what a post that
+# was never translated has everywhere.
+def address_of(post, lang)
+  entry = post['translations'].is_a?(Hash) ? post['translations'][lang.to_s] : nil
+  named = entry.is_a?(Hash) ? entry[Translations::ADDRESS_KEY].to_s.strip : ''
+  PostAddress.path(post.merge('address_slug' => (named.empty? ? post['slug'] : named)),
+                   year: post_time(post).year)
 end
 
 # What a crawler is told about the other languages of THIS page -- built

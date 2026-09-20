@@ -32,6 +32,15 @@
 module Translations
   TEXT_KEYS = %w[title content excerpt].freeze
 
+  # The address this language serves the post at, kept beside its words.
+  #
+  # 🪤 NOT the post's own `slug`, which is the name of its file and of its
+  # media directory -- identity, and identity does not change with the
+  # language somebody is reading in. Swapping it would move the file, take
+  # the pictures with it and turn one post into two. So it travels as
+  # `address_slug`, which only PostAddress reads.
+  ADDRESS_KEY = 'slug'
+
   module_function
 
   # The post as this language renders it. The post itself when there is
@@ -46,7 +55,10 @@ module Translations
     text = one.slice(*TEXT_KEYS).reject { |_, value| value.nil? }
     return post if text.empty?
 
-    post.merge(text)
+    merged = post.merge(text)
+    address = one[ADDRESS_KEY].to_s.strip
+    merged['address_slug'] = address unless address.empty?
+    merged
   end
 
   # Which languages this post has a text of its own for -- the site's own

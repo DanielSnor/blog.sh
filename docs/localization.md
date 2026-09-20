@@ -202,11 +202,37 @@ one site and nothing has to be merged afterwards. Each language's build
 sweeps only its own root, which is how two of them can share a tree
 without carrying each other away.
 
+### The address in each language
+
+A translated post is served under an address of its own:
+`/de/posts/2026/mehrsprachiger-blog/`, not the Czech slug with a German
+prefix. An address is read by people, and half of it in a language they
+do not read is the half that says what the piece is about.
+
+It is made from the translated title the first time the translation is
+written, and then left alone -- a post's own slug works that way for the
+same reason: an address that follows a title somebody corrected is an
+address that breaks every link to it. To choose one, put it in the
+header the `translate` editor opens:
+
+```
+---
+title: Mehrsprachiger Blog
+slug: mehrsprachiger-blog
+---
+```
+
+Two posts cannot share an address in one language: the command says whose
+it already is and leaves you in the header to pick another.
+
+🪤 **The post's own `slug` is not this.** It names the post's file and its
+media directory -- identity, which does not change with the language
+somebody reads in. Changing a translated address changes where that
+language serves the post and nothing else; no redirect is left behind, so
+it is worth choosing before anybody links to it.
+
 ### What is not there yet
 
-- **A slug per language.** An address is the post's one slug in every
-  language (`/de/posts/2026/muj-post/`), because the file's identity and
-  its media directory both hang off it.
 - **A fallback chain.** A language falls back to the post's own text, not
   to a language you nominate.
 - **Pictures in a translation.** Media belong to the post and its

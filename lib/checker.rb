@@ -762,19 +762,27 @@ module Checker
     # has, so claiming the other would be inventing one (build's
     # post_href). Everything else -- listings, tags, series, the archive,
     # the feed -- is built in every language the site publishes.
+    # A post's address in a language is the post's ANSWER, not this one with
+    # a language in front of it: the other language serves it under a slug
+    # of its own (lib/translations.rb). Worked out per post and per
+    # language, so what check calls sound is what the build wrote.
     per_post = {}
     posts.each do |post|
-      path = post_path(post)
-      per_post[path] = Translations.languages(post)
+      per_post[post_path(post)] = post
     end
     shared = paths.select { |path| path.start_with?('/write/', '/assets/') }
     base = paths.to_a - shared.to_a
     langs.each do |lang|
       paths << "/#{lang}/"
       base.each do |path|
-        next if per_post.key?(path) && !per_post[path].include?(lang)
+        post = per_post[path]
+        if post
+          next unless Translations.languages(post).include?(lang)
 
-        paths << (path == '/' ? "/#{lang}/" : "/#{lang}#{path}")
+          paths << "/#{lang}#{post_path(Translations.for_lang(post, lang))}"
+        else
+          paths << (path == '/' ? "/#{lang}/" : "/#{lang}#{path}")
+        end
       end
     end
     paths

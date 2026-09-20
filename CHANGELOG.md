@@ -28,7 +28,7 @@ player fix lives in the rendered page, so it reaches a site on the next full reb
 
 ### Added
 
-- **A site can be published in more than one language.** `site.locales` names them; each post keeps one set of metadata and a text per language, written with `./blog.sh translate <slug> --lang de`. The site's own language keeps the site root and every other one gets a root of its own, sharing one copy of the assets and the writing app, and `./blog.sh rebuild` produces all of them in one go. A post nobody has translated is shown in the other language with its link going to the one address it has, so the same words never stand at two addresses. A site that names no locales is unchanged -- no switcher, no alternates, nothing in the markup.
+- **A site can be published in more than one language.** `site.locales` names them; each post keeps one set of metadata and a text per language, written with `./blog.sh translate <slug> --lang de`, under an address of its own in that language. The site's own language keeps the site root and every other one gets a root of its own, sharing one copy of the assets and the writing app, and `./blog.sh rebuild` produces all of them in one go. A post nobody has translated is shown in the other language with its link going to the one address it has, so the same words never stand at two addresses. A site that names no locales is unchanged -- no switcher, no alternates, nothing in the markup.
 - **Setup says what went into a prompt that shows nothing.** The length of the secret and its last two characters -- enough to tell an access token from the client key beside it, too little to give either away.
 
 ### Fixed

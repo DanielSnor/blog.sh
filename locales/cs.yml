@@ -282,6 +282,7 @@ cli:
   translate_unknown_language: "Tenhle web „%{lang}“ nepublikuje. Publikuje: %{known}. Nejdřív jazyk doplň do `site.locales` v config/site.yml."
   translate_needs_language: "Do jakého jazyka? `./blog.sh translate <slug> --lang de`."
   translate_needs_locales: "Tenhle web publikuje jeden jazyk. Nejdřív ostatní vyjmenuj v `site.locales` v config/site.yml."
+  translate_address_taken: "Tu adresu už v tomhle jazyce má „%{slug}“. Vyber jinou řádkem `slug:` v hlavičce."
   translate_media_unsupported: "Překlad nese slova, ne obrázky: média patří postu a jazyky je sdílejí. Přidej obrázek přes `./blog.sh edit` a tady se na něj odkaž."
   frontmatter_hint: |
     <!--

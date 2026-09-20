@@ -29,6 +29,7 @@ require_relative '../lib/video_remuxer'
 require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
+require_relative '../lib/translations'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
@@ -4682,7 +4683,10 @@ def cmd_translate(slug, lang)
 
   entry = post.dig('translations', lang)
   entry = {} unless entry.is_a?(Hash)
-  opened_with = "---\ntitle: #{entry['title']}\n---\n\n" +
+  # The address line is shown with what it is, so it can be read as well as
+  # changed -- and left alone it stays exactly as it was, which is what an
+  # address is for.
+  opened_with = "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
                 MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
                        { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" })
@@ -4710,6 +4714,37 @@ def cmd_translate(slug, lang)
     one = {}
     one['title'] = title unless title.empty?
     one['content'] = blocks unless blocks.empty?
+    # The address this language serves the post at: made from the
+    # translated title the first time, then LEFT ALONE. A post's own slug
+    # works that way for the same reason -- an address that follows a
+    # title somebody corrected is an address that breaks every link to it.
+    # Typed into the header, it is what the author says it is.
+    chosen = meta['slug'].to_s.strip
+    address = if !chosen.empty?
+                Slug.slugify(chosen)
+              elsif !entry['slug'].to_s.strip.empty?
+                entry['slug'].to_s.strip
+              else
+                Slug.slugify(title)
+              end
+    address = post['slug'].to_s if address.empty?
+    one['slug'] = address
+    # Two posts at one address is the one thing an address may not do, and
+    # in this language the other posts' addresses are their own translated
+    # ones. Refused rather than made unique behind the author's back: they
+    # chose these words, and the header is where they can choose others.
+    wanted = PostAddress.path(post.merge('address_slug' => address))
+    clash = PathGlob.under(CONTENT_DIR, '*', '*.json').find do |file|
+      other = begin
+        JSON.parse(File.read(file, encoding: 'utf-8'))
+      rescue StandardError
+        nil
+      end
+      next false unless other.is_a?(Hash) && other['slug'].to_s != post['slug'].to_s
+
+      PostAddress.path(Translations.for_lang(other, lang)) == wanted
+    end
+    abort t('cli.translate_address_taken', address: address, slug: File.basename(clash.to_s, '.json')) if clash
     translations[lang] = one
     said = t('cli.translate_saved', lang: lang, slug: slug)
   end

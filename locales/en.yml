@@ -298,6 +298,7 @@ cli:
   translate_unknown_language: "This site does not publish '%{lang}'. It publishes: %{known}. Add the language to `site.locales` in config/site.yml first."
   translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."
   translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
+  translate_address_taken: "That address is already taken in this language by \"%{slug}\". Choose another with a `slug:` line in the header."
   translate_media_unsupported: "A translation carries words, not pictures: the post's media belong to the post and are shared by its languages. Add the picture with `./blog.sh edit` and refer to it here."
   frontmatter_hint: |
     <!--

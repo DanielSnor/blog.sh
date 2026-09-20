@@ -330,6 +330,10 @@ Save it and `./blog.sh rebuild` builds every language the site publishes:
 the language in `site.lang` at the site root, the others under `/de/`, all
 in one tree with one copy of `/assets/` between them.
 
+The header also holds the address that language serves the post at. Left
+alone it is made from the translated title, once, and then stays put --
+see [localization.md](localization.md#the-address-in-each-language).
+
 **Taking a language off a post** is emptying the title and deleting the
 body. The post then looks exactly as it did before the translation existed
 -- which matters, because a half-empty translation would otherwise give
