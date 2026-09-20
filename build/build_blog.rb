@@ -416,7 +416,10 @@ def language_switcher_html(links)
       %(<a class="#{classes.join(' ')}" href="#{h(link['href'])}" hreflang="#{h(link['lang'])}">#{h(name)}</a>)
     end
   end
-  %(<nav class="lang-switch" aria-label="#{h(t('ui.language'))}">#{items.join}</nav>)
+  # The newline belongs to the markup, not to the template: rendered as its
+  # own line there, a site with one language got a blank line on every page
+  # where the switcher would have been (tests/test_gaps.rb counts those).
+  %(\n    <nav class="lang-switch" aria-label="#{h(t('ui.language'))}">#{items.join}</nav>)
 end
 
 BANNER = SiteConfig.fetch('banner')
