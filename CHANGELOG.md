@@ -43,6 +43,7 @@ player fix lives in the rendered page, so it reaches a site on the next full reb
 - **A token pasted with a space on either side was saved with it.** The instance refused it and the hidden prompt could not show why; setup now trims it, and the hint says the access token is not the client key or secret beside it.
 - **Ctrl+C in any screen of `./blog.sh` ended in a stack trace.** It now stops the run with one line and status 130, as setup, style and import always did.
 - **FTP was nowhere in the docs.** The rclone backend has always reached a plain FTP host; `install.md` and `env.sh.example` now say how.
+- **`publish --json` fell over on a post whose date nobody can read.** Every other refusal on that route answers with an object and status 0; this one wrote prose to stderr and left with status 1, which a phone cannot tell apart from the engine having crashed.
 - **Cancelling a plan left the slot's date on the post.** The date the plan overwrote comes back -- and the post returns to the year that date names, when the slot had moved it out of it.
 
 ## 1.8 -- 2026-09-14

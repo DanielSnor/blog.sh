@@ -300,6 +300,23 @@ a translated page cannot be addressed `assets` or `write` any more than
 an untranslated one can -- the refusal says so and leaves you in the
 header to pick another.
 
+### The menu
+
+The menu is built once per language, and each kind of entry answers
+differently:
+
+| the entry | in `/de/` |
+|---|---|
+| the default menu (`All`, the types) | the German listings |
+| `tag:` | the tag's German listing |
+| `url:` naming a post or a page | that piece's German address, which is a different slug -- or the one copy of it, if it has no German words |
+| `url:` naming a listing the engine builds (`/search/`, `/archive/`) | its German copy |
+| anything else -- an address off the site, a file you put there yourself | exactly as written |
+
+The one to watch is the fourth row: `url: /o-mne/` is not turned into
+`/de/o-mne/`, because the German page is at `/de/ueber-mich/`. The item
+follows the piece rather than the spelling.
+
 ### What is not there yet
 
 - **Pictures in a translation.** Media belong to the post and its

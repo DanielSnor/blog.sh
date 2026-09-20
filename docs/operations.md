@@ -1382,6 +1382,11 @@ What it looks for, each with a line saying what to do about it:
   and another post that both claim `/de/…`, which the build would resolve
   by serving one of them and dropping the other.
 
+- **A language named in `site.locales` that the engine has no locale file
+  for.** A typo there is not a typo in one language: the build stops on it
+  in EVERY language of the site, its own included, because the menu that
+  offers the other languages needs each one's name.
+
 It only reports, unless you ask it not to. On its own -- and that is how
 cron runs it -- nothing here deletes a directory or rewrites a post: the
 value of the tool is that its output can be trusted, and a checker that
