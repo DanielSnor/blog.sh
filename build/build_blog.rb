@@ -226,7 +226,7 @@ def fediverse_creator_meta
   creator ? %(\n  <meta name="fediverse:creator" content="#{h(creator)}">) : ''
 end
 
-SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
+SITE_LANG = I18n.lang.to_s
 # locale is a SECOND language switch, independent of site.lang, and only
 # ./setup.sh ever kept the two in step. A site localized by hand -- or one
 # whose language was changed in the file afterwards -- shipped
@@ -242,8 +242,17 @@ SITE_LANG = SiteConfig.get('site', 'lang', default: 'en')
 # The default follows the language, because a site that never named a
 # locale has not chosen one.
 LOCALE_FOR_LANG = { 'cs' => 'cs_CZ', 'de' => 'de_DE', 'en' => 'en_US' }.freeze
-SITE_LOCALE = SiteConfig.get('site', 'locale',
-                             default: LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US'))
+# ...with one exception, and it is the whole reason BLOG_SH_LANG exists:
+# a run that was TOLD which language to render is not the site's own, and
+# the locale pinned in config belongs to the site's own language. Honouring
+# it there would ship `og:locale="en_US"` on every page of the German half
+# of a site -- the exact defect described above, one language further in.
+SITE_LOCALE = if ENV['BLOG_SH_LANG'].to_s.strip.empty?
+                SiteConfig.get('site', 'locale',
+                               default: LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US'))
+              else
+                LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US')
+              end
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
 # site that just doesn't want the overlay) can drop either line without

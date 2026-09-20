@@ -14,8 +14,19 @@ module I18n
 
   module_function
 
+  # One run, one language -- and a run can be told which, so a site that
+  # publishes in more than one renders each by building again with
+  # BLOG_SH_LANG and its own BLOG_SH_PUBLIC_DIR. The override lives HERE
+  # and nowhere else: the build reads the language three times (every
+  # string through this, <html lang> and og:locale from it), and a second
+  # door is how a German page ends up announcing itself as Czech. A code
+  # with no locale file stops the build in load_locale, which is the loud
+  # end this deserves -- the quiet one is English rendered into /de/.
   def lang
-    @lang ||= SiteConfig.get('site', 'lang', default: DEFAULT_LANG)
+    @lang ||= begin
+      named = ENV['BLOG_SH_LANG'].to_s.strip
+      named.empty? ? SiteConfig.get('site', 'lang', default: DEFAULT_LANG) : named
+    end
   end
 
   # Picks the language without asking SiteConfig -- for the one caller
