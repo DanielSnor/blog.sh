@@ -253,6 +253,33 @@ SITE_LOCALE = if ENV['BLOG_SH_LANG'].to_s.strip.empty?
               else
                 LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US')
               end
+# Where THIS run's content goes, and the addresses it carries.
+#
+# The site's own language keeps the site root: every link anyone has ever
+# made to it goes on working when a second language is added, which is the
+# whole reason the default is not /cs/ either. Another language gets a root
+# of its own, in the same output tree, so the two are merged by simply
+# existing side by side.
+#
+# /assets/ and /write/ are NOT in it: one copy of the stylesheet, the
+# pictures and the writing app serves every language, and duplicating them
+# per language would mean a second cache-buster for identical bytes.
+SITE_OWN_LANG = SiteConfig.get('site', 'lang', default: 'en').to_s
+LANG_ROOT = SITE_LANG == SITE_OWN_LANG ? '' : "/#{SITE_LANG}"
+CONTENT_ROOT = LANG_ROOT.empty? ? PUBLIC_DIR : File.join(PUBLIC_DIR, SITE_LANG)
+SHARED_ROOTS = %w[/assets/ /write/].freeze
+
+# An address inside this run's language.
+def loc(path)
+  return path if LANG_ROOT.empty?
+
+  text = path.to_s
+  return text unless text.start_with?('/')
+  return text if SHARED_ROOTS.any? { |root| text.start_with?(root) }
+
+  "#{LANG_ROOT}#{text}"
+end
+
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
 # site that just doesn't want the overlay) can drop either line without
@@ -594,7 +621,7 @@ def share_links_html(post)
   # archive has thousands of them.
   return '' if SHARE.empty? || page?(post) || draft?(post) || unlisted?(post)
 
-  share_url = "#{SITE_BASE_URL}#{post_path(post)}"
+  share_url = "#{SITE_BASE_URL}#{loc(post_path(post))}"
   text = "#{post_title_for(post)} #{share_url}"
   links = SHARE.map do |name|
     case name
@@ -1156,7 +1183,7 @@ def tags_html(post)
     if defined?(TAG_PAGES) && !TAG_PAGES.key?(slug)
       %(<span class="tag-pill tag-pill-flat">#{h(t)}</span>)
     else
-      %(<a class="tag-pill" href="/tag/#{slug}/">#{h(t)}</a>)
+      %(<a class="tag-pill" href="#{loc("/tag/#{slug}/")}">#{h(t)}</a>)
     end
   end.join
   %(<div class="tags">#{pills}</div>)
@@ -1224,14 +1251,14 @@ def post_path(post)
 end
 
 def output_dir(post)
-  File.join(PUBLIC_DIR, *post_path(post).split('/').reject(&:empty?))
+  File.join(CONTENT_ROOT, *post_path(post).split('/').reject(&:empty?))
 end
 
 # The address is right there in the banner, so it can be copied straight off
 # the open page -- e.g. when a preview is opened on a phone and needs to be
 # forwarded to someone else.
 def draft_banner(post)
-  url = "#{SITE_BASE_URL}#{post_path(post)}"
+  url = "#{SITE_BASE_URL}#{loc(post_path(post))}"
   <<~HTML
     <div class="draft-banner">
       <strong>#{h(t('post.draft_banner_heading'))}</strong>
@@ -1244,7 +1271,7 @@ end
 # The media prefix is post_path either way, so the rendered content is
 # identical on the post's own page and in every listing it appears in.
 def post_content_html(post)
-  CONTENT_CACHE[post] ||= Blocks.render_content(post['content'], post_path(post), lifted: link_title_block(post))
+  CONTENT_CACHE[post] ||= Blocks.render_content(post['content'], loc(post_path(post)), lifted: link_title_block(post))
 end
 
 def plain_text_length(post)
@@ -1369,7 +1396,7 @@ def archive_link_for(post)
   return nil if draft?(post) || page?(post) || unlisted?(post)
 
   time = post_time(post)
-  "/archive/#{time.year}/#m#{format('%02d', time.month)}"
+  loc("/archive/#{time.year}/#m#{format('%02d', time.month)}")
 end
 
 # Whether the post says what it is called. Untitled posts -- an imported
@@ -1550,7 +1577,7 @@ def series_nav_html(slug, in_series, index, position, post = nil)
     # a tag with no page is a pill that is not a link.
     return %(<p class="series-note">#{label}</p>\n                ) unless Slug.pageable?(slug)
 
-    return %(<p class="series-note"><a href="/series/#{h(slug)}/">#{label}</a></p>\n                )
+    return %(<p class="series-note"><a href="#{loc("/series/#{h(slug)}/")}">#{label}</a></p>\n                )
   end
 
   prev_post = index.positive? ? in_series[index - 1] : nil
@@ -1558,8 +1585,8 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   return '' if prev_post.nil? && next_post.nil?
 
   links = []
-  links << %(<a class="series-prev" href="#{h(post_path(prev_post))}">#{h(t('post.series_previous', title: post_title_for(prev_post)))}</a>) if prev_post
-  links << %(<a class="series-next" href="#{h(post_path(next_post))}">#{h(t('post.series_next', title: post_title_for(next_post)))}</a>) if next_post
+  links << %(<a class="series-prev" href="#{h(loc(post_path(prev_post)))}">#{h(t('post.series_previous', title: post_title_for(prev_post)))}</a>) if prev_post
+  links << %(<a class="series-next" href="#{h(loc(post_path(next_post)))}">#{h(t('post.series_next', title: post_title_for(next_post)))}</a>) if next_post
   # Named, like the table of contents is. A screen reader lists the
   # landmarks on a page, and a post can carry three <nav>s -- the site
   # bar, this one and the pagination -- of which only the toc had a name.
@@ -1660,7 +1687,7 @@ def render_post_html(post, template)
   # caption) lost BOTH copies when hero_for lifted the first one.
   content_html = if hero_block
                    rest = post['content'].reject { |b| b.equal?(hero_block) }
-                   Blocks.render_content(rest, post_path(post), lifted: link_title_block(post))
+                   Blocks.render_content(rest, loc(post_path(post)), lifted: link_title_block(post))
                  else
                    post_content_html(post)
                  end
@@ -1668,7 +1695,7 @@ def render_post_html(post, template)
   layout(template.result(binding),
          title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),
          description: Discovery.post_description(post),
-         path: post_path(post),
+         path: loc(post_path(post)),
          image: Discovery.post_og_image(post),
          og_type: 'article',
          # Drafts and unlisted posts must never end up in search engines
@@ -1815,7 +1842,7 @@ def nav_active_for(path)
   # Pagination lives under the type ('/type/video/page/2/'), so the item is
   # the first two segments rather than the whole path.
   type = path[%r{\A/type/([^/]+)/}, 1]
-  return "/type/#{type}/" if type
+  return loc("/type/#{type}/") if type
 
   # A tag listing (and its pagination) belongs under the tag's own item,
   # for the menus that are made of tags rather than types; anything else --
@@ -2566,7 +2593,7 @@ NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
           'video' => 'video', 'audio' => 'audio', 'link' => 'links',
           'document' => 'documents' }.fetch(type)
-  ["/type/#{type}/", t("nav.#{key}")]
+  [loc("/type/#{type}/"), t("nav.#{key}")]
 end.freeze
 
 # The menu a site actually shows. Without a `nav:` key it is what it has
@@ -2608,14 +2635,14 @@ def configured_nav_items
 
     label = entry['label'].to_s.strip
     slug = entry['tag'].to_s.strip
-    href = slug.empty? ? entry['url'].to_s.strip : "/tag/#{slug}/"
+    href = slug.empty? ? entry['url'].to_s.strip : loc("/tag/#{slug}/")
     next if label.empty? || href.empty?
 
     [href, label]
   end
 end
 
-NAV_ITEMS = (configured_nav_items || ([['/', t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
+NAV_ITEMS = (configured_nav_items || ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
 # Everything a page's bytes can depend on that is not the page's own
@@ -2898,7 +2925,7 @@ def redirect_stub_html(post)
   # close the attribute to put markup on the page. draft_banner, forty
   # lines up, has always done it this way; this stub had three places
   # where it did not.
-  url = h("#{SITE_BASE_URL}#{post_path(post)}")
+  url = h("#{SITE_BASE_URL}#{loc(post_path(post))}")
   <<~HTML
     <!doctype html>
     <html lang="#{SITE_LANG}">
@@ -2997,7 +3024,7 @@ NAME_MAX_BYTES = 255
 
     parts = former.to_s.split('/').reject(&:empty?)
 
-    dest = File.join(PUBLIC_DIR, 'posts', *parts, 'index.html')
+    dest = File.join(CONTENT_ROOT, 'posts', *parts, 'index.html')
     if written_already?(dest)
       warn t('build.former_slug_taken', slug: post['slug'], former: former)
       next
@@ -3017,7 +3044,7 @@ pinned_post = posts.find(&pinned)
 if posts.count(&pinned) > 1
   warn t('build.pinned_more_than_one', slug: pinned_post['slug'])
 end
-page_count = write_listing(posts, index_template, PUBLIC_DIR, pinned: pinned_post)
+page_count = write_listing(posts, index_template, CONTENT_ROOT, pinned: pinned_post)
 
 tags_map = {}
 overlong_tags = []
@@ -3125,7 +3152,7 @@ if SiteConfig.get('write', default: false)
          "#{JSON.generate('slug' => post['slug'].to_s,
                           'state' => post['state'].to_s,
                           'title' => post_title_for(post).to_s,
-                          'url' => SITE_BASE_URL.empty? ? '' : "#{SITE_BASE_URL}#{post_path(post)}",
+                          'url' => SITE_BASE_URL.empty? ? '' : "#{SITE_BASE_URL}#{loc(post_path(post))}",
                           'warnings' => Array(post['receipt_warnings']).map(&:to_s))}\n")
   end
 end
@@ -3144,14 +3171,14 @@ FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _| href[%r{\A/tag/([^/]+)/\z}, 1]
 
 tags_map.each do |slug, data|
   if FEED_TAG_SLUGS.include?(slug)
-    Output.emit(File.join(PUBLIC_DIR, 'tag', slug, 'rss.xml'),
-         Feeds.render_rss(data[:posts], path: "/tag/#{slug}/rss.xml",
+    Output.emit(File.join(CONTENT_ROOT, 'tag', slug, 'rss.xml'),
+         Feeds.render_rss(data[:posts], path: loc("/tag/#{slug}/rss.xml"),
                     title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
                     description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
                     link: "#{SITE_BASE_URL}/tag/#{slug}/"))
   end
-  write_listing(data[:posts], index_template, File.join(PUBLIC_DIR, 'tag', slug),
-                base_path: "/tag/#{slug}", heading: data[:name],
+  write_listing(data[:posts], index_template, File.join(CONTENT_ROOT, 'tag', slug),
+                base_path: loc("/tag/#{slug}"), heading: data[:name],
                 heading_kind: t('tag.kind'), heading_variant: 'tag',
                 # The page's own slug, not its display name: the name is
                 # whichever spelling the archive used first, and looking
@@ -3161,8 +3188,8 @@ tags_map.each do |slug, data|
                 # Only when there IS an index to go back to: a site whose
                 # tags all live on drafts builds no /tag/, and a heading
                 # linking there would be the dead menu item doctor refuses.
-                heading_href: (tags_map.empty? ? nil : '/tag/'),
-                feed_path: FEED_TAG_SLUGS.include?(slug) ? "/tag/#{slug}/rss.xml" : nil,
+                heading_href: (tags_map.empty? ? nil : loc('/tag/')),
+                feed_path: FEED_TAG_SLUGS.include?(slug) ? loc("/tag/#{slug}/rss.xml") : nil,
                 title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
                 description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
 end
@@ -3188,7 +3215,7 @@ unless tags_map.empty?
   tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
                            .sort_by { |_, name, _| [Slug.fold(name), name] }
   # Names and counts are the whole page, so that is the whole key.
-  tag_index_dest = File.join(PUBLIC_DIR, 'tag', 'index.html')
+  tag_index_dest = File.join(CONTENT_ROOT, 'tag', 'index.html')
   tag_index_key = Digest::SHA256.hexdigest(tag_index_rows.map { |row| row.join(':') }.join(','))
   # A letter above each run of names, so seven hundred tags read as a
   # dictionary rather than as a wall. Taken from the FOLDED name, because
@@ -3222,7 +3249,7 @@ unless tags_map.empty?
     # list wrapped into lines, a number between two pills reads as easily
     # for the one that follows it.
     head + [%(<li class="tag-index-item" data-count="#{count}">) +
-            %(<a class="tag-pill" href="/tag/#{h(slug)}/">#{h(name)}) +
+            %(<a class="tag-pill" href="#{loc("/tag/#{h(slug)}/")}">#{h(name)}) +
             %(<sup class="tag-index-count">#{count}</sup></a></li>)]
     end
   end
@@ -3231,7 +3258,7 @@ unless tags_map.empty?
            %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
            title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
            description: t('tags.description', site_title: SITE_TITLE),
-           path: '/tag/')
+           path: loc('/tag/'))
   end
 end
 
@@ -3253,9 +3280,9 @@ SERIES_MAP.each do |slug, in_series|
     next
   end
 
-  write_listing(in_series, index_template, File.join(PUBLIC_DIR, 'series', slug),
+  write_listing(in_series, index_template, File.join(CONTENT_ROOT, 'series', slug),
                 oldest_first: true,
-                base_path: "/series/#{slug}", heading: name,
+                base_path: loc("/series/#{slug}"), heading: name,
                 heading_kind: t('series.kind'), heading_variant: 'series',
                 heading_icon: :series,
                 title: t('series.title', name: name, short_name: SITE_SHORT_NAME),
@@ -3265,8 +3292,8 @@ end
 PRESENT_TYPES.each do |type|
   type_posts = posts.select { |post| dominant_content_type(post) == type }
   label = CONTENT_TYPE_LABELS[type]
-  write_listing(type_posts, index_template, File.join(PUBLIC_DIR, 'type', type),
-                base_path: "/type/#{type}", heading: label, heading_variant: 'type',
+  write_listing(type_posts, index_template, File.join(CONTENT_ROOT, 'type', type),
+                base_path: loc("/type/#{type}"), heading: label, heading_variant: 'type',
                 heading_icon: :"type_#{type}",
                 title: t('type.title', label: label, short_name: SITE_SHORT_NAME),
                 description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
@@ -3305,7 +3332,7 @@ def search_index_entry(post)
             without_borrowed_title(PostText.plain(post, separator: SNIPPET_SEPARATOR), post)
           end
   {
-    url: post_path(post),
+    url: loc(post_path(post)),
     # A link post has no title of its own and no opening sentence to lift a
     # name from, so this used to be nil: the page, the tab, the feed and the
     # announcement all showed the borrowed link title and the search result
@@ -3337,7 +3364,7 @@ end
 # new post rewrites the map and the current year and nothing else. 2014 has
 # not changed since new year's eve 2014 and never will, so a deploy that
 # compares content has nothing to upload for it.
-ARCHIVE_PATH = '/archive/'
+ARCHIVE_PATH = loc('/archive/')
 # Longer than any blog, shorter than a typo. 200 years of empty rows is
 # already nonsense to look at; 18,000 is a page nobody can open.
 ARCHIVE_SPAN_MAX = 200
@@ -3382,7 +3409,7 @@ unless archive_by_year.empty?
                 elsif count < 40 then 3
                 else 4
                 end
-        %(<a class="archive-month is-l#{level}" href="/archive/#{year}/#m#{format('%02d', m)}" ) +
+        %(<a class="archive-month is-l#{level}" href="#{loc("/archive/#{year}/#m#{format('%02d', m)}")}" ) +
           %(title="#{count}">#{label}</a>)
       end
     end.join
@@ -3391,7 +3418,7 @@ unless archive_by_year.empty?
   rows = archive_span.map do |year|
     in_year = archive_by_year[year] || []
     by_month = in_year.group_by { |post| post_time(post).month }
-    name = in_year.empty? ? %(<span class="archive-year-name">#{year}</span>) : %(<a class="archive-year-name" href="/archive/#{year}/">#{year}</a>)
+    name = in_year.empty? ? %(<span class="archive-year-name">#{year}</span>) : %(<a class="archive-year-name" href="#{loc("/archive/#{year}/")}">#{year}</a>)
     %(<li class="archive-year#{in_year.empty? ? ' is-empty' : ''}">#{name}) +
       %(<span class="archive-year-count">#{in_year.length}</span>) +
       %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
@@ -3413,7 +3440,7 @@ unless archive_by_year.empty?
   #
   # The YEAR pages below are what this buys something on anyway: 2014 has
   # not changed since new year's eve 2014 and never will.
-  Output.cached_emit(File.join(PUBLIC_DIR, 'archive', 'index.html'),
+  Output.cached_emit(File.join(CONTENT_ROOT, 'archive', 'index.html'),
               Digest::SHA256.hexdigest(rows.join)) do
     layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
            %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
@@ -3429,7 +3456,7 @@ unless archive_by_year.empty?
     # a dead end.
     next if in_year.empty?
 
-    year_dest = File.join(PUBLIC_DIR, 'archive', year.to_s, 'index.html')
+    year_dest = File.join(CONTENT_ROOT, 'archive', year.to_s, 'index.html')
     year_key = Output.posts_digest(in_year)
     if BuildCache.page_fresh?(year_dest, year_key)
       Output.keep(year_dest)
@@ -3454,7 +3481,7 @@ unless archive_by_year.empty?
         # page and /posts/<year>/ agree.
         %(<li><time datetime="#{h(post_display_time(post).strftime('%Y-%m-%d'))}">) +
           %(#{post_display_time(post).day}.</time> ) +
-          %(<a href="#{h(post_path(post))}">#{h(post_title_for(post))}</a></li>)
+          %(<a href="#{h(loc(post_path(post)))}">#{h(post_title_for(post))}</a></li>)
       end
       %(<section class="archive-section" id="m#{format('%02d', month)}">) +
         %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
@@ -3473,7 +3500,7 @@ unless archive_by_year.empty?
                 %(<a href="#{ARCHIVE_PATH}">#{h(t('archive.back'))}</a></nav>),
                 title: "#{t('archive.year_title', year: year)} – #{SITE_SHORT_NAME}",
                 description: t('archive.year_description', year: year, site_title: SITE_TITLE),
-                path: "/archive/#{year}/"))
+                path: loc("/archive/#{year}/")))
   end
 end
 
@@ -3487,15 +3514,15 @@ end
 searchable = pages + posts
 recent_searchable = searchable.first(SEARCH_INDEX_RECENT_LIMIT)
 archive_searchable = searchable.drop(SEARCH_INDEX_RECENT_LIMIT)
-Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:search_index]), Output.posts_digest(recent_searchable)) do
+Output.cached_emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:search_index]), Output.posts_digest(recent_searchable)) do
   recent_searchable.map { |post| search_index_entry(post) }.to_json
 end
-Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:search_index_archive]), Output.posts_digest(archive_searchable)) do
+Output.cached_emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:search_index_archive]), Output.posts_digest(archive_searchable)) do
   archive_searchable.map { |post| search_index_entry(post) }.to_json
 end
 
 search_template = ERB.new(File.read(File.join(ROOT, 'templates', 'search.html.erb'), encoding: 'utf-8'))
-Output.emit(File.join(PUBLIC_DIR, 'search', 'index.html'),
+Output.emit(File.join(CONTENT_ROOT, 'search', 'index.html'),
      layout(search_template.result(binding),
             title: t('search.page_title', site_title: SITE_TITLE),
             description: t('search.page_description'),
@@ -3535,7 +3562,7 @@ NOT_FOUND_SIGN =
   %(<line x1="46" y1="98" x2="74" y2="98"/>) +
   %(</svg>)
 
-Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:not_found]),
+Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:not_found]),
      layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
             %(        #{NOT_FOUND_SIGN}\n) +
             %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
@@ -3550,7 +3577,7 @@ if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_title = cheat_meta['title'] || t('markdown_page.default_title')
   content_html = Blocks.render_content(cheat_blocks, CHEAT_SHEET_PATH)
   cheat_sheet_template = ERB.new(File.read(File.join(ROOT, 'templates', 'markdown_cheat_sheet.html.erb'), encoding: 'utf-8'))
-  Output.emit(File.join(PUBLIC_DIR, 'markdown', 'index.html'),
+  Output.emit(File.join(CONTENT_ROOT, 'markdown', 'index.html'),
        layout(cheat_sheet_template.result(binding),
               title: "#{cheat_title} – #{SITE_SHORT_NAME}",
               description: t('markdown_page.description'),
@@ -3569,13 +3596,13 @@ end
 # meant that an author who turned the sidebar off while leaving the widget
 # settings in place kept yesterday's widget JSON on the site for good --
 # protected from the sweep by a build that had not written it.
-Sidebar.write_all(PUBLIC_DIR).each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
+Sidebar.write_all(CONTENT_ROOT).each_key { |name| WRITTEN[File.join(CONTENT_ROOT, name)] = true }
 
 # Stats for tooted posts are filled in by cron (scripts/refresh_sidebar.rb) --
 # the build just registers the file so prune doesn't delete it, and creates
 # an empty one if it doesn't exist yet. Fetching it on every build would mean
 # two Mastodon requests per tooted post.
-STATS_PATH = File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:stats])
+STATS_PATH = File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:stats])
 # Written directly rather than through emit, because cron owns the contents
 # and the build only guarantees the file exists -- but it is served to the
 # same browsers as everything else, so it needs the same permissions. It was
@@ -3605,20 +3632,20 @@ WRITTEN[STATS_PATH] = true
 # not exist yet means the cron has not run, and inventing an empty one
 # would tell the page there is nothing to show rather than nothing to
 # read.
-COMMENTS_PATH = File.join(PUBLIC_DIR, PostAddress::CRON_FILES[:comments])
+COMMENTS_PATH = File.join(CONTENT_ROOT, PostAddress::CRON_FILES[:comments])
 WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
 
 # Only the newest RSS_ITEM_LIMIT posts reach the feed, and its stated
 # <lastBuildDate> is the newest post's own date rather than the clock --
 # so a post dated 2003 changes nothing here, and the feed is not rewritten
 # for readers who would have been handed the same bytes.
-Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:feed]), Output.posts_digest(posts.first(RSS_ITEM_LIMIT))) do
+Output.cached_emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:feed]), Output.posts_digest(posts.first(RSS_ITEM_LIMIT))) do
   Feeds.render_rss(posts)
 end
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:sitemap]),
+Output.cached_emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:sitemap]),
             Digest::SHA256.hexdigest([Output.posts_digest(posts + pages),
                                       tags_map.keys.join(','),
                                       PRESENT_TYPES.join(',')].join('|'))) do
@@ -3656,7 +3683,7 @@ def robots_txt
   "#{lines.join("\n")}\n"
 end
 
-Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:robots]), robots_txt)
+Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:robots]), robots_txt)
 
 # An imported post keeps answering at the addresses its previous platform
 # gave it: redirect_from is a list of site-root paths ("/bitwarden/",
@@ -3691,16 +3718,16 @@ REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
     # server's index fallback for a URL that never had a trailing slash.
     # Anything else gets the directory-with-index shape former_slugs uses.
     dest = if parts.last.match?(/\.html?\z/i)
-             File.join(PUBLIC_DIR, *parts)
+             File.join(CONTENT_ROOT, *parts)
            else
-             File.join(PUBLIC_DIR, *parts, 'index.html')
+             File.join(CONTENT_ROOT, *parts, 'index.html')
            end
 
     # Two lookups, two different collisions: the destination itself, and a
     # ROOT FILE sitting where the path needs a directory (a stub at
     # "/rss.xml/whatever/" would need rss.xml to be one). Both end in the
     # same loud skip -- the build's own output always wins over a stub.
-    prefix_file = (0...parts.size).map { |i| File.join(PUBLIC_DIR, *parts[0..i]) }.find { |p| written_already?(p) }
+    prefix_file = (0...parts.size).map { |i| File.join(CONTENT_ROOT, *parts[0..i]) }.find { |p| written_already?(p) }
     if written_already?(dest) || prefix_file
       warn t('build.redirect_from_taken', slug: post['slug'], origin: origin)
       next
@@ -3750,7 +3777,7 @@ removed = Output.prune_public
 BuildCache.save!
 
 puts
-puts t('build.summary', posts: posts.size, pages: page_count, dir: PUBLIC_DIR, tags: tags_map.size)
+puts t('build.summary', posts: posts.size, pages: page_count, dir: CONTENT_ROOT, tags: tags_map.size)
 # Said out loud, because a cache nobody can see is a cache nobody can
 # check. When a build takes longer than it should, this line is the first
 # thing to look at: a zero here after an ordinary publish means the cache
