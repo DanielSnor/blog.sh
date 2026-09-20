@@ -166,6 +166,11 @@ module Checker
     # build refuses.
     config = check_config(root)
     posts = load_posts(root)
+    # Kept for whoever runs next in the same process: the matrix and the
+    # repair index both want the archive this run just read, and reading
+    # thousands of files a second time to hand back the same objects is a
+    # noticeable part of the wait on a large archive.
+    @posts_of_last_run = posts
     # "No posts" only when there is genuinely nothing -- not when every
     # file present was unreadable. load_posts drops the broken ones and
     # remembers them; firing the empty-archive early return before
@@ -206,7 +211,7 @@ module Checker
     # Without the set of known addresses every internal link would look
     # dead, and a wall of false reds is worse than the one finding that
     # says this question could not be asked.
-    findings.concat(guard(:internal_links) { known ? check_internal_links(posts, known, cap) : [] })
+    findings.concat(guard(:internal_links) { known ? check_internal_links(posts, known, cap, root: root) : [] })
     findings.concat(guard(:relative_links) { check_relative_links(posts, cap) })
     findings.concat(guard(:orphan_media) { check_orphan_media(root, posts, cap) })
     findings.concat(guard(:stray_media) { check_stray_media(root, posts, cap) })
@@ -258,6 +263,13 @@ module Checker
   end
 
   # --- reading the archive ------------------------------------------------
+
+  # The archive the last `run` in this process read, or nil if none has.
+  # 🪤 `attr_reader` is not a `def`, so `module_function` above does not
+  # carry it onto the module itself -- it has to be written out.
+  def posts_of_last_run
+    @posts_of_last_run
+  end
 
   def load_posts(root)
     @unreadable = []
@@ -1033,12 +1045,16 @@ module Checker
   # Links from one post to another address on this site that nothing will
   # ever answer at -- the residue of an import that rewrote permalinks, or
   # of a slug that was renamed before renaming kept a redirect.
-  def check_internal_links(posts, known, cap = CAP)
+  def check_internal_links(posts, known, cap = CAP, root: nil)
     dead = []
+    # The one exception below holds in every language the site publishes:
+    # `/de/type/photo/` is the same address `/type/photo/` is, written for
+    # the other language's reader.
+    type_roots = ['/type/'] + published_languages(root).map { |lang| "/#{lang}/type/" }
     posts.each do |post|
       internal_links(post).each do |url|
         path = url.split('#').first.split('?').first.to_s
-        next if path.empty? || path.start_with?('/type/') || path.start_with?('/assets/')
+        next if path.empty? || path.start_with?('/assets/') || type_roots.any? { |at| path.start_with?(at) }
         # Both spellings: a browser writes an accented address with percent
         # escapes, and the addresses this site answers at are written plain.
         # Comparing only the literal one reported a working link as dead --
@@ -1774,8 +1790,19 @@ module Checker
 
   # Both places a link can live: a block that is a link card, and a
   # formatting span inside any text the post carries.
+  # Every body the post has, not just the one it is written in: a
+  # translation is text the site serves, so a dead link in it is dead on a
+  # page a reader opens. Reading only `content` left the second language
+  # as the one place a renamed slug could rot unseen.
   def all_links(post)
-    (Array(post['content']) || []).flat_map do |block|
+    bodies = [post['content']]
+    translations = post['translations']
+    translations.each_value { |one| bodies << one['content'] if one.is_a?(Hash) } if translations.is_a?(Hash)
+    bodies.flat_map { |body| links_in(body) }
+  end
+
+  def links_in(content)
+    (Array(content) || []).flat_map do |block|
       next [] unless block.is_a?(Hash)
 
       urls = []

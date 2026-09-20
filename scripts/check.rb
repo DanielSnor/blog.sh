@@ -162,7 +162,7 @@ if repair
     exit 0
   end
 
-  idx = Repair.index(Checker.load_posts(ROOT))
+  idx = Repair.index(Checker.posts_of_last_run || Checker.load_posts(ROOT))
   applied = 0
   skipped = 0
   no_offer = 0
@@ -240,7 +240,7 @@ puts unless tty
 # publishes one language has nothing to tabulate and is told so rather
 # than shown an empty table.
 if languages
-  matrix = Checker.language_matrix(Checker.load_posts(ROOT), root: ROOT)
+  matrix = Checker.language_matrix(Checker.posts_of_last_run || Checker.load_posts(ROOT), root: ROOT)
   if matrix['languages'].empty?
     puts I18n.t('check.languages_none')
     puts
