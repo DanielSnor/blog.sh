@@ -1378,6 +1378,9 @@ What it looks for, each with a line saying what to do about it:
   upgrading cannot help, since by then they are in the posts. Reported
   rather than corrected: somebody writing *about* html has every right to
   `&amp;` in their text.
+- **Two posts asking for one address in one language** -- a translation
+  and another post that both claim `/de/…`, which the build would resolve
+  by serving one of them and dropping the other.
 
 It only reports, unless you ask it not to. On its own -- and that is how
 cron runs it -- nothing here deletes a directory or rewrites a post: the
