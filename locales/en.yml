@@ -299,6 +299,7 @@ cli:
   translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."
   translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
   publish_partial: "Publishing %{slug} would put it out in one language: the site also publishes %{langs}, and this post has no words there. Write it with `./blog.sh translate`, or say `--allow-partial` to publish it as it is."
+  translate_address_reserved: "The engine writes %{address} at the root of a language itself, so a page cannot be addressed that. Choose another with the `slug:` line in the header."
   translate_address_taken: "That address is already taken in this language by \"%{slug}\". Choose another with a `slug:` line in the header."
   translate_media_unsupported: "A translation carries words, not pictures: the post's media belong to the post and are shared by its languages. Add the picture with `./blog.sh edit` and refer to it here."
   frontmatter_hint: |

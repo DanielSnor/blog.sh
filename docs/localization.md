@@ -282,6 +282,16 @@ the exceptions are worth saying out loud rather than discovering later.
 The cron that publishes the queue never asks: a post got there through
 `schedule`, where somebody already answered this.
 
+### Pages
+
+A page (`About`, `Contact`) is translated exactly as a post is, and is
+the thing a reader of the other language reaches for first. Its address
+has no year in it, so the translated one is a root of that language:
+`/de/ueber-mich/`. That is where the engine writes its own names too, so
+a translated page cannot be addressed `assets` or `write` any more than
+an untranslated one can -- the refusal says so and leaves you in the
+header to pick another.
+
 ### What is not there yet
 
 - **Pictures in a translation.** Media belong to the post and its

@@ -4762,6 +4762,14 @@ def cmd_translate(slug, lang)
               end
     address = post['slug'].to_s if address.empty?
     one['slug'] = address
+    # A PAGE lives in the root of its language, which is where the engine
+    # keeps its own names: a page addressed `assets` in German would be
+    # written over /de/assets/ and take the stylesheet down with it. The
+    # build refuses such a page in the site's own language and says so;
+    # this is the same refusal, one language further in.
+    if PostAddress.page?(post) && PostAddress::RESERVED_ROOT_SEGMENTS.include?(address.downcase)
+      abort t('cli.translate_address_reserved', address: address)
+    end
     # Two posts at one address is the one thing an address may not do, and
     # in this language the other posts' addresses are their own translated
     # ones. Refused rather than made unique behind the author's back: they
