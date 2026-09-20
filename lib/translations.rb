@@ -45,11 +45,15 @@ module Translations
 
   # The post as this language renders it. The post itself when there is
   # nothing for that language, so the caller never has to ask.
-  def for_lang(post, lang)
+  # `chain` is what to try when this language has nothing: the site's
+  # `fallback` for it, nearest first. The post itself is the end of every
+  # chain -- it is the one text that always exists.
+  def for_lang(post, lang, chain: [])
     entry = post.is_a?(Hash) ? post['translations'] : nil
     return post unless entry.is_a?(Hash)
 
-    one = entry[lang.to_s]
+    wanted = ([lang.to_s] + Array(chain).map(&:to_s)).uniq
+    one = wanted.filter_map { |code| entry[code] }.find { |value| value.is_a?(Hash) }
     return post unless one.is_a?(Hash)
 
     text = one.slice(*TEXT_KEYS).reject { |_, value| value.nil? }

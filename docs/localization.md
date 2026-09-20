@@ -231,12 +231,64 @@ somebody reads in. Changing a translated address changes where that
 language serves the post and nothing else; no redirect is left behind, so
 it is worth choosing before anybody links to it.
 
+### When a language has nothing for a post
+
+It is shown anyway, in the nearest language that does have it, and the
+link on it goes to that copy. Which language is nearest is yours to say:
+
+```yaml
+site:
+  lang: en
+  locales: [en, cs, de]
+  fallback:
+    de: [cs]
+```
+
+A German page with no German words then carries the Czech ones and links
+to the Czech page, rather than the English ones the site would otherwise
+fall back to. Say nothing and the site's own language stands in, which is
+what every site does today.
+
+The words and the address come from the same answer, always: Czech words
+under a link to the English page would be worse than either on its own.
+And the chain never builds a page -- a language has a page only for a
+post that has words in it, so the same text never stands at two
+addresses.
+
+### Seeing what is written and what is not
+
+```bash
+./blog.sh check --languages
+```
+
+A row per post, a column per language: a tick where it is written, a half
+circle for a title with no text yet, a dot where that language has
+nothing. Only on request, because on an archive of thousands it is a
+document rather than a summary -- the ordinary `check` is read for what is
+wrong, and a post that exists in one language is not wrong.
+
+One state in it is a fault and is reported by an ordinary `check`: two
+posts asking for one address in one language. `translate` refuses to
+write that, so it arrives by hand or from an import -- and the build
+would serve one of them and drop the other without a word.
+
+### Publishing a post that is not in every language
+
+`publish` and `schedule` refuse it, name the languages it has no words in
+and offer `--allow-partial` in the same sentence. A site that publishes
+in several languages usually means to publish in all of them at once, and
+the exceptions are worth saying out loud rather than discovering later.
+
+The cron that publishes the queue never asks: a post got there through
+`schedule`, where somebody already answered this.
+
 ### What is not there yet
 
-- **A fallback chain.** A language falls back to the post's own text, not
-  to a language you nominate.
 - **Pictures in a translation.** Media belong to the post and its
   languages share them; add them with `edit`.
+- **Tags and series names are not translated.** A tag is the word it is,
+  in every language. A post that wants a German tag as well as a Czech
+  one carries both.
 
 ## Submitting
 

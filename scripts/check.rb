@@ -47,11 +47,13 @@ $stdout.sync = true
 online = false
 as_json = false
 repair = false
+languages = false
 ARGV.each do |arg|
   case arg
   when '--online' then online = true
   when '--json' then as_json = true
   when '--repair' then repair = true
+  when '--languages' then languages = true
   else
     warn(I18n.t('check.unknown_option', option: arg))
     exit 2
@@ -222,6 +224,30 @@ findings = Checker.run(root: ROOT, progress: progress, online: online,
 # Piped, the counters are real lines of output and want a separator.
 print("\r\e[K") if tty
 puts unless tty
+
+# What is written in which language, on its own screen and only when
+# asked: on an archive of thousands a row per post is a document, not a
+# summary, and the ordinary run is read for what is WRONG. A site that
+# publishes one language has nothing to tabulate and is told so rather
+# than shown an empty table.
+if languages
+  matrix = Checker.language_matrix(Checker.load_posts(ROOT), root: ROOT)
+  if matrix['languages'].empty?
+    puts I18n.t('check.languages_none')
+    puts
+  else
+    marks = { 'written' => '✅', 'title_only' => '◐', 'missing' => '·' }
+    width = matrix['rows'].map { |row| row['slug'].length }.max.to_i
+    puts "#{' ' * width}  #{matrix['languages'].join('  ')}"
+    matrix['rows'].each do |row|
+      cells = matrix['languages'].map { |lang| marks.fetch(row['cells'][lang], '?').ljust(lang.length) }
+      puts "#{row['slug'].ljust(width)}  #{cells.join('  ')}"
+    end
+    puts
+    puts Tui.paint(I18n.t('check.languages_legend'), :dim)
+    puts
+  end
+end
 
 order = { error: 0, warn: 1, ok: 2 }
 findings.sort_by.with_index { |f, i| [order.fetch(f.level, 3), i] }.each do |finding|

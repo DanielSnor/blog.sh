@@ -220,6 +220,7 @@ module Checker
     # on, five of them impossible to find from the document.
     findings.concat(guard(:duplicate_addresses) { check_duplicate_addresses(posts, cap) })
     findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
+    findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
     findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
@@ -1230,6 +1231,102 @@ module Checker
     when String then value.strip
     else value
     end
+  end
+
+  # Two posts at one address in ONE language. The CLI refuses to write
+  # that (`translate` says whose the address already is), so what gets
+  # here is a hand-edited archive or an import -- and then the build
+  # serves one of the two and drops the other without a word.
+  #
+  # Only in the languages the site publishes: a translation lying around
+  # for a language `site.locales` does not name is never built, so an
+  # address it claims collides with nothing.
+  def check_language_addresses(posts, root, cap = CAP)
+    langs = published_languages(root)
+    return [] if langs.empty?
+
+    findings = []
+    langs.each do |lang|
+      ordered = {}
+      posts.each do |post|
+        next unless Translations.languages(post).include?(lang)
+
+        localized = Translations.for_lang(post, lang)
+        (ordered[post_path(localized)] ||= []) << post
+      end
+      ordered.select { |_, group| group.size > 1 }.each do |address, group|
+        slugs = group.map { |post| post['slug'].to_s }.sort
+        findings << error(t('language_address_taken', lang: lang, address: "/#{lang}#{address}",
+                                                      slugs: slugs.join(', ')),
+                          t('language_address_taken_fix'),
+                          kind: :language_address_taken,
+                          data: { 'lang' => lang, 'address' => "/#{lang}#{address}", 'slugs' => slugs })
+      end
+    end
+    capped(findings, cap)
+  end
+
+  # The languages the site says it publishes, without the one it is
+  # written in -- read from the config rather than from the posts, because
+  # this is the question "what did the site promise", not "what is there".
+  def site_own_language(root)
+    return '' unless root
+
+    data = begin
+      YamlCompat.load_file(File.join(root, 'config', 'site.yml'))
+    rescue StandardError
+      nil
+    end
+    data.is_a?(Hash) ? data.dig('site', 'lang').to_s : ''
+  end
+
+  def published_languages(root)
+    return [] unless root
+
+    path = File.join(root, 'config', 'site.yml')
+    data = begin
+      YamlCompat.load_file(path)
+    rescue StandardError
+      nil
+    end
+    return [] unless data.is_a?(Hash)
+
+    own = data.dig('site', 'lang').to_s
+    named = Array(data.dig('site', 'locales')).map { |code| code.to_s.strip }.reject(&:empty?)
+    (named - [own]).uniq
+  end
+
+  # What is written in which language: a row per post, a column per
+  # language. A report and not a verdict -- a post that exists in one
+  # language is a legitimate post, and the other language shows it and
+  # links to the one copy of it. Rows come back in the order the archive
+  # was read, so the newest post is where the reader's eye already is.
+  def language_matrix(posts, root:)
+    others = published_languages(root)
+    return { 'languages' => [], 'rows' => [] } if others.empty?
+
+    # The site's own language is a column too, and the first one: a table
+    # of what is written that leaves out the language everything is
+    # written in reads as though those posts were nowhere.
+    own = site_own_language(root)
+    langs = ([own] + others).reject(&:empty?).uniq
+    rows = posts.map do |post|
+      cells = langs.to_h do |lang|
+        next [lang, Array(post['content']).empty? ? 'title_only' : 'written'] if lang == own
+
+        entry = post['translations'].is_a?(Hash) ? post['translations'][lang] : nil
+        state = if !entry.is_a?(Hash) || entry.slice(*Translations::TEXT_KEYS).compact.empty?
+                  'missing'
+                elsif Array(entry['content']).empty?
+                  'title_only'
+                else
+                  'written'
+                end
+        [lang, state]
+      end
+      { 'slug' => post['slug'].to_s, 'title' => post['title'].to_s, 'cells' => cells }
+    end
+    { 'languages' => langs, 'rows' => rows }
   end
 
   def check_duplicate_addresses(posts, cap = CAP)

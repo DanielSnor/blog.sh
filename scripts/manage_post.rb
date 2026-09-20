@@ -2377,11 +2377,11 @@ end
 # draft dialog would be waiting for a keypress that a program is never
 # going to send, and a promise that the whole output is one object cannot
 # be kept by a run that stops to ask something.
-def cmd_publish(slug, yes: false, announce: true, json: false)
+def cmd_publish(slug, yes: false, announce: true, json: false, allow_partial: false)
   JSON_REFUSALS[:enabled] = json
-  return publish_as_json(slug, announce: announce) if json
+  return publish_as_json(slug, announce: announce, allow_partial: allow_partial) if json
 
-  publish_interactively(slug, yes: yes, announce: announce)
+  publish_interactively(slug, yes: yes, announce: announce, allow_partial: allow_partial)
 end
 
 # The whole run under one refusal contract: anything that would have been
@@ -2389,7 +2389,7 @@ end
 # status stays 0 because the object IS the answer. iOS Shortcuts throws
 # away the output of a command that failed, which is the same reason
 # `add --json` leaves with zero.
-def publish_as_json(slug, announce: true)
+def publish_as_json(slug, announce: true, allow_partial: false)
   path = find_post_path(slug, ask: false)
   refuse('not_found', t('cli.post_not_found', slug: slug)) unless path
 
@@ -2403,6 +2403,7 @@ def publish_as_json(slug, announce: true)
                                       url: published_url(slug, post_time!(post).year,
                                                          page: PostAddress.page?(post))))
   end
+  refuse_partial!(post, slug, allow_partial, json: true)
 
   moved, warnings = begin
     quietly(true) { publish_draft(slug, path: path, announce: announce, asked: false) }
@@ -2415,7 +2416,7 @@ rescue Refused => e
   exit 0
 end
 
-def publish_interactively(slug, yes: false, announce: true)
+def publish_interactively(slug, yes: false, announce: true, allow_partial: false)
   # ask: false is --yes. find_post_path ASKS when a slug lives in more
   # than one year -- backdating makes that ordinary, and the picker is a
   # full-screen menu -- and under --yes there is nobody to work it: on a
@@ -2432,6 +2433,7 @@ def publish_interactively(slug, yes: false, announce: true)
     puts
     return
   end
+  refuse_partial!(post, slug, allow_partial)
 
   # The one path into the draft dialog that never built: add, edit and
   # unpublish all rebuild before it, so the Preview line the dialog prints
@@ -2467,12 +2469,15 @@ end
 # date, exactly as the [s] dialog choice does: it used to require one set
 # to the future via `edit` beforehand, which stopped being a usable route
 # when the frontmatter template dropped its date field.
-def cmd_schedule(slug)
+def cmd_schedule(slug, allow_partial: false)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   raw = File.read(path, encoding: 'utf-8')
   post = JSON.parse(raw)
+  # Asked here as well as at publish: scheduling IS publishing, only later
+  # and with nobody watching when it happens.
+  refuse_partial!(post, slug, allow_partial) unless post['scheduled']
   unless draft?(post)
     puts t('cli.schedule_only_drafts', slug: slug)
     puts
@@ -4654,6 +4659,34 @@ def rename_post(path, post, raw: nil)
   new_slug
 end
 
+# Which languages the site publishes that this post has no words in.
+#
+# Empty on a site that names no `site.locales` -- every site today -- so
+# nothing below it ever asks such a site anything.
+def missing_translations(post)
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }.reject(&:empty?)
+  return [] if named.empty?
+
+  (named - [own]) - Translations.languages(post)
+end
+
+# Refuses a post the site cannot show in every language it publishes --
+# where somebody is watching, and nowhere else.
+#
+# 🪤 NOT in the cron that publishes the queue: a post there was scheduled
+# by a person who already answered this question, and a refusal nobody is
+# looking at strands the post in the queue instead of asking anybody.
+def refuse_partial!(post, slug, allow_partial, json: false)
+  return if allow_partial
+
+  missing = missing_translations(post)
+  return if missing.empty?
+
+  said = t('cli.publish_partial', slug: slug, langs: missing.join(', '))
+  json ? refuse('partial_translation', said) : abort(said)
+end
+
 # Writing a post's other language: the WORDS, and nothing else.
 #
 # The metadata belong to the post and not to a language (lib/translations.rb)
@@ -6610,6 +6643,7 @@ begin
       yes = !ARGV.delete('--yes').nil?
       announce = ARGV.delete('--no-announce').nil?
       json = !ARGV.delete('--json').nil?
+      allow_partial = !ARGV.delete('--allow-partial').nil?
       unknown = ARGV.find { |arg| arg.start_with?('--') }
       abort t('cli.publish_unknown_option', option: unknown) if unknown
       # An object for an answer means nobody is watching, and the dialog
@@ -6627,10 +6661,11 @@ begin
       abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
 
       slug ||= pick_draft_interactively
-      cmd_publish(slug, yes: yes, announce: announce, json: json)
+      cmd_publish(slug, yes: yes, announce: announce, json: json, allow_partial: allow_partial)
     when 'schedule'
+      allow_partial = !ARGV.delete('--allow-partial').nil?
       slug = ARGV.shift || pick_draft_interactively
-      cmd_schedule(slug)
+      cmd_schedule(slug, allow_partial: allow_partial)
     when 'queue'
       cmd_queue
     when 'unpublish'

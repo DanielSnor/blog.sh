@@ -303,7 +303,8 @@ end
 # canonical, and what hreflang must never be told about (Daniel, 20. 9.
 # 2026 -- the listing carries it, the link goes where the piece really is).
 def post_href(post)
-  translated_here?(post) ? loc(post_path(post)) : post_path(post)
+  lang = stand_in_lang(post)
+  "#{lang_root_for(lang)}#{address_of(post, lang)}"
 end
 
 # Which languages this site publishes, the site's own first. Absent -- and
@@ -334,6 +335,29 @@ end
 
 def outside_this_language?(path)
   foreign_language_roots.any? { |root| path == root || path.start_with?("#{root}/") }
+end
+
+# What stands in for this language when a post has nothing in it, nearest
+# first. Only languages the site actually publishes, and never this one:
+# a chain that named a language nobody builds would point readers at a
+# tree that does not exist.
+FALLBACK_CHAIN = begin
+  table = SiteConfig.get('site', 'fallback', default: nil)
+  named = table.is_a?(Hash) ? Array(table[SITE_LANG]) : []
+  (named.map { |code| code.to_s.strip } & SITE_LOCALES) - [SITE_LANG]
+end.freeze
+
+# Which language a post is SHOWN in here: its own words when it has them,
+# then the chain, and the site's own language at the end of it. The words
+# and the address come from this one answer together -- Czech words under
+# a link to the English page is worse than either of them alone.
+def stand_in_lang(post)
+  return SITE_LANG if LANG_ROOT.empty?
+
+  written = Translations.languages(post)
+  return SITE_LANG if written.include?(SITE_LANG)
+
+  FALLBACK_CHAIN.find { |lang| written.include?(lang) } || SITE_OWN_LANG
 end
 
 def lang_root_for(lang)
@@ -2492,7 +2516,7 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # Which text this run renders, decided at the same door the shape is
   # settled at, so nothing downstream has to ask: the metadata stay the
   # post's, only the words change with the language (lib/translations.rb).
-  parsed = Translations.for_lang(parsed, SITE_LANG)
+  parsed = Translations.for_lang(parsed, SITE_LANG, chain: FALLBACK_CHAIN)
 
   # Which year's DIRECTORY the file sits in -- the same key the checker,
   # the exporter and stats already carry. A post whose date was corrected
