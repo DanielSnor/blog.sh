@@ -282,6 +282,7 @@ cli:
   translate_own_language: "„%{lang}“ je jazyk, ve kterém je post napsaný — ten se edituje přes `./blog.sh edit`."
   translate_unknown_language: "Tenhle web „%{lang}“ nepublikuje. Publikuje: %{known}. Nejdřív jazyk doplň do `site.locales` v config/site.yml."
   translate_needs_language: "Do jakého jazyka? `./blog.sh translate <slug> --lang de`."
+  translate_unknown_args: "❌ `translate` neví, co si počít s: %{args}. Bere jeden post a jeden jazyk — `./blog.sh translate <slug> --lang <kód>`."
   translate_needs_locales: "Tenhle web publikuje jeden jazyk. Nejdřív ostatní vyjmenuj v `site.locales` v config/site.yml."
   publish_partial: "Publikovat „%{slug}“ by ho vydalo v jednom jazyce: web publikuje i %{langs} a tenhle post tam slova nemá. Napiš je přes `./blog.sh translate`, nebo řekni `--allow-partial` a vyjde, jak je."
   translate_address_reserved: "Adresu %{address} si engine v kořeni jazyka píše sám, takže ji stránka mít nemůže. Vyber jinou řádkem `slug:` v hlavičce."

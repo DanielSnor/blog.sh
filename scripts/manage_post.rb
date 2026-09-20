@@ -4862,7 +4862,12 @@ end
 def post_time!(post)
   Time.parse(post['date'].to_s)
 rescue ArgumentError, TypeError
-  abort t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect)
+  # Through `refuse`, so a --json run answers with an object like every
+  # other refusal there: a date nobody can read is exactly the state a
+  # phone meets and cannot report, because prose on stderr with exit 1 is
+  # indistinguishable from the engine having fallen over.
+  refuse('date_unreadable',
+         t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect))
 end
 
 def edit_post(slug, path: nil)
@@ -6665,7 +6670,14 @@ begin
         args.slice!(at, 2)
       end
       slug = args.shift || pick_slug_interactively
-      lang ||= args.shift
+      lang ||= args.shift unless args.first.to_s.start_with?('--')
+      # 🪤 Whatever is still here was not asked for: a typo in `--lang`, a
+      # second `--lang`, a stray word. Swallowing it silently is how a
+      # translation ends up in a language nobody typed -- and the one
+      # message that came out named the typo as the language, which sent
+      # the reader to site.locales to add it.
+      abort t('cli.translate_unknown_args', args: args.join(' ')) unless args.empty?
+      lang = nil if lang.to_s.start_with?('--')
       abort t('cli.translate_needs_language') if lang.to_s.strip.empty?
       cmd_translate(slug, lang.to_s.strip)
     when 'edit'

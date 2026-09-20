@@ -298,6 +298,7 @@ cli:
   translate_own_language: "'%{lang}' is the language the post is already written in -- edit that with `./blog.sh edit`."
   translate_unknown_language: "This site does not publish '%{lang}'. It publishes: %{known}. Add the language to `site.locales` in config/site.yml first."
   translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."
+  translate_unknown_args: "❌ `translate` does not know what to do with: %{args}. It takes a post and one language -- `./blog.sh translate <slug> --lang <code>`."
   translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
   publish_partial: "Publishing %{slug} would put it out in one language: the site also publishes %{langs}, and this post has no words there. Write it with `./blog.sh translate`, or say `--allow-partial` to publish it as it is."
   translate_address_reserved: "The engine writes %{address} at the root of a language itself, so a page cannot be addressed that. Choose another with the `slug:` line in the header."
