@@ -345,9 +345,16 @@ end
 # first. Only languages the site actually publishes, and never this one:
 # a chain that named a language nobody builds would point readers at a
 # tree that does not exist.
+#
+# 🪤 The site's own language is where every chain ENDS, so it never starts
+# one: a table written symmetrically (`cs: [de]` next to `de: [cs]`) reads
+# as the obvious thing to write and used to take the site apart, because
+# the run that builds the root then rendered the other language's words at
+# the other language's address -- and the permalink every link in the world
+# points at was gone.
 FALLBACK_CHAIN = begin
   table = SiteConfig.get('site', 'fallback', default: nil)
-  named = table.is_a?(Hash) ? Array(table[SITE_LANG]) : []
+  named = table.is_a?(Hash) && !LANG_ROOT.empty? ? Array(table[SITE_LANG]) : []
   (named.map { |code| code.to_s.strip } & SITE_LOCALES) - [SITE_LANG]
 end.freeze
 
