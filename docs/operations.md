@@ -310,6 +310,44 @@ being menu items. Every CLI command still exists unchanged --
 `./blog.sh unpublish <slug>` works exactly as before; only the menu
 stopped listing it.
 
+## Writing a post in another language
+
+Only on a site that publishes more than one -- `site.locales` in
+[install.md](install.md#2-configure-the-site----configsiteyml) is what
+says so.
+
+```bash
+./blog.sh translate my-post --lang de
+```
+
+The editor that opens holds a title and a body, and nothing else. That is
+the whole of what a translation may carry: the date, the tags, the series,
+the pin and the state belong to the POST and are true in every language at
+once, so they are changed with `props` or `edit` and never here. A
+translation cannot quietly disagree with the post it belongs to.
+
+Save it and `./blog.sh rebuild` builds every language the site publishes:
+the language in `site.lang` at the site root, the others under `/de/`, all
+in one tree with one copy of `/assets/` between them.
+
+**Taking a language off a post** is emptying the title and deleting the
+body. The post then looks exactly as it did before the translation existed
+-- which matters, because a half-empty translation would otherwise give
+that language a page with the wrong words on it.
+
+**A post you have not translated is not hidden.** It stays in the other
+language's listing and the link on it goes to the address the post really
+has, so the same words never stand at two addresses. The language switcher
+still offers every language; one with nothing of this post in it leads to
+that language's front page rather than to a 404. What is promised to a
+search engine (`hreflang`) is narrower on purpose: only the addresses that
+exist.
+
+**Pictures belong to the post**, not to one of its languages, so they are
+added with `edit` and referred to from a translation. `translate` refuses
+an attachment rather than putting a file in one language's copy of a post
+whose media the other languages share.
+
 ## Writing from a phone
 
 The trick is that a bare filename in an image line resolves against the

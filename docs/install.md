@@ -299,6 +299,16 @@ does nothing for a Bluesky entry.
 English per key. Adding another language is data, not code -- see
 [localization.md](localization.md).
 
+`site.locales` is the list of languages the site **publishes**, and it is
+only needed when that is more than one. The language in `site.lang` keeps
+the site root; every other one is built into a root of its own (`/de/`),
+with one copy of `/assets/` and one writing app shared between them. The
+words of a post in another language are written with `./blog.sh translate`
+(see [operations.md](operations.md#writing-a-post-in-another-language)),
+and `./blog.sh rebuild` produces every language in one go. Leave the key
+out and nothing about the site changes -- no switcher, no alternates,
+nothing in the markup.
+
 `site.timezone` (an IANA name like `Europe/Prague`) is the zone every
 timestamp the engine writes is expressed in. **Set it if you'll ever
 publish from a server**, because a server's clock is usually UTC: without

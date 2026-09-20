@@ -1,5 +1,19 @@
 # Adding a language
 
+Two different things are called "another language" here, and they are
+independent:
+
+- **Translating the ENGINE** -- the menu, the labels, the dates, the
+  wizards. That is this page, and it is one file of data.
+- **Publishing the SITE in more than one language** -- posts with a text
+  per language, a root per language, a switcher. That is
+  [Publishing in more than one language](#publishing-in-more-than-one-language)
+  at the foot of this page.
+
+A site can do either without the other: a Czech blog whose engine speaks
+Czech publishes one language, and a blog published in Czech and German
+needs both locales to exist first.
+
 How to translate blog.sh -- the generated site and the CLI wizards -- into
 a language it doesn't ship yet. No code changes are involved: a language is
 data, and a partial translation is useful from day one.
@@ -108,6 +122,95 @@ submitting.
   ß, ł, œ and friends -- see `lib/slug.rb`); scripts that don't
   transliterate (CJK, Cyrillic, Arabic) produce an id-based slug instead.
   URLs work either way.
+
+## Publishing in more than one language
+
+`site.lang` is the language the site is WRITTEN in; `site.locales` is the
+list of languages it is PUBLISHED in:
+
+```yaml
+site:
+  lang: cs
+  locales: [cs, de]
+```
+
+Both locale files have to exist (`locales/cs.yml`, `locales/de.yml`) --
+that is the first half of this page.
+
+### What the site looks like
+
+The language in `site.lang` keeps the site root and every other one gets a
+root of its own:
+
+```
+/                 the site's own language
+/de/              every listing, tag, series, feed and post that has German words
+/assets/          one copy, shared
+/write/           one writing app, shared
+```
+
+The root is not `/cs/` on a Czech site, and that is deliberate: every link
+anyone has ever made to the site goes on working the day a second language
+is added.
+
+### What a post carries
+
+Metadata once, words per language. A post with no `translations` key is a
+post in the site's own language -- which is every post in every archive
+today, so nothing has to be migrated:
+
+```json
+{
+  "slug": "muj-post",
+  "title": "Český titulek",
+  "date": "2026-09-20T10:00:00+02:00",
+  "tags": ["ruby"],
+  "content": [ ... ],
+  "translations": {
+    "de": { "title": "Deutscher Titel", "content": [ ... ] }
+  }
+}
+```
+
+A translation may carry `title`, `content` and `excerpt`, and nothing
+else. The date, the tags, the series, the pin and the state belong to the
+post and hold in every language at once -- so a post cannot be published
+in one language and a draft in another.
+
+Write one with `./blog.sh translate <slug> --lang de` (see
+[operations.md](operations.md#writing-a-post-in-another-language)); the
+editor shows the title and the body, because that is all there is to it.
+
+### What happens to a post nobody has translated
+
+It is shown, not hidden. It stays in the other language's listing, and the
+link on it leads to the address the post actually has -- so the same words
+never stand at two addresses, and nothing needs a `canonical`.
+
+The switcher offers every language the site publishes. A language with
+nothing of the current post in it leads to that language's front page
+rather than to a page that is not there. What the `hreflang` alternates
+name is narrower and on purpose: only addresses that exist. A site that
+promises a crawler an address it never wrote sends readers from a search
+result to its own 404.
+
+### Building and deploying
+
+`./blog.sh rebuild` produces every language the site publishes, in one go
+and under one lock, into a single tree -- so the deploy that follows sees
+one site and nothing has to be merged afterwards. Each language's build
+sweeps only its own root, which is how two of them can share a tree
+without carrying each other away.
+
+### What is not there yet
+
+- **A slug per language.** An address is the post's one slug in every
+  language (`/de/posts/2026/muj-post/`), because the file's identity and
+  its media directory both hang off it.
+- **A fallback chain.** A language falls back to the post's own text, not
+  to a language you nominate.
+- **Pictures in a translation.** Media belong to the post and its
+  languages share them; add them with `edit`.
 
 ## Submitting
 

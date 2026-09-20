@@ -85,6 +85,12 @@ site:
   # any key missing from it falls back to English.
   lang: "en"
   locale: "en_US"
+  # The languages this site PUBLISHES, when that is more than the one above.
+  # Each one is built into its own root (/de/), the language in `lang` keeps
+  # the site root, and the words of a post in another language are written
+  # with `./blog.sh translate <slug> --lang de`. A site that publishes one
+  # language leaves this out and nothing about it changes.
+  # locales: [en, de]
   # The timezone every timestamp this engine writes is expressed in: publish
   # times, "publish now", the date you type into `schedule`. An IANA zone
   # name (see /usr/share/zoneinfo) -- DST is handled for you.
