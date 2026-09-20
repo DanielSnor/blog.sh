@@ -29,6 +29,7 @@ require_relative '../lib/path_glob'
 require_relative '../lib/path_safety'
 require_relative '../lib/atomic_write'
 require_relative '../lib/build_cache'
+require_relative '../lib/translations'
 require_relative 'blocks'
 require_relative 'feeds'
 require_relative 'output'
@@ -2327,6 +2328,11 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # sail past this and die much later with a TypeError that named no file --
   # same blindness as an unparseable file, different exception.
   raise JSON::ParserError, "not a post object (#{parsed.class})" unless parsed.is_a?(Hash)
+
+  # Which text this run renders, decided at the same door the shape is
+  # settled at, so nothing downstream has to ask: the metadata stay the
+  # post's, only the words change with the language (lib/translations.rb).
+  parsed = Translations.for_lang(parsed, SITE_LANG)
 
   # Which year's DIRECTORY the file sits in -- the same key the checker,
   # the exporter and stats already carry. A post whose date was corrected
