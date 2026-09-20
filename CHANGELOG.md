@@ -13,12 +13,18 @@ prints what an installation is running.
 
 ## 1.9.pre -- 2026-09-16
 
-A bug-fix release about two things a live site found. Every embedded player -- YouTube, Vimeo,
-Spotify, all of them -- refused to play on a host that sends a tight `Referrer-Policy`, which is
-what Cloudron's Surfer sends by default: the player never learned who was embedding it, and drew a
-black rectangle instead. And `check` called a link to the writing app a dead link on exactly the
-sites where that address answers. Nothing to configure and nothing to migrate -- but the player
-fix lives in the rendered page, so it reaches a site on the next full rebuild and deploy.
+The release about the first hour with the engine. Most of it comes from people setting blog.sh up
+for the first time and saying what got in their way: a token pasted with a space on either side was
+saved with it and then refused by the instance, with nothing on screen to say why -- so the prompt
+that shows nothing now says what went in, and which of the three values a Mastodon application page
+offers is the one to copy. Ctrl+C left every screen of `./blog.sh` through a stack trace. The import
+menu never said a WordPress export is a file you can point it at, and the documentation never
+mentioned that a plain FTP host has been reachable all along. Before those, two things a live site
+found: every embedded player -- YouTube, Vimeo, Spotify, all of them -- drew a black rectangle on a
+host that sends a tight `Referrer-Policy`, which is what Cloudron's Surfer sends by default, because
+the player never learned who was embedding it; and `check` called a link to the writing app dead on
+exactly the sites where that address answers. Nothing to configure and nothing to migrate -- but the
+player fix lives in the rendered page, so it reaches a site on the next full rebuild and deploy.
 
 ### Fixed
 
