@@ -226,6 +226,7 @@ module Checker
     findings.concat(guard(:duplicate_addresses) { check_duplicate_addresses(posts, cap) })
     findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
     findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
+    findings.concat(guard(:unknown_locales) { check_unknown_locales(root) })
     findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
@@ -1263,6 +1264,19 @@ module Checker
   # Only in the languages the site publishes: a translation lying around
   # for a language `site.locales` does not name is never built, so an
   # address it claims collides with nothing.
+  # A language `site.locales` names but the engine has no locale file for.
+  # The build refuses to run on it -- every language of it, the site's own
+  # included -- so check saying nothing meant a sound archive and a site
+  # that would not build.
+  def check_unknown_locales(root)
+    codes = ([site_own_language(root)] + published_languages(root)).reject(&:empty?).uniq
+    missing = codes.reject { |code| I18n.locale_file?(code) }
+    return [] if missing.empty?
+
+    [error(t('unknown_locale', langs: missing.join(', ')), t('unknown_locale_fix'),
+           kind: :unknown_locale, data: { 'langs' => missing })]
+  end
+
   def check_language_addresses(posts, root, cap = CAP)
     langs = published_languages(root)
     return [] if langs.empty?

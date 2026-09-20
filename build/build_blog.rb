@@ -317,7 +317,15 @@ end
 # to offer and nothing to compare.
 SITE_LOCALES = begin
   named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
-  ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq.freeze
+  all = ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq
+  # 🪤 A code with no locale file used to be met far from here, in the
+  # language switcher, where `I18n.load_locale` aborts -- and it aborts
+  # with SystemExit, which the rescue there does not catch. So a typo in
+  # `site.locales` stopped the build of EVERY language, including the
+  # site's own, with a sentence telling the reader to change `site.lang`.
+  missing = all.reject { |code| I18n.locale_file?(code) }
+  abort(I18n.t('build.unknown_locale', langs: missing.join(', '))) unless missing.empty?
+  all.freeze
 end
 
 # Which part of the tree this run's sweep owns.
@@ -444,8 +452,11 @@ end
 # looking for it can recognise: somebody who reads German is looking for
 # "Deutsch", not for "nemecky".
 LANGUAGE_NAMES = Hash.new do |cache, code|
+  # Only for a language that has a file: `I18n.load_locale` aborts on one
+  # that has none, and an abort is a SystemExit that no `rescue` here
+  # would catch. SITE_LOCALES refuses those long before this runs.
   cache[code] = begin
-    I18n.load_locale(code.to_s)['language_name'].to_s
+    I18n.locale_file?(code) ? I18n.load_locale(code.to_s)['language_name'].to_s : ''
   rescue StandardError
     ''
   end

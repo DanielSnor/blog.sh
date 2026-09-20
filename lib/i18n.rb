@@ -47,6 +47,14 @@ module I18n
     @data ||= lang == DEFAULT_LANG ? default_data : load_locale(lang)
   end
 
+  # Whether a code has a locale file at all -- asked before loading one,
+  # by everybody who has something better to do with a missing file than
+  # end the process (`load_locale` aborts, and an abort is a SystemExit
+  # that an ordinary rescue does not catch).
+  def locale_file?(code)
+    File.exist?(File.join(LOCALES_DIR, "#{code}.yml"))
+  end
+
   def load_locale(code)
     path = File.join(LOCALES_DIR, "#{code}.yml")
     unless File.exist?(path)
