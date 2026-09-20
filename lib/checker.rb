@@ -8,6 +8,8 @@ require 'uri'
 require 'timeout'
 require 'time'
 require_relative 'entity_text'
+require_relative 'translations'
+require_relative 'config_lang'
 require_relative 'post_address'
 require_relative 'path_safety'
 require_relative 'slug'
@@ -732,6 +734,35 @@ module Checker
     # pages or unlisted posts has neither.
     paths << '/archive/' if stream_post
     paths << '/tag/' if stream_tag
+    with_languages(paths, posts, root: root)
+  end
+
+  # The same addresses again under every language the archive has text in.
+  #
+  # Which languages those are is read from the POSTS, the way every other
+  # answer in known_paths is: a language somebody has written a post in is
+  # a language the site publishes, and a list in the config would be the
+  # second opinion this method exists to avoid. An archive with no
+  # translations gets nothing added, which is what keeps a single-language
+  # site exactly as it was.
+  #
+  # 🪤 /write/ and /assets/ are NOT copied per language -- one writing app
+  # and one stylesheet serve the whole site (build/build_blog.rb's loc()).
+  # A link to /de/write/ is dead and has to stay dead: an address check
+  # INVENTS is worse than one it misses, because it makes an archive read
+  # sound while a reader gets a 404.
+  def with_languages(paths, posts, root: nil)
+    own = root ? ConfigLang.of(File.join(root, 'config', 'site.yml')) : nil
+    langs = posts.flat_map { |post| Translations.languages(post) }.uniq
+    langs -= [own.to_s] unless own.to_s.empty?
+    return paths if langs.empty?
+
+    shared = paths.select { |path| path.start_with?('/write/', '/assets/') }
+    base = paths.to_a - shared.to_a
+    langs.each do |lang|
+      paths << "/#{lang}/"
+      base.each { |path| paths << (path == '/' ? "/#{lang}/" : "/#{lang}#{path}") }
+    end
     paths
   end
 
