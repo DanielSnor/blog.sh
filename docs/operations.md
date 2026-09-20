@@ -320,6 +320,14 @@ says so.
 ./blog.sh translate my-post --lang de
 ```
 
+Or from the wizard, which is where the rest of the work happens: pick the
+post, and the crossroads that offers its text and its properties offers
+the languages too. With one other language it names it (`[l] language:
+Deutsch`); with several it opens a picker that says what is already
+written, what is only started, and what has nothing yet -- the same three
+states `check --languages` prints. The properties screen carries a
+`languages` row for the same reason.
+
 The editor that opens holds a title and a body, and nothing else. That is
 the whole of what a translation may carry: the date, the tags, the series,
 the pin and the state belong to the POST and are true in every language at
@@ -333,6 +341,16 @@ in one tree with one copy of `/assets/` between them.
 The header also holds the address that language serves the post at. Left
 alone it is made from the translated title, once, and then stays put --
 see [localization.md](localization.md#the-address-in-each-language).
+
+The post's own words come along as `//` lines the first time, so the
+text being translated is in front of you rather than in another window.
+The editor drops every `//` line on save, which is also why a translation
+left half-done cannot save the original as though it were this language's.
+
+**Publishing a post the site cannot show in every language it publishes**
+is a decision, not an accident: the command line refuses it and names
+`--allow-partial`, and the wizard asks -- write the missing language now,
+or publish it as it stands.
 
 **Taking a language off a post** is emptying the title and deleting the
 body. The post then looks exactly as it did before the translation existed

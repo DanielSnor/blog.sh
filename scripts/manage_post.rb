@@ -2082,6 +2082,14 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
     return
   end
 
+  # 🪤 The languages question, where the wizard asks it. `./blog.sh publish`
+  # refuses a post the site cannot show in every language it publishes and
+  # names `--allow-partial`; this path asked NOTHING, so the same decision
+  # was enforced on the command line and skipped one screen into the
+  # wizard. It is a question here rather than that refusal, because a flag
+  # is not something anybody can type at a keypress prompt.
+  return unless asked ? offer_missing_languages(slug, post) : true
+
   # If the date is still whatever the template suggested at creation time,
   # the author never touched it, so it publishes with the current time.
   # If they overwrote it, that's a deliberate decision left alone -- so
@@ -3698,6 +3706,26 @@ def props_line(key, value)
   format('  %-12s %s', t("cli.props_label_#{key}"), value)
 end
 
+# The post's languages on one line, the site's own first: it is the one
+# every other is a translation OF, and it always has words.
+def languages_summary(post)
+  langs = other_languages
+  return nil if langs.empty?
+
+  marks = { written: '✅', started: '◐', none: '·' }
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  named = (["✅ #{language_name(own)}"] +
+           langs.map { |lang| "#{marks[language_state(post, lang)]} #{language_name(lang)}" }).join('  ')
+  # Named while they fit on the line, counted when they stop -- the rule
+  # the old addresses on this screen already keep. A site publishing six
+  # languages would otherwise push the rows under it off the screen, and
+  # the picker one keypress away says the same thing with room to spare.
+  return named if named.length <= 58
+
+  states = langs.map { |lang| language_state(post, lang) }.tally
+  ["✅ #{states.fetch(:written, 0) + 1}", "◐ #{states.fetch(:started, 0)}", "· #{states.fetch(:none, 0)}"].join('  ')
+end
+
 def props_title(post)
   post['title'] || post['content'].find { |b| b['type'] == 'text' }&.fetch('text', '')&.slice(0, 60) || post['slug']
 end
@@ -3740,6 +3768,11 @@ def props_frame_lines(post, path, slug, year)
   # not fooled by an empty string and sees all three fields, unlisted?
   # reads the flag as broadly as the builder that hides the post.
   lines << props_line('unlisted', Publishing.unlisted?(post) ? t('cli.props_unlisted_yes') : nil)
+  # Which languages this post is readable in -- only where there is more
+  # than one, so a site that publishes one sees the screen it always saw.
+  # The marks are the ones `check --languages` prints and the picker
+  # shows, because three notations for three states is two too many.
+  lines << props_line('languages', languages_summary(post))
   announced = Publishing.announcement_url(post)
   # An unlisted draft used to be told "goes out when the post publishes",
   # which was both a false promise and the wrong way round: an unlisted post
@@ -4704,6 +4737,32 @@ def language_state(post, lang)
   return :none unless entry.is_a?(Hash) && entry.slice(*Translations::TEXT_KEYS).compact.any?
 
   Array(entry['content']).empty? ? :started : :written
+end
+
+# The wizard's half of the missing-languages question: write one now,
+# publish as it stands, or step back. Answering the first opens the same
+# editor `translate` opens and comes back here -- the post is still a
+# draft, so nothing has been decided by going there.
+#
+# true means carry on publishing.
+def offer_missing_languages(slug, post)
+  missing = missing_translations(post)
+  return true if missing.empty?
+
+  # By name, not by code: the person at this prompt is deciding about a
+  # language, and `de` is a thing in a config file.
+  named = missing.map { |lang| language_name(lang) }.join(', ')
+  case Tui.key_choice(t('cli.publish_partial_prompt', langs: named))
+  when t('cli.publish_partial_write_key')
+    chosen = missing.size == 1 ? missing.first : pick_language_interactively(find_post_path(slug), missing)
+    cmd_translate(slug, chosen) if chosen
+    false
+  when t('cli.publish_partial_anyway_key') then true
+  else
+    puts t('cli.cancelled')
+    puts
+    false
+  end
 end
 
 # Refuses a post the site cannot show in every language it publishes --
