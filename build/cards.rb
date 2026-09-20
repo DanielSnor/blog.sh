@@ -25,7 +25,7 @@ module Cards
   end
 
   def build_list_item(post, pinned: false)
-    prefix = loc(post_path(post))
+    prefix = post_href(post)
     # A post that wrote its own teaser shows exactly that here, and nothing
     # below it: the listing is where the site invites, and an author who wrote
     # the invitation should not have it padded with the first 500px of the

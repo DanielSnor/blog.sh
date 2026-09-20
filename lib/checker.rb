@@ -757,11 +757,25 @@ module Checker
     langs -= [own.to_s] unless own.to_s.empty?
     return paths if langs.empty?
 
+    # A POST's address exists in a language only if the post has words in
+    # it: one with none is not built there and keeps the single address it
+    # has, so claiming the other would be inventing one (build's
+    # post_href). Everything else -- listings, tags, series, the archive,
+    # the feed -- is built in every language the site publishes.
+    per_post = {}
+    posts.each do |post|
+      path = post_path(post)
+      per_post[path] = Translations.languages(post)
+    end
     shared = paths.select { |path| path.start_with?('/write/', '/assets/') }
     base = paths.to_a - shared.to_a
     langs.each do |lang|
       paths << "/#{lang}/"
-      base.each { |path| paths << (path == '/' ? "/#{lang}/" : "/#{lang}#{path}") }
+      base.each do |path|
+        next if per_post.key?(path) && !per_post[path].include?(lang)
+
+        paths << (path == '/' ? "/#{lang}/" : "/#{lang}#{path}")
+      end
     end
     paths
   end

@@ -281,6 +281,21 @@ def loc(path)
   "#{LANG_ROOT}#{text}"
 end
 
+# Whether this run has a text of its own for the post. In the site's own
+# language always: that text IS the post.
+def translated_here?(post)
+  LANG_ROOT.empty? || Translations.languages(post).include?(SITE_LANG)
+end
+
+# Where a link to the post goes from a page of this language. A post with
+# no text here keeps the one address it has, and gets no page of its own:
+# the same words standing at two addresses is what would otherwise need a
+# canonical, and what hreflang must never be told about (Daniel, 20. 9.
+# 2026 -- the listing carries it, the link goes where the piece really is).
+def post_href(post)
+  translated_here?(post) ? loc(post_path(post)) : post_path(post)
+end
+
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
 # site that just doesn't want the overlay) can drop either line without
@@ -622,7 +637,7 @@ def share_links_html(post)
   # archive has thousands of them.
   return '' if SHARE.empty? || page?(post) || draft?(post) || unlisted?(post)
 
-  share_url = "#{SITE_BASE_URL}#{loc(post_path(post))}"
+  share_url = "#{SITE_BASE_URL}#{post_href(post)}"
   text = "#{post_title_for(post)} #{share_url}"
   links = SHARE.map do |name|
     case name
@@ -1259,7 +1274,7 @@ end
 # the open page -- e.g. when a preview is opened on a phone and needs to be
 # forwarded to someone else.
 def draft_banner(post)
-  url = "#{SITE_BASE_URL}#{loc(post_path(post))}"
+  url = "#{SITE_BASE_URL}#{post_href(post)}"
   <<~HTML
     <div class="draft-banner">
       <strong>#{h(t('post.draft_banner_heading'))}</strong>
@@ -1272,7 +1287,7 @@ end
 # The media prefix is post_path either way, so the rendered content is
 # identical on the post's own page and in every listing it appears in.
 def post_content_html(post)
-  CONTENT_CACHE[post] ||= Blocks.render_content(post['content'], loc(post_path(post)), lifted: link_title_block(post))
+  CONTENT_CACHE[post] ||= Blocks.render_content(post['content'], post_href(post), lifted: link_title_block(post))
 end
 
 def plain_text_length(post)
@@ -1586,8 +1601,8 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   return '' if prev_post.nil? && next_post.nil?
 
   links = []
-  links << %(<a class="series-prev" href="#{h(loc(post_path(prev_post)))}">#{h(t('post.series_previous', title: post_title_for(prev_post)))}</a>) if prev_post
-  links << %(<a class="series-next" href="#{h(loc(post_path(next_post)))}">#{h(t('post.series_next', title: post_title_for(next_post)))}</a>) if next_post
+  links << %(<a class="series-prev" href="#{h(post_href(prev_post))}">#{h(t('post.series_previous', title: post_title_for(prev_post)))}</a>) if prev_post
+  links << %(<a class="series-next" href="#{h(post_href(next_post))}">#{h(t('post.series_next', title: post_title_for(next_post)))}</a>) if next_post
   # Named, like the table of contents is. A screen reader lists the
   # landmarks on a page, and a post can carry three <nav>s -- the site
   # bar, this one and the pagination -- of which only the toc had a name.
@@ -1688,7 +1703,7 @@ def render_post_html(post, template)
   # caption) lost BOTH copies when hero_for lifted the first one.
   content_html = if hero_block
                    rest = post['content'].reject { |b| b.equal?(hero_block) }
-                   Blocks.render_content(rest, loc(post_path(post)), lifted: link_title_block(post))
+                   Blocks.render_content(rest, post_href(post), lifted: link_title_block(post))
                  else
                    post_content_html(post)
                  end
@@ -1696,7 +1711,7 @@ def render_post_html(post, template)
   layout(template.result(binding),
          title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),
          description: Discovery.post_description(post),
-         path: loc(post_path(post)),
+         path: post_href(post),
          image: Discovery.post_og_image(post),
          og_type: 'article',
          # Drafts and unlisted posts must never end up in search engines
@@ -2871,6 +2886,11 @@ def post_page_key(post, source_media_dir)
 end
 
 (posts + pages + unlisted_posts + drafts).each do |post|
+  # Nothing of a post this language has no words for: no page, and no copy
+  # of its media either -- both belong to the address it does have, which
+  # is where every link to it from this language points.
+  next unless translated_here?(post)
+
   year = post_time(post).year
   dir = output_dir(post)
 
@@ -2931,7 +2951,7 @@ def redirect_stub_html(post)
   # close the attribute to put markup on the page. draft_banner, forty
   # lines up, has always done it this way; this stub had three places
   # where it did not.
-  url = h("#{SITE_BASE_URL}#{loc(post_path(post))}")
+  url = h("#{SITE_BASE_URL}#{post_href(post)}")
   <<~HTML
     <!doctype html>
     <html lang="#{SITE_LANG}">
@@ -3158,7 +3178,7 @@ if SiteConfig.get('write', default: false)
          "#{JSON.generate('slug' => post['slug'].to_s,
                           'state' => post['state'].to_s,
                           'title' => post_title_for(post).to_s,
-                          'url' => SITE_BASE_URL.empty? ? '' : "#{SITE_BASE_URL}#{loc(post_path(post))}",
+                          'url' => SITE_BASE_URL.empty? ? '' : "#{SITE_BASE_URL}#{post_href(post)}",
                           'warnings' => Array(post['receipt_warnings']).map(&:to_s))}\n")
   end
 end
@@ -3338,7 +3358,7 @@ def search_index_entry(post)
             without_borrowed_title(PostText.plain(post, separator: SNIPPET_SEPARATOR), post)
           end
   {
-    url: loc(post_path(post)),
+    url: post_href(post),
     # A link post has no title of its own and no opening sentence to lift a
     # name from, so this used to be nil: the page, the tab, the feed and the
     # announcement all showed the borrowed link title and the search result
@@ -3487,7 +3507,7 @@ unless archive_by_year.empty?
         # page and /posts/<year>/ agree.
         %(<li><time datetime="#{h(post_display_time(post).strftime('%Y-%m-%d'))}">) +
           %(#{post_display_time(post).day}.</time> ) +
-          %(<a href="#{h(loc(post_path(post)))}">#{h(post_title_for(post))}</a></li>)
+          %(<a href="#{h(post_href(post))}">#{h(post_title_for(post))}</a></li>)
       end
       %(<section class="archive-section" id="m#{format('%02d', month)}">) +
         %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
