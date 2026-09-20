@@ -984,7 +984,13 @@ def nav_tags
 end
 
 def nav_known
-  @nav_known ||= Checker.known_paths(nav_posts)
+  # 🪤 With the root, because two of the answers depend on it: `/write/`
+  # exists only on a site that publishes the writing app, and a site
+  # published in more than one language answers under each language's own
+  # root. Asked without it, the wizard told the person their own address
+  # was a 404 -- the same defect check carried for `/write/` until 1.9,
+  # in the other tool.
+  @nav_known ||= Checker.known_paths(nav_posts, root: ROOT)
 end
 
 def nav_pages
