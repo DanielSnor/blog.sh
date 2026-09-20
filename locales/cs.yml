@@ -10,6 +10,8 @@ decimal_point: ","
 date_format: "%-d. %-m. %Y"
 date_time_format: "%-d. %-m. %Y %H:%M"
 
+# The language in its own name: what a reader looking for it recognises.
+language_name: "Čeština"
 nav:
   all: "Vše"
   text: "Text"
@@ -177,6 +179,7 @@ ui:
   # Popisek přepínače vzhledu. Čte se dvakrát: šablona ho vloží do stránky a
   # assets/js/theme-toggle.js ho přepisuje při každém kliknutí, takže se sem
   # dostává i přes window.BLOG_I18N (client_i18n_json v build/build_blog.rb).
+  language: "Jazyk"
   theme_auto: "Vzhled: podle systému"
   theme_light: "Vzhled: světlý"
   theme_dark: "Vzhled: tmavý"

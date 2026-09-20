@@ -296,6 +296,98 @@ def post_href(post)
   translated_here?(post) ? loc(post_path(post)) : post_path(post)
 end
 
+# Which languages this site publishes, the site's own first. Absent -- and
+# it is absent on every site today -- means one, and then nothing below
+# renders at all: no switcher and no alternates, because there is nothing
+# to offer and nothing to compare.
+SITE_LOCALES = begin
+  named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
+  ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq.freeze
+end
+
+def lang_root_for(lang)
+  lang.to_s == SITE_OWN_LANG ? '' : "/#{lang}"
+end
+
+# The address without this run's language on it, so another one can be put
+# there instead.
+def bare_path(path)
+  return path.to_s if LANG_ROOT.empty?
+
+  text = path.to_s
+  text.start_with?("#{LANG_ROOT}/") ? text.delete_prefix(LANG_ROOT) : text
+end
+
+# Every language this page can be offered in, and where each one goes.
+#
+# 🪤 For a POST the answer comes from the post, never from rewriting the
+# address: a language it has no words in has no page, so the offer leads to
+# that language's front page instead of a 404 -- and `has` is false, which
+# is what keeps it out of the alternates below. Listings, tags, the archive
+# and the feed are built in every language and carry no per-language name,
+# so for those the language on the address is simply swapped.
+def language_links(path, post: nil)
+  return [] if SITE_LOCALES.length < 2
+
+  bare = bare_path(path)
+  SITE_LOCALES.map do |lang|
+    root = lang_root_for(lang)
+    has = post.nil? || lang == SITE_OWN_LANG || Translations.languages(post).include?(lang)
+    href = if !has
+             "#{root}/"
+           else
+             bare == '/' ? "#{root}/" : "#{root}#{bare}"
+           end
+    { 'lang' => lang, 'href' => href, 'has' => has }
+  end
+end
+
+# What a crawler is told about the other languages of THIS page -- built
+# from the ones that exist, never from the list of languages the site
+# publishes. A site that promises an address it never wrote is a site that
+# sends readers to its own 404.
+def alternates_head(links)
+  offered = links.select { |link| link['has'] }
+  return '' if offered.length < 2
+
+  rows = offered.map do |link|
+    %(\n  <link rel="alternate" hreflang="#{h(link['lang'])}" href="#{h(SITE_BASE_URL + link['href'])}">)
+  end
+  own = offered.find { |link| link['lang'] == SITE_OWN_LANG }
+  rows << %(\n  <link rel="alternate" hreflang="x-default" href="#{h(SITE_BASE_URL + own['href'])}">) if own
+  rows.join
+end
+
+# A language's name in its own language, which is the only name a reader
+# looking for it can recognise: somebody who reads German is looking for
+# "Deutsch", not for "nemecky".
+LANGUAGE_NAMES = Hash.new do |cache, code|
+  cache[code] = begin
+    I18n.load_locale(code.to_s)['language_name'].to_s
+  rescue StandardError
+    ''
+  end
+end
+
+def language_switcher_html(links)
+  return '' if links.length < 2
+
+  items = links.map do |link|
+    name = LANGUAGE_NAMES[link['lang']]
+    name = link['lang'].to_s.upcase if name.empty?
+    current = link['lang'] == SITE_LANG
+    classes = ['lang-switch__item']
+    classes << 'is-current' if current
+    classes << 'is-elsewhere' unless link['has']
+    if current
+      %(<span class="#{classes.join(' ')}" aria-current="true">#{h(name)}</span>)
+    else
+      %(<a class="#{classes.join(' ')}" href="#{h(link['href'])}" hreflang="#{h(link['lang'])}">#{h(name)}</a>)
+    end
+  end
+  %(<nav class="lang-switch" aria-label="#{h(t('ui.language'))}">#{items.join}</nav>)
+end
+
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
 # site that just doesn't want the overlay) can drop either line without
@@ -1712,6 +1804,7 @@ def render_post_html(post, template)
          title: draft?(post) ? "#{t('post.draft_title_prefix')}#{post_title_for(post)}" : post_title_for(post),
          description: Discovery.post_description(post),
          path: post_href(post),
+         post: post,
          image: Discovery.post_og_image(post),
          og_type: 'article',
          # Drafts and unlisted posts must never end up in search engines
@@ -1926,7 +2019,8 @@ end
 # instead of writing them unconditionally and then undoing each property
 # again further down.
 def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website',
-           extra_head: '', frame_origins: [], comment_origins: [], body_class: nil)
+           extra_head: '', frame_origins: [], comment_origins: [], body_class: nil, post: nil)
+  links = language_links(path, post: post)
   LAYOUT.result_with_hash(
     # Pre-rendered as the whole attribute, so a page without one keeps a bare
     # <body> rather than an empty class="" on every page of every site.
@@ -1938,7 +2032,8 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     nav_active: nav_active_for(path),
     og_image: image,
     og_type: og_type,
-    extra_head: extra_head,
+    extra_head: alternates_head(links) + extra_head,
+    lang_switcher: language_switcher_html(links),
     # The players a page carries decide its frame-src, so the policy is
     # computed here rather than widened for the whole site (csp_content).
     page_frame_origins: frame_origins,

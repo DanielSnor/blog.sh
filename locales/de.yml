@@ -11,6 +11,8 @@ decimal_point: ","
 date_format: "%d.%m.%Y"
 date_time_format: "%d.%m.%Y %H:%M"
 
+# The language in its own name: what a reader looking for it recognises.
+language_name: "Deutsch"
 nav:
   all: "Alle"
   text: "Text"
@@ -182,6 +184,7 @@ ui:
   # Layout setzt sie auf die Seite, assets/js/theme-toggle.js schreibt sie bei
   # jedem Klick neu -- deshalb läuft sie auch über window.BLOG_I18N
   # (client_i18n_json in build/build_blog.rb).
+  language: "Sprache"
   theme_auto: "Erscheinungsbild: wie im System"
   theme_light: "Erscheinungsbild: hell"
   theme_dark: "Erscheinungsbild: dunkel"
