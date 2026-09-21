@@ -517,6 +517,10 @@ nav a[aria-current="page"]:hover {
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
+  /* One target, like the button beside it: the whole chip takes the click
+     and moves you on, rather than asking a reader to hit two letters. */
+  cursor: pointer;
+  text-decoration: none;
   /* 🪤 It IS a <nav>, so the menu's own rules reach it: a 1rem gap that
      put air around the slash, a 60px floor that made the chip as tall as
      the menu bar, and a 5px border top and bottom. Every one of them has
@@ -554,8 +558,25 @@ nav a[aria-current="page"]:hover {
 }
 
 .lang-switch__item.is-current { color: var(--lang-switch-text, #ffffff); font-weight: 700; }
-a.lang-switch__item:hover { color: var(--lang-switch-text, #ffffff); text-decoration: underline; }
-a.lang-switch__item:focus-visible { outline-color: var(--lang-switch-text, #ffffff); outline-offset: 2px; }
+
+/* Hover and focus belong to the chip, not to a code inside it -- the same
+   two states the appearance button has, in the same colours. */
+a.lang-switch:hover {
+  background: var(--hover-invert);
+  border-color: var(--hover-invert);
+}
+
+a.lang-switch:hover .lang-switch__item { color: var(--badge-hover-text); }
+
+a.lang-switch:hover .lang-switch__item.is-current {
+  color: var(--badge-hover-text);
+  opacity: 1;
+}
+
+a.lang-switch:focus-visible {
+  outline-color: var(--lang-switch-text, #ffffff);
+  outline-offset: -3px;
+}
 
 /* No spaces around it: the button next door reads ☀︎/☾︎, and this is the
    same word in the same voice. */

@@ -199,8 +199,11 @@ The switcher is a chip in the banner's corner, beside the light/dark
 button: which language you read the site in is a choice about this visit,
 like which mode you read it in, and it belongs where that choice already
 lives rather than in the menu, which it breaks in two. It shows language
-CODES (`CS/DE/EN`) with each language's own name in the title, the way
-the button beside it shows `☀︎/☾︎` and says what it does in a title.
+CODES (`CS/DE/EN`) with the language a click leads to named in the title,
+the way the button beside it shows `☀︎/☾︎` and says what it does in a
+title. A click anywhere on the chip moves to the next language and wraps
+around at the end -- one target, like the button, rather than a row of
+small ones to aim at.
 
 The switcher offers every language the site publishes. A language with
 nothing of the current post in it leads to that language's front page

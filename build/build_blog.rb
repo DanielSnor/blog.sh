@@ -462,33 +462,44 @@ LANGUAGE_NAMES = Hash.new do |cache, code|
   end
 end
 
+# A language's name, or its code when the engine has no name for it.
+def language_label(code)
+  name = LANGUAGE_NAMES[code]
+  name.empty? ? code.to_s.upcase : name
+end
+
+# The chip in the banner's corner, and it works the way the button beside
+# it works: ONE target, and a click anywhere on it moves you on. The
+# button cycles light → dark → system; this cycles to the next language
+# the site publishes and wraps around at the end.
+#
+# 🪤 It was a row of separate links at first, which looked the same and
+# behaved differently -- a reader had to hit two letters rather than the
+# chip (Daniel, 21. 9. 2026: "ne abych se musel trefovat"). Two controls
+# side by side that take a click differently are one control too many.
+#
+# The face still shows every language it publishes, with the one being
+# read marked, because that is what says where you are; what changed is
+# that the whole chip, not the code inside it, is the thing you click.
 def language_switcher_html(links)
   return '' if links.length < 2
 
-  # The code on the face, the name in the title -- the same division the
-  # button beside it keeps, which shows ☀︎/☾︎ and says "Appearance: follow
-  # system" to a cursor and to a screen reader. A chip in the banner's
-  # corner has room for four codes and not for four names, and a code is
-  # what a reader looking for their own language scans for anyway.
+  here = links.index { |link| link['lang'] == SITE_LANG } || 0
+  nxt = links[(here + 1) % links.length]
   items = links.map do |link|
-    code = link['lang'].to_s.upcase
-    name = LANGUAGE_NAMES[link['lang']]
-    name = code if name.empty?
-    current = link['lang'] == SITE_LANG
     classes = ['lang-switch__item']
-    classes << 'is-current' if current
+    classes << 'is-current' if link['lang'] == SITE_LANG
     classes << 'is-elsewhere' unless link['has']
-    if current
-      %(<span class="#{classes.join(' ')}" aria-current="true" title="#{h(name)}">#{h(code)}</span>)
-    else
-      %(<a class="#{classes.join(' ')}" href="#{h(link['href'])}" hreflang="#{h(link['lang'])}" ) +
-        %(title="#{h(name)}" aria-label="#{h(name)}">#{h(code)}</a>)
-    end
+    current = link['lang'] == SITE_LANG ? ' aria-current="true"' : ''
+    %(<span class="#{classes.join(' ')}"#{current}>#{h(link['lang'].to_s.upcase)}</span>)
   end
-  # The newline belongs to the markup, not to the template: rendered as its
-  # own line there, a site with one language got a blank line on every page
-  # where the switcher would have been (tests/test_gaps.rb counts those).
-  %(<nav class="lang-switch" aria-label="#{h(t('ui.language'))}">#{items.join}</nav>)
+  # The name of the language the click LEADS TO -- a label saying "English"
+  # on a control that takes you to Czech is the one thing worse than no
+  # label at all. The same division the button keeps: codes on the face,
+  # the sentence in the title and to a screen reader.
+  name = language_label(nxt['lang'])
+  %(<a class="lang-switch" href="#{h(nxt['href'])}" hreflang="#{h(nxt['lang'])}" ) +
+    %(title="#{h(name)}" aria-label="#{h(name)}">#{items.join}</a>)
 end
 
 BANNER = SiteConfig.fetch('banner')

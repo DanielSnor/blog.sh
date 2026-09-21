@@ -155,10 +155,16 @@ stretching the shorter one so no number has to be kept in step.
 
 ```
 .banner-tools          the row (absolute, top/right)
-  nav.lang-switch      the chip -- only on a site with site.locales
+  a.lang-switch        the chip -- only on a site with site.locales
     .lang-switch__item   a language; .is-current is the one being read
   #theme-toggle        the appearance button
 ```
+
+The chip is ONE link, not a link per language: a click anywhere on it
+moves to the next language the site publishes and wraps around at the
+end, the way the button beside it cycles light → dark → system. The codes
+inside it are spans, so style `.lang-switch__item` for how a language
+looks and `a.lang-switch` for how the control behaves.
 
 The row deliberately has **no `z-index`**: with one it would become a
 stacking context, and `#theme-toggle { z-index: 6 }` -- which the section
