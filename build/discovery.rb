@@ -94,6 +94,12 @@ module Discovery
       'datePublished' => published,
       'url' => "#{SITE_BASE_URL}#{post_href(post)}",
       'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_href(post)}",
+      # The language the page is WRITTEN in -- everything else on it says
+      # so (<html lang>, og:locale, the feed, hreflang) and this was the
+      # one place that left a machine to guess. SITE_LANG, not the
+      # language the engine speaks here: a Slovak branch borrowing Czech
+      # furniture (site.ui_language) is still Slovak to a reader.
+      'inLanguage' => SITE_LANG,
       'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR },
       'image' => post_og_image(post),
       'description' => post_description(post)

@@ -13,18 +13,34 @@ prints what an installation is running.
 
 ## 1.9.pre -- 2026-09-16
 
-The release about the first hour with the engine. Most of it comes from people setting blog.sh up
-for the first time and saying what got in their way: a token pasted with a space on either side was
-saved with it and then refused by the instance, with nothing on screen to say why -- so the prompt
-that shows nothing now says what went in, and which of the three values a Mastodon application page
-offers is the one to copy. Ctrl+C left every screen of `./blog.sh` through a stack trace. The import
-menu never said a WordPress export is a file you can point it at, and the documentation never
-mentioned that a plain FTP host has been reachable all along. Before those, two things a live site
-found: every embedded player -- YouTube, Vimeo, Spotify, all of them -- drew a black rectangle on a
-host that sends a tight `Referrer-Policy`, which is what Cloudron's Surfer sends by default, because
-the player never learned who was embedding it; and `check` called a link to the writing app dead on
-exactly the sites where that address answers. Nothing to configure and nothing to migrate -- but the
-player fix lives in the rendered page, so it reaches a site on the next full rebuild and deploy.
+The release about publishing in more than one language. A post keeps one set of metadata and a text
+per language: the date, the tags, the series and the state belong to the piece of writing, and only
+the words change. The language in `site.lang` keeps the site root, every other one named in
+`site.locales` gets a root of its own, and one `rebuild` produces all of them into a single tree
+that shares one copy of the assets. A post nobody has translated is shown in the other language all
+the same, with its link going to the one copy that exists -- so the same words never stand at two
+addresses. Writing a translation is `./blog.sh translate <slug> --lang de`, or the third way out of
+the wizard's crossroads; `check --languages` prints what is written where; and publishing a post the
+site cannot show in every language it publishes is refused, with `--allow-partial` named in the same
+sentence. A language the engine has never been translated into can borrow another's interface rather
+than be refused outright.
+
+Around that, the release a site's first hour asked for, most of it from people setting blog.sh up
+and saying what got in their way: a token pasted with a space on either side was saved with it and
+then refused by the instance, with nothing on screen to say why -- so the prompt that shows nothing
+now says what went in, and which of the three values a Mastodon application page offers is the one to
+copy. Ctrl+C left every screen of `./blog.sh` through a stack trace. The import menu never said a
+WordPress export is a file you can point it at, and the documentation never mentioned that a plain
+FTP host has been reachable all along. Two more came from a live site: every embedded player --
+YouTube, Vimeo, Spotify, all of them -- drew a black rectangle on a host that sends a tight
+`Referrer-Policy`, which is what Cloudron's Surfer sends by default, because the player never learned
+who was embedding it; and `check` called a link to the writing app dead on exactly the sites where
+that address answers.
+
+Nothing to configure and nothing to migrate: a site that names no `site.locales` publishes one
+language and is the site it was, down to the markup. Two things reach an existing site only on the
+next full rebuild and deploy, because they live in the rendered page: the player fix, and the
+language switcher's move out of the menu into the banner's corner.
 
 ### Added
 
@@ -44,6 +60,7 @@ player fix lives in the rendered page, so it reaches a site on the next full reb
 - **A picture whose caption was in typographic quotes vanished from the page.** `![alt](01.png „Caption“)` -- what every translator, word processor and phone keyboard writes -- put the quotes and the caption into the FILENAME, so the picture pointed at a file nobody has, the build dropped it without a word and the page went out with a hole in it. Straight and typographic quotes are both read now.
 - **The sitemap knew nothing about the other languages.** The one robots.txt names listed only the site's own language, while each language wrote a copy nothing ever fetched -- on a two-language site the second one was undiscoverable. There is one sitemap now, at the site root, naming every language and saying which addresses are the same page in another.
 - **robots.txt, the sitemap and the sidebar's data were written into every language root.** Nothing read those copies -- the page fetches them by absolute address and a crawler reads the robots.txt at the origin root -- and nothing refreshed them either, so `/cs/stats.json` stayed as the build left it. They are written once, at the site root.
+- **Structured data did not say which language the page is in.** Everything else on it did -- `<html lang>`, `og:locale`, the feed, the alternates -- and the JSON-LD left a machine to guess.
 - **A picture in a translation reserved no space on the page.** What a picture measures is a fact about the file, and the languages of a post share one media directory -- so the size now comes from the post's own text, and the translated page stops jumping as it loads.
 - **`check` did not look at the pictures or the links a translation asks for.** It read only the post's own body, so the second language was the one place a missing file or a renamed slug could rot unseen.
 
