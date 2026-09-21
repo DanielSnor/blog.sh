@@ -1779,8 +1779,21 @@ module Checker
   # existed, which cut both ways at once -- a poster file that vanished
   # was never reported missing, and the stray check below would have
   # reported every poster that exists as a leftover.
+  # Every body the post has, translations included -- they share the
+  # post's one media directory, so a picture asked for in another
+  # language is asked for from the same place. Reading only `content`
+  # left a translated post free to point at a file that is not there:
+  # the build drops such a picture without a word, and check called the
+  # archive sound while a page went out with a hole in it.
   def media_urls(post)
-    (Array(post['content']) || []).flat_map do |block|
+    bodies = [post['content']]
+    translations = post['translations']
+    translations.each_value { |one| bodies << one['content'] if one.is_a?(Hash) } if translations.is_a?(Hash)
+    bodies.flat_map { |body| media_urls_in(body) }.uniq
+  end
+
+  def media_urls_in(content)
+    (Array(content) || []).flat_map do |block|
       next [] unless block.is_a?(Hash)
 
       %w[media poster].flat_map do |key|
