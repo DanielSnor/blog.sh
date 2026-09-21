@@ -41,6 +41,8 @@ player fix lives in the rendered page, so it reaches a site on the next full reb
 ### Fixed
 
 - **A picture whose caption was in typographic quotes vanished from the page.** `![alt](01.png „Caption“)` -- what every translator, word processor and phone keyboard writes -- put the quotes and the caption into the FILENAME, so the picture pointed at a file nobody has, the build dropped it without a word and the page went out with a hole in it. Straight and typographic quotes are both read now.
+- **The sitemap knew nothing about the other languages.** The one robots.txt names listed only the site's own language, while each language wrote a copy nothing ever fetched -- on a two-language site the second one was undiscoverable. There is one sitemap now, at the site root, naming every language and saying which addresses are the same page in another.
+- **robots.txt, the sitemap and the sidebar's data were written into every language root.** Nothing read those copies -- the page fetches them by absolute address and a crawler reads the robots.txt at the origin root -- and nothing refreshed them either, so `/cs/stats.json` stayed as the build left it. They are written once, at the site root.
 - **A picture in a translation reserved no space on the page.** What a picture measures is a fact about the file, and the languages of a post share one media directory -- so the size now comes from the post's own text, and the translated page stops jumping as it loads.
 - **`check` did not look at the pictures or the links a translation asks for.** It read only the post's own body, so the second language was the one place a missing file or a renamed slug could rot unseen.
 

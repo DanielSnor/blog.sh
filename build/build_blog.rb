@@ -3887,24 +3887,35 @@ end
 # meant that an author who turned the sidebar off while leaving the widget
 # settings in place kept yesterday's widget JSON on the site for good --
 # protected from the sweep by a build that had not written it.
-Sidebar.write_all(CONTENT_ROOT).each_key { |name| WRITTEN[File.join(CONTENT_ROOT, name)] = true }
+# 🪤 At the SITE root, not this language's: the cron that refreshes these
+# (scripts/refresh_sidebar.rb) writes to public.nosync and nowhere else, and
+# the page fetches them by absolute address -- so a copy under /cs/ was
+# written once by the build and then never touched again. On blogsh.app
+# that copy was `{}` from the small hours while the real one was minutes
+# old. They are site-wide data, like /assets/, so the run that owns the
+# site root writes them and a language run leaves them alone.
+if LANG_ROOT.empty?
+  Sidebar.write_all(PUBLIC_DIR).each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
+end
 
 # Stats for tooted posts are filled in by cron (scripts/refresh_sidebar.rb) --
 # the build just registers the file so prune doesn't delete it, and creates
 # an empty one if it doesn't exist yet. Fetching it on every build would mean
 # two Mastodon requests per tooted post.
-STATS_PATH = File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:stats])
+STATS_PATH = File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:stats])
 # Written directly rather than through emit, because cron owns the contents
 # and the build only guarantees the file exists -- but it is served to the
 # same browsers as everything else, so it needs the same permissions. It was
 # the one file left behind by the sweep above: 600 on a strict umask, and a
 # stats row that quietly showed nothing.
-unless File.exist?(STATS_PATH)
-  File.write(STATS_PATH, '{}')
-  Output.make_readable(STATS_PATH)
+if LANG_ROOT.empty?
+  unless File.exist?(STATS_PATH)
+    File.write(STATS_PATH, '{}')
+    Output.make_readable(STATS_PATH)
+  end
+  Output.make_readable(STATS_PATH) unless Output.world_readable?(STATS_PATH)
+  WRITTEN[STATS_PATH] = true
 end
-Output.make_readable(STATS_PATH) unless Output.world_readable?(STATS_PATH)
-WRITTEN[STATS_PATH] = true
 
 # The approved comments, written by the same cron and needing the same
 # protection -- which it did not have. Every build swept the file away as
@@ -3923,8 +3934,8 @@ WRITTEN[STATS_PATH] = true
 # not exist yet means the cron has not run, and inventing an empty one
 # would tell the page there is nothing to show rather than nothing to
 # read.
-COMMENTS_PATH = File.join(CONTENT_ROOT, PostAddress::CRON_FILES[:comments])
-WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL
+COMMENTS_PATH = File.join(PUBLIC_DIR, PostAddress::CRON_FILES[:comments])
+WRITTEN[COMMENTS_PATH] = true if COMMENTS_APPROVAL && LANG_ROOT.empty?
 
 # Only the newest RSS_ITEM_LIMIT posts reach the feed, and its stated
 # <lastBuildDate> is the newest post's own date rather than the clock --
@@ -3936,11 +3947,29 @@ end
 # Pages ride along in the sitemap: being findable is the whole point of
 # one, and the sitemap is how a search engine is told they exist at all
 # -- nothing links to them from the archive.
-Output.cached_emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:sitemap]),
-            Digest::SHA256.hexdigest([Output.posts_digest(posts + pages),
-                                      tags_map.keys.join(','),
-                                      PRESENT_TYPES.join(',')].join('|'))) do
-  Feeds.render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts)
+#
+# One sitemap for the whole site, written by the run that owns the site
+# root and covering every language: robots.txt names one file, so a copy
+# under /cs/ is something nothing ever asks for -- while the one crawlers
+# do read had no Czech address in it at all.
+SITEMAP_LANGUAGES = SITE_LOCALES.map do |lang|
+  { 'lang' => lang,
+    'root' => lang_root_for(lang),
+    'address' => ->(entry) { address_of(entry, lang) },
+    # A post has a page in a language when it has WORDS there; the site's
+    # own language is where every post always has them.
+    'has' => ->(entry) { lang == SITE_OWN_LANG || Translations.languages(entry).include?(lang) } }
+end.freeze
+
+if LANG_ROOT.empty?
+  Output.cached_emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:sitemap]),
+              Digest::SHA256.hexdigest([Output.posts_digest(posts + pages),
+                                        tags_map.keys.join(','),
+                                        SITE_LOCALES.join(','),
+                                        PRESENT_TYPES.join(',')].join('|'))) do
+    Feeds.render_sitemap(posts + pages, tags_map, PRESENT_TYPES, posts,
+                         languages: SITE_LOCALES.length < 2 ? nil : SITEMAP_LANGUAGES)
+  end
 end
 # The crawlers that collect text to train on, as of this release. A list in
 # the engine goes stale, which is why the free-text key below exists beside
@@ -3974,7 +4003,10 @@ def robots_txt
   "#{lines.join("\n")}\n"
 end
 
-Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:robots]), robots_txt)
+# One robots.txt, at the site root: a crawler reads the one at the origin's
+# root and nothing else, so a copy under /cs/ was a file nobody would ever
+# ask for.
+Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:robots]), robots_txt) if LANG_ROOT.empty?
 
 # An imported post keeps answering at the addresses its previous platform
 # gave it: redirect_from is a list of site-root paths ("/bitwarden/",

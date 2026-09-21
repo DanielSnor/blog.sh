@@ -85,9 +85,15 @@ module Feeds
     XML
   end
 
-  def sitemap_url(loc, lastmod = nil)
+  def sitemap_url(loc, lastmod = nil, alternates: [])
     lastmod_tag = lastmod ? "<lastmod>#{lastmod}</lastmod>" : ''
-    "<url><loc>#{loc}</loc>#{lastmod_tag}</url>"
+    # 🪤 Only when there are two or more: a lone <xhtml:link> saying this
+    # page is an alternate of itself is noise a crawler has to read on
+    # every URL of every single-language site the engine has ever built.
+    links = alternates.length < 2 ? '' : alternates.map { |lang, href|
+      %(<xhtml:link rel="alternate" hreflang="#{lang}" href="#{href}"/>)
+    }.join
+    "<url><loc>#{loc}</loc>#{lastmod_tag}#{links}</url>"
   end
 
   # `entries`, not `posts`: the caller hands this posts AND pages, and the name
@@ -95,12 +101,50 @@ module Feeds
   # address belongs on a sitemap, so the combined list is right for the URL
   # list -- but the archive is built from the STREAM alone, so it is given the
   # stream rather than left to guess from a list that is not one.
-  def render_sitemap(entries, tags_map, content_types, stream)
-    urls = [sitemap_url("#{SITE_BASE_URL}/", entries.first && post_time(entries.first).iso8601)]
+  # `languages` is what the site publishes, as [code, root, address, has?]:
+  # the code for hreflang, the root each language is served under ('' for
+  # the site's own), how a post's address reads in it, and whether a given
+  # post has a page there at all. One sitemap covers every language,
+  # because a crawler reads the one robots.txt names and a per-language
+  # copy is a file nothing points at -- which is exactly what blogsh.app
+  # had: 112 addresses at the root, not one of them Czech, and a Czech
+  # sitemap listing mostly English ones that nobody had ever fetched.
+  def render_sitemap(entries, tags_map, content_types, stream, languages: nil)
+    languages ||= [{ 'lang' => nil, 'root' => '', 'address' => ->(e) { post_href(e) },
+                     'has' => ->(_e) { true } }]
+    urls = []
 
-    entries.each do |entry|
-      urls << sitemap_url("#{SITE_BASE_URL}#{post_href(entry)}", post_time(entry).iso8601)
+    languages.each do |language|
+      root = language['root'].to_s
+      urls << sitemap_url("#{SITE_BASE_URL}#{root}/", entries.first && post_time(entries.first).iso8601,
+                          alternates: listing_alternates(languages, '/'))
+
+      entries.each do |entry|
+        next unless language['has'].call(entry)
+
+        here = languages.select { |other| other['has'].call(entry) }
+        alternates = here.map do |other|
+          [other['lang'], "#{SITE_BASE_URL}#{other['root']}#{other['address'].call(entry)}"]
+        end
+        urls << sitemap_url("#{SITE_BASE_URL}#{root}#{language['address'].call(entry)}",
+                            post_time(entry).iso8601, alternates: alternates)
+      end
+
+      urls.concat(sitemap_listings(root, languages, tags_map, content_types, stream))
     end
+
+    wrap_sitemap(urls)
+  end
+
+  # Every listing exists in every language the site publishes: a post with
+  # no words in one is still SHOWN there, so the tag, the type and the
+  # archive it belongs to all have a page of their own in that language.
+  def listing_alternates(languages, path)
+    languages.map { |language| [language['lang'], "#{SITE_BASE_URL}#{language['root']}#{path}"] }
+  end
+
+  def sitemap_listings(root, languages, tags_map, content_types, stream)
+    urls = []
 
     # max_by post_time, not max_by the stored STRING. The comment on the post
     # sort spells out why a lexical compare is wrong here: a post written
@@ -110,7 +154,8 @@ module Feeds
     # could be told a listing was last touched by the wrong post.
     tags_map.each do |slug, data|
       latest = data[:posts].max_by { |p| post_time(p) }
-      urls << sitemap_url("#{SITE_BASE_URL}/tag/#{slug}/", latest && post_time(latest).iso8601)
+      urls << sitemap_url("#{SITE_BASE_URL}#{root}/tag/#{slug}/", latest && post_time(latest).iso8601,
+                          alternates: listing_alternates(languages, "/tag/#{slug}/"))
     end
 
     content_types.each do |type|
@@ -120,7 +165,8 @@ module Feeds
       # given `stream` for exactly this reason, and says so.
       type_posts = stream.select { |entry| dominant_content_type(entry) == type }
       latest = type_posts.max_by { |p| post_time(p) }
-      urls << sitemap_url("#{SITE_BASE_URL}/type/#{type}/", latest && post_time(latest).iso8601)
+      urls << sitemap_url("#{SITE_BASE_URL}#{root}/type/#{type}/", latest && post_time(latest).iso8601,
+                          alternates: listing_alternates(languages, "/type/#{type}/"))
     end
 
     # Every series listing, for the same reason as a tag's: the build writes
@@ -130,13 +176,18 @@ module Feeds
       next unless Slug.pageable?(slug)
 
       latest = in_series.max_by { |p| post_time(p) }
-      urls << sitemap_url("#{SITE_BASE_URL}/series/#{slug}/", latest && post_time(latest).iso8601)
+      urls << sitemap_url("#{SITE_BASE_URL}#{root}/series/#{slug}/", latest && post_time(latest).iso8601,
+                          alternates: listing_alternates(languages, "/series/#{slug}/"))
     end
 
     # The tag index: one entry, and only when there is at least one tag with a
     # page of its own -- a site with no tags builds no index and must not be
     # advertising one.
-    urls << sitemap_url("#{SITE_BASE_URL}/tag/", entries.first && post_time(entries.first).iso8601) if tags_map.any?
+    if tags_map.any?
+      newest = stream.first || tags_map.values.first&.fetch(:posts, [])&.first
+      urls << sitemap_url("#{SITE_BASE_URL}#{root}/tag/", newest && post_time(newest).iso8601,
+                          alternates: listing_alternates(languages, '/tag/'))
+    end
 
     # The archive index and one entry per year that has posts in it, from the
     # stream and only the stream -- the same list the map itself is grouped
@@ -146,16 +197,26 @@ module Feeds
     # years ago. The root was worse -- written unconditionally, while the build
     # skips the whole map when the stream is empty.
     unless stream.empty?
-      urls << sitemap_url("#{SITE_BASE_URL}/archive/", stream.first && post_time(stream.first).iso8601)
+      urls << sitemap_url("#{SITE_BASE_URL}#{root}/archive/", stream.first && post_time(stream.first).iso8601,
+                          alternates: listing_alternates(languages, '/archive/'))
       stream.group_by { |post| post_time(post).year }.each do |year, in_year|
         latest = in_year.max_by { |p| post_time(p) }
-        urls << sitemap_url("#{SITE_BASE_URL}/archive/#{year}/", latest && post_time(latest).iso8601)
+        urls << sitemap_url("#{SITE_BASE_URL}#{root}/archive/#{year}/", latest && post_time(latest).iso8601,
+                            alternates: listing_alternates(languages, "/archive/#{year}/"))
       end
     end
 
+    urls
+  end
+
+  def wrap_sitemap(urls)
+    # The xhtml namespace is declared whether or not anything uses it: a
+    # single-language site emits no <xhtml:link> at all, and one unused
+    # declaration on the root element is cheaper than two shapes of the
+    # same document to keep in step.
     <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
-      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
         #{urls.join("\n  ")}
       </urlset>
     XML

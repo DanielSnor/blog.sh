@@ -147,6 +147,9 @@ root of its own:
 /de/              every listing, tag, series, feed and post that has German words
 /assets/          one copy, shared
 /write/           one writing app, shared
+/robots.txt       one copy -- a crawler reads the origin's root and nothing else
+/sitemap.xml      one copy, naming every language and their alternates
+/stats.json …     the sidebar's data, refreshed by cron at the root
 ```
 
 The root is not `/cs/` on a Czech site, and that is deliberate: every link
