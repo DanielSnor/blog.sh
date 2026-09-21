@@ -69,6 +69,13 @@ module Translations
     # translated page of a link post was the one thing a link post is not:
     # a post with no link. Put back here rather than copied into every
     # translation, so there is one of it and old archives are right too.
+    # What a picture MEASURES is a fact about the file, and the languages
+    # of a post share one media directory. The editors do not measure an
+    # existing file (only one arriving with a post is measured), so a
+    # translated page had no width and height on its pictures and reserved
+    # no space for them -- the same page, jumping as it loads. Filled in
+    # from the post's own words, never overwritten.
+    merged['content'] = measured_like(merged['content'], post['content'])
     card, = LinkCard.split(post['content'])
     if card && LinkCard.split(merged['content']).first.nil?
       merged['content'] = [card] + Array(merged['content'])
@@ -100,6 +107,43 @@ module Translations
   # three separate review passes flagged independently (Daniel, 20. 9.
   # 2026: it counts when it has a body). It stays in the archive and the
   # matrix in `check --languages` shows it as started.
+  # Every media entry of the post's own text, by file name.
+  def measurements(content)
+    Array(content).each_with_object({}) do |block, found|
+      next unless block.is_a?(Hash)
+
+      %w[media poster].each do |key|
+        Array(block[key]).each do |entry|
+          next unless entry.is_a?(Hash) && entry['width'] && entry['height']
+
+          found[entry['url'].to_s] ||= { 'width' => entry['width'], 'height' => entry['height'] }
+        end
+      end
+    end
+  end
+
+  def measured_like(content, original)
+    sizes = measurements(original)
+    return content if sizes.empty?
+
+    Array(content).map do |block|
+      next block unless block.is_a?(Hash)
+
+      copy = block.dup
+      %w[media poster].each do |key|
+        next unless copy[key].is_a?(Array)
+
+        copy[key] = copy[key].map do |entry|
+          known = entry.is_a?(Hash) ? sizes[entry['url'].to_s] : nil
+          next entry unless known && !(entry['width'] && entry['height'])
+
+          known.merge(entry)
+        end
+      end
+      copy
+    end
+  end
+
   def written?(one)
     one.is_a?(Hash) && !Array(one['content']).empty?
   end

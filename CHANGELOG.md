@@ -40,6 +40,7 @@ player fix lives in the rendered page, so it reaches a site on the next full reb
 ### Fixed
 
 - **A picture whose caption was in typographic quotes vanished from the page.** `![alt](01.png „Caption“)` -- what every translator, word processor and phone keyboard writes -- put the quotes and the caption into the FILENAME, so the picture pointed at a file nobody has, the build dropped it without a word and the page went out with a hole in it. Straight and typographic quotes are both read now.
+- **A picture in a translation reserved no space on the page.** What a picture measures is a fact about the file, and the languages of a post share one media directory -- so the size now comes from the post's own text, and the translated page stops jumping as it loads.
 - **`check` did not look at the pictures or the links a translation asks for.** It read only the post's own body, so the second language was the one place a missing file or a renamed slug could rot unseen.
 
 - **Every embedded player drew a black rectangle on a site with a tight referrer policy.** YouTube called it "Error 153".
