@@ -92,6 +92,14 @@ site:
   # with `./blog.sh translate <slug> --lang de`. A site that publishes one
   # language leaves this out and nothing about it changes.
   # locales: [en, de]
+  # Optional, and only for a language the engine has NOT been translated
+  # into: where that branch borrows its interface words from. Without it a
+  # language with no locales/<code>.yml is refused -- inheriting English by
+  # accident is the one outcome worse than being told. The content stays in
+  # the language itself: addresses, <html lang> and what a crawler is told
+  # are untouched, only Read more, the dates and the search box change.
+  # ui_language:
+  #   sk: cs
   # The timezone every timestamp this engine writes is expressed in: publish
   # times, "publish now", the date you type into `schedule`. An IANA zone
   # name (see /usr/share/zoneinfo) -- DST is handled for you.

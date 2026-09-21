@@ -151,7 +151,11 @@ SEARCH_INDEX_RECENT_LIMIT = 500
 # templates/ (it's engine documentation, shipped with the repo), not in
 # drafts/ -- that directory is per-deployment authoring space, ignored by git.
 def cheat_sheet_source
-  localized = File.join(ROOT, 'templates', "markdown-cheat-sheet.#{I18n.lang}.md")
+  # By the language the engine SPEAKS here, not by the one it publishes:
+  # the cheat sheet is the engine's own documentation, so a Slovak branch
+  # borrowing Czech furniture gets the Czech sheet rather than the English
+  # one (lib/i18n.rb, ui_lang).
+  localized = File.join(ROOT, 'templates', "markdown-cheat-sheet.#{I18n.ui_lang}.md")
   return localized if File.exist?(localized)
 
   File.join(ROOT, 'templates', 'markdown-cheat-sheet.en.md')
@@ -323,7 +327,15 @@ SITE_LOCALES = begin
   # with SystemExit, which the rescue there does not catch. So a typo in
   # `site.locales` stopped the build of EVERY language, including the
   # site's own, with a sentence telling the reader to change `site.lang`.
-  missing = all.reject { |code| I18n.locale_file?(code) }
+  # A language the engine has no words for is refused -- unless the site
+  # says where to borrow them from, which is what `site.ui_language` is
+  # for. Publishing Slovak with Czech furniture is a decision somebody can
+  # make; inheriting English by accident is not.
+  borrowed = SiteConfig.get('site', 'ui_language', default: nil)
+  borrowed = {} unless borrowed.is_a?(Hash)
+  missing = all.reject do |code|
+    I18n.locale_file?(code) || I18n.locale_file?(borrowed[code].to_s)
+  end
   abort(I18n.t('build.unknown_locale', langs: missing.join(', '))) unless missing.empty?
   all.freeze
 end

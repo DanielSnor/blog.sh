@@ -31,7 +31,7 @@ nav:
 build:
   unreadable_posts: "❌ V content.nosync/posts/ jsou soubory, které nejdou přečíst — build zastaven:"
   duplicate_address: "❌ Dva posty na jedné adrese v content.nosync/posts/ — build zastaven:"
-  unknown_locale: "❌ V site.locales je jazyk, ke kterému engine nemá soubor s překlady: %{langs} — přidej locales/<kód>.yml, nebo kód z config/site.yml vyndej."
+  unknown_locale: "❌ V site.locales je jazyk, ke kterému engine nemá soubor s překlady: %{langs} — přidej locales/<kód>.yml, vyndej kód z config/site.yml, nebo řekni, odkud vzít slova rozhraní (site.ui_language)."
   # Každý počet má svůj popisek — „postů: 1“, ne „1 postů“ — protože I18n
   # v enginu nezná množná čísla a nikdy je znát nebude. Věta, která musí
   # skloňovat, u nějakého čísla vždycky zaskřípe; popisek s dvojtečkou
@@ -1204,7 +1204,7 @@ check:
   language_address_taken_fix: "Dej jednomu z nich jinou adresu: řádek `slug:` v hlavičce, kterou otevře `./blog.sh translate <slug> --lang %{lang}`."
   language_address_taken: "V jazyce %{lang} chtějí %{slugs} tutéž adresu %{address} — build jednoho vysází a druhého zahodí."
   unknown_locale: "%{langs}: `site.locales` ten jazyk jmenuje, ale engine k němu nemá soubor s překlady — nepostaví se žádný jazyk tohoto webu."
-  unknown_locale_fix: "Přidej pro něj locales/<kód>.yml, nebo kód ze `site.locales` v config/site.yml vyndej."
+  unknown_locale_fix: "Přidej pro něj locales/<kód>.yml, vyndej kód ze `site.locales`, nebo pod `site.ui_language` v config/site.yml řekni, z jakého jazyka vzít slova rozhraní."
   languages_legend: "Fajfka je napsáno, půlkolečko titulek bez textu, tečka znamená, že jazyk nemá nic — druhý jazyk post stejně ukáže a odkáže na tu jednu kopii."
   languages_alone: "check --languages tiskne tabulku, kdežto --json a --repair ne; chtěj je po jednom."
   languages_none: "Tenhle web publikuje jeden jazyk, není co tabelovat. Ostatní vyjmenuj v `site.locales` v config/site.yml."

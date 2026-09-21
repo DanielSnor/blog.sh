@@ -32,7 +32,7 @@ nav:
 build:
   unreadable_posts: "❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:"
   duplicate_address: "❌ Two posts at one address in content.nosync/posts/ -- build stopped:"
-  unknown_locale: "❌ site.locales names a language the engine has no locale file for: %{langs} -- add locales/<code>.yml, or take the code out of config/site.yml."
+  unknown_locale: "❌ site.locales names a language the engine has no locale file for: %{langs} -- add locales/<code>.yml, take the code out of config/site.yml, or say which language its interface words come from (site.ui_language)."
   # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
   # because the engine's I18n has no plural forms and is not getting any.
   # A sentence that has to decline the noun reads wrong in every language
@@ -1235,7 +1235,7 @@ check:
   language_address_taken_fix: "Give one of them another address: the `slug:` line in the header that `./blog.sh translate <slug> --lang %{lang}` opens."
   language_address_taken: "In %{lang}, %{slugs} both ask for %{address} -- the build serves one of them and drops the other."
   unknown_locale: "%{langs}: `site.locales` names it, and the engine has no locale file for it -- no language of this site will build."
-  unknown_locale_fix: "Add locales/<code>.yml for it, or take the code out of `site.locales` in config/site.yml."
+  unknown_locale_fix: "Add locales/<code>.yml for it, take the code out of `site.locales`, or name the language its interface words come from under `site.ui_language` in config/site.yml."
   languages_legend: "A tick is written, a half circle a title with no text yet, a dot where that language has nothing -- the other language still shows the post and links to the one copy of it."
   languages_alone: "check --languages prints a table and --json and --repair do not; ask for them one at a time."
   languages_none: "This site publishes one language, so there is nothing to tabulate. Name the others in `site.locales` in config/site.yml."

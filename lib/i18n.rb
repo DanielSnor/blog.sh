@@ -29,6 +29,29 @@ module I18n
     end
   end
 
+  # Which locale FILE this run reads its own strings from. Normally the
+  # language being rendered -- a German run speaks German -- but a site
+  # may publish a language the engine has never been translated into, and
+  # then it says where to borrow the engine's own words from:
+  #
+  #   site:
+  #     locales: [cs, sk]
+  #     ui_language:
+  #       sk: cs
+  #
+  # The CONTENT stays Slovak: the addresses, <html lang> and what a
+  # crawler is told are all built from `lang` and are untouched by this.
+  # Only the engine's furniture -- Read more, the date, the search box --
+  # comes from somewhere else, because the alternative is refusing to
+  # publish the language at all.
+  def ui_lang
+    @ui_lang ||= begin
+      table = SiteConfig.get('site', 'ui_language', default: nil)
+      named = table.is_a?(Hash) ? table[lang.to_s].to_s.strip : ''
+      named.empty? || !locale_file?(named) ? lang.to_s : named
+    end
+  end
+
   # Picks the language without asking SiteConfig -- for the one caller
   # that cannot afford to: `./blog.sh doctor` runs ON a broken config, and
   # reading site.yml through SiteConfig would abort on the very syntax
@@ -37,6 +60,7 @@ module I18n
   def force_lang(code)
     @lang = File.exist?(File.join(LOCALES_DIR, "#{code}.yml")) ? code : DEFAULT_LANG
     @data = nil
+    @ui_lang = nil
   end
 
   def default_data
@@ -44,7 +68,7 @@ module I18n
   end
 
   def data
-    @data ||= lang == DEFAULT_LANG ? default_data : load_locale(lang)
+    @data ||= ui_lang == DEFAULT_LANG ? default_data : load_locale(ui_lang)
   end
 
   # Whether a code has a locale file at all -- asked before loading one,
@@ -58,7 +82,14 @@ module I18n
   def load_locale(code)
     path = File.join(LOCALES_DIR, "#{code}.yml")
     unless File.exist?(path)
-      abort("❌ Missing locale file #{path} -- add one, or set site.lang: #{DEFAULT_LANG} in config/site.yml")
+      # 🪤 In English and hardcoded, because this is the one failure that
+      # happens BEFORE any locale is loaded -- there are no translated
+      # strings to say it with. All three ways out are named: the engine
+      # has no words for this language, so either give it some, stop
+      # publishing the language, or say which language's words to borrow.
+      abort("❌ Missing locale file #{path} -- add one, take #{code} out of site.locales, " \
+            "or say where its interface words come from (site.ui_language: { #{code}: cs }) " \
+            'in config/site.yml')
     end
 
     SiteConfig.load_yaml(path)

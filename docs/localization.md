@@ -137,6 +137,33 @@ site:
 Both locale files have to exist (`locales/cs.yml`, `locales/de.yml`) --
 that is the first half of this page.
 
+### A language the engine has not been translated into
+
+The engine ships `en`, `cs` and `de`. Naming any other language in
+`site.locales` stops the build and says so: without words of its own that
+branch would quietly inherit English, which is worse than being told.
+
+There are three ways out, and the third one is why this section exists:
+
+```yaml
+site:
+  lang: cs
+  locales: [cs, sk]
+  ui_language:
+    sk: cs
+```
+
+The Slovak branch is then built and is Slovak in every way a reader or a
+crawler can see -- `/sk/` addresses, `<html lang="sk">`, its own
+`hreflang` -- while the engine's own furniture (Read more, the dates, the
+search box) is Czech. Borrowing a near language beats publishing an
+English-speaking Slovak site, and unlike the silent inheritance it is a
+decision somebody made.
+
+The other two ways out are to write `locales/sk.yml` -- the engine takes
+translations, see the top of this page -- or to stop publishing the
+language.
+
 ### What the site looks like
 
 The language in `site.lang` keeps the site root and every other one gets a

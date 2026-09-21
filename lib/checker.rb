@@ -1278,7 +1278,13 @@ module Checker
   # that would not build.
   def check_unknown_locales(root)
     codes = ([site_own_language(root)] + published_languages(root)).reject(&:empty?).uniq
-    missing = codes.reject { |code| I18n.locale_file?(code) }
+    # `site.ui_language` says where a language the engine cannot speak
+    # borrows its furniture from, and a language that borrows is one the
+    # build runs on -- so it is not missing here either.
+    borrowed = config_table(root, 'ui_language')
+    missing = codes.reject do |code|
+      I18n.locale_file?(code) || I18n.locale_file?(borrowed[code].to_s)
+    end
     return [] if missing.empty?
 
     [error(t('unknown_locale', langs: missing.join(', ')), t('unknown_locale_fix'),
@@ -1322,6 +1328,21 @@ module Checker
       nil
     end
     data.is_a?(Hash) ? data.dig('site', 'lang').to_s : ''
+  end
+
+  # A hash under `site:` in the config, or {} when it is absent or is
+  # something else -- read the way everything else here reads the config,
+  # tolerating a file that will not parse.
+  def config_table(root, key)
+    return {} unless root
+
+    data = begin
+      YamlCompat.load_file(File.join(root, 'config', 'site.yml'))
+    rescue StandardError
+      nil
+    end
+    table = data.is_a?(Hash) ? data.dig('site', key) : nil
+    table.is_a?(Hash) ? table : {}
   end
 
   def published_languages(root)
