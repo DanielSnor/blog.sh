@@ -195,6 +195,13 @@ It is shown, not hidden. It stays in the other language's listing, and the
 link on it leads to the address the post actually has -- so the same words
 never stand at two addresses, and nothing needs a `canonical`.
 
+The switcher is a chip in the banner's corner, beside the light/dark
+button: which language you read the site in is a choice about this visit,
+like which mode you read it in, and it belongs where that choice already
+lives rather than in the menu, which it breaks in two. It shows language
+CODES (`CS/DE/EN`) with each language's own name in the title, the way
+the button beside it shows `☀︎/☾︎` and says what it does in a title.
+
 The switcher offers every language the site publishes. A language with
 nothing of the current post in it leads to that language's front page
 rather than to a page that is not there. What the `hreflang` alternates

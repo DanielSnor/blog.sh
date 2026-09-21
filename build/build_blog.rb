@@ -465,23 +465,30 @@ end
 def language_switcher_html(links)
   return '' if links.length < 2
 
+  # The code on the face, the name in the title -- the same division the
+  # button beside it keeps, which shows ☀︎/☾︎ and says "Appearance: follow
+  # system" to a cursor and to a screen reader. A chip in the banner's
+  # corner has room for four codes and not for four names, and a code is
+  # what a reader looking for their own language scans for anyway.
   items = links.map do |link|
+    code = link['lang'].to_s.upcase
     name = LANGUAGE_NAMES[link['lang']]
-    name = link['lang'].to_s.upcase if name.empty?
+    name = code if name.empty?
     current = link['lang'] == SITE_LANG
     classes = ['lang-switch__item']
     classes << 'is-current' if current
     classes << 'is-elsewhere' unless link['has']
     if current
-      %(<span class="#{classes.join(' ')}" aria-current="true">#{h(name)}</span>)
+      %(<span class="#{classes.join(' ')}" aria-current="true" title="#{h(name)}">#{h(code)}</span>)
     else
-      %(<a class="#{classes.join(' ')}" href="#{h(link['href'])}" hreflang="#{h(link['lang'])}">#{h(name)}</a>)
+      %(<a class="#{classes.join(' ')}" href="#{h(link['href'])}" hreflang="#{h(link['lang'])}" ) +
+        %(title="#{h(name)}" aria-label="#{h(name)}">#{h(code)}</a>)
     end
   end
   # The newline belongs to the markup, not to the template: rendered as its
   # own line there, a site with one language got a blank line on every page
   # where the switcher would have been (tests/test_gaps.rb counts those).
-  %(\n    <nav class="lang-switch" aria-label="#{h(t('ui.language'))}">#{items.join}</nav>)
+  %(<nav class="lang-switch" aria-label="#{h(t('ui.language'))}">#{items.join}</nav>)
 end
 
 BANNER = SiteConfig.fetch('banner')

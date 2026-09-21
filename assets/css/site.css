@@ -477,6 +477,83 @@ nav a[aria-current="page"]:hover {
   }
 }
 
+/* The two controls that belong to the reader rather than to the site:
+   which language they read it in, and whether it is light or dark. They
+   sit together in the banner's corner because they are the same kind of
+   thing -- a choice about this visit, not a place to go. The language
+   switcher spent its first days as a band under the menu, which broke the
+   menu in two (Daniel, 21. 9. 2026: it must not be in the menu).
+
+   The row is the positioned thing now; the button keeps its own absolute
+   rule for the sites whose skin moves it, and is static inside here. */
+.banner-tools {
+  position: absolute;
+  z-index: 3;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.banner-tools #theme-toggle {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+/* The same chip as the button beside it: a reader who has understood one
+   of them has understood the other. The codes are what fits a chip that
+   has to hold four of them one day; the name each code stands for is in
+   the title and the label, exactly as the button carries its sentence
+   there rather than on its face. */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  /* 🪤 It IS a <nav>, so the menu's own rules reach it: a 1rem gap that
+     put air around the slash, a 60px floor that made the chip as tall as
+     the menu bar, and a 5px border top and bottom. Every one of them has
+     to be said again here, or the chip inherits the bar it is not. */
+  gap: 0;
+  min-height: 0;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  /* The same line box as the button beside it -- with line-height: 1 the
+     chip came out 25px against its 33px and sat visibly high in the row. */
+  line-height: normal;
+  transition: 0.3s ease-in-out;
+}
+
+.lang-switch__item {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  height: auto;
+  background: none;
+  border: 0;
+  line-height: inherit;
+  font-size: inherit;
+  letter-spacing: normal;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.lang-switch__item.is-current { color: #ffffff; font-weight: 700; }
+a.lang-switch__item:hover { color: #ffffff; text-decoration: underline; }
+a.lang-switch__item:focus-visible { outline-color: #ffffff; outline-offset: 2px; }
+
+/* No spaces around it: the button next door reads ☀︎/☾︎, and this is the
+   same word in the same voice. */
+.lang-switch__item + .lang-switch__item::before {
+  content: "/";
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
 #theme-toggle {
   position: absolute;
   z-index: 3;

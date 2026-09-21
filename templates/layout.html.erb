@@ -59,13 +59,14 @@
         <% if BANNER_SHOW_TITLE %><p class="banner-title"><%= h(SITE_SHORT_NAME) %></p><% end %>
         <% if BANNER_SHOW_CLAIM %><p class="banner-claim"><%= banner_claim_html %></p><% end %>
       </div><% end %>
+      <div class="banner-tools"><%# The reader's own two choices, side by side in the corner: which language, and light or dark. The language switcher used to be a band under the menu, which broke the menu in two. %><%= lang_switcher %>
       <button id="theme-toggle" type="button" title="<%= h(t('ui.theme_auto')) %>" aria-label="<%= h(t('ui.theme_auto')) %>">☀︎/☾︎</button><%# Both the symbol and the label are what "follow the system" looks like --
       the page is built once and served to everyone, so the server can't know
       which of the three states a given reader is in. theme-toggle.js corrects
       both on load. Without the label a screen reader announces the raw sun and
-      moon glyphs. %>
+      moon glyphs. %></div>
     </div>
-    <%= partial('nav', search: true, active: nav_active) %><%= lang_switcher %>
+    <%= partial('nav', search: true, active: nav_active) %>
 
     <div class="layout<%= SIDEBAR_SHOWN ? '' : ' layout--no-aside' %>">
       <main>
