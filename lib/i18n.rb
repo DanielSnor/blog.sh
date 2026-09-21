@@ -44,9 +44,21 @@ module I18n
   # Only the engine's furniture -- Read more, the date, the search box --
   # comes from somewhere else, because the alternative is refusing to
   # publish the language at all.
+  # 🪤 Read WITHOUT SiteConfig, tolerating every way the file can fail.
+  # SiteConfig aborts on a config that is missing, unreadable or not valid
+  # YAML -- correct for a build, fatal here: this is reached from `t()`,
+  # which is how `doctor` and `check --json` say what is wrong with that
+  # very file. Going through SiteConfig turned their answer into the abort
+  # they exist to explain, which is the trap force_lang below was written
+  # for and which this walked straight into.
   def ui_lang
     @ui_lang ||= begin
-      table = SiteConfig.get('site', 'ui_language', default: nil)
+      table = begin
+        data = YAML.load_file(SiteConfig::PATH)
+        data.is_a?(Hash) ? data.dig('site', 'ui_language') : nil
+      rescue StandardError, Psych::SyntaxError
+        nil
+      end
       named = table.is_a?(Hash) ? table[lang.to_s].to_s.strip : ''
       named.empty? || !locale_file?(named) ? lang.to_s : named
     end
