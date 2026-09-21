@@ -488,9 +488,14 @@ nav a[aria-current="page"]:hover {
    rule for the sites whose skin moves it, and is static inside here. */
 .banner-tools {
   position: absolute;
-  z-index: 3;
   top: 0.75rem;
   right: 0.75rem;
+  /* 🪤 No z-index here on purpose. With one, this box becomes a stacking
+     context and the layer its children ask for stops meaning anything
+     outside it -- which would quietly break the advice docs/skinning.md
+     gives every skin that unsticks the bar: `#theme-toggle { z-index: 6 }`.
+     The children carry their own layer instead, in the context the banner
+     is already in. */
   display: flex;
   /* stretch, NOT center: the two chips carry different glyphs -- Latin
      letters against ☀︎ and ☾︎, which fall back to a symbol font with taller
@@ -501,18 +506,14 @@ nav a[aria-current="page"]:hover {
   gap: 0.5rem;
 }
 
-.banner-tools #theme-toggle {
-  position: static;
-  top: auto;
-  right: auto;
-}
-
 /* The same chip as the button beside it: a reader who has understood one
    of them has understood the other. The codes are what fits a chip that
    has to hold four of them one day; the name each code stands for is in
    the title and the label, exactly as the button carries its sentence
    there rather than on its face. */
 .lang-switch {
+  position: relative;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -522,8 +523,13 @@ nav a[aria-current="page"]:hover {
      to be said again here, or the chip inherits the bar it is not. */
   gap: 0;
   min-height: 0;
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  /* The button beside it is accent with white on top, and so is this --
+     but a skin that wants another pairing should not have to restate the
+     selectors. Each colour is read from a name of its own, falling back
+     to what the button uses, so `--lang-switch-bg` and its two companions
+     are all a skin has to set (docs/skinning.md lists them). */
+  background: var(--lang-switch-bg, var(--accent));
+  border: 1px solid var(--lang-switch-bg, var(--accent));
   border-radius: 3px;
   padding: 0.3rem 0.6rem;
   font-size: 0.85rem;
@@ -544,26 +550,29 @@ nav a[aria-current="page"]:hover {
   font-size: inherit;
   letter-spacing: normal;
   text-decoration: none;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--lang-switch-dim, rgba(255, 255, 255, 0.65));
 }
 
-.lang-switch__item.is-current { color: #ffffff; font-weight: 700; }
-a.lang-switch__item:hover { color: #ffffff; text-decoration: underline; }
-a.lang-switch__item:focus-visible { outline-color: #ffffff; outline-offset: 2px; }
+.lang-switch__item.is-current { color: var(--lang-switch-text, #ffffff); font-weight: 700; }
+a.lang-switch__item:hover { color: var(--lang-switch-text, #ffffff); text-decoration: underline; }
+a.lang-switch__item:focus-visible { outline-color: var(--lang-switch-text, #ffffff); outline-offset: 2px; }
 
 /* No spaces around it: the button next door reads ☀︎/☾︎, and this is the
    same word in the same voice. */
 .lang-switch__item + .lang-switch__item::before {
   content: "/";
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--lang-switch-dim, rgba(255, 255, 255, 0.5));
   font-weight: 400;
 }
 
 #theme-toggle {
-  position: absolute;
+  /* In the corner row with the language switcher since 1.9, so the corner
+     is the ROW's to place; relative rather than static so a skin that
+     lifts it above an unstuck bar (`#theme-toggle { z-index: 6 }`, which
+     docs/skinning.md tells it to do) still has an element a layer can
+     apply to. */
+  position: relative;
   z-index: 3;
-  top: 0.75rem;
-  right: 0.75rem;
   background: var(--accent);
   border: 1px solid var(--accent);
   color: #ffffff;

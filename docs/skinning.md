@@ -145,6 +145,43 @@ This exact bug shipped, and it was reported by somebody else. It survived
 because the switch had been exercised by setting the theme directly rather
 than by clicking it -- see *Checking a skin* below.
 
+### The corner of the banner holds two controls, not one
+
+Since 1.9 the banner's top right corner is a row, `.banner-tools`, holding
+the language switcher and the appearance button side by side. They are the
+same kind of thing -- a choice about this visit rather than a place to go --
+so they are styled as one pair: two chips of the same height, the row
+stretching the shorter one so no number has to be kept in step.
+
+```
+.banner-tools          the row (absolute, top/right)
+  nav.lang-switch      the chip -- only on a site with site.locales
+    .lang-switch__item   a language; .is-current is the one being read
+  #theme-toggle        the appearance button
+```
+
+The row deliberately has **no `z-index`**: with one it would become a
+stacking context, and `#theme-toggle { z-index: 6 }` -- which the section
+above tells you to write when your skin unsticks the bar -- would stop
+lifting the button above it. Both children carry `z-index: 3` themselves
+instead. If your skin gives the row a layer, give the children one too.
+
+Recolour the switcher with three custom properties rather than by
+restating the selectors; each falls back to what the button beside it
+uses, so setting none of them keeps the pair in step:
+
+```css
+:root {
+  --lang-switch-bg: var(--accent);            /* the chip */
+  --lang-switch-text: #ffffff;                /* the language being read */
+  --lang-switch-dim: rgba(255, 255, 255, .65); /* the others, and the / */
+}
+```
+
+The chip is a `<nav>`, so the menu's own rules reach it -- gap, minimum
+height, borders. Its rule says all of them again; if you restyle it from
+scratch, say them again too, or it will quietly grow into a menu bar.
+
 ### The excerpt is a positioning context
 
 `.content.excerpt` is `max-height: 500px; overflow: hidden; position:
