@@ -492,7 +492,12 @@ nav a[aria-current="page"]:hover {
   top: 0.75rem;
   right: 0.75rem;
   display: flex;
-  align-items: center;
+  /* stretch, NOT center: the two chips carry different glyphs -- Latin
+     letters against ☀︎ and ☾︎, which fall back to a symbol font with taller
+     metrics -- so equal padding gave a 31px chip beside a 33px button and
+     the pair sat visibly uneven. Stretching makes the shorter one take the
+     row's height, with no number to keep in step. */
+  align-items: stretch;
   gap: 0.5rem;
 }
 
