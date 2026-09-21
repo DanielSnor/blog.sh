@@ -22,6 +22,7 @@ require_relative '../lib/bluesky_poster'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
+require_relative '../lib/link_card'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/heic_converter'
 require_relative '../lib/video_probe'
@@ -927,11 +928,7 @@ end
 # has no place in the header; it stays in the body, where the save's
 # content-loss guard still asks before markdown drops it.
 def split_link_card(content)
-  blocks = Array(content)
-  first = blocks.first
-  return [nil, blocks] unless first.is_a?(Hash) && first['type'] == 'link'
-
-  [first, blocks.drop(1)]
+  LinkCard.split(content)
 end
 
 # A value on its way into the line-based front matter, made safe to put
@@ -4785,7 +4782,10 @@ end
 # rides along in the same shape, because the title is the first thing
 # anybody translates and the one the address is made of.
 def original_as_notes(post, media_dir)
-  body = MarkdownWriter.blocks_to_markdown(Array(post['content']), media_dir)
+  # Without the card: the writer drops it anyway (lib/link_card.rb), and
+  # the link is not something a translation is asked to write -- it is put
+  # back in every language on its own.
+  body = MarkdownWriter.blocks_to_markdown(LinkCard.split(post['content']).last, media_dir)
   lines = ["// #{post['title']}", '//'] + body.split("\n", -1).map { |line| line.empty? ? '//' : "// #{line}" }
   "#{lines.join("\n").rstrip}\n"
 end

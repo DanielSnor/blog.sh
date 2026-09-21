@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'link_card'
+
 # lib/translations.rb -- which text of a post this run is rendering.
 #
 # A post keeps ONE set of metadata and as many texts as it has languages.
@@ -60,6 +62,17 @@ module Translations
     return post if text.empty?
 
     merged = post.merge(text)
+    # The link of a link post belongs to the POST, like its date and its
+    # tags: the page it points at is the same page in every language. It
+    # lives in the first content block rather than in a field, though, so
+    # a translation -- which replaces the content -- dropped it, and the
+    # translated page of a link post was the one thing a link post is not:
+    # a post with no link. Put back here rather than copied into every
+    # translation, so there is one of it and old archives are right too.
+    card, = LinkCard.split(post['content'])
+    if card && LinkCard.split(merged['content']).first.nil?
+      merged['content'] = [card] + Array(merged['content'])
+    end
     # A translation with words and no title of its own is an UNTITLED post
     # in that language, not a post wearing the other language's headline:
     # the engine names an untitled post from its own first sentence, and

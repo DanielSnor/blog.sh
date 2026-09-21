@@ -317,6 +317,13 @@ The one to watch is the fourth row: `url: /o-mne/` is not turned into
 `/de/o-mne/`, because the German page is at `/de/ueber-mich/`. The item
 follows the piece rather than the spelling.
 
+### A link post
+
+The link a link post is about belongs to the post, not to a language: it
+is the same page whatever language you read the write-up in. So it is not
+in the translation editor, and every language's page carries it. Write
+the words under it and nothing else.
+
 ### What is not there yet
 
 - **Pictures in a translation.** Media belong to the post and its
