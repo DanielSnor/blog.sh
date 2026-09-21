@@ -926,8 +926,12 @@ module Import
     # who cannot see it. Every part is CGI-escaped, so a colon inside
     # any of them arrives as %3A and the split stays unambiguous.
     def images_to_sentinels(body)
+      # By NAME: IMAGE_RE carries the title in one of three alternatives
+      # (straight quotes and the two typographic pairs), so its groups are
+      # not countable any more.
       body = body.gsub(MarkdownParser::IMAGE_RE) do
-        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
+        m = Regexp.last_match
+        image_sentinel(m[:target], m[:alt], m[:title])
       end
       # Line-anchored form ([ \t], NOT \s -- \s eats the newlines and
       # with them the paragraph break after the image).
