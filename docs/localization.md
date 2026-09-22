@@ -146,11 +146,15 @@ branch would quietly inherit English, which is worse than being told.
 There are three ways out, and the third one is why this section exists:
 
 ```yaml
+# config/site.yml -- the site, and one sentence about its languages
 site:
   lang: cs
   locales: [cs, sk]
-  ui_language:
-    sk: cs
+```
+
+```yaml
+# config/site.sk.yml -- what "this site in Slovak" means
+ui_language: cs
 ```
 
 The Slovak branch is then built and is Slovak in every way a reader or a
@@ -182,6 +186,24 @@ root of its own:
 The root is not `/cs/` on a Czech site, and that is deliberate: every link
 anyone has ever made to the site goes on working the day a second language
 is added.
+
+### What a language says about itself
+
+Everything that is true of ONE language lives in a file of its own,
+`config/site.<lang>.yml`, beside the config:
+
+```
+config/site.yml        the site, and the one line that names its languages
+config/site.de.yml     what "this site in German" means
+config/site.sk.yml     ...and in Slovak
+```
+
+Today those files hold two keys -- `fallback` and `ui_language`, both
+below -- and they will hold the site's own chrome per language when that
+arrives. Three rules keep them honest, and the build and `check` both
+enforce them: the site's own language has no file (site.yml is it), a
+file for a language `site.locales` does not name is refused rather than
+ignored, and so is a key the engine does not read.
 
 ### What a post carries
 
@@ -285,17 +307,25 @@ It is shown anyway, in the nearest language that does have it, and the
 link on it goes to that copy. Which language is nearest is yours to say:
 
 ```yaml
+# config/site.yml
 site:
   lang: en
   locales: [en, cs, de]
-  fallback:
-    de: [cs]
+```
+
+```yaml
+# config/site.de.yml -- what German does when it has nothing
+fallback: [cs]
 ```
 
 A German page with no German words then carries the Czech ones and links
 to the Czech page, rather than the English ones the site would otherwise
 fall back to. Say nothing and the site's own language stands in, which is
 what every site does today.
+
+The site's own language has no file of its own -- `config/site.yml` is
+its file -- and that is also why it cannot be given a chain: it is where
+every chain ends.
 
 The words and the address come from the same answer, always: Czech words
 under a link to the English page would be worse than either on its own.

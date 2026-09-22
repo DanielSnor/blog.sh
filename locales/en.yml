@@ -33,6 +33,9 @@ build:
   unreadable_posts: "❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:"
   duplicate_address: "❌ Two posts at one address in content.nosync/posts/ -- build stopped:"
   unknown_locale: "❌ site.locales names a language the engine has no locale file for: %{langs} -- add locales/<code>.yml, take the code out of config/site.yml, or say which language its interface words come from (site.ui_language)."
+  language_key_moved: "❌ site.%{key} is a table keyed by language, which is the shape this had before 1.9. Each language says it in its own file now: %{file} and its kin, one key per file, no language names inside."
+  language_file_stray: "❌ %{files}: a file for a language this site does not publish. Name the language in site.locales, or delete the file -- nothing reads it as it stands."
+  language_key_unknown: "❌ %{file} says %{keys}, which the engine does not read. It knows: %{known}."
   # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
   # because the engine's I18n has no plural forms and is not getting any.
   # A sentence that has to decline the noun reads wrong in every language
@@ -1236,6 +1239,10 @@ check:
   language_address_taken: "In %{lang}, %{slugs} both ask for %{address} -- the build serves one of them and drops the other."
   unknown_locale: "%{langs}: `site.locales` names it, and the engine has no locale file for it -- no language of this site will build."
   unknown_locale_fix: "Add locales/<code>.yml for it, take the code out of `site.locales`, or name the language its interface words come from under `site.ui_language` in config/site.yml."
+  language_file_stray: "%{file} is a file for a language this site does not publish -- nothing reads it."
+  language_file_stray_fix: "Name the language in `site.locales`, or delete the file. The site's own language has no file of its own: config/site.yml is it."
+  language_key_unknown: "%{file} says %{keys}, which the engine does not read."
+  language_key_unknown_fix: "It knows: %{known}. A key it does not know does nothing at all, which is why it is said here."
   languages_legend: "A tick is written, a half circle a title with no text yet, a dot where that language has nothing -- the other language still shows the post and links to the one copy of it."
   languages_alone: "check --languages prints a table and --json and --repair do not; ask for them one at a time."
   languages_none: "This site publishes one language, so there is nothing to tabulate. Name the others in `site.locales` in config/site.yml."

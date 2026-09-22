@@ -227,6 +227,7 @@ module Checker
     findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
     findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
     findings.concat(guard(:unknown_locales) { check_unknown_locales(root) })
+    findings.concat(guard(:language_files) { check_language_files(root) })
     findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
@@ -1281,9 +1282,8 @@ module Checker
     # `site.ui_language` says where a language the engine cannot speak
     # borrows its furniture from, and a language that borrows is one the
     # build runs on -- so it is not missing here either.
-    borrowed = config_table(root, 'ui_language')
     missing = codes.reject do |code|
-      I18n.locale_file?(code) || I18n.locale_file?(borrowed[code].to_s)
+      I18n.locale_file?(code) || I18n.locale_file?(language_file(root, code)['ui_language'].to_s)
     end
     return [] if missing.empty?
 
@@ -1330,19 +1330,53 @@ module Checker
     data.is_a?(Hash) ? data.dig('site', 'lang').to_s : ''
   end
 
-  # A hash under `site:` in the config, or {} when it is absent or is
-  # something else -- read the way everything else here reads the config,
-  # tolerating a file that will not parse.
-  def config_table(root, key)
+  # What a language says about itself: config/site.<lang>.yml beside the
+  # config. {} when there is none, which is the ordinary case, or when the
+  # file will not parse -- `check` reports on an archive, and a config that
+  # cannot be read is reported by the check that exists for that.
+  def language_file(root, lang)
     return {} unless root
 
+    path = File.join(root, 'config', "site.#{lang}.yml")
+    return {} unless File.exist?(path)
+
     data = begin
-      YamlCompat.load_file(File.join(root, 'config', 'site.yml'))
+      YamlCompat.load_file(path)
     rescue StandardError
       nil
     end
-    table = data.is_a?(Hash) ? data.dig('site', key) : nil
-    table.is_a?(Hash) ? table : {}
+    data.is_a?(Hash) ? data : {}
+  end
+
+  # Both things about those files that the build refuses to run on: one
+  # written for a language nothing publishes, and a key inside one that
+  # the engine does not read. Reported here as well, because an archive
+  # whose build cannot start is exactly what `check` exists to say out
+  # loud -- and both are silent otherwise: a file nobody reads looks like
+  # work that is done.
+  LANGUAGE_FILE_KEYS = %w[fallback ui_language].freeze
+
+  def check_language_files(root)
+    return [] unless root
+
+    published = ([site_own_language(root)] + published_languages(root)).reject(&:empty?)
+    findings = []
+    Dir.glob(File.join(root, 'config', 'site.*.yml')).sort.each do |path|
+      code = File.basename(path).sub(/\Asite\./, '').sub(/\.yml\z/, '')
+      name = File.basename(path)
+      unless published.include?(code) && code != site_own_language(root)
+        findings << error(t('language_file_stray', file: name), t('language_file_stray_fix'),
+                          kind: :language_file_stray, data: { 'file' => name, 'lang' => code })
+        next
+      end
+      unknown = language_file(root, code).keys - LANGUAGE_FILE_KEYS
+      next if unknown.empty?
+
+      findings << error(t('language_key_unknown', file: name, keys: unknown.join(', ')),
+                        t('language_key_unknown_fix', known: LANGUAGE_FILE_KEYS.join(', ')),
+                        kind: :language_key_unknown, data: { 'file' => name, 'keys' => unknown })
+    end
+    findings
   end
 
   def published_languages(root)

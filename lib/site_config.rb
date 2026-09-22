@@ -33,6 +33,39 @@ module SiteConfig
 
   module_function
 
+  # What a language of this site says about itself, in a file of its own:
+  # config/site.cs.yml beside config/site.yml.
+  #
+  # The site's own language has no such file -- site.yml IS its file -- and
+  # everything that used to be a table keyed by language inside site.yml
+  # (which language stands in for this one, which language's interface it
+  # borrows) is written here instead, where that language is described.
+  # A site that publishes one language never has one of these.
+  def language_path(lang)
+    File.join(File.dirname(PATH), "site.#{lang}.yml")
+  end
+
+  # Empty when there is no such file, which is the ordinary case. A file
+  # that exists and will not parse stops the build the way site.yml does:
+  # it was written to be read.
+  def language_data(lang)
+    path = language_path(lang)
+    return {} unless File.exist?(path)
+
+    loaded = load_yaml(path)
+    loaded.is_a?(Hash) ? loaded : {}
+  end
+
+  # Every language file lying in config/, by the language each one names.
+  # Read by the build and by `check` to refuse one that nothing publishes:
+  # a file nobody reads is worse than a missing one, because it looks like
+  # the work is done.
+  def language_files
+    Dir.glob(File.join(File.dirname(PATH), 'site.*.yml')).to_h do |path|
+      [File.basename(path).sub(/\Asite\./, '').sub(/\.yml\z/, ''), path]
+    end
+  end
+
   def data
     @data ||= begin
       unless File.exist?(PATH)

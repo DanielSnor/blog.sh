@@ -32,6 +32,9 @@ build:
   unreadable_posts: "❌ V content.nosync/posts/ jsou soubory, které nejdou přečíst — build zastaven:"
   duplicate_address: "❌ Dva posty na jedné adrese v content.nosync/posts/ — build zastaven:"
   unknown_locale: "❌ V site.locales je jazyk, ke kterému engine nemá soubor s překlady: %{langs} — přidej locales/<kód>.yml, vyndej kód z config/site.yml, nebo řekni, odkud vzít slova rozhraní (site.ui_language)."
+  language_key_moved: "❌ site.%{key} je tabulka klíčovaná jazykem, což je tvar, který to mělo před 1.9. Každý jazyk si to teď říká ve vlastním souboru: %{file} a spol., jeden klíč na soubor, bez jmen jazyků uvnitř."
+  language_file_stray: "❌ %{files}: soubor pro jazyk, který tenhle web nepublikuje. Buď jazyk uveď v site.locales, nebo soubor smaž — takhle ho nikdo nečte."
+  language_key_unknown: "❌ %{file} říká %{keys}, což engine nečte. Zná: %{known}."
   # Každý počet má svůj popisek — „postů: 1“, ne „1 postů“ — protože I18n
   # v enginu nezná množná čísla a nikdy je znát nebude. Věta, která musí
   # skloňovat, u nějakého čísla vždycky zaskřípe; popisek s dvojtečkou
@@ -1205,6 +1208,10 @@ check:
   language_address_taken: "V jazyce %{lang} chtějí %{slugs} tutéž adresu %{address} — build jednoho vysází a druhého zahodí."
   unknown_locale: "%{langs}: `site.locales` ten jazyk jmenuje, ale engine k němu nemá soubor s překlady — nepostaví se žádný jazyk tohoto webu."
   unknown_locale_fix: "Přidej pro něj locales/<kód>.yml, vyndej kód ze `site.locales`, nebo pod `site.ui_language` v config/site.yml řekni, z jakého jazyka vzít slova rozhraní."
+  language_file_stray: "%{file} je soubor pro jazyk, který tenhle web nepublikuje — nikdo ho nečte."
+  language_file_stray_fix: "Buď jazyk uveď v `site.locales`, nebo soubor smaž. Vlastní jazyk webu svůj soubor nemá: je jím config/site.yml."
+  language_key_unknown: "%{file} říká %{keys}, což engine nečte."
+  language_key_unknown_fix: "Zná: %{known}. Klíč, který nezná, nedělá vůbec nic — proto se to říká nahlas."
   languages_legend: "Fajfka je napsáno, půlkolečko titulek bez textu, tečka znamená, že jazyk nemá nic — druhý jazyk post stejně ukáže a odkáže na tu jednu kopii."
   languages_alone: "check --languages tiskne tabulku, kdežto --json a --repair ne; chtěj je po jednom."
   languages_none: "Tenhle web publikuje jeden jazyk, není co tabelovat. Ostatní vyjmenuj v `site.locales` v config/site.yml."

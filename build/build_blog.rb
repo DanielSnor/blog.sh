@@ -319,6 +319,11 @@ end
 # it is absent on every site today -- means one, and then nothing below
 # renders at all: no switcher and no alternates, because there is nothing
 # to offer and nothing to compare.
+# Everything config/site.<lang>.yml may say today. It grows as the chrome
+# a site writes about itself learns to speak more than one language; until
+# then anything else in there is a typo, and is named as one.
+LANGUAGE_FILE_KEYS = %w[fallback ui_language].freeze
+
 SITE_LOCALES = begin
   named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
   all = ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq
@@ -331,12 +336,39 @@ SITE_LOCALES = begin
   # says where to borrow them from, which is what `site.ui_language` is
   # for. Publishing Slovak with Czech furniture is a decision somebody can
   # make; inheriting English by accident is not.
-  borrowed = SiteConfig.get('site', 'ui_language', default: nil)
-  borrowed = {} unless borrowed.is_a?(Hash)
   missing = all.reject do |code|
-    I18n.locale_file?(code) || I18n.locale_file?(borrowed[code].to_s)
+    I18n.locale_file?(code) || I18n.locale_file?(SiteConfig.language_data(code)['ui_language'].to_s)
   end
   abort(I18n.t('build.unknown_locale', langs: missing.join(', '))) unless missing.empty?
+
+  # What a language says about itself lives in config/site.<lang>.yml, and
+  # three things about that are worth stopping for rather than ignoring.
+  #
+  # A table keyed by language inside site.yml is the shape these keys had
+  # before 1.9 shipped: two places to say one thing is how a site ends up
+  # with two answers, so the old one is refused by name rather than read.
+  %w[fallback ui_language].each do |key|
+    next unless SiteConfig.key?('site', key)
+
+    abort(I18n.t('build.language_key_moved', key: key, file: File.basename(SiteConfig.language_path('cs'))))
+  end
+  # A file for a language nothing publishes -- a typo in the name, or a
+  # language taken out of site.locales and its file left behind. Nothing
+  # would ever read it, and a file that does nothing looks like work done.
+  stray = SiteConfig.language_files.keys - (all - [SITE_OWN_LANG])
+  unless stray.empty?
+    abort(I18n.t('build.language_file_stray', files: stray.map { |code| "site.#{code}.yml" }.join(', ')))
+  end
+  # ...and a key inside one that the engine does not read. The file is new
+  # and will grow; a misspelt key that silently does nothing is the thing
+  # to prevent while it is small.
+  all.each do |code|
+    unknown = SiteConfig.language_data(code).keys - LANGUAGE_FILE_KEYS
+    next if unknown.empty?
+
+    abort(I18n.t('build.language_key_unknown', file: "site.#{code}.yml", keys: unknown.join(', '),
+                                               known: LANGUAGE_FILE_KEYS.join(', ')))
+  end
   all.freeze
 end
 
@@ -373,8 +405,7 @@ end
 # the other language's address -- and the permalink every link in the world
 # points at was gone.
 FALLBACK_CHAIN = begin
-  table = SiteConfig.get('site', 'fallback', default: nil)
-  named = table.is_a?(Hash) && !LANG_ROOT.empty? ? Array(table[SITE_LANG]) : []
+  named = LANG_ROOT.empty? ? [] : Array(SiteConfig.language_data(SITE_LANG)['fallback'])
   (named.map { |code| code.to_s.strip } & SITE_LOCALES) - [SITE_LANG]
 end.freeze
 

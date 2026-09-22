@@ -53,13 +53,13 @@ module I18n
   # for and which this walked straight into.
   def ui_lang
     @ui_lang ||= begin
-      table = begin
-        data = YAML.load_file(SiteConfig::PATH)
-        data.is_a?(Hash) ? data.dig('site', 'ui_language') : nil
+      named = begin
+        path = SiteConfig.language_path(lang)
+        data = File.exist?(path) ? YAML.load_file(path) : nil
+        data.is_a?(Hash) ? data['ui_language'].to_s.strip : ''
       rescue StandardError, Psych::SyntaxError
-        nil
+        ''
       end
-      named = table.is_a?(Hash) ? table[lang.to_s].to_s.strip : ''
       named.empty? || !locale_file?(named) ? lang.to_s : named
     end
   end

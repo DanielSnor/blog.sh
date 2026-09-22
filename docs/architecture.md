@@ -358,7 +358,7 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Eighteen questions, in one pass: a `config/site.yml` that is missing, empty,
+Nineteen questions, in one pass: a `config/site.yml` that is missing, empty,
 unparseable or unopenable -- the one question about something outside the
 archive, asked because this is what people run before a build and the build
 refuses all four; files the checker cannot read at all, posts
@@ -402,7 +402,10 @@ characters themselves belong; and, on a site that publishes more than one
 language, two posts asking for one address inside one of them -- which the
 build resolves by serving one of the pair and dropping the other, and a
 language `site.locales` names that the engine has no locale file for, which
-stops the build of every language of the site, its own included.
+stops the build of every language of the site, its own included; and a
+`config/site.<lang>.yml` that nothing reads -- written for a language the
+site does not publish, or carrying a key the engine does not know -- both
+of which look exactly like work that is done.
 
 The addresses a site answers at are worked out per language on the same
 terms the build uses: every listing exists in every language `site.locales`

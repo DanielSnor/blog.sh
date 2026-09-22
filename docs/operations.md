@@ -1400,6 +1400,10 @@ What it looks for, each with a line saying what to do about it:
   and another post that both claim `/de/…`, which the build would resolve
   by serving one of them and dropping the other.
 
+- **A `config/site.<lang>.yml` that nothing reads** -- written for a
+  language the site does not publish, or carrying a key the engine does
+  not know. Both do nothing at all, and both look like the work is done.
+
 - **A language named in `site.locales` that the engine has no locale file
   for.** A typo there is not a typo in one language: the build stops on it
   in EVERY language of the site, its own included, because the menu that

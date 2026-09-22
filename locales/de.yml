@@ -33,6 +33,9 @@ build:
   unreadable_posts: "❌ Nicht lesbare Beitragsdateien in content.nosync/posts/ -- Build angehalten:"
   duplicate_address: "❌ Zwei Beiträge unter einer Adresse in content.nosync/posts/ -- Build angehalten:"
   unknown_locale: "❌ site.locales nennt eine Sprache, für die die Engine keine Sprachdatei hat: %{langs} -- lege locales/<Code>.yml an, nimm den Code aus config/site.yml heraus, oder sage, woher ihre Oberflächenwörter kommen (site.ui_language)."
+  language_key_moved: "❌ site.%{key} ist eine nach Sprache geschlüsselte Tabelle -- die Form von vor 1.9. Jede Sprache sagt es jetzt in ihrer eigenen Datei: %{file} und Geschwister, ein Schlüssel pro Datei, ohne Sprachnamen darin."
+  language_file_stray: "❌ %{files}: eine Datei für eine Sprache, die diese Website nicht veröffentlicht. Nenne die Sprache in site.locales oder lösche die Datei -- so liest sie niemand."
+  language_key_unknown: "❌ %{file} nennt %{keys}, was die Engine nicht liest. Sie kennt: %{known}."
   # Jede Zahl bekommt ihre eigene Beschriftung -- „Beiträge: 1“ statt
   # „1 Beiträge“ --, denn das I18n der Engine kennt keine Pluralformen und
   # bekommt auch keine. Ein Satz, der das Wort beugen muss, liest sich bei
@@ -1219,6 +1222,10 @@ check:
   language_address_taken: "In %{lang} wollen %{slugs} beide %{address} -- der Build liefert einen davon aus und lässt den anderen fallen."
   unknown_locale: "%{langs}: `site.locales` nennt die Sprache, und die Engine hat keine Sprachdatei dafür -- keine Sprache dieser Website wird gebaut."
   unknown_locale_fix: "Lege locales/<Code>.yml dafür an, nimm den Code aus `site.locales` heraus, oder nenne unter `site.ui_language` in config/site.yml die Sprache, aus der die Oberflächenwörter kommen."
+  language_file_stray: "%{file} ist eine Datei für eine Sprache, die diese Website nicht veröffentlicht -- niemand liest sie."
+  language_file_stray_fix: "Nenne die Sprache in `site.locales` oder lösche die Datei. Die eigene Sprache der Website hat keine eigene Datei: config/site.yml ist sie."
+  language_key_unknown: "%{file} nennt %{keys}, was die Engine nicht liest."
+  language_key_unknown_fix: "Sie kennt: %{known}. Ein Schlüssel, den sie nicht kennt, tut gar nichts -- darum steht es hier."
   languages_legend: "Ein Haken heißt geschrieben, ein Halbkreis ein Titel ohne Text, ein Punkt, dass diese Sprache nichts hat -- die andere Sprache zeigt den Beitrag und verlinkt die eine Fassung."
   languages_alone: "check --languages druckt eine Tabelle, --json und --repair tun das nicht; verlange sie einzeln."
   languages_none: "Diese Website veröffentlicht eine Sprache, es gibt nichts zu tabellieren. Nenne die anderen in `site.locales` in config/site.yml."
