@@ -508,6 +508,31 @@ cli:
 
   no_changes: "No changes, nothing to save."
   content_loss_warning: "Careful, saving this would lose: %{summary}."
+  content_loss_item: "%{count}× %{kind}"
+  # What the guard above names, as an author knows it. A type missing here
+  # is named by its schema word rather than refused.
+  content_kind:
+    block:
+      text: "text block"
+      list: "list"
+      table: "table"
+      code: "code block"
+      chat: "chat transcript"
+      hr: "divider"
+      image: "picture"
+      file: "attachment"
+      video: "video"
+      audio: "audio"
+      link: "link card"
+    span:
+      bold: "bold"
+      italic: "italics"
+      strikethrough: "strikethrough"
+      code: "inline code"
+      link: "link"
+      small: "small print"
+      mention: "mention"
+      color: "text colour"
   confirm_continue_yes: "Really continue? Type \"%{word}\": "
 
   edited_label: "Edited: %{path}"

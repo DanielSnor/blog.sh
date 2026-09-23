@@ -499,6 +499,31 @@ cli:
 
   no_changes: "Keine Änderungen, nichts zu speichern."
   content_loss_warning: "Vorsicht, beim Speichern ginge verloren: %{summary}."
+  content_loss_item: "%{count}× %{kind}"
+  # What the guard above names, as an author knows it. A type missing here
+  # is named by its schema word rather than refused.
+  content_kind:
+    block:
+      text: "Textblock"
+      list: "Liste"
+      table: "Tabelle"
+      code: "Codeblock"
+      chat: "Chatverlauf"
+      hr: "Trennlinie"
+      image: "Bild"
+      file: "Anhang"
+      video: "Video"
+      audio: "Audio"
+      link: "Linkkarte"
+    span:
+      bold: "Fettdruck"
+      italic: "Kursivschrift"
+      strikethrough: "Durchstreichung"
+      code: "Code im Text"
+      link: "Link"
+      small: "Kleingedrucktes"
+      mention: "Erwähnung"
+      color: "Textfarbe"
   confirm_continue_yes: "Wirklich fortfahren? Tipp \"%{word}\": "
 
   edited_label: "Bearbeitet: %{path}"

@@ -5098,9 +5098,9 @@ def edit_post(slug, path: nil)
   # happened and no confirmation was asked for.
   counts = lambda do |list|
     list.each_with_object(Hash.new(0)) do |b, h|
-      h[b['type']] += 1
+      h[['block', b['type']]] += 1
       spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| Array(i['formatting']) }
-      spans.each { |f| h["#{f['type']} span"] += 1 }
+      spans.each { |f| h[['span', f['type']]] += 1 }
     end
   end
   # ⚠️ The card the header just created does not stand in for one the body
@@ -5115,7 +5115,15 @@ def edit_post(slug, path: nil)
   lost = before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
   if lost.any?
     puts
-    puts t('cli.content_loss_warning', summary: lost.map { |type, n| "#{n}x #{type}" }.join(', '))
+    # Named as the author knows them, in the site's language: the summary
+    # used to be built here as "1x small span", the schema's words, on a
+    # Czech screen. A type the locale has no name for -- something a future
+    # import brings -- is still named, by its schema word.
+    summary = lost.map do |(kind, type), n|
+      t('cli.content_loss_item', count: n,
+                                kind: I18n.lookup("cli.content_kind.#{kind}.#{type}") || type.to_s)
+    end
+    puts t('cli.content_loss_warning', summary: summary.join(', '))
     # The word is compared against the locale's own confirm_word -- the
     # Czech prompt says to type "ano", so comparing against a hardcoded
     # 'yes' aborted exactly the users who followed the instruction.

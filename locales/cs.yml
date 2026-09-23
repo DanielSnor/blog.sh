@@ -487,6 +487,31 @@ cli:
 
   no_changes: "Žádné změny, nic se neukládá."
   content_loss_warning: "Pozor, tímhle uložením by se ztratilo: %{summary}."
+  content_loss_item: "%{count}× %{kind}"
+  # What the guard above names, as an author knows it. A type missing here
+  # is named by its schema word rather than refused.
+  content_kind:
+    block:
+      text: "blok textu"
+      list: "seznam"
+      table: "tabulka"
+      code: "blok kódu"
+      chat: "přepis chatu"
+      hr: "oddělovač"
+      image: "obrázek"
+      file: "příloha"
+      video: "video"
+      audio: "zvuk"
+      link: "karta odkazu"
+    span:
+      bold: "tučné písmo"
+      italic: "kurzíva"
+      strikethrough: "přeškrtnutí"
+      code: "kód v textu"
+      link: "odkaz"
+      small: "malé písmo"
+      mention: "zmínka"
+      color: "barva písma"
   confirm_continue_yes: "Opravdu pokračovat? Napiš \"%{word}\": "
 
   edited_label: "Upraveno: %{path}"
