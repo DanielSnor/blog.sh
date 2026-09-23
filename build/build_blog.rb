@@ -3418,7 +3418,14 @@ end
 # it was typed before, instead of growing a second spelling. Generated
 # here rather than kept in write/, because all of it is this site's, and
 # the page itself is the same file on every site.
-if SiteConfig.get('write', default: false)
+#
+# 🪤 Only in the run of the site's own language. /write/ is one shared copy
+# at the root, and every language run used to write this file into it --
+# so the last run won: blogsh.app, an English site, served its writing app
+# in Czech and marked the previews lang="cs". The author writes in the
+# site's own language, and that run always goes first, so the others have
+# nothing to add.
+if SiteConfig.get('write', default: false) && SITE_LANG == SITE_OWN_LANG
   # Each tag with two counts: all time, and the last twelve months. The
   # page ranks an empty field by the second -- what the blog is tagging
   # NOW -- because all time is led by where an archive came from
