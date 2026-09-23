@@ -484,8 +484,9 @@ nav a[aria-current="page"]:hover {
    switcher spent its first days as a band under the menu, which broke the
    menu in two (Daniel, 21. 9. 2026: it must not be in the menu).
 
-   The row is the positioned thing now; the button keeps its own absolute
-   rule for the sites whose skin moves it, and is static inside here. */
+   The row exists only on a site with more than one language -- with one
+   there is nothing to stand beside, and the button keeps the corner to
+   itself as it always has (see #theme-toggle below). */
 .banner-tools {
   position: absolute;
   top: 0.75rem;
@@ -587,13 +588,10 @@ a.lang-switch:focus-visible {
 }
 
 #theme-toggle {
-  /* In the corner row with the language switcher since 1.9, so the corner
-     is the ROW's to place; relative rather than static so a skin that
-     lifts it above an unstuck bar (`#theme-toggle { z-index: 6 }`, which
-     docs/skinning.md tells it to do) still has an element a layer can
-     apply to. */
-  position: relative;
+  position: absolute;
   z-index: 3;
+  top: 0.75rem;
+  right: 0.75rem;
   background: var(--accent);
   border: 1px solid var(--accent);
   color: #ffffff;
@@ -610,6 +608,25 @@ a.lang-switch:focus-visible {
   min-width: 3.6em;
   text-align: center;
 }
+/* In the corner row beside the language switcher the ROW places it, so
+   it gives up its own place there: relative rather than static, so a skin
+   that lifts it above an unstuck bar (`#theme-toggle { z-index: 6 }`, which
+   docs/skinning.md tells it to do) still has an element a layer applies
+   to. The offsets are reset here, at a weight a skin's bare
+   `#theme-toggle { top: 32px }` cannot outrank -- written for the corner,
+   those numbers would otherwise shift the button off its place in the row
+   -- and the translateY(-50%) that centres it on a bar pulled it half its
+   height out of the row, off the top of the page (arch-linux.cz's skin on
+   a two-language build). A skin moves the row instead, `.banner-tools`. */
+.banner-tools #theme-toggle {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  transform: none;
+}
+
 #theme-toggle:hover { background: var(--hover-invert); border-color: var(--hover-invert); color: var(--badge-hover-text); }
 
 /* The button is 32px tall and a finger wants 44. Growing it would be the
