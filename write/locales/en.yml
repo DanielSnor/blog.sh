@@ -51,6 +51,7 @@ app:
   add_image: "Add a picture or video"
   alt_hint: "What is in the picture. Someone using a screen reader has only this."
   alt_missing: "No description yet"
+  alt_missing_send: "No description yet: {names}. It is for readers who cannot see the picture or the video. Add one, or tap again to send without it."
   used_in_text: "Used in the text"
   unused_image: "Not mentioned in the text -- it will be uploaded but nothing will show it."
   send: "Send to blog"

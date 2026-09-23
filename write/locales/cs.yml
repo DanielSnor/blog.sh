@@ -45,6 +45,7 @@ app:
   add_image: "Přidat obrázek nebo video"
   alt_hint: "Co je na obrázku. Kdo čte přes odečítač, má jenom tohle."
   alt_missing: "Zatím bez popisu"
+  alt_missing_send: "Zatím bez popisu: {names}. Popis je pro čtenáře, kteří obrázek nebo video nevidí. Doplň ho, nebo klepni znovu a pošli to i bez něj."
   used_in_text: "V textu použit"
   unused_image: "V textu se na něj neodkazuješ — nahraje se, ale nikde se neukáže."
   send: "Odeslat na blog"

@@ -45,6 +45,7 @@ app:
   add_image: "Bild oder Video hinzufügen"
   alt_hint: "Was auf dem Bild zu sehen ist. Wer einen Screenreader nutzt, hat nur das."
   alt_missing: "Noch ohne Beschreibung"
+  alt_missing_send: "Noch ohne Beschreibung: {names}. Sie ist für alle, die das Bild oder Video nicht sehen. Ergänzen, oder noch einmal tippen und ohne sie senden."
   used_in_text: "Im Text verwendet"
   unused_image: "Im Text nicht erwähnt — es wird hochgeladen, aber nirgends gezeigt."
   send: "Ans Blog senden"

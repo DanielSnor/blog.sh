@@ -151,8 +151,11 @@ textarea{resize:vertical;line-height:1.6}
 button.btn.small{font-size:.85rem;padding:.5rem .8rem;flex:0 0 auto}
 /* A destructive control looks inactive until it is armed: no border, muted
    text, pushed to the far right so a thumb heading for Insert does not
-   pass over it. Armed, it becomes a warning-coloured button. */
-.remove,button.btn.ghost[data-arm=""],button.btn.ghost:not([data-arm]){
+   pass over it. Armed, it becomes a warning-coloured button. Only a control
+   that CAN be armed -- one carrying data-arm from the start. This used to
+   reach every ghost button without the attribute, and "add a picture or
+   video" is one: the page's way to attach anything looked like a label. */
+.remove,button.btn.ghost[data-arm=""]{
   margin-left:auto;background:none;border:1px solid transparent;color:var(--meta);
   font:inherit;font-size:.85rem;padding:.5rem .8rem;border-radius:8px;cursor:pointer}
 .remove[data-arm="yes"],button.btn.ghost[data-arm="yes"]{
@@ -281,7 +284,7 @@ details.server .field{margin:.8rem 0 .2rem}
   </div>
   <div class="inner">
     <button type="button" class="btn" id="send" data-t="app.send"></button>
-    <button type="button" class="btn ghost" id="discard" data-t="app.discard"></button>
+    <button type="button" class="btn ghost" id="discard" data-arm="" data-t="app.discard"></button>
   </div>
   <p class="say" id="say"></p>
 </div>

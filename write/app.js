@@ -885,7 +885,7 @@
     });
     if (mute.length && this.dataset.anyway !== "alt") {
       this.dataset.anyway = "alt";
-      say(t("app.alt_missing") + ": " + mute.map(function (s) { return s.name; }).join(", "), "bad");
+      say(t("app.alt_missing_send").replace("{names}", mute.map(function (s) { return s.name; }).join(", ")), "bad");
       return;
     }
     // Over the server's ceiling as this page knows it. A second tap
