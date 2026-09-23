@@ -37,34 +37,36 @@ YouTube, Vimeo, Spotify, all of them -- drew a black rectangle on a host that se
 who was embedding it; and `check` called a link to the writing app dead on exactly the sites where
 that address answers.
 
-Nothing to configure and nothing to migrate: a site that names no `site.locales` publishes one
-language and is the site it was, down to the markup. Two things reach an existing site only on the
-next full rebuild and deploy, because they live in the rendered page: the player fix, and the
-language switcher's move out of the menu into the banner's corner.
+Nothing to configure and nothing to migrate. A site that names no `site.locales` publishes one
+language and looks exactly as it did: no switcher, no alternates, the banner and the menu as 1.8 wrote
+them, so a skin keeps working untouched. Its pages do change underneath, on the next rebuild: a post's
+structured data names its language, an embedded player carries its referrer policy, and the small
+script every page carries gained an entry -- which changes that page's content-security hash. So the
+first deploy after the upgrade sends nearly the whole site once: on an archive of 6,600 posts, 10,176
+of its 13,490 files. Past that, the two builds differ only in the stylesheet, one script and the
+sitemap's opening tag, and report the same warnings.
 
 ### Added
 
-- **A site can be published in more than one language.** `site.locales` names them; each post keeps one set of metadata and a text per language, written with `./blog.sh translate <slug> --lang de`, under an address of its own in that language; a language counts once it has a body. The site's own language keeps the site root and every other one gets a root of its own, sharing one copy of the assets and the writing app, and `./blog.sh rebuild` produces all of them in one go. A post nobody has translated is shown in the other language with its link going to the one address it has, so the same words never stand at two addresses. A site that names no locales is unchanged -- no switcher, no alternates, nothing in the markup.
+- **A site can be published in more than one language.** `site.locales` names them; each post keeps one set of metadata and a text per language, written with `./blog.sh translate <slug> --lang de`, under an address of its own in that language; a language counts once it has a body. The site's own language keeps the site root and every other one gets a root of its own, sharing one copy of the assets and the writing app, and `./blog.sh rebuild` produces all of them in one go. A post nobody has translated is shown in the other language with its link going to the one address it has, so the same words never stand at two addresses. One sitemap at the site root names every language and says which addresses are the same page in another.
 - **Translations are written from the wizard, not only from the command line.** The crossroads that offers a post's text and its properties offers its languages too, and the properties screen says which languages the post is readable in. Publishing a post that has no words in a language the site publishes asks there, the way the command line refuses there.
-- **The language switcher is a chip in the banner's corner, beside the light/dark button.** Which language you read the site in is a choice about this visit, like which mode you read it in -- it belongs where that choice already lives, not in a band under the menu. It behaves like that button too: a click anywhere on it moves to the next language and wraps around at the end, so there is nothing to aim at. The corner becomes a row only on a site that publishes more than one language; with one, the button stands exactly where it stood in 1.8, so a skin that places it keeps working.
+- **The language switcher is a chip in the banner's corner, beside the light/dark button.** Which language you read the site in is a choice about this visit, like which mode you read it in, so it sits where that choice already lives. It behaves like that button too: a click anywhere on it moves to the next language and wraps around at the end, so there is nothing to aim at. A skin moves the pair as one, `.banner-tools`; `docs/skinning.md` has the three colours it can set.
 - **A language with nothing for a post falls back to the nearest one you name.** `fallback:` in that language's own file decides which, and the words and the link come from the same answer.
-- **The link of a link post holds in every language.** It belongs to the post like its date does, so the translated page carries it without being asked to write it.
-- **A language the engine has not been translated into can borrow another's interface.** `ui_language: cs` in `config/site.sk.yml` builds a Slovak branch -- Slovak addresses, `<html lang="sk">`, its own `hreflang` -- with the engine's own words in Czech. Without it such a language is still refused, because inheriting English by accident is worse than being told.
-- **What a language says about itself lives in a file of its own.** `config/site.de.yml` beside `config/site.yml`, holding `fallback` and `ui_language` -- so `site.yml` names the languages in one line and nothing inside it is a table keyed by language. A file for a language the site does not publish, or a key the engine does not read, is refused rather than quietly doing nothing.
+- **What a translation shares with the original, it keeps.** The link of a link post, and the size of every picture -- so a translated page does not jump as it loads.
+- **A language the engine has not been translated into can borrow another's interface.** `ui_language: cs` in `config/site.sk.yml` builds a Slovak branch -- Slovak addresses, `<html lang="sk">`, its own `hreflang` -- with the engine's own words in Czech. Without it such a language is refused, because inheriting English by accident is worse than being told.
+- **What a language says about itself lives in a file of its own.** `config/site.de.yml` beside `config/site.yml`, holding `fallback` and `ui_language`. A file for a language the site does not publish, or a key the engine does not read, is refused rather than quietly doing nothing.
 - **Pages are translated like posts**, under a root of their own in that language (`/de/ueber-mich/`).
-- **`check --languages` prints what is written in which language**, a row per post; and an ordinary `check` reports two posts asking for one address in one language.
+- **`check` reads every language a post is written in.** `check --languages` prints what is written where, a row per post; an ordinary `check` looks for the pictures and links of every translation, and reports two posts asking for one address in one language.
 - **`publish` and `schedule` refuse a post the site cannot show in every language it publishes.** The languages are named and `--allow-partial` is offered in the same sentence.
 - **Setup says what went into a prompt that shows nothing.** The length of the secret and its last two characters -- enough to tell an access token from the client key beside it, too little to give either away.
 
+### Changed
+
+- **Structured data says which language the page is in.** Every post's JSON-LD carries `inLanguage`; everything else on the page -- `<html lang>`, `og:locale`, the feed -- already said so.
+
 ### Fixed
 
-- **A picture whose caption was in typographic quotes vanished from the page.** `![alt](01.png „Caption“)` -- what every translator, word processor and phone keyboard writes -- put the quotes and the caption into the FILENAME, so the picture pointed at a file nobody has, the build dropped it without a word and the page went out with a hole in it. Straight and typographic quotes are both read now.
-- **The sitemap knew nothing about the other languages.** The one robots.txt names listed only the site's own language, while each language wrote a copy nothing ever fetched -- on a two-language site the second one was undiscoverable. There is one sitemap now, at the site root, naming every language and saying which addresses are the same page in another.
-- **robots.txt, the sitemap and the sidebar's data were written into every language root.** Nothing read those copies -- the page fetches them by absolute address and a crawler reads the robots.txt at the origin root -- and nothing refreshed them either, so `/cs/stats.json` stayed as the build left it. They are written once, at the site root.
-- **Structured data did not say which language the page is in.** Everything else on it did -- `<html lang>`, `og:locale`, the feed, the alternates -- and the JSON-LD left a machine to guess.
-- **A picture in a translation reserved no space on the page.** What a picture measures is a fact about the file, and the languages of a post share one media directory -- so the size now comes from the post's own text, and the translated page stops jumping as it loads.
-- **`check` did not look at the pictures or the links a translation asks for.** It read only the post's own body, so the second language was the one place a missing file or a renamed slug could rot unseen.
-
+- **A picture whose caption was in typographic quotes vanished from the page.** `![alt](01.png „Caption“)` -- what every word processor and phone keyboard writes -- put the quotes and the caption into the FILENAME, so the picture pointed at a file nobody has and the page went out with a hole in it. Straight and typographic quotes are both read now.
 - **Every embedded player drew a black rectangle on a site with a tight referrer policy.** YouTube called it "Error 153".
 - **`check` called a link to `/write/` dead on the sites that publish the app.** And `doctor`'s menu question with it.
 - **The import menu did not say WordPress takes a file.** Its entry now says so, as the prompt after it always did.
