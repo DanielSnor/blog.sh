@@ -36,6 +36,8 @@ build:
   language_key_moved: "❌ site.%{key} is a table keyed by language, which is the shape this had before 1.9. Each language says it in its own file now: %{file} and its kin, one key per file, no language names inside."
   language_file_stray: "❌ %{files}: a file for a language this site does not publish. Name the language in site.locales, or delete the file -- nothing reads it as it stands."
   language_key_unknown: "❌ %{file} says %{keys}, which the engine does not read. It knows: %{known}."
+  language_key_orphan: "❌ %{file} translates %{keys}, which config/site.yml does not have -- there is nothing for it to replace. Set it up in site.yml first, or take it out of %{file}."
+  language_list_mismatch: "❌ %{file}: %{key} has to go to the same places as in config/site.yml, in the same order -- only the words change. %{detail}"
   # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
   # because the engine's I18n has no plural forms and is not getting any.
   # A sentence that has to decline the noun reads wrong in every language
@@ -1268,6 +1270,10 @@ check:
   language_file_stray_fix: "Name the language in `site.locales`, or delete the file. The site's own language has no file of its own: config/site.yml is it."
   language_key_unknown: "%{file} says %{keys}, which the engine does not read."
   language_key_unknown_fix: "It knows: %{known}. A key it does not know does nothing at all, which is why it is said here."
+  language_key_orphan: "%{file} translates %{keys}, which config/site.yml does not have."
+  language_key_orphan_fix: "There is nothing for it to replace. Set it up in site.yml first, or take it out of the file -- as it stands it does nothing."
+  language_list_mismatch: "%{file}: %{key} goes to other places than in config/site.yml. %{detail}"
+  language_list_mismatch_fix: "A translated menu or footer names the same places in the same order; only the words change. The build refuses the file until they match."
   languages_legend: "A tick is written, a half circle a title with no text yet, a dot where that language has nothing -- the other language still shows the post and links to the one copy of it."
   languages_alone: "check --languages prints a table and --json and --repair do not; ask for them one at a time."
   languages_none: "This site publishes one language, so there is nothing to tabulate. Name the others in `site.locales` in config/site.yml."
@@ -1789,3 +1795,10 @@ share:
   linkedin: "Share on LinkedIn"
   threads: "Share on Threads"
   x: "Share on X"
+
+# What config/site.<lang>.yml got wrong about a list with places in it
+# (lib/language_file.rb). Shared by the build and check.
+language_file:
+  list_count: "config/site.yml has %{mine} item(s), %{file} has %{theirs}."
+  list_item: "Item %{n}: config/site.yml goes to %{mine}, %{file} to %{theirs}."
+  list_shape: "In %{file} it is not a list."

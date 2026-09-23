@@ -35,6 +35,8 @@ build:
   language_key_moved: "❌ site.%{key} je tabulka klíčovaná jazykem, což je tvar, který to mělo před 1.9. Každý jazyk si to teď říká ve vlastním souboru: %{file} a spol., jeden klíč na soubor, bez jmen jazyků uvnitř."
   language_file_stray: "❌ %{files}: soubor pro jazyk, který tenhle web nepublikuje. Buď jazyk uveď v site.locales, nebo soubor smaž — takhle ho nikdo nečte."
   language_key_unknown: "❌ %{file} říká %{keys}, což engine nečte. Zná: %{known}."
+  language_key_orphan: "❌ %{file} překládá %{keys}, ale config/site.yml nic takového nemá — není co nahradit. Nejdřív to nastav v site.yml, nebo to z %{file} vyndej."
+  language_list_mismatch: "❌ %{file}: %{key} musí vést na stejná místa ve stejném pořadí jako v config/site.yml — mění se jen slova. %{detail}"
   # Každý počet má svůj popisek — „postů: 1“, ne „1 postů“ — protože I18n
   # v enginu nezná množná čísla a nikdy je znát nebude. Věta, která musí
   # skloňovat, u nějakého čísla vždycky zaskřípe; popisek s dvojtečkou
@@ -1237,6 +1239,10 @@ check:
   language_file_stray_fix: "Buď jazyk uveď v `site.locales`, nebo soubor smaž. Vlastní jazyk webu svůj soubor nemá: je jím config/site.yml."
   language_key_unknown: "%{file} říká %{keys}, což engine nečte."
   language_key_unknown_fix: "Zná: %{known}. Klíč, který nezná, nedělá vůbec nic — proto se to říká nahlas."
+  language_key_orphan: "%{file} překládá %{keys}, ale config/site.yml nic takového nemá."
+  language_key_orphan_fix: "Není co nahradit. Nejdřív to nastav v site.yml, nebo to ze souboru vyndej — takhle to nedělá nic."
+  language_list_mismatch: "%{file}: %{key} vede jinam než v config/site.yml. %{detail}"
+  language_list_mismatch_fix: "Přeložené menu nebo patička jmenuje stejná místa ve stejném pořadí; mění se jen slova. Dokud se neshodují, build soubor odmítá."
   languages_legend: "Fajfka je napsáno, půlkolečko titulek bez textu, tečka znamená, že jazyk nemá nic — druhý jazyk příspěvek stejně ukáže a odkáže na tu jednu kopii."
   languages_alone: "check --languages tiskne tabulku, kdežto --json a --repair ne; chtěj je po jednom."
   languages_none: "Tenhle web publikuje jeden jazyk, není co tabelovat. Ostatní vyjmenuj v `site.locales` v config/site.yml."
@@ -1758,3 +1764,10 @@ share:
   linkedin: "Sdílet na LinkedInu"
   threads: "Sdílet na Threads"
   x: "Sdílet na X"
+
+# Co config/site.<lang>.yml pokazil na seznamu s místy (lib/language_file.rb).
+# Sdílí je build i check.
+language_file:
+  list_count: "config/site.yml má položek: %{mine}, %{file}: %{theirs}."
+  list_item: "Položka %{n}: v config/site.yml vede na %{mine}, v %{file} na %{theirs}."
+  list_shape: "V %{file} to není seznam."

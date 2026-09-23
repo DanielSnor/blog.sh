@@ -36,6 +36,8 @@ build:
   language_key_moved: "❌ site.%{key} ist eine nach Sprache geschlüsselte Tabelle -- die Form von vor 1.9. Jede Sprache sagt es jetzt in ihrer eigenen Datei: %{file} und Geschwister, ein Schlüssel pro Datei, ohne Sprachnamen darin."
   language_file_stray: "❌ %{files}: eine Datei für eine Sprache, die diese Website nicht veröffentlicht. Nenne die Sprache in site.locales oder lösche die Datei -- so liest sie niemand."
   language_key_unknown: "❌ %{file} nennt %{keys}, was die Engine nicht liest. Sie kennt: %{known}."
+  language_key_orphan: "❌ %{file} übersetzt %{keys}, das es in config/site.yml nicht gibt -- es gibt nichts zu ersetzen. Richte es zuerst in site.yml ein oder nimm es aus %{file} heraus."
+  language_list_mismatch: "❌ %{file}: %{key} muss auf dieselben Ziele in derselben Reihenfolge führen wie in config/site.yml -- nur die Worte ändern sich. %{detail}"
   # Jede Zahl bekommt ihre eigene Beschriftung -- „Beiträge: 1“ statt
   # „1 Beiträge“ --, denn das I18n der Engine kennt keine Pluralformen und
   # bekommt auch keine. Ein Satz, der das Wort beugen muss, liest sich bei
@@ -1251,6 +1253,10 @@ check:
   language_file_stray_fix: "Nenne die Sprache in `site.locales` oder lösche die Datei. Die eigene Sprache der Website hat keine eigene Datei: config/site.yml ist sie."
   language_key_unknown: "%{file} nennt %{keys}, was die Engine nicht liest."
   language_key_unknown_fix: "Sie kennt: %{known}. Ein Schlüssel, den sie nicht kennt, tut gar nichts -- darum steht es hier."
+  language_key_orphan: "%{file} übersetzt %{keys}, das es in config/site.yml nicht gibt."
+  language_key_orphan_fix: "Es gibt nichts zu ersetzen. Richte es zuerst in site.yml ein oder nimm es aus der Datei -- so bewirkt es nichts."
+  language_list_mismatch: "%{file}: %{key} führt woandershin als in config/site.yml. %{detail}"
+  language_list_mismatch_fix: "Ein übersetztes Menü oder eine übersetzte Fußzeile nennt dieselben Ziele in derselben Reihenfolge; nur die Worte ändern sich. Bis sie übereinstimmen, verweigert der Build die Datei."
   languages_legend: "Ein Haken heißt geschrieben, ein Halbkreis ein Titel ohne Text, ein Punkt, dass diese Sprache nichts hat -- die andere Sprache zeigt den Beitrag und verlinkt die eine Fassung."
   languages_alone: "check --languages druckt eine Tabelle, --json und --repair tun das nicht; verlange sie einzeln."
   languages_none: "Diese Website veröffentlicht eine Sprache, es gibt nichts zu tabellieren. Nenne die anderen in `site.locales` in config/site.yml."
@@ -1772,3 +1778,10 @@ share:
   linkedin: "Auf LinkedIn teilen"
   threads: "Auf Threads teilen"
   x: "Auf X teilen"
+
+# Was config/site.<lang>.yml an einer Liste mit Zielen falsch hat
+# (lib/language_file.rb). Build und check teilen sie.
+language_file:
+  list_count: "config/site.yml hat Einträge: %{mine}, %{file}: %{theirs}."
+  list_item: "Eintrag %{n}: in config/site.yml führt er zu %{mine}, in %{file} zu %{theirs}."
+  list_shape: "In %{file} ist es keine Liste."

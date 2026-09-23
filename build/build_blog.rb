@@ -60,6 +60,12 @@ require_relative '../lib/series'
 # update. It is simply what this script owes the files it renders.
 
 SiteConfig.use_site_timezone!
+# What the site says about itself -- title, description, banner words,
+# about, footer, menu, widget headings -- in the language this run is
+# building, from config/site.<lang>.yml. Before anything below reads a
+# single one of those keys; the site's own language is left as it is. Only
+# the build does this (see SiteConfig.localize!).
+SiteConfig.localize!(I18n.lang)
 
 ROOT = File.expand_path('..', __dir__)
 # .nosync: on a Mac, both directories are just a local development copy
@@ -319,11 +325,6 @@ end
 # it is absent on every site today -- means one, and then nothing below
 # renders at all: no switcher and no alternates, because there is nothing
 # to offer and nothing to compare.
-# Everything config/site.<lang>.yml may say today. It grows as the chrome
-# a site writes about itself learns to speak more than one language; until
-# then anything else in there is a typo, and is named as one.
-LANGUAGE_FILE_KEYS = %w[fallback ui_language].freeze
-
 SITE_LOCALES = begin
   named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
   all = ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq
@@ -359,16 +360,34 @@ SITE_LOCALES = begin
   unless stray.empty?
     abort(I18n.t('build.language_file_stray', files: stray.map { |code| "site.#{code}.yml" }.join(', ')))
   end
-  # ...and a key inside one that the engine does not read. The file is new
-  # and will grow; a misspelt key that silently does nothing is the thing
-  # to prevent while it is small.
-  all.each do |code|
-    unknown = SiteConfig.language_data(code).keys - LANGUAGE_FILE_KEYS
-    next if unknown.empty?
-
-    abort(I18n.t('build.language_key_unknown', file: "site.#{code}.yml", keys: unknown.join(', '),
-                                               known: LANGUAGE_FILE_KEYS.join(', ')))
+  # ...and what is wrong inside one (lib/language_file.rb): a key the
+  # engine does not read, a translation of something site.yml does not
+  # have, and a menu or footer list that goes to other places than the
+  # site's own. Each of them silently does nothing, or does something the
+  # site never said -- so every language is asked, not only this run's.
+  #
+  # Read against the file as WRITTEN: by now this run's own config has the
+  # chrome of its language laid over it, and comparing a Czech menu with
+  # itself would find nothing.
+  own_config = SiteConfig.load_yaml(SiteConfig::PATH)
+  sentences = (all - [SITE_OWN_LANG]).flat_map do |code|
+    file = "site.#{code}.yml"
+    LanguageFile.problems(own_config, SiteConfig.language_data(code)).group_by(&:first).flat_map do |kind, found|
+      case kind
+      when :unknown
+        [I18n.t('build.language_key_unknown', file: file, keys: found.map { |f| f[1] }.join(', '),
+                                              known: LanguageFile.known.join(', '))]
+      when :orphan
+        [I18n.t('build.language_key_orphan', file: file, keys: found.map { |f| f[1] }.join(', '))]
+      else
+        found.map do |_, key, detail|
+          I18n.t('build.language_list_mismatch', file: file, key: key,
+                                                 detail: LanguageFile.describe(detail, file) { |k, **v| I18n.t(k, **v) })
+        end
+      end
+    end
   end
+  abort(sentences.join("\n")) unless sentences.empty?
   all.freeze
 end
 

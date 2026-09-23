@@ -404,8 +404,10 @@ build resolves by serving one of the pair and dropping the other, and a
 language `site.locales` names that the engine has no locale file for, which
 stops the build of every language of the site, its own included; and a
 `config/site.<lang>.yml` that nothing reads -- written for a language the
-site does not publish, or carrying a key the engine does not know -- both
-of which look exactly like work that is done.
+site does not publish, carrying a key the engine does not know, or
+translating something site.yml does not have -- all of which look exactly
+like work that is done; and one whose menu or footer links go to other
+places than site.yml's (`lib/language_file.rb`, which the build asks too).
 
 The addresses a site answers at are worked out per language on the same
 terms the build uses: every listing exists in every language `site.locales`

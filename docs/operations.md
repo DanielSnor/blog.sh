@@ -1401,8 +1401,11 @@ What it looks for, each with a line saying what to do about it:
   by serving one of them and dropping the other.
 
 - **A `config/site.<lang>.yml` that nothing reads** -- written for a
-  language the site does not publish, or carrying a key the engine does
-  not know. Both do nothing at all, and both look like the work is done.
+  language the site does not publish, carrying a key the engine does not
+  know, or translating something site.yml does not have. All of them do
+  nothing at all, and all of them look like the work is done. And one
+  whose menu or footer links go to other places than site.yml's: a
+  translation changes the words, not where they lead.
 
 - **A language named in `site.locales` that the engine has no locale file
   for.** A typo there is not a typo in one language: the build stops on it

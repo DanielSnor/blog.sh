@@ -22,6 +22,9 @@ env.sh
 .last-edit.meta
 .stats_full_refresh_at
 config/site.yml
+# ...and each language's file beside it (config/site.de.yml) -- the site's
+# own words, like site.yml. site.lang.yml.example is the engine's.
+config/site.*.yml
 incoming/
 trash/
 drafts/

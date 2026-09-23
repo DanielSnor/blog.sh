@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'yaml'
+require_relative 'language_file'
 
 # Every entry point requires this file, so the two process-wide
 # prerequisites live here, next to the timezone handling below.
@@ -54,6 +55,23 @@ module SiteConfig
 
     loaded = load_yaml(path)
     loaded.is_a?(Hash) ? loaded : {}
+  end
+
+  # The chrome of one language laid over site.yml, for the rest of this
+  # process: the title, the description, the banner's words, the about
+  # text, the footer, the menu and the widget headings that
+  # config/site.<lang>.yml translates (lib/language_file.rb says which).
+  #
+  # 🪤 The BUILD calls this, and nothing else may. Every other program that
+  # reads the config -- setup, style, the wizards -- also WRITES it back,
+  # and a Czech title read here would be written into site.yml as the
+  # site's own. The site's own language has no file, so its run is left as
+  # it is.
+  def localize!(lang)
+    lang = lang.to_s.strip
+    return if lang.empty? || lang == get('site', 'lang', default: 'en').to_s
+
+    @data = LanguageFile.localize(data, language_data(lang))
   end
 
   # Every language file lying in config/, by the language each one names.

@@ -1,0 +1,114 @@
+# One language of the site, described in a file of its own -- the example
+# every config/site.<lang>.yml starts from. Only a site that publishes more
+# than one language needs one, and only for the languages that are NOT
+# its own: site.yml is the file of the site's own language.
+#
+# Copy this file to config/site.<lang>.yml -- config/site.de.yml for
+# German, the name it is written for below -- and name the language in
+# config/site.yml:
+#
+#   site:
+#     lang: en
+#     locales: [en, de]
+#
+# After every edit, rebuild: ./blog.sh rebuild builds every language the
+# site publishes and deploys them together. docs/localization.md has the
+# whole story.
+#
+# HOW TO READ THE '#' LINES -- the same as in site.yml.example:
+#
+#   # like this sentence      documentation. Prose, never a setting.
+#   # nav:                    a SETTING that is switched off. Drop the
+#   #   - { label: ... }      '# ' from every line of the block to use it.
+#   # --- end of nav ---      where a switched-off block ends.
+#
+# Two kinds of thing go here. What the language DOES -- `fallback` and
+# `ui_language` -- and what the site SAYS about itself in this language:
+# the same keys site.yml has for its words, only in other words. Whatever
+# this file leaves out stands as site.yml has it, so a key can be
+# translated one at a time.
+#
+# The keys it takes, and nothing else:
+#
+#   fallback, ui_language
+#   site        title, short_name, description
+#   banner      claim, alt
+#   about       heading, html
+#   footer      links_heading, links, note_heading, note_html, copyright,
+#               social_heading
+#   nav
+#   widgets     <name>: heading
+#
+# Everything else in site.yml -- the banner's picture, the author, the
+# address, the colours, a widget's account -- is a fact about the site,
+# the same in every language. The build refuses a key it does not read
+# here, and ./blog.sh check says so before a build does.
+
+# Which language stands in when this one has nothing for a post. Without
+# it, the site's own language does -- on a site of two languages that is
+# the only answer there is, so this is for a third: a German reader is
+# better served by the Czech text than by the English one.
+# fallback: [cs]
+# --- end of fallback ---
+
+# For a language the engine has not been translated into: whose interface
+# words it borrows. German has its own, so this stays off here; a Slovak
+# branch would say `ui_language: cs`.
+# ui_language: cs
+# --- end of ui_language ---
+
+site:
+  title: "Dein Name - persönliches Web/Log"
+  short_name: "DEINESEITE"
+  description: "Persönliches Web/Log von Dein Name"
+
+banner:
+  alt: "Deine Seite"
+  # The claim over the banner, if site.yml has one of its own.
+  # claim: "ein Satz über die Seite"
+
+about:
+  heading: "Über mich"
+  # Markdown, as in site.yml. A link to a post is written out in full here
+  # -- the German address of it, /de/posts/... -- because the build does
+  # not rewrite what is inside a text; it does rewrite the menu below.
+  html: |-
+    Ein paar Sätze über dich, mit einem [Link](https://example.com)
+    wenn du magst.
+
+footer:
+  links_heading: "Links"
+  # The same links as in site.yml, to the same addresses in the same order:
+  # a translation changes what a link says, not where it goes. The build
+  # refuses a list that leads anywhere else.
+  links:
+    - title: "Beispiel"
+      url: "https://example.com"
+  note_heading: "Etwas gefunden?"
+  note_html: |-
+    Wenn dich ein Artikel oder Foto hier anspricht und du es anderswo
+    verwenden möchtest, schreib mir -- wir finden eine Lösung.
+  copyright: "Alle Rechte vorbehalten &copy; 2026"
+  social_heading: "Du findest mich auf"
+
+# The menu, item by item, the way site.yml writes it: every item goes to
+# the same place as the same item there, in the same order, and only the
+# label changes. Write the address the way site.yml does -- the build takes
+# it to the German copy of that post, or to the German listing of a tag.
+# Switched on only together with the menu in site.yml; a site whose menu is
+# the engine's own has nothing here to translate, and the engine's own
+# menu speaks every language it knows already.
+# nav:
+#   - { label: "Start", url: "/" }
+#   - { label: "Fotografie", tag: "photography" }
+#   - { label: "Syntax", url: "/markdown/" }
+# --- end of nav ---
+
+# A widget's heading, for the widgets site.yml sets up. Its account, feed
+# and limit are the site's and stay there.
+# widgets:
+#   toots:
+#     heading: "Neueste Toots"
+#   commits:
+#     heading: "Neueste Commits"
+# --- end of widgets ---

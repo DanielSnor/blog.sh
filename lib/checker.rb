@@ -8,6 +8,7 @@ require 'uri'
 require 'timeout'
 require 'time'
 require_relative 'entity_text'
+require_relative 'language_file'
 require_relative 'translations'
 require_relative 'config_lang'
 require_relative 'post_address'
@@ -1348,13 +1349,15 @@ module Checker
     data.is_a?(Hash) ? data : {}
   end
 
-  # Both things about those files that the build refuses to run on: one
-  # written for a language nothing publishes, and a key inside one that
-  # the engine does not read. Reported here as well, because an archive
+  # Everything about those files that the build refuses to run on: one
+  # written for a language nothing publishes, and inside one a key the
+  # engine does not read, a translation of something site.yml does not
+  # have, and a menu or footer list that goes to other places than the
+  # site's own (lib/language_file.rb -- the build asks the same module, so
+  # the two cannot disagree). Reported here as well, because an archive
   # whose build cannot start is exactly what `check` exists to say out
-  # loud -- and both are silent otherwise: a file nobody reads looks like
-  # work that is done.
-  LANGUAGE_FILE_KEYS = %w[fallback ui_language].freeze
+  # loud -- and all of them are silent otherwise: a file nobody reads looks
+  # like work that is done.
 
   def check_language_files(root)
     return [] unless root
@@ -1369,14 +1372,41 @@ module Checker
                           kind: :language_file_stray, data: { 'file' => name, 'lang' => code })
         next
       end
-      unknown = language_file(root, code).keys - LANGUAGE_FILE_KEYS
-      next if unknown.empty?
-
-      findings << error(t('language_key_unknown', file: name, keys: unknown.join(', ')),
-                        t('language_key_unknown_fix', known: LANGUAGE_FILE_KEYS.join(', ')),
-                        kind: :language_key_unknown, data: { 'file' => name, 'keys' => unknown })
+      findings.concat(language_file_findings(name, own_config(root), language_file(root, code)))
     end
     findings
+  end
+
+  def language_file_findings(name, own, data)
+    LanguageFile.problems(own, data).group_by(&:first).flat_map do |kind, found|
+      keys = found.map { |f| f[1] }
+      case kind
+      when :unknown
+        [error(t('language_key_unknown', file: name, keys: keys.join(', ')),
+               t('language_key_unknown_fix', known: LanguageFile.known.join(', ')),
+               kind: :language_key_unknown, data: { 'file' => name, 'keys' => keys })]
+      when :orphan
+        [error(t('language_key_orphan', file: name, keys: keys.join(', ')), t('language_key_orphan_fix'),
+               kind: :language_key_orphan, data: { 'file' => name, 'keys' => keys })]
+      else
+        found.map do |_, key, detail|
+          sentence = LanguageFile.describe(detail, name) { |k, **v| I18n.t(k, **v) }
+          error(t('language_list_mismatch', file: name, key: key, detail: sentence), t('language_list_mismatch_fix'),
+                kind: :language_list_mismatch, data: { 'file' => name, 'key' => key })
+        end
+      end
+    end
+  end
+
+  # The site's own config as written, {} when it cannot be read -- the
+  # check that exists for an unreadable config reports that one.
+  def own_config(root)
+    data = begin
+      YamlCompat.load_file(File.join(root, 'config', 'site.yml'))
+    rescue StandardError
+      nil
+    end
+    data.is_a?(Hash) ? data : {}
   end
 
   def published_languages(root)

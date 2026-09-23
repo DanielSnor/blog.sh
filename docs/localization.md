@@ -198,12 +198,68 @@ config/site.de.yml     what "this site in German" means
 config/site.sk.yml     ...and in Slovak
 ```
 
-Today those files hold two keys -- `fallback` and `ui_language`, both
-below -- and they will hold the site's own chrome per language when that
-arrives. Three rules keep them honest, and the build and `check` both
-enforce them: the site's own language has no file (site.yml is it), a
-file for a language `site.locales` does not name is refused rather than
-ignored, and so is a key the engine does not read.
+Start one from `config/site.lang.yml.example`: copy it to
+`config/site.de.yml` (or whichever language), and it says the rest in its
+comments. Like site.yml, these files are the site's own, not the engine's,
+and git ignores them.
+
+Two kinds of thing go in one. What the language DOES -- `fallback` and
+`ui_language`, both below -- and what the site SAYS about itself in that
+language: the same keys `config/site.yml` has for its words, only in
+other words. The build of that language lays them over site.yml; whatever
+the file leaves out stands as site.yml has it.
+
+```yaml
+# config/site.cs.yml -- blogsh.app in Czech
+site:
+  title: "./blog.sh"
+  description: "Minimalistický blogovací engine, který ovládáš z terminálu"
+banner:
+  claim: "jen ./blog.sh"
+about:
+  heading: "O projektu"
+  html: "Blog.sh je …"
+footer:
+  note_heading: "Licence"
+  copyright: "Texty a obrázky © 2026 Daniel Šnor."
+nav:
+  - { label: "Vše", url: "/" }
+  - { label: "Začni tady", url: "/posts/2026/blog-sh/" }
+  - { label: "Proč", tag: "philosophy" }
+widgets:
+  toots:
+    heading: "Nedávné tooty"
+```
+
+The keys it takes, and nothing else: `site.title`, `site.short_name`,
+`site.description`; `banner.claim`, `banner.alt`; `about.heading`,
+`about.html`; `footer.links_heading`, `footer.links`,
+`footer.note_heading`, `footer.note_html`, `footer.copyright`,
+`footer.social_heading`; `nav`; and `heading` under a widget. Everything
+else in site.yml -- the picture in the banner, the author, the address,
+the colours, the widgets' accounts -- is a fact about the site, the same in
+every language, and a translation of it would be a second site.
+
+**A list with places in it names the same places.** The menu and the
+footer links are written out in full, the way site.yml has them, but
+every item goes where the same item goes in site.yml, in the same order;
+only the label changes. A menu that drifts apart between languages is a
+second site, and a reader who switches language would lose the item they
+were reaching for. The address is still the one the site's own language
+writes -- `/posts/2026/blog-sh/` above -- and the Czech build takes it to
+the Czech copy of that post, as it does for the site's own menu.
+
+The rules, which the build and `check` both enforce: the site's own
+language has no file (site.yml is it); a file for a language
+`site.locales` does not name is refused rather than ignored; so is a key
+the engine does not read, a translation of something site.yml does not
+have (a heading for a widget the site has not set up, a menu on a site
+whose menu is the engine's), and a menu or footer list that goes to other
+places than site.yml's.
+
+The writing app is not translated this way: it is one copy for the site,
+and it speaks the site's own language, because that is the language its
+author writes in.
 
 ### What a post carries
 

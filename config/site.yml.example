@@ -34,8 +34,7 @@
 # (brackets) is optional and commented out where it lives; the rest of
 # this file explains each one where it stands.
 #
-#   site        title, short_name, description, author, lang, locale, locales,
-#               fallback,
+#   site        title, short_name, description, author, lang, locale, (locales),
 #               timezone, base_url, (page_size), (extra_css)
 #   banner      src, alt, width, height, (show_title), (show_claim), (claim)
 #   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
@@ -95,9 +94,12 @@ site:
   # Everything else about a language lives in a file of its own beside this
   # one -- config/site.de.yml, config/site.sk.yml -- where that language is
   # described: `fallback:` (which language stands in when this one has
-  # nothing for a post) and `ui_language:` (which language's interface
+  # nothing for a post), `ui_language:` (which language's interface
   # words it borrows, for a language the engine has not been translated
-  # into). The site's own language has no such file: this one is it.
+  # into), and the site's own words in that language -- the title, the
+  # description, the banner claim, about, footer, menu and widget headings,
+  # under the same keys as here. Start one from config/site.lang.yml.example.
+  # The site's own language has no such file: this one is it.
   # See docs/localization.md.
   # The timezone every timestamp this engine writes is expressed in: publish
   # times, "publish now", the date you type into `schedule`. An IANA zone
