@@ -325,7 +325,7 @@ cli:
 
     OBSAH píšeš pod druhý ---. Jak na formátování:
 
-      Markdown Cheat Sheet — %{cheat_sheet_url}
+      Tahák Markdownu — %{cheat_sheet_url}
     -->
 
   template_unchanged: "Šablona zůstala beze změny (neuloženo?), příspěvek nevznikl."

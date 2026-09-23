@@ -1,5 +1,5 @@
 ---
-title: Markdown Cheat Sheet
+title: Tahák Markdownu
 ---
 Tenhle web se píše v markdownu — v editoru, který otevře `./blog.sh add`. Není to úplný markdown, je to podmnožina šitá na míru tomuhle enginu. Tahle stránka ukazuje všechno, co umí: u každé skupiny nejdřív zdroj, jak ho napsat, a hned pod ním, jak to dopadne.
 
