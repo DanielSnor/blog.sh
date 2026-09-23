@@ -637,7 +637,11 @@ export RCLONE_ARGS="--s3-acl public-read"   # optional provider flags
 
 Run `rclone config` once to set up the remote -- credentials live in
 rclone's own config, never in env.sh. Needs the `rclone` binary
-installed.
+installed -- from your distribution's packages or from rclone.org, not
+as a snap. The snap is not published by the rclone project, and it is
+confined to your home directory: with the site anywhere else (`/srv`,
+`/var/www`, `/opt`) it cannot read a single file of it, and says so as
+"no such file or directory" about a file that is plainly there.
 
 A plain **FTP** host -- the kind a shared hosting plan gives you, with no
 SSH to it at all -- goes through rclone as well. In `rclone config` pick

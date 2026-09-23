@@ -50,3 +50,6 @@ tests/
 # graphics above: nothing generated should be able to ride along on an
 # unrelated commit.
 tmp/
+# A file list the rclone backend hands to rclone, beside public.nosync
+# (lib/deploy_backend/rclone.rb); only ever left behind by a killed run.
+blog-sh-rclone*.nosync

@@ -65,13 +65,26 @@ module DeployBackend
       true
     end
 
+    # The lists rclone reads with --files-from are written beside public.nosync,
+    # never in the system's tmp. rclone installed as a snap has a /tmp of its
+    # own, so a list in the real one is a file it cannot open -- every deploy
+    # failed whole with "no such file or directory" and sent nothing
+    # (reproduced 23. 9. 2026, Ubuntu with the snap). Next to the tree it
+    # lists is the one place a confined rclone can read whenever it can read
+    # the site at all; not inside it, where it would be uploaded. The
+    # .nosync suffix keeps it out of iCloud and .gitignore names it, for the
+    # run that is killed before Tempfile can remove it.
+    def list_file(name, dir, &block)
+      Tempfile.create([name, '.nosync'], dir, &block)
+    end
+
     # Named deletions rather than a mirror: `rclone delete --files-from`
     # removes these paths and looks at nothing else on the target.
-    def prune_orphans(orphans, logger)
+    def prune_orphans(orphans, logger, list_dir: nil)
       names = Array(orphans)
       return true if names.empty?
 
-      Tempfile.create('blog-sh-rclone-prune') do |f|
+      list_file('blog-sh-rclone-prune', list_dir) do |f|
         f.puts(names)
         f.flush
         full = ['rclone', 'delete', target, '--files-from', f.path]
@@ -109,16 +122,17 @@ module DeployBackend
       # rclone deciding again by size and modtime made the manifest
       # describe bytes that never left this machine.
       wanted = only || Array(files)
+      list_dir = File.dirname(File.expand_path(public_dir))
       ok = if wanted.empty?
              true
            else
-             Tempfile.create('blog-sh-rclone') do |f|
+             list_file('blog-sh-rclone', list_dir) do |f|
                f.puts(wanted)
                f.flush
                run.call(['--ignore-times', '--files-from', f.path])
              end
            end
-      ok = prune_orphans(orphans, logger) if ok && prune
+      ok = prune_orphans(orphans, logger, list_dir: list_dir) if ok && prune
       logger&.call(ok ? '  ✅ rclone finished' : '  ❌ rclone failed')
       !!ok
     end
