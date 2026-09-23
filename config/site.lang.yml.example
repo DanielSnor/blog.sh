@@ -68,7 +68,10 @@ banner:
   # claim: "ein Satz über die Seite"
 
 about:
-  heading: "Über mich"
+  # The heading is the engine's words unless site.yml writes its own --
+  # German says "Über mich" by itself. Translate it only when site.yml says
+  # something else there.
+  # heading: "Über den Blog"
   # Markdown, as in site.yml. A link to a post is written out in full here
   # -- the German address of it, /de/posts/... -- because the build does
   # not rewrite what is inside a text; it does rewrite the menu below.
@@ -77,7 +80,9 @@ about:
     wenn du magst.
 
 footer:
-  links_heading: "Links"
+  # links_heading and social_heading, likewise: the engine's words unless
+  # site.yml writes its own.
+  # links_heading: "Weiterlesen"
   # The same links as in site.yml, to the same addresses in the same order:
   # a translation changes what a link says, not where it goes. The build
   # refuses a list that leads anywhere else.
@@ -89,7 +94,7 @@ footer:
     Wenn dich ein Artikel oder Foto hier anspricht und du es anderswo
     verwenden möchtest, schreib mir -- wir finden eine Lösung.
   copyright: "Alle Rechte vorbehalten &copy; 2026"
-  social_heading: "Du findest mich auf"
+  # social_heading: "Hier bin ich auch"
 
 # The menu, item by item, the way site.yml writes it: every item goes to
 # the same place as the same item there, in the same order, and only the
@@ -104,11 +109,12 @@ footer:
 #   - { label: "Syntax", url: "/markdown/" }
 # --- end of nav ---
 
-# A widget's heading, for the widgets site.yml sets up. Its account, feed
-# and limit are the site's and stay there.
+# A widget's heading, for a widget whose heading site.yml writes itself --
+# one it leaves out is the engine's words, in German already. Its account,
+# feed and limit are the site's and stay there.
 # widgets:
 #   toots:
-#     heading: "Neueste Toots"
+#     heading: "Aus dem Fediverse"
 #   commits:
-#     heading: "Neueste Commits"
+#     heading: "Woran ich arbeite"
 # --- end of widgets ---

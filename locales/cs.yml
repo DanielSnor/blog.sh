@@ -1150,7 +1150,6 @@ doctor:
   widget_instance_repo_fix: "Widget chce samotný server. Forge, který opravdu bydlí pod cestou, je v pořádku — jenže stejně vypadá i adresa profilu nebo repozitáře. Otevři si <instance>/api/v1/version v prohlížeči: forge odpoví verzí, cokoli jiného ne."
   widget_instance: "`instance` u widgetu commits není adresa serveru: %{value}."
   widget_instance_fix: "Napiš samotný server, jen schéma a host — „https://codeberg.org“, „https://git.example.org“ — ne handle, ne repozitář a ne holé jméno hostu. Pro GitHub klíč vůbec neuváděj."
-  widget_heading: "Widget %{name} nemá nadpis, takže se zobrazí bez titulku."
   widget_limit: "Limit widgetu %{name} je %{value}; musí to být celé číslo větší než nula."
 
   slots_ok: "Publikačních slotů: %{count}."
@@ -1438,7 +1437,6 @@ setup:
   token_kept_rejected: "Uložím ho, ale dokud ho nevyměníš, nic se neoznámí. Vytvoř nový a spusť ./setup.sh znovu."
 
   q_toots_widget: "Ukázat poslední tooty v postranním panelu? ID účtu (%{id}) máme rovnou tady, takže to nic nestojí. [a/N] "
-  toots_heading: "Poslední tooty"
   toots_added: "✅ Přidáno. Naplní to ./scripts/refresh-sidebar.sh; pouštěj ho z cronu, ať je to aktuální."
 
   q_handle: "Bluesky handle"
@@ -1636,11 +1634,6 @@ style:
   widget_commits: "Poslední commity z účtu na GitHubu, Gitee nebo Forgejo"
   widget_bluesky: "Poslední příspěvky z Bluesky"
   widget_rss: "Cokoli, co má RSS nebo Atom feed"
-  widget_heading_toots: "Poslední tooty"
-  widget_heading_pixelfed: "Poslední na Pixelfedu"
-  widget_heading_commits: "Poslední commity"
-  widget_heading_bluesky: "Poslední na Bluesky"
-  widget_heading_rss: "Jinde"
   q_widget_heading: "Nadpis nad widgetem"
   q_widget_account_id: "ID účtu"
   h_widget_account_id: "ID, ne @jméno — číslo na Mastodonu, ULID na GoToSocial. Najde ho ./setup.sh s tokenem, nebo otevři https://tvoje-instance/api/v1/accounts/lookup?acct=tvojejmeno a opiš „id“."
@@ -1771,3 +1764,17 @@ language_file:
   list_count: "config/site.yml má položek: %{mine}, %{file}: %{theirs}."
   list_item: "Položka %{n}: v config/site.yml vede na %{mine}, v %{file} na %{theirs}."
   list_shape: "V %{file} to není seznam."
+
+# Nadpisy, které engine řekne, když web žádný vlastní nenapíše
+# (about.heading, footer.links_heading, footer.social_heading, nadpis
+# widgetu) -- v každém jazyce, který web publikuje. Nadpis napsaný webem
+# je jeho; napsaný prázdný znamená žádný nadpis.
+chrome:
+  about_heading: "O mně"
+  links_heading: "Odkazy"
+  social_heading: "Kde mě najdeš"
+  widget_toots: "Poslední tooty"
+  widget_pixelfed: "Poslední na Pixelfedu"
+  widget_commits: "Poslední commity"
+  widget_bluesky: "Poslední na Bluesky"
+  widget_rss: "Jinde"

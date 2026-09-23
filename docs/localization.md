@@ -226,10 +226,16 @@ nav:
   - { label: "Vše", url: "/" }
   - { label: "Začni tady", url: "/posts/2026/blog-sh/" }
   - { label: "Proč", tag: "philosophy" }
-widgets:
-  toots:
-    heading: "Nedávné tooty"
 ```
+
+**Some headings need no translating at all.** "About" over the about
+card, "Links" and "Find me on" over the footer columns, and each widget's
+heading ("Recent toots", "Recent commits", ...) are the engine's own words
+when site.yml does not write them -- and then every language says them in
+its own words, from the engine's locale files. Write one in site.yml only
+to say something else, and translate that one here; write it as `""` for
+no heading at all. The wizards leave the engine's words out of site.yml
+for the same reason.
 
 The keys it takes, and nothing else: `site.title`, `site.short_name`,
 `site.description`; `banner.claim`, `banner.alt`; `about.heading`,

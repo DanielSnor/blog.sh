@@ -509,7 +509,8 @@ def ask_toots_widget(site, current, account_id)
   return unless confirm(t('q_toots_widget', id: account_id))
 
   site.set(%w[widgets toots account_id], account_id.to_s)
-  site.set(%w[widgets toots heading], current.dig('widgets', 'toots', 'heading') || t('toots_heading'))
+  # No heading written: the engine says "Recent toots" itself, in every
+  # language the site publishes. One the site wrote before stays.
   site.set(%w[widgets toots limit], current.dig('widgets', 'toots', 'limit') || 3)
   puts Tui.paint(t('toots_added'), :green)
 end

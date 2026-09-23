@@ -43,10 +43,10 @@
 #               (banner_claim), (banner_claim_size)
 #   layout      (sidebar), (hero)
 #   nav         (the menu bar: label with tag or url -- or [] for none)
-#   about       heading, html
+#   about       (heading), html
 #   widgets     (toots, pixelfed, commits, bluesky, rss)
-#   footer      links_heading, links, note_heading, note_html, copyright,
-#               social_heading
+#   footer      (links_heading), links, note_heading, note_html, copyright,
+#               (social_heading)
 #   social      name, url, icon or icon_svg, (rel)
 #   tag_icons   (a list: tag with icon or icon_svg)
 #   share       (the share block: a list of network names)
@@ -285,7 +285,10 @@ colors:
 # emptied html takes the card with it, heading and all, and deleting
 # the whole block reads the same as emptying it.
 about:
-  heading: "About"
+  # The heading over the card. Left out, the engine says "About" itself --
+  # in every language the site publishes; write one only to say something
+  # else, and "" for a card with no heading at all.
+  # heading: "About"
   # Markdown, the same as in a post: **bold**, [links](https://example.com),
   # lists, a blank line for a new paragraph. Raw HTML still works too and is
   # how a photo gets in (<img>) -- Markdown images are left out on purpose,
@@ -304,21 +307,22 @@ about:
 # by cron via ./scripts/refresh-sidebar.sh. Commented out here because the
 # placeholder accounts don't exist -- uncomment an entry once you've put
 # your own values in; omitting any entry (or the whole `widgets:` key)
-# just means no such widget.
+# just means no such widget. A widget's heading is the engine's words
+# (in every language the site publishes) unless you write your own.
 # widgets:
 #   toots:
-#     heading: "Recent toots"
+#     # heading: "Recent toots"
 #     # instance is optional -- it falls back to mastodon.instance below,
 #     # so set it only when the widget shows an account living elsewhere.
 #     # instance: "mastodon.social"
 #     account_id: "000000000000000000" # the account's API id, not the @handle -- a number on Mastodon, a ULID on GoToSocial
 #     limit: 3
 #   pixelfed:
-#     heading: "Recent Pixelfed posts"
+#     # heading: "Recent Pixelfed posts"
 #     feed_url: "https://pixelfed.social/users/yourname.atom"
 #     limit: 3
 #   commits:
-#     heading: "Recent commits"
+#     # heading: "Recent commits"
 #     username: "yourname"
 #     limit: 3
 #     # GitHub unless you say otherwise. For a Gitea or Forgejo server --
@@ -326,13 +330,13 @@ about:
 #     # reads that instead; the address is the whole configuration.
 #     # instance: "https://codeberg.org"
 #   bluesky:
-#     heading: "Recent Bluesky posts"
+#     # heading: "Recent Bluesky posts"
 #     # handle is optional -- it falls back to bluesky.handle below, so set
 #     # it only when the widget shows an account other than the site's own.
 #     # handle: "you.bsky.social"
 #     limit: 3
 #   rss:
-#     heading: "Elsewhere"
+#     # heading: "Elsewhere"
 #     # Any RSS 2.0 or Atom feed: another blog, a YouTube channel, a
 #     # podcast -- or X through a self-hosted Nitter instance.
 #     feed_url: "https://example.com/feed.xml"
@@ -345,7 +349,10 @@ about:
 # included, rather than a title over an empty list. Same for the note,
 # the copyright and the icons; a deleted block reads as all-empty.
 footer:
-  links_heading: "Links"
+  # The two column headings are the engine's words when left out --
+  # "Links" and "Find me on", in every language the site publishes. Write
+  # them only to say something else; "" means no heading at all.
+  # links_heading: "Links"
   links:
     - title: "Example"
       url: "https://example.com"
@@ -362,7 +369,7 @@ footer:
   # default_external the caller has, which under cron or the system Ruby is
   # US-ASCII -- one accented character here and both wizards stop working.)
   copyright: "All rights reserved &copy; 2026"
-  social_heading: "Find me on"
+  # social_heading: "Find me on"
 
 # icon = a name from the built-in set. The network marks: mastodon,
 # pixelfed, linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky,

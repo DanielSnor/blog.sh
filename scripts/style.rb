@@ -1088,9 +1088,20 @@ end
 def configure_widget(name)
   # Setting one up again is the undo for having removed it.
   removed_widgets.delete(name)
-  heading = Wizard.ask(t('q_widget_heading'),
-                       at('widgets', name, 'heading') || inactive_default(name, 'heading') || t("widget_heading_#{name}"))
-  site.set(['widgets', name, 'heading'], heading) if heading
+  # The engine says a widget's heading itself, in every language the site
+  # publishes (chrome.* in locales/). Only a heading of the site's OWN is
+  # written: the engine's words written into site.yml used to freeze there
+  # in one language, and a second language then had to translate what the
+  # engine already says in it. Taking the engine's words over one that
+  # froze earlier switches the frozen one off.
+  engine = I18n.t("chrome.widget_#{name}")
+  written = at('widgets', name, 'heading')
+  heading = Wizard.ask(t('q_widget_heading'), written || inactive_default(name, 'heading') || engine)
+  if heading && heading != engine
+    site.set(['widgets', name, 'heading'], heading)
+  elsif heading == engine && written
+    site.deactivate(['widgets', name, 'heading'])
+  end
 
   WIDGETS[name].each do |key|
     value = Wizard.ask_valid(t("q_widget_#{key}"),

@@ -1040,10 +1040,29 @@ end
 # partials compile without a trim mode, and a guard written as its own
 # template line would have added a blank line to every page of every
 # installation (same trap as the about card's guard).
-def chrome_heading_line(text)
+def chrome_heading_line(text, indent: 8)
   return '' if text.to_s.strip.empty?
 
-  "        <h3>#{h(text)}</h3>\n"
+  "#{' ' * indent}<h3>#{h(text)}</h3>\n"
+end
+
+# The heading over a card or a footer column: the site's own when it wrote
+# one, the ENGINE's when it did not -- in the language this run builds.
+#
+# 🪤 "Recent toots", "About", "Links", "Find me on" are the engine's words,
+# and the wizards used to write them into site.yml, where they froze in
+# English: a second language then had to translate, in config/site.cs.yml,
+# what the engine already says in Czech. Written empty still means no
+# heading at all -- absent and empty are two different answers, the way
+# they are for the menu.
+def site_heading(section, key, engine_key)
+  return t("chrome.#{engine_key}") unless section.is_a?(Hash) && section.key?(key)
+
+  section[key].to_s
+end
+
+def widget_heading(name)
+  site_heading(WIDGETS[name], 'heading', "widget_#{name}")
 end
 
 def footer_links_html

@@ -1162,7 +1162,6 @@ doctor:
   widget_instance_repo_fix: "Das Widget will den Server selbst. Eine Forge, die wirklich unter einem Pfad liegt, ist in Ordnung -- aber eine Profil- oder Repository-Adresse sieht von hier genauso aus. Öffne <instance>/api/v1/version im Browser: eine Forge antwortet mit einer Version, alles andere nicht."
   widget_instance: "`instance` des Commits-Widgets ist keine Serveradresse: %{value}."
   widget_instance_fix: "Gib den Server selbst an, nur Schema und Host -- \"https://codeberg.org\", \"https://git.example.org\" -- keinen Handle, kein Repository und keinen bloßen Hostnamen. Für GitHub den Schlüssel ganz weglassen."
-  widget_heading: "Das Widget %{name} hat keine Überschrift und erscheint deshalb ohne Titel."
   widget_limit: "Das Limit des Widgets %{name} ist %{value}; es muss eine ganze Zahl größer als null sein."
 
   slots_ok: "%{count} Veröffentlichungszeit(en)."
@@ -1452,7 +1451,6 @@ setup:
   token_kept_rejected: "Gespeichert, aber bis er ersetzt ist, wird nichts angekündigt. Erstelle einen neuen und starte ./setup.sh erneut."
 
   q_toots_widget: "Deine letzten Toots in der Seitenleiste zeigen? Die Konto-ID (%{id}) liegt hier schon vor, das kostet also nichts. [j/N] "
-  toots_heading: "Neueste Toots"
   toots_added: "✅ Hinzugefügt. Gefüllt wird es von ./scripts/refresh-sidebar.sh; lass das per Cron laufen, damit es aktuell bleibt."
 
   q_handle: "Bluesky-Handle"
@@ -1650,11 +1648,6 @@ style:
   widget_commits: "Neueste Commits aus einem Konto bei GitHub, Gitea oder Forgejo"
   widget_bluesky: "Neueste Beiträge eines Bluesky-Kontos"
   widget_rss: "Alles mit einem RSS- oder Atom-Feed"
-  widget_heading_toots: "Neueste Toots"
-  widget_heading_pixelfed: "Neueste Pixelfed-Beiträge"
-  widget_heading_commits: "Neueste Commits"
-  widget_heading_bluesky: "Neueste Bluesky-Beiträge"
-  widget_heading_rss: "Anderswo"
   q_widget_heading: "Überschrift über dem Widget"
   q_widget_account_id: "Konto-ID"
   h_widget_account_id: "Die ID, nicht der @Name -- auf Mastodon eine Nummer, auf GoToSocial eine ULID. ./setup.sh findet sie mit eingetragenem Token. Von Hand: öffne https://deine-instanz/api/v1/accounts/lookup?acct=deinname und übernimm \"id\"."
@@ -1785,3 +1778,18 @@ language_file:
   list_count: "config/site.yml hat Einträge: %{mine}, %{file}: %{theirs}."
   list_item: "Eintrag %{n}: in config/site.yml führt er zu %{mine}, in %{file} zu %{theirs}."
   list_shape: "In %{file} ist es keine Liste."
+
+# Die Überschriften, die die Engine sagt, wenn die Seite keine eigene
+# schreibt (about.heading, footer.links_heading, footer.social_heading,
+# die Überschrift eines Widgets) -- in jeder Sprache, die die Seite
+# veröffentlicht. Eine von der Seite geschriebene gehört ihr; eine leer
+# geschriebene heißt: keine Überschrift.
+chrome:
+  about_heading: "Über mich"
+  links_heading: "Links"
+  social_heading: "Du findest mich auf"
+  widget_toots: "Neueste Toots"
+  widget_pixelfed: "Neueste Pixelfed-Beiträge"
+  widget_commits: "Neueste Commits"
+  widget_bluesky: "Neueste Bluesky-Beiträge"
+  widget_rss: "Anderswo"

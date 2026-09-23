@@ -1180,7 +1180,6 @@ doctor:
   widget_instance_repo_fix: "The widget wants the server itself. A forge that really does live under a path is fine -- but so is a profile or a repository address, and they look the same from here. Open <instance>/api/v1/version in a browser: a forge answers with a version, anything else does not."
   widget_instance: "The commits widget's `instance` is not a server address: %{value}."
   widget_instance_fix: "Write the server itself, scheme and host only -- \"https://codeberg.org\", \"https://git.example.org\" -- not a handle, a repository or a bare host name. Leave the key out entirely for GitHub."
-  widget_heading: "The %{name} widget has no heading, so it appears without a title."
   widget_limit: "The %{name} widget's limit is %{value}; it has to be a whole number greater than zero."
 
   slots_ok: "%{count} publishing slot(s)."
@@ -1469,7 +1468,6 @@ setup:
   token_kept_rejected: "Saved, but nothing will be announced until it is replaced. Make a new one and run ./setup.sh again."
 
   q_toots_widget: "Show your latest toots in the sidebar? The account id (%{id}) is right here, so this costs nothing. [y/N] "
-  toots_heading: "Recent toots"
   toots_added: "✅ Added. ./scripts/refresh-sidebar.sh fills it in; run it from cron to keep it fresh."
 
   q_handle: "Bluesky handle"
@@ -1667,11 +1665,6 @@ style:
   widget_commits: "Recent commits from a GitHub, Gitea or Forgejo account"
   widget_bluesky: "Recent posts from a Bluesky account"
   widget_rss: "Anything with an RSS or Atom feed"
-  widget_heading_toots: "Recent toots"
-  widget_heading_pixelfed: "Recent Pixelfed posts"
-  widget_heading_commits: "Recent commits"
-  widget_heading_bluesky: "Recent Bluesky posts"
-  widget_heading_rss: "Elsewhere"
   q_widget_heading: "Heading over the widget"
   q_widget_account_id: "Account id"
   h_widget_account_id: "The id, not the @handle -- a number on Mastodon, a ULID on GoToSocial. ./setup.sh finds it when the token is filled in. By hand: open https://your-instance/api/v1/accounts/lookup?acct=yourname and copy \"id\"."
@@ -1802,3 +1795,17 @@ language_file:
   list_count: "config/site.yml has %{mine} item(s), %{file} has %{theirs}."
   list_item: "Item %{n}: config/site.yml goes to %{mine}, %{file} to %{theirs}."
   list_shape: "In %{file} it is not a list."
+
+# The headings the engine says when the site writes none of its own
+# (about.heading, footer.links_heading, footer.social_heading, a widget's
+# heading) -- in every language the site publishes. A heading the site
+# writes is the site's; one written empty means no heading at all.
+chrome:
+  about_heading: "About"
+  links_heading: "Links"
+  social_heading: "Find me on"
+  widget_toots: "Recent toots"
+  widget_pixelfed: "Recent Pixelfed posts"
+  widget_commits: "Recent commits"
+  widget_bluesky: "Recent Bluesky posts"
+  widget_rss: "Elsewhere"

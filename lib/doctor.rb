@@ -873,7 +873,9 @@ module Doctor
         end
       end
 
-      findings << warn(t('widget_heading', name: name)) if conf['heading'].to_s.empty?
+      # No word about a missing heading any more: the engine says one itself
+      # (chrome.* in locales/), and one written empty is the site deciding it
+      # wants none.
       limit = conf['limit']
       findings << error(t('widget_limit', name: name, value: limit.inspect)) if limit && !(limit.is_a?(Integer) && limit.positive?)
     end
