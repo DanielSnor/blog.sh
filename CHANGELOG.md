@@ -62,6 +62,7 @@ differ only in the stylesheet and one script, and report the same warnings.
 ### Changed
 
 - **Structured data says which language the page is in.** Every post's JSON-LD carries `inLanguage`; everything else on the page -- `<html lang>`, `og:locale`, the feed -- already said so.
+- **The Czech interface says "příspěvek" and "sestavit".** It said "post" and "postavit", the one in 285 places, while the site's own Czech texts said "příspěvek" -- and a build is put together, not constructed. The writing app says the same. A script that reads the Czech output will see the new words.
 
 ### Fixed
 
