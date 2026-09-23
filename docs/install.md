@@ -559,6 +559,17 @@ into before any address of yours is touched; set the target when the site
 is ready to be seen. Reported from the outside, and it cost somebody their
 placeholder.
 
+The other way round, **nothing is removed**. A deploy writes the site's
+files and deletes only files an earlier deploy of this site wrote;
+whatever else was in the target stays. After a previous site that
+matters: a host typically serves `index.php` before `index.html`, so an
+old WordPress front page goes on answering over the new one, and an old
+`.htaccess` can go on rewriting addresses the new site depends on. Clear
+the old site out of the target before the first deploy -- over FTP, with
+the client or file manager you used for it -- and keep only what the
+host itself put there. (The git backend is the exception: every push
+replaces the whole branch.)
+
 One thing to know before you write your first post with a big attachment:
 a single file over 100 MB is refused, at save time and again at deploy
 time. The limit is the same for every backend so the site stays portable
@@ -641,6 +652,19 @@ Nothing else is needed: the engine tells rclone exactly which files to
 send and which to delete, so it never asks the server for checksums,
 which FTP cannot give. If the host offers FTPS, turn it on in `rclone
 config` (`explicit_tls`) -- plain FTP sends the password in the clear.
+
+If the deploy fails with the server complaining about too many
+connections -- shared hosting often allows only a few per account --
+make rclone open one at a time:
+
+```bash
+export RCLONE_ARGS="--checkers 1 --transfers 1"
+```
+
+rclone also has `--ftp-concurrency`, but its own documentation warns that
+setting it is very likely to deadlock unless it is one more than
+`--checkers` and `--transfers` together; the two flags above are the
+simpler way to the same limit.
 
 ### sftp (hosts with neither rsync nor git)
 

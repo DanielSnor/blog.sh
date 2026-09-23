@@ -70,8 +70,9 @@ differ only in the stylesheet and one script, and report the same warnings.
 - **`check` called a link to `/write/` dead on the sites that publish the app.** And `doctor`'s menu question with it.
 - **The import menu did not say WordPress takes a file.** Its entry now says so, as the prompt after it always did.
 - **A token pasted with a space on either side was saved with it.** The instance refused it and the hidden prompt could not show why; setup now trims it, and the hint says the access token is not the client key or secret beside it.
+- **The install guide never said a deploy leaves an old site's files in place.** Nothing a deploy did not write is ever removed, and a host that serves `index.php` before `index.html` goes on showing the old WordPress front page over the new site; `install.md` now says to clear the target first.
 - **Ctrl+C in any screen of `./blog.sh` ended in a stack trace.** It now stops the run with one line and status 130, as setup, style and import always did.
-- **FTP was nowhere in the docs.** The rclone backend has always reached a plain FTP host; `install.md` and `env.sh.example` now say how.
+- **FTP was nowhere in the docs.** The rclone backend has always reached a plain FTP host; `install.md` and `env.sh.example` now say how, and what to set when a shared host refuses "too many connections".
 - **`publish --json` fell over on a post whose date nobody can read.** Every other refusal on that route answers with an object and status 0; this one wrote prose to stderr and left with status 1, which a phone cannot tell apart from the engine having crashed.
 - **Cancelling a plan left the slot's date on the post.** The date the plan overwrote comes back -- and the post returns to the year that date names, when the slot had moved it out of it.
 
