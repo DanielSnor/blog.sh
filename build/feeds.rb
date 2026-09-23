@@ -210,13 +210,14 @@ module Feeds
   end
 
   def wrap_sitemap(urls)
-    # The xhtml namespace is declared whether or not anything uses it: a
-    # single-language site emits no <xhtml:link> at all, and one unused
-    # declaration on the root element is cheaper than two shapes of the
-    # same document to keep in step.
+    # The xhtml namespace only where an alternate is written in it. Declared
+    # always, it looked free -- until a single-language site's upgrade
+    # counted its sitemap among the files that changed for nothing. Asked of
+    # the entries themselves, so the declaration cannot drift from its use.
+    xhtml = urls.any? { |url| url.include?('<xhtml:link') } ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ''
     <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
-      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"#{xhtml}>
         #{urls.join("\n  ")}
       </urlset>
     XML

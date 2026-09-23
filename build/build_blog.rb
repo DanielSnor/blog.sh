@@ -639,11 +639,22 @@ end
 # (see templates/layout.html.erb) since client-side JS can't read
 # locales/*.yml directly -- that only happens at build time, in Ruby.
 def client_i18n_json
-  {
-    # Where this language's own copies live: the scripts fetch the search
-    # index and the comments by address, and a German page fetching the
-    # Czech index searched the wrong site quietly.
-    lang_root: LANG_ROOT,
+  # Where this language's own copies live: the scripts fetch the search
+  # index by address, and a German page fetching the Czech index searched
+  # the wrong site quietly. Only when there IS a root -- the site's own
+  # language has none, and an empty entry still changed this script and
+  # with it the CSP hash of every page, so a single-language site's upgrade
+  # rewrote its whole archive to say nothing. search.js reads a missing
+  # root as the site root. One key to a line, as below: test_docs_completeness
+  # reads the keys this method emits off the start of the line.
+  root = if LANG_ROOT.empty?
+           {}
+         else
+           {
+             lang_root: LANG_ROOT
+           }
+         end
+  root.merge(
     date_locale: t('js.date_locale'),
     tags_sort_alpha: t('tags.sort_alpha'),
     tags_sort_count: t('tags.sort_count'),
@@ -677,7 +688,7 @@ def client_i18n_json
     theme_auto: t('ui.theme_auto'),
     theme_light: t('ui.theme_light'),
     theme_dark: t('ui.theme_dark')
-  }.to_json
+  ).to_json
 end
 
 # The exact text content of the one inline <script> this site ever emits

@@ -38,13 +38,12 @@ who was embedding it; and `check` called a link to the writing app dead on exact
 that address answers.
 
 Nothing to configure and nothing to migrate. A site that names no `site.locales` publishes one
-language and looks exactly as it did: no switcher, no alternates, the banner and the menu as 1.8 wrote
-them, so a skin keeps working untouched. Its pages do change underneath, on the next rebuild: a post's
-structured data names its language, an embedded player carries its referrer policy, and the small
-script every page carries gained an entry -- which changes that page's content-security hash. So the
-first deploy after the upgrade sends nearly the whole site once: on an archive of 6,600 posts, 10,176
-of its 13,490 files. Past that, the two builds differ only in the stylesheet, one script and the
-sitemap's opening tag, and report the same warnings.
+language and looks exactly as it did: no switcher, no alternates, the banner, the menu and the sitemap
+as 1.8 wrote them, so a skin keeps working untouched. Two things change underneath, on the next
+rebuild: every post's structured data names its language, and an embedded player carries its referrer
+policy. So the first deploy after the upgrade sends every post page once, and a listing only where it
+shows a player: on an archive of 6,600 posts, 6,647 of its 13,490 files. Past that, the two builds
+differ only in the stylesheet and one script, and report the same warnings.
 
 ### Added
 
