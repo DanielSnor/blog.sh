@@ -181,6 +181,7 @@ module Doctor
     findings.concat(check_share(data))
     findings.concat(check_trash(root))
     findings.concat(check_deploy(root))
+    findings.concat(check_deploy_keep(data))
     findings.concat(check_online(data, root)) if online
     findings
   end
@@ -1384,7 +1385,7 @@ module Doctor
     findings.concat(check_online_network(data))
     findings.concat(check_online_thread_readable(data))
     findings.concat(check_online_approval(data))
-    findings.concat(check_online_deploy(root))
+    findings.concat(check_online_deploy(root, data))
     findings
   end
 
@@ -1400,7 +1401,7 @@ module Doctor
   # Only when the offline check has nothing against the backend: an
   # unchosen, unknown, unfinished or uninstalled one is reported there,
   # and asking it over the network could only repeat that less clearly.
-  def check_online_deploy(root)
+  def check_online_deploy(root, data = nil)
     name = deploy_backend_name
     backend = name && DeployBackend::BACKENDS[name]
     return [] unless backend&.configured?
@@ -1420,7 +1421,7 @@ module Doctor
     end
     return [ok(t('deploy_target_answers', target: where))] if entries.nil?
 
-    ours = site_root_names(root, backend)
+    ours = site_root_names(root, backend) + kept_names(data || load_site_yml(root).first)
     foreign = entries.reject { |entry_name, _| ours.include?(entry_name) }
                      .map { |entry_name, dir| dir ? "#{entry_name}/" : entry_name }
                      .sort
@@ -1430,6 +1431,53 @@ module Doctor
     shown += t('deploy_target_more', count: foreign.size - FOREIGN_SHOWN) if foreign.size > FOREIGN_SHOWN
     [warn(t('deploy_target_foreign', target: where, count: foreign.size, names: shown),
           t('deploy_target_foreign_fix'))]
+  end
+
+  # What stands in the target's root on purpose although the build does
+  # not put it there: `deploy.keep` in site.yml -- screenshots an issue
+  # links to, a file a search console asked for -- and .well-known/, where
+  # a host keeps its certificate challenge, always. Exact names, the way
+  # the listing prints them; a trailing slash is allowed and means nothing.
+  # Only doctor reads it: a deploy never deletes what it did not write, so
+  # there is nothing for the list to protect -- it only stops a warning
+  # nobody acts on from teaching its reader to skip the one that matters.
+  ALWAYS_KEPT = %w[.well-known].freeze
+
+  def kept_names(data)
+    keep = dig(data, 'deploy', 'keep')
+    listed = keep.is_a?(Array) ? keep.filter_map { |entry| keep_name(entry) } : []
+    ALWAYS_KEPT + listed
+  end
+
+  # A name in the root, or nil for anything that is not one: a path with a
+  # directory in it, a pattern, a non-string.
+  def keep_name(entry)
+    return nil unless entry.is_a?(String)
+
+    name = entry.strip.delete_prefix('/').delete_suffix('/')
+    return nil if name.empty? || name.include?('/') || name.match?(/[*?\[\]]/)
+
+    name
+  end
+
+  # deploy.keep written the way it means: a list of names. What is not
+  # one is said here, offline, because the online check would only skip
+  # it -- and a pattern that silently matches nothing leaves the warning
+  # it was written to quiet exactly where it was.
+  def check_deploy_keep(data)
+    return [] unless data.is_a?(Hash) && data.key?('deploy')
+
+    section = data['deploy']
+    return [warn(t('deploy_keep_shape'), t('deploy_keep_fix'))] unless section.nil? || section.is_a?(Hash)
+
+    keep = section.is_a?(Hash) ? section['keep'] : nil
+    return [] if keep.nil?
+    return [warn(t('deploy_keep_shape'), t('deploy_keep_fix'))] unless keep.is_a?(Array)
+
+    bad = keep.reject { |entry| keep_name(entry) }.map { |entry| entry.is_a?(String) ? entry : entry.inspect }
+    return [] if bad.empty?
+
+    [warn(t('deploy_keep_invalid', entries: bad.join(', ')), t('deploy_keep_fix'))]
   end
 
   # The backend DEPLOY_BACKEND names, Surfer when it is unset but Surfer's

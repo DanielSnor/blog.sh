@@ -58,6 +58,7 @@
 #   media       (convert_heic), (remux_video), (strip_location)
 #   seo         (block_ai_crawlers), (robots_extra)
 #   analytics   (src), (website_id)
+#   deploy      (keep)
 #
 # The order is the order the page reads, top to bottom -- identity, then
 # the header, the palette and the type, then the regions, the menu, the
@@ -621,3 +622,16 @@ social:
 #   src: "https://analytics.example.com/script.js"
 #   website_id: "00000000-0000-0000-0000-000000000000"
 # --- end of analytics ---
+
+# Optional. What stands in the root of the deploy target on purpose
+# although the build does not put it there -- screenshots an issue links
+# to, a file a search console asked for. `./blog.sh doctor --online` lists
+# everything else in the root as foreign (the files an earlier site left
+# behind); a name here is left off that list. Exact names as they stand in
+# the root, a directory with or without its slash. .well-known, where a
+# host keeps its certificate challenge, is never listed. Only doctor reads
+# the list -- a deploy never deletes what it did not write either way.
+# deploy:
+#   keep:
+#     - issue-45/
+# --- end of deploy ---
