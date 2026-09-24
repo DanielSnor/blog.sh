@@ -228,8 +228,7 @@ module Checker
     findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
     findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
     findings.concat(guard(:unknown_locales) { check_unknown_locales(root) })
-    findings.concat(guard(:language_files) { check_language_files(root) })
-    findings.concat(guard(:tag_labels) { check_tag_labels(posts, root) })
+    findings.concat(guard(:language_files) { check_language_files(root, posts) })
     findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
@@ -1360,7 +1359,7 @@ module Checker
   # loud -- and all of them are silent otherwise: a file nobody reads looks
   # like work that is done.
 
-  def check_language_files(root)
+  def check_language_files(root, posts = [])
     return [] unless root
 
     published = ([site_own_language(root)] + published_languages(root)).reject(&:empty?)
@@ -1375,6 +1374,7 @@ module Checker
       end
       findings.concat(language_file_findings(name, own_config(root), language_file(root, code)))
     end
+    findings.concat(unused_tag_labels(posts, root))
     findings
   end
 
@@ -1399,11 +1399,12 @@ module Checker
     end
   end
 
-  # A label in a language file for a tag no published post carries: it
-  # shows nowhere. Worth a look, never an error -- tags come and go with the
-  # posts, and a label left behind when the last post dropped its tag is not
-  # a broken site. The build does not stop on it for the same reason.
-  def check_tag_labels(posts, root)
+  # Part of the language-file check: a label for a tag no published post
+  # carries shows nowhere. Worth a look, never an error -- tags come and go
+  # with the posts, and a label left behind when the last post dropped its
+  # tag is not a broken site. The build does not stop on it for the same
+  # reason.
+  def unused_tag_labels(posts, root)
     return [] unless root
 
     carried = stream_tags(posts)
