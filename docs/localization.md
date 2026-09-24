@@ -37,7 +37,7 @@ from both.
    | Section | Who sees it |
    | --- | --- |
    | `date_format`, `date_time_format` | everyone -- strftime formats for every rendered date |
-   | `thousands_separator`, `decimal_point` | nobody reads these as words: they are how a number is written, not a message. English keeps `,` and `.`, German swaps them, Czech separates thousands with a non-breaking space. Only `./blog.sh stats` formats numbers through them |
+   | `thousands_separator`, `decimal_point` | nobody reads these as words: they are how a number is written, not a message. English keeps `,` and `.`, German swaps them, Czech separates thousands with a non-breaking space. `./blog.sh stats` formats its numbers through them, and every file size the engine prints -- beside an attachment on a page as well -- takes its decimal mark from `decimal_point` |
    | `language_name` | site visitors -- the language's name in itself (`Deutsch`), which the language switcher shows to a reader of any other language |
    | `nav`, `post`, `pagination`, `tag`, `tags`, `type`, `series`, `index`, `archive`, `search`, `not_found`, `markdown_page`, `ui`, `redirect` | site visitors -- the chrome, the listings, the tag index and the archive map, a post's own furniture (reading time, contents, series navigation), the 404 page and the one line an old address shows while it forwards |
    | `chrome` | site visitors -- the headings the engine says when the site writes none of its own: "About", "Links", "Find me on", each widget's "Recent toots" |

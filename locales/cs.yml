@@ -259,7 +259,7 @@ cli:
   # Předpona „media:“ je adresář, ne slovo k překladu.
   media_name_taken: "media: %{name} už bylo obsazené — soubor, který tam byl, je teď %{moved}"
   versions_not_moved: "versions: historie úprav příspěvku %{slug} ho do roku %{year} nenásledovala — hledej ji v %{path}"
-  receipt_shape: "`receipt:` je jméno, které si odesílající stránka volí pro svou odpověď, a musí to být šestnáct hexadecimálních znaků — stane se z něj jméno souboru na webu. Bez toho řádku se příspěvek zapíše bez účtenky."
+  receipt_shape: "`receipt:` je jméno stvrzenky, kterou si odesílající stránka volí pro svou odpověď, a musí to být šestnáct hexadecimálních znaků — stane se z něj jméno souboru na webu. Bez toho řádku se příspěvek zapíše bez stvrzenky."
   link_without_url: "Příspěvek může nést kartu odkazu, ale `link_title:` a `link_description:` jsou řádky O NÍ — musí u nich být `link:` s adresou."
   link_not_http: "`link: %{url}` není adresa, na kterou může karta mířit. Chce celou adresu http:// nebo https://, nebo adresu od kořene tohohle webu (`/posts/2026/nejaky-post/`); na soubor vedle příspěvku se odkazuje obyčejným řádkem s odkazem v textu."
   video_hevc: "⚠️  %{files}: natočeno v HEVC, což většina prohlížečů přehraje, ale ne všechny — zbytek čtenářů uvidí místo videa prázdný přehrávač. Uloženo tak jako tak. Překódování přehraje všude (potřebuje ffmpeg — na Macu `brew install ffmpeg`):\n     %{command}"
