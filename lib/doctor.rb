@@ -180,7 +180,7 @@ module Doctor
     findings.concat(check_share(data))
     findings.concat(check_trash(root))
     findings.concat(check_deploy(root))
-    findings.concat(check_online(data)) if online
+    findings.concat(check_online(data, root)) if online
     findings
   end
 
@@ -1313,7 +1313,7 @@ module Doctor
   # Everything that needs the network, and nothing that doesn't. Failures
   # here are warnings, never errors: a host being down right now says
   # nothing about whether the config is right.
-  def check_online(data)
+  def check_online(data, root = ROOT)
     require_relative 'feed_http'
     findings = []
 
@@ -1358,7 +1358,85 @@ module Doctor
     findings.concat(check_online_network(data))
     findings.concat(check_online_thread_readable(data))
     findings.concat(check_online_approval(data))
+    findings.concat(check_online_deploy(root))
     findings
+  end
+
+  # How many foreign names a finding spells out before it only counts.
+  FOREIGN_SHOWN = 10
+
+  # Whether the deploy target answers, and what stands in its root that
+  # this site does not put there -- the files an earlier site leaves
+  # behind. A deploy never deletes what it did not write, so they stay,
+  # and a host serves index.php before index.html: the new site is
+  # uploaded and the old front page goes on being what people see.
+  #
+  # Only when the offline check has nothing against the backend: an
+  # unchosen, unknown, unfinished or uninstalled one is reported there,
+  # and asking it over the network could only repeat that less clearly.
+  def check_online_deploy(root)
+    name = deploy_backend_name
+    backend = name && DeployBackend::BACKENDS[name]
+    return [] unless backend&.configured?
+    return [] if backend.respond_to?(:problem) && backend.problem
+    return [] if BACKEND_PROGRAMS[name] && !find_program(BACKEND_PROGRAMS[name])
+
+    # Where the listing looked: sftp's target is only the login, and the
+    # directory is half of the answer.
+    where = backend.respond_to?(:location) ? backend.location : backend.target
+    begin
+      entries = backend.list_root
+    rescue StandardError => e
+      return [warn(t('deploy_target_failed', target: where,
+                                             message: e.message.to_s.lines.first.to_s.strip.sub(/\.\z/, '')))]
+    end
+    return [ok(t('deploy_target_answers', target: where))] if entries.nil?
+
+    ours = site_root_names(root, backend)
+    foreign = entries.reject { |entry_name, _| ours.include?(entry_name) }
+                     .map { |entry_name, dir| dir ? "#{entry_name}/" : entry_name }
+                     .sort
+    return [ok(t('deploy_target_clean', target: where))] if foreign.empty?
+
+    shown = foreign.first(FOREIGN_SHOWN).join(', ')
+    shown += t('deploy_target_more', count: foreign.size - FOREIGN_SHOWN) if foreign.size > FOREIGN_SHOWN
+    [warn(t('deploy_target_foreign', target: where, count: foreign.size, names: shown),
+          t('deploy_target_foreign_fix'))]
+  end
+
+  # The backend DEPLOY_BACKEND names, Surfer when it is unset but Surfer's
+  # values are there (the compatibility default), nil when nothing is
+  # chosen or the name is not a backend.
+  def deploy_backend_name
+    name = ENV['DEPLOY_BACKEND'].to_s
+    if name.empty?
+      return nil if BACKEND_VALUES['surfer'].all? { |v| ENV[v].to_s.empty? }
+
+      name = 'surfer'
+    end
+    DeployBackend::BACKENDS.key?(name) ? name : nil
+  end
+
+  # The top-level names this site puts on a target: what the build holds
+  # now, and what the manifest says an earlier deploy put there (a page
+  # since deleted is still the site's own, waiting for --prune, not
+  # somebody else's). Before the first build and the first deploy there
+  # is nothing, and then everything on the target is foreign -- which is
+  # exactly the moment the question matters.
+  def site_root_names(root, backend)
+    names = []
+    public_dir = File.join(root, 'public.nosync')
+    names.concat(Dir.children(public_dir)) if File.directory?(public_dir)
+    manifest = File.join(root, ".deploy_manifest#{backend.manifest_suffix}.json")
+    if File.file?(manifest)
+      begin
+        data = JSON.parse(File.read(manifest, encoding: 'utf-8'))
+        names.concat(data.keys.reject { |k| k == '_target' }.map { |k| k.split('/').first }) if data.is_a?(Hash)
+      rescue JSON::ParserError, SystemCallError
+        nil
+      end
+    end
+    names.uniq
   end
 
   # Whether the credentials can actually see which replies the author

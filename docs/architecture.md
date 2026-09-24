@@ -753,6 +753,15 @@ The deploy script owns the *what*; backends own the *how*:
   backend is a *snapshot*: every deploy force-pushes one commit that
   mirrors the build exactly, so it declares `always_prunes?` and the
   script keeps its bookkeeping honest.
+- **`list_root`** on every backend answers `doctor --online`: what stands
+  in the target's root, as name and directory-or-not, which doctor holds
+  against the build and the manifest to name what the site did not put
+  there. Only the root -- one request on every backend, where Surfer
+  would need one per directory for the whole tree -- and none for git,
+  whose branch nothing foreign survives in; there the question is only
+  whether the remote answers. The tools run through
+  `DeployBackend::Listing`, with a deadline and ssh in batch mode, so a
+  dead host or a password prompt is a warning rather than a hang.
 
 ## The client side
 

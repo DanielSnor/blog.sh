@@ -2,6 +2,7 @@
 
 require 'tempfile'
 require 'digest'
+require_relative 'listing'
 
 module DeployBackend
   # One rsync run instead of per-file uploads -- rsync does its own
@@ -30,6 +31,23 @@ module DeployBackend
 
     def manifest_suffix
       '.rsync'
+    end
+
+    # [name, directory?] for what stands in the target directory.
+    # `--list-only` with the trailing slash lists the directory's contents,
+    # one level: "drwxr-xr-x  4,096 2026/09/24 10:00:00 name". ssh in batch
+    # mode unless RSYNC_SSH says otherwise, so a password prompt fails
+    # instead of waiting for a reply nobody will type.
+    def list_root
+      ssh = ENV['RSYNC_SSH'].to_s.empty? ? 'ssh -o BatchMode=yes' : ENV['RSYNC_SSH']
+      out = Listing.run(['rsync', '--list-only', '-e', ssh, "#{target.chomp('/')}/"])
+      out.lines.filter_map do |line|
+        perms, _size, _date, _time, name = line.chomp.split(nil, 5)
+        next if name.nil? || name == '.'
+
+        name = name.sub(/ -> .*\z/, '') if perms.start_with?('l')
+        [name, perms.start_with?('d')]
+      end
     end
 
     # The manifest's own name for where this deploy goes. RSYNC_SSH carries

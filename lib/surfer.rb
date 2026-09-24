@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'net/http'
+require 'json'
 require 'uri'
 require_relative 'version'
 
@@ -25,6 +26,9 @@ module Surfer
 # stack trace an otherwise fully spoken setup could still show a
 # beginner (a stopped app and a mistyped URL both land here).
 class Unreachable < StandardError; end
+
+# A directory listing that came back as anything but the API's JSON.
+class ListFailed < StandardError; end
 
 # Everything TCPSocket/TLS can throw before the first request goes out.
 # Distinct from Session::RETRIABLE on purpose: those happen mid-batch on
@@ -126,7 +130,34 @@ module_function
       :failed
     end
 
+    # [name, directory?] for what stands in a remote directory. The API
+    # lists a directory asked for WITH its trailing slash and answers
+    # HTTP 222; the root is `/api/files//` -- `/api/files/` alone is not
+    # the API at all but the site's own front page, served with a 404.
+    def list(dir)
+      remote = dir.to_s.gsub(%r{\A/+|/+\z}, '')
+      resp = send_request { build_list(remote) }
+      code = resp.code.to_i
+      raise ListFailed, "HTTP #{code}" unless code.between?(200, 299)
+
+      entries = JSON.parse(resp.body.to_s)['entries']
+      raise ListFailed, "HTTP #{code}, no entries" unless entries.is_a?(Array)
+
+      entries.map { |e| [e['fileName'].to_s, e['isDirectory'] == true] }
+    rescue JSON::ParserError
+      raise ListFailed, "HTTP #{code}, not a listing"
+    end
+
     private
+
+    def build_list(remote)
+      uri = api_uri(remote)
+      # "/api/files/posts" -> ".../posts/", and the root "/api/files/" -> "//".
+      uri.path = "#{uri.path}/"
+      req = Net::HTTP::Get.new(uri)
+      req['User-Agent'] = Surfer::USER_AGENT
+      req
+    end
 
     # The request is only built here, inside the block, so it can be built
     # again after a reconnect.

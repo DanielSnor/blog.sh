@@ -3,6 +3,8 @@
 require 'tempfile'
 require 'shellwords'
 require 'digest'
+require 'json'
+require_relative 'listing'
 
 module DeployBackend
   # rclone covers the long tail of targets in one integration: S3, R2, B2,
@@ -43,6 +45,14 @@ module DeployBackend
 
     def manifest_suffix
       '.rclone'
+    end
+
+    # [name, directory?] for what stands at the target, one level.
+    def list_root
+      out = Listing.run(['rclone', 'lsjson', target, *Shellwords.split(ENV['RCLONE_ARGS'].to_s)])
+      JSON.parse(out).map { |e| [e['Name'].to_s, e['IsDir'] == true] }
+    rescue JSON::ParserError => e
+      raise Listing::Failed, e.message
     end
 
     # RCLONE_ARGS can carry --config, which re-resolves the whole remote to

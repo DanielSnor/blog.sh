@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require 'tmpdir'
+require_relative 'listing'
 
 module DeployBackend
   # Pushes the build as a single-commit snapshot to a git branch --
@@ -46,6 +47,14 @@ module DeployBackend
 
     def manifest_suffix
       '.git'
+    end
+
+    # nil: the branch is replaced whole on every deploy, so nothing that is
+    # not the site can survive in it and there is no root to look through.
+    # Whether the remote answers is the whole question.
+    def list_root
+      Listing.run(['git', 'ls-remote', '--heads', remote, branch])
+      nil
     end
 
     # A snapshot mirrors the whole build every run, so orphaned files are

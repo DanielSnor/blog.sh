@@ -4,6 +4,7 @@ require 'open3'
 require 'tempfile'
 require 'shellwords'
 require 'digest'
+require_relative 'listing'
 
 module DeployBackend
   # Plain SFTP for hosts that offer neither rsync nor git -- openssh's
@@ -162,6 +163,36 @@ module DeployBackend
 
     def manifest_suffix
       '.sftp'
+    end
+
+    # Where the site lands, for a person to read: the login and the
+    # directory, which `target` (the address handed to sftp) leaves out.
+    def location
+      dir = ENV['SFTP_REMOTE_DIR'].to_s
+      dir.empty? ? target : "#{target}:#{dir}"
+    end
+
+    # [name, directory?] for what stands in SFTP_REMOTE_DIR (or the login
+    # directory). The batch comes on stdin and `ls -la` prints the long
+    # form -- "drwxr-xr-x  2 me me  4096 Sep 24 10:00 name" -- which is
+    # the only one that says what is a directory. Batch mode, so a password
+    # prompt fails instead of waiting.
+    def list_root
+      dir = ENV['SFTP_REMOTE_DIR'].to_s
+      batch = dir.empty? ? "ls -la\n" : "cd #{quote(dir)}\nls -la\n"
+      cmd = ['sftp', '-o', 'BatchMode=yes', '-b', '-', *Shellwords.split(ENV['SFTP_ARGS'].to_s), target]
+      Listing.run(cmd, input: batch).lines.filter_map do |line|
+        next if line.start_with?('sftp>')
+
+        fields = line.chomp.split(nil, 9)
+        next unless fields.size == 9 && fields.first.match?(/\A[dlcbps-][rwxsStT-]{9}/)
+
+        name = fields.last
+        next if %w[. ..].include?(name)
+
+        name = name.sub(/ -> .*\z/, '') if fields.first.start_with?('l')
+        [name, fields.first.start_with?('d')]
+      end
     end
 
     # Deletion here is by NAME, one orphan at a time, so it composes with

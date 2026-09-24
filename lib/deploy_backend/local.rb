@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require_relative '../path_safety'
+require_relative 'listing'
 
 module DeployBackend
   # Copies the build into a directory on this machine -- for a site served
@@ -39,6 +40,14 @@ module DeployBackend
 
     def manifest_suffix
       '.local'
+    end
+
+    # [name, directory?] for what stands in the target directory.
+    def list_root
+      base = File.expand_path(dir)
+      Dir.children(base).map { |name| [name, File.directory?(File.join(base, name))] }
+    rescue SystemCallError => e
+      raise Listing::Failed, e.message
     end
 
     def session

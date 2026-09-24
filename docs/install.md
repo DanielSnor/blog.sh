@@ -568,7 +568,9 @@ old WordPress front page goes on answering over the new one, and an old
 the old site out of the target before the first deploy -- over FTP, with
 the client or file manager you used for it -- and keep only what the
 host itself put there. (The git backend is the exception: every push
-replaces the whole branch.)
+replaces the whole branch.) `./blog.sh doctor --online` lists what stands
+in the target's root that the site does not put there -- run it once the
+target is set, before the first deploy.
 
 One thing to know before you write your first post with a big attachment:
 a single file over 100 MB is refused, at save time and again at deploy
