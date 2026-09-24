@@ -33,6 +33,14 @@ module LanguageFile
     'about' => %w[heading html],
     'footer' => %w[links_heading links note_heading note_html copyright social_heading]
   }.freeze
+  # Texts that stand in for something when site.yml leaves them out: the
+  # engine's own headings, in the language of the page, and the banner's
+  # claim, which is the site's description until it is written. A language
+  # file may give them without site.yml doing so -- every language still
+  # shows one, in its own words. Every other text translates something
+  # site.yml says, and with nothing there it would be a text only this
+  # language has.
+  STANDS_IN = %w[about.heading footer.links_heading footer.social_heading banner.claim].freeze
   # A widget's heading is words; its account, instance and limit are not.
   WIDGET_TEXTS = %w[heading].freeze
   # What the reader of this language sees for a tag: `tags:` maps a tag to
@@ -89,7 +97,11 @@ module LanguageFile
   #   :unknown  -- a key the engine does not read (a typo, or a fact about
   #                the site that is the same in every language)
   #   :orphan   -- a translation of something the site's own config does
-  #                not have, so there is nothing for it to replace
+  #                not have, so there is nothing for it to replace -- an
+  #                about text or a footer note only this language would
+  #                show, or a heading for a widget the site has not set up
+  #   :empty    -- a tag given an empty word, which would leave its pill
+  #                with nothing on it
   #   :mismatch -- a list with places in it that names other places than
   #                the site's own does, or the same ones in another order
   def problems(own, lang_data)
@@ -103,11 +115,21 @@ module LanguageFile
       elsif TEXTS.key?(key)
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
-        value.each_key { |sub| found << [:unknown, "#{key}.#{sub}", nil] unless TEXTS[key].include?(sub) }
+        value.each_key do |sub|
+          name = "#{key}.#{sub}"
+          next found << [:unknown, name, nil] unless TEXTS[key].include?(sub)
+          next if sub == 'links' || STANDS_IN.include?(name)
+
+          found << [:orphan, name, nil] if dig(own, key, sub).to_s.strip.empty?
+        end
       elsif key == TAG_LABELS
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
-        value.each { |tag, label| found << [:unknown, "#{key}.#{tag}", nil] unless label.is_a?(String) && !label.strip.empty? }
+        value.each do |tag, label|
+          next if label.is_a?(String) && !label.strip.empty?
+
+          found << [label.nil? || label.is_a?(String) ? :empty : :unknown, "#{key}.#{tag}", nil]
+        end
       elsif key == 'widgets'
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 

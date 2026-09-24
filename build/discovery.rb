@@ -85,7 +85,9 @@ module Discovery
     published = post_display_time(post).iso8601
     tags = post['tags'] || []
     lines = [%(<meta property="article:published_time" content="#{h(published)}">)]
-    lines += tags.map { |tag| %(<meta property="article:tag" content="#{h(tag)}">) }
+    # The tag's word in this language, as on the pill and in `keywords`
+    # below -- the raw tag here made the two lines of one head disagree.
+    lines += tags.map { |tag| %(<meta property="article:tag" content="#{h(tag_label(tag))}">) }
 
     data = {
       '@context' => 'https://schema.org',

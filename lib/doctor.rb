@@ -158,6 +158,7 @@ module Doctor
     findings.concat(parse_findings)
     return findings unless data
 
+    findings.concat(check_language_yml(root))
     findings.concat(check_identity(data))
     findings.concat(check_placeholders(data))
     findings.concat(check_locale(data))
@@ -234,6 +235,23 @@ module Doctor
     return [nil, [error(t('site_yml_empty'), t('site_yml_missing_fix'))]] unless data.is_a?(Hash)
 
     [data, [ok(t('site_yml_ok'))]]
+  end
+
+  # The language files beside site.yml parse. One that does not stops the
+  # build of every language, and the build's message sends the reader
+  # here -- which used to say nothing about it. Whether the keys inside are
+  # right is `check`'s question, and the build's; this is only whether the
+  # file can be read at all.
+  def check_language_yml(root)
+    Dir.glob(File.join(root, 'config', 'site.*.yml')).sort.filter_map do |path|
+      YAML.load_file(path)
+      nil
+    rescue Psych::SyntaxError => e
+      error(t('language_yml_syntax', file: File.basename(path), message: e.problem.to_s),
+            t('site_yml_syntax_fix', line: e.line, column: e.column))
+    rescue StandardError
+      nil
+    end
   end
 
   # --- identity ------------------------------------------------------

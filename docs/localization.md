@@ -254,7 +254,8 @@ the same in every language, and a translation of it would be a second site.
 written once in the site's own language like its date, and a tag has one
 page in every language: `/cs/tag/philosophy/` is the Czech page of the tag
 `philosophy`. What a Czech reader sees for it -- on the pill, over its
-page, in its feed and in the tag index -- is the word `tags:` gives it:
+page, in its feed, in the tag index and in what the search box finds --
+is the word `tags:` gives it:
 
 ```yaml
 # config/site.cs.yml
@@ -276,15 +277,24 @@ only the label changes. A menu that drifts apart between languages is a
 second site, and a reader who switches language would lose the item they
 were reaching for. The address is still the one the site's own language
 writes -- `/posts/2026/blog-sh/` above -- and the Czech build takes it to
-the Czech copy of that post, as it does for the site's own menu.
+the Czech copy of that post, as it does for the site's own menu. A footer
+link goes the same way.
 
 The rules, which the build and `check` both enforce: the site's own
 language has no file (site.yml is it); a file for a language
 `site.locales` does not name is refused rather than ignored; so is a key
 the engine does not read, a translation of something site.yml does not
 have (a heading for a widget the site has not set up, a menu on a site
-whose menu is the engine's), and a menu or footer list that goes to other
-places than site.yml's.
+whose menu is the engine's, an about text or a footer note site.yml does
+not write -- it would be a text only this language shows), and a menu or
+footer list that goes to other places than site.yml's. The exceptions are
+the texts that stand in for something when site.yml leaves them out: the
+engine's own headings (`about.heading`, `footer.links_heading`,
+`footer.social_heading`) and `banner.claim`, which is the description
+until it is written -- every language shows one of those anyway. A tag
+given an empty word is refused too; leave it out to show it as written.
+A language file that is not valid YAML stops the build of every language,
+and `check` and `doctor` both name it.
 
 The writing app is not translated this way: it is one copy for the site,
 and it speaks the site's own language, because that is the language its

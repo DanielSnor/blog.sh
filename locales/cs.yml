@@ -36,6 +36,7 @@ build:
   language_file_stray: "❌ %{files}: soubor pro jazyk, který tenhle web nepublikuje. Buď jazyk uveď v site.locales, nebo soubor smaž — takhle ho nikdo nečte."
   language_key_unknown: "❌ %{file} říká %{keys}, což engine nečte. Zná: %{known}."
   language_key_orphan: "❌ %{file} překládá %{keys}, ale config/site.yml nic takového nemá — není co nahradit. Nejdřív to nastav v site.yml, nebo to z %{file} vyndej."
+  language_label_empty: "❌ %{file} dává %{keys} prázdné slovo, takže by na štítku nic nebylo. Napiš to slovo, nebo ten štítek z tags: vyndej — pak se ukáže tak, jak je napsaný."
   language_list_mismatch: "❌ %{file}: %{key} musí vést na stejná místa ve stejném pořadí jako v config/site.yml — mění se jen slova. %{detail}"
   # Každý počet má svůj popisek — „postů: 1“, ne „1 postů“ — protože I18n
   # v enginu nezná množná čísla a nikdy je znát nebude. Věta, která musí
@@ -1034,6 +1035,7 @@ doctor:
   site_yml_unreadable: "config/site.yml existuje, ale nejde přečíst: %{message}."
   site_yml_unreadable_fix: "Zkontroluj vlastníka a práva souboru (ls -l config/site.yml). Obvykle pomůže: chmod 644 config/site.yml — a pokud soubor vlastní root po průvodci spuštěném přes sudo, taky chown."
   site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek. Když ten řádek vypadá v pořádku, příčina je jinde — nejčastěji zakomentovaná hlavička sekce, pod kterou zůstaly její klíče, nebo dřív neuzavřená uvozovka."
+  language_yml_syntax: "config/%{file} není platné YAML: %{message} — a sestavení se na něm zastaví, ve všech jazycích."
 
   identity_ok: "Identita webu je vyplněná."
   key_missing: "V config/site.yml chybí %{key}."
@@ -1250,8 +1252,12 @@ check:
   language_file_stray_fix: "Buď jazyk uveď v `site.locales`, nebo soubor smaž. Vlastní jazyk webu svůj soubor nemá: je jím config/site.yml."
   language_key_unknown: "%{file} říká %{keys}, což engine nečte."
   language_key_unknown_fix: "Zná: %{known}. Klíč, který nezná, nedělá vůbec nic — proto se to říká nahlas."
+  language_file_syntax: "%{file} není platné YAML: %{message} na řádku %{line}, sloupec %{column} — a sestavení se na něm zastaví, ve všech jazycích, ne jen v tomhle."
+  language_file_syntax_fix: "Skoro vždycky je to odsazení, chybějící uvozovka nebo uvozovka uvnitř hodnoty v uvozovkách. ./blog.sh doctor řekne, na co se podívat."
   language_key_orphan: "%{file} překládá %{keys}, ale config/site.yml nic takového nemá."
   language_key_orphan_fix: "Není co nahradit. Nejdřív to nastav v site.yml, nebo to ze souboru vyndej — takhle to nedělá nic."
+  language_label_empty: "%{file} dává %{keys} prázdné slovo, takže by na štítku nic nebylo."
+  language_label_empty_fix: "Napiš to slovo, nebo ten štítek z tags: vyndej — pak se ukáže tak, jak je napsaný."
   language_list_mismatch: "%{file}: %{key} vede jinam než v config/site.yml. %{detail}"
   language_list_mismatch_fix: "Přeložené menu nebo patička jmenuje stejná místa ve stejném pořadí; mění se jen slova. Dokud se neshodují, sestavení soubor odmítá."
   language_tag_unused: "%{file} dává slovo štítku %{tags}, který žádný publikovaný příspěvek nenese — nikde se neukáže."

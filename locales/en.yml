@@ -37,6 +37,7 @@ build:
   language_file_stray: "❌ %{files}: a file for a language this site does not publish. Name the language in site.locales, or delete the file -- nothing reads it as it stands."
   language_key_unknown: "❌ %{file} says %{keys}, which the engine does not read. It knows: %{known}."
   language_key_orphan: "❌ %{file} translates %{keys}, which config/site.yml does not have -- there is nothing for it to replace. Set it up in site.yml first, or take it out of %{file}."
+  language_label_empty: "❌ %{file} gives %{keys} an empty word, which would leave the pill with nothing on it. Write the word, or take the tag out of tags: -- it then shows as written."
   language_list_mismatch: "❌ %{file}: %{key} has to go to the same places as in config/site.yml, in the same order -- only the words change. %{detail}"
   # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
   # because the engine's I18n has no plural forms and is not getting any.
@@ -1064,6 +1065,7 @@ doctor:
   site_yml_unreadable: "config/site.yml exists but cannot be read: %{message}."
   site_yml_unreadable_fix: "Check the file's owner and permissions (ls -l config/site.yml). Usually: chmod 644 config/site.yml — and if the file is owned by root after a wizard ran under sudo, chown it too."
   site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. If that line looks fine, the cause is elsewhere -- most often a section header commented out with its keys left behind, or a quote left open earlier."
+  language_yml_syntax: "config/%{file} is not valid YAML: %{message} -- and the build stops on it, in every language."
 
   identity_ok: "The site's identity is filled in."
   key_missing: "%{key} is missing from config/site.yml."
@@ -1281,8 +1283,12 @@ check:
   language_file_stray_fix: "Name the language in `site.locales`, or delete the file. The site's own language has no file of its own: config/site.yml is it."
   language_key_unknown: "%{file} says %{keys}, which the engine does not read."
   language_key_unknown_fix: "It knows: %{known}. A key it does not know does nothing at all, which is why it is said here."
+  language_file_syntax: "%{file} is not valid YAML: %{message} at line %{line}, column %{column} -- and the build stops on it, in every language, not only this one."
+  language_file_syntax_fix: "Almost always this is indentation, a missing quote, or a quote inside a quoted value. ./blog.sh doctor says what to look for."
   language_key_orphan: "%{file} translates %{keys}, which config/site.yml does not have."
   language_key_orphan_fix: "There is nothing for it to replace. Set it up in site.yml first, or take it out of the file -- as it stands it does nothing."
+  language_label_empty: "%{file} gives %{keys} an empty word, which would leave the pill with nothing on it."
+  language_label_empty_fix: "Write the word, or take the tag out of tags: -- it then shows as written."
   language_list_mismatch: "%{file}: %{key} goes to other places than in config/site.yml. %{detail}"
   language_list_mismatch_fix: "A translated menu or footer names the same places in the same order; only the words change. The build refuses the file until they match."
   language_tag_unused: "%{file} gives a word to %{tags}, which no published post carries -- nothing shows it."

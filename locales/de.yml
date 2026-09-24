@@ -37,6 +37,7 @@ build:
   language_file_stray: "❌ %{files}: eine Datei für eine Sprache, die diese Website nicht veröffentlicht. Nenne die Sprache in site.locales oder lösche die Datei -- so liest sie niemand."
   language_key_unknown: "❌ %{file} nennt %{keys}, was die Engine nicht liest. Sie kennt: %{known}."
   language_key_orphan: "❌ %{file} übersetzt %{keys}, das es in config/site.yml nicht gibt -- es gibt nichts zu ersetzen. Richte es zuerst in site.yml ein oder nimm es aus %{file} heraus."
+  language_label_empty: "❌ %{file} gibt %{keys} ein leeres Wort, sodass auf dem Schlagwort nichts stünde. Schreib das Wort, oder nimm das Schlagwort aus tags: heraus -- dann erscheint es so, wie es geschrieben ist."
   language_list_mismatch: "❌ %{file}: %{key} muss auf dieselben Ziele in derselben Reihenfolge führen wie in config/site.yml -- nur die Worte ändern sich. %{detail}"
   # Jede Zahl bekommt ihre eigene Beschriftung -- „Beiträge: 1“ statt
   # „1 Beiträge“ --, denn das I18n der Engine kennt keine Pluralformen und
@@ -1046,6 +1047,7 @@ doctor:
   site_yml_unreadable: "config/site.yml existiert, lässt sich aber nicht lesen: %{message}."
   site_yml_unreadable_fix: "Prüfe Eigentümer und Rechte der Datei (ls -l config/site.yml). Meist hilft: chmod 644 config/site.yml — und wenn die Datei nach einem mit sudo gestarteten Assistenten root gehört, auch chown."
   site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen. Wenn diese Zeile in Ordnung aussieht, liegt die Ursache anderswo -- meist ein auskommentierter Abschnittskopf, dessen Schlüssel stehen geblieben sind, oder ein weiter oben offen gelassenes Anführungszeichen."
+  language_yml_syntax: "config/%{file} ist kein gültiges YAML: %{message} -- und der Build hält daran an, in jeder Sprache."
 
   identity_ok: "Die Identität der Website ist ausgefüllt."
   key_missing: "%{key} fehlt in config/site.yml."
@@ -1264,8 +1266,12 @@ check:
   language_file_stray_fix: "Nenne die Sprache in `site.locales` oder lösche die Datei. Die eigene Sprache der Website hat keine eigene Datei: config/site.yml ist sie."
   language_key_unknown: "%{file} nennt %{keys}, was die Engine nicht liest."
   language_key_unknown_fix: "Sie kennt: %{known}. Ein Schlüssel, den sie nicht kennt, tut gar nichts -- darum steht es hier."
+  language_file_syntax: "%{file} ist kein gültiges YAML: %{message} in Zeile %{line}, Spalte %{column} -- und der Build hält daran an, in jeder Sprache, nicht nur in dieser."
+  language_file_syntax_fix: "Fast immer ist es die Einrückung, ein fehlendes Anführungszeichen oder ein Anführungszeichen in einem Wert in Anführungszeichen. ./blog.sh doctor sagt, worauf zu achten ist."
   language_key_orphan: "%{file} übersetzt %{keys}, das es in config/site.yml nicht gibt."
   language_key_orphan_fix: "Es gibt nichts zu ersetzen. Richte es zuerst in site.yml ein oder nimm es aus der Datei -- so bewirkt es nichts."
+  language_label_empty: "%{file} gibt %{keys} ein leeres Wort, sodass auf dem Schlagwort nichts stünde."
+  language_label_empty_fix: "Schreib das Wort, oder nimm das Schlagwort aus tags: heraus -- dann erscheint es so, wie es geschrieben ist."
   language_list_mismatch: "%{file}: %{key} führt woandershin als in config/site.yml. %{detail}"
   language_list_mismatch_fix: "Ein übersetztes Menü oder eine übersetzte Fußzeile nennt dieselben Ziele in derselben Reihenfolge; nur die Worte ändern sich. Bis sie übereinstimmen, verweigert der Build die Datei."
   language_tag_unused: "%{file} gibt %{tags} ein Wort, aber kein veröffentlichter Beitrag trägt diesen Tag -- nichts zeigt es."

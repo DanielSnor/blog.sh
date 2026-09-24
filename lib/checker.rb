@@ -1372,10 +1372,30 @@ module Checker
                           kind: :language_file_stray, data: { 'file' => name, 'lang' => code })
         next
       end
+      broken = language_file_syntax(path)
+      if broken
+        findings << broken
+        next
+      end
       findings.concat(language_file_findings(name, own_config(root), language_file(root, code)))
     end
     findings.concat(unused_tag_labels(posts, root))
     findings
+  end
+
+  # A language file that will not parse stops the build of EVERY language
+  # (build_blog.rb reads them all), so it is an error here -- `language_file`
+  # above reads it as {} and this check used to call the archive sound while
+  # nothing could be built. site.yml has its own check; this file had none.
+  def language_file_syntax(path)
+    YamlCompat.load_file(path)
+    nil
+  rescue Psych::SyntaxError => e
+    name = File.basename(path)
+    error(t('language_file_syntax', file: name, message: e.problem.to_s, line: e.line, column: e.column),
+          t('language_file_syntax_fix'), kind: :language_file_syntax, data: { 'file' => name, 'line' => e.line })
+  rescue StandardError
+    nil
   end
 
   def language_file_findings(name, own, data)
@@ -1389,6 +1409,9 @@ module Checker
       when :orphan
         [error(t('language_key_orphan', file: name, keys: keys.join(', ')), t('language_key_orphan_fix'),
                kind: :language_key_orphan, data: { 'file' => name, 'keys' => keys })]
+      when :empty
+        [error(t('language_label_empty', file: name, keys: keys.join(', ')), t('language_label_empty_fix'),
+               kind: :language_label_empty, data: { 'file' => name, 'keys' => keys })]
       else
         found.map do |_, key, detail|
           sentence = LanguageFile.describe(detail, name) { |k, **v| I18n.t(k, **v) }

@@ -379,6 +379,8 @@ SITE_LOCALES = begin
                                               known: LanguageFile.known.join(', '))]
       when :orphan
         [I18n.t('build.language_key_orphan', file: file, keys: found.map { |f| f[1] }.join(', '))]
+      when :empty
+        [I18n.t('build.language_label_empty', file: file, keys: found.map { |f| f[1] }.join(', '))]
       else
         found.map do |_, key, detail|
           I18n.t('build.language_list_mismatch', file: file, key: key,
@@ -1074,8 +1076,13 @@ def footer_links_html
   # file healthy. Its sibling `social:` has always read the empty answer
   # correctly (SiteConfig.get returns the default for nil), and the two
   # describe the same shape of data.
+  #
+  # The address goes the way a menu item's does (nav_url): the language
+  # file names the same places as site.yml and refuses a /cs/ address, so
+  # a link to the site's own page has to be taken to this language's copy
+  # here -- otherwise every such link on /cs/ led back into English.
   SiteConfig::Chrome.list(SiteConfig.data, 'footer', 'links').map do |link|
-    %(          <li><a href="#{h(link['url'])}">#{h(link['title'])}</a></li>)
+    %(          <li><a href="#{h(nav_url(link['url'].to_s))}">#{h(link['title'])}</a></li>)
   end.join("\n")
 end
 
@@ -3435,7 +3442,11 @@ pinned_post = posts.find(&pinned)
 if posts.count(&pinned) > 1
   warn t('build.pinned_more_than_one', slug: pinned_post['slug'])
 end
-page_count = write_listing(posts, index_template, CONTENT_ROOT, pinned: pinned_post)
+# The language root, like every other listing's base path: without it the
+# Czech front page paged into the English /page/N/ and named the English
+# front page as its canonical address -- a search engine then files /cs/
+# as a copy of /. Empty on the site's own language, where nothing changes.
+page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post)
 
 tags_map = {}
 overlong_tags = []
@@ -3753,8 +3764,18 @@ def search_index_entry(post)
     title: post['title'] || link_title_block(post)&.[]('title') || name,
     date: post_display_time(post).strftime(t('date_format')),
     excerpt: truncate_excerpt(after),
-    folded: PostText.searchable(post, text)
+    # The word the pill shows is what a reader types, so it has to be
+    # findable: on /cs/ the pill says "filozofie" and the index knew only
+    # "philosophy" (1 of 20 tagged posts found). The tag itself stays too
+    # -- it is the address of the tag page -- and where the two are one
+    # word, as on a site's own language, nothing changes.
+    folded: PostText.searchable(post.merge('tags' => searchable_tags(post)), text)
   }
+end
+
+def searchable_tags(post)
+  tags = post['tags'] || []
+  (tags + tags.map { |tag| tag_label(tag) }).uniq
 end
 
 # --- The archive index -------------------------------------------------
