@@ -1262,7 +1262,7 @@ check:
   repair_summary: "Applied: %{applied}, skipped: %{skipped}, nothing offered: %{no_offer}."
   repair_rebuild: "Run ./blog.sh rebuild to put the changes on the site."
   language_address_taken_fix: "Give one of them another address: the `slug:` line in the header that `./blog.sh translate <slug> --lang %{lang}` opens."
-  language_address_taken: "In %{lang}, %{slugs} both ask for %{address} -- the build serves one of them and drops the other."
+  language_address_taken: "In %{lang}, %{slugs} both ask for %{address} -- the build stops on it, and the site is not deployed."
   unknown_locale: "%{langs}: `site.locales` names it, and the engine has no locale file for it -- no language of this site will build."
   unknown_locale_fix: "Add locales/<code>.yml for it, take the code out of `site.locales`, or name the language its interface words come from under `site.ui_language` in config/site.yml."
   language_file_stray: "%{file} is a file for a language this site does not publish -- nothing reads it."

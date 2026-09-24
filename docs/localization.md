@@ -432,8 +432,9 @@ wrong, and a post that exists in one language is not wrong.
 
 One state in it is a fault and is reported by an ordinary `check`: two
 posts asking for one address in one language. `translate` refuses to
-write that, so it arrives by hand or from an import -- and the build
-would serve one of them and drop the other without a word.
+write that, so it arrives by hand or from an import -- and the build of
+that language stops on it, so `./blog.sh rebuild` deploys nothing until
+one of the two is given another address.
 
 ### Publishing a post that is not in every language
 
