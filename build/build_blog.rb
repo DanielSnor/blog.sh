@@ -1025,10 +1025,14 @@ def share_ask_html
     %(#{h(t('share.ask_invalid'))}</span></form>)
 end
 
+# An icon that points at the site itself -- the RSS one, a page -- goes the
+# way a menu item does (nav_url): on /cs/ the feed icon led to the English
+# /rss.xml while the page's own <link rel="alternate"> named /cs/rss.xml.
+# An address elsewhere, which is nearly every icon, is left as written.
 def social_links_html
   SOCIAL.map do |entry|
     rel = entry['rel'] ? %( rel="#{h(entry['rel'])}") : ''
-    %(          <a href="#{h(entry['url'])}"#{rel} title="#{h(entry['name'])}">#{social_icon(entry)}</a>)
+    %(          <a href="#{h(nav_url(entry['url'].to_s))}"#{rel} title="#{h(entry['name'])}">#{social_icon(entry)}</a>)
   end.join("\n")
 end
 
