@@ -2990,6 +2990,11 @@ def nav_url(url)
 
   known = NAV_POSTS_BY_ADDRESS[url] || NAV_POSTS_BY_ADDRESS["#{url}/"]
   return post_href(known) if known
+  # 🪤 The front page and the feed are this language's too, but they are
+  # not directories, so the ROOT_DIRS rule below never reached them: `url:
+  # /` -- the first item of most hand-written menus -- sent a Czech reader
+  # to the English front page, and the Czech one never marked its own item.
+  return loc(url) if ['/', '/rss.xml'].include?(url)
 
   first = url.split('/').reject(&:empty?).first.to_s
   PostAddress::ROOT_DIRS.include?(first) ? loc(url) : url
