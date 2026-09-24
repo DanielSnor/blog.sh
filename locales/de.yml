@@ -1198,7 +1198,7 @@ doctor:
   program_missing: "Das Backend %{name} ruft %{program} auf, und %{program} ist hier nicht installiert -- jeder Deploy würde nach dem Build scheitern."
   program_missing_fix: "Installiere %{program} aus den Paketen deines Systems und starte dann ./blog.sh doctor erneut."
   program_missing_fix_rclone: "Installiere rclone aus den Paketen deines Systems oder von rclone.org -- nicht als Snap, siehe docs/install.md."
-  rclone_snap_confined: "rclone ist hier der Snap (%{path}), der nur in deinem Home-Verzeichnis lesen darf -- die Website liegt aber in %{dir}, also würde jeder Deploy mit no such file or directory scheitern."
+  rclone_snap_confined: "rclone ist hier der Snap (%{path}), der nur in deinem Home-Verzeichnis lesen darf -- die Website liegt aber in %{dir}, also würde jeder Deploy an Dateien scheitern, die offensichtlich da sind (no such file or directory oder permission denied)."
   rclone_snap_confined_fix: "Installiere rclone statt des Snaps aus den Paketen deines Systems oder von rclone.org (docs/install.md), oder verschiebe die Website in einen Ordner in deinem Home-Verzeichnis, dessen Name nicht mit einem Punkt beginnt."
 
   widget_label: "der Feed des Widgets %{name}"

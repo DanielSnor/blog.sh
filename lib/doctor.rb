@@ -1255,7 +1255,8 @@ module Doctor
     # The rclone snap is not the rclone project's, and it is confined: it
     # reads your home directory and nothing else, so a site in /srv or
     # /var/www fails every deploy with "no such file or directory" about a
-    # file that is plainly there (reproduced 23. 9. 2026, Ubuntu 22.04).
+    # file that is plainly there, and one under ~/.hidden with "permission
+    # denied" (both reproduced, Ubuntu 22.04, snap rclone 1.75.1).
     site = resolved_path(root)
     return nil if snap_can_read?(site)
 
