@@ -118,6 +118,17 @@ module Doctor
     'sftp' => %w[SFTP_TARGET]
   }.freeze
 
+  # The program each backend shells out to. Surfer talks HTTP from Ruby and
+  # local copies files, so neither needs one. Without the program every
+  # deploy fails with the shell's "command not found" -- after the build,
+  # in cron output nobody reads, which is exactly what doctor is for.
+  BACKEND_PROGRAMS = {
+    'rsync' => 'rsync',
+    'rclone' => 'rclone',
+    'sftp' => 'sftp',
+    'git' => 'git'
+  }.freeze
+
   module_function
 
   def t(key, **vars)
@@ -168,7 +179,7 @@ module Doctor
     findings.concat(check_social_icons(data))
     findings.concat(check_share(data))
     findings.concat(check_trash(root))
-    findings.concat(check_deploy)
+    findings.concat(check_deploy(root))
     findings.concat(check_online(data)) if online
     findings
   end
@@ -1188,7 +1199,7 @@ module Doctor
     [warn(I18n.t('doctor.trash_holds', count: held.length, size: FileSize.human(bytes)))]
   end
 
-  def check_deploy
+  def check_deploy(root = ROOT)
     name = ENV['DEPLOY_BACKEND'].to_s
 
     # An unset DEPLOY_BACKEND means Surfer -- that is the compatibility
@@ -1216,11 +1227,84 @@ module Doctor
     trouble = backend.respond_to?(:problem) ? backend.problem : nil
     return [error(trouble, I18n.t('cli.deploy_args_fix'))] if trouble
 
+    program_trouble = check_backend_program(name, root)
+    return program_trouble if program_trouble
+
     return [ok(t('backend_ok', name: name))] if missing.empty?
 
     # Not an error: an unconfigured backend is the documented state of a
     # local-only install, where deploy skips out loud and exits 0.
     [warn(t('backend_incomplete', name: name, values: missing.join(', ')), t('backend_incomplete_fix'))]
+  end
+
+  # nil when the backend's program is there and can do its job, otherwise
+  # the one finding that says why not. Asked before the values: somebody
+  # who has chosen rsync and not yet filled RSYNC_TARGET is better told now
+  # that rsync is not installed than after they have filled it in.
+  def check_backend_program(name, root)
+    program = BACKEND_PROGRAMS[name]
+    return nil unless program
+
+    path = find_program(program)
+    unless path
+      fix = name == 'rclone' ? t('program_missing_fix_rclone') : t('program_missing_fix', program: program)
+      return [error(t('program_missing', name: name, program: program), fix)]
+    end
+    return nil unless name == 'rclone' && snap_program?(path)
+
+    # The rclone snap is not the rclone project's, and it is confined: it
+    # reads your home directory and nothing else, so a site in /srv or
+    # /var/www fails every deploy with "no such file or directory" about a
+    # file that is plainly there (reproduced 23. 9. 2026, Ubuntu 22.04).
+    site = resolved_path(root)
+    return nil if snap_can_read?(site)
+
+    [error(t('rclone_snap_confined', path: path, dir: site), t('rclone_snap_confined_fix'))]
+  end
+
+  # The full path of a program the way the shell would find it, or nil.
+  # Walked by hand rather than asking `which`, which is not on every
+  # system and says "not found" in a dozen different ways.
+  def find_program(program, search = ENV['PATH'])
+    search.to_s.split(File::PATH_SEPARATOR).each do |dir|
+      next if dir.empty?
+
+      candidate = File.join(dir, program)
+      return candidate if File.file?(candidate) && File.executable?(candidate)
+    end
+    nil
+  end
+
+  # A snap is started through /snap/bin, whose entries are links to
+  # /usr/bin/snap -- either end gives it away.
+  def snap_program?(path)
+    return true if path.start_with?('/snap/')
+
+    File.realpath(path).end_with?('/bin/snap')
+  rescue SystemCallError
+    false
+  end
+
+  # What snapd's `home` interface lets a snap read: anything under the home
+  # directory whose first step below it is not hidden (~/blog is readable,
+  # ~/.local/blog is not). Everything outside home is out of reach.
+  def snap_can_read?(dir, home = ENV['HOME'])
+    return true if home.to_s.empty?
+
+    home = resolved_path(home)
+    dir = resolved_path(dir)
+    return true if dir == home
+    return false unless dir.start_with?("#{home}/")
+
+    !dir.delete_prefix("#{home}/").start_with?('.')
+  end
+
+  # The confinement judges the path the kernel opens, so a site reached
+  # through a link from home into /srv is still in /srv.
+  def resolved_path(path)
+    File.realpath(File.expand_path(path))
+  rescue SystemCallError
+    File.expand_path(path)
   end
 
   # --- online --------------------------------------------------------

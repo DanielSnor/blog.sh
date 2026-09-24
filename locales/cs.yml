@@ -1183,6 +1183,11 @@ doctor:
   backend_unknown_fix: "Známé backendy: %{known}."
   backend_incomplete: "Backendu %{name} chybí %{values}, takže nasazení nic nenahraje."
   backend_incomplete_fix: "Nasazení to řekne a skončí v pořádku, což je přesně to, co chce instalace jen pro lokální použití — až budeš chtít web online, doplň hodnoty do env.sh."
+  program_missing: "Backend %{name} spouští %{program} a ten tu není nainstalovaný — každé nasazení by po sestavení selhalo."
+  program_missing_fix: "Nainstaluj %{program} z balíčků systému a pak znovu spusť ./blog.sh doctor."
+  program_missing_fix_rclone: "Nainstaluj rclone z balíčků systému nebo z rclone.org — ne jako snap, viz docs/install.md."
+  rclone_snap_confined: "rclone je tu snap (%{path}), který smí číst jen v domovském adresáři — a web leží v %{dir}, takže každé nasazení by selhalo s hláškou no such file or directory."
+  rclone_snap_confined_fix: "Místo snapu nainstaluj rclone z balíčků systému nebo z rclone.org (docs/install.md), nebo přesuň web do složky v domovském adresáři, jejíž jméno nezačíná tečkou."
 
   widget_label: "feed widgetu %{name}"
   analytics_label: "měřicí skript"

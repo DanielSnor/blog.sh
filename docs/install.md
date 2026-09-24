@@ -642,6 +642,8 @@ as a snap. The snap is not published by the rclone project, and it is
 confined to your home directory: with the site anywhere else (`/srv`,
 `/var/www`, `/opt`) it cannot read a single file of it, and says so as
 "no such file or directory" about a file that is plainly there.
+`./blog.sh doctor` notices the snap and says when the site is out of its
+reach.
 
 A plain **FTP** host -- the kind a shared hosting plan gives you, with no
 SSH to it at all -- goes through rclone as well. In `rclone config` pick

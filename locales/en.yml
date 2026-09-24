@@ -1213,6 +1213,11 @@ doctor:
   backend_unknown_fix: "Known backends: %{known}."
   backend_incomplete: "The %{name} deploy backend is missing %{values}, so deploys upload nothing."
   backend_incomplete_fix: "Deploys say so and exit cleanly, which is what a local-only install wants -- set the values in env.sh when you want the site online."
+  program_missing: "The %{name} backend runs %{program}, and %{program} is not installed here -- every deploy would fail after the build."
+  program_missing_fix: "Install %{program} from your system's packages, then run ./blog.sh doctor again."
+  program_missing_fix_rclone: "Install rclone from your system's packages or from rclone.org -- not as a snap, see docs/install.md."
+  rclone_snap_confined: "rclone here is the snap (%{path}), which can only read inside your home directory -- and the site is in %{dir}, so every deploy would fail with no such file or directory."
+  rclone_snap_confined_fix: "Install rclone from your system's packages or from rclone.org instead of the snap (docs/install.md), or move the site into a folder in your home directory whose name does not start with a dot."
 
   widget_label: "the %{name} widget's feed"
   analytics_label: "the analytics script"
