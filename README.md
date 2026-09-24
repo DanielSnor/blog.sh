@@ -153,7 +153,7 @@ config/site.lang.yml.example  One more published language, described -- copy to 
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment
 docs/                    Install, operations, importing, architecture, decisions, skinning and
                          localization guides; this README's screenshots; and shortcuts/,
-                         the two iOS shortcuts that send a post from a phone
+                         the shortcut that sends a post from a phone (iOS, and macOS too)
 
 content.nosync/, media.nosync/, public.nosync/, incoming/, trash/, drafts/, env.sh, config/site.yml
                          Per-deployment/generated, not part of the engine -- see .gitignore

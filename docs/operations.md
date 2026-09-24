@@ -611,21 +611,46 @@ saved as one archive instead -- a net, so a post written on the way home
 is not lost to a browser that will not share it, rather than a road this
 page offers. `/write/` is for a phone; on a phone the files go over.
 
-**Two shortcuts, because the one that receives the files may not open an
-SSH connection.** A shortcut started from the Share Sheet runs in
-Shortcuts' background runner, whose only screen is a banner; *Run Script
-over SSH* asks for a screen there -- the host prompt, the first-run
-privacy question -- and is refused with "This action could not be run
-with the current user interface", before any connection is made. The
-action that would hand the run over to the full app, *Continue in
-Shortcuts App*, is no longer offered. A shortcut started from a URL,
-on the other hand, always runs in the app. So the receiving shortcut
-writes a file and opens a URL, and the sending shortcut does the rest.
+**One shortcut, run twice, because the run that receives the files may
+not open an SSH connection.** A shortcut started from the Share Sheet
+runs in Shortcuts' background runner, whose only screen is a banner; *Run
+Script over SSH* asks for a screen there -- the host prompt, the
+first-run privacy question -- and is refused with "This action could not
+be run with the current user interface", before any connection is made.
+The action that would hand the run over to the full app, *Continue in
+Shortcuts App*, is no longer offered. A shortcut started from a URL, on
+the other hand, always runs in the app. So the same shortcut runs twice:
+from the Share Sheet it packs the files into one batch, writes it to a
+file and opens a URL that names itself; from that URL, with nothing
+handed to it, it reads the file back and sends it. The two runs are told
+apart by the one thing that differs between them, whether there is a
+Shortcut Input. One shortcut per blog.
 
-*Shortcut A* -- "Show in Share Sheet" on, accepting Images and Files;
-"If there's no input": Stop and Respond:
+"Show in Share Sheet" on, accepting Images and Files; "If there's no
+input": **Continue** -- not Stop and Respond, because the second run has
+none and has to go on. Then:
 
-1. **Repeat with Each** over Shortcut Input, and inside it: Get **Name**,
+1. **If** *Shortcut Input* **does not have any value** -- the second run.
+   Inside it:
+   1. **Get File** `incoming/batch.txt` from the **Shortcuts** folder in
+      iCloud Drive, without the document picker. A folder chosen in the
+      action, not a variable; see the warning below.
+   2. **Run Script over SSH** with that file as the **Input**; the script
+      is the receiver, or the wrapper that reaches it.
+   3. **Base64 Encode** the *Shell Script Result* (Line Breaks: None, if
+      the option is offered; the page copes either way).
+   4. **Delete Files** with the *File* from Get File, *Immediately
+      Delete* on. Without the switch it asks before every post; without
+      the action a batch already sent would wait for the next run that
+      finds nothing to share, and go out a second time.
+   5. **Text**: `https://YOUR-BLOG-URL/write/#b=` followed by the *Base64
+      Encoded* variable, with nothing between them.
+   6. **Open URLs** with that text.
+   7. **Stop and Output** the result, or **Stop This Shortcut** -- the
+      second run ends here and never reaches the loop below.
+
+   **End If.**
+2. **Repeat with Each** over Shortcut Input -- the first run -- and inside it: Get **Name**,
    Get **File Extension**, then a **Text** holding `mov mp4 m4v MOV MP4
    M4V` and an **If** *Text contains File Extension*. Inside the If:
    **Encode Media** the Repeat Item with Size **1280x720**, and **Set
@@ -641,40 +666,42 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    page cannot know the shortcut does this, so its red line for a video
    measures the original; send anyway, and the answer says what
    arrived.
-2. After the loop: **Combine Text** `batch` with New Lines.
-3. **Save File** the combined text to iCloud Drive, into the Shortcuts
+3. After the loop: **Combine Text** `batch` with New Lines.
+4. **Save File** the combined text to iCloud Drive, into the Shortcuts
    folder, *Ask Where to Save* off, subpath `incoming/batch.txt`,
-   *Overwrite If File Exists* on -- the same folder shortcut B reads it
-   back from.
-4. **Open URLs**: `shortcuts://run-shortcut?name=UploadIncoming`.
+   *Overwrite If File Exists* on -- the same file step 1 reads back.
+5. **Open URLs**: `shortcuts://run-shortcut?name=SendPost`, where
+   `SendPost` is the shortcut's own name, spelled as the library spells
+   it. Rename the shortcut and this line has to change with it; a name
+   without spaces or punctuation saves percent-encoding it.
 
-![Shortcut A as the Shortcuts app shows it: the Repeat with Each loop with the If around Encode Media, the base64 Text and Add to Variable, then Combine Text, Save File and Open URLs](shortcut-a.png)
+![The shortcut as the Shortcuts app shows it, with placeholders where the server's details go: the If with Get File, Run Script over SSH, Base64 Encode, Delete Files, the Text with #b=, Open URLs and Stop and Output; then the Repeat with Each loop with the If around Encode Media, Combine Text, Save File, and the Open URLs that names the shortcut itself](shortcut.png)
 
-*Shortcut B*, named exactly `UploadIncoming`, not in the Share Sheet:
+It can be imported instead of built: [SendPost](shortcuts/SendPost.shortcut),
+signed so that anyone may import it. Keep its name, or change the name in
+the last *Open URLs* to whatever you call it, and fill in what is yours.
+In *Run Script over SSH*: the machine you log into (a host name or an IP
+address), its SSH port, the user, and the path to `scripts/receive.sh` or
+the wrapper that reaches it. In the *Text*: `YOUR-BLOG-URL` is the address
+the site is served at, `base_url` in `config/site.yml`. The SSH action
+carries no key; pick or generate one there and put its public half on the
+server, as the key line below shows.
 
-1. **Get File** `incoming/batch.txt` from the Shortcuts folder, without
-   the document picker.
-2. **Run Script over SSH** with that file as the **Input**; the script is
-   the receiver, or the wrapper that reaches it.
-3. **Base64 Encode** the *Shell Script Result* (Line Breaks: None, if
-   the option is offered; the page copes either way).
-4. **Text**: `https://YOUR-BLOG-URL/write/#b=` followed by the *Base64
-   Encoded* variable, with nothing between them.
-5. **Open URLs** with that text.
+⚠️ **Pasting actions between shortcuts rewires them.** Shortcuts reconnects
+a pasted action's inputs to whatever stands above the place it lands. A
+Get File copied in this way came back reading from a *Text*, then from
+*If Result*, then from *Shortcut Input* -- which is empty in the second
+run, so it read nothing, the SSH action sent nothing, and the server
+answered `empty_input` for a batch that was whole. After any paste or
+move, check that Get File still reads *from Shortcuts*, and that the SSH
+*Input* and *Delete Files* both name the *File* it produces.
 
-![Shortcut B as the Shortcuts app shows it, with placeholders where the server's details go: Get File, Run Script over SSH, Base64 Encode, the Text with #b=, Open URLs](shortcut-b.png)
-
-Both can be imported instead of built: [blog.sh Send post](shortcuts/blog.sh-send-post.shortcut)
-is shortcut A and [UploadIncoming template](shortcuts/UploadIncoming-template.shortcut)
-is shortcut B, signed so that anyone may import them. After importing,
-rename the second to exactly `UploadIncoming` -- the first opens it by
-that name -- and fill in what is yours. In *Run Script over SSH*: the
-machine you log into (a host name or an IP address), its SSH port, the
-user, and the path to `scripts/receive.sh` or the wrapper that reaches
-it. In the *Text*: `YOUR-BLOG-URL` is the address the site is served at,
-`base_url` in `config/site.yml`. The SSH action carries no key; pick or
-generate one there and put its public half on the server, as the key
-line below shows. The first shortcut needs nothing changed.
+**It runs on a Mac as well.** The Shortcuts app there has the same
+shortcut through iCloud, Safari's Share Sheet offers it, and the terminal
+runs it: `shortcuts run SendPost` with a `batch.txt` in the Shortcuts
+folder sends that batch and prints the address it would have opened --
+which is how the sending half is tested without a phone. `/write/`
+itself is still made for a phone.
 
 Base64, not URL Encode, and not for taste: Shortcuts reads a reply
 that is JSON as a Dictionary and then refuses to hand a Dictionary to
@@ -682,7 +709,7 @@ URL Encode -- "couldn't convert from Dictionary to Text" -- on exactly
 the replies that matter, the refusals. Base64 Encode takes anything.
 (The page also still reads a percent-encoded reply after `#r=`.)
 
-The last three carry the answer back to the page. It opens with the
+Base64 Encode, the Text and Open URLs carry the answer back to the page. It opens with the
 reply after `#b=` -- a fragment, so it never leaves the browser -- and
 says what the server did: the pictures it kept, the draft's preview
 address or the post's public one, the command that publishes a draft
@@ -719,7 +746,7 @@ that asked for one.
 
 **Publishing from the phone.** The answer for a draft carries a Publish
 button, and it sends one file called `publish.txt` holding the slug --
-down the same connection, through the same two shortcuts. The receiver
+down the same connection, through the same shortcut. The receiver
 knows that shape: exactly one file, called that, and it runs
 `publish <slug> --yes --json` rather than storing anything. The slug is
 checked as hard as a filename is, because it becomes an argument to a
@@ -755,7 +782,7 @@ could not put on screen.
 
 The page that sent the files sees the share end in an abort -- that is
 how the hand-off to the app looks from a web page, not a failure -- so it
-says the files have left. The answer arrives when shortcut B opens the
+says the files have left. The answer arrives when the second run opens the
 page again with it.
 
 The order inside the batch matters, because the markdown arriving is what
@@ -817,7 +844,7 @@ worked.** A refusal leaves with zero -- deliberately, because iOS Shortcuts
 discards the output of a remote command that failed, and the reason is the
 whole point of the answer. The cost is that Shortcuts then reports a tick
 for a refusal exactly as it does for a post. End the shortcut by opening the
-page with the answer, as shortcut B above does, or with a *Show Content*
+page with the answer, as the second run above does, or with a *Show Content*
 of the SSH output. The reply is one JSON object per file, so read it
 whole: a picture answers `"ok":true`, a refusal answers `"ok":false` and
 names the reason, and the post that was written answers with a `slug`

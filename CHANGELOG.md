@@ -67,6 +67,11 @@ differ only in the stylesheet and one script, and report the same warnings.
 - **Structured data says which language the page is in.** Every post's JSON-LD carries `inLanguage`; everything else on the page -- `<html lang>`, `og:locale`, the feed -- already said so.
 - **The Czech interface says "příspěvek", "sestavení" and "koncept".** It said "post" and "postavit", the one in over 300 places -- the help and the editor's hint included -- while the site's own Czech texts said "příspěvek"; a build is put together, not constructed, and the noun "build" went the same way in 43 places ("sestavení zastaveno", "v sestavení už nejsou"); and a draft is a koncept, in the wizard, the CLI, the writing app ("Koncept") and the Czech cheat sheet. The key is still `d` for "[d] nechat jako koncept". A script that reads the Czech output will see the new words.
 - **A heading the site does not write is the engine's.** "About", "Links", "Find me on" and each widget's heading come from the engine when `site.yml` leaves them out, in the language of the page -- so they need no translating. A heading the site writes is still the site's, and one written `""` is still no heading at all. `./setup.sh` and `./style.sh` stop writing the engine's words into `site.yml` (where they froze in one language), `doctor` no longer calls a widget without a heading a problem, and a site that writes all its headings -- every site set up so far -- renders exactly as before.
+- **One shortcut sends a post from the phone, not two.** The shortcut started from the Share Sheet still may not open
+  an SSH connection, so it writes the batch to a file and opens a URL -- but the URL now names the shortcut itself,
+  and the second run, the one with no input, reads the file back, sends it and deletes it. One shortcut per blog,
+  and it runs on a Mac as well (`shortcuts run SendPost`). `docs/operations.md` describes it, with one screenshot and
+  one template in `docs/shortcuts/` where there were two of each. Nothing changed in the receiver or the page.
 
 ### Fixed
 
