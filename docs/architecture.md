@@ -90,6 +90,7 @@ dedup by `source`).
 | `scheduled` | boolean | set on a draft whose `date` is its future publish time; the `publish-scheduled` cron publishes it then and drops the key |
 | `unlisted` | string/boolean | a published post out of the listings, the archives, the feeds, the sitemap and the search index, `noindex` on its page -- but on its ordinary dated address, with its redirects intact. Not a password (see [decisions.md](decisions.md)); the truth test is loose, so a typo hides rather than exposes |
 | `page` | boolean | a page rather than a post: a permanent address (`/<slug>/`), out of the listings, the archives and the feed, but in the sitemap and the search index. Written as `type: page` in front matter; `page: true` is the older spelling and is still read |
+| `translations` | object | the post's text in the OTHER languages the site publishes, keyed by language code: `{"de": {"title": …, "content": [ … ]}}`. An entry may carry `title`, `content` (blocks, the same shapes as below), `excerpt`, and `slug` -- the address that language serves the post at, which is NOT the post's own `slug` (that names the file and the media directory; internally the translated one travels as `address_slug`). Nothing else: the date, the tags, the series, the state and the source belong to the post and hold in every language (`Translations::TEXT_KEYS` is the whole list). A language counts as written once it has a body. Absent = a post in the site's own language, which is every post of an archive that publishes one. See [localization.md](localization.md#what-a-post-carries) |
 | `redirect_from` | array of strings | site-root paths the post answered at on its PREVIOUS platform (`"/old-post/"`, `"/2009/05/old-post.html"`), written by importers when the new site keeps the old domain. The build emits a redirect stub for each, after everything real -- a live page, listing or site file always wins over a stub, out loud. Deliberately separate from `former_slugs`: that is rename history inside this site, this is where the post lived before it arrived. Paths ending `.html`/`.htm` become literal files (Blogger-era URLs had no trailing slash); first segments the site itself owns (`posts`, `page`, `tag`, `type`, `assets`, `search`, `markdown`) are refused. Published posts only; edits and re-imports carry it over untouched |
 
 **Blocks** (`content` array entries), by `type`:
@@ -592,6 +593,64 @@ type, list item) keyed by object identity -- a post appears on its own
 page plus every listing, and would otherwise be rendered 4-6x. ERB
 partials (nav, aside, footer) are cached by name+locals since they
 don't depend on page content.
+
+### One site, several languages
+
+A site that names `site.locales` is built once per language, and every
+run writes into the same `public.nosync/`. The build itself knows one
+language at a time: `BLOG_SH_LANG` says which (`lib/i18n.rb` reads it and
+nothing else may), and `Publishing#run_build` runs the site's own language
+first and the others after it, all under one lock, so a scheduled publish
+cannot deploy a tree that is half one language. What a run needs to know
+about the others it asks: which roots exist (`SITE_LOCALES`) and what a
+post says in them.
+
+- **Roots.** The site's own language keeps the site root (`LANG_ROOT` is
+  empty); every other writes under `/<lang>/` (`CONTENT_ROOT`). `loc()`
+  turns a site path into this language's, and `SHARED_ROOTS` --
+  `/assets/` and `/write/` -- are the two it leaves alone: one copy for
+  every language.
+- **The sweep.** Each run removes what it did not write, but only in the
+  part of the tree it owns (`prune_root`): another language's run owns its
+  root and nothing else; the site's own run owns everything except those
+  roots. Without that the second run would carry off the first one's site.
+- **Written once.** `robots.txt`, `sitemap.xml` (one document naming every
+  language, with `xhtml:link` alternates only where an address exists in
+  more than one), the sidebar's JSON and the writing app's `site.js` come
+  from the site's own run alone. A crawler reads the robots.txt at the
+  origin, the sidebar fetches its data by absolute address, and the writing
+  app speaks the language its author writes in -- a copy per language would
+  be files nothing reads, and for `site.js`, the last run's language.
+- **What a post says here.** `Translations.for_lang` gives the post as this
+  language renders it: its own text when it has one, otherwise the nearest
+  language on the `fallback` chain in `config/site.<lang>.yml`, ending at
+  the post itself. A language gets a PAGE only for a post that has words
+  in it; the listing shows the fallback text under a link to the one copy
+  that exists, so the same words never stand at two addresses.
+  `PostAddress` builds the address from the translation's own slug.
+- **What the site says here.** `SiteConfig.localize!`, called at the top
+  of the build and nowhere else, lays the chrome of `config/site.<lang>.yml`
+  over `site.yml` -- title, description, banner words, about, footer, menu,
+  widget headings, tag labels -- before anything reads a single one of
+  those keys. Only the build: every other program that reads the config
+  also writes it back. `lib/language_file.rb` says which keys a language
+  file may carry and what is wrong with one (an unknown key, a translation
+  of something site.yml lacks, a menu or footer list that leads elsewhere);
+  the build refuses those and `check` reports the same list.
+- **The engine's own words.** A heading the site does not write -- about,
+  the footer's links and social columns, a widget's -- is `chrome.*` from
+  the locale of this run (`site_heading`); a tag shows `TAG_LABELS[slug]`
+  when the language file gives it a word (`tag_label`), which the tag map,
+  the pills, the feed's categories and the JSON-LD all go through.
+- **Telling the reader and the crawler.** The switcher offers every
+  language the site publishes; a post with nothing in one leads to that
+  language's front page. The `hreflang` alternates are narrower on purpose
+  and name only addresses that were written (`language_links`).
+- **The cache.** `config/` is in the fingerprint, so an edit to a language
+  file re-renders the pages it speaks on like any other config change.
+
+A site without `site.locales` goes through none of this: one run, an empty
+`LANG_ROOT`, no alternates, no switcher -- the markup it has always had.
 
 ## The terminal UI
 
