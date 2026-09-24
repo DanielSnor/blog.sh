@@ -241,10 +241,29 @@ The keys it takes, and nothing else: `site.title`, `site.short_name`,
 `site.description`; `banner.claim`, `banner.alt`; `about.heading`,
 `about.html`; `footer.links_heading`, `footer.links`,
 `footer.note_heading`, `footer.note_html`, `footer.copyright`,
-`footer.social_heading`; `nav`; and `heading` under a widget. Everything
-else in site.yml -- the picture in the banner, the author, the address,
-the colours, the widgets' accounts -- is a fact about the site, the same in
-every language, and a translation of it would be a second site.
+`footer.social_heading`; `nav`; `heading` under a widget; and `tags`.
+Everything else in site.yml -- the picture in the banner, the author, the
+address, the colours, the widgets' accounts -- is a fact about the site,
+the same in every language, and a translation of it would be a second site.
+
+**A tag is an ID with a word per language.** A post's tags are metadata,
+written once in the site's own language like its date, and a tag has one
+page in every language: `/cs/tag/philosophy/` is the Czech page of the tag
+`philosophy`. What a Czech reader sees for it -- on the pill, over its
+page, in its feed and in the tag index -- is the word `tags:` gives it:
+
+```yaml
+# config/site.cs.yml
+tags:
+  philosophy: "filozofie"
+  authoring: "psaní"
+```
+
+Keyed by the tag as the posts write it, and matched the way the engine
+matches tags, so `Philosophy:` names the same one. A tag with no word here
+shows as written. A word for a tag no published post carries is shown
+nowhere; `check` says so, and the build goes on -- tags come and go with
+the posts, and the build runs after every save.
 
 **A list with places in it names the same places.** The menu and the
 footer links are written out in full, the way site.yml has them, but

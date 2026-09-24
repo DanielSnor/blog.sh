@@ -1242,6 +1242,8 @@ check:
   language_key_orphan_fix: "Není co nahradit. Nejdřív to nastav v site.yml, nebo to ze souboru vyndej — takhle to nedělá nic."
   language_list_mismatch: "%{file}: %{key} vede jinam než v config/site.yml. %{detail}"
   language_list_mismatch_fix: "Přeložené menu nebo patička jmenuje stejná místa ve stejném pořadí; mění se jen slova. Dokud se neshodují, build soubor odmítá."
+  language_tag_unused: "%{file} dává slovo štítku %{tags}, který žádný publikovaný příspěvek nenese — nikde se neukáže."
+  language_tag_unused_fix: "Na webu nic rozbitého není. Řádek vyndej, nebo ho nech pro štítek, který se chystáš použít."
   languages_legend: "Fajfka je napsáno, půlkolečko titulek bez textu, tečka znamená, že jazyk nemá nic — druhý jazyk příspěvek stejně ukáže a odkáže na tu jednu kopii."
   languages_alone: "check --languages tiskne tabulku, kdežto --json a --repair ne; chtěj je po jednom."
   languages_none: "Tenhle web publikuje jeden jazyk, není co tabelovat. Ostatní vyjmenuj v `site.locales` v config/site.yml."

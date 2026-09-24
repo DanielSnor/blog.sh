@@ -42,7 +42,7 @@ module Feeds
     # uses -- a non-string tag out of a hand-edited JSON used to end the
     # whole build in CGI.escapeHTML.
     categories = (post['tags'] || []).reject { |t| tag_slug(t).empty? }
-                                     .map { |t| "<category>#{h(t)}</category>" }.join
+                                     .map { |t| "<category>#{h(tag_label(t))}</category>" }.join
     <<~ITEM
       <item>
         <title>#{xml_text(title)}</title>

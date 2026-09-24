@@ -38,6 +38,7 @@
 #               social_heading
 #   nav
 #   widgets     <name>: heading
+#   tags        <tag>: the word for it
 #
 # Everything else in site.yml -- the banner's picture, the author, the
 # address, the colours, a widget's account -- is a fact about the site,
@@ -118,3 +119,13 @@ footer:
 #   commits:
 #     heading: "Woran ich arbeite"
 # --- end of widgets ---
+
+# What a reader of this language sees for a tag. A tag is written once, in
+# the site's own language, and keeps its address in every language
+# (/de/tag/photography/); only the word on the pill, the tag's page and its
+# feed changes. Keyed by the tag as the posts write it -- "Photography" and
+# "photography" are the same tag. A tag with no word here shows as written.
+# tags:
+#   photography: "Fotografie"
+#   travel: "Reisen"
+# --- end of tags ---

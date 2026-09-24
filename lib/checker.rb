@@ -229,6 +229,7 @@ module Checker
     findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
     findings.concat(guard(:unknown_locales) { check_unknown_locales(root) })
     findings.concat(guard(:language_files) { check_language_files(root) })
+    findings.concat(guard(:tag_labels) { check_tag_labels(posts, root) })
     findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
     local_clean = findings.none? { |f| f.error? || f.warn? }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
@@ -1395,6 +1396,25 @@ module Checker
                 kind: :language_list_mismatch, data: { 'file' => name, 'key' => key })
         end
       end
+    end
+  end
+
+  # A label in a language file for a tag no published post carries: it
+  # shows nowhere. Worth a look, never an error -- tags come and go with the
+  # posts, and a label left behind when the last post dropped its tag is not
+  # a broken site. The build does not stop on it for the same reason.
+  def check_tag_labels(posts, root)
+    return [] unless root
+
+    carried = stream_tags(posts)
+    published_languages(root).flat_map do |code|
+      name = "site.#{code}.yml"
+      unused = LanguageFile.tag_labels(language_file(root, code)) { |tag| Slug.slugify(tag) }
+                           .keys.reject { |slug| carried.include?(slug) }
+      next [] if unused.empty?
+
+      [warn(t('language_tag_unused', file: name, tags: unused.join(', ')), t('language_tag_unused_fix'),
+            kind: :language_tag_unused, data: { 'file' => name, 'tags' => unused })]
     end
   end
 

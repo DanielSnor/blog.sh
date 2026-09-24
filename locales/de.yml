@@ -1256,6 +1256,8 @@ check:
   language_key_orphan_fix: "Es gibt nichts zu ersetzen. Richte es zuerst in site.yml ein oder nimm es aus der Datei -- so bewirkt es nichts."
   language_list_mismatch: "%{file}: %{key} führt woandershin als in config/site.yml. %{detail}"
   language_list_mismatch_fix: "Ein übersetztes Menü oder eine übersetzte Fußzeile nennt dieselben Ziele in derselben Reihenfolge; nur die Worte ändern sich. Bis sie übereinstimmen, verweigert der Build die Datei."
+  language_tag_unused: "%{file} gibt %{tags} ein Wort, aber kein veröffentlichter Beitrag trägt diesen Tag -- nichts zeigt es."
+  language_tag_unused_fix: "Auf der Seite ist nichts kaputt. Nimm die Zeile heraus oder lass sie für einen Tag stehen, den du bald verwendest."
   languages_legend: "Ein Haken heißt geschrieben, ein Halbkreis ein Titel ohne Text, ein Punkt, dass diese Sprache nichts hat -- die andere Sprache zeigt den Beitrag und verlinkt die eine Fassung."
   languages_alone: "check --languages druckt eine Tabelle, --json und --repair tun das nicht; verlange sie einzeln."
   languages_none: "Diese Website veröffentlicht eine Sprache, es gibt nichts zu tabellieren. Nenne die anderen in `site.locales` in config/site.yml."

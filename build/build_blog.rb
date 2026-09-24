@@ -1480,6 +1480,21 @@ def tag_slug(tag)
   Slug.slugify(tag)
 end
 
+# What the reader of this run's language sees for a tag. A tag is an ID --
+# one set per post, written once in the site's own language, one page per
+# tag in every language -- and config/site.<lang>.yml gives it that
+# language's word (`tags:`), by the tag's slug. The site's own language
+# shows a tag as it is written; so does a language that has no word for it.
+TAG_LABELS = if SITE_LANG == SITE_OWN_LANG
+               {}
+             else
+               LanguageFile.tag_labels(SiteConfig.data) { |tag| tag_slug(tag) }
+             end.freeze
+
+def tag_label(tag)
+  TAG_LABELS.fetch(tag_slug(tag), tag)
+end
+
 def tags_html(post)
   return '' if post['tags'].nil? || post['tags'].empty?
 
@@ -1499,9 +1514,9 @@ def tags_html(post)
   pills = visible.map do |t|
     slug = tag_slug(t)
     if defined?(TAG_PAGES) && !TAG_PAGES.key?(slug)
-      %(<span class="tag-pill tag-pill-flat">#{h(t)}</span>)
+      %(<span class="tag-pill tag-pill-flat">#{h(tag_label(t))}</span>)
     else
-      %(<a class="tag-pill" href="#{loc("/tag/#{slug}/")}">#{h(t)}</a>)
+      %(<a class="tag-pill" href="#{loc("/tag/#{slug}/")}">#{h(tag_label(t))}</a>)
     end
   end.join
   %(<div class="tags">#{pills}</div>)
@@ -3441,7 +3456,10 @@ posts.each do |post|
       next
     end
 
-    tags_map[slug] ||= { name: tag, posts: [] }
+    # The name the pages and the index show: this language's word for the
+    # tag where it has one (tag_label), so the listing, its title, its feed
+    # and the index cannot disagree with the pills.
+    tags_map[slug] ||= { name: tag_label(tag), posts: [] }
     tags_map[slug][:posts] << post
   end
 end

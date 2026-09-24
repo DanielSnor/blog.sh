@@ -35,6 +35,10 @@ module LanguageFile
   }.freeze
   # A widget's heading is words; its account, instance and limit are not.
   WIDGET_TEXTS = %w[heading].freeze
+  # What the reader of this language sees for a tag: `tags:` maps a tag to
+  # its word here. The tag itself -- its address, its page, the posts that
+  # carry it -- is one ID in every language; only the label is translated.
+  TAG_LABELS = 'tags'
 
   # The lists with places in them. A translation says the same places in
   # the same order with other words: a menu that drifts apart between the
@@ -51,7 +55,7 @@ module LanguageFile
   # names.
   def known
     SETTINGS + TEXTS.flat_map { |section, keys| keys.map { |key| "#{section}.#{key}" } } +
-      %w[nav] + WIDGET_TEXTS.map { |key| "widgets.<name>.#{key}" }
+      %w[nav] + WIDGET_TEXTS.map { |key| "widgets.<name>.#{key}" } + [TAG_LABELS]
   end
 
   # The chrome of one language laid over the site's own config: sections
@@ -70,6 +74,7 @@ module LanguageFile
       keys.each { |key| merged[section][key] = given[key] if given.key?(key) }
     end
     merged['nav'] = lang_data['nav'] if lang_data.key?('nav')
+    merged[TAG_LABELS] = lang_data[TAG_LABELS] if lang_data[TAG_LABELS].is_a?(Hash)
     widgets = lang_data['widgets'].is_a?(Hash) ? lang_data['widgets'] : {}
     widgets.each do |name, conf|
       next unless conf.is_a?(Hash) && dig(merged, 'widgets', name).is_a?(Hash)
@@ -99,6 +104,10 @@ module LanguageFile
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
         value.each_key { |sub| found << [:unknown, "#{key}.#{sub}", nil] unless TEXTS[key].include?(sub) }
+      elsif key == TAG_LABELS
+        next found << [:unknown, key, nil] unless value.is_a?(Hash)
+
+        value.each { |tag, label| found << [:unknown, "#{key}.#{tag}", nil] unless label.is_a?(String) && !label.strip.empty? }
       elsif key == 'widgets'
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
@@ -138,6 +147,21 @@ module LanguageFile
   # met as a TypeError.
   def dig(data, *path)
     path.reduce(data) { |acc, key| acc.is_a?(Hash) ? acc[key] : nil }
+  end
+
+  # The labels a language gives its tags, by the tag's slug -- the ID the
+  # engine folds every spelling of a tag into, so `Filozofie:` and
+  # `filozofie:` name the one page. The slug is the caller's to compute
+  # (Slug.slugify), which keeps this file free of it.
+  def tag_labels(data)
+    given = data.is_a?(Hash) ? data[TAG_LABELS] : nil
+    return {} unless given.is_a?(Hash)
+
+    given.each_with_object({}) do |(tag, label), labels|
+      next unless label.is_a?(String) && !label.strip.empty?
+
+      labels[yield(tag.to_s)] = label.strip
+    end
   end
 
   # The difference `problems` found, as a sentence -- asked of whoever holds

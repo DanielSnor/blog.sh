@@ -1273,6 +1273,8 @@ check:
   language_key_orphan_fix: "There is nothing for it to replace. Set it up in site.yml first, or take it out of the file -- as it stands it does nothing."
   language_list_mismatch: "%{file}: %{key} goes to other places than in config/site.yml. %{detail}"
   language_list_mismatch_fix: "A translated menu or footer names the same places in the same order; only the words change. The build refuses the file until they match."
+  language_tag_unused: "%{file} gives a word to %{tags}, which no published post carries -- nothing shows it."
+  language_tag_unused_fix: "Nothing is wrong on the site. Take the line out, or leave it for a tag you are about to use."
   languages_legend: "A tick is written, a half circle a title with no text yet, a dot where that language has nothing -- the other language still shows the post and links to the one copy of it."
   languages_alone: "check --languages prints a table and --json and --repair do not; ask for them one at a time."
   languages_none: "This site publishes one language, so there is nothing to tabulate. Name the others in `site.locales` in config/site.yml."

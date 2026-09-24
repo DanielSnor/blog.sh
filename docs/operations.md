@@ -1405,7 +1405,9 @@ What it looks for, each with a line saying what to do about it:
   know, or translating something site.yml does not have. All of them do
   nothing at all, and all of them look like the work is done. And one
   whose menu or footer links go to other places than site.yml's: a
-  translation changes the words, not where they lead.
+  translation changes the words, not where they lead. A word for a tag no
+  published post carries is worth a look rather than an error: it shows
+  nowhere, and nothing is broken.
 
 - **A language named in `site.locales` that the engine has no locale file
   for.** A typo there is not a typo in one language: the build stops on it

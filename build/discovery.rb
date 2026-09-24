@@ -104,7 +104,7 @@ module Discovery
       'image' => post_og_image(post),
       'description' => post_description(post)
     }
-    data['keywords'] = tags.join(', ') unless tags.empty?
+    data['keywords'] = tags.map { |tag| tag_label(tag) }.join(', ') unless tags.empty?
     # Both sequences that can end a script block from inside a JSON string:
     # "</" closes it, and "<!--" opens an HTML comment whose scope runs to the
     # next "-->" -- so a post whose text held an unterminated comment followed
