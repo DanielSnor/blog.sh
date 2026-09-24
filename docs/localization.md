@@ -38,7 +38,9 @@ from both.
    | --- | --- |
    | `date_format`, `date_time_format` | everyone -- strftime formats for every rendered date |
    | `thousands_separator`, `decimal_point` | nobody reads these as words: they are how a number is written, not a message. English keeps `,` and `.`, German swaps them, Czech separates thousands with a non-breaking space. Only `./blog.sh stats` formats numbers through them |
-   | `nav`, `post`, `pagination`, `tag`, `type`, `series`, `index`, `search`, `not_found`, `markdown_page`, `ui`, `redirect` | site visitors -- the chrome, the listings, a post's own furniture (reading time, contents, series navigation), the 404 page and the one line an old address shows while it forwards |
+   | `language_name` | site visitors -- the language's name in itself (`Deutsch`), which the language switcher shows to a reader of any other language |
+   | `nav`, `post`, `pagination`, `tag`, `tags`, `type`, `series`, `index`, `archive`, `search`, `not_found`, `markdown_page`, `ui`, `redirect` | site visitors -- the chrome, the listings, the tag index and the archive map, a post's own furniture (reading time, contents, series navigation), the 404 page and the one line an old address shows while it forwards |
+   | `chrome` | site visitors -- the headings the engine says when the site writes none of its own: "About", "Links", "Find me on", each widget's "Recent toots" |
    | `share` | site visitors -- the row of controls under a post, including the question the Mastodon button asks and the two lines the copy button swaps between |
    | `js` | site visitors -- shipped into the browser for client-rendered strings; `js.date_locale` is a BCP-47 tag (`de-DE`) and must agree with `date_format`, or server- and client-rendered dates diverge |
    | `build` | authors -- what `ruby build/build_blog.rb` says while it renders: both lines it signs off with, and everything it names as not built -- a post, a page, a tag, a redirect, a picture a post's media folder does not hold |
@@ -47,6 +49,8 @@ from both.
    | `doctor`, `check`, `stats`, `export` | authors -- the commands that report on the installation and the archive. `doctor` and `check` pair each finding with a fix line, and the fix is a sentence telling somebody what to do, so it is worth as much care as the finding |
    | `setup`, `style`, `wizard` | authors -- the questions in `./setup.sh` and `./style.sh`, plus the plumbing both share |
    | `cron`, `import` | authors -- scheduled publishing and `./import.sh` |
+   | `lock` | authors -- what a command says when another run holds the site |
+   | `language_file` | authors -- the build's and `check`'s sentences about a `config/site.<lang>.yml` whose menu or footer links go elsewhere |
 
 2. **`templates/markdown-cheat-sheet.<lang>.md`** -- the source of the
    generated `/markdown/` syntax page. Optional: without it the page falls
@@ -461,12 +465,18 @@ differently:
 | the default menu (`All`, the types) | the German listings |
 | `tag:` | the tag's German listing |
 | `url:` naming a post or a page | that piece's German address, which is a different slug -- or the one copy of it, if it has no German words |
-| `url:` naming a listing the engine builds (`/search/`, `/archive/`) | its German copy |
+| `url:` naming a listing the engine builds (`/search/`, `/archive/`), the front page `/` or the feed `/rss.xml` | its German copy |
 | anything else -- an address off the site, a file you put there yourself | exactly as written |
 
 The one to watch is the fourth row: `url: /o-mne/` is not turned into
 `/de/o-mne/`, because the German page is at `/de/ueber-mich/`. The item
 follows the piece rather than the spelling.
+
+That is where each item GOES. What it SAYS is translated in the
+language's own file, item by item, to the same places -- see
+[What a language says about itself](#what-a-language-says-about-itself).
+Without one, a hand-written menu keeps site.yml's labels in every
+language; the engine's default menu speaks every language it knows.
 
 ### A link post
 
@@ -479,9 +489,11 @@ the words under it and nothing else.
 
 - **Pictures in a translation.** Media belong to the post and its
   languages share them; add them with `edit`.
-- **Tags and series names are not translated.** A tag is the word it is,
-  in every language. A post that wants a German tag as well as a Czech
-  one carries both.
+- **Series names are not translated.** A series is named the way its
+  posts name it, in every language. Tags are translated -- see
+  [What a language says about itself](#what-a-language-says-about-itself);
+  do not give a post a second tag in the other language, which makes two
+  tag pages for one subject.
 
 ## Submitting
 

@@ -101,6 +101,7 @@ Each part says where it is described in full.
   432 kB against 4.3 MB. Beside it, `/archive/` maps the whole site in two levels and `/tag/`
   lists every tag with its count. → [architecture.md](docs/architecture.md#the-client-side),
   [operations.md](docs/operations.md#reading-the-archive)
+- **More than one language.** A post keeps one set of metadata and a text per language; each language gets a root of its own (`/de/`) with its own addresses, feed and listings, the site's own language keeps the root, and a post nobody translated is shown with a link to the one copy it has. The site's own words -- title, about, footer, menu, tags -- are translated in `config/site.<lang>.yml`; the engine's words already are, in English, Czech and German. → [localization.md](docs/localization.md#publishing-in-more-than-one-language)
 - **Build.** Static HTML from JSON through ERB templates: stable pagination, tag, series and type archives, RSS, sitemap, `robots.txt`, a generated favicon, a 404 in the site's own chrome. A page whose inputs have not moved is not rendered again. → [architecture.md](docs/architecture.md#build-pipeline-buildbuild_blogrb)
 - **Deploy.** Cloudron Surfer, a local directory, rsync over SSH, a git-pages push, any rclone remote, or SFTP. A SHA-256 manifest ships only what changed and refuses a build that swings too far from the last one. → [operations.md](docs/operations.md#deploying)
 - **Comments.** The announcement's replies are the thread; `comments.approval: fav` publishes only the ones you favourite. → [Why this exists](#why-this-exists)
@@ -148,6 +149,7 @@ assets/                  CSS/JS/fonts (drop your own images into assets/images/)
 write/                   The page served at /write/ when write: true -- the editor itself, its
                          locale sources and the script that turns them into i18n.js
 config/site.yml.example  Documented config template -- copy to config/site.yml (gitignored) per deployment
+config/site.lang.yml.example  One more published language, described -- copy to config/site.<lang>.yml
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment
 docs/                    Install, operations, importing, architecture, decisions, skinning and
                          localization guides; this README's screenshots; and shortcuts/,
