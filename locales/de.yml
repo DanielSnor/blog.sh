@@ -1209,6 +1209,8 @@ doctor:
   online_failed: "%{label} (%{url}) hat nicht geantwortet: %{message}."
   deploy_target_answers: "Das Deploy-Ziel (%{target}) antwortet."
   deploy_target_failed: "Das Deploy-Ziel (%{target}) hat nicht geantwortet: %{message}."
+  deploy_target_missing: "Das Deploy-Ziel (%{target}) antwortet, aber das Verzeichnis, in das die Website gehört, gibt es noch nicht."
+  deploy_target_missing_fix: "Der erste Deploy legt es an. Wenn es schon da sein sollte, prüfe den Pfad -- ein Tippfehler oder ein nicht eingehängtes Laufwerk sieht genau so aus, und der Deploy würde neben dem richtigen ein neues Verzeichnis anlegen."
   deploy_target_clean: "Das Deploy-Ziel (%{target}) antwortet, und alles in seinem Wurzelverzeichnis gehört zu dieser Website."
   deploy_target_foreign: "Im Wurzelverzeichnis des Deploy-Ziels (%{target}) liegen %{count} Einträge, die diese Website nicht dorthin legt: %{names}."
   deploy_target_more: " und %{count} weitere"

@@ -760,8 +760,10 @@ The deploy script owns the *what*; backends own the *how*:
   would need one per directory for the whole tree -- and none for git,
   whose branch nothing foreign survives in; there the question is only
   whether the remote answers. The tools run through
-  `DeployBackend::Listing`, with a deadline and ssh in batch mode, so a
-  dead host or a password prompt is a warning rather than a hang.
+  `DeployBackend::Listing`, with a deadline and ssh in batch mode (git's
+  and `RSYNC_SSH`'s too), so a dead host, a host-key question or a
+  password prompt is a warning rather than a hang; a target directory that
+  is not there yet is told apart from a host that does not answer.
 
 ## The client side
 

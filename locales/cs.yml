@@ -1197,6 +1197,8 @@ doctor:
   online_failed: "%{label} (%{url}) neodpověděl: %{message}."
   deploy_target_answers: "Cíl nasazení (%{target}) odpovídá."
   deploy_target_failed: "Cíl nasazení (%{target}) neodpověděl: %{message}."
+  deploy_target_missing: "Cíl nasazení (%{target}) odpovídá, ale adresář, do kterého web patří, zatím neexistuje."
+  deploy_target_missing_fix: "První nasazení ho vytvoří. Jestli už tam být má, zkontroluj cestu — překlep nebo nepřipojený disk vypadají přesně takhle a nasazení by vedle toho skutečného založilo nový adresář."
   deploy_target_clean: "Cíl nasazení (%{target}) odpovídá a všechno v jeho kořeni patří tomuto webu."
   deploy_target_foreign: "V kořeni cíle nasazení (%{target}) leží položky, které tam tento web nedává (položek: %{count}): %{names}."
   deploy_target_more: " a dalších: %{count}"

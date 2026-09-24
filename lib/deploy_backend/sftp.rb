@@ -165,6 +165,18 @@ module DeployBackend
       '.sftp'
     end
 
+    # sftp prints a byte it will not put on the terminal as \ooo -- in a C
+    # or POSIX locale that is every byte of "café", which then looked like
+    # somebody else's folder. Taken back to bytes, and kept only when they
+    # are text.
+    def unescape(name)
+      return name unless name.include?('\\')
+
+      bytes = name.b.gsub(/\\([0-7]{3})/n) { Regexp.last_match(1).to_i(8).chr }
+      text = bytes.force_encoding(Encoding::UTF_8)
+      text.valid_encoding? ? text : name
+    end
+
     # Where the site lands, for a person to read: the login and the
     # directory, which `target` (the address handed to sftp) leaves out.
     def location
@@ -187,7 +199,7 @@ module DeployBackend
         fields = line.chomp.split(nil, 9)
         next unless fields.size == 9 && fields.first.match?(/\A[dlcbps-][rwxsStT-]{9}/)
 
-        name = fields.last
+        name = unescape(fields.last)
         next if %w[. ..].include?(name)
 
         name = name.sub(/ -> .*\z/, '') if fields.first.start_with?('l')

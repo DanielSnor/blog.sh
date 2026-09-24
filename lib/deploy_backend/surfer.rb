@@ -37,7 +37,7 @@ module DeployBackend
     # [name, directory?] for everything in the root the site is deployed
     # to (SURFER_REMOTE_DIR, or the whole Surfer).
     def list_root
-      ::Surfer.session { |s| s.list(ENV['SURFER_REMOTE_DIR'].to_s) }
+      ::Surfer.session(read_timeout: Listing::TIMEOUT) { |s| s.list(ENV['SURFER_REMOTE_DIR'].to_s) }
     rescue ::Surfer::Unreachable, ::Surfer::ListFailed => e
       raise Listing::Failed, e.message
     end

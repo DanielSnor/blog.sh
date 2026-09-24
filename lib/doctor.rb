@@ -1275,10 +1275,18 @@ module Doctor
     # /var/www fails every deploy with "no such file or directory" about a
     # file that is plainly there, and one under ~/.hidden with "permission
     # denied" (both reproduced, Ubuntu 22.04, snap rclone 1.75.1).
-    site = resolved_path(root)
-    return nil if snap_can_read?(site)
+    # The build as well as the site: a public.nosync linked out of home is
+    # where rclone actually reads, and the site around it being in home
+    # does not bring it back in.
+    [root, File.join(root, 'public.nosync')].each do |dir|
+      next unless dir == root || File.exist?(dir)
 
-    [error(t('rclone_snap_confined', path: path, dir: site), t('rclone_snap_confined_fix'))]
+      place = resolved_path(dir)
+      next if snap_can_read?(place)
+
+      return [error(t('rclone_snap_confined', path: path, dir: place), t('rclone_snap_confined_fix'))]
+    end
+    nil
   end
 
   # The full path of a program the way the shell would find it, or nil.
@@ -1404,6 +1412,8 @@ module Doctor
     where = backend.respond_to?(:location) ? backend.location : backend.target
     begin
       entries = backend.list_root
+    rescue DeployBackend::Listing::Missing
+      return [warn(t('deploy_target_missing', target: where), t('deploy_target_missing_fix'))]
     rescue StandardError => e
       return [warn(t('deploy_target_failed', target: where,
                                              message: e.message.to_s.lines.first.to_s.strip.sub(/\.\z/, '')))]

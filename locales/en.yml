@@ -1227,6 +1227,8 @@ doctor:
   online_failed: "%{label} (%{url}) did not answer: %{message}."
   deploy_target_answers: "The deploy target (%{target}) answers."
   deploy_target_failed: "The deploy target (%{target}) did not answer: %{message}."
+  deploy_target_missing: "The deploy target (%{target}) answers, but the directory the site goes into is not there yet."
+  deploy_target_missing_fix: "A first deploy creates it. If it should be there already, check the path -- a typo or a volume that is not mounted looks exactly like this, and the deploy would make a new directory beside the real one."
   deploy_target_clean: "The deploy target (%{target}) answers, and everything in its root is this site's."
   deploy_target_foreign: "The deploy target (%{target}) holds %{count} item(s) in its root that this site does not put there: %{names}."
   deploy_target_more: " and %{count} more"

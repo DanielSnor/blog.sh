@@ -46,8 +46,10 @@ module DeployBackend
     def list_root
       base = File.expand_path(dir)
       Dir.children(base).map { |name| [name, File.directory?(File.join(base, name))] }
+    rescue Errno::ENOENT
+      raise Listing::Missing, base
     rescue SystemCallError => e
-      raise Listing::Failed, e.message
+      raise Listing::Failed, e.message.sub(/ @ \w+ - .*\z/, '')
     end
 
     def session

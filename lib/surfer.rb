@@ -47,12 +47,15 @@ module_function
 
   # Opens one connection and yields a Session (see below) to the block. The
   # connection is always closed once the block finishes.
-  def session
+  #
+  # read_timeout: a deploy waits a minute for a big upload to be taken;
+  # doctor's listing asks for one directory and passes its own, shorter.
+  def session(read_timeout: 60)
     base = URI(ENV['SURFER_URL'].to_s.chomp('/'))
     http = Net::HTTP.new(base.host, base.port)
     http.use_ssl = (base.scheme == 'https')
     http.open_timeout = 15
-    http.read_timeout = 60
+    http.read_timeout = read_timeout
     begin
       http.start
     rescue *CONNECT_ERRORS => e
@@ -136,7 +139,16 @@ module_function
     # the API at all but the site's own front page, served with a 404.
     def list(dir)
       remote = dir.to_s.gsub(%r{\A/+|/+\z}, '')
-      resp = send_request { build_list(remote) }
+      # Asked once. send_request reconnects and asks again, and Net::HTTP
+      # retries an idempotent GET on its own: against a Surfer that takes
+      # the connection and never answers, that was four waits of a minute
+      # each. A listing that does not come back in time is the answer.
+      @http.max_retries = 0 if @http.respond_to?(:max_retries=)
+      resp = begin
+        @http.request(build_list(remote))
+      rescue Net::ReadTimeout
+        raise ListFailed, I18n.t('doctor.deploy_target_timeout', seconds: @http.read_timeout.to_i)
+      end
       code = resp.code.to_i
       raise ListFailed, "HTTP #{code}" unless code.between?(200, 299)
 

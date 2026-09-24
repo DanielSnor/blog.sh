@@ -16,6 +16,23 @@ module DeployBackend
   # --prune already look after.
   module Listing
     class Failed < StandardError; end
+    # The target answered, and the directory the site goes into is not
+    # there yet. A first deploy creates it -- or the path has a typo, or a
+    # volume is not mounted, which is why it stays a warning.
+    class Missing < Failed; end
+
+    # What each tool says when the directory it was asked to list is not
+    # there: rsync's change_dir and openrsync's (l)stat, sftp's "stat
+    # remote", rclone's own words. Not a bare "No such file or directory" --
+    # rsync says that about an ssh it cannot exec, which is not the target.
+    MISSING = /(change_dir|stat|opendir).*No such file or directory|directory not found/i.freeze
+
+    # ssh that never asks. A question about an unknown host key or a
+    # password goes to the terminal, which a tool run from here cannot
+    # have: ssh was stopped waiting for it and the deadline reported a host
+    # that had answered at once as one that never did. In batch mode it
+    # says "Host key verification failed" or "Permission denied" instead.
+    BATCH_SSH = 'ssh -o BatchMode=yes'
 
     TIMEOUT = 30
 
@@ -23,8 +40,8 @@ module DeployBackend
     # command runs in a process group of its own so a deadline takes down
     # the ssh underneath it too, and with nothing on stdin, so nothing can
     # sit waiting for an answer nobody is going to type.
-    def self.run(cmd, input: nil, timeout: TIMEOUT)
-      Open3.popen3(*cmd, pgroup: true) do |stdin, stdout, stderr, wait|
+    def self.run(cmd, input: nil, timeout: TIMEOUT, env: {})
+      Open3.popen3(env, *cmd, pgroup: true) do |stdin, stdout, stderr, wait|
         stdin.write(input) if input
         stdin.close
         out = reader(stdout)
@@ -36,7 +53,10 @@ module DeployBackend
         end
         output = out.value.to_s
         unless wait.value.success?
-          raise Failed, first_said(err.value) || first_said(output) || "#{cmd.first} exit #{wait.value.exitstatus}"
+          said = first_said(err.value) || first_said(output) || "#{cmd.first} exit #{wait.value.exitstatus}"
+          raise Missing, said if said.match?(MISSING)
+
+          raise Failed, said
         end
         output
       end
