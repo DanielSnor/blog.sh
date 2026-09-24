@@ -42,7 +42,7 @@ build:
   # skloňovat, u nějakého čísla vždycky zaskřípe; popisek s dvojtečkou
   # sedí u všech.
   summary: "Sestaveno do %{dir} — příspěvků: %{posts}, stránek výpisu: %{pages}, štítkových stránek: %{tags}, k tomu index hledání, RSS a mapa webu"
-  drafts: "Rozepsané drafty (jen náhled, v žádném výpisu nejsou): %{count}"
+  drafts: "Rozepsané koncepty (jen náhled, v žádném výpisu nejsou): %{count}"
   reused: "Stránek beze změny, znovu nesestavených: %{count}"
   full: "Úplné sestavení -- každá stránka vyrenderována a porovnána."
   two_pages: "⚠️  Na adrese /%{slug}/ se servíruje víc příspěvků (%{count}), doopravdy ale jen jeden:"
@@ -53,7 +53,7 @@ build:
   # pojmenuje post, o který jde, protože build jede dál i bez něj.
   extra_css_offsite: "⚠️  site.extra_css: %{value} není cesta na tomhle webu, takže by ho Content-Security-Policy stránky zahodila — přeskočeno. Zkopíruj soubor do assets/ a pojmenuj ho jako /assets/css/<jméno>.css."
   page_reserved_name: "⚠️  Stránka „%{slug}“ by seděla na adrese, kterou engine sám používá (/%{slug}/) — nesestavená. Přejmenuj ji."
-  draft_no_token: "⚠️  Draft „%{slug}“ nemá draft_token — náhled by byl na uhodnutelné adrese, takže se nestaví. Ulož ho znovu přes ./blog.sh edit."
+  draft_no_token: "⚠️  Koncept „%{slug}“ nemá draft_token — náhled by byl na uhodnutelné adrese, takže se nestaví. Ulož ho znovu přes ./blog.sh edit."
   pinned_more_than_one: "⚠️  Připnutý je víc než jeden příspěvek; použije se ten nejnovější (%{slug})."
   tag_too_long: "⚠️  Štítek „%{name}…“ je na adresu výpisové stránky moc dlouhý — na svých příspěvcích se ukazuje, ale stránka /tag/ se pro něj nesestavuje."
   series_too_long: "⚠️  Série %{name} má jméno delší, než unese adresa, takže nedostane stránku výpisu. Všechno ostatní kolem série funguje; když ji chceš, dej sérii kratší jméno."
@@ -275,7 +275,7 @@ cli:
     ❌ V textu je druhá hlavička.
 
     Vypadá to, že jsi vložil text i s vlastními řádky mezi --- pod hlavičku,
-    která tu už byla. Zpracuje se jen ta první, takže by post zůstal bez
+    která tu už byla. Zpracuje se jen ta první, takže by příspěvek zůstal bez
     titulku a dostal by slug odvozený z prvních slov textu.
 
     Nech jen jednu hlavičku: buď smaž tu prázdnou nahoře, nebo z vloženého
@@ -298,26 +298,26 @@ cli:
   translate_media_unsupported: "Překlad nese slova, ne obrázky: média patří příspěvku a jazyky je sdílejí. Přidej obrázek přes `./blog.sh edit` a tady se na něj odkaž."
   frontmatter_hint: |
     <!--
-    NÁVOD — tenhle blok i řádky začínající // se při uložení smažou, do postu se nedostanou.
+    NÁVOD — tenhle blok i řádky začínající // se při uložení smažou, do příspěvku se nedostanou.
     (Poznámku si tedy piš přes //, ne přes # — mřížky jsou vyhrazené pro nadpisy.)
 
     FRONTMATTER (mezi --- a ---):
       title   nadpis (volitelný)
       tags    tagy oddělené čárkou, např: příroda, procházka, praha
-      type    typ postu — text / quote / chat / image / video / audio / link
+      type    typ příspěvku — text / quote / chat / image / video / audio / link
               (volitelné — necháš-li prázdné, typ se odvodí sám podle
-              obsahu postu)
+              obsahu příspěvku)
               page → stránka mimo výpisy, archiv i RSS, na vlastní adrese
               (About, Kontakt)
-      pinned  true → post se drží na začátku první stránky výpisu
-      unlisted true → post zůstane na své adrese, ale zmizí z výpisů,
+      pinned  true → příspěvek se drží na začátku první stránky výpisu
+      unlisted true → příspěvek zůstane na své adrese, ale zmizí z výpisů,
               feedů, sitemapy i hledání (odkaz pro pár lidí, ne heslo)
-      series  jméno série; posty se stejným jménem tvoří sérii
-      hero    true/false → úvodní obrázek nad titulkem u tohohle postu
+      series  jméno série; příspěvky se stejným jménem tvoří sérii
+      hero    true/false → úvodní obrázek nad titulkem u tohohle příspěvku
       toc     true/false → seznam kapitol (sám naskočí od čtyř nadpisů)
       link   https://... -> karta odkazu nad textem: adresa, o kterou jde;
              link_title a link_description jsou slova na ní, a bez
-             vlastního titulku se post jmenuje podle karty
+             vlastního titulku se příspěvek jmenuje podle karty
 
     Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
     publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
@@ -330,7 +330,7 @@ cli:
 
   template_unchanged: "Šablona zůstala beze změny (neuloženo?), příspěvek nevznikl."
   empty_content: "Prázdný obsah, nic se nezapsalo."
-  wrote_draft: "Zapsáno jako draft: %{path}"
+  wrote_draft: "Zapsáno jako koncept: %{path}"
   add_file_not_found: "Takový soubor není: %{file}. Samotné jméno se hledá v incoming/, cesta s adresářem se bere tak, jak je."
   bad_reference: "Odkaz na obrázek jmenuje cestu: %{reference}. Tenhle běh cesty nenásleduje — obrázek se musí jmenovat sám za sebe (foto.jpg) a soubor musí přijít do incoming/ spolu s textem. Nic se nezapsalo."
   add_file_not_a_file: "Tohle není soubor: %{file}. Je to adresář, odkaz do prázdna, nebo něco jiného, z čeho příspěvek přečíst nejde."
@@ -342,14 +342,14 @@ cli:
   add_json_needs_file: "--json potřebuje soubor ke čtení: `add <soubor> --json`. Bez něj `add` otevře editor a až do jeho zavření není co hlásit."
   add_unknown_option: "Neznámý přepínač: %{option}. add bere soubor, --json a --untrusted, nic jiného."
   publish_unknown_option: "Neznámý přepínač: %{option}. publish bere slug, --yes, --no-announce a --json, nic jiného."
-  publish_json_needs_yes: "`publish --json` chce i `--yes`. Bez něj se běh zastaví u dialogu draftu a není tam nikdo, kdo by odpověděl."
-  publish_yes_needs_slug: "--yes musí pojmenovat příspěvek: `publish <slug> --yes`. Bez slugu nabídne publish drafty na výběr — a vybírat se má nad náhledem, ne jedním klávesovým úhozem od oznámení, které nejde vzít zpět."
+  publish_json_needs_yes: "`publish --json` chce i `--yes`. Bez něj se běh zastaví u dialogu konceptu a není tam nikdo, kdo by odpověděl."
+  publish_yes_needs_slug: "--yes musí pojmenovat příspěvek: `publish <slug> --yes`. Bez slugu nabídne publish koncepty na výběr — a vybírat se má nad náhledem, ne jedním klávesovým úhozem od oznámení, které nejde vzít zpět."
   no_announce_not_scheduled: "Pozor: --no-announce se do naplánované publikace nepřenese. Cron se řídí samotným příspěvkem, takže ho v jeho čase oznámí. Když má zůstat potichu, publikuj ho ručně s --no-announce, nebo ho označ jako unlisted."
   publish_yes_ambiguous: "Slug %{slug} je ve víc než jednom roce (%{years}) a --yes se nemá koho zeptat, který to má být. Publikuj ho přes `props %{slug}`, kde se ukážou a dají vybrat."
   toot_skipped_old: "Bez oznámení: datum (%{date}) je mimo okno čerstvosti a tuhle otázku tu nemá kdo zodpovědět. Příspěvek je publikovaný, oznámit se dá ručně přes `toot`."
   incoming_not_cleaned: "V incoming/ zůstalo: %{files} — kopie je v příspěvku, originál se smazat nepovedlo (chybí právo zápisu do incoming/). Ukliď ho ručně, ať dál platí, že prázdné incoming = nic nečeká."
   generating_preview: "Generuji náhled"
-  draft_saved_preview_pending: "Draft je uložený. Náhled se ukáže po úspěšném nasazení — pak spusť ./blog.sh edit %{slug}"
+  draft_saved_preview_pending: "Koncept je uložený. Náhled se ukáže po úspěšném nasazení — pak spusť ./blog.sh edit %{slug}"
 
   base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
   preview_label: "Náhled: %{url}"
@@ -399,18 +399,18 @@ cli:
   deploy_done: "Hotovo: nahráno %{uploaded}, smazáno %{deleted}, selhalo %{failed}, beze změny %{unchanged}"
   announce_no_base_url: "⚠️  Neoznamuje se: site.base_url není nastavená, takže by v tootu nebyl odkaz, ale holá cesta — a to už nevezmeš zpět. Doplň site.base_url v config/site.yml (nebo SITE_BASE_URL v env.sh) a pusť ./blog.sh toot."
   surfer_unreachable: "❌ Surfer na %{url} neodpovídá (%{reason}) — appka je nejspíš vypnutá, nebo SURFER_URL v env.sh míří jinam, než kde běží. Sestavený web čeká v public.nosync/; až server poběží (nebo adresu opravíš), nahraje ho ./blog.sh rebuild."
-  what_next_prompt: "Co dál? [d] nechat draftem  [e] upravit  [p] publikovat  [s] naplánovat  [x] smazat: "
-  left_as_draft: "Ponecháno jako draft. Publikovat později: ./blog.sh publish %{slug}"
+  what_next_prompt: "Co dál? [d] nechat jako koncept  [e] upravit  [p] publikovat  [s] naplánovat  [x] smazat: "
+  left_as_draft: "Ponecháno jako koncept. Publikovat později: ./blog.sh publish %{slug}"
   unknown_choice_pde: "Nerozumím, zkus d / e / p / s / x."
   schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, jen HH:MM = dnes; prázdné = zrušit): "
-  what_next_prompt_slot: "Co dál? [d] nechat draftem  [e] upravit  [p] publikovat  [s] naplánovat (%{slot})  [x] smazat: "
+  what_next_prompt_slot: "Co dál? [d] nechat jako koncept  [e] upravit  [p] publikovat  [s] naplánovat (%{slot})  [x] smazat: "
   schedule_slot_offer: "Publikovat kdy?\n  Nejbližší volný slot: %{slot}"
   schedule_slot_keys: "  [Enter] přijmout  ·  vlastní datum (YYYY-MM-DD HH:MM, jen HH:MM = dnes)  ·  „%{cancel_word}“ = zpět"
   schedule_queue_position: "  %{count}. příspěvek ve frontě (předchozí: '%{slug}', %{date})."
   schedule_slots_taken: "  Dřívější sloty jsou obsazené:"
   schedule_queue_hint: "Chceš ho dřív — třeba v dnešním slotu? Přijmi nabídnutý čas a ve frontě (./blog.sh queue) ho přenes na začátek: časy zůstanou slotům a zbytek ustoupí o jeden."
   props_queue_heading: "Fronta (naplánovaných: %{count}):"
-  queue_empty: "Fronta je prázdná — draft naplánuješ přes [s] v jeho náhledu, nebo ./blog.sh schedule."
+  queue_empty: "Fronta je prázdná — koncept naplánuješ přes [s] v jeho náhledu, nebo ./blog.sh schedule."
   queue_overdue: "(čeká na cron)"
   queue_menu_hint: "↑↓ pohyb · Enter akce s příspěvkem · Esc zpět"
   queue_pick_prompt: "Číslo příspěvku (prázdné = konec): "
@@ -457,10 +457,10 @@ cli:
   delete_bluesky_failed: "Smazání oznámení na Bluesky selhalo — smaž ho ručně."
   unlisted_no_toot: "Příspěvek je nezalistovaný, oznámení se neposlalo. Aby odešlo, sundej mu nejdřív příznak."
   backdated_no_toot: "Datum příspěvku není aktuální (zpětně datovaný příspěvek), oznámení se neposlalo."
-  schedule_only_drafts: "Příspěvek '%{slug}' už je publikovaný — plánovat jde jen drafty."
+  schedule_only_drafts: "Příspěvek '%{slug}' už je publikovaný — plánovat jde jen koncepty."
   scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
   schedule_cron_note: "Vyžaduje nainstalovaný cron publish-scheduled.sh — viz docs/operations.md. Zrušení: opětovné schedule, nebo [n] ve vlastnostech příspěvku."
-  unscheduled_label: "Plán zrušen: '%{slug}' zůstává draftem."
+  unscheduled_label: "Plán zrušen: '%{slug}' zůstává konceptem."
 
   already_published: "Příspěvek '%{slug}' už je publikovaný: %{url}"
   publish_date_now: "Datum publikace: %{date} (nastaveno na teď)"
@@ -472,19 +472,19 @@ cli:
 
   post_not_found: "Příspěvek '%{slug}' nenalezen.\n\n"
   post_date_unreadable: "❌ %{slug}: datum tohohle příspěvku není nic, s čím by se dalo pracovat (%{value}). Oprav ho přímo v souboru příspěvku — 2026-08-22T10:00:00+02:00 — a zkus to znovu. `./blog.sh check` vyjmenuje všechny příspěvky v tomhle stavu."
-  still_draft_toot: "Příspěvek '%{slug}' je pořád draft — nejdřív publikuj (./blog.sh publish %{slug}), teprve pak má toot na co odkazovat."
+  still_draft_toot: "Příspěvek '%{slug}' je pořád koncept — nejdřív publikuj (./blog.sh publish %{slug}), teprve pak má toot na co odkazovat."
   toot_failed: "Toot se nepodařilo poslat (viz výš)."
   no_network_toot: "Nic se neoznámilo: config/site.yml nemá sekci mastodon: ani bluesky:, takže tenhle web nikam neoznamuje. Jestli jsi ji chtěl nastavit, zkontroluj, že hlavička sekce je živý řádek, a ne komentář — klíče pod zakomentovanou hlavičkou patří tomu, co bylo před ní. Samotný token patří do env.sh."
   toot_declined: "Neoznámeno, jak jsi chtěl."
   tooted: "Otootováno: %{url}"
 
-  already_draft: "Příspěvek '%{slug}' je už draft: %{url}"
-  confirm_unpublish: "Opravdu vrátit '%{slug}' zpátky do draftu? Napiš slug pro potvrzení: "
+  already_draft: "Příspěvek '%{slug}' je už koncept: %{url}"
+  confirm_unpublish: "Opravdu vrátit '%{slug}' zpátky do konceptu? Napiš slug pro potvrzení: "
   cancelled: "Zrušeno."
   deleting_toot: "Mažu toot na Mastodonu: %{url}"
   delete_toot_failed: "Smazání selhalo (viz výš) — toot zůstává, jen teď odkazuje na dočasně mrtvou stránku."
   announcement_kept: "Příspěvek si adresu %{url} nechává, aby šlo oznámení smazat později — a aby publikováním nevzniklo druhé."
-  reverted_to_draft: "Vráceno do draftu: %{path}"
+  reverted_to_draft: "Vráceno do konceptu: %{path}"
   updating_preview: "Aktualizuji náhled"
 
   no_changes: "Žádné změny, nic se neukládá."
@@ -547,7 +547,7 @@ cli:
   restore_media_kept: "V koši zůstaly, protože soubor toho jména je teď v archivu: %{files}"
   restored_label: "Obnoveno: %{path}"
 
-  post_count: "\nPostů: %{count}%{drafts_suffix}"
+  post_count: "\nPříspěvků: %{count}%{drafts_suffix}"
   drafts_suffix: ", z toho rozepsaných: %{count}"
 
   enter_number_or_slug: "Zadej číslo nebo slug: "
@@ -556,7 +556,7 @@ cli:
   enter_number: "Číslo (cokoliv jiného zruší): "
   cancelled_empty: "Zrušeno.\n\n"
   no_posts_to_pick: "Žádné příspěvky k výběru."
-  no_drafts_to_publish: "Není připravený žádný draft, který bychom mohli publikovat."
+  no_drafts_to_publish: "Není připravený žádný koncept, který bychom mohli publikovat."
   no_published_posts: "Žádný publikovaný příspěvek k dispozici."
   trash_empty: "Koš je prázdný."
 
@@ -572,30 +572,30 @@ cli:
   header_mode: "Režim: %{mode}"
   usage: |
     usage:
-      ./blog.sh add [<soubor>]       založí draft, ukáže náhled a zeptá se, co dál;
-                                     se souborem s markdownem se nezeptá na nic a jen zapíše draft,
+      ./blog.sh add [<soubor>]       založí koncept, ukáže náhled a zeptá se, co dál;
+                                     se souborem s markdownem se nezeptá na nic a jen zapíše koncept,
                                      což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
-      ./blog.sh edit [<slug>]        edituje post, bez slugu nabídne posledních %{recent_count} postů k editaci
+      ./blog.sh edit [<slug>]        edituje příspěvek, bez slugu nabídne posledních %{recent_count} příspěvků k editaci
       ./blog.sh translate <slug> --lang <kód>
-                                     napíše text toho postu v dalším jazyce, který web publikuje
-      ./blog.sh props [<slug>]       stav postu, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním
+                                     napíše text toho příspěvku v dalším jazyce, který web publikuje
+      ./blog.sh props [<slug>]       stav příspěvku, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
-                                     ukáže náhled draftu a zeptá se, co dál (bez slugu nabídne rozepsané drafty);
-                                     --yes publikuje rovnou bez ptaní, --no-announce nechá post mimo Mastodon a Bluesky
-      ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje draft k automatické publikaci v něm; opětovné spuštění plán zruší
-      ./blog.sh queue                fronta naplánovaných postů — pořadí, publikace hned, vyřazení zpět do draftů
-      ./blog.sh unpublish [<slug>]   vrátí publikovaný post zpátky do draftu, smaže i jeho toot (bez slugu nabídne publikované posty)
-      ./blog.sh delete [<slug>]      smaže post do koše, bez slugu nabídne posledních %{recent_count} postů ke smazání
-      ./blog.sh restore [<slug>]     obnoví post z koše, bez slugu nabídne obsah koše
+                                     ukáže náhled konceptu a zeptá se, co dál (bez slugu nabídne rozepsané koncepty);
+                                     --yes publikuje rovnou bez ptaní, --no-announce nechá příspěvek mimo Mastodon a Bluesky
+      ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje koncept k automatické publikaci v něm; opětovné spuštění plán zruší
+      ./blog.sh queue                fronta naplánovaných příspěvků — pořadí, publikace hned, vyřazení zpět do konceptů
+      ./blog.sh unpublish [<slug>]   vrátí publikovaný příspěvek zpátky do konceptu, smaže i jeho toot (bez slugu nabídne publikované příspěvky)
+      ./blog.sh delete [<slug>]      smaže příspěvek do koše, bez slugu nabídne posledních %{recent_count} příspěvků ke smazání
+      ./blog.sh restore [<slug>]     obnoví příspěvek z koše, bez slugu nabídne obsah koše
       ./blog.sh empty trash          nadobro smaže všechno v koši; napřed řekne kolik toho je
-      ./blog.sh empty versions       nechá každému postu poslední verzi a starší smaže
-      ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} postů
+      ./blog.sh empty versions       nechá každému příspěvku poslední verzi a starší smaže
+      ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} příspěvků
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
-      ./blog.sh rebuild [--full]     znovu sestaví a nasadí celý web, bez vazby na konkrétní post;
+      ./blog.sh rebuild [--full]     znovu sestaví a nasadí celý web, bez vazby na konkrétní příspěvek;
                                      --full sestaví znovu každou stránku, ne jen ty změněné
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
-                                     vypíše posty po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
+                                     vypíše příspěvky po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek
       ./blog.sh doctor [--online] [--strip-location]
@@ -606,7 +606,7 @@ cli:
                                      --repair u každého nálezu nabídne tu jedinou opravu, kterou dovoluje
       ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
                                      zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
-      ./blog.sh stats [--json]       spočítá archiv — posty, roky, slova, štítky, média, odkud to je
+      ./blog.sh stats [--json]       spočítá archiv — příspěvky, roky, slova, štítky, média, odkud to je
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -702,7 +702,7 @@ cli:
   props_label_unlisted: "nezalistován"
   props_label_announced: "oznámení"
   props_label_addresses: "staré odkazy"
-  props_draft_banner: "draft — není na webu, jen náhled"
+  props_draft_banner: "koncept — není na webu, jen náhled"
   props_state_published: "publikováno, %{date}"
   props_pinned_yes: "ano — drží se nahoře na úvodní stránce"
   props_unlisted_yes: "ano — dostupný na své adrese, ale v žádném výpisu, feedu, sitemapě ani hledání"
@@ -729,7 +729,7 @@ cli:
   addresses_menu_hint: "↑↓ pohyb · Enter zrušit adresu · Esc zpět"
   addresses_pick_prompt: "Číslo adresy ke zrušení (cokoliv jiného = zpět): "
   addresses_taken: "— adresu převzal jiný příspěvek, tohle přesměrování nikdy nenastane"
-  addresses_taken_draft: "— adresu zabral draft, přesměrování zatím funguje; převezme ji až jeho publikace"
+  addresses_taken_draft: "— adresu zabral koncept, přesměrování zatím funguje; převezme ji až jeho publikace"
   addresses_unusable: "— nepoužitelné, čekám \"rok/slug\""
   addresses_drop_confirm: "Zrušit %{address}? Ten odkaz tím přestane fungovat natrvalo. [a/N] "
   addresses_dropped: "🔗 %{address} zrušeno — už nikam nepřesměrovává."
@@ -961,10 +961,10 @@ import:
     feed_dropped: "Z těl příspěvků vypadl obsah, pro který schéma bloků nemá tvar: %{listed}. Obvykle jde o embedy a formuláře — jestli příspěvek to video potřebuje, vrať odkaz ručně."
     duplicate_ids: "%{count} položek zdroje neslo id, které už jiná položka použila. Každá se zapsala jako vlastní příspěvek, ne přes tu první — projdi je a smaž tu, která je kopie."
     feed_linked_images: "Obrázků obalených odkazem, který obrázkový blok neunese: %{count} — obrázky dorazily, adresy, kam mířily, ne."
-    ghost_scheduled: "Příspěvků naplánovaných v Ghostu: %{count} — dorazily jako drafty; naplánuj je tady, až budeš chtít."
-    ghost_members: "Příspěvků jen pro předplatitele: %{count} — dorazily jako drafty se štítkem ghost-members; co z nich pustíš na web, rozhodni sám."
-    livejournal_nonpublic: "Zápisků jen pro přátele nebo soukromých: %{count} — dorazily jako drafty, veřejné nikdy nebyly."
-    medium_responses: "Příspěvků vypadajících jako reakce pod cizími články: %{count} — dorazily jako drafty k revizi."
+    ghost_scheduled: "Příspěvků naplánovaných v Ghostu: %{count} — dorazily jako koncepty; naplánuj je tady, až budeš chtít."
+    ghost_members: "Příspěvků jen pro předplatitele: %{count} — dorazily jako koncepty se štítkem ghost-members; co z nich pustíš na web, rozhodni sám."
+    livejournal_nonpublic: "Zápisků jen pro přátele nebo soukromých: %{count} — dorazily jako koncepty, veřejné nikdy nebyly."
+    medium_responses: "Příspěvků vypadajících jako reakce pod cizími články: %{count} — dorazily jako koncepty k revizi."
     medium_untagged: "Publikovaných příspěvků bez štítků: %{count}."
     movabletype_comments: "komentáře (%{count})"
     movabletype_pings: "trackbacky (%{count})"
@@ -1214,7 +1214,7 @@ check:
   repair_nothing: "Není co spravovat — archiv je v pořádku."
   repair_heading: "Kontrola archivu; ke každému nálezu pak nabídnu opravu"
   repair_no_offer: "Tady nemám co nabídnout: tohle je rozhodnutí na tobě."
-  repair_no_offer_draft: "Jediný příspěvek toho jména je rozepsaný, a draft na webu zatím žádnou adresu nemá — jakmile ho vydáš, odkaz se spraví sám."
+  repair_no_offer_draft: "Jediný příspěvek toho jména je rozepsaný, a koncept na webu zatím žádnou adresu nemá — jakmile ho vydáš, odkaz se spraví sám."
   repair_no_offer_duplicate: "Ten slug nesou dva příspěvky v různých letech, takže nepojmenovává ani jeden. Tady musí rozhodnout člověk."
   repair_add_redirect: "Zapsat %{origin} do redirect_from příspěvku %{slug} (%{to}) — jeden přidaný řádek, a odpoví se na všechny odkazy na starou adresu včetně těch zvenčí."
   repair_rewrite_link: "Přepsat odkaz v příspěvku %{slug}: %{from} -> %{to}"

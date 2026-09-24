@@ -26,7 +26,7 @@ window.I18N = {
       "name_taken": "V incoming/ je pod tím jménem něco, co není obyčejný soubor -- složka nebo symbolický odkaz. Nic se nepřepsalo. Přejmenuj obrázek, nebo na serveru ukliď, co pod tím jménem leží."
     },
     "app": {
-      "mode_draft": "Draft",
+      "mode_draft": "Koncept",
       "mode_publish": "Rovnou publikovat",
       "send_publish": "Publikovat na blog",
       "insert": "Vložit do textu",
@@ -78,7 +78,7 @@ window.I18N = {
       "handing": "Předávám {what}…",
       "preview": "Náhled",
       "preview_hide": "Skrýt náhled",
-      "preview_note": "Přibližně, ne přesně: příspěvek vykresluje až blog a skutečný náhled je ten draftový po odeslání.",
+      "preview_note": "Přibližně, ne přesně: příspěvek vykresluje až blog a skutečný náhled je náhled konceptu po odeslání.",
       "preview_missing_picture": "Obrázek {name} -- v tomto zařízení bez náhledu",
       "mark_bold": "Tučně",
       "mark_italic": "Kurzíva",
@@ -106,7 +106,7 @@ window.I18N = {
       "sent_elsewhere": "Odesláno z jiného okna tohoto webu; tahle kopie byla vymazána.",
       "files_skipped": "Něco z vybraného není obrázek ani video a zůstalo stranou.",
       "preview_picture_glued": "{name}: obrázek musí stát na vlastním řádku s prázdným řádkem před sebou i za sebou -- jinak blog příspěvek odmítne",
-      "result_saved": "Uloženo jako draft.",
+      "result_saved": "Uloženo jako koncept.",
       "result_preview": "Náhled",
       "result_pending": "Web se znovu sestaví do čtvrt hodiny.",
       "result_warnings": "Za pozornost stojí",

@@ -139,11 +139,11 @@ Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem 
 Zaškrtávací seznam značí položky hranatými závorkami — vykreslí se jako checkboxy (jen ke čtení; návštěvník vaše úkoly neodškrtá):
 
 ```
-- [x] napsat post
+- [x] napsat příspěvek
 - [ ] publikovat ho
 ```
 
-- [x] napsat post
+- [x] napsat příspěvek
 - [ ] publikovat ho
 
 Na číslech nezáleží, při zobrazení se přepočítají. Vnořený seznam se odsadí o dvě mezery:
@@ -320,8 +320,8 @@ Stejné dva vykřičníky jako u videa — rozlišuje je přípona souboru
 a soubor se vykreslí jako nativní přehrávač. Na tentýž řádek jde napsat
 i adresu ze Spotify, SoundCloudu, Mixcloudu, Funkwhale nebo Bandcampu —
 udělá se z ní přehrávač té platformy. (U posledních dvou samotná adresa
-nestačí, takže se uložení postu jednou zeptá služby, kde má přehrávač —
-jediná chvíle, kdy psaní postu potřebuje síť.)
+nestačí, takže se uložení příspěvku jednou zeptá služby, kde má přehrávač —
+jediná chvíle, kdy psaní příspěvku potřebuje síť.)
 
 ```
 !![Popisek nahrávky](/cesta/k/nahravce.mp3)
@@ -341,13 +341,13 @@ Přípony, které se počítají: .pdf, .zip, .tgz, .epub, .txt, .md, .ics,
 [Čtenářský deník 2025](denik.pdf)
 ```
 
-Post, jehož text je jen krátká věta plus přílohy, spadne pod
+Příspěvek, jehož text je jen krátká věta plus přílohy, spadne pod
 **Dokumenty**; delší článek, který k sobě přibalí data, zůstává článkem
 s přílohou.
 
 ## Karta odkazu
 
-Post může BÝT O nějaké adrese — o vydání, o cizím článku, o stránce, na
+Příspěvek může BÝT O nějaké adrese — o vydání, o cizím článku, o stránce, na
 kterou chceš ukázat. To je karta nad textem, ne řádek v něm, takže se
 píše do hlavičky, ne do těla:
 
@@ -362,7 +362,7 @@ A tady je, co si o tom myslím.
 ```
 
 `link_title` a `link_description` jsou slova na kartě, obojí
-nepovinné; bez vlastního `title:` se post jmenuje podle karty. Odstavec,
+nepovinné; bez vlastního `title:` se příspěvek jmenuje podle karty. Odstavec,
 který je jen odkaz, zůstává tím, čím vypadá — obyčejným odkazem
 v obyčejném textu.
 
