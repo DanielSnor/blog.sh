@@ -678,8 +678,10 @@ none and has to go on. Then:
 ![The shortcut as the Shortcuts app shows it, with placeholders where the server's details go: the If with Get File, Run Script over SSH, Base64 Encode, Delete Files, the Text with #b=, Open URLs and Stop and Output; then the Repeat with Each loop with the If around Encode Media, Combine Text, Save File, and the Open URLs that names the shortcut itself](shortcut.png)
 
 It can be imported instead of built: [SendPost](shortcuts/SendPost.shortcut),
-signed so that anyone may import it. Keep its name, or change the name in
-the last *Open URLs* to whatever you call it, and fill in what is yours.
+signed so that anyone may import it. After importing, make sure it is
+called exactly `SendPost` -- the last *Open URLs* opens it by that name --
+or change the name there to whatever you call it. Then fill in what is
+yours.
 In *Run Script over SSH*: the machine you log into (a host name or an IP
 address), its SSH port, the user, and the path to `scripts/receive.sh` or
 the wrapper that reaches it. In the *Text*: `YOUR-BLOG-URL` is the address
