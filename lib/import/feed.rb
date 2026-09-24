@@ -180,7 +180,11 @@ module Import
         'source' => {
           'platform' => wordpress? ? 'wordpress' : 'feed',
           'account' => channel_host,
-          'post_url' => item_link(item),
+          # nil, not "": .compact below is how a value the item does not
+          # have stays out of the post, and an empty string is a value.
+          # Podcast hosts leave <link> out of most items (Buzzsprout 6 of
+          # 6, Megaphone 213 of 214), so the empty one was the common case.
+          'post_url' => item_link(item).then { |link| link.empty? ? nil : link },
           'original_id' => item_id(item)
         }.compact
       }

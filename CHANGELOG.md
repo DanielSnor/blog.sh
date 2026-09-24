@@ -90,6 +90,7 @@ differ only in the stylesheet and one script, and report the same warnings.
 - **Ctrl+C in any screen of `./blog.sh` ended in a stack trace.** It now stops the run with one line and status 130, as setup, style and import always did.
 - **FTP was nowhere in the docs.** The rclone backend has always reached a plain FTP host; `install.md` and `env.sh.example` now say how, and what to set when a shared host refuses "too many connections".
 - **`publish --json` fell over on a post whose date nobody can read.** Every other refusal on that route answers with an object and status 0; this one wrote prose to stderr and left with status 1, which a phone cannot tell apart from the engine having crashed.
+- **A podcast import put the show's cover over every episode.** Anchor and others repeat it in each item; only an episode's own artwork leads its post now. And an episode with no `<link>` -- most of them, on most hosts -- no longer carries an empty `post_url`.
 - **Cancelling a plan left the slot's date on the post.** The date the plan overwrote comes back -- and the post returns to the year that date names, when the slot had moved it out of it.
 
 ## 1.8 -- 2026-09-14
