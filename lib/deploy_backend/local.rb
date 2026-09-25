@@ -27,10 +27,20 @@ module DeployBackend
     # an unmounted mountpoint has -- and the whole site was deployed into
     # a directory of that name INSIDE the installation, quietly and
     # successfully. A relative target is not a target anybody meant.
+    # A leading ~ is not relative: env.sh quotes the value, so the shell
+    # leaves the tilde alone, and #session expands it -- the newcomer
+    # trial's ~/fresh-www was refused by doctor while the deploy found it.
     def problem
-      return nil if dir.empty? || dir.start_with?('/')
+      return nil if dir.empty? || dir.start_with?('/', '~')
 
       I18n.t('cli.deploy_target_relative', dir: dir)
+    end
+
+    # The sentence above says what to write instead; the generic advice
+    # about unclosed quotes in the extra switches belongs to backends
+    # that take switches.
+    def problem_fix
+      nil
     end
 
     def dir

@@ -39,6 +39,12 @@ require_relative '../lib/doctor'
 
 online = ARGV.include?('--online')
 
+# Only the switches it has: `doctor --onlien` ran the offline checks and
+# said nothing about the typo, so the online half the person asked for
+# silently never happened (second trial, 25. 9. 2026).
+unknown = ARGV.reject { |arg| %w[--online --strip-location].include?(arg) }
+abort I18n.t('cli.doctor_unknown_option', option: unknown.join(' ')) unless unknown.empty?
+
 # The one thing doctor does rather than reports, and it has to be asked for
 # by name. Everything else here reads; this rewrites photographs that are
 # already on somebody's website, so it never happens as a side effect of

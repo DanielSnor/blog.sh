@@ -7,10 +7,20 @@ require_relative 'version'
 
 # lib/surfer.rb -- uploads files to Surfer (Cloudron's Files API).
 #
-#   POST /api/files/<remote>?access_token=TOKEN&newFilePath=<remote>
+#   POST /api/files/<remote>
 #   Content-Type: multipart/form-data, field "file". Success = HTTP 2xx.
 #
-# Configured via ENV (env.sh): SURFER_URL, SURFER_TOKEN, SURFER_REMOTE_DIR.
+# Configured via ENV (env.sh): SURFER_URL, SURFER_REMOTE_DIR, and how to
+# sign in -- one of two ways:
+#
+#   SURFER_USERNAME + SURFER_PASSWORD  Surfer 7 and later: the Cloudron
+#       user and an app password, sent as HTTP Basic. Surfer 7 (September
+#       2026) took access tokens away; its files API is otherwise the same.
+#   SURFER_TOKEN  Surfer 6 and earlier: an access token, sent as
+#       ?access_token=. Surfer 7 answers it with 401.
+#
+# The password wins when both are set: an install moving to Surfer 7 adds
+# the two lines and leaves the token where it was.
 #
 # For a batch of files, use Surfer.session -- it holds one HTTP/TLS
 # connection for the whole batch. A new connection per file (the original
@@ -30,6 +40,12 @@ class Unreachable < StandardError; end
 # A directory listing that came back as anything but the API's JSON.
 class ListFailed < StandardError; end
 
+# Surfer said no to the credentials (401/403). Raised from the first file
+# rather than counted: every other file would get the same answer, and a
+# deploy of 6,000 files printed 6,000 lines of HTTP 401 before it said
+# anything a person could act on.
+class Unauthorized < StandardError; end
+
 # Everything TCPSocket/TLS can throw before the first request goes out.
 # Distinct from Session::RETRIABLE on purpose: those happen mid-batch on
 # a connection that already worked, and reconnecting once is the right
@@ -42,7 +58,25 @@ CONNECT_ERRORS = [
 module_function
 
   def configured?
-    !ENV['SURFER_URL'].to_s.empty? && !ENV['SURFER_TOKEN'].to_s.empty?
+    !ENV['SURFER_URL'].to_s.empty? && !sign_in.nil?
+  end
+
+  # :password, :token, or nil when neither is filled in.
+  def sign_in
+    if !ENV['SURFER_USERNAME'].to_s.empty? && !ENV['SURFER_PASSWORD'].to_s.empty?
+      :password
+    elsif !ENV['SURFER_TOKEN'].to_s.empty?
+      :token
+    end
+  end
+
+  def authorize(request)
+    request.basic_auth(ENV['SURFER_USERNAME'].to_s, ENV['SURFER_PASSWORD'].to_s) if sign_in == :password
+    request
+  end
+
+  def refused?(code)
+    [401, 403].include?(code.to_i)
   end
 
   # Opens one connection and yields a Session (see below) to the block. The
@@ -69,11 +103,19 @@ module_function
   # One-off upload of a single file (opens and closes its own connection).
   def upload(path, logger: nil, remote_name: nil)
     unless configured?
-      logger&.call("  ℹ️  SURFER_URL/SURFER_TOKEN not set -> upload skipped (#{path})")
+      logger&.call("  ℹ️  SURFER_URL or its sign-in (SURFER_USERNAME + SURFER_PASSWORD) not set -> upload skipped (#{path})")
       return :skipped
     end
 
     session { |s| s.upload(path, logger: logger, remote_name: remote_name) }
+  end
+
+  # What to say when Surfer refuses: the fix depends on which way in was
+  # tried, and a token refused is almost always a Surfer that became 7.
+  def refusal_sentence(code)
+    require_relative 'i18n'
+    key = sign_in == :password ? 'cli.surfer_refused_password' : 'cli.surfer_refused_token'
+    I18n.t(key, url: ENV['SURFER_URL'].to_s.chomp('/'), code: code)
   end
 
   # Remote path = SURFER_REMOTE_DIR + relative name (preserves subdirectories).
@@ -101,15 +143,19 @@ module_function
     def upload(path, logger: nil, remote_name: nil)
       say = ->(m) { logger&.call(m) }
       unless Surfer.configured?
-        say.call("  ℹ️  SURFER_URL/SURFER_TOKEN not set -> upload skipped (#{path})")
+        say.call("  ℹ️  SURFER_URL or its sign-in (SURFER_USERNAME + SURFER_PASSWORD) not set -> upload skipped (#{path})")
         return :skipped
       end
 
       remote = Surfer.remote_path(path, remote_name)
       resp = send_request { build_upload(remote, path) }
+      raise Unauthorized, "HTTP #{resp.code}" if Surfer.refused?(resp.code)
+
       ok = resp.code.to_i.between?(200, 299)
       say.call("  #{ok ? '✅' : '❌'} upload -> #{ENV['SURFER_URL'].to_s.chomp('/')}/#{remote} (HTTP #{resp.code})")
       ok ? :ok : :failed
+    rescue Unauthorized
+      raise
     rescue StandardError => e
       say.call("  ❌ upload failed: #{e.class}: #{e.message}")
       :failed
@@ -124,10 +170,13 @@ module_function
       resp = send_request { build_delete(remote) }
       code = resp.code.to_i
       return :missing if code == 404
+      raise Unauthorized, "HTTP #{code}" if Surfer.refused?(code)
 
       ok = code.between?(200, 299)
       say.call("  #{ok ? '🗑️ ' : '❌'} deleted -> #{remote} (HTTP #{resp.code})")
       ok ? :ok : :failed
+    rescue Unauthorized
+      raise
     rescue StandardError => e
       say.call("  ❌ delete failed: #{e.class}: #{e.message}")
       :failed
@@ -150,6 +199,7 @@ module_function
         raise ListFailed, I18n.t('doctor.deploy_target_timeout', seconds: @http.read_timeout.to_i)
       end
       code = resp.code.to_i
+      raise Unauthorized, Surfer.refusal_sentence(code) if Surfer.refused?(code)
       raise ListFailed, "HTTP #{code}" unless code.between?(200, 299)
 
       entries = JSON.parse(resp.body.to_s)['entries']
@@ -168,7 +218,7 @@ module_function
       uri.path = "#{uri.path}/"
       req = Net::HTTP::Get.new(uri)
       req['User-Agent'] = Surfer::USER_AGENT
-      req
+      Surfer.authorize(req)
     end
 
     # The request is only built here, inside the block, so it can be built
@@ -201,14 +251,16 @@ module_function
       remote_enc = remote.split('/')
                          .map { |s| URI.encode_www_form_component(s).gsub('+', '%20') }
                          .join('/')
-      params = { 'access_token' => ENV['SURFER_TOKEN'].to_s }.merge(extra_params)
-      URI("#{ENV['SURFER_URL'].to_s.chomp('/')}/api/files/#{remote_enc}?#{URI.encode_www_form(params)}")
+      params = Surfer.sign_in == :token ? { 'access_token' => ENV['SURFER_TOKEN'].to_s } : {}
+      params = params.merge(extra_params)
+      query = params.empty? ? '' : "?#{URI.encode_www_form(params)}"
+      URI("#{ENV['SURFER_URL'].to_s.chomp('/')}/api/files/#{remote_enc}#{query}")
     end
 
     def build_delete(remote)
       req = Net::HTTP::Delete.new(api_uri(remote))
       req['User-Agent'] = Surfer::USER_AGENT
-      req
+      Surfer.authorize(req)
     end
 
     def build_upload(remote, path)
@@ -229,7 +281,7 @@ module_function
       req['Content-Type'] = "multipart/form-data; boundary=#{boundary}"
       req['User-Agent'] = Surfer::USER_AGENT
       req.body = body
-      req
+      Surfer.authorize(req)
     end
   end
 end

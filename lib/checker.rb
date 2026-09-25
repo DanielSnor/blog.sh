@@ -96,6 +96,16 @@ module Checker
     I18n.t("doctor.#{key}", **vars)
   end
 
+  # The same hint doctor gives: a quote left open is named by its line.
+  def syntax_fix(error, path)
+    open_quote = YamlCompat.open_quote_line(File.read(path, encoding: 'utf-8'))
+    return dt('site_yml_open_quote_fix', line: open_quote) if open_quote
+
+    dt('site_yml_syntax_fix', line: error.line, column: error.column)
+  rescue SystemCallError
+    dt('site_yml_syntax_fix', line: error.line, column: error.column)
+  end
+
   def ok(text, kind: nil, data: nil)
     Finding.new(level: :ok, text: text, count: 1, kind: kind, data: data)
   end
@@ -136,7 +146,7 @@ module Checker
     [error(dt('site_yml_empty'), dt('site_yml_missing_fix'), kind: :config_empty)]
   rescue Psych::SyntaxError => e
     [error(dt('site_yml_syntax', message: e.problem.to_s),
-           dt('site_yml_syntax_fix', line: e.line, column: e.column),
+           syntax_fix(e, path),
            kind: :config_syntax,
            data: { 'line' => e.line, 'column' => e.column, 'message' => e.problem.to_s })]
   rescue SystemCallError => e
@@ -1484,13 +1494,19 @@ module Checker
     own = site_own_language(root)
     langs = ([own] + others).reject(&:empty?).uniq
     rows = posts.map do |post|
+      # The own language is the post itself, text or no text: a photo
+      # imported from Tumblr has none, and it showed as half-written in
+      # the language it was published in (second trial, 25. 9. 2026). A
+      # translation of such a post is whole with its title, since there is
+      # nothing else to translate.
+      wordless = Array(post['content']).empty?
       cells = langs.to_h do |lang|
-        next [lang, Array(post['content']).empty? ? 'title_only' : 'written'] if lang == own
+        next [lang, 'written'] if lang == own
 
         entry = post['translations'].is_a?(Hash) ? post['translations'][lang] : nil
         state = if !entry.is_a?(Hash) || entry.slice(*Translations::TEXT_KEYS).compact.empty?
                   'missing'
-                elsif Array(entry['content']).empty?
+                elsif Array(entry['content']).empty? && !wordless
                   'title_only'
                 else
                   'written'

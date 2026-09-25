@@ -347,7 +347,8 @@ end
 # as started and never finished, which is what feeds the "unfinished" streak
 # the header reports.
 if BACKEND.respond_to?(:problem) && (args_problem = BACKEND.problem)
-  abort "❌ #{args_problem}\n   #{I18n.t('cli.deploy_args_fix')}"
+  fix = BACKEND.respond_to?(:problem_fix) ? BACKEND.problem_fix : I18n.t('cli.deploy_args_fix')
+  abort ["❌ #{args_problem}", fix && "   #{fix}"].compact.join("\n")
 end
 
 # Read before anything writes it, because the write below happens mid-run
@@ -775,6 +776,8 @@ log("  #{I18n.t('cli.deploy_no_growth_reference')}") if growth_files.zero?
 log("  #{I18n.t('cli.deploy_selection', files: files.size, bytes: FileSize.human(build_bytes),
                                         changed: to_upload.size, unchanged: skipped)}")
 if orphans.any?
+  # The reason, not the switch: `rebuild` passes --prune on every run, and
+  # "(--prune)" read as if somebody had typed it (second trial, 25. 9. 2026).
   why = if PRUNE then I18n.t('cli.deploy_orphans_why_prune')
         elsif SNAPSHOT then I18n.t('cli.deploy_orphans_why_snapshot')
         else I18n.t('cli.deploy_orphans_why_only')
@@ -910,6 +913,12 @@ rescue Surfer::Unreachable => e
   # to be, on the likeliest beginner mistakes there are: the app is
   # stopped, or SURFER_URL points at a machine where nothing listens.
   abort(I18n.t('cli.surfer_unreachable', url: ENV['SURFER_URL'].to_s, reason: e.message))
+rescue Surfer::Unauthorized => e
+  # Stopped at the first refusal: nothing after it would be let in either.
+  # Surfer 7 (September 2026) refuses the access tokens every earlier
+  # Surfer took, so on the day Cloudron updates the app this is what an
+  # untouched install meets.
+  abort("❌ #{Surfer.refusal_sentence(e.message[/\d+/])} #{I18n.t('cli.surfer_refused_waits')}")
 ensure
   save_manifest(manifest)
   # `completed` no longer decides whether a marker survives -- it is how a

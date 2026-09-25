@@ -376,6 +376,12 @@ holding the rest of the site to the usual limits. Nothing needs
 deleted from the target by the next deploy, without `--prune` -- a
 language taken out of `site.locales` is taken off the web too.
 
+Its `config/site.<lang>.yml` has to leave with it: the build stops on a
+file for a language the site does not publish, and names it (so does
+`./blog.sh doctor`). Move the file out of `config/` rather than deleting
+it -- the translated title, menu and footer in it are exactly what you
+will want back if the language returns.
+
 ### The address in each language
 
 A translated post is served under an address of its own:

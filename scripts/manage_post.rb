@@ -136,10 +136,20 @@ LOCAL_PREVIEW_PORT = 8000
 # Printed under a preview or a publish line, and only where the canonical
 # address is still the template's: on a real site that address IS the
 # answer, and a second one under every post would be noise.
+# "Goes nowhere yet" only where that is true: a site deploying into a
+# local directory with the template's address still in site.yml was told
+# its web went nowhere, right after the deploy (second trial, 25. 9. 2026).
 def puts_local_preview_hint(site_path)
   return unless placeholder_base_url?
 
-  puts Tui.paint(t('cli.local_preview_hint', url: "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}"), :dim)
+  key = deploys_somewhere? ? 'cli.local_preview_hint_deployed' : 'cli.local_preview_hint'
+  puts Tui.paint(t(key, url: "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}"), :dim)
+end
+
+def deploys_somewhere?
+  require_relative '../lib/deploy_backend'
+  backend = DeployBackend::BACKENDS[ENV['DEPLOY_BACKEND'].to_s]
+  !backend.nil? && backend.configured?
 end
 
 # --- frontmatter ------------------------------------------------------
@@ -2152,6 +2162,12 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # question it had always asked, so a piped run that used to answer yes
   # and announce quietly stopped announcing. Only the flag knows whether
   # anybody is there to answer.
+  #
+  # A site with no network publishes without a word about it: that is a
+  # site that announces nowhere by choice, not a broken config, and the
+  # "check your section header" advice under every publish said otherwise
+  # (second trial, 25. 9. 2026). An explicit toot or bluesky still says it.
+  announce &&= !SiteConfig.comment_network.nil?
   fields = announce ? announce_on_publish(updated, new_year, date, ask: asked) : nil
   if fields
     updated.merge!(fields)
@@ -3723,6 +3739,26 @@ def props_line(key, value)
   format('  %-12s %s', t("cli.props_label_#{key}"), value)
 end
 
+# The frame truncates every row to the window, and at 80 columns what went
+# was the end of the preview address -- the one row on this screen that is
+# there to be opened (second trial, 25. 9. 2026). A plain row too wide for
+# the window goes on under its value instead; painted rows are left as
+# they are, since their escape codes would be counted as text.
+PROPS_VALUE_COLUMN = 15
+
+def props_fold(lines, width)
+  lines.flat_map do |line|
+    next [line] if line.include?("\e") || Tui.display_width(line) <= width || width <= PROPS_VALUE_COLUMN + 10
+    # A label longer than its column pushed the value right; cut there
+    # and the label would be split instead.
+    next [line] unless line[PROPS_VALUE_COLUMN - 1] == ' '
+
+    head = line[0, PROPS_VALUE_COLUMN]
+    pieces = Tui.wrap_to_width(line[PROPS_VALUE_COLUMN..].to_s, width - PROPS_VALUE_COLUMN)
+    ["#{head}#{pieces.first}"] + pieces.drop(1).map { |piece| (' ' * PROPS_VALUE_COLUMN) + piece }
+  end
+end
+
 # The post's languages on one line, the site's own first: it is the one
 # every other is a translation OF, and it always has words.
 def languages_summary(post)
@@ -3960,7 +3996,7 @@ def props_loop(slug, screen)
 
     if screen
       keys = Tui.fold_prompt(Tui.paint(prompt, :dim), Tui.term_width).lines.map(&:chomp)
-      screen.paint(lines + keys, keep_last: keys.size)
+      screen.paint(props_fold(lines, Tui.term_width) + keys, keep_last: keys.size)
       key = screen.key
       next if key == :resize
 
@@ -3989,7 +4025,7 @@ def props_loop(slug, screen)
         published = false
         props_run(screen) do
           published = props_confirm_publish(post, network_label)
-          publish_draft(slug) if published
+          published ? publish_draft(slug) : :nothing
         end
         return if published
       when 's'
@@ -4821,7 +4857,9 @@ def language_state(post, lang)
   entry = post['translations'].is_a?(Hash) ? post['translations'][lang.to_s] : nil
   return :none unless entry.is_a?(Hash) && entry.slice(*Translations::TEXT_KEYS).compact.any?
 
-  Array(entry['content']).empty? ? :started : :written
+  # A post with no text of its own is translated by its title -- the same
+  # answer `check --languages` gives.
+  Array(entry['content']).empty? && !Array(post['content']).empty? ? :started : :written
 end
 
 # The wizard's half of the missing-languages question: write one now,
@@ -5758,18 +5796,23 @@ rescue JSON::ParserError, SystemCallError => e
   nil
 end
 
-def state_marker(post)
+# `list` is the plain-text face for pipes and scripts, and keeps the
+# English marks a script may grep for; the screens -- pickers, browse --
+# say them in the site's language (second trial, 25. 9. 2026: [DRAFT] in
+# the middle of a Czech screen).
+def state_marker(post, localized: false)
+  word = ->(key, english) { localized ? t("cli.mark_#{key}") : english }
   # Pin rides alongside the state, not instead of it: a pinned draft
   # (the pin survives unpublish) has to show both, or the list would be
   # the one place that can't answer "which post is pinned?" -- the exact
   # question that sends someone here.
   marks = []
   if post[:scheduled]
-    marks << Tui.paint('[SCHEDULED]', :cyan)
+    marks << Tui.paint(word.call('scheduled', '[SCHEDULED]'), :cyan)
   elsif post[:state] == DRAFT
-    marks << Tui.paint('[DRAFT]', :yellow)
+    marks << Tui.paint(word.call('draft', '[DRAFT]'), :yellow)
   end
-  marks << Tui.paint('[PINNED]', :green) if post[:pinned]
+  marks << Tui.paint(word.call('pinned', '[PINNED]'), :green) if post[:pinned]
   marks.empty? ? '' : "  #{marks.join(' ')}"
 end
 
@@ -5788,8 +5831,8 @@ rescue ArgumentError, TypeError
   '----------'
 end
 
-def summary_row(post)
-  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
+def summary_row(post, localized: true)
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post, localized: localized)}  #{post[:slug]}  #{post[:title]}"
 end
 
 def load_posts_summary
@@ -5810,7 +5853,7 @@ def cmd_list(filters)
   # named neither the file nor the problem.
   posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
-  posts.each { |p| puts summary_row(p) }
+  posts.each { |p| puts summary_row(p, localized: false) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   count = t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
   # The tally is for a person, so it goes where a person is looking. Down
@@ -5849,7 +5892,7 @@ BROWSE_HOT_KEYS = ['/', 't', 's', 'g', 'z', ' '].freeze
 def browse_row(post)
   title = post[:title].to_s.strip
   label = title.empty? ? Tui.paint(post[:slug], :dim) : title
-  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{label}"
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post, localized: true)}  #{label}"
 end
 
 def browse_posts
@@ -6062,7 +6105,7 @@ def browse_preview(summary)
   markdown = MarkdownWriter.blocks_to_markdown(post['content'], File.join(MEDIA_DIR, year, summary[:slug]))
   width = [Tui.term_width - 4, 40].max
   header = [Tui.paint(post['title'].to_s.empty? ? summary[:slug] : post['title'], :bold),
-            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary)}  ·  #{summary[:slug]}"]
+            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary, localized: true)}  ·  #{summary[:slug]}"]
   header << t('cli.browse_preview_tags', tags: post['tags'].join(', ')) unless (post['tags'] || []).empty?
   lines = header + [''] + browse_preview_lines(post, markdown, width)
   state = { selected: 0, offset: 0 }

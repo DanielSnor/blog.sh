@@ -358,8 +358,13 @@ def ask_identity_value(current, key)
 
   problem = nil
   loop do
-    answer = Wizard.ask(t("q_#{key}"), nil, hint: t("h_#{key}"), problem: problem)
-    return answer unless answer.to_s.strip.empty?
+    # Recorded only once it is an answer: a refused Enter went into the
+    # running record as if it were one (second trial, 25. 9. 2026).
+    answer = Wizard.ask(t("q_#{key}"), nil, hint: t("h_#{key}"), problem: problem, record: false)
+    unless answer.to_s.strip.empty?
+      Wizard.record(t("q_#{key}"), answer) if Tui.interactive?
+      return answer
+    end
 
     problem = t('e_identity_required', example: current.dig('site', key))
   end
@@ -422,14 +427,18 @@ def ask_address(site, env, current)
   say(t('section_address'), :bold)
   say('')
 
-  url = ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url'),
-                  suggested: template?(current, 'site', 'base_url')) do |answer|
+  check = lambda do |answer|
     if !answer.match?(%r{\Ahttps?://[^/\s]+})
       t('e_base_url')
     elsif answer.end_with?('/')
       t('e_base_url_slash')
     end
   end
+  url = if template?(current, 'site', 'base_url')
+          ask_base_url_required(current.dig('site', 'base_url'), check)
+        else
+          ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url'), &check)
+        end
   return if url.to_s.empty?
 
   site.set(%w[site base_url], url)
@@ -568,7 +577,9 @@ end
 # exits 0).
 BACKENDS = [
   ['none', 'backend_none', []],
-  ['surfer', 'backend_surfer', %w[SURFER_URL SURFER_TOKEN SURFER_REMOTE_DIR]],
+  # Surfer 7 signs in with the Cloudron user and an app password; the
+  # access token of Surfer 6 and earlier is still read, but not asked for.
+  ['surfer', 'backend_surfer', %w[SURFER_URL SURFER_USERNAME SURFER_PASSWORD SURFER_REMOTE_DIR]],
   ['local', 'backend_local', %w[DEPLOY_TARGET_DIR]],
   ['rsync', 'backend_rsync', %w[RSYNC_TARGET]],
   ['git', 'backend_git', %w[GIT_PAGES_REMOTE GIT_PAGES_BRANCH]],
@@ -576,7 +587,7 @@ BACKENDS = [
   ['sftp', 'backend_sftp', %w[SFTP_TARGET SFTP_REMOTE_DIR]]
 ].freeze
 
-SECRET_VALUES = %w[SURFER_TOKEN].freeze
+SECRET_VALUES = %w[SURFER_PASSWORD].freeze
 
 # The secret prompts show nothing, so this says what went in: the length,
 # and the last two characters when there are enough to spare them. A
@@ -593,6 +604,24 @@ def acknowledge_secret(value)
            t('secret_received', length: value.length)
          end
   puts Tui.paint(line, :dim)
+end
+
+# While the address is still the template's example.com it is no Enter
+# answer, for the reason the site's name is not: the feed, the sitemap and
+# every share preview would point at somebody else's domain, doctor warns
+# about it, and `add` then says the site goes nowhere yet (both trials,
+# 24. and 25. 9. 2026). Trying it out on this machine has an answer too --
+# the hint says which.
+def ask_base_url_required(example, check)
+  problem = nil
+  loop do
+    answer = Wizard.ask(t('q_base_url'), nil, hint: t('h_base_url'), problem: problem, record: false).to_s.strip
+    problem = answer.empty? ? t('e_base_url_required', example: example) : check.call(answer)
+    next if problem
+
+    Wizard.record(t('q_base_url'), answer) if Tui.interactive?
+    return answer
+  end
 end
 
 def ask_deploy(env, _current)
@@ -626,13 +655,17 @@ def ask_deploy(env, _current)
     if SECRET_VALUES.include?(name)
       # Same courtesy the Mastodon token gets: say where a secret comes
       # from before asking for it.
-      puts t('surfer_token_where') if name == 'SURFER_TOKEN'
+      puts t('surfer_password_where') if name == 'SURFER_PASSWORD'
       value = Tui.password(t("q_#{name.downcase}"))
       puts unless Tui.interactive? # see the note by the Mastodon token above
       acknowledge_secret(value)
       puts
     else
       value = ask(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}"))
+      # Written out whole: env.sh quotes the value, so the shell never
+      # expands the tilde, and a path that means the same thing to every
+      # tool that reads it is the one that cannot surprise.
+      value = File.expand_path(value) if name == 'DEPLOY_TARGET_DIR' && value.to_s.start_with?('~')
     end
     env.set(name, value) unless value.to_s.empty?
   end

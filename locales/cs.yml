@@ -33,7 +33,7 @@ build:
   duplicate_address: "❌ Dva příspěvky na jedné adrese v content.nosync/posts/ — sestavení zastaveno:"
   unknown_locale: "❌ V site.locales je jazyk, ke kterému engine nemá soubor s překlady: %{langs} — přidej locales/<kód>.yml, vyndej kód z config/site.yml, nebo řekni, odkud vzít slova rozhraní (site.ui_language)."
   language_key_moved: "❌ site.%{key} je tabulka klíčovaná jazykem, což je tvar, který to mělo před 1.9. Každý jazyk si to teď říká ve vlastním souboru: %{file} a spol., jeden klíč na soubor, bez jmen jazyků uvnitř."
-  language_file_stray: "❌ %{files}: soubor pro jazyk, který tenhle web nepublikuje. Buď jazyk uveď v site.locales, nebo soubor smaž — takhle ho nikdo nečte."
+  language_file_stray: "❌ %{files}: soubor pro jazyk, který tenhle web nepublikuje. Buď jazyk uveď v site.locales, nebo soubor přesuň mimo config/ (překlady v něm se hodí, až jazyk vrátíš) — takhle ho nikdo nečte."
   language_key_unknown: "❌ %{file} říká %{keys}, což engine nečte. Zná: %{known}."
   language_key_orphan: "❌ %{file} překládá %{keys}, ale config/site.yml nic takového nemá — není co nahradit. Nejdřív to nastav v site.yml, nebo to z %{file} vyndej."
   language_label_empty: "❌ %{file} dává %{keys} prázdné slovo, takže by na štítku nic nebylo. Napiš to slovo, nebo ten štítek z tags: vyndej — pak se ukáže tak, jak je napsaný."
@@ -355,6 +355,10 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
   preview_label: "Náhled: %{url}"
+  mark_scheduled: "[NAPLÁNOVÁNO]"
+  mark_draft: "[KONCEPT]"
+  mark_pinned: "[PŘIPNUTO]"
+  local_preview_hint_deployed: "Adresa výše je příklad ze šablony — web se nasazuje, jen site.base_url ještě neříká kam (opraví to ./setup.sh). Náhled tady: ./blog.sh preview a %{url}."
   local_preview_hint: "Web zatím nikam neputuje — spusť ./blog.sh preview a otevři %{url} (výchozí port 8000)."
   template_body_placeholder: "Text prvního odstavce."
   deploy_backend_incomplete: "Cíl nasazení „%{name}“ nemá v env.sh vyplněné hodnoty — nahrávání přeskakuji. Sestavený web v public.nosync/ je hotový, ukáže ho ./blog.sh preview. Až ho budeš chtít nahrávat, doplň hodnoty do env.sh (vzor je v env.sh.example)."
@@ -397,7 +401,7 @@ cli:
   deploy_orphans_delete: "Osiřelých souborů ke smazání: %{count}%{why}"
   deploy_orphans_kept: "⚠️  Osiřelých souborů na cíli: %{count} — smaže je --prune"
   deploy_orphans_language_delete: "   Z toho patří jazyku, který web už nepublikuje (souborů: %{count}) — ty se teď smažou."
-  deploy_orphans_why_prune: " (--prune)"
+  deploy_orphans_why_prune: " (sestavení je už nevytváří)"
   deploy_orphans_why_snapshot: " (nasazení snímkem)"
   deploy_orphans_why_only: " (jmenované v --only, v sestavení už nejsou)"
   deploy_orphans_no_single_delete: "⚠️  %{names}: v sestavení už nejsou, ale %{backend} neumí mazat jednotlivé soubory — spusť ./scripts/deploy-web.sh --prune a sundej je z cíle."
@@ -408,6 +412,9 @@ cli:
   deploy_outcome_unrecorded: "⚠️  Výsledek nasazení se nepodařilo zapsat do %{path}: %{error}"
   deploy_done: "Hotovo: nahráno %{uploaded}, smazáno %{deleted}, selhalo %{failed}, beze změny %{unchanged}"
   announce_no_base_url: "⚠️  Neoznamuje se: site.base_url není nastavená, takže by v tootu nebyl odkaz, ale holá cesta — a to už nevezmeš zpět. Doplň site.base_url v config/site.yml (nebo SITE_BASE_URL v env.sh) a pusť ./blog.sh toot."
+  surfer_refused_token: "Surfer na %{url} odmítl přístupový token (HTTP %{code}). Surfer 7 tokeny už nebere: v Cloudronu si v profilu vytvoř heslo pro aplikace (Profile -> App Passwords) a zapiš do env.sh SURFER_USERNAME (tvoje jméno v Cloudronu) a SURFER_PASSWORD (to heslo). SURFER_TOKEN pak můžeš smazat."
+  surfer_refused_password: "Surfer na %{url} odmítl jméno a heslo (HTTP %{code}). Zkontroluj v env.sh SURFER_USERNAME (jméno v Cloudronu, ne e-mail) a SURFER_PASSWORD — heslo pro aplikace z profilu v Cloudronu (Profile -> App Passwords), ne heslo, kterým se do Cloudronu přihlašuješ."
+  surfer_refused_waits: "Sestavený web čeká v public.nosync/; až to opravíš, nahraje ho ./blog.sh rebuild."
   surfer_unreachable: "❌ Surfer na %{url} neodpovídá (%{reason}) — appka je nejspíš vypnutá, nebo SURFER_URL v env.sh míří jinam, než kde běží. Sestavený web čeká v public.nosync/; až server poběží (nebo adresu opravíš), nahraje ho ./blog.sh rebuild."
   what_next_prompt: "Co dál? [d] nechat jako koncept  [e] upravit  [p] publikovat  [s] naplánovat  [x] smazat: "
   left_as_draft: "Ponecháno jako koncept. Publikovat později: ./blog.sh publish %{slug}"
@@ -579,6 +586,9 @@ cli:
   deploy_pending_marked_failed: "Web je označený jako dlužný nasazení: až vyřešíš důvod výše, pošle ho ./blog.sh rebuild — nebo nejbližší plánovaný běh, pokud nějaký máš nastavený."
 
   rebuild_prompt: "Znovu sestavit a nasadit web teď? [A/n] "
+  yaml_invalid: "%{path} není platné YAML (%{message})."
+  yaml_invalid_doctor: "Celý obrázek dá ./blog.sh doctor."
+  doctor_unknown_option: "doctor nezná %{option} — umí --online (ověří i to, co je potřeba zkusit po síti) a --strip-location (odstraní polohu z fotek)."
   rebuild_unknown_option: "rebuild nezná %{option} — umí --full (sestavit znovu všechny stránky) a --force (pustit nasazení přes pojistky a nahrát všechno)."
   unknown_command: "❌ ./blog.sh nemá příkaz „%{command}“."
   unknown_command_nearest: "   Myslel jsi ./blog.sh %{command}?"
@@ -586,7 +596,7 @@ cli:
 
   header_mode: "Režim: %{mode}"
   usage: |
-    usage:
+    použití:
       ./blog.sh add [<soubor>]       založí koncept, ukáže náhled a zeptá se, co dál;
                                      se souborem s markdownem se nezeptá na nic a jen zapíše koncept,
                                      což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
@@ -606,7 +616,8 @@ cli:
       ./blog.sh empty versions       nechá každému příspěvku poslední verzi a starší smaže
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} příspěvků
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
-      ./blog.sh rebuild [--full]     znovu sestaví a nasadí celý web, bez vazby na konkrétní příspěvek;
+      ./blog.sh rebuild [--full] [--force]
+                                     znovu sestaví a nasadí celý web, bez vazby na konkrétní příspěvek;
                                      --full sestaví znovu každou stránku, ne jen ty změněné;
                                      --force pustí nasazení přes pojistky a nahraje všechno
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
@@ -616,10 +627,11 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek
       ./blog.sh doctor [--online] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
-      ./blog.sh check [--online] [--json] [--repair]
+      ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      projde archiv a řekne, co je v něm rozbité;
                                      --json vypíše všechny nálezy jako data, bez stropu;
-                                     --repair u každého nálezu nabídne tu jedinou opravu, kterou dovoluje
+                                     --repair u každého nálezu nabídne tu jedinou opravu, kterou dovoluje;
+                                     --languages místo toho ukáže, který příspěvek je v jakém jazyce hotový
       ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
                                      zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
       ./blog.sh stats [--json]       spočítá archiv — příspěvky, roky, slova, štítky, média, odkud to je
@@ -1055,7 +1067,10 @@ doctor:
   site_yml_syntax: "config/site.yml není platné YAML: %{message}."
   site_yml_unreadable: "config/site.yml existuje, ale nejde přečíst: %{message}."
   site_yml_unreadable_fix: "Zkontroluj vlastníka a práva souboru (ls -l config/site.yml). Obvykle pomůže: chmod 644 config/site.yml — a pokud soubor vlastní root po průvodci spuštěném přes sudo, taky chown."
-  site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek. Když ten řádek vypadá v pořádku, příčina je jinde — nejčastěji zakomentovaná hlavička sekce, pod kterou zůstaly její klíče, nebo dřív neuzavřená uvozovka."
+  site_yml_open_quote_fix: "Na řádku %{line} začíná hodnota uvozovkou, která se na tom řádku nezavírá — YAML pak čte další řádky jako pokračování té hodnoty a chybu ohlásí jinde. Doplň uvozovku na konec hodnoty."
+  site_yml_syntax_fix: "Koukni na řádek %{line}, sloupec %{column}. Skoro vždycky je to odsazení (jen mezery, nikdy tabulátory), chybějící uvozovka, nebo dvojtečka uvnitř hodnoty bez uvozovek. Když ten řádek vypadá v pořádku, příčina je jinde — nejčastěji zakomentovaná hlavička sekce, pod kterou zůstaly její klíče,."
+  language_yml_template: "config/%{file}: %{keys} je pořád text ze vzoru config/site.lang.yml.example — na stránkách v tom jazyce se ukáže on."
+  language_yml_template_fix: "Přepiš je do toho jazyka, nebo je ze souboru vymaž: co v něm chybí, bere se z config/site.yml."
   language_yml_syntax: "config/%{file} není platné YAML: %{message} — a sestavení se na něm zastaví, ve všech jazycích."
 
   identity_ok: "Identita webu je vyplněná."
@@ -1201,6 +1216,8 @@ doctor:
   media_location_redeploy: "Každá přepsaná fotka má nový kontrolní součet, takže ji nejbližší nasazení nahraje znovu. Až budeš chtít, spusť ./blog.sh rebuild."
   backend_unset: "Není vybraný cíl nasazení, web se tedy sestavuje lokálně a nikam neputuje."
   backend_unset_fix: "Jako začátek to úplně stačí — sestavený web ukáže ./blog.sh preview. Až ho budeš chtít online, spusť ./setup.sh."
+  surfer_token_only: "Surfer se přihlašuje přístupovým tokenem (SURFER_TOKEN), a ten Surfer 7 už nebere — po aktualizaci appky se každé nasazení zastaví na HTTP 401."
+  surfer_token_only_fix: "V Cloudronu si v profilu vytvoř heslo pro aplikace (Profile -> App Passwords) a přidej do env.sh SURFER_USERNAME a SURFER_PASSWORD; mají přednost před tokenem, takže SURFER_TOKEN může zůstat, dokud appka nepoběží na verzi 7. ./blog.sh doctor --online ověří, co Surfer přijme."
   backend_ok: "Nasazuje se backendem %{name}."
   backend_unknown: "DEPLOY_BACKEND je \"%{name}\", což není backend, který engine má."
   backend_unknown_fix: "Známé backendy: %{known}."
@@ -1223,7 +1240,8 @@ doctor:
   deploy_target_clean: "Cíl nasazení (%{target}) odpovídá a všechno v jeho kořeni patří tomuto webu."
   deploy_target_foreign: "V kořeni cíle nasazení (%{target}) leží položky, které tam tento web nedává (položek: %{count}): %{names}."
   deploy_target_more: " a dalších: %{count}"
-  deploy_target_foreign_fix: "Nasazení nikdy nemaže, co samo nenahrálo, takže tyhle položky zůstanou a servírují se vedle webu — a hosting obslouží index.php dřív než index.html, takže stará úvodní stránka může dál zakrývat novou. Co nechceš, smaž ručně (FTP, správce souborů hostingu); co tam je záměrně, vypiš v config/site.yml pod deploy.keep a doctor to přestane hlásit (.well-known, kde hosting drží ověření certifikátu, nehlásí nikdy)."
+  deploy_target_foreign_index: "Mezi nimi je %{name}, a hosting ho obslouží dřív než index.html — stará úvodní stránka tak může dál zakrývat novou."
+  deploy_target_foreign_fix: "Nasazení nikdy nemaže, co samo nenahrálo, takže tyhle položky zůstanou a servírují se vedle webu. Co nechceš, smaž ručně (FTP, správce souborů hostingu); co tam je záměrně, vypiš v config/site.yml pod deploy.keep a doctor to přestane hlásit (.well-known, kde hosting drží ověření certifikátu, nehlásí nikdy)."
   deploy_keep_shape: "deploy.keep v config/site.yml není seznam, takže doctor ze seznamu cizích položek nic nevyjme."
   deploy_keep_invalid: "deploy.keep jmenuje %{entries}, což nejsou jména v kořeni cíle — doctor se dívá jen do kořene a jen na přesná jména."
   deploy_keep_fix: "Napiš to jako seznam jmen přesně tak, jak v kořeni stojí, adresář s lomítkem nebo bez: deploy: { keep: [issue-45/, google1234.html] }."
@@ -1275,7 +1293,7 @@ check:
   unknown_locale: "%{langs}: `site.locales` ten jazyk jmenuje, ale engine k němu nemá soubor s překlady — nesestaví se žádný jazyk tohoto webu."
   unknown_locale_fix: "Přidej pro něj locales/<kód>.yml, vyndej kód ze `site.locales`, nebo pod `site.ui_language` v config/site.yml řekni, z jakého jazyka vzít slova rozhraní."
   language_file_stray: "%{file} je soubor pro jazyk, který tenhle web nepublikuje — nikdo ho nečte."
-  language_file_stray_fix: "Buď jazyk uveď v `site.locales`, nebo soubor smaž. Vlastní jazyk webu svůj soubor nemá: je jím config/site.yml."
+  language_file_stray_fix: "Buď jazyk uveď v `site.locales`, nebo soubor přesuň mimo config/ — překlady v něm se hodí, až jazyk vrátíš. Vlastní jazyk webu svůj soubor nemá: je jím config/site.yml."
   language_key_unknown: "%{file} říká %{keys}, což engine nečte."
   language_key_unknown_fix: "Zná: %{known}. Klíč, který nezná, nedělá vůbec nic — proto se to říká nahlas."
   language_file_syntax: "%{file} není platné YAML: %{message} na řádku %{line}, sloupec %{column} — a sestavení se na něm zastaví, ve všech jazycích, ne jen v tomhle."
@@ -1432,7 +1450,7 @@ export:
 
 setup:
   intro: "Zeptám se na nastavení, která web potřebuje k provozu, odpovědi cestou ověřím a zapíšu je do config/site.yml a env.sh."
-  intro_skip: "Většinu otázek jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní; jméno webu a autora musíš napsat jen tehdy, když je tam ještě příklad ze šablony. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."
+  intro_skip: "Většinu otázek jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní; jméno webu, jeho zkratku, popis a autora musíš napsat jen tehdy, když je u nich ještě příklad ze šablony. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."
   intro_expert: "(Kdo si soubory radši edituje sám: config/site.yml má okomentovanou šablonu config/site.yml.example a env.sh šablonu env.sh.example.)"
   config_unreadable: "❌ %{path} se nepodařilo přečíst: %{error}"
   network_unchanged: "Nic zadáno, nic změněno — web si nechává síť pro komentáře, kterou měl."
@@ -1458,6 +1476,7 @@ setup:
 
   q_base_url: "Adresa webu"
   h_base_url: "Adresa, na které bude web k vidění, třeba https://mujweb.cz — bez lomítka na konci. Sestavují se z ní RSS, sitemapa i náhledy při sdílení; zapíše se do config/site.yml i env.sh naráz."
+  e_base_url_required: "Web potřebuje vlastní adresu — %{example} byl jen příklad ze šablony. Jen to zkoušíš na tomhle počítači? Stačí http://localhost:8000 a opakované ./setup.sh ji později změní."
   e_base_url: "Tohle není URL — musí začínat na http:// nebo https:// a obsahovat jméno serveru."
   e_base_url_slash: "Smaž koncové lomítko, jinak budou v generovaných odkazech dvě."
 
@@ -1514,8 +1533,10 @@ setup:
 
   q_surfer_url: "URL Surfer aplikace"
   h_surfer_url: "Adresa, na které Surfer appka běží — stejná, kterou uvidí návštěvníci webu. Třeba https://blog.mojedomena.cz."
-  surfer_token_where: "Token vydá Surfer ve svém webovém rozhraní: přihlas se do appky a otevři Settings -> Access Tokens."
-  q_surfer_token: "Přístupový token k Surferu (při psaní se nezobrazuje): "
+  surfer_password_where: "Heslo pro aplikace vytvoříš v Cloudronu ve svém profilu: Profile -> App Passwords, pro appku Surfer. Není to heslo, kterým se do Cloudronu přihlašuješ."
+  q_surfer_password: "Heslo pro aplikace k Surferu (při psaní se nezobrazuje): "
+  q_surfer_username: "Tvoje jméno v Cloudronu"
+  h_surfer_username: "Uživatelské jméno, ne e-mail — to, pod kterým se do Cloudronu přihlašuješ. Surfer 7 přístupové tokeny už nebere, přihlašuje se jménem a heslem pro aplikace."
   q_surfer_remote_dir: "Podadresář na Surferu"
   h_surfer_remote_dir: "Vyplň, jen když má web bydlet v podsložce vedle něčeho dalšího. Enter = web bude přímo na adrese appky."
   q_deploy_target_dir: "Adresář"

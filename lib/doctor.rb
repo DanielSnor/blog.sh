@@ -9,6 +9,7 @@ require 'yaml'
 # NoMethodError just as happily.
 require 'time'
 require_relative 'site_config'
+require_relative 'yaml_compat'
 require_relative 'icons'
 require_relative 'i18n'
 require_relative 'media_dimensions'
@@ -110,7 +111,8 @@ module Doctor
   # to be specific, not theirs -- but that does mean a backend which grows
   # a new required value needs a line here too.
   BACKEND_VALUES = {
-    'surfer' => %w[SURFER_URL SURFER_TOKEN],
+    # The sign-in is added below: it is either of two pairs.
+    'surfer' => %w[SURFER_URL],
     'local' => %w[DEPLOY_TARGET_DIR],
     'rsync' => %w[RSYNC_TARGET],
     'git' => %w[GIT_PAGES_REMOTE],
@@ -158,7 +160,7 @@ module Doctor
     findings.concat(parse_findings)
     return findings unless data
 
-    findings.concat(check_language_yml(root))
+    findings.concat(check_language_yml(root, data))
     findings.concat(check_identity(data))
     findings.concat(check_placeholders(data))
     findings.concat(check_locale(data))
@@ -220,12 +222,12 @@ module Doctor
       data = begin
         YAML.load_file(path)
       rescue Psych::SyntaxError => e
-        return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), t('site_yml_syntax_fix', line: e.line, column: e.column))]]
+        return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), yaml_syntax_fix(e, path))]]
       rescue SystemCallError => e
         return [nil, [error(t('site_yml_unreadable', message: e.message), t('site_yml_unreadable_fix'))]]
       end
     rescue Psych::SyntaxError => e
-      return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), t('site_yml_syntax_fix', line: e.line, column: e.column))]]
+      return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), yaml_syntax_fix(e, path))]]
     rescue SystemCallError => e
       # A file that exists but cannot be OPENED -- wrong permissions after
       # a root-run wizard is the usual story. The one command whose whole
@@ -243,15 +245,71 @@ module Doctor
   # here -- which used to say nothing about it. Whether the keys inside are
   # right is `check`'s question, and the build's; this is only whether the
   # file can be read at all.
-  def check_language_yml(root)
-    Dir.glob(File.join(root, 'config', 'site.*.yml')).sort.filter_map do |path|
-      YAML.load_file(path)
+  # Where the fault is, as near as it can be said. A quote left open is
+  # found by reading the file, since Psych names the wrong line for it.
+  def yaml_syntax_fix(error, path)
+    open_quote = YamlCompat.open_quote_line(File.read(path, encoding: 'utf-8'))
+    return t('site_yml_open_quote_fix', line: open_quote) if open_quote
+
+    t('site_yml_syntax_fix', line: error.line, column: error.column)
+  rescue SystemCallError
+    t('site_yml_syntax_fix', line: error.line, column: error.column)
+  end
+
+  #
+  # Two more things about them, both from the second new-user trial
+  # (25. 9. 2026): a file left behind for a language taken out of
+  # site.locales stops the build of every language, and doctor -- where
+  # the build's message sends you -- did not name it; and a file copied
+  # from the example and never rewritten put the example's German on the
+  # Czech pages, with nobody saying so.
+  def check_language_yml(root, data)
+    files = Dir.glob(File.join(root, 'config', 'site.*.yml')).sort
+    parsed = {}
+    findings = files.filter_map do |path|
+      parsed[path] = YAML.load_file(path)
       nil
     rescue Psych::SyntaxError => e
       error(t('language_yml_syntax', file: File.basename(path), message: e.problem.to_s),
-            t('site_yml_syntax_fix', line: e.line, column: e.column))
+            yaml_syntax_fix(e, path))
     rescue StandardError
       nil
+    end
+    findings + stray_language_files(files, data) + template_language_texts(root, parsed)
+  end
+
+  # The build's own rule: a file for every published language but the
+  # site's own, which config/site.yml speaks.
+  def stray_language_files(files, data)
+    own = dig(data, 'site', 'lang').to_s
+    own = 'en' if own.empty?
+    published = Array(dig(data, 'site', 'locales')).map(&:to_s) - [own]
+    files.filter_map do |path|
+      code = File.basename(path)[/\Asite\.(.+)\.yml\z/, 1]
+      next if published.include?(code)
+
+      error(I18n.t('check.language_file_stray', file: "config/#{File.basename(path)}"), I18n.t('check.language_file_stray_fix'))
+    end
+  end
+
+  def template_language_texts(root, parsed)
+    example = begin
+      YAML.load_file(File.join(root, 'config', 'site.lang.yml.example'))
+    rescue StandardError
+      nil
+    end
+    return [] unless example.is_a?(Hash)
+
+    parsed.filter_map do |path, lang_data|
+      next unless lang_data.is_a?(Hash)
+
+      stale = LanguageFile::TEXTS.flat_map do |section, keys|
+        keys.select { |key| !dig(example, section, key).nil? && dig(lang_data, section, key) == dig(example, section, key) }
+            .map { |key| "#{section}.#{key}" }
+      end
+      next if stale.empty?
+
+      warn(t('language_yml_template', file: File.basename(path), keys: stale.join(', ')), t('language_yml_template_fix'))
     end
   end
 
@@ -560,6 +618,12 @@ module Doctor
   # getting them wrong is a layout jump on every page -- and they are
   # copied by hand from whatever the file used to be, which is exactly the
   # kind of thing that goes stale the first time the banner is redrawn.
+  def same_ratio?(one, other)
+    return false if one.any? { |v| v <= 0 } || other.any? { |v| v <= 0 }
+
+    ((one[0] / one[1]) - (other[0] / other[1])).abs <= (one[0] / one[1]) * 0.005
+  end
+
   def check_banner(data, root)
     src = dig(data, 'banner', 'src').to_s
     return [] if src.empty?
@@ -580,6 +644,12 @@ module Doctor
     end
     return [ok(t('banner_ok'))] if actual.nil? || declared.any?(&:nil?)
     return [ok(t('banner_ok'))] if declared.map(&:to_i) == actual.map(&:to_i)
+    # What reserves the space is the RATIO: the page scales the banner to
+    # its column, and width/height only tell the browser how tall that
+    # will be. The default header is declared 940x300 and drawn 1880x600
+    # for sharp screens -- nothing moves, and the warning said it would
+    # (second trial, 25. 9. 2026).
+    return [ok(t('banner_ok'))] if same_ratio?(declared.map(&:to_f), actual.map(&:to_f))
 
     [warn(t('banner_dimensions', declared: declared.join('x'), actual: actual.join('x')),
           t('banner_dimensions_fix', width: actual[0], height: actual[1]))]
@@ -1242,17 +1312,24 @@ module Doctor
     end
 
     missing = BACKEND_VALUES.fetch(name, []).select { |v| ENV[v].to_s.empty? }
+    missing << 'SURFER_USERNAME + SURFER_PASSWORD' if name == 'surfer' && ::Surfer.sign_in.nil?
     # A backend can be fully configured and still refuse to run: an
     # unmatched quote in its extra switches aborts every deploy. doctor
     # exists so that the state of an install is known before the deploy
     # that needs it, so it must not tick a line that will stop on sight.
     backend = DeployBackend::BACKENDS[name]
     trouble = backend.respond_to?(:problem) ? backend.problem : nil
-    return [error(trouble, I18n.t('cli.deploy_args_fix'))] if trouble
+    return [error(trouble, backend.respond_to?(:problem_fix) ? backend.problem_fix : I18n.t('cli.deploy_args_fix'))] if trouble
 
     program_trouble = check_backend_program(name, root)
     return program_trouble if program_trouble
 
+    # A token still signs in to Surfer 6, so it is not an error -- but
+    # Cloudron updates its apps by itself, and the day it brings Surfer 7
+    # every deploy stops on 401 (September 2026).
+    if missing.empty? && name == 'surfer' && ::Surfer.sign_in == :token
+      return [ok(t('backend_ok', name: name)), warn(t('surfer_token_only'), t('surfer_token_only_fix'))]
+    end
     return [ok(t('backend_ok', name: name))] if missing.empty?
 
     # Not an error: an unconfigured backend is the documented state of a
@@ -1393,6 +1470,10 @@ module Doctor
     findings
   end
 
+  # What a host serves ahead of index.html: shared hosting lists the PHP
+  # front page first in its DirectoryIndex.
+  INDEX_SHADOWS = %w[index.php].freeze
+
   # How many foreign names a finding spells out before it only counts.
   FOREIGN_SHOWN = 10
 
@@ -1419,6 +1500,10 @@ module Doctor
       entries = backend.list_root
     rescue DeployBackend::Listing::Missing
       return [warn(t('deploy_target_missing', target: where), t('deploy_target_missing_fix'))]
+    rescue ::Surfer::Unauthorized => e
+      # It answered -- with no. Every deploy will get the same answer, so
+      # this one is an error, and its sentence already says what to do.
+      return [error(e.message)]
     rescue StandardError => e
       return [warn(t('deploy_target_failed', target: where,
                                              message: e.message.to_s.lines.first.to_s.strip.sub(/\.\z/, '')))]
@@ -1433,8 +1518,12 @@ module Doctor
 
     shown = foreign.first(FOREIGN_SHOWN).join(', ')
     shown += t('deploy_target_more', count: foreign.size - FOREIGN_SHOWN) if foreign.size > FOREIGN_SHOWN
-    [warn(t('deploy_target_foreign', target: where, count: foreign.size, names: shown),
-          t('deploy_target_foreign_fix'))]
+    # The index.php sentence only where there is one: said about every
+    # stray file, it sent the second trial hunting for a file that was not
+    # there (25. 9. 2026).
+    shadowing = foreign.find { |entry_name| INDEX_SHADOWS.include?(entry_name) }
+    fix = [shadowing && t('deploy_target_foreign_index', name: shadowing), t('deploy_target_foreign_fix')].compact.join(' ')
+    [warn(t('deploy_target_foreign', target: where, count: foreign.size, names: shown), fix)]
   end
 
   # What stands in the target's root on purpose although the build does

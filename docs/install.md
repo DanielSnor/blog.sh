@@ -585,12 +585,23 @@ See [Deploying](operations.md#deploying) for the rest of the guards.
 
 ```bash
 export SURFER_URL=https://surfer.example.com
-export SURFER_TOKEN=...        # create an access token in the Surfer admin UI (/_admin)
+export SURFER_USERNAME=...     # your Cloudron username, not the e-mail
+export SURFER_PASSWORD=...     # an app password: Cloudron profile -> App Passwords
 export SURFER_REMOTE_DIR=      # optional subdirectory; empty = app root
 ```
 
 No `DEPLOY_BACKEND` needed -- surfer is the default whenever
 `SURFER_URL` is set.
+
+Surfer 7 (September 2026) signs in with the Cloudron user and an **app
+password** -- one you create for the Surfer app in your Cloudron profile,
+not the password you sign in to Cloudron with. The access token of Surfer
+6 and earlier (`SURFER_TOKEN`) is still read, but Surfer 7 answers it with
+HTTP 401, and the deploy then stops at the first file and says so. Moving
+over is two lines in `env.sh`: add `SURFER_USERNAME` and `SURFER_PASSWORD`
+-- they take precedence over the token, so the token can stay until the
+app has updated. `./blog.sh doctor --online` asks Surfer whether it lets
+you in.
 
 ### local (a directory on the same machine)
 

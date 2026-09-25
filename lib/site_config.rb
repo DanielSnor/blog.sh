@@ -117,11 +117,23 @@ module SiteConfig
     # section before it. Said out loud, because the first person to report
     # this had read the named line, found it blameless, and gone looking
     # through the engine's source instead.
-    abort("❌ #{path} is not valid YAML: #{e.problem} at line #{e.line}, column #{e.column}. " \
-          "Usually indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. " \
-          "If that line looks fine, the cause is elsewhere -- most often a commented-out section header " \
-          "with its keys left behind, or an unclosed quote earlier. " \
-          "Run ./blog.sh doctor for the full picture.")
+    #
+    # In the site's language, dug out of the raw file the way doctor does
+    # it -- I18n would ask this very method -- and with doctor's hint, so a
+    # quote left open is named by its own line (second trial, 25. 9. 2026:
+    # English on a Czech site, and the wrong line).
+    require_relative 'config_lang'
+    require_relative 'yaml_compat'
+    require_relative 'i18n'
+    lang = ConfigLang.of(path)
+    I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)
+    open_quote = YamlCompat.open_quote_line(File.read(path, encoding: 'utf-8'))
+    fix = if open_quote
+            I18n.t('doctor.site_yml_open_quote_fix', line: open_quote)
+          else
+            I18n.t('doctor.site_yml_syntax_fix', line: e.line, column: e.column)
+          end
+    abort("❌ #{I18n.t('cli.yaml_invalid', path: path, message: e.problem)} #{fix} #{I18n.t('cli.yaml_invalid_doctor')}")
   rescue SystemCallError => e
     # A file that exists but cannot be OPENED. Wrong owner after a wizard
     # ran under sudo is the usual story, and until this rescue existed the

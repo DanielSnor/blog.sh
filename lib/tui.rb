@@ -651,7 +651,12 @@ module Tui
           typed = "#{key}#{typed}"
           print "\r\n\e[?25h#{text_prompt}#{typed}"
           rest = newline.empty? ? $stdin.gets.to_s.strip : (puts; '')
-          line = "#{typed}#{rest}".strip
+          # Esc in the typed line backs out, as it does everywhere: the
+          # cooked read hands it over as a character, and "abc^[" came
+          # back as the slug to open (second trial, 25. 9. 2026).
+          return nil if "#{typed}#{rest}".include?("\e")
+
+          line = "#{typed}#{rest}".gsub(/[[:cntrl:]]+/, ' ').strip
           # numeric_pick: false for menus whose rows carry no numbers and
           # whose VALUES can be numbers (tag names like "365") -- there a
           # typed number must mean the text, not a row.
@@ -961,10 +966,13 @@ module Tui
     # under it, rather than the two overwriting each other row by row. The
     # pause is what keeps the output readable: without it the next frame
     # would wipe whatever was just said.
+    # A block that returns :nothing gets no pause: "press any key" under
+    # a question answered no -- nothing printed, nothing to read -- was a
+    # keystroke for no reason (second trial, 25. 9. 2026).
     def leave(pause_message)
       Tui.frame_end(@lines)
       result = yield
-      Tui.pause_and_clear(pause_message)
+      Tui.pause_and_clear(pause_message) unless result == :nothing
       result
     end
 
