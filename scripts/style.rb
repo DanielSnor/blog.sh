@@ -650,13 +650,26 @@ end
 # hard way.
 def section_layout
   sidebar = Wizard.confirm(t('q_layout_sidebar'), default: at('layout', 'sidebar') != false)
-  site.set(%w[layout sidebar], sidebar)
+  set_switch(%w[layout sidebar], sidebar, default: true)
 
   hero = Wizard.confirm(t('q_layout_hero'), default: at('layout', 'hero') == true)
-  site.set(%w[layout hero], hero)
+  set_switch(%w[layout hero], hero, default: false)
 
   puts
   section_extra_css
+end
+
+# A switch written only when the answer changes what the site does. Enter
+# through Layout on a site that never set it wrote `layout: sidebar: true /
+# hero: false` into site.yml -- the values the engine uses anyway -- and the
+# wizard showed that as a change to write (newcomer trial, 25. 9. 2026).
+# Absent means the default, so the default goes on being absent.
+def set_switch(path, value, default:)
+  current = at(*path)
+  return if current == value
+  return if current.nil? && value == default
+
+  site.set(path, value)
 end
 
 # The skin. A list, in load order, of stylesheets the browser gets after

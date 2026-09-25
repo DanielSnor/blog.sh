@@ -1429,8 +1429,8 @@ export:
 
 setup:
   intro: "Zeptám se na nastavení, která web potřebuje k provozu, odpovědi cestou ověřím a zapíšu je do config/site.yml a env.sh."
-  intro_skip: "Každou otázku jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."
-  intro_expert: "(Kdo si YAML radši edituje sám: průvodce jen vyplňuje config/site.yml, jehož okomentovaná šablona je config/site.yml.example.)"
+  intro_skip: "Většinu otázek jde přeskočit — Enter vezme hodnotu předvyplněnou pod ní; jméno webu a autora musíš napsat jen tehdy, když je tam ještě příklad ze šablony. Nic se nezapíše, dokud všechny změny neuvidíš pohromadě a neřekneš ano."
+  intro_expert: "(Kdo si soubory radši edituje sám: config/site.yml má okomentovanou šablonu config/site.yml.example a env.sh šablonu env.sh.example.)"
   config_unreadable: "❌ %{path} se nepodařilo přečíst: %{error}"
   network_unchanged: "Nic zadáno, nic změněno — web si nechává síť pro komentáře, kterou měl."
   config_unreadable_stop: "Nic se nezměnilo. Každá otázka tady nabízí, co už v configu je, a Enter to nechává — když se soubor nedá přečíst, není co nechat a odpovídáním bys to, co v něm je, vyprázdnil. Oprav soubor (`./blog.sh doctor` řekne který řádek) a spusť to znovu."
@@ -1451,6 +1451,7 @@ setup:
   q_timezone: "Časová zóna"
   h_timezone: "V téhle zóně se počítají časy publikování příspěvků. Jméno podle IANA, třeba Europe/Prague. Pozor na serverech: stroj bývá v UTC, ale sem patří zóna, ve které žiješ ty."
   e_timezone: "Tenhle stroj zónu „%{zone}“ nezná. Zóny se jmenují Světadíl/Město, anglicky — Europe/Prague, ne Praha ani CEST; úplný seznam je v /usr/share/zoneinfo."
+  e_identity_required: "Tohle web potřebuje — v šabloně tu byl jen příklad. Napiš vlastní."
 
   q_base_url: "Adresa webu"
   h_base_url: "Adresa, na které bude web k vidění, třeba https://mujweb.cz — bez lomítka na konci. Sestavují se z ní RSS, sitemapa i náhledy při sdílení; zapíše se do config/site.yml i env.sh naráz."
@@ -1529,7 +1530,7 @@ setup:
   q_sftp_remote_dir: "Vzdálený adresář"
   h_sftp_remote_dir: "Složka na serveru, kterou hosting ukazuje světu — často www nebo public_html."
   target_ok: "✅ %{dir} existuje."
-  target_missing: "%{dir} zatím neexistuje. Vytvoř ho před prvním nasazením, jinak nebude mít nasazení web kam dát."
+  target_missing: "%{dir} zatím neexistuje — první nasazení ho vytvoří. Jestli už tam být má, zkontroluj cestu."
 
   env_permissions: "%{path} drží živé přihlašovací údaje a čte ho jen tvůj účet (práva 600)."
   next_steps: "Dál: ./blog.sh add napíše první příspěvek, ./blog.sh preview ukáže web na http://localhost:8000/ a ./style.sh nastaví paletu, obrázek hlavičky a postranní panel."

@@ -195,11 +195,7 @@ def run
   # Into the frame context, not onto the screen: the language menu is the
   # very next thing and repaints from the top, so a printed intro was
   # erased before anyone could read what Enter means here.
-  say(t('intro'))
-  say('')
-  say(t('intro_skip'), :dim)
-  say(t('intro_expert'), :dim)
-  say('')
+  say_intro
 
   site = ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
   env = ConfigWriter::EnvFile.new(ENV_SH, template: ENV_SH_EXAMPLE)
@@ -213,7 +209,15 @@ def run
   # Address and deploy back to back on purpose: "where the site lives"
   # and "where the build goes" are one theme, and the comments network is
   # an optional integration -- it goes last, like in the config file.
+  said_in = I18n.lang
   ask_language(site, current)
+  # The intro was said before anybody chose a language, so a Czech run
+  # carried an English paragraph at the top of every screen that followed
+  # (newcomer trial, 25. 9. 2026). Said again, in the language chosen.
+  if I18n.lang != said_in
+    Wizard.context = []
+    say_intro
+  end
   ask_identity(site, current)
   ask_page_size(site, current)
   ask_address(site, env, current)
@@ -227,6 +231,14 @@ end
 # Read once, up front: every prompt's default comes from here, and on a
 # first run these are the template's own values, since that is what the
 # site would say if left alone.
+def say_intro
+  say(t('intro'))
+  say('')
+  say(t('intro_skip'), :dim)
+  say(t('intro_expert'), :dim)
+  say('')
+end
+
 def current_values
   path = File.exist?(SITE_YML) ? SITE_YML : SITE_YML_EXAMPLE
   data = begin
@@ -299,21 +311,10 @@ def ask_identity(site, current)
   say(t('section_identity'), :bold)
   say('')
 
-  title = ask(t('q_title'), current.dig('site', 'title'), hint: t('h_title'),
-              suggested: template?(current, 'site', 'title'))
-  site.set(%w[site title], title)
-
-  short = ask(t('q_short_name'), current.dig('site', 'short_name'), hint: t('h_short_name'),
-              suggested: template?(current, 'site', 'short_name'))
-  site.set(%w[site short_name], short)
-
-  desc = ask(t('q_description'), current.dig('site', 'description'), hint: t('h_description'),
-             suggested: template?(current, 'site', 'description'))
-  site.set(%w[site description], desc)
-
-  author = ask(t('q_author'), current.dig('site', 'author'), hint: t('h_author'),
-               suggested: template?(current, 'site', 'author'))
-  site.set(%w[site author], author)
+  site.set(%w[site title], ask_identity_value(current, 'title'))
+  site.set(%w[site short_name], ask_identity_value(current, 'short_name'))
+  site.set(%w[site description], ask_identity_value(current, 'description'))
+  site.set(%w[site author], ask_identity_value(current, 'author'))
 
   # On a first run the "current" value is the template's Europe/Prague,
   # which is a placeholder rather than an answer -- so the suggestion
@@ -345,6 +346,25 @@ end
 # On a re-run the question is therefore not asked at all. Somebody who
 # really means it can still edit the key by hand, where the comment in
 # config/site.yml.example says the same thing at more length.
+# One of the four things a site is called. While the answer is still the
+# template's own -- "Your Name - personal web/log", "YOURSITE" -- it is not
+# offered as the Enter answer: that made the example text the site's name
+# on a single keypress, in English on a Czech site, and doctor then warned
+# about it (newcomer trial, 25. 9. 2026). The question wants a real answer
+# then; anything already the site's own is kept on Enter as always.
+def ask_identity_value(current, key)
+  placeholder = template?(current, 'site', key)
+  return ask(t("q_#{key}"), current.dig('site', key), hint: t("h_#{key}")) unless placeholder
+
+  problem = nil
+  loop do
+    answer = Wizard.ask(t("q_#{key}"), nil, hint: t("h_#{key}"), problem: problem)
+    return answer unless answer.to_s.strip.empty?
+
+    problem = t('e_identity_required', example: current.dig('site', key))
+  end
+end
+
 def ask_page_size(site, current)
   return unless @fresh
 

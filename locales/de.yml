@@ -1443,8 +1443,8 @@ export:
 
 setup:
   intro: "Hier werden die Einstellungen abgefragt, die eine Website zum Laufen braucht. Die Antworten werden unterwegs geprüft und in config/site.yml und env.sh geschrieben."
-  intro_skip: "Jede Frage lässt sich überspringen -- Enter übernimmt den darunter vorausgefüllten Wert. Nichts wird geschrieben, bevor du alle Änderungen zusammen gesehen und bestätigt hast."
-  intro_expert: "(Lieber selbst YAML bearbeiten? Der Assistent füllt nur config/site.yml aus, dessen kommentierte Vorlage config/site.yml.example ist.)"
+  intro_skip: "Die meisten Fragen lassen sich überspringen -- Enter nimmt den darunter vorausgefüllten Wert; Name der Website und Autor musst du nur eintippen, solange dort noch das Beispiel der Vorlage steht. Geschrieben wird nichts, bevor du alle Änderungen zusammen gesehen und Ja gesagt hast."
+  intro_expert: "(Lieber die Dateien selbst bearbeiten? Für config/site.yml gibt es die kommentierte Vorlage config/site.yml.example, für env.sh die Vorlage env.sh.example.)"
   config_unreadable: "❌ %{path} konnte nicht gelesen werden: %{error}"
   network_unchanged: "Nichts angegeben, nichts geändert -- die Website behält das Kommentar-Netzwerk, das sie hatte."
   config_unreadable_stop: "Es wurde nichts geändert. Jede Frage hier bietet an, was in der Konfiguration steht, und Enter behält es -- ist die Datei unlesbar, gibt es nichts zu behalten, und Antworten hätte geleert, was darin steht. Bring die Datei in Ordnung (`./blog.sh doctor` nennt die Zeile) und starte erneut."
@@ -1465,6 +1465,7 @@ setup:
   q_timezone: "Zeitzone"
   h_timezone: "Veröffentlichungszeiten werden in dieser Zone gerechnet. Ein IANA-Name wie Europe/Berlin. Vorsicht bei Servern: die Maschine läuft oft auf UTC, hierher gehört aber die Zone, in der du lebst."
   e_timezone: "Dieser Rechner kennt keine Zone namens \"%{zone}\". Zonen heißen Kontinent/Stadt, auf Englisch -- Europe/Berlin, nicht Berlin oder MEZ; die vollständige Liste steht in /usr/share/zoneinfo."
+  e_identity_required: "Das braucht die Website -- in der Vorlage stand hier nur ein Beispiel. Schreib dein eigenes."
 
   q_base_url: "Adresse der Website"
   h_base_url: "Die Adresse, unter der die Website zu sehen ist, z. B. https://meineseite.de -- ohne Schrägstrich am Ende. RSS, Sitemap und Vorschauen werden daraus gebaut; geht zugleich in config/site.yml und env.sh."
@@ -1543,7 +1544,7 @@ setup:
   q_sftp_remote_dir: "Verzeichnis auf dem Host"
   h_sftp_remote_dir: "Der Ordner auf dem Server, den das Hosting der Welt zeigt -- oft www oder public_html."
   target_ok: "✅ %{dir} existiert."
-  target_missing: "%{dir} existiert noch nicht. Lege es vor dem ersten Deploy an, sonst hat der Deploy keinen Ort für die Website."
+  target_missing: "%{dir} gibt es noch nicht -- der erste Deploy legt es an. Wenn es schon da sein sollte, prüfe den Pfad."
 
   env_permissions: "%{path} enthält echte Zugangsdaten und ist nur für dich lesbar (Modus 600)."
   next_steps: "Weiter: ./blog.sh add schreibt den ersten Beitrag, ./blog.sh preview zeigt die Website unter http://localhost:8000/, und ./style.sh setzt Palette, Bannerbild und Seitenleiste."

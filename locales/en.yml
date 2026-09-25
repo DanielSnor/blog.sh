@@ -1460,8 +1460,8 @@ export:
 
 setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
-  intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."
-  intro_expert: "(Rather edit YAML yourself? The wizard only fills in config/site.yml, whose commented template is config/site.yml.example.)"
+  intro_skip: "Most questions can be skipped -- Enter takes the value pre-filled under it; the site's name and author need typing only while they are still the template's example. Nothing is written until you have seen all the changes together and said yes."
+  intro_expert: "(Rather edit the files yourself? config/site.yml has a commented template in config/site.yml.example, and env.sh one in env.sh.example.)"
   config_unreadable: "❌ %{path} could not be read: %{error}"
   network_unchanged: "Nothing given, so nothing changed -- the site keeps the comments network it had."
   config_unreadable_stop: "Nothing was changed. Every question here offers what the config already says and Enter keeps it -- with the file unreadable there is nothing to keep, and answering would have blanked what is in it. Put the file right (`./blog.sh doctor` names the line) and run this again."
@@ -1482,6 +1482,7 @@ setup:
   q_timezone: "Timezone"
   h_timezone: "Publish times are calculated in this zone. An IANA name like Europe/Prague. Mind servers: the machine is often on UTC, but this should be the zone you live in."
   e_timezone: "This machine does not know a zone called \"%{zone}\". Zones are named Continent/City, in English -- Europe/Prague, not Praha or CEST; the full list is in /usr/share/zoneinfo."
+  e_identity_required: "The site needs this one -- the template only had an example here. Type the site's own."
 
   q_base_url: "Site address"
   h_base_url: "The address the site will be seen at, e.g. https://mysite.com -- no trailing slash. RSS, the sitemap and share previews are built from it; written to config/site.yml and env.sh at once."
@@ -1560,7 +1561,7 @@ setup:
   q_sftp_remote_dir: "Remote directory"
   h_sftp_remote_dir: "The folder on the server the hosting shows the world -- often www or public_html."
   target_ok: "✅ %{dir} exists."
-  target_missing: "%{dir} does not exist yet. Create it before the first deploy, or the deploy will have nowhere to put the site."
+  target_missing: "%{dir} does not exist yet -- the first deploy creates it. If it should be there already, check the path."
 
   env_permissions: "%{path} holds live credentials and is readable only by you (mode 600)."
   next_steps: "Next: ./blog.sh add writes your first post, ./blog.sh preview shows the site at http://localhost:8000/, and ./style.sh sets the palette, the header image and the sidebar."
