@@ -3747,6 +3747,11 @@ def props_frame_lines(post, path, slug, year)
   lines = ["  #{Tui.paint(props_title(post), :bold)}",
            "  #{draft?(post) ? t('cli.props_draft_banner') : PostAddress.path(post).sub(%r{\A/}, '')}", '']
   if draft?(post)
+    # Where the draft can be read. Until now only the dialog after a save
+    # said so, which made editing the one way to look at a draft; the
+    # address is the draft's, whatever else this screen is for. [m] shows
+    # it as a QR code for a phone -- too tall to stand in the frame.
+    lines << props_line('preview', props_preview_url(post))
     # No created/date line for a plain draft, on purpose: a draft has no
     # time -- its date is set by publishing or scheduling, and showing
     # anything earlier would suggest it means something.
@@ -3817,7 +3822,42 @@ def props_prompt(post, path, slug, network_label)
         else
           'cli.props_actions_published_plain'
         end
-  with_versions_key(t(key, network: network_label), path, slug)
+  with_qr_key(with_versions_key(t(key, network: network_label), path, slug), post)
+end
+
+# The draft's address on this screen. Under the placeholder base URL the
+# site is not online anywhere yet, and the address that works is the local
+# preview's -- the same one the save dialog's hint names.
+def props_preview_url(post)
+  return "http://localhost:#{LOCAL_PREVIEW_PORT}#{draft_path(post)}" if placeholder_base_url?
+
+  draft_url(post)
+end
+
+# [m] only where a QR code can do its job: a draft, in a terminal, on a
+# site with a real address. A phone that scans example.com or localhost
+# lands on a domain this author does not own, or on itself.
+def props_qr_available?(post)
+  draft?(post) && Tui.interactive? && !placeholder_base_url?
+end
+
+def with_qr_key(prompt, post)
+  return prompt unless props_qr_available?(post)
+
+  prompt.sub('[Enter]') { "#{t('cli.props_action_qr')}[Enter]" }
+end
+
+# The QR code for the draft, with its address over it -- the same three
+# rows the save dialog prints, on a screen of their own.
+def props_show_qr(post)
+  qr = QrCode.render(draft_url(post))
+  puts
+  puts Tui.paint(t('cli.preview_label', url: draft_url(post)), :cyan)
+  return unless qr
+
+  puts
+  puts qr
+  puts Tui.paint(t('cli.qr_hint'), :dim)
 end
 
 # "Not understood, try ..." -- listing the keys the row above is OFFERING,
@@ -3923,6 +3963,8 @@ def props_loop(slug, screen)
         props_run(screen) { props_properties(path, slug, raw: original_raw) }
       when 'v'
         props_run(screen) { props_versions(path, slug) }
+      when 'm'
+        props_run(screen) { props_qr_available?(post) ? props_show_qr(post) : puts(props_unknown(prompt)) }
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.

@@ -179,8 +179,9 @@ say -- are published oldest first, in the order the queue was arranged in.
 The CLI adapts to where it runs. In an interactive terminal you get
 arrow-key menus (digits still quick-select, typing a slug still works),
 single-keypress answers without Enter, colored state markers and a
-**QR code of the draft preview URL** -- point your phone's camera at
-the screen instead of retyping a token. A menu longer than the terminal
+**QR code of the draft preview URL** -- after a save, and on `[m]` in a
+draft's properties -- point your phone's camera at the screen instead of
+retyping a token. A menu longer than the terminal
 is tall scrolls, showing your position in the list next to the hint;
 `Page Up`, `Page Down`, `Home` and `End` work in every list.
 
@@ -211,7 +212,9 @@ the announcement -- and offers the guarded actions:
 - **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
   review the old addresses that redirect here, delete;
 - **draft**: publish, schedule (or reschedule, or cancel the schedule),
-  rename the slug, delete;
+  rename the slug, delete -- and the screen names the draft's preview
+  address, with `[m]` for its QR code, so a draft can be read on a phone
+  without opening it in the editor first;
 - **either**: `[e]` opens the post's properties -- which series it is in
   and which part of it, its tags, its type, and the three flags (out of
   the listings, lead image, chapter list);
