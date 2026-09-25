@@ -53,13 +53,34 @@ require_relative '../lib/path_glob'
 require 'yaml'
 require_relative '../lib/yaml_compat'
 require_relative '../lib/i18n'
-deploy_lang = begin
+SITE_YML = begin
   site = YamlCompat.load_file(File.join(File.expand_path('..', __dir__), 'config', 'site.yml'))
-  site.is_a?(Hash) ? site.dig('site', 'lang') : nil
+  site.is_a?(Hash) ? site : {}
 rescue StandardError
-  nil
+  {}
 end
+deploy_lang = SITE_YML.dig('site', 'lang')
+# The languages the site publishes, own first -- the same list the build
+# makes a root for each of (Publishing.publish_languages). The deploy only
+# needs to know when it CHANGES; see "The languages changed" below.
+SITE_LANGUAGES = ([deploy_lang.to_s.empty? ? 'en' : deploy_lang.to_s] +
+                  Array(SITE_YML.dig('site', 'locales')).map { |code| code.to_s.strip }.reject(&:empty?)).uniq
 I18n.force_lang(deploy_lang.to_s.empty? ? 'en' : deploy_lang.to_s)
+
+# What kind of run this is, before anything else is said. It was echoed by
+# deploy-web.sh, in English on every site; here it speaks the site's
+# language like every line after it.
+if ENV['BLOG_SH_DEPLOY_HEADER'] == '1'
+  puts '== deploy-web.sh =='
+  mode = if ARGV.include?('--dry-run') then I18n.t('cli.deploy_mode_dry')
+         elsif (only_arg = ARGV.find { |arg| arg.start_with?('--only=') })
+           I18n.t('cli.deploy_mode_only', files: only_arg.delete_prefix('--only='))
+         elsif ARGV.include?('--force') then I18n.t('cli.deploy_mode_force')
+         else I18n.t('cli.deploy_mode_smart')
+         end
+  puts mode
+  puts
+end
 
 # Runs at the end of the cron chain too, where stdout is a block-buffered
 # pipe and warn would otherwise overtake the progress lines around it.
@@ -574,6 +595,63 @@ end
 # was handed (see deploy_backend/git.rb), so there an oversized file
 # anywhere in the build really does bring the push down; a per-file backend
 # must not refuse to run over a file it never sends.
+# The languages changed. Adding one grows the build by a whole second tree
+# (/en/ for every listing, tag and feed), removing one shrinks it by the
+# same -- and the guards below read both as a broken build: "a 35 % jump
+# looks like a doubled build, run it again with --force", on the very
+# first deploy of the feature a site switches on to show it off. And a
+# removed language stayed online: its files are orphans, deleted only by
+# --prune, which the shrink guard then refused.
+#
+# So a change of languages is said out loud and taken out of the guards'
+# arithmetic, and nothing else is: the tree of an added language is not
+# counted against the reference, the tree of a removed one is not counted
+# in it, and the rest of the site is still held to the same limits -- a
+# broken build that happens on the same day still stops. The files of a
+# removed language are deleted from the target on this run, --prune or
+# not: they are the engine's own, and nothing else would ever take them
+# down.
+#
+# What the languages WERE is in the baseline from 1.9 on. A baseline from
+# before has no list, so it is read off the manifest instead: a root the
+# target holds that is named like a language the engine speaks.
+def language_roots(names)
+  names.map { |name| name.split('/').first }.uniq.select do |root|
+    root.match?(/\A[a-z]{2,3}\z/) && File.exist?(File.join(ROOT, 'locales', "#{root}.yml"))
+  end
+end
+
+languages_before = if BASE.is_a?(Hash) && BASE['languages'].is_a?(Array)
+                     BASE['languages'].map(&:to_s)
+                   else
+                     ([SITE_LANGUAGES.first] + language_roots(stored.keys)).uniq
+                   end
+own_language = SITE_LANGUAGES.first
+added_languages = ONLY ? [] : (SITE_LANGUAGES - languages_before - [own_language])
+removed_languages = ONLY ? [] : (languages_before - SITE_LANGUAGES - [own_language])
+under = ->(names, codes) { names.select { |name| codes.include?(name.split('/').first) } }
+
+added_files = under.call(all_files, added_languages)
+removed_files = under.call(stored.keys, removed_languages)
+guard_build_files = build_files - added_files.size
+guard_build_bytes = build_bytes - added_files.sum { |name| stats.dig(name, 'size').to_i }
+removed_bytes = removed_files.sum { |name| stored[name].is_a?(Hash) ? stored[name]['size'].to_i : 0 }
+shrink_files -= removed_files.size
+shrink_bytes -= removed_bytes
+growth_files = [growth_files - removed_files.size, 0].max
+growth_bytes = [growth_bytes - removed_bytes, 0].max
+
+# What this run deletes: every orphan under --prune (and on a snapshot, and
+# for --only), and otherwise the orphans of a language the site stopped
+# publishing -- they stay listed as orphans either way.
+deleting = PRUNES ? orphans : under.call(orphans, removed_languages)
+unless added_languages.empty? && removed_languages.empty?
+  notices << I18n.t('cli.deploy_languages_changed',
+                    added: added_languages.empty? ? '—' : added_languages.join(', '),
+                    removed: removed_languages.empty? ? '—' : removed_languages.join(', '),
+                    added_files: added_files.size, removed_files: removed_files.size)
+end
+
 shipped = SNAPSHOT ? all_files : to_upload
 sized = ->(list) { list.map { |name| [name, stats.dig(name, 'size').to_i] } }
 described = ->(list) { list.map { |(name, bytes)| "#{name} (#{FileSize.human(bytes)})" } }
@@ -639,16 +717,16 @@ SHRINK_MIN_BYTES = 25_000_000
 # force-push leaves nothing to restore from. Same reasoning, and the same
 # SNAPSHOT test, as the per-file size limit above.
 
-if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
-  abort(I18n.t('cli.deploy_guard_shrink_files', have: build_files, expected: shrink_files,
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(guard_build_files, shrink_files, SHRINK_LIMIT, SHRINK_MIN_FILES, :down)
+  abort(I18n.t('cli.deploy_guard_shrink_files', have: guard_build_files, expected: shrink_files,
                                                 source: ref_source,
-                                                percent: (100 - (build_files * 100.0 / shrink_files)).round))
+                                                percent: (100 - (guard_build_files * 100.0 / shrink_files)).round))
 end
 
 # What the counts cannot see: the same number of files, each of them nearly
 # empty. A broken template or a lost media prefix does exactly that.
-if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
-  abort(I18n.t('cli.deploy_guard_shrink_bytes', have: FileSize.human(build_bytes),
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(guard_build_bytes, shrink_bytes, BYTES_SHRINK_LIMIT, SHRINK_MIN_BYTES, :down)
+  abort(I18n.t('cli.deploy_guard_shrink_bytes', have: FileSize.human(guard_build_bytes),
                                                 expected: FileSize.human(shrink_bytes),
                                                 source: ref_source))
 end
@@ -657,10 +735,10 @@ end
 # matching year/slug, but not against duplication of some other kind), a
 # badly merged import, or an accidentally copied tree. Normal growth is a
 # handful of files per published post.
-if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
-  abort(I18n.t('cli.deploy_guard_growth_files', have: build_files, expected: growth_files,
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(guard_build_files, growth_files, GROWTH_LIMIT, GROWTH_MIN_FILES, :up)
+  abort(I18n.t('cli.deploy_guard_growth_files', have: guard_build_files, expected: growth_files,
                                                 source: ref_source,
-                                                percent: ((build_files * 100.0 / growth_files) - 100).round))
+                                                percent: ((guard_build_files * 100.0 / growth_files) - 100).round))
 end
 
 # A notice, not an abort: adding a video IS authoring, not a malfunction,
@@ -668,9 +746,9 @@ end
 # precisely, by name, by the per-file limit. Aborting on the total would
 # just recreate the dead end this whole change removes, in the flows that
 # cannot pass --force.
-if (!ONLY || SNAPSHOT) && !FORCE && swing?(build_bytes, growth_bytes, BYTES_GROWTH_NOTICE, 0, :up)
+if (!ONLY || SNAPSHOT) && !FORCE && swing?(guard_build_bytes, growth_bytes, BYTES_GROWTH_NOTICE, 0, :up)
   notices << I18n.t('cli.deploy_growth_notice', was: FileSize.human(growth_bytes),
-                                                now: FileSize.human(build_bytes), source: ref_source)
+                                                now: FileSize.human(guard_build_bytes), source: ref_source)
 end
 
 log('')
@@ -703,16 +781,19 @@ if orphans.any?
         end
   log(PRUNES ? "  #{I18n.t('cli.deploy_orphans_delete', count: orphans.size, why: why)}" \
              : "  #{I18n.t('cli.deploy_orphans_kept', count: orphans.size)}")
+  log("  #{I18n.t('cli.deploy_orphans_language_delete', count: deleting.size)}") if !PRUNES && deleting.any?
 end
 
 if DRY
   to_upload.each { |name| log("  [dry] #{name} (#{File.size(File.join(PUBLIC_DIR, name))} B)") }
-  dry_word = I18n.t(PRUNES ? 'cli.deploy_dry_delete' : 'cli.deploy_dry_orphan')
-  orphans.each { |name| log("  [dry] #{dry_word} #{name}") }
+  orphans.each do |name|
+    dry_word = I18n.t(deleting.include?(name) ? 'cli.deploy_dry_delete' : 'cli.deploy_dry_orphan')
+    log("  [dry] #{dry_word} #{name}")
+  end
   exit 0
 end
 
-log('') if to_upload.any? || (PRUNES && orphans.any?)
+log('') if to_upload.any? || deleting.any?
 
 ok = failed = deleted = 0
 completed = false
@@ -731,7 +812,8 @@ completed = false
 # special case to code around.
 unless ONLY
   STATE['version'] = 1
-  STATE['build'] = { 'files' => build_files, 'bytes' => build_bytes, 'at' => Time.now.iso8601 }
+  STATE['build'] = { 'files' => build_files, 'bytes' => build_bytes, 'at' => Time.now.iso8601,
+                     'languages' => SITE_LANGUAGES }
   STATE['last_run'] = { 'at' => Time.now.iso8601, 'backend' => BACKEND.label, 'outcome' => 'started',
                         'to_upload' => to_upload.size,
                         'unfinished_streak' => PREV['unfinished_streak'].to_i + 1 }
@@ -745,20 +827,20 @@ begin
     # `files`, not ONLY: a name the build no longer produces has been taken
     # out of it above, and handing it to --files-from would fail the whole
     # transfer over a file that is meant to be gone.
-    if BACKEND.sync(public_dir: PUBLIC_DIR, files: to_upload, orphans: orphans,
-                    only: ONLY && files, prune: PRUNES && orphans.any?,
+    if BACKEND.sync(public_dir: PUBLIC_DIR, files: to_upload, orphans: deleting,
+                    only: ONLY && files, prune: deleting.any?,
                     force: FORCE, logger: method(:log))
       to_upload.each do |name|
         manifest[name] = { 'hash' => hashes[name], 'size' => stats[name]['size'], 'mtime' => stats[name]['mtime'] }
       end
       ok = to_upload.size
-      if PRUNES
+      if deleting.any?
         # A backend that can tell WHICH deletes failed (sftp) keeps those
         # in the manifest, so the prune is retried next run instead of the
         # file staying live on the target with nothing left knowing it.
         kept = BACKEND.respond_to?(:failed_orphans) ? BACKEND.failed_orphans : []
-        orphans.each { |name| manifest.delete(name) unless kept.include?(name) }
-        deleted = orphans.size - kept.size
+        deleting.each { |name| manifest.delete(name) unless kept.include?(name) }
+        deleted = deleting.size - kept.size
         failed += kept.size
         kept.each { |name| log("  #{I18n.t('cli.deploy_delete_failed_kept', name: name)}") }
       end
@@ -805,9 +887,9 @@ begin
         end
       end
 
-      next unless PRUNES
+      next if deleting.empty?
 
-      orphans.each do |name|
+      deleting.each do |name|
         case session.delete(name, logger: method(:log))
         when :ok, :missing
           deleted += 1

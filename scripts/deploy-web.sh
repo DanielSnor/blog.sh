@@ -15,15 +15,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "== deploy-web.sh =="
-case "$*" in
-  *--dry-run*) echo "Mode: preview (dry-run) -- nothing is actually uploaded." ;;
-  *--only=*)   echo "Mode: single file ($*)." ;;
-  *--force*)   echo "Mode: forced upload of everything (--force)." ;;
-  *)           echo "Mode: smart sync -- uploading only new/changed files." ;;
-esac
-echo
-
+# The header and the mode line are printed by deploy_web.rb, in the
+# site's language -- a shell echo could only ever say them in English. Only
+# for a run started here: the engine's own callers (rebuild, the palette
+# preview) run deploy_web.rb directly and never printed them.
+export BLOG_SH_DEPLOY_HEADER=1
 if [ ! -f env.sh ]; then
   echo "Missing env.sh -- copy the documented template first:"
   echo "  cp env.sh.example env.sh && chmod 600 env.sh"

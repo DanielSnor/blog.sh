@@ -217,7 +217,8 @@ the announcement -- and offers the guarded actions:
 
 - **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
   review the old addresses that redirect here, delete;
-- **draft**: publish, schedule (or reschedule, or cancel the schedule),
+- **draft**: publish (asked first -- with a network configured it announces
+  too, which nothing takes back), schedule (or reschedule, or cancel the schedule),
   rename the slug, delete -- and the screen names the draft's preview
   address, with `[q]` for its QR code, so a draft can be read on a phone
   without opening it in the editor first;
@@ -1712,6 +1713,14 @@ Things worth knowing:
 
   The absolute floors keep the percentages usable on a small site, where
   two posts published at once would otherwise read as an explosion.
+
+  A change of the site's languages is not a swing. Adding one grows the
+  build by a whole tree (`/en/`, every listing, tag and feed in it) and
+  removing one shrinks it by as much, so the deploy says the languages
+  changed, leaves those trees out of the comparison and holds the rest of
+  the site to the limits above -- a broken build on the same day still
+  stops. The files of a language the site no longer publishes are deleted
+  from the target by that deploy, without `--prune`.
 
   A drop also measures against the manifest when that is larger, since
   every entry in it is a file that really did upload. Growth never does:

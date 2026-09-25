@@ -1592,6 +1592,21 @@ end
 def report_added(path, warnings, json:, publish: false)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
 
+  # `publish: yes` is the road `publish <slug> --yes` takes, and that road
+  # refuses a post the site cannot show in every language it publishes.
+  # This one went straight out: a file from the phone, on a two-language
+  # site, published in one language without a word. It stays a draft here,
+  # and says why and how to send it anyway -- the answer carries the
+  # sentence, so the phone shows it too.
+  missing = publish ? missing_translations(post) : []
+  if missing.any?
+    kept = t('cli.add_publish_partial', slug: post['slug'], langs: missing.join(', '))
+    # Into the answer under --json; said on the terminal otherwise, where
+    # the other warnings of this run have already been said as they came.
+    json ? warnings += [kept] : warn(Tui.paint(kept, :yellow))
+    publish = false
+  end
+
   if publish
     # The same road `publish <slug> --yes` takes -- date settled, the
     # announcement sent, the site rebuilt and deployed -- with its prose
@@ -1954,6 +1969,11 @@ def prompt_and_schedule(path, post, raw: nil)
     input = answer.strip
     return false if input.empty? && slot.nil?
     return false if input.downcase == t('cli.cancel_word')
+    # Esc backs out here too. The line is read cooked, so the key arrives as
+    # a character: it piled up as ^[ and the only ways out were the cancel
+    # word and Ctrl+C, on the one question that decides when a post goes
+    # out and gets announced.
+    return false if input.include?("\e")
 
     date = if input.empty?
              slot
@@ -3781,7 +3801,12 @@ def props_frame_lines(post, path, slug, year)
   # is never announced, so the line has to say that rather than leave the
   # author expecting a toot that will not come -- or worse, believing one is
   # owed and going to look for why it failed.
+  # ...and a site with no network at all is told so too: "goes out when the
+  # post publishes" was said on a site that announces nowhere, and publish
+  # then said the opposite. doctor has the sentence right; so does this.
   lines << props_line('announced', if announced then announced
+                                   elsif SiteConfig.comment_network.nil?
+                                     t('cli.props_announces_nowhere')
                                    elsif Publishing.unlisted?(post)
                                      t('cli.props_announces_never_unlisted')
                                    elsif draft?(post) then t('cli.props_announces_on_publish')
@@ -3823,6 +3848,14 @@ def props_prompt(post, path, slug, network_label)
           'cli.props_actions_published_plain'
         end
   with_qr_key(with_versions_key(t(key, network: network_label), path, slug), post)
+end
+
+# The question before [p] publishes from this screen, with the part that
+# cannot be undone said first when there is one.
+def props_confirm_publish(post, network_label)
+  puts
+  puts Tui.paint(t('cli.props_publish_announces', network: network_label), :yellow) if network_label && !Publishing.unlisted?(post)
+  Tui.yes?(Tui.key_choice(t('cli.props_publish_confirm', slug: post['slug']), escape: 'n'))
 end
 
 # The draft's address on this screen. Under the placeholder base URL the
@@ -3945,7 +3978,16 @@ def props_loop(slug, screen)
 
     if draft?(post)
       case key
-      when 'p' then return props_run(screen) { publish_draft(slug) }
+      when 'p'
+        # Asked, as this screen's "guarded actions" promise: one keystroke
+        # published the post, deployed the site and -- on a site with a
+        # network -- announced it, which nothing takes back. Esc is no.
+        published = false
+        props_run(screen) do
+          published = props_confirm_publish(post, network_label)
+          publish_draft(slug) if published
+        end
+        return if published
       when 's'
         props_run(screen) do
           puts
@@ -6432,8 +6474,8 @@ end
 # Build and deploy as one step -- the mechanics (and the reasoning for
 # the built-in --prune) live in Publishing.rebuild_and_deploy, shared
 # with the scheduled-publish cron.
-def rebuild_and_deploy(reason = nil, full: false)
-  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'), full: full)
+def rebuild_and_deploy(reason = nil, full: false, force: false)
+  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'), full: full, force: force)
 end
 
 def maybe_rebuild
@@ -6449,8 +6491,8 @@ end
 
 # A manual build+deploy not tied to a specific post -- e.g. after a manual
 # template edit, when nothing else would otherwise trigger a rebuild.
-def cmd_rebuild(full: false)
-  return if rebuild_and_deploy(nil, full: full)
+def cmd_rebuild(full: false, force: false)
+  return if rebuild_and_deploy(nil, full: full, force: force)
 
   # The lock's own exit code, same as the build and deploy scripts leave
   # with: somebody ran this by hand, and exit 0 reads as "a deploy
@@ -6557,6 +6599,33 @@ def cmd_empty(what)
   when 'versions' then cmd_empty_versions
   else abort t('cli.empty_what')
   end
+end
+
+# Every command ./blog.sh answers to: this dispatcher's and the four the
+# shell front hands to scripts of their own.
+KNOWN_COMMANDS = %w[add translate edit props delete restore empty publish schedule queue unpublish toot
+                    bluesky rebuild preview list browse help version doctor check export stats].freeze
+
+# The command a typo most likely meant, or nil when nothing is close: at
+# most two edits away, and never more than half the word.
+def nearest_command(typed)
+  word = typed.to_s.downcase
+  best = KNOWN_COMMANDS.map { |known| [edit_distance(word, known), known] }.min
+  return nil unless best && best.first <= [2, word.length / 2].min && best.first.positive?
+
+  best.last
+end
+
+def edit_distance(one, two)
+  row = (0..two.length).to_a
+  one.each_char.with_index(1) do |char, i|
+    previous = row.dup
+    row[0] = i
+    two.each_char.with_index(1) do |other, j|
+      row[j] = [previous[j] + 1, row[j - 1] + 1, previous[j - 1] + (char == other ? 0 : 1)].min
+    end
+  end
+  row.last
 end
 
 def print_usage
@@ -6935,7 +7004,18 @@ begin
       # Read here rather than inside cmd_rebuild, the way `list` and `browse`
       # read their filters: the dispatcher is where this file turns a command
       # line into arguments, and the wizard calls cmd_rebuild with none.
-      cmd_rebuild(full: ARGV.include?('--full'))
+      #
+      # Only the switches it has. `rebuild --help` used to build and deploy
+      # the site, and `rebuild --force` -- which the deploy's own guard
+      # tells you to run -- was taken for nothing and stopped again on the
+      # same guard: any word was accepted and all but --full ignored.
+      if ARGV.intersect?(%w[--help -h])
+        print_usage
+        exit 0
+      end
+      unknown = ARGV.reject { |arg| %w[--full --force].include?(arg) }
+      abort t('cli.rebuild_unknown_option', option: unknown.join(' ')) unless unknown.empty?
+      cmd_rebuild(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
     when 'preview'
       # A local static server over the build output -- the quickest way to
       # look at the site before deploying anywhere.
@@ -6979,7 +7059,14 @@ begin
     when 'version', '--version', '-v'
       puts "blog.sh #{BlogSh::VERSION}"
     else
-      print_usage
+      # Not the whole usage: 43 lines scrolled a mistyped `publsh` off the
+      # screen without ever saying the command does not exist. One line
+      # that does, the nearest real command if there is one, and where the
+      # full list is.
+      warn t('cli.unknown_command', command: command)
+      nearest = nearest_command(command)
+      warn t('cli.unknown_command_nearest', command: nearest) if nearest
+      warn t('cli.unknown_command_help')
       exit 1
     end
   end

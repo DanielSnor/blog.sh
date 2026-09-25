@@ -307,6 +307,7 @@ cli:
   translate_unknown_args: "❌ `translate` does not know what to do with: %{args}. It takes a post and one language -- `./blog.sh translate <slug> --lang <code>`."
   translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
   publish_partial: "Publishing %{slug} would put it out in one language: the site also publishes %{langs}, and this post has no words there. Write it with `./blog.sh translate`, or say `--allow-partial` to publish it as it is."
+  add_publish_partial: "Kept as a draft, not published: %{slug} has no words in %{langs}, which the site also publishes. Write them with ./blog.sh translate %{slug} --lang <code>, or send it out as it is with ./blog.sh publish %{slug} --allow-partial."
   publish_partial_prompt: "This post would go out in one language; %{langs} has no words in it. [w] write it now  [p] publish as it is  [anything else] back: "
   publish_partial_write_key: "w"
   publish_partial_anyway_key: "p"
@@ -398,13 +399,19 @@ cli:
   deploy_stale_too_large: "⚠️  %{files} already on the target, over the %{limit} per-file limit -- this site can no longer be moved to a target that enforces it."
   deploy_large_files: "⚠️  Large files: %{files}%{more} -- under the %{limit} limit, but every reader pays for those bytes."
   deploy_large_files_more: " and %{count} more"
+  deploy_mode_dry: "Mode: preview (dry run) -- nothing is uploaded."
+  deploy_mode_only: "Mode: just %{files}."
+  deploy_mode_force: "Mode: everything again (--force)."
+  deploy_mode_smart: "Mode: only what is new or changed."
   deploy_growth_notice: "⚠️  The build grew from %{was} to %{now} since %{source} -- expected if you added media, worth a look if you didn't."
+  deploy_languages_changed: "ℹ️  The site's languages changed -- added: %{added}, removed: %{removed}. The guards leave those trees out (new files: %{added_files}, gone: %{removed_files}) and hold the rest of the site to the usual limits."
   deploy_prev_outcome: "ℹ️  Previous deploy (%{at}, %{backend}) ended as '%{outcome}': uploaded %{uploaded}, failed %{failed}. This run re-diffs against the manifest; the guards apply as normal."
   deploy_unfinished_streak: "⚠️  Deploys in a row that have not finished: %{count} -- something is being refused every time (an oversized file, credentials, the target). The guards are on; the failures below say what."
   deploy_no_growth_reference: "ℹ️  Nothing to measure growth against yet -- that guard stands down for this one run (the drop guard still measures against the manifest)."
   deploy_selection: "Files selected: %{files}, %{bytes} in the build, new or changed: %{changed}, unchanged (skipped): %{unchanged}"
   deploy_orphans_delete: "Orphans to delete: %{count}%{why}"
   deploy_orphans_kept: "⚠️  Orphaned files on the target: %{count} -- delete them with --prune"
+  deploy_orphans_language_delete: "   Of those, %{count} belong to a language the site no longer publishes, and are deleted now."
   deploy_orphans_why_prune: " (--prune)"
   deploy_orphans_why_snapshot: " (snapshot deploy)"
   deploy_orphans_why_only: " (named in --only, no longer in the build)"
@@ -590,6 +597,10 @@ cli:
   deploy_pending_marked: "The site is marked as owing a deploy, so the next scheduled run finishes it. To not wait, run ./blog.sh rebuild once the other run is done."
 
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
+  rebuild_unknown_option: "rebuild does not know %{option} -- it takes --full (build every page again) and --force (let the deploy through its guards and upload everything)."
+  unknown_command: "❌ ./blog.sh has no command \"%{command}\"."
+  unknown_command_nearest: "   Did you mean ./blog.sh %{command}?"
+  unknown_command_help: "   ./blog.sh help lists every command."
 
   header_mode: "Mode: %{mode}"
   usage: |
@@ -614,7 +625,8 @@ cli:
       ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
       ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
       ./blog.sh rebuild [--full]     rebuilds and deploys the whole site, not tied to a specific post;
-                                     --full builds every page again instead of only the ones that changed
+                                     --full builds every page again instead of only the ones that changed;
+                                     --force lets the deploy past its guards and uploads everything
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
@@ -730,6 +742,7 @@ cli:
   props_pinned_yes: "yes -- held at the top of the front page"
   props_unlisted_yes: "yes -- reachable by its address, in no listing, feed, sitemap or search"
   props_announces_on_publish: "not yet -- goes out when the post publishes"
+  props_announces_nowhere: "never -- this site announces nowhere (no mastodon: or bluesky: in config/site.yml)"
   props_announces_never_unlisted: "never -- an unlisted post is not announced"
   props_not_announced: "not announced"
   props_attributes_hint: "Type, tags and the series are changed with [e]; the text itself with edit."
@@ -739,6 +752,8 @@ cli:
   props_actions_published_plain: "[u] unpublish  [c] pin/unpin  [e] properties  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
   props_action_versions: "[v] earlier versions  "
   props_action_qr: "[q] QR for a phone  "
+  props_publish_confirm: "Publish %{slug} now? [y/N] "
+  props_publish_announces: "It also goes out on %{network} -- an announcement cannot be taken back."
   versions_none: "This post has no earlier versions yet -- one is kept each time it is edited."
   versions_heading: "What the post %{slug} said before its recent saves:"
   versions_media_note: "Only the text comes back; images are not versioned, so an old copy of the post may mention one it no longer has."

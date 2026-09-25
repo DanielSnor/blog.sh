@@ -291,6 +291,7 @@ cli:
   translate_unknown_args: "❌ `translate` neví, co si počít s: %{args}. Bere jeden příspěvek a jeden jazyk — `./blog.sh translate <slug> --lang <kód>`."
   translate_needs_locales: "Tenhle web publikuje jeden jazyk. Nejdřív ostatní vyjmenuj v `site.locales` v config/site.yml."
   publish_partial: "Publikovat „%{slug}“ by ho vydalo v jednom jazyce: web publikuje i %{langs} a tenhle příspěvek tam slova nemá. Napiš je přes `./blog.sh translate`, nebo řekni `--allow-partial` a vyjde, jak je."
+  add_publish_partial: "Zůstává konceptem, nepublikovalo se: „%{slug}“ nemá slova v jazyce %{langs}, který web publikuje taky. Napiš je přes ./blog.sh translate %{slug} --lang <kód>, nebo ho pošli ven, jak je, přes ./blog.sh publish %{slug} --allow-partial."
   publish_partial_prompt: "Příspěvek by šel ven jen v jednom jazyce, %{langs} v něm slova nemá. [n] napsat teď  [p] publikovat tak jak je  [cokoliv jiného] zpět: "
   publish_partial_write_key: "n"
   publish_partial_anyway_key: "p"
@@ -381,13 +382,19 @@ cli:
   deploy_stale_too_large: "⚠️  %{files} na cíli už je, nad limitem %{limit} na soubor — tenhle web se na cíl, který limit vynucuje, přestěhovat nedá."
   deploy_large_files: "⚠️  Velké soubory: %{files}%{more} — pod limitem %{limit}, ale ty bajty platí každý čtenář."
   deploy_large_files_more: ", dalších souborů: %{count}"
+  deploy_mode_dry: "Režim: náhled (dry run) — nic se nenahrává."
+  deploy_mode_only: "Režim: jen %{files}."
+  deploy_mode_force: "Režim: všechno znovu (--force)."
+  deploy_mode_smart: "Režim: jen to, co je nové nebo změněné."
   deploy_growth_notice: "⚠️  Sestavení vyrostlo z %{was} na %{now} od %{source} — čekané, jestli jsi přidával média, jinak to stojí za pohled."
+  deploy_languages_changed: "ℹ️  Jazyky webu se změnily — přibylo: %{added}, ubylo: %{removed}. Pojistky tyhle stromy vynechávají (nových souborů: %{added_files}, odebraných: %{removed_files}) a zbytek webu drží v obvyklých mezích."
   deploy_prev_outcome: "ℹ️  Předchozí nasazení (%{at}, %{backend}) skončilo jako '%{outcome}': nahráno %{uploaded}, selhalo %{failed}. Tenhle běh porovnává znovu proti manifestu; pojistky platí jako vždycky."
   deploy_unfinished_streak: "⚠️  Nasazení po sobě, která nedoběhla: %{count} — něco se odmítá pokaždé (moc velký soubor, přihlašovací údaje, cíl). Pojistky jsou zapnuté; co selhalo, je vidět níž."
   deploy_no_growth_reference: "ℹ️  Zatím není k čemu měřit nárůst — ta pojistka tenhle jeden běh stojí stranou (pojistka proti propadu měří dál proti manifestu)."
   deploy_selection: "Vybraných souborů: %{files}, v sestavení %{bytes}, nových nebo změněných: %{changed}, beze změny (přeskočeno): %{unchanged}"
   deploy_orphans_delete: "Osiřelých souborů ke smazání: %{count}%{why}"
   deploy_orphans_kept: "⚠️  Osiřelých souborů na cíli: %{count} — smaže je --prune"
+  deploy_orphans_language_delete: "   Z toho patří jazyku, který web už nepublikuje (souborů: %{count}) — ty se teď smažou."
   deploy_orphans_why_prune: " (--prune)"
   deploy_orphans_why_snapshot: " (nasazení snímkem)"
   deploy_orphans_why_only: " (jmenované v --only, v sestavení už nejsou)"
@@ -569,6 +576,10 @@ cli:
   deploy_pending_marked: "Web je označený jako dlužný nasazení, takže to dokončí nejbližší plánovaný běh. Když nechceš čekat, spusť po doběhnutí toho druhého ./blog.sh rebuild."
 
   rebuild_prompt: "Znovu sestavit a nasadit web teď? [A/n] "
+  rebuild_unknown_option: "rebuild nezná %{option} — umí --full (sestavit znovu všechny stránky) a --force (pustit nasazení přes pojistky a nahrát všechno)."
+  unknown_command: "❌ ./blog.sh nemá příkaz „%{command}“."
+  unknown_command_nearest: "   Myslel jsi ./blog.sh %{command}?"
+  unknown_command_help: "   ./blog.sh help vypíše všechny příkazy."
 
   header_mode: "Režim: %{mode}"
   usage: |
@@ -593,7 +604,8 @@ cli:
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} příspěvků
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
       ./blog.sh rebuild [--full]     znovu sestaví a nasadí celý web, bez vazby na konkrétní příspěvek;
-                                     --full sestaví znovu každou stránku, ne jen ty změněné
+                                     --full sestaví znovu každou stránku, ne jen ty změněné;
+                                     --force pustí nasazení přes pojistky a nahraje všechno
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      vypíše příspěvky po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
@@ -709,6 +721,7 @@ cli:
   props_pinned_yes: "ano — drží se nahoře na úvodní stránce"
   props_unlisted_yes: "ano — dostupný na své adrese, ale v žádném výpisu, feedu, sitemapě ani hledání"
   props_announces_on_publish: "zatím ne — odejde s publikací"
+  props_announces_nowhere: "nikdy — tenhle web neoznamuje nikam (v config/site.yml není mastodon: ani bluesky:)"
   props_announces_never_unlisted: "neodejde — nezalistovaný příspěvek se neoznamuje"
   props_not_announced: "bez oznámení"
   props_attributes_hint: "Typ, štítky a sérii mění [e]; samotný text edit."
@@ -718,6 +731,8 @@ cli:
   props_actions_published_plain: "[u] stáhnout z webu  [c] připnout/odepnout  [e] vlastnosti  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
   props_action_versions: "[v] starší verze  "
   props_action_qr: "[q] QR pro mobil  "
+  props_publish_confirm: "Publikovat „%{slug}“ teď? [a/N] "
+  props_publish_announces: "Zároveň se oznámí na %{network} — oznámení nejde vzít zpět."
   versions_none: "Tenhle příspěvek zatím žádnou starší verzi nemá — odkládá se při každé editaci."
   versions_heading: "Co příspěvek %{slug} říkal před posledními uloženími:"
   versions_media_note: "Vrací se jen text; obrázky se neverzují, takže stará kopie příspěvku může zmiňovat ten, který příspěvek už nemá."

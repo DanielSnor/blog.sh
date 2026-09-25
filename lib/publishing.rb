@@ -517,7 +517,7 @@ module Publishing
   # spending nothing on the rest. It is on only when somebody asks for it by
   # hand (`./blog.sh rebuild --full`), which is what you do when you doubt
   # what is on disk rather than what is in the archive.
-  def rebuild_and_deploy(reason, full: false)
+  def rebuild_and_deploy(reason, full: false, force: false)
     @stopped_on_busy_lock = false
     # Noted before the build reads a single file, so a marker written after
     # this instant is somebody else's debt and survives our success.
@@ -533,7 +533,10 @@ module Publishing
       return false
     end
 
-    if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
+    # --force is the deploy's: its guard says to run again with it, and
+    # `./blog.sh rebuild --force` is how that is said from here.
+    extra = force ? ['--force'] : []
+    if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune', *extra)
       clear_deploy_pending(written_before: started)
       return true
     end

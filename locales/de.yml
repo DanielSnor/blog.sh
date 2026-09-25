@@ -299,6 +299,7 @@ cli:
   translate_unknown_args: "❌ `translate` weiß nichts anzufangen mit: %{args}. Es nimmt einen Beitrag und eine Sprache -- `./blog.sh translate <slug> --lang <Code>`."
   translate_needs_locales: "Diese Website veröffentlicht eine Sprache. Nenne die anderen zuerst in `site.locales` in config/site.yml."
   publish_partial: "Ein Veröffentlichen von „%{slug}“ ginge nur in einer Sprache: die Website veröffentlicht auch %{langs}, und dieser Beitrag hat dort keine Worte. Schreibe sie mit `./blog.sh translate`, oder sage `--allow-partial`, damit er so erscheint."
+  add_publish_partial: "Als Entwurf behalten, nicht veröffentlicht: „%{slug}“ hat keine Worte in %{langs}, das die Website auch veröffentlicht. Schreib sie mit ./blog.sh translate %{slug} --lang <Code>, oder bring ihn so, wie er ist, mit ./blog.sh publish %{slug} --allow-partial hinaus."
   publish_partial_prompt: "Dieser Beitrag ginge nur in einer Sprache hinaus; %{langs} hat keine Worte darin. [s] jetzt schreiben  [v] so veröffentlichen  [alles andere] zurück: "
   publish_partial_write_key: "s"
   publish_partial_anyway_key: "v"
@@ -393,13 +394,19 @@ cli:
   deploy_stale_too_large: "⚠️  %{files} liegt bereits auf dem Ziel, über dem Limit von %{limit} pro Datei -- diese Website lässt sich nicht mehr auf ein Ziel umziehen, das es durchsetzt."
   deploy_large_files: "⚠️  Große Dateien: %{files}%{more} -- unter dem Limit von %{limit}, aber für diese Bytes zahlt jede Leserin mit."
   deploy_large_files_more: ", weitere Dateien: %{count}"
+  deploy_mode_dry: "Modus: Vorschau (dry run) -- es wird nichts hochgeladen."
+  deploy_mode_only: "Modus: nur %{files}."
+  deploy_mode_force: "Modus: alles neu (--force)."
+  deploy_mode_smart: "Modus: nur, was neu oder geändert ist."
   deploy_growth_notice: "⚠️  Der Build ist seit %{source} von %{was} auf %{now} gewachsen -- zu erwarten, wenn du Medien hinzugefügt hast, sonst einen Blick wert."
+  deploy_languages_changed: "ℹ️  Die Sprachen der Website haben sich geändert -- dazu: %{added}, weg: %{removed}. Die Schutzprüfungen lassen diese Bäume aus (neue Dateien: %{added_files}, entfernte: %{removed_files}) und halten den Rest der Website in den üblichen Grenzen."
   deploy_prev_outcome: "ℹ️  Vorheriger Deploy (%{at}, %{backend}) endete als '%{outcome}': hochgeladen %{uploaded}, fehlgeschlagen %{failed}. Dieser Lauf vergleicht erneut gegen das Manifest; die Sicherungen gelten wie immer."
   deploy_unfinished_streak: "⚠️  Deploys in Folge, die nicht durchgelaufen sind: %{count} -- etwas wird jedes Mal abgelehnt (eine zu große Datei, die Zugangsdaten, das Ziel). Die Sicherungen sind an; was scheitert, steht unten."
   deploy_no_growth_reference: "ℹ️  Es gibt noch nichts, woran sich der Zuwachs messen ließe -- diese Sicherung setzt für diesen einen Lauf aus (die Rückgang-Sicherung misst weiter gegen das Manifest)."
   deploy_selection: "Ausgewählte Dateien: %{files}, %{bytes} im Build, neu oder geändert: %{changed}, unverändert (übersprungen): %{unchanged}"
   deploy_orphans_delete: "Zu löschende verwaiste Dateien: %{count}%{why}"
   deploy_orphans_kept: "⚠️  Verwaiste Dateien auf dem Ziel: %{count} -- mit --prune löschen"
+  deploy_orphans_language_delete: "   Davon gehören %{count} zu einer Sprache, die die Website nicht mehr veröffentlicht, und werden jetzt gelöscht."
   deploy_orphans_why_prune: " (--prune)"
   deploy_orphans_why_snapshot: " (Snapshot-Deploy)"
   deploy_orphans_why_only: " (in --only genannt, nicht mehr im Build)"
@@ -581,6 +588,10 @@ cli:
   deploy_pending_marked: "Die Website ist als ausstehender Deploy vermerkt, der nächste geplante Lauf erledigt ihn. Wer nicht warten will, führt nach dem anderen Lauf ./blog.sh rebuild aus."
 
   rebuild_prompt: "Seite jetzt neu bauen und deployen? [J/n] "
+  rebuild_unknown_option: "rebuild kennt %{option} nicht -- es nimmt --full (jede Seite neu bauen) und --force (den Deploy an seinen Schutzprüfungen vorbeilassen und alles hochladen)."
+  unknown_command: "❌ ./blog.sh hat keinen Befehl „%{command}“."
+  unknown_command_nearest: "   Meintest du ./blog.sh %{command}?"
+  unknown_command_help: "   ./blog.sh help listet alle Befehle."
 
   header_mode: "Modus: %{mode}"
   usage: |
@@ -605,7 +616,8 @@ cli:
       ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
       ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
       ./blog.sh rebuild [--full]     baut und deployt die ganze Seite, unabhängig von einem Beitrag;
-                                     --full baut jede Seite neu, nicht nur die geänderten
+                                     --full baut jede Seite neu, nicht nur die geänderten;
+                                     --force lässt den Deploy an den Schutzprüfungen vorbei und lädt alles hoch
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte
@@ -721,6 +733,7 @@ cli:
   props_pinned_yes: "ja -- bleibt oben auf der Startseite"
   props_unlisted_yes: "ja -- über die eigene Adresse erreichbar, in keiner Liste, keinem Feed, keiner Sitemap und keiner Suche"
   props_announces_on_publish: "noch nicht -- geht mit der Veröffentlichung raus"
+  props_announces_nowhere: "nie -- diese Website kündigt nirgends an (kein mastodon: oder bluesky: in config/site.yml)"
   props_announces_never_unlisted: "nie -- ein ungelisteter Beitrag wird nicht angekündigt"
   props_not_announced: "nicht angekündigt"
   props_attributes_hint: "Typ, Schlagwörter und Serie ändert [e]; den Text selbst edit."
@@ -730,6 +743,8 @@ cli:
   props_actions_published_plain: "[u] zurück auf Entwurf  [c] anpinnen/lösen  [e] Eigenschaften  [r] Slug umbenennen  [a] alte Links  [x] löschen  [Enter] zurück: "
   props_action_versions: "[v] frühere Fassungen  "
   props_action_qr: "[q] QR fürs Handy  "
+  props_publish_confirm: "„%{slug}“ jetzt veröffentlichen? [j/N] "
+  props_publish_announces: "Es wird auch auf %{network} angekündigt -- eine Ankündigung lässt sich nicht zurücknehmen."
   versions_none: "Dieser Beitrag hat noch keine frühere Fassung -- bei jeder Bearbeitung wird eine abgelegt."
   versions_heading: "Was der Beitrag %{slug} vor den letzten Speicherungen sagte:"
   versions_media_note: "Nur der Text kommt zurück; Bilder werden nicht versioniert, eine alte Fassung des Beitrags kann also eines erwähnen, das er nicht mehr hat."

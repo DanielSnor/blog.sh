@@ -367,6 +367,15 @@ one site and nothing has to be merged afterwards. Each language's build
 sweeps only its own root, which is how two of them can share a tree
 without carrying each other away.
 
+Adding a language grows the build by a whole tree of its own, and taking
+one away shrinks it by as much -- which is exactly what the deploy's
+guards exist to stop. They know the difference: the deploy says which
+languages changed, leaves those trees out of its comparison and keeps
+holding the rest of the site to the usual limits. Nothing needs
+`--force`. And the files of a language the site stops publishing are
+deleted from the target by the next deploy, without `--prune` -- a
+language taken out of `site.locales` is taken off the web too.
+
 ### The address in each language
 
 A translated post is served under an address of its own:
