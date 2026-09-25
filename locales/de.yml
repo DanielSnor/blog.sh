@@ -737,6 +737,7 @@ cli:
   props_unlisted_yes: "ja -- über die eigene Adresse erreichbar, in keiner Liste, keinem Feed, keiner Sitemap und keiner Suche"
   props_announces_on_publish: "noch nicht -- geht mit der Veröffentlichung raus"
   props_announces_nowhere: "nie -- diese Website kündigt nirgends an (kein mastodon: oder bluesky: in config/site.yml)"
+  props_announces_no_secret: "derzeit nie -- %{value} in env.sh ist leer, also kündigt das Veröffentlichen nichts an"
   props_announces_never_unlisted: "nie -- ein ungelisteter Beitrag wird nicht angekündigt"
   props_not_announced: "nicht angekündigt"
   props_attributes_hint: "Typ, Schlagwörter und Serie ändert [e]; den Text selbst edit."

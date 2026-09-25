@@ -3,6 +3,7 @@
 require 'fileutils'
 require_relative '../path_safety'
 require_relative 'listing'
+require_relative '../i18n'
 
 module DeployBackend
   # Copies the build into a directory on this machine -- for a site served

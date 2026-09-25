@@ -392,6 +392,23 @@ module Publishing
     [title, blocks]
   end
 
+  # The env.sh value an announcement on this site's network needs, or nil
+  # when there is no network. Said by name where it is missing, because
+  # "announced on Mastodon" on a site with no token is a promise publish
+  # then cannot keep (newcomer trial, 25. 9. 2026).
+  NETWORK_SECRET = { mastodon: 'MASTODON_ACCESS_TOKEN', bluesky: 'BLUESKY_APP_PASSWORD' }.freeze
+
+  def network_secret
+    NETWORK_SECRET[SiteConfig.comment_network]
+  end
+
+  # Whether publishing a post here would announce it: a network, and the
+  # secret it needs.
+  def announces?
+    secret = network_secret
+    !secret.nil? && !ENV[secret].to_s.empty?
+  end
+
   def announce(post, year:)
     # An announcement is the one act that cannot be taken back, and without
     # a base URL it goes out carrying "/posts/2026/slug/" -- not a link at

@@ -746,6 +746,7 @@ cli:
   props_unlisted_yes: "yes -- reachable by its address, in no listing, feed, sitemap or search"
   props_announces_on_publish: "not yet -- goes out when the post publishes"
   props_announces_nowhere: "never -- this site announces nowhere (no mastodon: or bluesky: in config/site.yml)"
+  props_announces_no_secret: "never, as things stand -- %{value} in env.sh is empty, so publishing announces nothing"
   props_announces_never_unlisted: "never -- an unlisted post is not announced"
   props_not_announced: "not announced"
   props_attributes_hint: "Type, tags and the series are changed with [e]; the text itself with edit."

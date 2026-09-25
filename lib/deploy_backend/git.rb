@@ -3,6 +3,7 @@
 require 'fileutils'
 require 'tmpdir'
 require_relative 'listing'
+require_relative '../i18n'
 
 module DeployBackend
   # Pushes the build as a single-commit snapshot to a git branch --

@@ -725,6 +725,7 @@ cli:
   props_unlisted_yes: "ano — dostupný na své adrese, ale v žádném výpisu, feedu, sitemapě ani hledání"
   props_announces_on_publish: "zatím ne — odejde s publikací"
   props_announces_nowhere: "nikdy — tenhle web neoznamuje nikam (v config/site.yml není mastodon: ani bluesky:)"
+  props_announces_no_secret: "zatím nikdy — %{value} v env.sh je prázdný, takže publikace nic neoznámí"
   props_announces_never_unlisted: "neodejde — nezalistovaný příspěvek se neoznamuje"
   props_not_announced: "bez oznámení"
   props_attributes_hint: "Typ, štítky a sérii změníš přes [e]; samotný text přes ./blog.sh edit."

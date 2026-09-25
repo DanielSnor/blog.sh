@@ -3809,6 +3809,8 @@ def props_frame_lines(post, path, slug, year)
                                      t('cli.props_announces_nowhere')
                                    elsif Publishing.unlisted?(post)
                                      t('cli.props_announces_never_unlisted')
+                                   elsif !Publishing.announces?
+                                     t('cli.props_announces_no_secret', value: Publishing.network_secret)
                                    elsif draft?(post) then t('cli.props_announces_on_publish')
                                    else t('cli.props_not_announced')
                                    end)
@@ -3854,7 +3856,9 @@ end
 # cannot be undone said first when there is one.
 def props_confirm_publish(post, network_label)
   puts
-  puts Tui.paint(t('cli.props_publish_announces', network: network_label), :yellow) if network_label && !Publishing.unlisted?(post)
+  if network_label && Publishing.announces? && !Publishing.unlisted?(post)
+    puts Tui.paint(t('cli.props_publish_announces', network: network_label), :yellow)
+  end
   Tui.yes?(Tui.key_choice(t('cli.props_publish_confirm', slug: post['slug']), escape: 'n'))
 end
 
@@ -6502,6 +6506,13 @@ def cmd_rebuild(full: false, force: false)
   # the SystemExit is caught like every other cmd_* abort and only ends
   # this menu entry, not the session.
   exit RunLock::BUSY_EXIT if Publishing.stopped_on_busy_lock?
+
+  # And a failure is not a success. It left with 0 -- the reasoning was that
+  # the deploy-pending marker hands the job to the next scheduled run -- so a
+  # script, a cron wrapper or a CI step read "rebuild failed" as "done"
+  # (newcomer trial, 25. 9. 2026). The marker is still written; the status
+  # now says what the lines above it say.
+  exit 1
 end
 
 # --- empty ------------------------------------------------------------
@@ -7009,7 +7020,9 @@ begin
       # the site, and `rebuild --force` -- which the deploy's own guard
       # tells you to run -- was taken for nothing and stopped again on the
       # same guard: any word was accepted and all but --full ignored.
-      if ARGV.intersect?(%w[--help -h])
+      # `&`, not Array#intersect? -- that is Ruby 3.1, and Ubuntu 22.04's
+      # ruby-full is 3.0: every `rebuild` died on it (newcomer trial).
+      if (ARGV & %w[--help -h]).any?
         print_usage
         exit 0
       end
