@@ -4247,7 +4247,11 @@ removed = Output.prune_public
 BuildCache.save!
 
 puts
-puts t('build.summary', posts: posts.size, pages: page_count, dir: CONTENT_ROOT, tags: tags_map.size)
+# The posts this run gave a page of their own: on a language's branch that
+# is the translated ones, not every post its listings show -- "posts: 6642"
+# over /en/ with one post translated read as 6642 English pages.
+puts t('build.summary', posts: posts.count { |post| translated_here?(post) }, pages: page_count,
+                        dir: CONTENT_ROOT, tags: tags_map.size)
 # Said out loud, because a cache nobody can see is a cache nobody can
 # check. When a build takes longer than it should, this line is the first
 # thing to look at: a zero here after an ordinary publish means the cache

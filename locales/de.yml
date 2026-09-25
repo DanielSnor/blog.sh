@@ -383,6 +383,8 @@ cli:
   # formuliert, dass keine Sprache Pluralformen braucht; die Bezeichnung
   # des Backends und die Adresse des Ziels werden unverändert eingesetzt
   # -- so nennt sich das Werkzeug selbst, und so steht es in env.sh.
+  backend_label_local: "lokales Verzeichnis"
+  backend_label_git: "Git Pages"
   deploy_header: "Deploy der Website -> %{backend}: %{target}"
   deploy_public_missing: "❌ public.nosync/ existiert nicht -- baue zuerst (ruby build/build_blog.rb)."
   deploy_public_empty: "❌ Angehalten: public.nosync/ ist leer -- baue zuerst (ruby build/build_blog.rb)."

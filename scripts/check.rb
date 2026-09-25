@@ -239,6 +239,8 @@ puts unless tty
 # summary, and the ordinary run is read for what is WRONG. A site that
 # publishes one language has nothing to tabulate and is told so rather
 # than shown an empty table.
+SLUG_COLUMN_MAX = 48
+
 if languages
   matrix = Checker.language_matrix(Checker.posts_of_last_run || Checker.load_posts(ROOT), root: ROOT)
   if matrix['languages'].empty?
@@ -246,11 +248,20 @@ if languages
     puts
   else
     marks = { 'written' => '✅', 'title_only' => '◐', 'missing' => '·' }
+    # The slug column is as wide as the slugs, up to a limit: one imported
+    # slug of 187 characters made every row of a 6648-post archive 195 wide,
+    # so each wrapped and the marks sat a screen away from their slug
+    # (newcomer trial, 25. 9. 2026). A longer slug is cut, with an ellipsis;
+    # down a pipe the full slug is kept, for whatever reads it.
+    limit = $stdout.tty? ? SLUG_COLUMN_MAX : nil
     width = matrix['rows'].map { |row| row['slug'].length }.max.to_i
+    width = [width, limit].min if limit
     puts "#{' ' * width}  #{matrix['languages'].join('  ')}"
     matrix['rows'].each do |row|
       cells = matrix['languages'].map { |lang| marks.fetch(row['cells'][lang], '?').ljust(lang.length) }
-      puts "#{row['slug'].ljust(width)}  #{cells.join('  ')}"
+      slug = row['slug']
+      slug = "#{slug[0, width - 1]}…" if slug.length > width
+      puts "#{slug.ljust(width)}  #{cells.join('  ')}"
     end
     puts
     puts Tui.paint(I18n.t('check.languages_legend'), :dim)

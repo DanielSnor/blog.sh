@@ -843,6 +843,15 @@ git pull
 ruby build/build_blog.rb && ./scripts/deploy-web.sh
 ```
 
+`main` is the release branch: a clone on it gets each release by `git
+pull`. A clone that was put on a release tag (`git checkout v1.8`) is on
+no branch, and `git pull` refuses with "You are not currently on a
+branch"; move it to the next release by name instead:
+
+```bash
+git fetch --tags && git checkout v1.9
+```
+
 The first build after an upgrade may be a full one -- the engine's own
 fingerprint changed, so the record of the last build is thrown away --
 and it writes `.build_cache.json` in the installation directory, which

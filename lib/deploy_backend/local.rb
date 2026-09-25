@@ -12,7 +12,9 @@ module DeployBackend
     module_function
 
     def label
-      'local directory'
+      # Words, not a name like Surfer or rsync, so they speak the site's
+      # language: "Nasazení webu -> local directory" on a Czech site.
+      I18n.t('cli.backend_label_local')
     end
 
     def configured?

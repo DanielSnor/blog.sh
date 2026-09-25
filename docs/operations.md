@@ -196,7 +196,9 @@ archive browser keeps the size it opened with until you leave it.
 offers -- the capital letter in `[Y/n]`, the named `[Enter] …`, the row
 under the cursor. Esc leaves without doing anything: it never builds,
 deploys, opens the editor or writes a file, and in a question about a
-setting it keeps the current value -- typed questions included.
+setting it keeps the current value. A question you type an answer into
+is read a whole line at a time, so there it is Esc and then Enter: the
+current value stays, and "publish when?" is left without a date.
 
 The three question-and-answer wizards -- `./setup.sh`, `./style.sh` and
 `./import.sh` -- keep the section you are in and the answers already given

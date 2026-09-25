@@ -388,6 +388,8 @@ cli:
   # so no language needs plural forms; the backend's own label and the
   # target address are interpolated raw, because they are what the tool
   # calls itself and what has to be typed back into env.sh.
+  backend_label_local: "local directory"
+  backend_label_git: "git pages"
   deploy_header: "Deploy web -> %{backend}: %{target}"
   deploy_public_missing: "❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb)."
   deploy_public_empty: "❌ Stopped: public.nosync/ is empty -- run the build first (ruby build/build_blog.rb)."

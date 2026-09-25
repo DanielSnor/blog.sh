@@ -321,8 +321,8 @@ cli:
              link_title a link_description jsou slova na ní, a bez
              vlastního titulku se příspěvek jmenuje podle karty
 
-    Datum publikace se tady nenastavuje — [p]ublikovat vezme okamžik
-    publikace, [s]chedule se na budoucí datum/čas zeptá při plánování.
+    Datum publikace se tady nenastavuje — [p] publikovat vezme okamžik
+    publikace, [s] naplánovat se na budoucí datum a čas zeptá.
     Zpětné datum: dopiš si do hlavičky řádek date: — publish ho respektuje.
 
     OBSAH píšeš pod druhý ---. Jak na formátování:
@@ -371,6 +371,8 @@ cli:
   # tak, aby žádný jazyk nepotřeboval množná čísla; jméno backendu a
   # adresa cíle se dosazují tak, jak jsou — je to, jak si nástroj říká
   # sám, a co se píše zpátky do env.sh.
+  backend_label_local: "lokální adresář"
+  backend_label_git: "git pages"
   deploy_header: "Nasazení webu -> %{backend}: %{target}"
   deploy_public_missing: "❌ public.nosync/ neexistuje — nejdřív web sestav (ruby build/build_blog.rb)."
   deploy_public_empty: "❌ Zastaveno: public.nosync/ je prázdný — nejdřív web sestav (ruby build/build_blog.rb)."
@@ -725,7 +727,7 @@ cli:
   props_announces_nowhere: "nikdy — tenhle web neoznamuje nikam (v config/site.yml není mastodon: ani bluesky:)"
   props_announces_never_unlisted: "neodejde — nezalistovaný příspěvek se neoznamuje"
   props_not_announced: "bez oznámení"
-  props_attributes_hint: "Typ, štítky a sérii mění [e]; samotný text edit."
+  props_attributes_hint: "Typ, štítky a sérii změníš přes [e]; samotný text přes ./blog.sh edit."
   props_actions_draft: "[p] publikovat  [s] naplánovat  [e] vlastnosti  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
   props_actions_scheduled: "[p] publikovat hned  [s] přeplánovat  [n] zrušit plán  [e] vlastnosti  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
   props_actions_published: "[u] stáhnout z webu  [t] oznámit (%{network})  [c] připnout/odepnout  [e] vlastnosti  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
@@ -1533,7 +1535,7 @@ setup:
   target_missing: "%{dir} zatím neexistuje — první nasazení ho vytvoří. Jestli už tam být má, zkontroluj cestu."
 
   env_permissions: "%{path} drží živé přihlašovací údaje a čte ho jen tvůj účet (práva 600)."
-  next_steps: "Dál: ./blog.sh add napíše první příspěvek, ./blog.sh preview ukáže web na http://localhost:8000/ a ./style.sh nastaví paletu, obrázek hlavičky a postranní panel."
+  next_steps: "Dál: v ./blog.sh add napíšeš první příspěvek, ./blog.sh preview ukáže web na http://localhost:8000/ a ./style.sh nastaví paletu, obrázek hlavičky a postranní panel."
   doctor_clean: "✅ Nic dalšího nepotřebuje pozornost."
   doctor_rest: "Ještě by stálo za to"
   doctor_hint: "./blog.sh doctor tohle řekne kdykoli znovu a ty vzhledové věci vyřeší ./style.sh."

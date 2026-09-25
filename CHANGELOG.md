@@ -42,8 +42,9 @@ language and looks exactly as it did: no switcher, no alternates, the banner, th
 as 1.8 wrote them, so a skin keeps working untouched. Two things change underneath, on the next
 rebuild: every post's structured data names its language, and an embedded player carries its referrer
 policy. So the first deploy after the upgrade sends every post page once, and a listing only where it
-shows a player: on an archive of 6,600 posts, 6,647 of its 13,490 files. Past that, the two builds
-differ only in the stylesheet and one script, and report the same warnings.
+shows a player: on an archive of 6,600 posts, 6,650 of its 13,490 files. Past that, the two builds
+differ in the stylesheet and one script, the players inside the feed, the writing app's three files
+and the Czech cheat sheet, whose title is Czech now -- and report the same warnings.
 
 ### Added
 
@@ -93,7 +94,7 @@ differ only in the stylesheet and one script, and report the same warnings.
 - **FTP was nowhere in the docs.** The rclone backend has always reached a plain FTP host; `install.md` and `env.sh.example` now say how, and what to set when a shared host refuses "too many connections".
 - **`publish --json` fell over on a post whose date nobody can read.** Every other refusal on that route answers with an object and status 0; this one wrote prose to stderr and left with status 1, which a phone cannot tell apart from the engine having crashed.
 - **A podcast import put the show's cover over every episode.** Anchor and others repeat it in each item; only an episode's own artwork leads its post now. And an episode with no `<link>` -- most of them, on most hosts -- no longer carries an empty `post_url`.
-- **Esc did things.** At "Rebuild and deploy the site now? [Y/n]" -- after an import, and after an action in a post's properties -- it answered yes and deployed the site; at the post crossroads it opened the editor; in a typed question of `./setup.sh` or `./style.sh` it wrote an invisible control character into `site.yml` instead of keeping the current value. Esc now leaves without doing anything, everywhere. And `q` no longer closes a menu: it was a second Esc in the menus and nowhere else.
+- **Esc did things.** At "Rebuild and deploy the site now? [Y/n]" -- after an import, and after an action in a post's properties -- it answered yes and deployed the site; at the post crossroads it opened the editor; in a typed question of `./setup.sh` or `./style.sh` it wrote an invisible control character into `site.yml` instead of keeping the current value. Esc now leaves without doing anything, everywhere -- in a question you type into, followed by Enter, since the terminal reads a whole line there; "publish when?" included. And `q` no longer closes a menu: it was a second Esc in the menus and nowhere else.
 - **`./blog.sh rebuild --help` built and deployed the site.** Any word after `rebuild` was accepted and all but `--full` ignored -- `--force`, which the deploy's own guard tells you to run, included. `rebuild` now takes `--full` and `--force`, prints its usage for `--help` and refuses anything else; and a mistyped command says it does not exist and names the nearest one, instead of scrolling 43 lines of usage past.
 - **`add <file>` with `publish: yes` put a post out in one language** on a site that publishes several, where `publish --yes` refuses. It stays a draft now and says why, on the terminal and in the answer a phone reads.
 - **`[p]` in a draft's properties published -- and announced -- on one key.** It asks first, and says when an announcement will go out.
@@ -102,6 +103,7 @@ differ only in the stylesheet and one script, and report the same warnings.
 - **A slug pasted into a picker kept its first character**, and the picker waited for the rest. A menu longer than nine rows could not be picked past nine by number -- `./style.sh` has eleven sections -- and now takes two digits. A yes/no question that did not say its keys gets them, with the capital letter on the default, and its answer stays on screen above the next question like every typed one.
 - **`./setup.sh` in Czech kept an English introduction above every screen**, because it was said before the language was chosen; it is said again in the language picked. The template's examples -- "Your Name - personal web/log", "YOURSITE" -- are no longer the Enter answer for the site's name: while the name is still the example, the question wants one of your own. The introduction no longer contradicts itself about which files it writes, and a local deploy directory that does not exist yet is said to be made by the first deploy, as `doctor` says.
 - **Enter through Layout in `./style.sh` wrote the engine's own defaults into `site.yml`** and asked to save that as a change. A switch is written only when the answer changes what the site does.
+- **A two-language build spoke two languages on the terminal.** Each language's run said its summary and its warnings in that language, and counted every post its listings show as that language's -- "posts: 6642" over /en/ with one post translated. The build now says everything in the site's own language and counts the posts it gave a page. `check --languages` keeps its slug column to a readable width, the local and git deploy targets are named in the site's language, and three Czech sentences read as Czech.
 - **Cancelling a plan left the slot's date on the post.** The date the plan overwrote comes back -- and the post returns to the year that date names, when the slot had moved it out of it.
 
 ## 1.8 -- 2026-09-14

@@ -25,7 +25,7 @@ module DeployBackend
     module_function
 
     def label
-      'git pages'
+      I18n.t('cli.backend_label_git')
     end
 
     def configured?
