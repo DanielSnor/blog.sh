@@ -583,12 +583,18 @@ module Publishing
 
   # Says which of the two things happened and leaves the marker behind so
   # the next scheduled run picks the site back up.
+  #
+  # The two are told apart in the LAST line too. "The next scheduled run
+  # finishes it, once the other run is done" is true of a lock two runs
+  # met at; after a failed build or a guard's stop there is no other run,
+  # and no scheduled run can fix a typo in site.yml -- the newcomer trial
+  # (25. 9. 2026) read it after every failure and waited for nothing.
   def finish_later(step, status)
     busy = RunLock.busy_exit?(status)
     @stopped_on_busy_lock = busy
     warn I18n.t("cli.#{step}_#{busy ? 'busy' : 'failed'}")
     mark_deploy_pending
-    warn I18n.t('cli.deploy_pending_marked')
+    warn I18n.t(busy ? 'cli.deploy_pending_marked' : 'cli.deploy_pending_marked_failed')
   end
 
   # Whether the most recent rebuild_and_deploy came back false because

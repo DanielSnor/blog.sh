@@ -309,7 +309,11 @@ module Doctor
       findings << warn(t('locale_mismatch', locale: locale, lang: lang), t('locale_mismatch_fix'))
     end
 
-    findings << ok(t('identity_ok')) if findings.empty?
+    # Not "filled in" while any of it is still the example's own text: the
+    # placeholder warning names those keys a line above, and a tick right
+    # under it said the opposite (newcomer trial, 25. 9. 2026).
+    example = REQUIRED.any? { |path| PLACEHOLDERS.key?(path) && dig(data, *path) == PLACEHOLDERS[path] }
+    findings << ok(t('identity_ok')) if findings.empty? && !example
     findings
   end
 

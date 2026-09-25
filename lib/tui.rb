@@ -623,16 +623,35 @@ module Tui
         if !allow_text && key == '0'
           return nil
         elsif !allow_text && key =~ /\A[1-9]\z/
-          relative = key.to_i - 1
+          # Past nine rows a quick pick is two digits: the first waits a
+          # moment for a second. style.sh's menu has eleven sections and
+          # its hint said "1-9", leaving Analytics and Done unreachable by
+          # number (newcomer trial, 25. 9. 2026).
+          number = key
+          if [window, items.size - offset].min > 9 && key.to_i * 10 <= [window, items.size - offset].min
+            number += pending_input(wait: 0.6)[/\A\d/].to_s
+          end
+          relative = number.to_i - 1
           index = offset + relative
           return index if relative < window && index < items.size
         elsif allow_text && key =~ /\A[[:alnum:]]\z/
           # On its own line under the frame, which the frame leaves room
           # for: typing onto the last painted row would put the answer
           # inside the hint, and the frame would repaint over it.
-          print "\r\n\e[?25h#{text_prompt}#{key}"
-          rest = $stdin.gets.to_s.strip
-          line = "#{key}#{rest}"
+          # A pasted slug arrives all at once, and everything after its first
+          # character was already waiting in the raw queue -- where the
+          # closing Return is a bare \r that a cooked read never takes for
+          # the end of a line. The menu sat waiting after "p" for the rest
+          # of "partial-draft" (newcomer trial, 25. 9. 2026). So what is
+          # already there is read in raw mode first; a line that is complete
+          # needs nothing more, and only a line still being typed goes on
+          # to the cooked read.
+          waiting = pending_input
+          typed, newline, = waiting.partition(/[\r\n]/)
+          typed = "#{key}#{typed}"
+          print "\r\n\e[?25h#{text_prompt}#{typed}"
+          rest = newline.empty? ? $stdin.gets.to_s.strip : (puts; '')
+          line = "#{typed}#{rest}".strip
           # numeric_pick: false for menus whose rows carry no numbers and
           # whose VALUES can be numbers (tag names like "365") -- there a
           # typed number must mean the text, not a row.
@@ -660,6 +679,26 @@ module Tui
   # Two strings on one line, the second flush right -- the status line of
   # `browse` below, where the left half says what is being shown and the
   # right half says where in it you are.
+  # What has already arrived on stdin, read without waiting and without
+  # leaving raw mode -- the rest of a paste, typically. Empty when nothing
+  # is there, or when stdin is not a terminal to put in raw mode.
+  def pending_input(wait: 0.03)
+    buffer = +''
+    $stdin.raw do
+      first = true
+      while IO.select([$stdin], nil, nil, first ? wait : 0.03)
+        first = false
+        chunk = $stdin.read_nonblock(4096, exception: false)
+        break unless chunk.is_a?(String)
+
+        buffer << chunk
+      end
+    end
+    buffer.force_encoding(Encoding::UTF_8).scrub('')
+  rescue StandardError
+    ''
+  end
+
   def pad_between(left, right, width)
     gap = width - display_width(strip_ansi(left)) - display_width(strip_ansi(right))
     return truncate_to_width(left, width) if gap < 1

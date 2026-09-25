@@ -520,7 +520,7 @@ def ask_source
       # 13) the hint stops at 9 rather than promising keys that don't exist.
       index = Tui.menu(choices.map { |k, _| source_name(k) },
                        header: [t("import.group.#{key}"), ''],
-                       hint: t('import.menu_hint', count: [choices.size, 9].min))
+                       hint: t('import.menu_hint', count: choices.size))
       # Backing out of a group is not backing out of the import --
       # return to the group question instead of quitting the wizard.
       next if index.nil?

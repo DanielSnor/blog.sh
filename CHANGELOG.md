@@ -98,6 +98,8 @@ differ only in the stylesheet and one script, and report the same warnings.
 - **`add <file>` with `publish: yes` put a post out in one language** on a site that publishes several, where `publish --yes` refuses. It stays a draft now and says why, on the terminal and in the answer a phone reads.
 - **`[p]` in a draft's properties published -- and announced -- on one key.** It asks first, and says when an announcement will go out.
 - **A site that announces nowhere was told a draft's announcement "goes out when the post publishes".**
+- **After a failed build, the last line said to wait for "the other run" and the next scheduled one.** There was no other run, and no scheduled run fixes a config error; that line now belongs to a lock two runs met at, and a failure says to deal with the reason and rebuild. `doctor` no longer calls the debt "something was published", and no longer ticks the site's identity as filled in while it is still the example's text.
+- **A slug pasted into a picker kept its first character**, and the picker waited for the rest. A menu longer than nine rows could not be picked past nine by number -- `./style.sh` has eleven sections -- and now takes two digits. A yes/no question that did not say its keys gets them, with the capital letter on the default, and its answer stays on screen above the next question like every typed one.
 - **Cancelling a plan left the slot's date on the post.** The date the plan overwrote comes back -- and the post returns to the year that date names, when the slot had moved it out of it.
 
 ## 1.8 -- 2026-09-14
