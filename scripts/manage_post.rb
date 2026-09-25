@@ -3749,7 +3749,7 @@ def props_frame_lines(post, path, slug, year)
   if draft?(post)
     # Where the draft can be read. Until now only the dialog after a save
     # said so, which made editing the one way to look at a draft; the
-    # address is the draft's, whatever else this screen is for. [m] shows
+    # address is the draft's, whatever else this screen is for. [q] shows
     # it as a QR code for a phone -- too tall to stand in the frame.
     lines << props_line('preview', props_preview_url(post))
     # No created/date line for a plain draft, on purpose: a draft has no
@@ -3834,7 +3834,7 @@ def props_preview_url(post)
   draft_url(post)
 end
 
-# [m] only where a QR code can do its job: a draft, in a terminal, on a
+# [q] only where a QR code can do its job: a draft, in a terminal, on a
 # site with a real address. A phone that scans example.com or localhost
 # lands on a domain this author does not own, or on itself.
 def props_qr_available?(post)
@@ -3963,7 +3963,7 @@ def props_loop(slug, screen)
         props_run(screen) { props_properties(path, slug, raw: original_raw) }
       when 'v'
         props_run(screen) { props_versions(path, slug) }
-      when 'm'
+      when 'q'
         props_run(screen) { props_qr_available?(post) ? props_show_qr(post) : puts(props_unknown(prompt)) }
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
@@ -6438,7 +6438,8 @@ end
 
 def maybe_rebuild
   puts
-  if Tui.key_choice(t('cli.rebuild_prompt')) == 'n'
+  # Esc answers "no" -- see import.rb: as Enter's twin it deployed.
+  if Tui.key_choice(t('cli.rebuild_prompt'), escape: 'n') == 'n'
     puts
     return
   end
@@ -6613,7 +6614,9 @@ def post_crossroads(slug)
            when 1 then t('cli.edit_what_prompt_one', language: language_name(langs.first))
            else t('cli.edit_what_prompt_many')
            end
-  case Tui.key_choice(prompt)
+  # Enter edits, the offered default; Esc leaves. As Enter's twin it opened
+  # the editor on the one key people press to back out.
+  case Tui.key_choice(prompt, escape: :cancel)
   when '', 'e' then cmd_edit(slug)
   when 'v' then cmd_props(slug)
   when t('cli.translation_key')

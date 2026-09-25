@@ -738,7 +738,7 @@ cli:
   props_actions_published: "[u] unpublish  [t] announce (%{network})  [c] pin/unpin  [e] properties  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
   props_actions_published_plain: "[u] unpublish  [c] pin/unpin  [e] properties  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
   props_action_versions: "[v] earlier versions  "
-  props_action_qr: "[m] QR for a phone  "
+  props_action_qr: "[q] QR for a phone  "
   versions_none: "This post has no earlier versions yet -- one is kept each time it is edited."
   versions_heading: "What the post %{slug} said before its recent saves:"
   versions_media_note: "Only the text comes back; images are not versioned, so an old copy of the post may mention one it no longer has."

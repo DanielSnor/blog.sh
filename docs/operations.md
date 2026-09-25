@@ -179,7 +179,7 @@ say -- are published oldest first, in the order the queue was arranged in.
 The CLI adapts to where it runs. In an interactive terminal you get
 arrow-key menus (digits still quick-select, typing a slug still works),
 single-keypress answers without Enter, colored state markers and a
-**QR code of the draft preview URL** -- after a save, and on `[m]` in a
+**QR code of the draft preview URL** -- after a save, and on `[q]` in a
 draft's properties -- point your phone's camera at the screen instead of
 retyping a token. A menu longer than the terminal
 is tall scrolls, showing your position in the list next to the hint;
@@ -191,6 +191,12 @@ another copy on each keypress -- and not on the alternate screen, so the
 last screen and your scrollback survive. Resizing straightens a waiting
 menu, the queue or the properties screen on the spot; a picker or the
 archive browser keeps the size it opened with until you leave it.
+
+**Enter and Esc mean the same everywhere.** Enter takes what the question
+offers -- the capital letter in `[Y/n]`, the named `[Enter] …`, the row
+under the cursor. Esc leaves without doing anything: it never builds,
+deploys, opens the editor or writes a file, and in a question about a
+setting it keeps the current value -- typed questions included.
 
 The three question-and-answer wizards -- `./setup.sh`, `./style.sh` and
 `./import.sh` -- keep the section you are in and the answers already given
@@ -213,7 +219,7 @@ the announcement -- and offers the guarded actions:
   review the old addresses that redirect here, delete;
 - **draft**: publish, schedule (or reschedule, or cancel the schedule),
   rename the slug, delete -- and the screen names the draft's preview
-  address, with `[m]` for its QR code, so a draft can be read on a phone
+  address, with `[q]` for its QR code, so a draft can be read on a phone
   without opening it in the editor first;
 - **either**: `[e]` opens the post's properties -- which series it is in
   and which part of it, its tags, its type, and the three flags (out of

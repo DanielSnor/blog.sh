@@ -798,7 +798,9 @@ def run_import(adapter)
   @lost = result.interrupted || Array(result.respond_to?(:errors) ? result.errors : nil).any?
 
   puts
-  rebuild = Tui.key_choice(t('import.rebuild_prompt'))
+  # Esc answers "no". Enter takes the offered yes; Esc is the way out, and
+  # as Enter's twin it built and deployed the whole site.
+  rebuild = Tui.key_choice(t('import.rebuild_prompt'), escape: 'n')
   # Declining is where the import ends, so it owes the one trailing blank
   # line every command here ends with. Without it the last thing on screen
   # was the unfinished question itself -- and down a pipe the output ended

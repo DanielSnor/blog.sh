@@ -608,8 +608,11 @@ module Tui
       when :enter then return selected
       when :escape then return nil
       when String
-        # Without allow_text, single keys keep their shortcuts: q/0 cancel,
-        # 1-9 pick a visible row directly. With allow_text those characters
+        # Without allow_text, single keys keep their shortcuts: 0 cancels,
+        # 1-9 pick a visible row directly. Not q: Esc is the way out of
+        # every screen, and a second key for it here -- and nowhere else,
+        # not the browser, not the properties -- was a rule half kept
+        # (Daniel, 25. 9. 2026: q is not a second Esc). With allow_text those characters
         # have to be typeable -- slugs beginning with a digit (or q) were
         # impossible to enter, and the first keypress silently retargeted
         # to a visible row instead -- so every alphanumeric key starts a
@@ -617,7 +620,7 @@ module Tui
         # that row (the quick pick, one keystroke later), an empty line
         # cancels, anything else is the slug. Same contract as the piped,
         # non-interactive picker.
-        if !allow_text && %w[q 0].include?(key)
+        if !allow_text && key == '0'
           return nil
         elsif !allow_text && key =~ /\A[1-9]\z/
           relative = key.to_i - 1

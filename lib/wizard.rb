@@ -208,11 +208,26 @@ module Wizard
     answer = $stdin.gets
     raise Interrupt if answer.nil?
 
-    answer = answer.strip
     puts unless Tui.interactive?
-    value = answer.empty? ? current : answer
+    value = typed_answer(answer, current)
     self.record(label, value) if record && Tui.interactive?
     value
+  end
+
+  # A typed line as the answer to a question with a current value. The
+  # line is read cooked, so the keys a person presses to back out arrive as
+  # characters: Esc and Enter came back as "\e", and a site title was set
+  # to an invisible control character -- while the menu of the same wizard
+  # promises "Esc keep current". So Esc anywhere in the line keeps the
+  # current value (an arrow key is Esc followed by "[A", and is no answer
+  # either), and any other control character -- a Tab, a stray ^A -- is a
+  # space rather than a byte written into site.yml.
+  def typed_answer(raw, current)
+    line = raw.to_s
+    return current if line.include?("\e")
+
+    line = line.gsub(/[[:cntrl:]]+/, ' ').strip
+    line.empty? ? current : line
   end
 
   # The same, with a check that runs before the answer is accepted. The
@@ -270,9 +285,8 @@ module Wizard
       answer = $stdin.gets
       raise Interrupt if answer.nil?
 
-      answer = answer.strip
       puts
-      return answer.empty? ? current : answer
+      return typed_answer(answer, current)
     end
 
     return current unless confirm(t('edit_in_editor'))
