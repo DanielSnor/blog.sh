@@ -13,16 +13,11 @@ prints what an installation is running.
 
 ## 1.9.pre -- 2026-09-16
 
-The release about publishing in more than one language. A post keeps one date, one set of tags and
-one series, with a text per language written by `./blog.sh translate`; the site's own language keeps
-the root, every other one in `site.locales` gets its own, and one `rebuild` builds them all into a
-single tree. A post nobody has translated still shows, linking to the one copy that exists, and
-publishing one the site cannot show in every language is refused. Around it, the first hour: two
-people set 1.9 up from nothing and upgraded a 6,600-post site by the docs, and everything they
-tripped over is fixed. One thing to do, and only on Cloudron's Surfer: Surfer 7 signs in with the
-Cloudron username and an app password, `SURFER_USERNAME` and `SURFER_PASSWORD`, which can go in
-before the app updates. Nothing else to migrate; a site that names no `site.locales` looks as it did,
-though the first deploy sends every post page once, because each now names its language.
+The release about publishing in more than one language. A post keeps one set of metadata and a
+text per language, every language in `site.locales` beyond the site's own gets a root of its own,
+and one `rebuild` builds them all. Beside that, the first hour: everything two people setting
+blog.sh up from scratch tripped over is fixed. One thing to do, on Cloudron's Surfer only: Surfer 7
+signs in with `SURFER_USERNAME` and an app password in `SURFER_PASSWORD`.
 
 ### Added
 
