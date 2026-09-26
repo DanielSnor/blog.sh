@@ -379,6 +379,7 @@ cli:
   local_preview_hint: "The site goes nowhere yet -- run ./blog.sh preview and open %{url} (port 8000 by default)."
   template_body_placeholder: "First paragraph's text."
   deploy_backend_incomplete: "The %{name} deploy backend is not configured -- skipping the upload. The build in public.nosync/ is complete; view it with ./blog.sh preview. To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example)."
+  deploy_target_no_user: "DEPLOY_TARGET_DIR is %{dir}, but there is no user \"%{user}\" on this machine, so ~%{user} leads nowhere. Was it meant to be ~/ (your home directory)?"
   deploy_target_relative: "DEPLOY_TARGET_DIR is %{dir}, which is a relative path -- the whole site would go into a directory of that name inside the installation. env.sh.example and docs/install.md both show an absolute one (/var/www/mysite)."
   deploy_args_fix: "That line in env.sh most likely has an unmatched quote in it. Switches are written into it as plain text in quotes, for example \"-P 2022 -i /home/dan/.ssh/key\"."
   deploy_guard_shrink_files: "❌ Stopped: public.nosync/ has %{have} files, but %{expected} were expected from %{source}.\n   That is a %{percent}% drop -- looks like a broken build.\n   Check the build output. If the drop is expected (you deleted a lot of posts), run again with --force."
@@ -431,6 +432,7 @@ cli:
   announce_no_base_url: "⚠️  Not announcing: site.base_url is not set, so the toot would carry a bare path instead of a link -- and that cannot be taken back. Set site.base_url in config/site.yml (or SITE_BASE_URL in env.sh) and run ./blog.sh toot."
   surfer_refused_token: "Surfer at %{url} refused the access token (HTTP %{code}). Surfer 7 no longer takes tokens: create an app password in your Cloudron profile (Profile -> App Passwords) and put SURFER_USERNAME (your Cloudron username) and SURFER_PASSWORD (that password) in env.sh. SURFER_TOKEN can go then."
   surfer_password_unsupported: "Surfer at %{url} does not understand the app password (HTTP %{code}) -- it runs a version older than 7, which knows only the access token. Put SURFER_TOKEN back in env.sh (the password can stay: with the token beside it, it is used by itself once the app moves to version 7)."
+  surfer_refused_token_old: "Surfer at %{url} runs a version older than 7 (it does not know app passwords) and refused the access token too (HTTP %{code}). Check SURFER_TOKEN in env.sh."
   surfer_refused_password: "Surfer at %{url} refused the username and password (HTTP %{code}). Check SURFER_USERNAME (the Cloudron username, not the e-mail) and SURFER_PASSWORD in env.sh -- an app password from your Cloudron profile (Profile -> App Passwords), not the password you sign in to Cloudron with."
   surfer_fell_back: "Surfer did not take the app password (HTTP %{code}) -- it runs a version older than 7; going on with the token (SURFER_TOKEN)."
   surfer_refused_waits: "The built site waits in public.nosync/; once that is fixed, ./blog.sh rebuild uploads it."
@@ -1102,7 +1104,7 @@ doctor:
   site_yml_unreadable_fix: "Check the file's owner and permissions (ls -l config/site.yml). Usually: chmod 644 config/site.yml — and if the file is owned by root after a wizard ran under sudo, chown it too."
   site_yml_open_quote_fix: "Line %{line} starts a value with a quote that does not close on that line -- YAML then reads the next lines as more of that value and reports the error somewhere else. Close the quote at the end of the value."
   site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. If that line looks fine, the cause is elsewhere -- most often a section header commented out with its keys left behind."
-  language_yml_template: "config/%{file}: %{keys} is still the text of the example, config/site.lang.yml.example -- the pages in that language show it."
+  language_yml_template: "config/%{file}: the text of the example, config/site.lang.yml.example, is still there for %{keys} -- the pages in that language show it."
   language_yml_template_fix: "Rewrite them in that language, or delete them from the file: whatever it leaves out comes from config/site.yml."
   language_yml_syntax: "config/%{file} is not valid YAML: %{message} -- and the build stops on it, in every language."
 
@@ -1512,6 +1514,7 @@ setup:
 
   q_base_url: "Site address"
   h_base_url: "The address the site will be seen at, e.g. https://mysite.com -- no trailing slash. RSS, the sitemap and share previews are built from it; written to config/site.yml and env.sh at once."
+  e_target_no_user: "There is no user \"%{user}\" on this machine, so ~%{user} leads nowhere. Was it meant to be ~/ (your home directory)?"
   e_base_url_required: "The site needs its own address -- %{example} was only the template's example. Only trying it out on this machine? http://localhost:8000 will do, and a rerun of ./setup.sh changes it later."
   e_base_url: "That is not a URL -- it has to start with http:// or https:// and carry a host name."
   e_base_url_slash: "Drop the trailing slash, or generated links end up with two."

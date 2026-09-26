@@ -125,7 +125,9 @@ module SiteConfig
     require_relative 'config_lang'
     require_relative 'yaml_compat'
     require_relative 'i18n'
-    lang = ConfigLang.of(path)
+    # The site's language lives in site.yml, also when the file that broke
+    # is a site.<lang>.yml, which has no lang: of its own (fleet, 26. 9.).
+    lang = ConfigLang.of(File.join(File.dirname(path), 'site.yml'))
     I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)
     open_quote = YamlCompat.open_quote_line(File.read(path, encoding: 'utf-8'))
     fix = if open_quote

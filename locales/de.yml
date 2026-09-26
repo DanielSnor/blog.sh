@@ -374,6 +374,7 @@ cli:
   local_preview_hint: "Die Website geht noch nirgendwohin -- starte ./blog.sh preview und öffne %{url} (Standardport 8000)."
   template_body_placeholder: "Text des ersten Absatzes."
   deploy_backend_incomplete: "Das Deploy-Backend %{name} ist nicht konfiguriert -- der Upload wird übersprungen. Der Build in public.nosync/ ist vollständig; ./blog.sh preview zeigt ihn. Setze DEPLOY_BACKEND und seine Werte in env.sh (siehe env.sh.example), um wirklich zu deployen."
+  deploy_target_no_user: "DEPLOY_TARGET_DIR ist %{dir}, aber einen Benutzer „%{user}“ gibt es auf diesem Rechner nicht, also führt ~%{user} nirgendwohin. War ~/ gemeint (dein Home-Verzeichnis)?"
   deploy_target_relative: "DEPLOY_TARGET_DIR ist %{dir}, ein relativer Pfad -- die ganze Website landete in einem Verzeichnis dieses Namens innerhalb der Installation. env.sh.example und docs/install.md zeigen beide einen absoluten (/var/www/meineseite)."
   deploy_args_fix: "In dieser Zeile in env.sh fehlt vermutlich ein schließendes Anführungszeichen. Schalter werden dort als normaler Text in Anführungszeichen geschrieben, zum Beispiel \"-P 2022 -i /home/dan/.ssh/key\"."
   deploy_guard_shrink_files: "❌ Angehalten: public.nosync/ hat %{have} Dateien, laut %{source} sollten es %{expected} sein.\n   Das ist ein Rückgang um %{percent} % -- das sieht nach einem kaputten Build aus.\n   Sieh dir die Build-Ausgabe an. Wenn der Rückgang so gewollt ist (viele Beiträge gelöscht), führe es erneut mit --force aus."
@@ -426,6 +427,7 @@ cli:
   announce_no_base_url: "⚠️  Keine Ankündigung: site.base_url ist nicht gesetzt, der Beitrag trüge also einen nackten Pfad statt eines Links -- und das lässt sich nicht zurücknehmen. Setze site.base_url in config/site.yml (oder SITE_BASE_URL in env.sh) und führe ./blog.sh toot aus."
   surfer_refused_token: "Surfer unter %{url} hat den Zugriffstoken abgelehnt (HTTP %{code}). Surfer 7 nimmt keine Tokens mehr: leg in deinem Cloudron-Profil ein App-Passwort an (Profile -> App Passwords) und trag SURFER_USERNAME (dein Cloudron-Benutzername) und SURFER_PASSWORD (dieses Passwort) in env.sh ein. SURFER_TOKEN kann dann weg."
   surfer_password_unsupported: "Surfer unter %{url} versteht das App-Passwort nicht (HTTP %{code}) -- dort läuft eine Version vor 7, die nur den Zugriffstoken kennt. Trag SURFER_TOKEN wieder in env.sh ein (das Passwort kann bleiben: mit dem Token daneben wird es von selbst genommen, sobald die App auf Version 7 geht)."
+  surfer_refused_token_old: "Surfer unter %{url} läuft in einer Version vor 7 (kennt keine App-Passwörter) und hat auch den Zugriffstoken abgelehnt (HTTP %{code}). Prüf SURFER_TOKEN in env.sh."
   surfer_refused_password: "Surfer unter %{url} hat Benutzername und Passwort abgelehnt (HTTP %{code}). Prüf SURFER_USERNAME (der Cloudron-Benutzername, nicht die E-Mail) und SURFER_PASSWORD in env.sh -- ein App-Passwort aus deinem Cloudron-Profil (Profile -> App Passwords), nicht das Passwort, mit dem du dich bei Cloudron anmeldest."
   surfer_fell_back: "Surfer hat das App-Passwort nicht angenommen (HTTP %{code}) -- er läuft in einer Version vor 7; weiter mit dem Token (SURFER_TOKEN)."
   surfer_refused_waits: "Die gebaute Website wartet in public.nosync/; sobald das behoben ist, lädt ./blog.sh rebuild sie hoch."
@@ -1084,7 +1086,7 @@ doctor:
   site_yml_unreadable_fix: "Prüfe Eigentümer und Rechte der Datei (ls -l config/site.yml). Meist hilft: chmod 644 config/site.yml — und wenn die Datei nach einem mit sudo gestarteten Assistenten root gehört, auch chown."
   site_yml_open_quote_fix: "In Zeile %{line} beginnt ein Wert mit einem Anführungszeichen, das in dieser Zeile nicht geschlossen wird -- YAML liest die folgenden Zeilen dann als Fortsetzung dieses Werts und meldet den Fehler an anderer Stelle. Schließ das Anführungszeichen am Ende des Werts."
   site_yml_syntax_fix: "Sieh dir Zeile %{line}, Spalte %{column} an. Fast immer ist es die Einrückung (nur Leerzeichen, nie Tabulatoren), ein fehlendes Anführungszeichen oder ein Doppelpunkt in einem Wert ohne Anführungszeichen. Wenn diese Zeile in Ordnung aussieht, liegt die Ursache anderswo -- meist ein auskommentierter Abschnittskopf, dessen Schlüssel stehen geblieben sind."
-  language_yml_template: "config/%{file}: %{keys} ist noch der Text der Vorlage config/site.lang.yml.example -- die Seiten in dieser Sprache zeigen ihn."
+  language_yml_template: "config/%{file}: bei %{keys} steht noch der Text der Vorlage config/site.lang.yml.example -- die Seiten in dieser Sprache zeigen ihn."
   language_yml_template_fix: "Schreib sie in dieser Sprache neu oder lösche sie aus der Datei: was dort fehlt, kommt aus config/site.yml."
   language_yml_syntax: "config/%{file} ist kein gültiges YAML: %{message} -- und der Build hält daran an, in jeder Sprache."
 
@@ -1495,6 +1497,7 @@ setup:
 
   q_base_url: "Adresse der Website"
   h_base_url: "Die Adresse, unter der die Website zu sehen ist, z. B. https://meineseite.de -- ohne Schrägstrich am Ende. RSS, Sitemap und Vorschauen werden daraus gebaut; geht zugleich in config/site.yml und env.sh."
+  e_target_no_user: "Einen Benutzer „%{user}“ gibt es auf diesem Rechner nicht, also führt ~%{user} nirgendwohin. War ~/ gemeint (dein Home-Verzeichnis)?"
   e_base_url_required: "Die Website braucht ihre eigene Adresse -- %{example} war nur das Beispiel der Vorlage. Nur zum Ausprobieren auf diesem Rechner? http://localhost:8000 reicht, und ein erneutes ./setup.sh ändert sie später."
   e_base_url: "Das ist keine URL -- sie muss mit http:// oder https:// beginnen und einen Hostnamen enthalten."
   e_base_url_slash: "Entferne den Schrägstrich am Ende, sonst stehen in erzeugten Links zwei."

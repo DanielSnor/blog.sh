@@ -275,7 +275,11 @@ module Doctor
     rescue StandardError
       nil
     end
-    findings + stray_language_files(files, data) + template_language_texts(root, parsed)
+    stray = stray_language_files(files, data)
+    # A stray file is not read at all, so what text it holds shows nowhere:
+    # "nothing reads it" beside "its pages show it" said both (fleet, 26. 9.).
+    published = parsed.reject { |path, _| stray.any? { |finding| finding.text.include?("config/#{File.basename(path)}") } }
+    findings + stray + template_language_texts(root, published)
   end
 
   # The build's own rule: a file for every published language but the
@@ -1493,6 +1497,9 @@ module Doctor
   def check_online_deploy(root, data = nil)
     findings = online_deploy_target(root, data)
     return findings unless deploy_backend_name.to_s.then { |n| n.empty? || n == 'surfer' } && ::Surfer.fell_back?
+    # Only when the token then got in: beside "the token was refused" a
+    # note saying "nothing to do" contradicted it (fleet, 26. 9. 2026).
+    return findings if findings.any?(&:error?)
 
     findings + [warn(t('surfer_fell_back'), t('surfer_fell_back_fix'))]
   end

@@ -31,9 +31,21 @@ module DeployBackend
     # leaves the tilde alone, and #session expands it -- the newcomer
     # trial's ~/fresh-www was refused by doctor while the deploy found it.
     def problem
-      return nil if dir.empty? || dir.start_with?('/', '~')
+      return nil if dir.empty? || dir.start_with?('/')
+      return unknown_user(dir) if dir.start_with?('~')
 
       I18n.t('cli.deploy_target_relative', dir: dir)
+    end
+
+    # ~name/... expands to name's home -- and to an ArgumentError backtrace
+    # from the middle of a deploy when there is no such user, which is what
+    # a typo'd ~www/blog for ~/www/blog is (fleet, 26. 9. 2026). Said here
+    # instead, where doctor and the deploy's own check ask first.
+    def unknown_user(path)
+      File.expand_path(path)
+      nil
+    rescue ArgumentError
+      I18n.t('cli.deploy_target_no_user', dir: path, user: path[%r{\A~([^/]*)}, 1])
     end
 
     # The sentence above says what to write instead; the generic advice

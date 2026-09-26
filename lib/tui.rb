@@ -886,6 +886,24 @@ module Tui
   # 12-row window lost "Esc back" and the screen became a trap. What gets
   # dropped instead is the end of the middle, which is a list the cursor can
   # still scroll through.
+  # A row the frame must not cut: an address to be copied or clicked. It
+  # is printed whole and the terminal wraps it softly, so it stays ONE
+  # line to select -- folded by hand into indented pieces, or truncated,
+  # it could be neither copied nor opened (fleet, 26. 9. 2026). The frame
+  # counts the physical rows it takes, which is what keeps the repaint
+  # from the top honest.
+  Whole = Struct.new(:text) do
+    def to_s
+      text.to_s
+    end
+  end
+
+  def physical_rows(line, width)
+    return 1 unless line.is_a?(Whole) && width.positive?
+
+    [(display_width(sanitize_row(line.text)) + width - 1) / width, 1].max
+  end
+
   def frame(lines, keep_last: 0)
     width = term_width
     height = term_height
@@ -895,7 +913,17 @@ module Tui
              tail = lines.last([keep_last, height].min)
              lines.first(height - tail.size) + tail
            end
-    body = rows.map { |line| "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}" }
+    # A whole row that wraps takes more than one row of the window; drop
+    # rows from above the kept tail until the frame fits again.
+    tail_size = [keep_last, rows.size].min
+    while rows.sum { |line| physical_rows(line, width) } > height && rows.size > tail_size
+      rows.delete_at(rows.size - tail_size - 1)
+    end
+    body = rows.map do |line|
+      next "\e[2K#{sanitize_row(line.text)}\e[K" if line.is_a?(Whole)
+
+      "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}"
+    end
     print "\e[H#{body.join("\r\n")}\e[J"
   end
 

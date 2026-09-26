@@ -660,17 +660,36 @@ def ask_deploy(env, _current)
       puts unless Tui.interactive? # see the note by the Mastodon token above
       acknowledge_secret(value)
       puts
+    elsif name == 'DEPLOY_TARGET_DIR'
+      value = ask_target_dir(name)
     else
       value = ask(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}"))
-      # Written out whole: env.sh quotes the value, so the shell never
-      # expands the tilde, and a path that means the same thing to every
-      # tool that reads it is the one that cannot surprise.
-      value = File.expand_path(value) if name == 'DEPLOY_TARGET_DIR' && value.to_s.start_with?('~')
     end
     env.set(name, value) unless value.to_s.empty?
   end
 
   check_local_target(env) if chosen == 'local'
+end
+
+# Written out whole: env.sh quotes the value, so the shell never expands
+# the tilde, and a path that means the same thing to every tool that reads
+# it is the one that cannot surprise. A ~name with no such user is asked
+# again rather than raised: the ArgumentError took every answer of the
+# interview with it (fleet, 26. 9. 2026).
+def ask_target_dir(name)
+  value = ask_valid(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}")) do |answer|
+    next nil unless answer.start_with?('~')
+
+    begin
+      File.expand_path(answer)
+      nil
+    rescue ArgumentError
+      t('e_target_no_user', user: answer[%r{\A~([^/]*)}, 1])
+    end
+  end
+  value.to_s.start_with?('~') ? File.expand_path(value) : value
+rescue ArgumentError
+  value
 end
 
 # The one target that can be checked without the network, and worth
@@ -687,7 +706,14 @@ def check_local_target(env)
   # The same expansion the backend does (DeployBackend::Local#session), or
   # a path typed with a leading ~ -- the ordinary way to write one -- was
   # called missing by the wizard and then found by the deploy.
-  if File.directory?(File.expand_path(dir))
+  there = begin
+    File.directory?(File.expand_path(dir))
+  rescue ArgumentError # ~name with no such user, kept on Enter
+    say("⚠️  #{t('e_target_no_user', user: dir[%r{\A~([^/]*)}, 1])}", :yellow)
+    say('')
+    return
+  end
+  if there
     say(t('target_ok', dir: dir), :green)
   else
     say("⚠️  #{t('target_missing', dir: dir)}", :yellow)

@@ -146,9 +146,13 @@ def puts_local_preview_hint(site_path)
   puts Tui.paint(t(key, url: "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}"), :dim)
 end
 
+# An unset DEPLOY_BACKEND is Surfer, as DeployBackend.pick and doctor read
+# it -- looked up by name it was nothing, and a publish that had just
+# uploaded said the site went nowhere (fleet, 26. 9. 2026).
 def deploys_somewhere?
   require_relative '../lib/deploy_backend'
-  backend = DeployBackend::BACKENDS[ENV['DEPLOY_BACKEND'].to_s]
+  name = ENV['DEPLOY_BACKEND'].to_s
+  backend = name.empty? ? DeployBackend::Surfer : DeployBackend::BACKENDS[name]
   !backend.nil? && backend.configured?
 end
 
@@ -3748,7 +3752,7 @@ PROPS_VALUE_COLUMN = 15
 
 def props_fold(lines, width)
   lines.flat_map do |line|
-    next [line] if line.include?("\e") || Tui.display_width(line) <= width || width <= PROPS_VALUE_COLUMN + 10
+    next [line] if line.is_a?(Tui::Whole) || line.include?("\e") || Tui.display_width(line) <= width || width <= PROPS_VALUE_COLUMN + 10
     # A label longer than its column pushed the value right; cut there
     # and the label would be split instead.
     next [line] unless line[PROPS_VALUE_COLUMN - 1] == ' '
@@ -3807,7 +3811,10 @@ def props_frame_lines(post, path, slug, year)
     # said so, which made editing the one way to look at a draft; the
     # address is the draft's, whatever else this screen is for. [q] shows
     # it as a QR code for a phone -- too tall to stand in the frame.
-    lines << props_line('preview', props_preview_url(post))
+    # Whole: the one row here that is meant to be opened, so the frame
+    # lets the terminal wrap it instead of cutting or folding it.
+    preview = props_line('preview', props_preview_url(post))
+    lines << (preview && Tui::Whole.new(preview))
     # No created/date line for a plain draft, on purpose: a draft has no
     # time -- its date is set by publishing or scheduling, and showing
     # anything earlier would suggest it means something.
@@ -4857,9 +4864,7 @@ def language_state(post, lang)
   entry = post['translations'].is_a?(Hash) ? post['translations'][lang.to_s] : nil
   return :none unless entry.is_a?(Hash) && entry.slice(*Translations::TEXT_KEYS).compact.any?
 
-  # A post with no text of its own is translated by its title -- the same
-  # answer `check --languages` gives.
-  Array(entry['content']).empty? && !Array(post['content']).empty? ? :started : :written
+  Array(entry['content']).empty? ? :started : :written
 end
 
 # The wizard's half of the missing-languages question: write one now,

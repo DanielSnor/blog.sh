@@ -46,6 +46,12 @@ class Unreachable < StandardError; end
 # A directory listing that came back as anything but the API's JSON.
 class ListFailed < StandardError; end
 
+# The API's own "no such directory": a JSON 404 naming ENOENT (Surfer 7 on
+# sean.cz, 26. 9. 2026). A missing SURFER_REMOTE_DIR, which the first
+# deploy creates -- not a target that "did not answer". An HTML 404 is the
+# site itself answering a path that is not the API, and stays a failure.
+class ListMissing < ListFailed; end
+
 # Surfer said no to the credentials (401/403). Raised from the first file
 # rather than counted: every other file would get the same answer, and a
 # deploy of 6,000 files printed 6,000 lines of HTTP 401 before it said
@@ -84,25 +90,40 @@ module_function
     !ENV['SURFER_TOKEN'].to_s.empty?
   end
 
-  # What an older Surfer answers a password with. 500 belongs here only
-  # until the password has worked once: after that a 500 is the server's
-  # own trouble, not the sign-in's.
-  PASSWORD_NOT_TAKEN = [401, 403, 500].freeze
+  # Surfer 6 does not know Basic auth: it crashes on it, before comparing
+  # anything, with this 500 (blogsh.app, 26. 9. 2026). That body is the
+  # only thing that says "older than 7". A 401 or 403 to a password is a
+  # password refused -- a typo in it, with a token left beside it for the
+  # move, used to be read as an old Surfer, and the run then asked for the
+  # SURFER_PASSWORD that was already there (fleet, 26. 9. 2026). Any other
+  # 500 is the server's own trouble and counts against one file, as it
+  # always did.
+  def old_surfer_answer?(response)
+    response.code.to_i == 500 && response.body.to_s.include?('accessToken')
+  end
 
-  # Called with every response. true when the request is to be sent again
-  # -- the password was not taken and a token stands behind it.
-  def switch_to_token?(code)
-    return false unless sign_in == :password && !@password_worked
-
-    if code.to_i.between?(200, 299) || code.to_i == 404
-      @password_worked = true
+  # Called with every response. true when the request is to be sent again:
+  # an old Surfer answered the password and a token stands behind it.
+  def switch_to_token?(response)
+    return false if @signed_in
+    if response.code.to_i.between?(200, 299) || response.code.to_i == 404
+      @signed_in = true
       return false
     end
-    return false unless PASSWORD_NOT_TAKEN.include?(code.to_i) && token?
+    return false unless sign_in == :password && old_surfer_answer?(response) && token?
 
     @on_token = true
     @fell_back = true
     true
+  end
+
+  # The run cannot go on: the sign-in itself was refused, before anything
+  # it asked for was let through. After that, a 401 or 403 is about one
+  # path (a proxy rule, a permission), and counts against that file only.
+  def refused?(response)
+    return false if @signed_in
+
+    [401, 403].include?(response.code.to_i) || (sign_in == :password && old_surfer_answer?(response))
   end
 
   # Whether this run went on with the token, once -- said by whoever
@@ -112,22 +133,12 @@ module_function
   end
 
   def reset_sign_in
-    @on_token = @password_worked = @fell_back = false
-  end
-
-  # A password with no token to fall back on, refused -- 500 included, which
-  # is how Surfer 6 refuses it.
-  def password_refused?(code)
-    sign_in == :password && !@password_worked && PASSWORD_NOT_TAKEN.include?(code.to_i)
+    @on_token = @signed_in = @fell_back = false
   end
 
   def authorize(request)
     request.basic_auth(ENV['SURFER_USERNAME'].to_s, ENV['SURFER_PASSWORD'].to_s) if sign_in == :password
     request
-  end
-
-  def refused?(code)
-    [401, 403].include?(code.to_i)
   end
 
   # Opens one connection and yields a Session (see below) to the block. The
@@ -168,6 +179,7 @@ module_function
     require_relative 'i18n'
     key = if sign_in == :password && code.to_i == 500 then 'cli.surfer_password_unsupported'
           elsif sign_in == :password then 'cli.surfer_refused_password'
+          elsif fell_back? then 'cli.surfer_refused_token_old'
           else 'cli.surfer_refused_token'
           end
     I18n.t(key, url: ENV['SURFER_URL'].to_s.chomp('/'), code: code)
@@ -204,7 +216,7 @@ module_function
 
       remote = Surfer.remote_path(path, remote_name)
       resp = signed_request(say) { build_upload(remote, path) }
-      raise Unauthorized, "HTTP #{resp.code}" if Surfer.refused?(resp.code) || Surfer.password_refused?(resp.code)
+      raise Unauthorized, "HTTP #{resp.code}" if Surfer.refused?(resp)
 
       ok = resp.code.to_i.between?(200, 299)
       say.call("  #{ok ? '✅' : '❌'} upload -> #{ENV['SURFER_URL'].to_s.chomp('/')}/#{remote} (HTTP #{resp.code})")
@@ -225,7 +237,7 @@ module_function
       resp = signed_request(say) { build_delete(remote) }
       code = resp.code.to_i
       return :missing if code == 404
-      raise Unauthorized, "HTTP #{code}" if Surfer.refused?(code) || Surfer.password_refused?(code)
+      raise Unauthorized, "HTTP #{code}" if Surfer.refused?(resp)
 
       ok = code.between?(200, 299)
       say.call("  #{ok ? '🗑️ ' : '❌'} deleted -> #{remote} (HTTP #{resp.code})")
@@ -250,12 +262,13 @@ module_function
       @http.max_retries = 0 if @http.respond_to?(:max_retries=)
       resp = begin
         r = @http.request(build_list(remote))
-        Surfer.switch_to_token?(r.code) ? @http.request(build_list(remote)) : r
+        Surfer.switch_to_token?(r) ? @http.request(build_list(remote)) : r
       rescue Net::ReadTimeout
         raise ListFailed, I18n.t('doctor.deploy_target_timeout', seconds: @http.read_timeout.to_i)
       end
       code = resp.code.to_i
-      raise Unauthorized, Surfer.refusal_sentence(code) if Surfer.refused?(code) || Surfer.password_refused?(code)
+      raise Unauthorized, Surfer.refusal_sentence(code) if Surfer.refused?(resp)
+      raise ListMissing, remote if code == 404 && resp['content-type'].to_s.include?('json') && resp.body.to_s.include?('ENOENT')
       raise ListFailed, "HTTP #{code}" unless code.between?(200, 299)
 
       entries = JSON.parse(resp.body.to_s)['entries']
@@ -281,7 +294,7 @@ module_function
     # a token, sent once more with the token -- and said, once, in the log.
     def signed_request(say, &build)
       resp = send_request(&build)
-      return resp unless Surfer.switch_to_token?(resp.code)
+      return resp unless Surfer.switch_to_token?(resp)
 
       require_relative 'i18n'
       say.call("  ℹ️  #{I18n.t('cli.surfer_fell_back', code: resp.code)}")

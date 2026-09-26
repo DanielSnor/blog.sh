@@ -1496,17 +1496,19 @@ module Checker
     rows = posts.map do |post|
       # The own language is the post itself, text or no text: a photo
       # imported from Tumblr has none, and it showed as half-written in
-      # the language it was published in (second trial, 25. 9. 2026). A
-      # translation of such a post is whole with its title, since there is
-      # nothing else to translate.
-      wordless = Array(post['content']).empty?
+      # the language it was published in (second trial, 25. 9. 2026).
+      # A translation is judged as Translations.written? judges it -- with
+      # a body -- even for such a post: the build and publish's guard ask
+      # that question, and a ✅ here over a page the build does not make
+      # was a promise nothing kept (fleet, 26. 9. 2026; Daniel: a title
+      # alone is not a translation).
       cells = langs.to_h do |lang|
         next [lang, 'written'] if lang == own
 
         entry = post['translations'].is_a?(Hash) ? post['translations'][lang] : nil
         state = if !entry.is_a?(Hash) || entry.slice(*Translations::TEXT_KEYS).compact.empty?
                   'missing'
-                elsif Array(entry['content']).empty? && !wordless
+                elsif Array(entry['content']).empty?
                   'title_only'
                 else
                   'written'

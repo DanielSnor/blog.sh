@@ -38,6 +38,8 @@ module DeployBackend
     # to (SURFER_REMOTE_DIR, or the whole Surfer).
     def list_root
       ::Surfer.session(read_timeout: Listing::TIMEOUT) { |s| s.list(ENV['SURFER_REMOTE_DIR'].to_s) }
+    rescue ::Surfer::ListMissing => e
+      raise Listing::Missing, e.message
     rescue ::Surfer::Unreachable, ::Surfer::ListFailed => e
       raise Listing::Failed, e.message
     end
