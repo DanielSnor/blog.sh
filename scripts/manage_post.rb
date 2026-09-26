@@ -172,8 +172,11 @@ FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt].freeze
 # What an edit decides: every key the editor shows in the header, and the
 # few the save computes on purpose (the address history, the state). Any
 # other key the post carries is kept as it was -- see edit_post.
+# receipt_warnings describe the text as it arrived from the phone; an edit
+# replaces that text, and the receipt kept warning about a picture the post
+# no longer had (review of the carry-all, 27. 9. 2026).
 EDIT_DECIDES = (FRONTMATTER_KEYS - %w[link link_title link_description] +
-                %w[slug state content source former_slugs redirect_from unpublished_from]).freeze
+                %w[slug state content source former_slugs redirect_from unpublished_from receipt_warnings]).freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -4929,6 +4932,33 @@ end
 # The address a post will be served at once it is out, in the language
 # whose `address_slug` it carries. Drafts live under a token until they are
 # published, and comparing tokens answers nothing about collisions.
+# The first translated address of `post` that another post already has in
+# the same language, as { address:, slug: }, or nil. Asked of the address
+# each translation will have when the post is out, the way translate asks.
+def translated_address_clash(post)
+  langs = Hash(post['translations']).keys
+  return nil if langs.empty?
+
+  others = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
+    other = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue StandardError
+      nil
+    end
+    other if other.is_a?(Hash) && other['slug'].to_s != post['slug'].to_s
+  end
+  langs.each do |lang|
+    mine = Translations.for_lang(post, lang)
+    wanted = published_address(mine, mine['address_slug'])
+    taken = others.find do |other|
+      theirs = Translations.for_lang(other, lang)
+      published_address(theirs, theirs['address_slug']) == wanted
+    end
+    return { address: wanted, slug: taken['slug'] } if taken
+  end
+  nil
+end
+
 def published_address(post, address = nil)
   out = post.reject { |key, _| key == 'draft_token' }.merge('state' => 'published')
   out['address_slug'] = address.to_s unless address.to_s.strip.empty?
@@ -5402,6 +5432,16 @@ def edit_post(slug, path: nil)
   # cancelled plan gives back. Kept by default now, so the next new key is
   # kept too; the editor decides only what it shows.
   post.each { |key, value| updated[key] = value unless updated.key?(key) || EDIT_DECIDES.include?(key) }
+  # The translations move with the post, and in their languages the other
+  # posts' addresses are their own translated ones: a year change or
+  # `type: page` could land a translation on an address another post
+  # already has there, and the next build stopped on two posts at one
+  # address. translate refuses the same clash; so does the edit, before
+  # anything is moved (review of the carry-all, 27. 9. 2026).
+  if moving
+    clash = translated_address_clash(updated)
+    abort t('cli.edit_translation_address_taken', address: clash[:address], slug: clash[:slug]) if clash
+  end
 
   # Before ANY of the moving, copying and pruning below: if the file changed
   # under the editor -- the scheduled-publish cron runs every 15 minutes --
@@ -5455,7 +5495,12 @@ def edit_post(slug, path: nil)
   # Keeping the file in that case is deliberate -- the author confirmed
   # losing the block, not deleting a file they can't name in markdown, and
   # a restore from trash would otherwise come back without its image.
-  keep = (blocks.flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
+  # And every file a translation shows: a translation shares the post's
+  # media folder, so a picture the original stopped showing can still be on
+  # the translated page -- pruned, it left that page with a 404 (review of
+  # the carry-all, 27. 9. 2026).
+  translated = Hash(updated['translations']).values.flat_map { |one| Array(one.is_a?(Hash) ? one['content'] : nil) }
+  keep = ((blocks + translated).flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
           post['content'].map { |b| b.dig('poster', 0, 'url') }).compact.to_set
 
   # The post first, its unreferenced media second. Pruning ahead of the

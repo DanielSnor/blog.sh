@@ -312,6 +312,7 @@ cli:
   publish_partial_write_key: "w"
   publish_partial_anyway_key: "p"
   translate_address_reserved: "The engine writes %{address} at the root of a language itself, so a page cannot be addressed that. Choose another with the `slug:` line in the header."
+  edit_translation_address_taken: "Not saved: a translation of this post would land on %{address}, which \"%{slug}\" already has in that language. Give the translation another address with ./blog.sh translate (a slug: line in its header), or leave the date and the type as they were."
   translate_address_taken: "That address is already taken in this language by \"%{slug}\". Choose another with a `slug:` line in the header."
   translate_media_unsupported: "A translation carries words, not pictures: the post's media belong to the post and are shared by its languages. Add the picture with `./blog.sh edit` and refer to it here."
   frontmatter_hint: |

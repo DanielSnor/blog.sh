@@ -304,6 +304,7 @@ cli:
   publish_partial_write_key: "s"
   publish_partial_anyway_key: "v"
   translate_address_reserved: "Die Adresse %{address} schreibt die Engine im Wurzelverzeichnis einer Sprache selbst, eine Seite kann sie also nicht haben. Wähle eine andere mit der `slug:`-Zeile im Kopf."
+  edit_translation_address_taken: "Nicht gespeichert: eine Übersetzung dieses Beitrags käme auf %{address}, die „%{slug}“ in dieser Sprache schon hat. Gib der Übersetzung mit ./blog.sh translate eine andere Adresse (eine slug:-Zeile in ihrem Kopf), oder lass Datum und Typ, wie sie waren."
   translate_address_taken: "Diese Adresse hat in dieser Sprache bereits „%{slug}“. Wähle eine andere mit einer `slug:`-Zeile im Kopf."
   translate_media_unsupported: "Eine Übersetzung trägt Worte, keine Bilder: die Medien gehören zum Beitrag und werden von seinen Sprachen geteilt. Füge das Bild mit `./blog.sh edit` hinzu und verweise hier darauf."
   frontmatter_hint: |

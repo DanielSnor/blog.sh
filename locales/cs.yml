@@ -296,6 +296,7 @@ cli:
   publish_partial_write_key: "n"
   publish_partial_anyway_key: "p"
   translate_address_reserved: "Adresu %{address} si engine v kořeni jazyka píše sám, takže ji stránka mít nemůže. Vyber jinou řádkem `slug:` v hlavičce."
+  edit_translation_address_taken: "Neuloženo: překlad tohoto příspěvku by skončil na %{address}, kterou už v tom jazyce má „%{slug}“. Dej překladu jinou adresu přes ./blog.sh translate (řádek slug: v jeho hlavičce), nebo nech datum a typ, jak byly."
   translate_address_taken: "Tu adresu už v tomhle jazyce má „%{slug}“. Vyber jinou řádkem `slug:` v hlavičce."
   translate_media_unsupported: "Překlad nese slova, ne obrázky: média patří příspěvku a jazyky je sdílejí. Přidej obrázek přes `./blog.sh edit` a tady se na něj odkaž."
   frontmatter_hint: |
