@@ -623,6 +623,20 @@ saved as one archive instead -- a net, so a post written on the way home
 is not lost to a browser that will not share it, rather than a road this
 page offers. `/write/` is for a phone; on a phone the files go over.
 
+**Under Chromium the text is called `<name>.md.txt`.** Chrome and Edge,
+on Android as at a desk, share from a page only a file whose extension is
+on their own list, and `.md` is not on it while `.txt` is; a `.md` is
+refused before any sheet opens, and `canShare` says true all the same.
+The page tells Chromium by `navigator.userAgentData` and names the text
+accordingly; the receiver puts the `.md` back, so whatever takes the
+files on such a phone passes them on under the names it was given and
+nothing else. WebKit keeps `.md`, and must: iOS reads a `.txt` as text
+rather than a file and hands the shortcut its first line for a name. A
+browser the page misjudges gets a second tap -- the refusal says so --
+which sends the text as `.md.txt`. Note what the list also leaves out:
+`.zip`, `.heic` and `.mov`. A video from an Android phone is `.mp4` and
+goes; the saved archive never went anywhere but a shortcut anyway.
+
 **One shortcut, run twice, because the run that receives the files may
 not open an SSH connection.** A shortcut started from the Share Sheet
 runs in Shortcuts' background runner, whose only screen is a banner; *Run

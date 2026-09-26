@@ -253,6 +253,10 @@ awk -v dir="$WORK" '
 while IFS= read -r NAME; do
   check_name "$NAME"
 done < "$WORK/names"
+# "<name>.md.txt" is "<name>.md": Chromium shares from a page no ".md",
+# only a ".txt" (write/app.js, textName). Put back BEFORE the duplicate
+# check, so "a.md" beside "a.md.txt" is one name twice and refused as such.
+LC_ALL=C sed 's/\.[Mm][Dd]\.[Tt][Xx][Tt]$/.md/' "$WORK/names" > "$WORK/names.md" && mv "$WORK/names.md" "$WORK/names"
 # Two files under one name in one delivery: the second replaced the
 # first and both were answered ok. iOS hands out IMG_0001 twice a day.
 DUP=$(sort "$WORK/names" | uniq -d | head -1)

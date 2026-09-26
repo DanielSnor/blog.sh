@@ -111,4 +111,5 @@ app:
   result_warnings: "Wissenswert"
   saved_instead: "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive."
   share_cancelled: "Übergeben. Sobald der Kurzbefehl fertig ist, erscheint die Antwort auf dieser Seite -- wurde stattdessen das Teilen-Menü geschlossen, ist nichts abgeschickt."
+  share_retry_txt: "Dieser Browser gibt eine .md-Datei nicht weiter, also noch einmal tippen: der Text geht dann als .md.txt, das Blog stellt den Namen wieder her."
   not_saved: "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."

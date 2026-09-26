@@ -112,6 +112,7 @@ window.I18N = {
       "result_warnings": "Za pozornost stojí",
       "saved_instead": "Tenhle prohlížeč soubory předat neumí, takže jsou uložené v jednom archivu. ROZBAL ho a zkratce předej soubory z něj -- blog bere soubory, ne archivy.",
       "share_cancelled": "Předáno. Až zkratka doběhne, otevře se tu odpověď -- pokud jsi místo toho zavřel panel sdílení, neodešlo nic.",
+      "share_retry_txt": "Tenhle prohlížeč soubor .md nesdílí, tak klepni znovu: text pak půjde jako .md.txt a blog mu jméno vrátí.",
       "not_saved": "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."
     }
   },
@@ -226,6 +227,7 @@ window.I18N = {
       "result_warnings": "Wissenswert",
       "saved_instead": "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive.",
       "share_cancelled": "Übergeben. Sobald der Kurzbefehl fertig ist, erscheint die Antwort auf dieser Seite -- wurde stattdessen das Teilen-Menü geschlossen, ist nichts abgeschickt.",
+      "share_retry_txt": "Dieser Browser gibt eine .md-Datei nicht weiter, also noch einmal tippen: der Text geht dann als .md.txt, das Blog stellt den Namen wieder her.",
       "not_saved": "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."
     }
   },
@@ -340,6 +342,7 @@ window.I18N = {
       "result_warnings": "Worth knowing",
       "saved_instead": "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives.",
       "share_cancelled": "Handed over. The answer opens on this page once the shortcut is done -- if you closed the sheet instead, nothing was sent.",
+      "share_retry_txt": "This browser will not share a file called .md, so tap again: the text then goes as .md.txt and the blog puts the name back.",
       "not_saved": "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
     }
   }

@@ -117,4 +117,5 @@ app:
   result_warnings: "Worth knowing"
   saved_instead: "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives."
   share_cancelled: "Handed over. The answer opens on this page once the shortcut is done -- if you closed the sheet instead, nothing was sent."
+  share_retry_txt: "This browser will not share a file called .md, so tap again: the text then goes as .md.txt and the blog puts the name back."
   not_saved: "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
