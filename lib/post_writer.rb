@@ -922,8 +922,10 @@ module PostWriter
     # rest: carried over only when the importer said nothing itself, so an
     # adapter that DOES recognise a page still wins, and a series -- which
     # no source has a notion of -- survives every re-import.
+    # translations: a text somebody wrote in another language after the
+    # import is theirs, and no source has one to replace it with.
     %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at
-       page series series_part].each do |key|
+       page series series_part translations].each do |key|
       post[key] = old[key] if old && old[key] && !post[key]
     end
     # redirect_from is the one key where "the importer set it itself" is NOT

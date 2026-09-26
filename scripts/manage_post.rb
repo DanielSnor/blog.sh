@@ -169,6 +169,11 @@ FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series seri
 # the key would be accepted and do nothing, which is the one thing the
 # unknown-key rule below exists to prevent; so it is unknown there.
 FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt].freeze
+# What an edit decides: every key the editor shows in the header, and the
+# few the save computes on purpose (the address history, the state). Any
+# other key the post carries is kept as it was -- see edit_post.
+EDIT_DECIDES = (FRONTMATTER_KEYS - %w[link link_title link_description] +
+                %w[slug state content source former_slugs redirect_from unpublished_from]).freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -5389,6 +5394,14 @@ def edit_post(slug, path: nil)
   # asked every three seconds for five minutes about a post that had gone
   # out perfectly well.
   updated['receipt'] = post['receipt'] if post['receipt']
+  # And everything else the editor never showed is the post's to keep. The
+  # save rebuilt the post from a list of what to carry, so whatever the
+  # list had not heard of was dropped: every translation of a post went
+  # with one edit of its original, taking the translated pages off the site
+  # (blogsh.app, 26. 9. 2026), and a scheduled post lost the date a
+  # cancelled plan gives back. Kept by default now, so the next new key is
+  # kept too; the editor decides only what it shows.
+  post.each { |key, value| updated[key] = value unless updated.key?(key) || EDIT_DECIDES.include?(key) }
 
   # Before ANY of the moving, copying and pruning below: if the file changed
   # under the editor -- the scheduled-publish cron runs every 15 minutes --
