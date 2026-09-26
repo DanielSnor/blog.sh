@@ -44,6 +44,13 @@ require_relative 'deploy_backend/sftp'
 # a broken build) stays behind the same guards.
 #
 module DeployBackend
+  # deploy_web's exit when the target refused the sign-in (Surfer's 401,
+  # 403, or an older Surfer's 500 to a password). Told apart from 1 so the
+  # rebuild that ran it does not advise running the transfer again: that
+  # only helps a transfer that broke off, and a refused sign-in is refused
+  # again until env.sh changes (Surfer 7, 26. 9. 2026). 3 is RunLock's.
+  REFUSED_EXIT = 4
+
   BACKENDS = {
     'surfer' => Surfer,
     'local' => Local,

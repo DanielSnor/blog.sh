@@ -581,6 +581,7 @@ cli:
 
   default_rebuild_reason: "Sestavuji a nasazuji"
   build_failed: "\n❌ Sestavení selhalo — nic se nenasazovalo, web tedy pořád ukazuje to, co dosud. Obsah na disku je nedotčený; oprav důvod výše a spusť ./blog.sh rebuild, který sestaví i nahraje."
+  deploy_refused: "\n❌ Nasazení selhalo: cíl odmítl přihlášení, důvod je výš. Web je sestavený; opakování nepomůže, dokud přihlášení v env.sh neopravíš."
   deploy_failed: "\n❌ Nasazení selhalo. Web je sestavený; důvod je výš. Přerušený přenos stačí spustit znovu (./scripts/deploy-web.sh) — pojistka, která nahrávání zastavila, ho zastaví stejně znovu, dokud neuděláš, co říká."
   build_busy: "\n⏳ Zámek drží jiný běh, web se teď znovu nesestavil. Nic není rozbité — potkal se plánovaný běh s tvým."
   deploy_busy: "\n⏳ Zámek drží jiný běh, nahrání se teď nekonalo. Nic není rozbité — potkal se plánovaný běh s tvým."

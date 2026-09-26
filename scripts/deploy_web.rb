@@ -918,7 +918,8 @@ rescue Surfer::Unauthorized => e
   # Surfer 7 (September 2026) refuses the access tokens every earlier
   # Surfer took, so on the day Cloudron updates the app this is what an
   # untouched install meets.
-  abort("❌ #{Surfer.refusal_sentence(e.message[/\d+/])} #{I18n.t('cli.surfer_refused_waits')}")
+  warn "❌ #{Surfer.refusal_sentence(e.message[/\d+/])} #{I18n.t('cli.surfer_refused_waits')}"
+  exit DeployBackend::REFUSED_EXIT
 ensure
   save_manifest(manifest)
   # `completed` no longer decides whether a marker survives -- it is how a

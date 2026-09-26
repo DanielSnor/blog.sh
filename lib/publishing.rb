@@ -606,10 +606,16 @@ module Publishing
   # met at; after a failed build or a guard's stop there is no other run,
   # and no scheduled run can fix a typo in site.yml -- the newcomer trial
   # (25. 9. 2026) read it after every failure and waited for nothing.
+  #
+  # A refused sign-in is told apart too: "a transfer that broke off only
+  # needs ./scripts/deploy-web.sh again" stood under Surfer's 401, where
+  # running it again changes nothing until env.sh does (26. 9. 2026).
   def finish_later(step, status)
     busy = RunLock.busy_exit?(status)
     @stopped_on_busy_lock = busy
-    warn I18n.t("cli.#{step}_#{busy ? 'busy' : 'failed'}")
+    require_relative 'deploy_backend'
+    refused = step == 'deploy' && status.respond_to?(:exitstatus) && status.exitstatus == DeployBackend::REFUSED_EXIT
+    warn I18n.t("cli.#{step}_#{busy ? 'busy' : refused ? 'refused' : 'failed'}")
     mark_deploy_pending
     warn I18n.t(busy ? 'cli.deploy_pending_marked' : 'cli.deploy_pending_marked_failed')
   end
