@@ -35,16 +35,25 @@ FTP host has been reachable all along. Two more came from a live site: every emb
 YouTube, Vimeo, Spotify, all of them -- drew a black rectangle on a host that sends a tight
 `Referrer-Policy`, which is what Cloudron's Surfer sends by default, because the player never learned
 who was embedding it; and `check` called a link to the writing app dead on exactly the sites where
-that address answers.
+that address answers. Then two people set 1.9 up from nothing and upgraded a copy of a 6,600-post
+site, doing only what the docs said, and everything they tripped over is fixed below.
 
-Nothing to configure and nothing to migrate. A site that names no `site.locales` publishes one
+One thing to do, and only on Cloudron's Surfer: Surfer 7, which Cloudron rolled out in September
+2026, no longer takes the access token every earlier Surfer did. An installation that deploys to it
+adds its Cloudron username and an app password to `env.sh` -- `SURFER_USERNAME`, `SURFER_PASSWORD`
+-- and can do so before its app updates: the password is tried first, and an older Surfer is signed
+in to with the token until the day it is not.
+
+Beyond that, nothing to configure and nothing to migrate. A site that names no `site.locales` publishes one
 language and looks exactly as it did: no switcher, no alternates, the banner, the menu and the sitemap
 as 1.8 wrote them, so a skin keeps working untouched. Two things change underneath, on the next
 rebuild: every post's structured data names its language, and an embedded player carries its referrer
 policy. So the first deploy after the upgrade sends every post page once, and a listing only where it
 shows a player: on an archive of 6,600 posts, 6,650 of its 13,490 files. Past that, the two builds
 differ in the stylesheet and one script, the players inside the feed, the writing app's three files
-and the Czech cheat sheet, whose title is Czech now -- and report the same warnings.
+and the Czech cheat sheet, whose title is Czech now -- and report the same warnings. A cold build
+costs about 6% more than 1.8's, the price of every page asking which language it is in; a cached
+rebuild costs what it did.
 
 ### Added
 
