@@ -13,47 +13,16 @@ prints what an installation is running.
 
 ## 1.9.pre -- 2026-09-16
 
-The release about publishing in more than one language. A post keeps one set of metadata and a text
-per language: the date, the tags, the series and the state belong to the piece of writing, and only
-the words change. The language in `site.lang` keeps the site root, every other one named in
-`site.locales` gets a root of its own, and one `rebuild` produces all of them into a single tree
-that shares one copy of the assets. A post nobody has translated is shown in the other language all
-the same, with its link going to the one copy that exists -- so the same words never stand at two
-addresses. Writing a translation is `./blog.sh translate <slug> --lang de`, or the third way out of
-the wizard's crossroads; `check --languages` prints what is written where; and publishing a post the
-site cannot show in every language it publishes is refused, with `--allow-partial` named in the same
-sentence. A language the engine has never been translated into can borrow another's interface rather
-than be refused outright.
-
-Around that, the release a site's first hour asked for, most of it from people setting blog.sh up
-and saying what got in their way: a token pasted with a space on either side was saved with it and
-then refused by the instance, with nothing on screen to say why -- so the prompt that shows nothing
-now says what went in, and which of the three values a Mastodon application page offers is the one to
-copy. Ctrl+C left every screen of `./blog.sh` through a stack trace. The import menu never said a
-WordPress export is a file you can point it at, and the documentation never mentioned that a plain
-FTP host has been reachable all along. Two more came from a live site: every embedded player --
-YouTube, Vimeo, Spotify, all of them -- drew a black rectangle on a host that sends a tight
-`Referrer-Policy`, which is what Cloudron's Surfer sends by default, because the player never learned
-who was embedding it; and `check` called a link to the writing app dead on exactly the sites where
-that address answers. Then two people set 1.9 up from nothing and upgraded a copy of a 6,600-post
-site, doing only what the docs said, and everything they tripped over is fixed below.
-
-One thing to do, and only on Cloudron's Surfer: Surfer 7, which Cloudron rolled out in September
-2026, no longer takes the access token every earlier Surfer did. An installation that deploys to it
-adds its Cloudron username and an app password to `env.sh` -- `SURFER_USERNAME`, `SURFER_PASSWORD`
--- and can do so before its app updates: the password is tried first, and an older Surfer is signed
-in to with the token until the day it is not.
-
-Beyond that, nothing to configure and nothing to migrate. A site that names no `site.locales` publishes one
-language and looks exactly as it did: no switcher, no alternates, the banner, the menu and the sitemap
-as 1.8 wrote them, so a skin keeps working untouched. Two things change underneath, on the next
-rebuild: every post's structured data names its language, and an embedded player carries its referrer
-policy. So the first deploy after the upgrade sends every post page once, and a listing only where it
-shows a player: on an archive of 6,600 posts, 6,650 of its 13,490 files. Past that, the two builds
-differ in the stylesheet and one script, the players inside the feed, the writing app's three files
-and the Czech cheat sheet, whose title is Czech now -- and report the same warnings. A cold build
-costs about 6% more than 1.8's, the price of every page asking which language it is in; a cached
-rebuild costs what it did.
+The release about publishing in more than one language. A post keeps one date, one set of tags and
+one series, with a text per language written by `./blog.sh translate`; the site's own language keeps
+the root, every other one in `site.locales` gets its own, and one `rebuild` builds them all into a
+single tree. A post nobody has translated still shows, linking to the one copy that exists, and
+publishing one the site cannot show in every language is refused. Around it, the first hour: two
+people set 1.9 up from nothing and upgraded a 6,600-post site by the docs, and everything they
+tripped over is fixed. One thing to do, and only on Cloudron's Surfer: Surfer 7 signs in with the
+Cloudron username and an app password, `SURFER_USERNAME` and `SURFER_PASSWORD`, which can go in
+before the app updates. Nothing else to migrate; a site that names no `site.locales` looks as it did,
+though the first deploy sends every post page once, because each now names its language.
 
 ### Added
 
@@ -76,6 +45,7 @@ rebuild costs what it did.
 
 ### Changed
 
+- **A cold build costs about 6% more than 1.8's**, the price of every page asking which language it is in -- its structured data, its alternates, the translations it looks up. A cached rebuild costs what it did, so an ordinary day of publishing is unchanged. The first deploy after the upgrade sends every post page once, because each now names its language: on an archive of 6,600 posts, 6,650 of its 13,490 files.
 - **Surfer is signed in to with your Cloudron username and an app password.** Surfer 7 (September 2026) no longer takes access tokens -- it answers every request that carries one with HTTP 401 -- and Cloudron updates the app by itself. Set `SURFER_USERNAME` and `SURFER_PASSWORD` in `env.sh` (an app password from your Cloudron profile, Profile -> App Passwords, not your sign-in password); they are tried first, and `SURFER_TOKEN` is still read: a Surfer older than 7 crashes on a password with its own HTTP 500, and the run then goes on with the token, so the password can go in before the app updates and takes over the day it does. Only that answer means "older than 7": a 401 to the password is a mistyped password, and any other error counts against one file, as it always did. `./setup.sh` asks for the two, `doctor` warns an install that still has only a token, `doctor --online` asks Surfer whether it lets you in, and a deploy that is refused stops at the first file and says what to do, instead of printing HTTP 401 once per file -- and `./blog.sh rebuild` no longer adds that a transfer which broke off only needs running again: a refused sign-in is refused again until `env.sh` changes.
 - **Structured data says which language the page is in.** Every post's JSON-LD carries `inLanguage`; everything else on the page -- `<html lang>`, `og:locale`, the feed -- already said so.
 - **The Czech interface says "příspěvek", "sestavení" and "koncept".** It said "post" and "postavit", the one in over 300 places -- the help and the editor's hint included -- while the site's own Czech texts said "příspěvek"; a build is put together, not constructed, and the noun "build" went the same way in 43 places ("sestavení zastaveno", "v sestavení už nejsou"); and a draft is a koncept, in the wizard, the CLI, the writing app ("Koncept") and the Czech cheat sheet. The key is still `d` for "[d] nechat jako koncept". A script that reads the Czech output will see the new words.
