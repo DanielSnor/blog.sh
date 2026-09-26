@@ -4,7 +4,7 @@
 
 *minimalistic static web/log cms*
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
 [![Shell](https://img.shields.io/badge/Shell-CLI_wrapper-4EAA25?logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
 [![Ruby](https://img.shields.io/badge/Ruby-Pure_stdlib-CC342D?logo=ruby&logoColor=white)](https://www.ruby-lang.org)
 [![JSON](https://img.shields.io/badge/JSON-Content_format-000000?logo=json&logoColor=white)](https://www.json.org)
@@ -233,6 +233,8 @@ says what you are running.
                                # with a markdown file it asks nothing, and --json answers as data;
                                # --untrusted refuses a picture reference that is not a bare filename
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
+./blog.sh translate <slug> --lang <code>
+                               # writes the post's text in another language the site publishes
 ./blog.sh props [<slug>]       # a post's state and its actions; [e] changes what the post IS --
                                # its series and part, tags, type, and the unlisted/hero/toc flags
 ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
@@ -248,20 +250,25 @@ says what you are running.
 ./blog.sh empty versions       # keeps each post's newest version, removes the older ones
 ./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
-./blog.sh rebuild [--full]     # rebuilds and deploys the whole site;
-                               # --full builds every page again instead of only the changed ones
+./blog.sh rebuild [--full] [--force]
+                               # rebuilds and deploys the whole site, every language it publishes;
+                               # --full builds every page again instead of only the changed ones;
+                               # --force lets the deploy past its guards and uploads everything
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                # the archive on screen: filters, search, preview, Enter opens the post
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                # the same, printed one line per post
-./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
+./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it;
+                               # --online also asks the feeds, the analytics script, the access
+                               # token and the deploy target -- whether it answers, what is in its root
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
-./blog.sh check [--online] [--json] [--repair]
+./blog.sh check [--online] [--json] [--repair] [--languages]
                                # walks the archive and says what is broken in it;
                                # --json prints every finding as data instead of a screenful;
-                               # --repair offers, per finding, the one repair that finding allows
+                               # --repair offers, per finding, the one repair that finding allows;
+                               # --languages shows instead which post is written in which language
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                # writes the whole archive out as a tree of markdown files
 ./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources
@@ -279,6 +286,7 @@ laptop for a local one.
 ```bash
 export SITE_BASE_URL=https://example.com
 export MASTODON_ACCESS_TOKEN=...   # comment toots (optional)
+export BLUESKY_APP_PASSWORD=...    # Bluesky announcements (optional)
 export TUMBLR_API_KEY=...          # importing a Tumblr blog (wizard or script)
 export DEPLOY_BACKEND=...          # surfer (default) | local | rsync | git | rclone | sftp
 export SURFER_URL=...              # surfer backend
@@ -354,12 +362,14 @@ how an installation moves.
 ## Deploy
 
 ```bash
-ruby build/build_blog.rb   # rebuild into public.nosync/
-./scripts/deploy-web.sh            # uploads only new/changed files (SHA256 manifest)
+./blog.sh rebuild                  # builds every language into public.nosync/, then deploys
+./scripts/deploy-web.sh            # deploys only: uploads new/changed files (SHA256 manifest)
 ./scripts/deploy-web.sh --prune    # also deletes orphaned files on the target
 ```
 
-`./blog.sh rebuild` does both steps at once.
+`ruby build/build_blog.rb` builds without deploying -- one language per run
+(the site's own, or the one `BLOG_SH_LANG` names), so on a site with more
+than one, `./blog.sh rebuild` is the way to build them all.
 
 ### Cron (sidebar widgets and post stats)
 
