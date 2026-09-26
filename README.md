@@ -444,6 +444,10 @@ Czech self-hosting community, skinned the same way. The tag index and the
 copy button on code blocks were both their requests -- a blog of terminal
 how-tos wanted them first.
 
+[pavelchcepsat.cz](https://pavelchcepsat.cz) is a personal blog in Czech,
+and the first to be written from an Android phone: the writing app sends
+its text from Chrome and Edge because its owner tested what they refuse.
+
 [archive.bierfaristo.com](https://archive.bierfaristo.com) is the largest
 archive we know of running this engine, some 13,700 posts -- a working
 answer to "does it scale". Its owner has reported more than anyone else
