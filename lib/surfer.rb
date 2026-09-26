@@ -20,7 +20,13 @@ require_relative 'version'
 #       ?access_token=. Surfer 7 answers it with 401.
 #
 # The password wins when both are set: an install moving to Surfer 7 adds
-# the two lines and leaves the token where it was.
+# the two lines and leaves the token where it was. And it may add them
+# early. Surfer 6 does not know Basic auth -- it answers it with HTTP 500,
+# "Cannot read properties of undefined (reading 'accessToken')", tried on
+# blogsh.app 26. 9. 2026 -- so a password refused (401/403/500) before it
+# has once been let in falls back to the token for the rest of the run,
+# and every run tries the password first again: the day Cloudron brings
+# Surfer 7, the password takes over by itself.
 #
 # For a batch of files, use Surfer.session -- it holds one HTTP/TLS
 # connection for the whole batch. A new connection per file (the original
@@ -63,11 +69,56 @@ module_function
 
   # :password, :token, or nil when neither is filled in.
   def sign_in
-    if !ENV['SURFER_USERNAME'].to_s.empty? && !ENV['SURFER_PASSWORD'].to_s.empty?
+    if password? && !@on_token
       :password
-    elsif !ENV['SURFER_TOKEN'].to_s.empty?
+    elsif token?
       :token
     end
+  end
+
+  def password?
+    !ENV['SURFER_USERNAME'].to_s.empty? && !ENV['SURFER_PASSWORD'].to_s.empty?
+  end
+
+  def token?
+    !ENV['SURFER_TOKEN'].to_s.empty?
+  end
+
+  # What an older Surfer answers a password with. 500 belongs here only
+  # until the password has worked once: after that a 500 is the server's
+  # own trouble, not the sign-in's.
+  PASSWORD_NOT_TAKEN = [401, 403, 500].freeze
+
+  # Called with every response. true when the request is to be sent again
+  # -- the password was not taken and a token stands behind it.
+  def switch_to_token?(code)
+    return false unless sign_in == :password && !@password_worked
+
+    if code.to_i.between?(200, 299) || code.to_i == 404
+      @password_worked = true
+      return false
+    end
+    return false unless PASSWORD_NOT_TAKEN.include?(code.to_i) && token?
+
+    @on_token = true
+    @fell_back = true
+    true
+  end
+
+  # Whether this run went on with the token, once -- said by whoever
+  # reports the run, in its own words.
+  def fell_back?
+    @fell_back == true
+  end
+
+  def reset_sign_in
+    @on_token = @password_worked = @fell_back = false
+  end
+
+  # A password with no token to fall back on, refused -- 500 included, which
+  # is how Surfer 6 refuses it.
+  def password_refused?(code)
+    sign_in == :password && !@password_worked && PASSWORD_NOT_TAKEN.include?(code.to_i)
   end
 
   def authorize(request)
@@ -85,6 +136,7 @@ module_function
   # read_timeout: a deploy waits a minute for a big upload to be taken;
   # doctor's listing asks for one directory and passes its own, shorter.
   def session(read_timeout: 60)
+    reset_sign_in
     base = URI(ENV['SURFER_URL'].to_s.chomp('/'))
     http = Net::HTTP.new(base.host, base.port)
     http.use_ssl = (base.scheme == 'https')
@@ -114,7 +166,10 @@ module_function
   # tried, and a token refused is almost always a Surfer that became 7.
   def refusal_sentence(code)
     require_relative 'i18n'
-    key = sign_in == :password ? 'cli.surfer_refused_password' : 'cli.surfer_refused_token'
+    key = if sign_in == :password && code.to_i == 500 then 'cli.surfer_password_unsupported'
+          elsif sign_in == :password then 'cli.surfer_refused_password'
+          else 'cli.surfer_refused_token'
+          end
     I18n.t(key, url: ENV['SURFER_URL'].to_s.chomp('/'), code: code)
   end
 
@@ -148,8 +203,8 @@ module_function
       end
 
       remote = Surfer.remote_path(path, remote_name)
-      resp = send_request { build_upload(remote, path) }
-      raise Unauthorized, "HTTP #{resp.code}" if Surfer.refused?(resp.code)
+      resp = signed_request(say) { build_upload(remote, path) }
+      raise Unauthorized, "HTTP #{resp.code}" if Surfer.refused?(resp.code) || Surfer.password_refused?(resp.code)
 
       ok = resp.code.to_i.between?(200, 299)
       say.call("  #{ok ? '✅' : '❌'} upload -> #{ENV['SURFER_URL'].to_s.chomp('/')}/#{remote} (HTTP #{resp.code})")
@@ -167,10 +222,10 @@ module_function
     def delete(remote_name, logger: nil)
       say = ->(m) { logger&.call(m) }
       remote = Surfer.remote_path(remote_name, remote_name)
-      resp = send_request { build_delete(remote) }
+      resp = signed_request(say) { build_delete(remote) }
       code = resp.code.to_i
       return :missing if code == 404
-      raise Unauthorized, "HTTP #{code}" if Surfer.refused?(code)
+      raise Unauthorized, "HTTP #{code}" if Surfer.refused?(code) || Surfer.password_refused?(code)
 
       ok = code.between?(200, 299)
       say.call("  #{ok ? '🗑️ ' : '❌'} deleted -> #{remote} (HTTP #{resp.code})")
@@ -194,12 +249,13 @@ module_function
       # each. A listing that does not come back in time is the answer.
       @http.max_retries = 0 if @http.respond_to?(:max_retries=)
       resp = begin
-        @http.request(build_list(remote))
+        r = @http.request(build_list(remote))
+        Surfer.switch_to_token?(r.code) ? @http.request(build_list(remote)) : r
       rescue Net::ReadTimeout
         raise ListFailed, I18n.t('doctor.deploy_target_timeout', seconds: @http.read_timeout.to_i)
       end
       code = resp.code.to_i
-      raise Unauthorized, Surfer.refusal_sentence(code) if Surfer.refused?(code)
+      raise Unauthorized, Surfer.refusal_sentence(code) if Surfer.refused?(code) || Surfer.password_refused?(code)
       raise ListFailed, "HTTP #{code}" unless code.between?(200, 299)
 
       entries = JSON.parse(resp.body.to_s)['entries']
@@ -219,6 +275,17 @@ module_function
       req = Net::HTTP::Get.new(uri)
       req['User-Agent'] = Surfer::USER_AGENT
       Surfer.authorize(req)
+    end
+
+    # Sent with the password first, if there is one; refused and backed by
+    # a token, sent once more with the token -- and said, once, in the log.
+    def signed_request(say, &build)
+      resp = send_request(&build)
+      return resp unless Surfer.switch_to_token?(resp.code)
+
+      require_relative 'i18n'
+      say.call("  ℹ️  #{I18n.t('cli.surfer_fell_back', code: resp.code)}")
+      send_request(&build)
     end
 
     # The request is only built here, inside the block, so it can be built

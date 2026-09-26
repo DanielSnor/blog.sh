@@ -1486,7 +1486,18 @@ module Doctor
   # Only when the offline check has nothing against the backend: an
   # unchosen, unknown, unfinished or uninstalled one is reported there,
   # and asking it over the network could only repeat that less clearly.
+  # The listing got in with the token after the password was not taken: a
+  # Surfer older than 7. Nothing is wrong -- the deploy goes on the same
+  # way -- but whoever just filled in the password should hear why it is
+  # not the one being used yet.
   def check_online_deploy(root, data = nil)
+    findings = online_deploy_target(root, data)
+    return findings unless deploy_backend_name.to_s.then { |n| n.empty? || n == 'surfer' } && ::Surfer.fell_back?
+
+    findings + [warn(t('surfer_fell_back'), t('surfer_fell_back_fix'))]
+  end
+
+  def online_deploy_target(root, data)
     name = deploy_backend_name
     backend = name && DeployBackend::BACKENDS[name]
     return [] unless backend&.configured?

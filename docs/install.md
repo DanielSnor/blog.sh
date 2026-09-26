@@ -599,9 +599,11 @@ not the password you sign in to Cloudron with. The access token of Surfer
 6 and earlier (`SURFER_TOKEN`) is still read, but Surfer 7 answers it with
 HTTP 401, and the deploy then stops at the first file and says so. Moving
 over is two lines in `env.sh`: add `SURFER_USERNAME` and `SURFER_PASSWORD`
--- they take precedence over the token, so the token can stay until the
-app has updated. `./blog.sh doctor --online` asks Surfer whether it lets
-you in.
+and leave `SURFER_TOKEN` where it is. They can go in before the app has
+updated: a Surfer older than 7 answers the password with an error (HTTP
+500), and the run then goes on with the token -- every run tries the
+password first, so the day Surfer 7 arrives it takes over by itself.
+`./blog.sh doctor --online` says which of the two Surfer took.
 
 ### local (a directory on the same machine)
 
