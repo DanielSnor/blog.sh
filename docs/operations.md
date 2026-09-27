@@ -761,9 +761,10 @@ the phone is the one place with no terminal to read them in. Only what
 was said about the POST: the file is served to anyone who has the
 sixteen characters, so what the run says about the SITE afterwards (a
 missing `base_url`, whatever the rebuild warns about) stays out of it.
-The page asks for it every three seconds for five minutes, and says so
-if it never comes. Whichever answer arrives first is the one that is
-shown.
+The page asks for it every three seconds for fifteen minutes, and says
+so if it never comes; a page reopened later asks once more, and shows
+the answer or says it did not come. Whichever answer arrives first is
+the one that is shown.
 
 The file is written by the BUILD, which is what keeps it true: publish
 the post and the next build says published and gives the public address;

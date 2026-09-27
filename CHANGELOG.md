@@ -59,6 +59,7 @@ signs in with `SURFER_USERNAME` and an app password in `SURFER_PASSWORD`.
 - **In the writing app, "Add a picture or video" did not look like a button.**
 - **The writing app's warning about a missing description read like a rule.** A second tap sends.
 - **Chrome and Edge could not send the text from the writing app.** It goes as `.md.txt` now.
+- **The writing app, reopened more than five minutes after sending, said nothing.** It waits fifteen now, and a page reopened later asks once.
 - **rclone installed as a snap failed every deploy.**
 - **`doctor` ticked a backend whose program is not installed.**
 - **The warning before an edit loses something spoke the schema's English.**
