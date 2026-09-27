@@ -11,7 +11,7 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.9.pre -- 2026-09-16
+## 1.9 -- 2026-09-28
 
 The release about publishing in more than one language. A post keeps one set of metadata and a
 text per language, every language in `site.locales` beyond the site's own gets a root of its own,
