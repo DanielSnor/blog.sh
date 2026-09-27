@@ -53,6 +53,7 @@ signs in with `SURFER_USERNAME` and an app password in `SURFER_PASSWORD`.
 - **Embedded players were black on a host with a tight referrer policy.** YouTube's "Error 153".
 - **`check` called `/write/` dead on the sites that publish it.**
 - **The import menu did not say WordPress takes a file.**
+- **A re-import dropped what it had no name for.** A phone receipt, among others. It keeps everything the source does not decide.
 - **A token pasted with a space around it was saved with it.**
 - **`install.md` never said a deploy leaves an old site's files in place.**
 - **In the writing app, "Add a picture or video" did not look like a button.**
