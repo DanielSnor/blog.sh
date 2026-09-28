@@ -11,6 +11,8 @@ decimal_point: "."
 date_format: "%b %-d, %Y"
 date_time_format: "%b %-d, %Y %H:%M"
 
+# The language in its own name: what a reader looking for it recognises.
+language_name: "English"
 nav:
   all: "All"
   text: "Text"
@@ -30,6 +32,13 @@ nav:
 build:
   unreadable_posts: "❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:"
   duplicate_address: "❌ Two posts at one address in content.nosync/posts/ -- build stopped:"
+  unknown_locale: "❌ site.locales names a language the engine has no locale file for: %{langs} -- add locales/<code>.yml, take the code out of config/site.yml, or say which language its interface words come from (site.ui_language)."
+  language_key_moved: "❌ site.%{key} is a table keyed by language, which is the shape this had before 1.9. Each language says it in its own file now: %{file} and its kin, one key per file, no language names inside."
+  language_file_stray: "❌ %{files}: a file for a language this site does not publish. Name the language in site.locales, or move the file out of config/ (its translations will be wanted if the language comes back) -- nothing reads it as it stands."
+  language_key_unknown: "❌ %{file} says %{keys}, which the engine does not read. It knows: %{known}."
+  language_key_orphan: "❌ %{file} translates %{keys}, which config/site.yml does not have -- there is nothing for it to replace. Set it up in site.yml first, or take it out of %{file}."
+  language_label_empty: "❌ %{file} gives %{keys} an empty word, which would leave the pill with nothing on it. Write the word, or take the tag out of tags: -- it then shows as written."
+  language_list_mismatch: "❌ %{file}: %{key} has to go to the same places as in config/site.yml, in the same order -- only the words change. %{detail}"
   # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
   # because the engine's I18n has no plural forms and is not getting any.
   # A sentence that has to decline the noun reads wrong in every language
@@ -179,6 +188,7 @@ ui:
   # page, and assets/js/theme-toggle.js rewrites it on every click -- which is
   # why it also travels through window.BLOG_I18N (client_i18n_json in
   # build/build_blog.rb).
+  language: "Language"
   theme_auto: "Appearance: follow system"
   theme_light: "Appearance: light"
   theme_dark: "Appearance: dark"
@@ -226,6 +236,7 @@ js:
 # (downcased) -- if you translate it, users must type the translated word to
 # cancel a wait loop.
 cli:
+  interrupted: "Stopped."
   cancel_word: "cancel"
   confirm_word: "yes"
   missing_images_wait: "Missing %{count} image(s), waiting for you to upload them to incoming/:"
@@ -287,6 +298,23 @@ cli:
     Keep only one header: either delete the empty one at the top, or remove
     the --- lines from the pasted text and copy its values into the one above.
 
+  translate_hint: "<!--\nTRANSLATION into %{lang} of: %{title}\nOnly the words are here. The date, the tags, the series and the state belong to the post itself -- change those with `props` or `edit`, and they hold in every language.\nLeave the title empty and delete the body to take this language off the post; it then looks exactly as it did before the translation existed.\nLines starting with // are removed on save.\n-->\n"
+  translate_saved: "Saved the %{lang} text of '%{slug}'."
+  translate_removed: "Took the %{lang} text off '%{slug}'."
+  translate_own_language: "'%{lang}' is the language the post is already written in -- edit that with `./blog.sh edit`."
+  translate_unknown_language: "This site does not publish '%{lang}'. It publishes: %{known}. Add the language to `site.locales` in config/site.yml first."
+  translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."
+  translate_unknown_args: "❌ `translate` does not know what to do with: %{args}. It takes a post and one language -- `./blog.sh translate <slug> --lang <code>`."
+  translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
+  publish_partial: "Publishing %{slug} would put it out in one language: the site also publishes %{langs}, and this post has no words there. Write it with `./blog.sh translate`, or say `--allow-partial` to publish it as it is."
+  add_publish_partial: "Kept as a draft, not published: %{slug} has no words in %{langs}, which the site also publishes. Write them with ./blog.sh translate %{slug} --lang <code>, or send it out as it is with ./blog.sh publish %{slug} --allow-partial."
+  publish_partial_prompt: "This post would go out in one language; %{langs} has no words in it. [w] write it now  [p] publish as it is  [anything else] back: "
+  publish_partial_write_key: "w"
+  publish_partial_anyway_key: "p"
+  translate_address_reserved: "The engine writes %{address} at the root of a language itself, so a page cannot be addressed that. Choose another with the `slug:` line in the header."
+  edit_translation_address_taken: "Not saved: a translation of this post would land on %{address}, which \"%{slug}\" already has in that language. Give the translation another address with ./blog.sh translate (a slug: line in its header), or leave the date and the type as they were."
+  translate_address_taken: "That address is already taken in this language by \"%{slug}\". Choose another with a `slug:` line in the header."
+  translate_media_unsupported: "A translation carries words, not pictures: the post's media belong to the post and are shared by its languages. Add the picture with `./blog.sh edit` and refer to it here."
   frontmatter_hint: |
     <!--
     GUIDE -- this block and lines starting with // are removed on save, they never end up in the post.
@@ -345,9 +373,14 @@ cli:
 
   base_url_missing_preview: "SITE_BASE_URL is not set, can't build the preview URL."
   preview_label: "Preview: %{url}"
+  mark_scheduled: "[SCHEDULED]"
+  mark_draft: "[DRAFT]"
+  mark_pinned: "[PINNED]"
+  local_preview_hint_deployed: "The address above is the template's example -- the site does deploy, only site.base_url does not say where yet (./setup.sh fixes it). To look here: ./blog.sh preview and %{url}."
   local_preview_hint: "The site goes nowhere yet -- run ./blog.sh preview and open %{url} (port 8000 by default)."
   template_body_placeholder: "First paragraph's text."
   deploy_backend_incomplete: "The %{name} deploy backend is not configured -- skipping the upload. The build in public.nosync/ is complete; view it with ./blog.sh preview. To actually deploy, set DEPLOY_BACKEND and its values in env.sh (see env.sh.example)."
+  deploy_target_no_user: "DEPLOY_TARGET_DIR is %{dir}, but there is no user \"%{user}\" on this machine, so ~%{user} leads nowhere. Was it meant to be ~/ (your home directory)?"
   deploy_target_relative: "DEPLOY_TARGET_DIR is %{dir}, which is a relative path -- the whole site would go into a directory of that name inside the installation. env.sh.example and docs/install.md both show an absolute one (/var/www/mysite)."
   deploy_args_fix: "That line in env.sh most likely has an unmatched quote in it. Switches are written into it as plain text in quotes, for example \"-P 2022 -i /home/dan/.ssh/key\"."
   deploy_guard_shrink_files: "❌ Stopped: public.nosync/ has %{have} files, but %{expected} were expected from %{source}.\n   That is a %{percent}% drop -- looks like a broken build.\n   Check the build output. If the drop is expected (you deleted a lot of posts), run again with --force."
@@ -361,6 +394,8 @@ cli:
   # so no language needs plural forms; the backend's own label and the
   # target address are interpolated raw, because they are what the tool
   # calls itself and what has to be typed back into env.sh.
+  backend_label_local: "local directory"
+  backend_label_git: "git pages"
   deploy_header: "Deploy web -> %{backend}: %{target}"
   deploy_public_missing: "❌ public.nosync/ does not exist -- run the build first (ruby build/build_blog.rb)."
   deploy_public_empty: "❌ Stopped: public.nosync/ is empty -- run the build first (ruby build/build_blog.rb)."
@@ -372,14 +407,20 @@ cli:
   deploy_stale_too_large: "⚠️  %{files} already on the target, over the %{limit} per-file limit -- this site can no longer be moved to a target that enforces it."
   deploy_large_files: "⚠️  Large files: %{files}%{more} -- under the %{limit} limit, but every reader pays for those bytes."
   deploy_large_files_more: " and %{count} more"
+  deploy_mode_dry: "Mode: preview (dry run) -- nothing is uploaded."
+  deploy_mode_only: "Mode: just %{files}."
+  deploy_mode_force: "Mode: everything again (--force)."
+  deploy_mode_smart: "Mode: only what is new or changed."
   deploy_growth_notice: "⚠️  The build grew from %{was} to %{now} since %{source} -- expected if you added media, worth a look if you didn't."
+  deploy_languages_changed: "ℹ️  The site's languages changed -- added: %{added}, removed: %{removed}. The guards leave those trees out (new files: %{added_files}, gone: %{removed_files}) and hold the rest of the site to the usual limits."
   deploy_prev_outcome: "ℹ️  Previous deploy (%{at}, %{backend}) ended as '%{outcome}': uploaded %{uploaded}, failed %{failed}. This run re-diffs against the manifest; the guards apply as normal."
   deploy_unfinished_streak: "⚠️  Deploys in a row that have not finished: %{count} -- something is being refused every time (an oversized file, credentials, the target). The guards are on; the failures below say what."
   deploy_no_growth_reference: "ℹ️  Nothing to measure growth against yet -- that guard stands down for this one run (the drop guard still measures against the manifest)."
   deploy_selection: "Files selected: %{files}, %{bytes} in the build, new or changed: %{changed}, unchanged (skipped): %{unchanged}"
   deploy_orphans_delete: "Orphans to delete: %{count}%{why}"
   deploy_orphans_kept: "⚠️  Orphaned files on the target: %{count} -- delete them with --prune"
-  deploy_orphans_why_prune: " (--prune)"
+  deploy_orphans_language_delete: "   Of those, %{count} belong to a language the site no longer publishes, and are deleted now."
+  deploy_orphans_why_prune: " (the build no longer makes them)"
   deploy_orphans_why_snapshot: " (snapshot deploy)"
   deploy_orphans_why_only: " (named in --only, no longer in the build)"
   deploy_orphans_no_single_delete: "⚠️  %{names}: no longer in the build, but %{backend} cannot delete single files -- run ./scripts/deploy-web.sh --prune to take them off the target."
@@ -390,6 +431,12 @@ cli:
   deploy_outcome_unrecorded: "⚠️  Could not record the deploy outcome in %{path}: %{error}"
   deploy_done: "Done: uploaded %{uploaded}, deleted %{deleted}, failed %{failed}, unchanged %{unchanged}"
   announce_no_base_url: "⚠️  Not announcing: site.base_url is not set, so the toot would carry a bare path instead of a link -- and that cannot be taken back. Set site.base_url in config/site.yml (or SITE_BASE_URL in env.sh) and run ./blog.sh toot."
+  surfer_refused_token: "Surfer at %{url} refused the access token (HTTP %{code}). Surfer 7 no longer takes tokens: create an app password in your Cloudron profile (Profile -> App Passwords) and put SURFER_USERNAME (your Cloudron username) and SURFER_PASSWORD (that password) in env.sh. SURFER_TOKEN can go then."
+  surfer_password_unsupported: "Surfer at %{url} does not understand the app password (HTTP %{code}) -- it runs a version older than 7, which knows only the access token. Put SURFER_TOKEN back in env.sh (the password can stay: with the token beside it, it is used by itself once the app moves to version 7)."
+  surfer_refused_token_old: "Surfer at %{url} runs a version older than 7 (it does not know app passwords) and refused the access token too (HTTP %{code}). Check SURFER_TOKEN in env.sh."
+  surfer_refused_password: "Surfer at %{url} refused the username and password (HTTP %{code}). Check SURFER_USERNAME (the Cloudron username, not the e-mail) and SURFER_PASSWORD in env.sh -- an app password from your Cloudron profile (Profile -> App Passwords), not the password you sign in to Cloudron with."
+  surfer_fell_back: "Surfer did not take the app password (HTTP %{code}) -- it runs a version older than 7; going on with the token (SURFER_TOKEN)."
+  surfer_refused_waits: "The built site waits in public.nosync/; once that is fixed, ./blog.sh rebuild uploads it."
   surfer_unreachable: "❌ The Surfer at %{url} is not answering (%{reason}) -- the app may be stopped, or SURFER_URL in env.sh points somewhere it does not run. The finished build waits in public.nosync/; once the server is up (or the address fixed), ./blog.sh rebuild ships it."
   what_next_prompt: "What next? [d] keep as draft  [e] edit  [p] publish  [s] schedule  [x] delete: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
@@ -485,6 +532,31 @@ cli:
 
   no_changes: "No changes, nothing to save."
   content_loss_warning: "Careful, saving this would lose: %{summary}."
+  content_loss_item: "%{count}× %{kind}"
+  # What the guard above names, as an author knows it. A type missing here
+  # is named by its schema word rather than refused.
+  content_kind:
+    block:
+      text: "text block"
+      list: "list"
+      table: "table"
+      code: "code block"
+      chat: "chat transcript"
+      hr: "divider"
+      image: "picture"
+      file: "attachment"
+      video: "video"
+      audio: "audio"
+      link: "link card"
+    span:
+      bold: "bold"
+      italic: "italics"
+      strikethrough: "strikethrough"
+      code: "inline code"
+      link: "link"
+      small: "small print"
+      mention: "mention"
+      color: "text colour"
   confirm_continue_yes: "Really continue? Type \"%{word}\": "
 
   edited_label: "Edited: %{path}"
@@ -533,12 +605,21 @@ cli:
 
   default_rebuild_reason: "Rebuilding and deploying"
   build_failed: "\n❌ Build failed -- nothing was deployed, so the site still shows what it showed before. Your content on disk is untouched; fix the reason above and run ./blog.sh rebuild, which builds and uploads in one go."
+  deploy_refused: "\n❌ Deploy failed: the target refused the sign-in, the reason is above. The site was rebuilt; running it again changes nothing until the sign-in in env.sh is fixed."
   deploy_failed: "\n❌ Deploy failed. The site was rebuilt; the reason is above. A transfer that broke off only needs ./scripts/deploy-web.sh again -- a guard that stopped the upload will stop it the same way until you do what it asks."
   build_busy: "\n⏳ Another run holds the lock, so the site was not rebuilt. Nothing is broken -- a scheduled run and yours arrived at the same moment."
   deploy_busy: "\n⏳ Another run holds the lock, so the upload did not happen. Nothing is broken -- a scheduled run and yours arrived at the same moment."
   deploy_pending_marked: "The site is marked as owing a deploy, so the next scheduled run finishes it. To not wait, run ./blog.sh rebuild once the other run is done."
+  deploy_pending_marked_failed: "The site is marked as owing a deploy: once the reason above is dealt with, ./blog.sh rebuild sends it -- or the next scheduled run, if one is set up."
 
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
+  yaml_invalid: "%{path} is not valid YAML (%{message})."
+  yaml_invalid_doctor: "Run ./blog.sh doctor for the full picture."
+  doctor_unknown_option: "doctor does not know %{option} -- it takes --online (also checks what needs trying over the network) and --strip-location (removes the location from photos)."
+  rebuild_unknown_option: "rebuild does not know %{option} -- it takes --full (build every page again) and --force (let the deploy through its guards and upload everything)."
+  unknown_command: "❌ ./blog.sh has no command \"%{command}\"."
+  unknown_command_nearest: "   Did you mean ./blog.sh %{command}?"
+  unknown_command_help: "   ./blog.sh help lists every command."
 
   header_mode: "Mode: %{mode}"
   usage: |
@@ -547,6 +628,8 @@ cli:
                                      with a markdown file it asks nothing at all and just writes the draft,
                                      which is the route for a phone, a script or a shortcut (--json reports it as data)
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
+      ./blog.sh translate <slug> --lang <code>
+                                     writes that post's text in another language the site publishes
       ./blog.sh props [<slug>]       a post's state, its properties (series, tags, type, flags) and its actions
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
@@ -560,8 +643,10 @@ cli:
       ./blog.sh empty versions       keeps each post's newest version and removes the older ones
       ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
       ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
-      ./blog.sh rebuild [--full]     rebuilds and deploys the whole site, not tied to a specific post;
-                                     --full builds every page again instead of only the ones that changed
+      ./blog.sh rebuild [--full] [--force]
+                                     rebuilds and deploys the whole site, not tied to a specific post;
+                                     --full builds every page again instead of only the ones that changed;
+                                     --force lets the deploy past its guards and uploads everything
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
@@ -569,10 +654,11 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--strip-location]
                                      reads the configuration and says what is wrong with it
-      ./blog.sh check [--online] [--json] [--repair]
+      ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      walks the archive and says what is broken in it;
                                      --json prints every finding as data, uncapped;
-                                     --repair offers, per finding, the one repair it allows
+                                     --repair offers, per finding, the one repair it allows;
+                                     --languages shows instead which post is done in which language
       ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                      writes the whole archive out as a tree of markdown files (default tmp/export)
       ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from
@@ -620,6 +706,14 @@ cli:
   browse_preview_no_caption: "no caption"
   browse_preview_tags: "tags: %{tags}"
   edit_what_prompt: "Edit what? [Enter] the text  [v] properties and actions  [anything else] back: "
+  edit_what_prompt_one: "Edit what? [Enter] the text  [l] language: %{language}  [v] properties and actions  [anything else] back: "
+  edit_what_prompt_many: "Edit what? [Enter] the text  [l] languages  [v] properties and actions  [anything else] back: "
+  translation_key: "l"
+  language_heading: "Which language?"
+  language_row: "%{mark} %{name} -- %{state}"
+  language_state_written: "written"
+  language_state_started: "a title, no text under it"
+  language_state_none: "nothing yet"
   properties_heading: "Properties of %{slug} -- what the post is, not what it says:"
   properties_hint: "↑↓ choose  ·  Enter open  ·  Esc back"
   properties_prompt: "Which one (1-%{count}), or Enter to go back: "
@@ -650,9 +744,11 @@ cli:
   type_heading: "What kind of post is this?"
   type_derived_row: "let the content decide (now: %{type})"
   type_row: "%{type}"
+  props_label_preview: "preview"
   props_label_state: "state"
   props_label_scheduled: "scheduled"
   props_label_type: "type"
+  props_label_languages: "languages"
   props_label_tags: "tags"
   props_label_series: "series"
   props_series_part: "%{name}, part %{part}"
@@ -667,6 +763,8 @@ cli:
   props_pinned_yes: "yes -- held at the top of the front page"
   props_unlisted_yes: "yes -- reachable by its address, in no listing, feed, sitemap or search"
   props_announces_on_publish: "not yet -- goes out when the post publishes"
+  props_announces_nowhere: "never -- this site announces nowhere (no mastodon: or bluesky: in config/site.yml)"
+  props_announces_no_secret: "never, as things stand -- %{value} in env.sh is empty, so publishing announces nothing"
   props_announces_never_unlisted: "never -- an unlisted post is not announced"
   props_not_announced: "not announced"
   props_attributes_hint: "Type, tags and the series are changed with [e]; the text itself with edit."
@@ -675,6 +773,9 @@ cli:
   props_actions_published: "[u] unpublish  [t] announce (%{network})  [c] pin/unpin  [e] properties  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
   props_actions_published_plain: "[u] unpublish  [c] pin/unpin  [e] properties  [r] rename slug  [a] old links  [x] delete  [Enter] back: "
   props_action_versions: "[v] earlier versions  "
+  props_action_qr: "[q] QR for a phone  "
+  props_publish_confirm: "Publish %{slug} now? [y/N] "
+  props_publish_announces: "It also goes out on %{network} -- an announcement cannot be taken back."
   versions_none: "This post has no earlier versions yet -- one is kept each time it is edited."
   versions_heading: "What the post %{slug} said before its recent saves:"
   versions_media_note: "Only the text comes back; images are not versioned, so an old copy of the post may mention one it no longer has."
@@ -873,7 +974,7 @@ import:
     wayback: "Wayback Machine (rescue a dead blog)"
     wix: "Wix (blog CSV export)"
     twitter: "Twitter/X (archive export)"
-    feed: "WordPress export or RSS/Atom feed"
+    feed: "WordPress export file or RSS/Atom feed"
   poll:
     heading: "Poll (voters: %{voters})"
     option: "%{name} -- %{votes}"
@@ -987,7 +1088,7 @@ doctor:
   running_online: "Checking hosts and tokens too (--online)"
   summary: "%{errors} problem(s), %{warnings} worth a look, %{oks} fine."
   summary_clean: "No problems. %{oks} check(s) passed."
-  hint_online: "Add --online to also check that the feeds, the analytics script and the access token still answer."
+  hint_online: "Add --online to also check that the feeds, the analytics script, the access token and the deploy target still answer."
 
   env_ok: "env.sh is there and only you can read it."
   env_missing: "There is no env.sh, so no tokens and no deploy target are configured."
@@ -1002,7 +1103,11 @@ doctor:
   site_yml_syntax: "config/site.yml is not valid YAML: %{message}."
   site_yml_unreadable: "config/site.yml exists but cannot be read: %{message}."
   site_yml_unreadable_fix: "Check the file's owner and permissions (ls -l config/site.yml). Usually: chmod 644 config/site.yml — and if the file is owned by root after a wizard ran under sudo, chown it too."
-  site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. If that line looks fine, the cause is elsewhere -- most often a section header commented out with its keys left behind, or a quote left open earlier."
+  site_yml_open_quote_fix: "Line %{line} starts a value with a quote that does not close on that line -- YAML then reads the next lines as more of that value and reports the error somewhere else. Close the quote at the end of the value."
+  site_yml_syntax_fix: "Look at line %{line}, column %{column}. Almost always this is indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. If that line looks fine, the cause is elsewhere -- most often a section header commented out with its keys left behind."
+  language_yml_template: "config/%{file}: the text of the example, config/site.lang.yml.example, is still there for %{keys} -- the pages in that language show it."
+  language_yml_template_fix: "Rewrite them in that language, or delete them from the file: whatever it leaves out comes from config/site.yml."
+  language_yml_syntax: "config/%{file} is not valid YAML: %{message} -- and the build stops on it, in every language."
 
   identity_ok: "The site's identity is filled in."
   key_missing: "%{key} is missing from config/site.yml."
@@ -1119,7 +1224,6 @@ doctor:
   widget_instance_repo_fix: "The widget wants the server itself. A forge that really does live under a path is fine -- but so is a profile or a repository address, and they look the same from here. Open <instance>/api/v1/version in a browser: a forge answers with a version, anything else does not."
   widget_instance: "The commits widget's `instance` is not a server address: %{value}."
   widget_instance_fix: "Write the server itself, scheme and host only -- \"https://codeberg.org\", \"https://git.example.org\" -- not a handle, a repository or a bare host name. Leave the key out entirely for GitHub."
-  widget_heading: "The %{name} widget has no heading, so it appears without a title."
   widget_limit: "The %{name} widget's limit is %{value}; it has to be a whole number greater than zero."
 
   slots_ok: "%{count} publishing slot(s)."
@@ -1131,8 +1235,8 @@ doctor:
   scheduler_stale: "Nothing has run the queue for %{ago}, and %{count} post(s) are waiting -- it runs every fifteen minutes when it runs at all."
   scheduler_overdue: "The scheduler is running (last tick %{ago} ago), but %{count} post(s) are past their date and still unpublished."
   scheduler_overdue_fix: "Something fails on those posts on every tick. Run `ruby scripts/publish_scheduled.rb` by hand and read what it says -- it keeps retrying until you fix it."
-  deploy_pending: "The site owes a deploy (since %{ago} ago): something was published and the upload did not happen."
-  deploy_pending_fix: "Run `./blog.sh rebuild`. With the scheduler cron set up, the next tick settles the debt on its own."
+  deploy_pending: "The site owes a deploy (since %{ago} ago): a change that should have gone out did not."
+  deploy_pending_fix: "Run `./blog.sh rebuild` -- if it stops, the reason it gives is why this one did too. With the scheduler cron set up, the next tick tries on its own."
   scheduler_fix: "Schedule scripts/publish-scheduled.sh -- every fifteen minutes is what the wizard's times assume (*/15 * * * * /path/to/blog/scripts/publish-scheduled.sh). On a hosted install the panel's own cron section is the place; check that its path points at THIS blog and not another one."
   age_minutes: "%{count} minute(s)"
   age_hours: "%{count} hour(s)"
@@ -1148,16 +1252,38 @@ doctor:
   media_location_redeploy: "Each rewritten photo has a new checksum, so the next deploy uploads it again. Run ./blog.sh rebuild when you're ready."
   backend_unset: "No deploy target chosen, so the site is built locally and goes nowhere."
   backend_unset_fix: "That is a fine place to start -- ./blog.sh preview shows the build. Run ./setup.sh when you want it online."
+  surfer_fell_back: "Surfer does not take the app password yet -- it answered it with an error, so it runs a version older than 7. Deploys sign in with the token (SURFER_TOKEN) for now."
+  surfer_fell_back_fix: "Nothing to do: every deploy tries the password first, and once Cloudron updates the app to Surfer 7 it takes over by itself. Keep the token in env.sh until then."
+  surfer_token_only: "Surfer is signed in to with an access token (SURFER_TOKEN), which Surfer 7 no longer takes -- once the app updates, every deploy stops on HTTP 401."
+  surfer_token_only_fix: "Create an app password in your Cloudron profile (Profile -> App Passwords) and add SURFER_USERNAME and SURFER_PASSWORD to env.sh; they take precedence over the token, so SURFER_TOKEN can stay until the app runs version 7. ./blog.sh doctor --online checks what Surfer accepts."
   backend_ok: "Deploying with the %{name} backend."
   backend_unknown: "DEPLOY_BACKEND is \"%{name}\", which is not a backend this engine has."
   backend_unknown_fix: "Known backends: %{known}."
   backend_incomplete: "The %{name} deploy backend is missing %{values}, so deploys upload nothing."
   backend_incomplete_fix: "Deploys say so and exit cleanly, which is what a local-only install wants -- set the values in env.sh when you want the site online."
+  program_missing: "The %{name} backend runs %{program}, and %{program} is not installed here -- every deploy would fail after the build."
+  program_missing_fix: "Install %{program} from your system's packages, then run ./blog.sh doctor again."
+  program_missing_fix_rclone: "Install rclone from your system's packages or from rclone.org -- not as a snap, see docs/install.md."
+  rclone_snap_confined: "rclone here is the snap (%{path}), which can only read inside your home directory -- and the site is in %{dir}, so every deploy would fail on files that are plainly there (no such file or directory, or permission denied)."
+  rclone_snap_confined_fix: "Install rclone from your system's packages or from rclone.org instead of the snap (docs/install.md), or move the site into a folder in your home directory whose name does not start with a dot."
 
   widget_label: "the %{name} widget's feed"
   analytics_label: "the analytics script"
   online_ok: "%{label} answers."
   online_failed: "%{label} (%{url}) did not answer: %{message}."
+  deploy_target_answers: "The deploy target (%{target}) answers."
+  deploy_target_failed: "The deploy target (%{target}) did not answer: %{message}."
+  deploy_target_missing: "The deploy target (%{target}) answers, but the directory the site goes into is not there yet."
+  deploy_target_missing_fix: "A first deploy creates it. If it should be there already, check the path -- a typo or a volume that is not mounted looks exactly like this, and the deploy would make a new directory beside the real one."
+  deploy_target_clean: "The deploy target (%{target}) answers, and everything in its root is this site's."
+  deploy_target_foreign: "The deploy target (%{target}) holds %{count} item(s) in its root that this site does not put there: %{names}."
+  deploy_target_more: " and %{count} more"
+  deploy_target_foreign_index: "One of them is %{name}, which a host serves before index.html -- an old front page can go on hiding the new one."
+  deploy_target_foreign_fix: "A deploy never deletes what it did not write, so these stay and are served beside the site. Delete what you do not want by hand (FTP, the host's file manager); and name what is there on purpose under deploy.keep in config/site.yml, and doctor stops listing it (.well-known, where a host keeps its certificate challenge, is never listed)."
+  deploy_keep_shape: "deploy.keep in config/site.yml is not a list, so doctor keeps nothing off its list of foreign files."
+  deploy_keep_invalid: "deploy.keep names %{entries}, which are not names in the root of the target -- doctor looks only at the root, and only at exact names."
+  deploy_keep_fix: "Write it as a list of names exactly as they stand in the root, a directory with or without its slash: deploy: { keep: [issue-45/, google1234.html] }."
+  deploy_target_timeout: "no answer in %{seconds} s"
   token_ok: "The access token works -- %{handle}."
   token_invalid: "%{instance} rejected the access token."
   token_invalid_fix: "Nothing has been announced since it stopped working, and nothing will be until it is replaced. Create a new one and put it in env.sh."
@@ -1201,7 +1327,28 @@ check:
   repair_summary_failed: "Refused or failed: %{count}. Nothing was changed for those."
   repair_summary: "Applied: %{applied}, skipped: %{skipped}, nothing offered: %{no_offer}."
   repair_rebuild: "Run ./blog.sh rebuild to put the changes on the site."
-  unknown_option: "Unknown option: %{option}. check takes --online, --json and --repair, nothing else."
+  language_address_taken_fix: "Give one of them another address: the `slug:` line in the header that `./blog.sh translate <slug> --lang %{lang}` opens."
+  language_address_taken: "In %{lang}, %{slugs} both ask for %{address} -- the build stops on it, and the site is not deployed."
+  unknown_locale: "%{langs}: `site.locales` names it, and the engine has no locale file for it -- no language of this site will build."
+  unknown_locale_fix: "Add locales/<code>.yml for it, take the code out of `site.locales`, or name the language its interface words come from under `site.ui_language` in config/site.yml."
+  language_file_stray: "%{file} is a file for a language this site does not publish -- nothing reads it."
+  language_file_stray_fix: "Name the language in `site.locales`, or move the file out of config/ -- its translations will be wanted if the language comes back. The site's own language has no file of its own: config/site.yml is it."
+  language_key_unknown: "%{file} says %{keys}, which the engine does not read."
+  language_key_unknown_fix: "It knows: %{known}. A key it does not know does nothing at all, which is why it is said here."
+  language_file_syntax: "%{file} is not valid YAML: %{message} at line %{line}, column %{column} -- and the build stops on it, in every language, not only this one."
+  language_file_syntax_fix: "Almost always this is indentation, a missing quote, or a quote inside a quoted value. ./blog.sh doctor says what to look for."
+  language_key_orphan: "%{file} translates %{keys}, which config/site.yml does not have."
+  language_key_orphan_fix: "There is nothing for it to replace. Set it up in site.yml first, or take it out of the file -- as it stands it does nothing."
+  language_label_empty: "%{file} gives %{keys} an empty word, which would leave the pill with nothing on it."
+  language_label_empty_fix: "Write the word, or take the tag out of tags: -- it then shows as written."
+  language_list_mismatch: "%{file}: %{key} goes to other places than in config/site.yml. %{detail}"
+  language_list_mismatch_fix: "A translated menu or footer names the same places in the same order; only the words change. The build refuses the file until they match."
+  language_tag_unused: "%{file} gives a word to %{tags}, which no published post carries -- nothing shows it."
+  language_tag_unused_fix: "Nothing is wrong on the site. Take the line out, or leave it for a tag you are about to use."
+  languages_legend: "A tick is written, a half circle a title with no text yet, a dot where that language has nothing -- the other language still shows the post and links to the one copy of it."
+  languages_alone: "check --languages prints a table and --json and --repair do not; ask for them one at a time."
+  languages_none: "This site publishes one language, so there is nothing to tabulate. Name the others in `site.locales` in config/site.yml."
+  unknown_option: "Unknown option: %{option}. check takes --online, --json, --languages and --repair, nothing else."
   heading: "Checking this archive"
   progress: "Reading posts: %{done}/%{total}"
   no_posts: "There are no posts to check yet."
@@ -1342,8 +1489,8 @@ export:
 
 setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
-  intro_skip: "Every question can be skipped -- Enter takes the value pre-filled under it. Nothing is written until you have seen all the changes together and said yes."
-  intro_expert: "(Rather edit YAML yourself? The wizard only fills in config/site.yml, whose commented template is config/site.yml.example.)"
+  intro_skip: "Most questions can be skipped -- Enter takes the value pre-filled under it; the site's name, short name, description and author need typing only while they are still the template's example. Nothing is written until you have seen all the changes together and said yes."
+  intro_expert: "(Rather edit the files yourself? config/site.yml has a commented template in config/site.yml.example, and env.sh one in env.sh.example.)"
   config_unreadable: "❌ %{path} could not be read: %{error}"
   network_unchanged: "Nothing given, so nothing changed -- the site keeps the comments network it had."
   config_unreadable_stop: "Nothing was changed. Every question here offers what the config already says and Enter keeps it -- with the file unreadable there is nothing to keep, and answering would have blanked what is in it. Put the file right (`./blog.sh doctor` names the line) and run this again."
@@ -1364,9 +1511,12 @@ setup:
   q_timezone: "Timezone"
   h_timezone: "Publish times are calculated in this zone. An IANA name like Europe/Prague. Mind servers: the machine is often on UTC, but this should be the zone you live in."
   e_timezone: "This machine does not know a zone called \"%{zone}\". Zones are named Continent/City, in English -- Europe/Prague, not Praha or CEST; the full list is in /usr/share/zoneinfo."
+  e_identity_required: "The site needs this one -- the template only had an example here. Type the site's own."
 
   q_base_url: "Site address"
   h_base_url: "The address the site will be seen at, e.g. https://mysite.com -- no trailing slash. RSS, the sitemap and share previews are built from it; written to config/site.yml and env.sh at once."
+  e_target_no_user: "There is no user \"%{user}\" on this machine, so ~%{user} leads nowhere. Was it meant to be ~/ (your home directory)?"
+  e_base_url_required: "The site needs its own address -- %{example} was only the template's example. Only trying it out on this machine? http://localhost:8000 will do, and a rerun of ./setup.sh changes it later."
   e_base_url: "That is not a URL -- it has to start with http:// or https:// and carry a host name."
   e_base_url_slash: "Drop the trailing slash, or generated links end up with two."
 
@@ -1380,7 +1530,9 @@ setup:
   q_instance: "Mastodon instance"
   h_instance: "Just the name of the server your account is on -- mastodon.social, not https://mastodon.social/@you."
   e_instance: "The host name only, with no https:// and no path."
-  token_where: "The token is the key that lets the blog post announcements in your name. Make one on %{instance}: Preferences -> Development -> New application, tick the write:statuses scope, and copy the access token here."
+  token_where: "The token is the key that lets the blog post announcements in your name. Make one on %{instance}: Preferences -> Development -> New application, tick the write:statuses scope, and copy the access token here -- not the client key or the client secret above it."
+  secret_received: "Received: length %{length}."
+  secret_received_tail: "Received: length %{length}, ends in …%{tail}."
   q_token: "Access token (Enter to skip -- it is not shown as you type): "
   token_skipped: "No token. The site works; it just never announces anything until you add one to env.sh."
   checking_token: "Asking the instance whether the token works"
@@ -1391,7 +1543,6 @@ setup:
   token_kept_rejected: "Saved, but nothing will be announced until it is replaced. Make a new one and run ./setup.sh again."
 
   q_toots_widget: "Show your latest toots in the sidebar? The account id (%{id}) is right here, so this costs nothing. [y/N] "
-  toots_heading: "Recent toots"
   toots_added: "✅ Added. ./scripts/refresh-sidebar.sh fills it in; run it from cron to keep it fresh."
 
   q_handle: "Bluesky handle"
@@ -1422,8 +1573,10 @@ setup:
 
   q_surfer_url: "Surfer app URL"
   h_surfer_url: "The address the Surfer app runs at -- the same one the site's visitors will see. E.g. https://blog.mydomain.com."
-  surfer_token_where: "Surfer issues the token in its web interface: log into the app and open Settings -> Access Tokens."
-  q_surfer_token: "Surfer access token (not shown as you type): "
+  surfer_password_where: "Create the app password in your Cloudron profile: Profile -> App Passwords, for the Surfer app. It is not the password you sign in to Cloudron with."
+  q_surfer_password: "Surfer app password (not shown as you type): "
+  q_surfer_username: "Your Cloudron username"
+  h_surfer_username: "The username, not the e-mail -- the one you sign in to Cloudron with. Surfer 7 no longer takes access tokens; it signs in with the username and an app password."
   q_surfer_remote_dir: "Subdirectory on Surfer"
   h_surfer_remote_dir: "Fill in only if the site should live in a subfolder next to something else. Enter = the site sits right at the app's address."
   q_deploy_target_dir: "Directory"
@@ -1441,7 +1594,7 @@ setup:
   q_sftp_remote_dir: "Remote directory"
   h_sftp_remote_dir: "The folder on the server the hosting shows the world -- often www or public_html."
   target_ok: "✅ %{dir} exists."
-  target_missing: "%{dir} does not exist yet. Create it before the first deploy, or the deploy will have nowhere to put the site."
+  target_missing: "%{dir} does not exist yet -- the first deploy creates it. If it should be there already, check the path."
 
   env_permissions: "%{path} holds live credentials and is readable only by you (mode 600)."
   next_steps: "Next: ./blog.sh add writes your first post, ./blog.sh preview shows the site at http://localhost:8000/, and ./style.sh sets the palette, the header image and the sidebar."
@@ -1456,6 +1609,8 @@ wizard:
   prompt_with_current: "Now: %{current}\n> "
   prompt_with_suggestion: "Suggested: %{current}\n> "
   empty_value: "(not set)"
+  answer_yes: "yes"
+  answer_no: "no"
   current_is: "Now: %{value}"
   choice_prompt: "Choice: "
   menu_hint: "↑↓ move · Enter select · 1-%{count} quick pick · Esc keep current"
@@ -1589,11 +1744,6 @@ style:
   widget_commits: "Recent commits from a GitHub, Gitea or Forgejo account"
   widget_bluesky: "Recent posts from a Bluesky account"
   widget_rss: "Anything with an RSS or Atom feed"
-  widget_heading_toots: "Recent toots"
-  widget_heading_pixelfed: "Recent Pixelfed posts"
-  widget_heading_commits: "Recent commits"
-  widget_heading_bluesky: "Recent Bluesky posts"
-  widget_heading_rss: "Elsewhere"
   q_widget_heading: "Heading over the widget"
   q_widget_account_id: "Account id"
   h_widget_account_id: "The id, not the @handle -- a number on Mastodon, a ULID on GoToSocial. ./setup.sh finds it when the token is filled in. By hand: open https://your-instance/api/v1/accounts/lookup?acct=yourname and copy \"id\"."
@@ -1717,3 +1867,24 @@ share:
   linkedin: "Share on LinkedIn"
   threads: "Share on Threads"
   x: "Share on X"
+
+# What config/site.<lang>.yml got wrong about a list with places in it
+# (lib/language_file.rb). Shared by the build and check.
+language_file:
+  list_count: "config/site.yml has %{mine} item(s), %{file} has %{theirs}."
+  list_item: "Item %{n}: config/site.yml goes to %{mine}, %{file} to %{theirs}."
+  list_shape: "In %{file} it is not a list."
+
+# The headings the engine says when the site writes none of its own
+# (about.heading, footer.links_heading, footer.social_heading, a widget's
+# heading) -- in every language the site publishes. A heading the site
+# writes is the site's; one written empty means no heading at all.
+chrome:
+  about_heading: "About"
+  links_heading: "Links"
+  social_heading: "Find me on"
+  widget_toots: "Recent toots"
+  widget_pixelfed: "Recent Pixelfed posts"
+  widget_commits: "Recent commits"
+  widget_bluesky: "Recent Bluesky posts"
+  widget_rss: "Elsewhere"

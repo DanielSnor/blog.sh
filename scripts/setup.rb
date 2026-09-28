@@ -195,11 +195,7 @@ def run
   # Into the frame context, not onto the screen: the language menu is the
   # very next thing and repaints from the top, so a printed intro was
   # erased before anyone could read what Enter means here.
-  say(t('intro'))
-  say('')
-  say(t('intro_skip'), :dim)
-  say(t('intro_expert'), :dim)
-  say('')
+  say_intro
 
   site = ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
   env = ConfigWriter::EnvFile.new(ENV_SH, template: ENV_SH_EXAMPLE)
@@ -213,7 +209,15 @@ def run
   # Address and deploy back to back on purpose: "where the site lives"
   # and "where the build goes" are one theme, and the comments network is
   # an optional integration -- it goes last, like in the config file.
+  said_in = I18n.lang
   ask_language(site, current)
+  # The intro was said before anybody chose a language, so a Czech run
+  # carried an English paragraph at the top of every screen that followed
+  # (newcomer trial, 25. 9. 2026). Said again, in the language chosen.
+  if I18n.lang != said_in
+    Wizard.context = []
+    say_intro
+  end
   ask_identity(site, current)
   ask_page_size(site, current)
   ask_address(site, env, current)
@@ -227,6 +231,14 @@ end
 # Read once, up front: every prompt's default comes from here, and on a
 # first run these are the template's own values, since that is what the
 # site would say if left alone.
+def say_intro
+  say(t('intro'))
+  say('')
+  say(t('intro_skip'), :dim)
+  say(t('intro_expert'), :dim)
+  say('')
+end
+
 def current_values
   path = File.exist?(SITE_YML) ? SITE_YML : SITE_YML_EXAMPLE
   data = begin
@@ -299,21 +311,10 @@ def ask_identity(site, current)
   say(t('section_identity'), :bold)
   say('')
 
-  title = ask(t('q_title'), current.dig('site', 'title'), hint: t('h_title'),
-              suggested: template?(current, 'site', 'title'))
-  site.set(%w[site title], title)
-
-  short = ask(t('q_short_name'), current.dig('site', 'short_name'), hint: t('h_short_name'),
-              suggested: template?(current, 'site', 'short_name'))
-  site.set(%w[site short_name], short)
-
-  desc = ask(t('q_description'), current.dig('site', 'description'), hint: t('h_description'),
-             suggested: template?(current, 'site', 'description'))
-  site.set(%w[site description], desc)
-
-  author = ask(t('q_author'), current.dig('site', 'author'), hint: t('h_author'),
-               suggested: template?(current, 'site', 'author'))
-  site.set(%w[site author], author)
+  site.set(%w[site title], ask_identity_value(current, 'title'))
+  site.set(%w[site short_name], ask_identity_value(current, 'short_name'))
+  site.set(%w[site description], ask_identity_value(current, 'description'))
+  site.set(%w[site author], ask_identity_value(current, 'author'))
 
   # On a first run the "current" value is the template's Europe/Prague,
   # which is a placeholder rather than an answer -- so the suggestion
@@ -345,6 +346,30 @@ end
 # On a re-run the question is therefore not asked at all. Somebody who
 # really means it can still edit the key by hand, where the comment in
 # config/site.yml.example says the same thing at more length.
+# One of the four things a site is called. While the answer is still the
+# template's own -- "Your Name - personal web/log", "YOURSITE" -- it is not
+# offered as the Enter answer: that made the example text the site's name
+# on a single keypress, in English on a Czech site, and doctor then warned
+# about it (newcomer trial, 25. 9. 2026). The question wants a real answer
+# then; anything already the site's own is kept on Enter as always.
+def ask_identity_value(current, key)
+  placeholder = template?(current, 'site', key)
+  return ask(t("q_#{key}"), current.dig('site', key), hint: t("h_#{key}")) unless placeholder
+
+  problem = nil
+  loop do
+    # Recorded only once it is an answer: a refused Enter went into the
+    # running record as if it were one (second trial, 25. 9. 2026).
+    answer = Wizard.ask(t("q_#{key}"), nil, hint: t("h_#{key}"), problem: problem, record: false)
+    unless answer.to_s.strip.empty?
+      Wizard.record(t("q_#{key}"), answer) if Tui.interactive?
+      return answer
+    end
+
+    problem = t('e_identity_required', example: current.dig('site', key))
+  end
+end
+
 def ask_page_size(site, current)
   return unless @fresh
 
@@ -402,14 +427,18 @@ def ask_address(site, env, current)
   say(t('section_address'), :bold)
   say('')
 
-  url = ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url'),
-                  suggested: template?(current, 'site', 'base_url')) do |answer|
+  check = lambda do |answer|
     if !answer.match?(%r{\Ahttps?://[^/\s]+})
       t('e_base_url')
     elsif answer.end_with?('/')
       t('e_base_url_slash')
     end
   end
+  url = if template?(current, 'site', 'base_url')
+          ask_base_url_required(current.dig('site', 'base_url'), check)
+        else
+          ask_valid(t('q_base_url'), current.dig('site', 'base_url'), hint: t('h_base_url'), &check)
+        end
   return if url.to_s.empty?
 
   site.set(%w[site base_url], url)
@@ -476,6 +505,7 @@ def ask_mastodon(site, env, current)
   # arrived hard against the question, and in a terminal a blank line above
   # it. One shape or the other, not one per stream.
   puts unless Tui.interactive?
+  acknowledge_secret(token)
   puts
   if token.empty?
     puts Tui.paint(t('token_skipped'), :dim)
@@ -508,7 +538,8 @@ def ask_toots_widget(site, current, account_id)
   return unless confirm(t('q_toots_widget', id: account_id))
 
   site.set(%w[widgets toots account_id], account_id.to_s)
-  site.set(%w[widgets toots heading], current.dig('widgets', 'toots', 'heading') || t('toots_heading'))
+  # No heading written: the engine says "Recent toots" itself, in every
+  # language the site publishes. One the site wrote before stays.
   site.set(%w[widgets toots limit], current.dig('widgets', 'toots', 'limit') || 3)
   puts Tui.paint(t('toots_added'), :green)
 end
@@ -529,6 +560,7 @@ def ask_bluesky(site, env, current)
 
   password = Tui.password(t('q_app_password'))
   puts unless Tui.interactive? # see the note by the Mastodon token above
+  acknowledge_secret(password)
   puts
   if password.empty?
     puts Tui.paint(t('password_skipped'), :dim)
@@ -545,7 +577,9 @@ end
 # exits 0).
 BACKENDS = [
   ['none', 'backend_none', []],
-  ['surfer', 'backend_surfer', %w[SURFER_URL SURFER_TOKEN SURFER_REMOTE_DIR]],
+  # Surfer 7 signs in with the Cloudron user and an app password; the
+  # access token of Surfer 6 and earlier is still read, but not asked for.
+  ['surfer', 'backend_surfer', %w[SURFER_URL SURFER_USERNAME SURFER_PASSWORD SURFER_REMOTE_DIR]],
   ['local', 'backend_local', %w[DEPLOY_TARGET_DIR]],
   ['rsync', 'backend_rsync', %w[RSYNC_TARGET]],
   ['git', 'backend_git', %w[GIT_PAGES_REMOTE GIT_PAGES_BRANCH]],
@@ -553,7 +587,42 @@ BACKENDS = [
   ['sftp', 'backend_sftp', %w[SFTP_TARGET SFTP_REMOTE_DIR]]
 ].freeze
 
-SECRET_VALUES = %w[SURFER_TOKEN].freeze
+SECRET_VALUES = %w[SURFER_PASSWORD].freeze
+
+# The secret prompts show nothing, so this says what went in: the length,
+# and the last two characters when there are enough to spare them. A
+# Mastodon client key, client secret and access token are all long random
+# strings, and comparing the end with the page is how somebody tells which
+# one they pasted.
+def acknowledge_secret(value)
+  return if value.to_s.empty?
+
+  tail = Tui.secret_tail(value)
+  line = if tail
+           t('secret_received_tail', length: value.length, tail: tail)
+         else
+           t('secret_received', length: value.length)
+         end
+  puts Tui.paint(line, :dim)
+end
+
+# While the address is still the template's example.com it is no Enter
+# answer, for the reason the site's name is not: the feed, the sitemap and
+# every share preview would point at somebody else's domain, doctor warns
+# about it, and `add` then says the site goes nowhere yet (both trials,
+# 24. and 25. 9. 2026). Trying it out on this machine has an answer too --
+# the hint says which.
+def ask_base_url_required(example, check)
+  problem = nil
+  loop do
+    answer = Wizard.ask(t('q_base_url'), nil, hint: t('h_base_url'), problem: problem, record: false).to_s.strip
+    problem = answer.empty? ? t('e_base_url_required', example: example) : check.call(answer)
+    next if problem
+
+    Wizard.record(t('q_base_url'), answer) if Tui.interactive?
+    return answer
+  end
+end
 
 def ask_deploy(env, _current)
   say(t('section_deploy'), :bold)
@@ -586,10 +655,13 @@ def ask_deploy(env, _current)
     if SECRET_VALUES.include?(name)
       # Same courtesy the Mastodon token gets: say where a secret comes
       # from before asking for it.
-      puts t('surfer_token_where') if name == 'SURFER_TOKEN'
+      puts t('surfer_password_where') if name == 'SURFER_PASSWORD'
       value = Tui.password(t("q_#{name.downcase}"))
       puts unless Tui.interactive? # see the note by the Mastodon token above
+      acknowledge_secret(value)
       puts
+    elsif name == 'DEPLOY_TARGET_DIR'
+      value = ask_target_dir(name)
     else
       value = ask(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}"))
     end
@@ -597,6 +669,27 @@ def ask_deploy(env, _current)
   end
 
   check_local_target(env) if chosen == 'local'
+end
+
+# Written out whole: env.sh quotes the value, so the shell never expands
+# the tilde, and a path that means the same thing to every tool that reads
+# it is the one that cannot surprise. A ~name with no such user is asked
+# again rather than raised: the ArgumentError took every answer of the
+# interview with it (fleet, 26. 9. 2026).
+def ask_target_dir(name)
+  value = ask_valid(t("q_#{name.downcase}"), ENV[name].to_s, hint: t("h_#{name.downcase}")) do |answer|
+    next nil unless answer.start_with?('~')
+
+    begin
+      File.expand_path(answer)
+      nil
+    rescue ArgumentError
+      t('e_target_no_user', user: answer[%r{\A~([^/]*)}, 1])
+    end
+  end
+  value.to_s.start_with?('~') ? File.expand_path(value) : value
+rescue ArgumentError
+  value
 end
 
 # The one target that can be checked without the network, and worth
@@ -613,7 +706,14 @@ def check_local_target(env)
   # The same expansion the backend does (DeployBackend::Local#session), or
   # a path typed with a leading ~ -- the ordinary way to write one -- was
   # called missing by the wizard and then found by the deploy.
-  if File.directory?(File.expand_path(dir))
+  there = begin
+    File.directory?(File.expand_path(dir))
+  rescue ArgumentError # ~name with no such user, kept on Enter
+    say("⚠️  #{t('e_target_no_user', user: dir[%r{\A~([^/]*)}, 1])}", :yellow)
+    say('')
+    return
+  end
+  if there
     say(t('target_ok', dir: dir), :green)
   else
     say("⚠️  #{t('target_missing', dir: dir)}", :yellow)

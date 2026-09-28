@@ -114,6 +114,9 @@ module Publishing
     updated = post.merge('state' => 'published', 'date' => date.iso8601)
     updated.delete('draft_token')
     updated.delete('scheduled')
+    # The date a plan overwrote: the post is going out with the slot it
+    # was given, so there is nothing left to put back.
+    updated.delete('date_before_schedule')
     # A post that was unpublished and renamed while a draft comes back
     # under a new address; the marker cmd_unpublish left behind becomes a
     # redirect from the old one. Coming back under the SAME address just
@@ -389,6 +392,23 @@ module Publishing
     [title, blocks]
   end
 
+  # The env.sh value an announcement on this site's network needs, or nil
+  # when there is no network. Said by name where it is missing, because
+  # "announced on Mastodon" on a site with no token is a promise publish
+  # then cannot keep (newcomer trial, 25. 9. 2026).
+  NETWORK_SECRET = { mastodon: 'MASTODON_ACCESS_TOKEN', bluesky: 'BLUESKY_APP_PASSWORD' }.freeze
+
+  def network_secret
+    NETWORK_SECRET[SiteConfig.comment_network]
+  end
+
+  # Whether publishing a post here would announce it: a network, and the
+  # secret it needs.
+  def announces?
+    secret = network_secret
+    !secret.nil? && !ENV[secret].to_s.empty?
+  end
+
   def announce(post, year:)
     # An announcement is the one act that cannot be taken back, and without
     # a base URL it goes out carrying "/posts/2026/slug/" -- not a link at
@@ -514,7 +534,7 @@ module Publishing
   # spending nothing on the rest. It is on only when somebody asks for it by
   # hand (`./blog.sh rebuild --full`), which is what you do when you doubt
   # what is on disk rather than what is in the archive.
-  def rebuild_and_deploy(reason, full: false)
+  def rebuild_and_deploy(reason, full: false, force: false)
     @stopped_on_busy_lock = false
     # Noted before the build reads a single file, so a marker written after
     # this instant is somebody else's debt and survives our success.
@@ -523,12 +543,17 @@ module Publishing
     puts "#{reason}…"
     build = [File.join(ROOT, 'build', 'build_blog.rb')]
     build << '--full' if full
-    unless system('ruby', *build)
+    unless run_build(build)
+      return false if @stopped_on_busy_lock
+
       finish_later('build', $CHILD_STATUS)
       return false
     end
 
-    if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune')
+    # --force is the deploy's: its guard says to run again with it, and
+    # `./blog.sh rebuild --force` is how that is said from here.
+    extra = force ? ['--force'] : []
+    if system('ruby', File.join(ROOT, 'scripts', 'deploy_web.rb'), '--prune', *extra)
       clear_deploy_pending(written_before: started)
       return true
     end
@@ -537,14 +562,62 @@ module Publishing
     false
   end
 
+  # Which languages a rebuild produces: the site's own, and every other one
+  # `site.locales` names. One run per language, all of them into the SAME
+  # public.nosync -- the tree is the merge (build_blog.rb's CONTENT_ROOT),
+  # so the deploy that follows sees one site and nothing has to be copied
+  # or reconciled afterwards.
+  def publish_languages
+    own = SiteConfig.get('site', 'lang', default: 'en').to_s
+    named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
+    ([own] + named.reject(&:empty?)).uniq
+  end
+
+  # One build, or one per language under a single lock.
+  #
+  # 🪤 The lock is the orchestrator's here. A build takes its own -- unless
+  # it was told where to write, which is exactly what each language run is
+  # told -- so without this the runs would go unguarded while a scheduled
+  # publish walked in between two of them and deployed half a site.
+  def run_build(build)
+    langs = publish_languages
+    return system('ruby', *build) if langs.length < 2
+
+    public_dir = File.join(ROOT, 'public.nosync')
+    held = RunLock.hold(ROOT, label: 'build') do
+      langs.all? do |lang|
+        system({ 'BLOG_SH_PUBLIC_DIR' => public_dir, 'BLOG_SH_LANG' => lang }, 'ruby', *build)
+      end
+    end
+    return held unless held == RunLock::BUSY
+
+    @stopped_on_busy_lock = true
+    warn I18n.t('cli.build_busy')
+    mark_deploy_pending
+    warn I18n.t('cli.deploy_pending_marked')
+    false
+  end
+
   # Says which of the two things happened and leaves the marker behind so
   # the next scheduled run picks the site back up.
+  #
+  # The two are told apart in the LAST line too. "The next scheduled run
+  # finishes it, once the other run is done" is true of a lock two runs
+  # met at; after a failed build or a guard's stop there is no other run,
+  # and no scheduled run can fix a typo in site.yml -- the newcomer trial
+  # (25. 9. 2026) read it after every failure and waited for nothing.
+  #
+  # A refused sign-in is told apart too: "a transfer that broke off only
+  # needs ./scripts/deploy-web.sh again" stood under Surfer's 401, where
+  # running it again changes nothing until env.sh does (26. 9. 2026).
   def finish_later(step, status)
     busy = RunLock.busy_exit?(status)
     @stopped_on_busy_lock = busy
-    warn I18n.t("cli.#{step}_#{busy ? 'busy' : 'failed'}")
+    require_relative 'deploy_backend'
+    refused = step == 'deploy' && status.respond_to?(:exitstatus) && status.exitstatus == DeployBackend::REFUSED_EXIT
+    warn I18n.t("cli.#{step}_#{busy ? 'busy' : refused ? 'refused' : 'failed'}")
     mark_deploy_pending
-    warn I18n.t('cli.deploy_pending_marked')
+    warn I18n.t(busy ? 'cli.deploy_pending_marked' : 'cli.deploy_pending_marked_failed')
   end
 
   # Whether the most recent rebuild_and_deploy came back false because

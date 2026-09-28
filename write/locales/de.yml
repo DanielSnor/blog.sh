@@ -45,6 +45,7 @@ app:
   add_image: "Bild oder Video hinzufügen"
   alt_hint: "Was auf dem Bild zu sehen ist. Wer einen Screenreader nutzt, hat nur das."
   alt_missing: "Noch ohne Beschreibung"
+  alt_missing_send: "Noch ohne Beschreibung: {names}. Sie ist für alle, die das Bild oder Video nicht sehen. Ergänzen, oder noch einmal tippen und ohne sie senden."
   used_in_text: "Im Text verwendet"
   unused_image: "Im Text nicht erwähnt — es wird hochgeladen, aber nirgends gezeigt."
   send: "Ans Blog senden"
@@ -110,4 +111,5 @@ app:
   result_warnings: "Wissenswert"
   saved_instead: "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive."
   share_cancelled: "Übergeben. Sobald der Kurzbefehl fertig ist, erscheint die Antwort auf dieser Seite -- wurde stattdessen das Teilen-Menü geschlossen, ist nichts abgeschickt."
+  share_retry_txt: "Dieser Browser gibt eine .md-Datei nicht weiter, also noch einmal tippen: der Text geht dann als .md.txt, das Blog stellt den Namen wieder her."
   not_saved: "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."

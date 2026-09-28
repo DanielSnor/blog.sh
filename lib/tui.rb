@@ -454,14 +454,30 @@ module Tui
     # terminal echoed the access token in clear text, into the scrollback
     # and over anybody's shoulder. The question is whether the keyboard is
     # a terminal, and only that.
+    # strip, not chomp: a token pasted with a space on either side was saved
+    # with it, the instance refused it, and nothing on screen could say why
+    # -- the one thing this prompt is for is never showing the value. Every
+    # caller reads a token or an app password, and an edge space is never
+    # part of either (#53).
     unless $stdin.tty?
-      value = $stdin.gets.to_s.chomp
+      value = $stdin.gets.to_s.strip
       return value
     end
 
-    value = $stdin.noecho(&:gets).to_s.chomp
+    value = $stdin.noecho(&:gets).to_s.strip
     puts
     value
+  end
+
+  # What may be shown of a value `password` read: its last two characters,
+  # and only when there are enough of them to spare two. The end rather
+  # than the start, because tokens often share a fixed prefix (ghp_,
+  # xoxb-) that would read the same on every one of them.
+  SECRET_TAIL_MIN = 8
+
+  def secret_tail(value)
+    value = value.to_s
+    value.length >= SECRET_TAIL_MIN ? value[-2..] : nil
   end
 
   # Clamps a scrolling window of `window` items (out of `total`) so that
@@ -592,8 +608,11 @@ module Tui
       when :enter then return selected
       when :escape then return nil
       when String
-        # Without allow_text, single keys keep their shortcuts: q/0 cancel,
-        # 1-9 pick a visible row directly. With allow_text those characters
+        # Without allow_text, single keys keep their shortcuts: 0 cancels,
+        # 1-9 pick a visible row directly. Not q: Esc is the way out of
+        # every screen, and a second key for it here -- and nowhere else,
+        # not the browser, not the properties -- was a rule half kept
+        # (Daniel, 25. 9. 2026: q is not a second Esc). With allow_text those characters
         # have to be typeable -- slugs beginning with a digit (or q) were
         # impossible to enter, and the first keypress silently retargeted
         # to a visible row instead -- so every alphanumeric key starts a
@@ -601,19 +620,43 @@ module Tui
         # that row (the quick pick, one keystroke later), an empty line
         # cancels, anything else is the slug. Same contract as the piped,
         # non-interactive picker.
-        if !allow_text && %w[q 0].include?(key)
+        if !allow_text && key == '0'
           return nil
         elsif !allow_text && key =~ /\A[1-9]\z/
-          relative = key.to_i - 1
+          # Past nine rows a quick pick is two digits: the first waits a
+          # moment for a second. style.sh's menu has eleven sections and
+          # its hint said "1-9", leaving Analytics and Done unreachable by
+          # number (newcomer trial, 25. 9. 2026).
+          number = key
+          if [window, items.size - offset].min > 9 && key.to_i * 10 <= [window, items.size - offset].min
+            number += pending_input(wait: 0.6)[/\A\d/].to_s
+          end
+          relative = number.to_i - 1
           index = offset + relative
           return index if relative < window && index < items.size
         elsif allow_text && key =~ /\A[[:alnum:]]\z/
           # On its own line under the frame, which the frame leaves room
           # for: typing onto the last painted row would put the answer
           # inside the hint, and the frame would repaint over it.
-          print "\r\n\e[?25h#{text_prompt}#{key}"
-          rest = $stdin.gets.to_s.strip
-          line = "#{key}#{rest}"
+          # A pasted slug arrives all at once, and everything after its first
+          # character was already waiting in the raw queue -- where the
+          # closing Return is a bare \r that a cooked read never takes for
+          # the end of a line. The menu sat waiting after "p" for the rest
+          # of "partial-draft" (newcomer trial, 25. 9. 2026). So what is
+          # already there is read in raw mode first; a line that is complete
+          # needs nothing more, and only a line still being typed goes on
+          # to the cooked read.
+          waiting = pending_input
+          typed, newline, = waiting.partition(/[\r\n]/)
+          typed = "#{key}#{typed}"
+          print "\r\n\e[?25h#{text_prompt}#{typed}"
+          rest = newline.empty? ? $stdin.gets.to_s.strip : (puts; '')
+          # Esc in the typed line backs out, as it does everywhere: the
+          # cooked read hands it over as a character, and "abc^[" came
+          # back as the slug to open (second trial, 25. 9. 2026).
+          return nil if "#{typed}#{rest}".include?("\e")
+
+          line = "#{typed}#{rest}".gsub(/[[:cntrl:]]+/, ' ').strip
           # numeric_pick: false for menus whose rows carry no numbers and
           # whose VALUES can be numbers (tag names like "365") -- there a
           # typed number must mean the text, not a row.
@@ -641,6 +684,26 @@ module Tui
   # Two strings on one line, the second flush right -- the status line of
   # `browse` below, where the left half says what is being shown and the
   # right half says where in it you are.
+  # What has already arrived on stdin, read without waiting and without
+  # leaving raw mode -- the rest of a paste, typically. Empty when nothing
+  # is there, or when stdin is not a terminal to put in raw mode.
+  def pending_input(wait: 0.03)
+    buffer = +''
+    $stdin.raw do
+      first = true
+      while IO.select([$stdin], nil, nil, first ? wait : 0.03)
+        first = false
+        chunk = $stdin.read_nonblock(4096, exception: false)
+        break unless chunk.is_a?(String)
+
+        buffer << chunk
+      end
+    end
+    buffer.force_encoding(Encoding::UTF_8).scrub('')
+  rescue StandardError
+    ''
+  end
+
   def pad_between(left, right, width)
     gap = width - display_width(strip_ansi(left)) - display_width(strip_ansi(right))
     return truncate_to_width(left, width) if gap < 1
@@ -823,6 +886,24 @@ module Tui
   # 12-row window lost "Esc back" and the screen became a trap. What gets
   # dropped instead is the end of the middle, which is a list the cursor can
   # still scroll through.
+  # A row the frame must not cut: an address to be copied or clicked. It
+  # is printed whole and the terminal wraps it softly, so it stays ONE
+  # line to select -- folded by hand into indented pieces, or truncated,
+  # it could be neither copied nor opened (fleet, 26. 9. 2026). The frame
+  # counts the physical rows it takes, which is what keeps the repaint
+  # from the top honest.
+  Whole = Struct.new(:text) do
+    def to_s
+      text.to_s
+    end
+  end
+
+  def physical_rows(line, width)
+    return 1 unless line.is_a?(Whole) && width.positive?
+
+    [(display_width(sanitize_row(line.text)) + width - 1) / width, 1].max
+  end
+
   def frame(lines, keep_last: 0)
     width = term_width
     height = term_height
@@ -832,7 +913,17 @@ module Tui
              tail = lines.last([keep_last, height].min)
              lines.first(height - tail.size) + tail
            end
-    body = rows.map { |line| "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}" }
+    # A whole row that wraps takes more than one row of the window; drop
+    # rows from above the kept tail until the frame fits again.
+    tail_size = [keep_last, rows.size].min
+    while rows.sum { |line| physical_rows(line, width) } > height && rows.size > tail_size
+      rows.delete_at(rows.size - tail_size - 1)
+    end
+    body = rows.map do |line|
+      next "\e[2K#{sanitize_row(line.text)}\e[K" if line.is_a?(Whole)
+
+      "\e[2K#{truncate_ansi(sanitize_row(line.to_s), width)}"
+    end
     print "\e[H#{body.join("\r\n")}\e[J"
   end
 
@@ -903,10 +994,13 @@ module Tui
     # under it, rather than the two overwriting each other row by row. The
     # pause is what keeps the output readable: without it the next frame
     # would wipe whatever was just said.
+    # A block that returns :nothing gets no pause: "press any key" under
+    # a question answered no -- nothing printed, nothing to read -- was a
+    # keystroke for no reason (second trial, 25. 9. 2026).
     def leave(pause_message)
       Tui.frame_end(@lines)
       result = yield
-      Tui.pause_and_clear(pause_message)
+      Tui.pause_and_clear(pause_message) unless result == :nothing
       result
     end
 

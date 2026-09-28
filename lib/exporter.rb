@@ -514,14 +514,20 @@ module Exporter
         element = block['type'].to_s == 'audio' ? 'audio' : 'video'
         %(<#{element} controls preload="metadata" src="#{src}"></#{element}>)
       elsif !block['embed_html'].to_s.strip.empty?
-        block['embed_html']
+        # The iframe an import brought with it, told who is embedding it --
+        # an export gets re-hosted under a name the engine never hears
+        # about, and a player that cannot name its embedder will not play
+        # there either. See Embed::REFERRER_POLICY.
+        Embed.with_referrer_policy(block['embed_html'])
       elsif !id.empty?
         # youtube-nocookie, as the build uses: the same player without
         # tracking cookies until the visitor presses play.
         %(<iframe src="https://www.youtube-nocookie.com/embed/#{escape_html(id)}" ) +
-          %(title="YouTube" frameborder="0" loading="lazy" allowfullscreen></iframe>)
+          %(title="YouTube" frameborder="0" loading="lazy" ) +
+          %(#{Embed::REFERRER_ATTR} allowfullscreen></iframe>)
       elsif (src = Embed.src(block))
-        %(<iframe src="#{escape_html(src)}" frameborder="0" loading="lazy" allowfullscreen></iframe>)
+        %(<iframe src="#{escape_html(src)}" frameborder="0" loading="lazy" ) +
+          %(#{Embed::REFERRER_ATTR} allowfullscreen></iframe>)
       elsif !block['url'].to_s.empty?
         %(<a href="#{escape_html(block['url'])}">#{escape_html(block['url'])}</a>)
       end

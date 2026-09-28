@@ -22,11 +22,20 @@ module PostAddress
   # `year` is passed by the build, which has the post's time parsed and
   # cached already; everyone else lets this read it from the date. The two
   # must not diverge, which is the whole reason for the parameter.
+  # `address_slug` is the post's address in the language being rendered,
+  # and only a translated post carries one (lib/translations.rb). The
+  # post's own slug stays its identity -- its file and its media -- so a
+  # build in another language moves the ADDRESS and nothing else.
+  def address_slug(post)
+    named = post['address_slug'].to_s
+    named.empty? ? post['slug'] : named
+  end
+
   def path(post, year: nil)
     return "/draft/#{post['draft_token']}/#{post['slug']}/" if draft?(post)
-    return "/#{post['slug']}/" if page?(post)
+    return "/#{address_slug(post)}/" if page?(post)
 
-    "/posts/#{year || date_year(post)}/#{post['slug']}/"
+    "/posts/#{year || date_year(post)}/#{address_slug(post)}/"
   end
 
 
@@ -104,7 +113,7 @@ module PostAddress
   # everyone else's) but never the page key: it is served under its token,
   # not at the root.
   def collision_keys(post, slug: nil, year: nil)
-    name = (slug || post['slug']).to_s
+    name = (slug || address_slug(post)).to_s
     keys = [[(year || date_year(post)).to_s, name]]
     keys << ['page', name] if page?(post) && !draft?(post)
     keys
@@ -166,7 +175,17 @@ module PostAddress
     pixelfed: 'pixelfed.json', toots: 'toots.json', commits: 'commits.json',
     bluesky: 'bluesky.json', rss: 'rss.json', comments: 'comments.json'
   }.freeze
-  RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
+  # Every language this installation has a locale file for is a root the
+  # build may write: a site published in more than one renders each into
+  # /<lang>/, and a page slugged `de` would be emitted over the German
+  # tree -- the incident described above, one language further in. Read
+  # from the locales directory rather than listed here, because adding a
+  # language is data and not code (docs/localization.md), and a list kept
+  # by hand is exactly how `archive` and `write` went missing from the one
+  # above.
+  LOCALE_ROOTS = Dir.glob(File.join(__dir__, '..', 'locales', '*.yml'))
+                    .map { |path| File.basename(path, '.yml') }.sort.freeze
+  RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + LOCALE_ROOTS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
   REDIRECT_SEGMENT_MAX_BYTES = 255
 
   def redirect_refusal(origin)

@@ -22,6 +22,7 @@ require_relative '../lib/bluesky_poster'
 require_relative '../lib/site_config'
 require_relative '../lib/markdown_parser'
 require_relative '../lib/markdown_writer'
+require_relative '../lib/link_card'
 require_relative '../lib/media_dimensions'
 require_relative '../lib/heic_converter'
 require_relative '../lib/video_probe'
@@ -29,6 +30,7 @@ require_relative '../lib/video_remuxer'
 require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
+require_relative '../lib/translations'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
@@ -134,10 +136,24 @@ LOCAL_PREVIEW_PORT = 8000
 # Printed under a preview or a publish line, and only where the canonical
 # address is still the template's: on a real site that address IS the
 # answer, and a second one under every post would be noise.
+# "Goes nowhere yet" only where that is true: a site deploying into a
+# local directory with the template's address still in site.yml was told
+# its web went nowhere, right after the deploy (second trial, 25. 9. 2026).
 def puts_local_preview_hint(site_path)
   return unless placeholder_base_url?
 
-  puts Tui.paint(t('cli.local_preview_hint', url: "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}"), :dim)
+  key = deploys_somewhere? ? 'cli.local_preview_hint_deployed' : 'cli.local_preview_hint'
+  puts Tui.paint(t(key, url: "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}"), :dim)
+end
+
+# An unset DEPLOY_BACKEND is Surfer, as DeployBackend.pick and doctor read
+# it -- looked up by name it was nothing, and a publish that had just
+# uploaded said the site went nowhere (fleet, 26. 9. 2026).
+def deploys_somewhere?
+  require_relative '../lib/deploy_backend'
+  name = ENV['DEPLOY_BACKEND'].to_s
+  backend = name.empty? ? DeployBackend::Surfer : DeployBackend::BACKENDS[name]
+  !backend.nil? && backend.configured?
 end
 
 # --- frontmatter ------------------------------------------------------
@@ -153,6 +169,14 @@ FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series seri
 # the key would be accepted and do nothing, which is the one thing the
 # unknown-key rule below exists to prevent; so it is unknown there.
 FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt].freeze
+# What an edit decides: every key the editor shows in the header, and the
+# few the save computes on purpose (the address history, the state). Any
+# other key the post carries is kept as it was -- see edit_post.
+# receipt_warnings describe the text as it arrived from the phone; an edit
+# replaces that text, and the receipt kept warning about a picture the post
+# no longer had (review of the carry-all, 27. 9. 2026).
+EDIT_DECIDES = (FRONTMATTER_KEYS - %w[link link_title link_description] +
+                %w[slug state content source former_slugs redirect_from unpublished_from receipt_warnings]).freeze
 
 # What the site does with lead images when a post says nothing. Read here
 # so the header can show a post's effective answer rather than a blank.
@@ -716,6 +740,9 @@ def buffer_command(origin)
   case origin && origin['kind']
   when 'add' then './blog.sh add'
   when 'edit' then "./blog.sh edit #{origin['slug']}"
+  when 'translate'
+    slug, lang = origin['slug'].to_s.split('@')
+    "./blog.sh translate #{slug} --lang #{lang}"
   else t('cli.buffer_unknown_origin')
   end
 end
@@ -923,11 +950,7 @@ end
 # has no place in the header; it stays in the body, where the save's
 # content-loss guard still asks before markdown drops it.
 def split_link_card(content)
-  blocks = Array(content)
-  first = blocks.first
-  return [nil, blocks] unless first.is_a?(Hash) && first['type'] == 'link'
-
-  [first, blocks.drop(1)]
+  LinkCard.split(content)
 end
 
 # A value on its way into the line-based front matter, made safe to put
@@ -1591,6 +1614,21 @@ end
 def report_added(path, warnings, json:, publish: false)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
 
+  # `publish: yes` is the road `publish <slug> --yes` takes, and that road
+  # refuses a post the site cannot show in every language it publishes.
+  # This one went straight out: a file from the phone, on a two-language
+  # site, published in one language without a word. It stays a draft here,
+  # and says why and how to send it anyway -- the answer carries the
+  # sentence, so the phone shows it too.
+  missing = publish ? missing_translations(post) : []
+  if missing.any?
+    kept = t('cli.add_publish_partial', slug: post['slug'], langs: missing.join(', '))
+    # Into the answer under --json; said on the terminal otherwise, where
+    # the other warnings of this run have already been said as they came.
+    json ? warnings += [kept] : warn(Tui.paint(kept, :yellow))
+    publish = false
+  end
+
   if publish
     # The same road `publish <slug> --yes` takes -- date settled, the
     # announcement sent, the site rebuilt and deployed -- with its prose
@@ -1953,6 +1991,11 @@ def prompt_and_schedule(path, post, raw: nil)
     input = answer.strip
     return false if input.empty? && slot.nil?
     return false if input.downcase == t('cli.cancel_word')
+    # Esc backs out here too. The line is read cooked, so the key arrives as
+    # a character: it piled up as ^[ and the only ways out were the cancel
+    # word and Ctrl+C, on the one question that decides when a post goes
+    # out and gets announced.
+    return false if input.include?("\e")
 
     date = if input.empty?
              slot
@@ -2078,6 +2121,14 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
     return
   end
 
+  # 🪤 The languages question, where the wizard asks it. `./blog.sh publish`
+  # refuses a post the site cannot show in every language it publishes and
+  # names `--allow-partial`; this path asked NOTHING, so the same decision
+  # was enforced on the command line and skipped one screen into the
+  # wizard. It is a question here rather than that refusal, because a flag
+  # is not something anybody can type at a keypress prompt.
+  return unless asked ? offer_missing_languages(slug, post) : true
+
   # If the date is still whatever the template suggested at creation time,
   # the author never touched it, so it publishes with the current time.
   # If they overwrote it, that's a deliberate decision left alone -- so
@@ -2123,6 +2174,12 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # question it had always asked, so a piped run that used to answer yes
   # and announce quietly stopped announcing. Only the flag knows whether
   # anybody is there to answer.
+  #
+  # A site with no network publishes without a word about it: that is a
+  # site that announces nowhere by choice, not a broken config, and the
+  # "check your section header" advice under every publish said otherwise
+  # (second trial, 25. 9. 2026). An explicit toot or bluesky still says it.
+  announce &&= !SiteConfig.comment_network.nil?
   fields = announce ? announce_on_publish(updated, new_year, date, ask: asked) : nil
   if fields
     updated.merge!(fields)
@@ -2376,11 +2433,11 @@ end
 # draft dialog would be waiting for a keypress that a program is never
 # going to send, and a promise that the whole output is one object cannot
 # be kept by a run that stops to ask something.
-def cmd_publish(slug, yes: false, announce: true, json: false)
+def cmd_publish(slug, yes: false, announce: true, json: false, allow_partial: false)
   JSON_REFUSALS[:enabled] = json
-  return publish_as_json(slug, announce: announce) if json
+  return publish_as_json(slug, announce: announce, allow_partial: allow_partial) if json
 
-  publish_interactively(slug, yes: yes, announce: announce)
+  publish_interactively(slug, yes: yes, announce: announce, allow_partial: allow_partial)
 end
 
 # The whole run under one refusal contract: anything that would have been
@@ -2388,7 +2445,7 @@ end
 # status stays 0 because the object IS the answer. iOS Shortcuts throws
 # away the output of a command that failed, which is the same reason
 # `add --json` leaves with zero.
-def publish_as_json(slug, announce: true)
+def publish_as_json(slug, announce: true, allow_partial: false)
   path = find_post_path(slug, ask: false)
   refuse('not_found', t('cli.post_not_found', slug: slug)) unless path
 
@@ -2402,6 +2459,7 @@ def publish_as_json(slug, announce: true)
                                       url: published_url(slug, post_time!(post).year,
                                                          page: PostAddress.page?(post))))
   end
+  refuse_partial!(post, slug, allow_partial, json: true)
 
   moved, warnings = begin
     quietly(true) { publish_draft(slug, path: path, announce: announce, asked: false) }
@@ -2414,7 +2472,7 @@ rescue Refused => e
   exit 0
 end
 
-def publish_interactively(slug, yes: false, announce: true)
+def publish_interactively(slug, yes: false, announce: true, allow_partial: false)
   # ask: false is --yes. find_post_path ASKS when a slug lives in more
   # than one year -- backdating makes that ordinary, and the picker is a
   # full-screen menu -- and under --yes there is nobody to work it: on a
@@ -2431,6 +2489,7 @@ def publish_interactively(slug, yes: false, announce: true)
     puts
     return
   end
+  refuse_partial!(post, slug, allow_partial)
 
   # The one path into the draft dialog that never built: add, edit and
   # unpublish all rebuild before it, so the Preview line the dialog prints
@@ -2466,17 +2525,22 @@ end
 # date, exactly as the [s] dialog choice does: it used to require one set
 # to the future via `edit` beforehand, which stopped being a usable route
 # when the frontmatter template dropped its date field.
-def cmd_schedule(slug)
+def cmd_schedule(slug, allow_partial: false)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   raw = File.read(path, encoding: 'utf-8')
   post = JSON.parse(raw)
+  # Asked here as well as at publish: scheduling IS publishing, only later
+  # and with nobody watching when it happens.
   unless draft?(post)
     puts t('cli.schedule_only_drafts', slug: slug)
     puts
     return
   end
+  # After the draft question, not before it: a published post is not
+  # missing a translation, it is simply not something you schedule.
+  refuse_partial!(post, slug, allow_partial) unless post['scheduled']
 
   if post['scheduled']
     # The same exit code cmd_rebuild answers a held lock with: somebody
@@ -2506,7 +2570,21 @@ def unschedule_post(path, post, slug, raw: nil)
     abort_if_post_changed(path, raw, slug) if raw
     updated = post.dup
     updated.delete('scheduled')
-    AtomicWrite.write_json(path, updated)
+    # Back to the date the plan overwrote. created_at would be the wrong
+    # answer for a draft that was backdated on purpose: its date is not
+    # its created_at, and that date is exactly what it must get back.
+    back = updated.delete('date_before_schedule')
+    updated['date'] = back if back
+    when_to_file = begin
+      Time.parse(updated['date'].to_s)
+    rescue StandardError
+      nil
+    end
+    if when_to_file
+      write_in_year_of(path, updated, when_to_file, slug: slug)
+    else
+      AtomicWrite.write_json(path, updated)
+    end
   end
   # false, not a bare return: the queue screen decides whether to offer
   # compacting the slots behind this post by this answer, and a decline
@@ -2550,29 +2628,43 @@ end
 # apply_queue_moves (RunLock.hold yields straight through for a holder), so
 # the queue screen pays nothing for it. Returns nil without writing when a
 # publish is running; callers treat that like any other declined prompt.
+# A post's folder IS its year, so a write that changes the date can move
+# the file -- and the media with it, because the build derives both the
+# address and the media lookup from the date. Scheduling always knew this;
+# cancelling a plan did not, and left the post in the year of a slot it no
+# longer had. One function, so the two cannot drift apart again.
+def write_in_year_of(path, updated, date, slug:)
+  new_year = date.year.to_s
+  new_path = File.join(CONTENT_DIR, new_year, "#{slug}.json")
+  # Asked whether or not the file moves: a date that stays inside the
+  # year can still land the post on an address another post is served
+  # at, and the old guard only looked when the folder changed.
+  taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
+                                slug: slug, except: path, path: new_path)
+  abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+
+  if File.expand_path(new_path) != File.expand_path(path)
+    FileUtils.mkdir_p(File.dirname(new_path))
+    Publishing.relocate_media(slug, File.basename(File.dirname(path)), new_year)
+    AtomicWrite.write_json(new_path, updated)
+    File.delete(path)
+  else
+    AtomicWrite.write_json(new_path, updated)
+  end
+  new_path
+end
+
 def write_scheduled_date(path, post, date, raw: nil, slug: nil)
   held = RunLock.hold(ROOT, label: 'queue') do
     abort_if_post_changed(path, raw, slug || post['slug']) if raw
     updated = post.merge('date' => date.iso8601, 'scheduled' => true)
-    new_year = date.year.to_s
-    new_path = File.join(CONTENT_DIR, new_year, "#{post['slug']}.json")
-    # Asked whether or not the file moves: a date that stays inside the
-    # year can still land the post on an address another post is served
-    # at, and the old guard only looked when the folder changed.
-    taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR,
-                                  slug: post['slug'], except: path, path: new_path)
-    abort t('cli.post_already_exists', slug: post['slug'], path: taken) if taken
-
-    if File.expand_path(new_path) != File.expand_path(path)
-
-      FileUtils.mkdir_p(File.dirname(new_path))
-      Publishing.relocate_media(post['slug'], File.basename(File.dirname(path)), new_year)
-      AtomicWrite.write_json(new_path, updated)
-      File.delete(path)
-    else
-      AtomicWrite.write_json(new_path, updated)
-    end
-    new_path
+    # The date the slot is about to overwrite, kept so cancelling the plan
+    # can give it back. Only on the way IN: rescheduling an already planned
+    # post would otherwise remember a slot instead of the post's own date.
+    # A post scheduled by an older version has none, and cancelling leaves
+    # it as it always did -- there is nothing to put back.
+    updated['date_before_schedule'] = post['date'] unless post['scheduled']
+    write_in_year_of(path, updated, date, slug: post['slug'])
   end
   if held == RunLock::BUSY
     warn t('cli.queue_busy')
@@ -3659,6 +3751,46 @@ def props_line(key, value)
   format('  %-12s %s', t("cli.props_label_#{key}"), value)
 end
 
+# The frame truncates every row to the window, and at 80 columns what went
+# was the end of the preview address -- the one row on this screen that is
+# there to be opened (second trial, 25. 9. 2026). A plain row too wide for
+# the window goes on under its value instead; painted rows are left as
+# they are, since their escape codes would be counted as text.
+PROPS_VALUE_COLUMN = 15
+
+def props_fold(lines, width)
+  lines.flat_map do |line|
+    next [line] if line.is_a?(Tui::Whole) || line.include?("\e") || Tui.display_width(line) <= width || width <= PROPS_VALUE_COLUMN + 10
+    # A label longer than its column pushed the value right; cut there
+    # and the label would be split instead.
+    next [line] unless line[PROPS_VALUE_COLUMN - 1] == ' '
+
+    head = line[0, PROPS_VALUE_COLUMN]
+    pieces = Tui.wrap_to_width(line[PROPS_VALUE_COLUMN..].to_s, width - PROPS_VALUE_COLUMN)
+    ["#{head}#{pieces.first}"] + pieces.drop(1).map { |piece| (' ' * PROPS_VALUE_COLUMN) + piece }
+  end
+end
+
+# The post's languages on one line, the site's own first: it is the one
+# every other is a translation OF, and it always has words.
+def languages_summary(post)
+  langs = other_languages
+  return nil if langs.empty?
+
+  marks = { written: '✅', started: '◐', none: '·' }
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  named = (["✅ #{language_name(own)}"] +
+           langs.map { |lang| "#{marks[language_state(post, lang)]} #{language_name(lang)}" }).join('  ')
+  # Named while they fit on the line, counted when they stop -- the rule
+  # the old addresses on this screen already keep. A site publishing six
+  # languages would otherwise push the rows under it off the screen, and
+  # the picker one keypress away says the same thing with room to spare.
+  return named if named.length <= 58
+
+  states = langs.map { |lang| language_state(post, lang) }.tally
+  ["✅ #{states.fetch(:written, 0) + 1}", "◐ #{states.fetch(:started, 0)}", "· #{states.fetch(:none, 0)}"].join('  ')
+end
+
 def props_title(post)
   post['title'] || post['content'].find { |b| b['type'] == 'text' }&.fetch('text', '')&.slice(0, 60) || post['slug']
 end
@@ -3683,6 +3815,14 @@ def props_frame_lines(post, path, slug, year)
   lines = ["  #{Tui.paint(props_title(post), :bold)}",
            "  #{draft?(post) ? t('cli.props_draft_banner') : PostAddress.path(post).sub(%r{\A/}, '')}", '']
   if draft?(post)
+    # Where the draft can be read. Until now only the dialog after a save
+    # said so, which made editing the one way to look at a draft; the
+    # address is the draft's, whatever else this screen is for. [q] shows
+    # it as a QR code for a phone -- too tall to stand in the frame.
+    # Whole: the one row here that is meant to be opened, so the frame
+    # lets the terminal wrap it instead of cutting or folding it.
+    preview = props_line('preview', props_preview_url(post))
+    lines << (preview && Tui::Whole.new(preview))
     # No created/date line for a plain draft, on purpose: a draft has no
     # time -- its date is set by publishing or scheduling, and showing
     # anything earlier would suggest it means something.
@@ -3701,15 +3841,27 @@ def props_frame_lines(post, path, slug, year)
   # not fooled by an empty string and sees all three fields, unlisted?
   # reads the flag as broadly as the builder that hides the post.
   lines << props_line('unlisted', Publishing.unlisted?(post) ? t('cli.props_unlisted_yes') : nil)
+  # Which languages this post is readable in -- only where there is more
+  # than one, so a site that publishes one sees the screen it always saw.
+  # The marks are the ones `check --languages` prints and the picker
+  # shows, because three notations for three states is two too many.
+  lines << props_line('languages', languages_summary(post))
   announced = Publishing.announcement_url(post)
   # An unlisted draft used to be told "goes out when the post publishes",
   # which was both a false promise and the wrong way round: an unlisted post
   # is never announced, so the line has to say that rather than leave the
   # author expecting a toot that will not come -- or worse, believing one is
   # owed and going to look for why it failed.
+  # ...and a site with no network at all is told so too: "goes out when the
+  # post publishes" was said on a site that announces nowhere, and publish
+  # then said the opposite. doctor has the sentence right; so does this.
   lines << props_line('announced', if announced then announced
+                                   elsif SiteConfig.comment_network.nil?
+                                     t('cli.props_announces_nowhere')
                                    elsif Publishing.unlisted?(post)
                                      t('cli.props_announces_never_unlisted')
+                                   elsif !Publishing.announces?
+                                     t('cli.props_announces_no_secret', value: Publishing.network_secret)
                                    elsif draft?(post) then t('cli.props_announces_on_publish')
                                    else t('cli.props_not_announced')
                                    end)
@@ -3748,7 +3900,52 @@ def props_prompt(post, path, slug, network_label)
         else
           'cli.props_actions_published_plain'
         end
-  with_versions_key(t(key, network: network_label), path, slug)
+  with_qr_key(with_versions_key(t(key, network: network_label), path, slug), post)
+end
+
+# The question before [p] publishes from this screen, with the part that
+# cannot be undone said first when there is one.
+def props_confirm_publish(post, network_label)
+  puts
+  if network_label && Publishing.announces? && !Publishing.unlisted?(post)
+    puts Tui.paint(t('cli.props_publish_announces', network: network_label), :yellow)
+  end
+  Tui.yes?(Tui.key_choice(t('cli.props_publish_confirm', slug: post['slug']), escape: 'n'))
+end
+
+# The draft's address on this screen. Under the placeholder base URL the
+# site is not online anywhere yet, and the address that works is the local
+# preview's -- the same one the save dialog's hint names.
+def props_preview_url(post)
+  return "http://localhost:#{LOCAL_PREVIEW_PORT}#{draft_path(post)}" if placeholder_base_url?
+
+  draft_url(post)
+end
+
+# [q] only where a QR code can do its job: a draft, in a terminal, on a
+# site with a real address. A phone that scans example.com or localhost
+# lands on a domain this author does not own, or on itself.
+def props_qr_available?(post)
+  draft?(post) && Tui.interactive? && !placeholder_base_url?
+end
+
+def with_qr_key(prompt, post)
+  return prompt unless props_qr_available?(post)
+
+  prompt.sub('[Enter]') { "#{t('cli.props_action_qr')}[Enter]" }
+end
+
+# The QR code for the draft, with its address over it -- the same three
+# rows the save dialog prints, on a screen of their own.
+def props_show_qr(post)
+  qr = QrCode.render(draft_url(post))
+  puts
+  puts Tui.paint(t('cli.preview_label', url: draft_url(post)), :cyan)
+  return unless qr
+
+  puts
+  puts qr
+  puts Tui.paint(t('cli.qr_hint'), :dim)
 end
 
 # "Not understood, try ..." -- listing the keys the row above is OFFERING,
@@ -3814,7 +4011,7 @@ def props_loop(slug, screen)
 
     if screen
       keys = Tui.fold_prompt(Tui.paint(prompt, :dim), Tui.term_width).lines.map(&:chomp)
-      screen.paint(lines + keys, keep_last: keys.size)
+      screen.paint(props_fold(lines, Tui.term_width) + keys, keep_last: keys.size)
       key = screen.key
       next if key == :resize
 
@@ -3836,7 +4033,16 @@ def props_loop(slug, screen)
 
     if draft?(post)
       case key
-      when 'p' then return props_run(screen) { publish_draft(slug) }
+      when 'p'
+        # Asked, as this screen's "guarded actions" promise: one keystroke
+        # published the post, deployed the site and -- on a site with a
+        # network -- announced it, which nothing takes back. Esc is no.
+        published = false
+        props_run(screen) do
+          published = props_confirm_publish(post, network_label)
+          published ? publish_draft(slug) : :nothing
+        end
+        return if published
       when 's'
         props_run(screen) do
           puts
@@ -3854,6 +4060,8 @@ def props_loop(slug, screen)
         props_run(screen) { props_properties(path, slug, raw: original_raw) }
       when 'v'
         props_run(screen) { props_versions(path, slug) }
+      when 'q'
+        props_run(screen) { props_qr_available?(post) ? props_show_qr(post) : puts(props_unknown(prompt)) }
       when 'x'
         # Same shape as the [x] branch of draft_decision_loop: a deleted
         # draft only changes the preview, so the rebuild needs no asking.
@@ -4625,6 +4833,285 @@ def rename_post(path, post, raw: nil)
   new_slug
 end
 
+# Which languages the site publishes that this post has no words in.
+#
+# Empty on a site that names no `site.locales` -- every site today -- so
+# nothing below it ever asks such a site anything.
+def missing_translations(post)
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }.reject(&:empty?)
+  return [] if named.empty?
+
+  (named - [own]) - Translations.languages(post)
+end
+
+# Every language the site publishes except the one it is written in --
+# the languages a post can be translated INTO. Empty on a site that names
+# no `site.locales`, which is what keeps every screen below unchanged for
+# the sites that publish one language.
+def other_languages
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
+  (named.reject(&:empty?) - [own]).uniq
+end
+
+# A language's name in its own language, which is the only name somebody
+# looking for it recognises -- and the code itself when the engine has no
+# file for it, rather than a blank where a name should be.
+def language_name(code)
+  return code.to_s unless I18n.locale_file?(code.to_s)
+
+  name = I18n.load_locale(code.to_s)['language_name'].to_s
+  name.empty? ? code.to_s : name
+end
+
+# What a post has in a language: words, a title somebody started and left,
+# or nothing. The same three states `check --languages` prints, worked out
+# the same way -- a language counts when it has a BODY.
+def language_state(post, lang)
+  entry = post['translations'].is_a?(Hash) ? post['translations'][lang.to_s] : nil
+  return :none unless entry.is_a?(Hash) && entry.slice(*Translations::TEXT_KEYS).compact.any?
+
+  Array(entry['content']).empty? ? :started : :written
+end
+
+# The wizard's half of the missing-languages question: write one now,
+# publish as it stands, or step back. Answering the first opens the same
+# editor `translate` opens and comes back here -- the post is still a
+# draft, so nothing has been decided by going there.
+#
+# true means carry on publishing.
+def offer_missing_languages(slug, post)
+  missing = missing_translations(post)
+  return true if missing.empty?
+
+  # By name, not by code: the person at this prompt is deciding about a
+  # language, and `de` is a thing in a config file.
+  named = missing.map { |lang| language_name(lang) }.join(', ')
+  case Tui.key_choice(t('cli.publish_partial_prompt', langs: named))
+  when t('cli.publish_partial_write_key')
+    chosen = missing.size == 1 ? missing.first : pick_language_interactively(find_post_path(slug), missing)
+    cmd_translate(slug, chosen) if chosen
+    false
+  when t('cli.publish_partial_anyway_key') then true
+  else
+    puts t('cli.cancelled')
+    puts
+    false
+  end
+end
+
+# Refuses a post the site cannot show in every language it publishes --
+# where somebody is watching, and nowhere else.
+#
+# 🪤 NOT in the cron that publishes the queue: a post there was scheduled
+# by a person who already answered this question, and a refusal nobody is
+# looking at strands the post in the queue instead of asking anybody.
+def refuse_partial!(post, slug, allow_partial, json: false)
+  return if allow_partial
+
+  missing = missing_translations(post)
+  return if missing.empty?
+
+  said = t('cli.publish_partial', slug: slug, langs: missing.join(', '))
+  json ? refuse('partial_translation', said) : abort(said)
+end
+
+# The post's own words, as lines the editor drops on save. Its title
+# rides along in the same shape, because the title is the first thing
+# anybody translates and the one the address is made of.
+def original_as_notes(post, media_dir)
+  # Without the card: the writer drops it anyway (lib/link_card.rb), and
+  # the link is not something a translation is asked to write -- it is put
+  # back in every language on its own.
+  body = MarkdownWriter.blocks_to_markdown(LinkCard.split(post['content']).last, media_dir)
+  lines = ["// #{post['title']}", '//'] + body.split("\n", -1).map { |line| line.empty? ? '//' : "// #{line}" }
+  "#{lines.join("\n").rstrip}\n"
+end
+
+# The address a post will be served at once it is out, in the language
+# whose `address_slug` it carries. Drafts live under a token until they are
+# published, and comparing tokens answers nothing about collisions.
+# The first translated address of `post` that another post already has in
+# the same language, as { address:, slug: }, or nil. Asked of the address
+# each translation will have when the post is out, the way translate asks.
+def translated_address_clash(post)
+  langs = Hash(post['translations']).keys
+  return nil if langs.empty?
+
+  others = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |file|
+    other = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue StandardError
+      nil
+    end
+    other if other.is_a?(Hash) && other['slug'].to_s != post['slug'].to_s
+  end
+  langs.each do |lang|
+    mine = Translations.for_lang(post, lang)
+    wanted = published_address(mine, mine['address_slug'])
+    taken = others.find do |other|
+      theirs = Translations.for_lang(other, lang)
+      published_address(theirs, theirs['address_slug']) == wanted
+    end
+    return { address: wanted, slug: taken['slug'] } if taken
+  end
+  nil
+end
+
+def published_address(post, address = nil)
+  out = post.reject { |key, _| key == 'draft_token' }.merge('state' => 'published')
+  out['address_slug'] = address.to_s unless address.to_s.strip.empty?
+  PostAddress.path(out)
+end
+
+# Writing a post's other language: the WORDS, and nothing else.
+#
+# The metadata belong to the post and not to a language (lib/translations.rb)
+# -- date, tags, series, state, the pin -- so this editor never shows them.
+# The frontmatter here is one line, the title, and everything below it is
+# the body. Editing those is `props` and `edit`, in the post's own language,
+# and what they change is true in every language at once.
+#
+# Removing every word saves nothing under that language rather than an
+# empty entry: a language a post has no words in must look exactly like a
+# language it was never offered in, or the build would give it a page with
+# the wrong text in it.
+def cmd_translate(slug, lang)
+  path = find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  offered = ([own] + Array(SiteConfig.get('site', 'locales', default: nil)).map { |c| c.to_s.strip }).uniq.reject(&:empty?)
+  abort t('cli.translate_needs_locales') if offered.length < 2
+  abort t('cli.translate_own_language', lang: lang) if lang == own
+  abort t('cli.translate_unknown_language', lang: lang, known: (offered - [own]).join(', ')) unless offered.include?(lang)
+
+  original_raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(original_raw)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+
+  entry = post.dig('translations', lang)
+  entry = {} unless entry.is_a?(Hash)
+  # Offered back the way `add` and `edit` offer theirs: this command writes
+  # a buffer on every abort (a taken address, a reserved root, a post that
+  # changed underneath), and a buffer nobody is ever offered is a promise
+  # the next successful save of any post quietly breaks.
+  restored = offer_editor_buffer('translate', "#{slug}@#{lang}")
+  # The address line is shown with what it is, so it can be read as well as
+  # changed -- and left alone it stays exactly as it was, which is what an
+  # address is for.
+  skeleton = "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
+             MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+  # Nothing written in this language yet: the post's own words come in as
+  # `//` lines, which the editor drops on the way back like every other
+  # note. Translating with the original in the buffer beats translating
+  # from a second window -- and because the lines are dropped, a
+  # translation left half-done cannot save the original text as if it
+  # were this language's.
+  opened_with = restored || (entry.empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
+  raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
+                       { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" })
+  # 🪤 Against the buffer WITHOUT the notes as well: the editor strips
+  # `//` lines on the way back, so a buffer that was carrying the original
+  # NEVER returns the bytes it went in with -- and an untouched editor
+  # then read as "everything was deleted", which takes the language off
+  # the post and rebuilds the site to say so.
+  if raw == opened_with || raw == skeleton
+    puts t('cli.no_changes')
+    puts
+    return
+  end
+
+  meta, body = MarkdownParser.parse_frontmatter(raw)
+  blocks, media_files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: INCOMING_DIR)
+  wait_for_missing_images(missing)
+  # A boundary rather than half of a feature: pictures belong to the post
+  # and are copied in by `edit`, which knows how to convert, remux and
+  # measure them. A translation that could bring its own would put files
+  # in one language's copy of a post whose media the other language shares.
+  abort t('cli.translate_media_unsupported') unless media_files.empty?
+
+  title = meta['title'].to_s.strip
+  translations = post['translations'].is_a?(Hash) ? post['translations'].dup : {}
+  if title.empty? && blocks.empty?
+    translations.delete(lang)
+    said = t('cli.translate_removed', lang: lang, slug: slug)
+  else
+    one = {}
+    one['title'] = title unless title.empty?
+    one['content'] = blocks unless blocks.empty?
+    # The address this language serves the post at: made from the
+    # translated title the first time, then LEFT ALONE. A post's own slug
+    # works that way for the same reason -- an address that follows a
+    # title somebody corrected is an address that breaks every link to it.
+    # Typed into the header, it is what the author says it is.
+    chosen = meta['slug'].to_s.strip
+    address = if !chosen.empty?
+                Slug.slugify(chosen)
+              elsif !entry['slug'].to_s.strip.empty?
+                entry['slug'].to_s.strip
+              else
+                Slug.slugify(title)
+              end
+    address = post['slug'].to_s if address.empty?
+    # The same 200-byte ceiling `add` and `rename` keep, and for the reason
+    # they both wrote down: past it mkdir dies with a raw ENAMETOOLONG in
+    # the middle of writing the site, naming no post. Cut on a word
+    # boundary where there is one, exactly as cmd_add cuts.
+    if address.bytesize > 200
+      address = address[0, 200]
+      address = address.sub(/-[^-]*\z/, '') if address.rindex('-')&.>(120)
+      address = address.sub(/-+\z/, '')
+    end
+    one['slug'] = address
+    # A PAGE lives in the root of its language, which is where the engine
+    # keeps its own names: a page addressed `assets` in German would be
+    # written over /de/assets/ and take the stylesheet down with it. The
+    # build refuses such a page in the site's own language and says so;
+    # this is the same refusal, one language further in.
+    if PostAddress.page?(post) && PostAddress::RESERVED_ROOT_SEGMENTS.include?(address.downcase)
+      abort t('cli.translate_address_reserved', address: address)
+    end
+    # Two posts at one address is the one thing an address may not do, and
+    # in this language the other posts' addresses are their own translated
+    # ones. Refused rather than made unique behind the author's back: they
+    # chose these words, and the header is where they can choose others.
+    # 🪤 Asked of the address the post will have when it is OUT, not of the
+    # one it has now: a draft is served under its token, so comparing
+    # today's addresses found nothing for exactly the posts people
+    # translate -- drafts -- and the collision then stopped the next build
+    # instead, in the language being built and with the site undeployable.
+    wanted = published_address(post, address)
+    clash = PathGlob.under(CONTENT_DIR, '*', '*.json').find do |file|
+      other = begin
+        JSON.parse(File.read(file, encoding: 'utf-8'))
+      rescue StandardError
+        nil
+      end
+      next false unless other.is_a?(Hash) && other['slug'].to_s != post['slug'].to_s
+
+      localized = Translations.for_lang(other, lang)
+      published_address(localized, localized['address_slug']) == wanted
+    end
+    abort t('cli.translate_address_taken', address: address, slug: File.basename(clash.to_s, '.json')) if clash
+    translations[lang] = one
+    said = t('cli.translate_saved', lang: lang, slug: slug)
+  end
+  updated = post.dup
+  translations.empty? ? updated.delete('translations') : updated['translations'] = translations
+
+  # The same guard every editor-backed save carries: the cron may have
+  # published this post while the editor sat open.
+  abort_if_post_changed(path, original_raw, slug)
+  AtomicWrite.write_json(path, updated)
+  discard_editor_buffer
+  puts
+  puts said
+  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+end
+
 def cmd_edit(slug)
   edit_post(slug)
   # Re-resolved AFTER the edit on purpose: a rename inside the editor moves
@@ -4650,7 +5137,12 @@ end
 def post_time!(post)
   Time.parse(post['date'].to_s)
 rescue ArgumentError, TypeError
-  abort t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect)
+  # Through `refuse`, so a --json run answers with an object like every
+  # other refusal there: a date nobody can read is exactly the state a
+  # phone meets and cannot report, because prose on stderr with exit 1 is
+  # indistinguishable from the engine having fallen over.
+  refuse('date_unreadable',
+         t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect))
 end
 
 def edit_post(slug, path: nil)
@@ -4772,9 +5264,9 @@ def edit_post(slug, path: nil)
   # happened and no confirmation was asked for.
   counts = lambda do |list|
     list.each_with_object(Hash.new(0)) do |b, h|
-      h[b['type']] += 1
+      h[['block', b['type']]] += 1
       spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| Array(i['formatting']) }
-      spans.each { |f| h["#{f['type']} span"] += 1 }
+      spans.each { |f| h[['span', f['type']]] += 1 }
     end
   end
   # ⚠️ The card the header just created does not stand in for one the body
@@ -4789,7 +5281,15 @@ def edit_post(slug, path: nil)
   lost = before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
   if lost.any?
     puts
-    puts t('cli.content_loss_warning', summary: lost.map { |type, n| "#{n}x #{type}" }.join(', '))
+    # Named as the author knows them, in the site's language: the summary
+    # used to be built here as "1x small span", the schema's words, on a
+    # Czech screen. A type the locale has no name for -- something a future
+    # import brings -- is still named, by its schema word.
+    summary = lost.map do |(kind, type), n|
+      t('cli.content_loss_item', count: n,
+                                kind: I18n.lookup("cli.content_kind.#{kind}.#{type}") || type.to_s)
+    end
+    puts t('cli.content_loss_warning', summary: summary.join(', '))
     # The word is compared against the locale's own confirm_word -- the
     # Czech prompt says to type "ano", so comparing against a hardcoded
     # 'yes' aborted exactly the users who followed the instruction.
@@ -4924,6 +5424,24 @@ def edit_post(slug, path: nil)
   # asked every three seconds for five minutes about a post that had gone
   # out perfectly well.
   updated['receipt'] = post['receipt'] if post['receipt']
+  # And everything else the editor never showed is the post's to keep. The
+  # save rebuilt the post from a list of what to carry, so whatever the
+  # list had not heard of was dropped: every translation of a post went
+  # with one edit of its original, taking the translated pages off the site
+  # (blogsh.app, 26. 9. 2026), and a scheduled post lost the date a
+  # cancelled plan gives back. Kept by default now, so the next new key is
+  # kept too; the editor decides only what it shows.
+  post.each { |key, value| updated[key] = value unless updated.key?(key) || EDIT_DECIDES.include?(key) }
+  # The translations move with the post, and in their languages the other
+  # posts' addresses are their own translated ones: a year change or
+  # `type: page` could land a translation on an address another post
+  # already has there, and the next build stopped on two posts at one
+  # address. translate refuses the same clash; so does the edit, before
+  # anything is moved (review of the carry-all, 27. 9. 2026).
+  if moving
+    clash = translated_address_clash(updated)
+    abort t('cli.edit_translation_address_taken', address: clash[:address], slug: clash[:slug]) if clash
+  end
 
   # Before ANY of the moving, copying and pruning below: if the file changed
   # under the editor -- the scheduled-publish cron runs every 15 minutes --
@@ -4977,7 +5495,12 @@ def edit_post(slug, path: nil)
   # Keeping the file in that case is deliberate -- the author confirmed
   # losing the block, not deleting a file they can't name in markdown, and
   # a restore from trash would otherwise come back without its image.
-  keep = (blocks.flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
+  # And every file a translation shows: a translation shares the post's
+  # media folder, so a picture the original stopped showing can still be on
+  # the translated page -- pruned, it left that page with a 404 (review of
+  # the carry-all, 27. 9. 2026).
+  translated = Hash(updated['translations']).values.flat_map { |one| Array(one.is_a?(Hash) ? one['content'] : nil) }
+  keep = ((blocks + translated).flat_map { |b| [b.dig('media', 0, 'url'), b.dig('poster', 0, 'url')] } +
           post['content'].map { |b| b.dig('poster', 0, 'url') }).compact.to_set
 
   # The post first, its unreferenced media second. Pruning ahead of the
@@ -5336,18 +5859,23 @@ rescue JSON::ParserError, SystemCallError => e
   nil
 end
 
-def state_marker(post)
+# `list` is the plain-text face for pipes and scripts, and keeps the
+# English marks a script may grep for; the screens -- pickers, browse --
+# say them in the site's language (second trial, 25. 9. 2026: [DRAFT] in
+# the middle of a Czech screen).
+def state_marker(post, localized: false)
+  word = ->(key, english) { localized ? t("cli.mark_#{key}") : english }
   # Pin rides alongside the state, not instead of it: a pinned draft
   # (the pin survives unpublish) has to show both, or the list would be
   # the one place that can't answer "which post is pinned?" -- the exact
   # question that sends someone here.
   marks = []
   if post[:scheduled]
-    marks << Tui.paint('[SCHEDULED]', :cyan)
+    marks << Tui.paint(word.call('scheduled', '[SCHEDULED]'), :cyan)
   elsif post[:state] == DRAFT
-    marks << Tui.paint('[DRAFT]', :yellow)
+    marks << Tui.paint(word.call('draft', '[DRAFT]'), :yellow)
   end
-  marks << Tui.paint('[PINNED]', :green) if post[:pinned]
+  marks << Tui.paint(word.call('pinned', '[PINNED]'), :green) if post[:pinned]
   marks.empty? ? '' : "  #{marks.join(' ')}"
 end
 
@@ -5366,8 +5894,8 @@ rescue ArgumentError, TypeError
   '----------'
 end
 
-def summary_row(post)
-  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{post[:slug]}  #{post[:title]}"
+def summary_row(post, localized: true)
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post, localized: localized)}  #{post[:slug]}  #{post[:title]}"
 end
 
 def load_posts_summary
@@ -5388,7 +5916,7 @@ def cmd_list(filters)
   # named neither the file nor the problem.
   posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
-  posts.each { |p| puts summary_row(p) }
+  posts.each { |p| puts summary_row(p, localized: false) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   count = t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
   # The tally is for a person, so it goes where a person is looking. Down
@@ -5427,7 +5955,7 @@ BROWSE_HOT_KEYS = ['/', 't', 's', 'g', 'z', ' '].freeze
 def browse_row(post)
   title = post[:title].to_s.strip
   label = title.empty? ? Tui.paint(post[:slug], :dim) : title
-  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post)}  #{label}"
+  "#{row_date(post)}  [#{post[:type]}]#{state_marker(post, localized: true)}  #{label}"
 end
 
 def browse_posts
@@ -5640,7 +6168,7 @@ def browse_preview(summary)
   markdown = MarkdownWriter.blocks_to_markdown(post['content'], File.join(MEDIA_DIR, year, summary[:slug]))
   width = [Tui.term_width - 4, 40].max
   header = [Tui.paint(post['title'].to_s.empty? ? summary[:slug] : post['title'], :bold),
-            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary)}  ·  #{summary[:slug]}"]
+            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary, localized: true)}  ·  #{summary[:slug]}"]
   header << t('cli.browse_preview_tags', tags: post['tags'].join(', ')) unless (post['tags'] || []).empty?
   lines = header + [''] + browse_preview_lines(post, markdown, width)
   state = { selected: 0, offset: 0 }
@@ -6056,13 +6584,14 @@ end
 # Build and deploy as one step -- the mechanics (and the reasoning for
 # the built-in --prune) live in Publishing.rebuild_and_deploy, shared
 # with the scheduled-publish cron.
-def rebuild_and_deploy(reason = nil, full: false)
-  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'), full: full)
+def rebuild_and_deploy(reason = nil, full: false, force: false)
+  Publishing.rebuild_and_deploy(reason || t('cli.default_rebuild_reason'), full: full, force: force)
 end
 
 def maybe_rebuild
   puts
-  if Tui.key_choice(t('cli.rebuild_prompt')) == 'n'
+  # Esc answers "no" -- see import.rb: as Enter's twin it deployed.
+  if Tui.key_choice(t('cli.rebuild_prompt'), escape: 'n') == 'n'
     puts
     return
   end
@@ -6072,8 +6601,8 @@ end
 
 # A manual build+deploy not tied to a specific post -- e.g. after a manual
 # template edit, when nothing else would otherwise trigger a rebuild.
-def cmd_rebuild(full: false)
-  return if rebuild_and_deploy(nil, full: full)
+def cmd_rebuild(full: false, force: false)
+  return if rebuild_and_deploy(nil, full: full, force: force)
 
   # The lock's own exit code, same as the build and deploy scripts leave
   # with: somebody ran this by hand, and exit 0 reads as "a deploy
@@ -6083,6 +6612,13 @@ def cmd_rebuild(full: false)
   # the SystemExit is caught like every other cmd_* abort and only ends
   # this menu entry, not the session.
   exit RunLock::BUSY_EXIT if Publishing.stopped_on_busy_lock?
+
+  # And a failure is not a success. It left with 0 -- the reasoning was that
+  # the deploy-pending marker hands the job to the next scheduled run -- so a
+  # script, a cron wrapper or a CI step read "rebuild failed" as "done"
+  # (newcomer trial, 25. 9. 2026). The marker is still written; the status
+  # now says what the lines above it say.
+  exit 1
 end
 
 # --- empty ------------------------------------------------------------
@@ -6182,6 +6718,33 @@ def cmd_empty(what)
   end
 end
 
+# Every command ./blog.sh answers to: this dispatcher's and the four the
+# shell front hands to scripts of their own.
+KNOWN_COMMANDS = %w[add translate edit props delete restore empty publish schedule queue unpublish toot
+                    bluesky rebuild preview list browse help version doctor check export stats].freeze
+
+# The command a typo most likely meant, or nil when nothing is close: at
+# most two edits away, and never more than half the word.
+def nearest_command(typed)
+  word = typed.to_s.downcase
+  best = KNOWN_COMMANDS.map { |known| [edit_distance(word, known), known] }.min
+  return nil unless best && best.first <= [2, word.length / 2].min && best.first.positive?
+
+  best.last
+end
+
+def edit_distance(one, two)
+  row = (0..two.length).to_a
+  one.each_char.with_index(1) do |char, i|
+    previous = row.dup
+    row[0] = i
+    two.each_char.with_index(1) do |other, j|
+      row[j] = [previous[j] + 1, row[j - 1] + 1, previous[j - 1] + (char == other ? 0 : 1)].min
+    end
+  end
+  row.last
+end
+
 def print_usage
   # The identity block above the usage: "what am I even running, and
   # where" is the first question of someone reading help on a server
@@ -6229,13 +6792,52 @@ def post_crossroads(slug)
   summary = post_summary(path)
   puts summary_row(summary) if summary
   puts
-  case Tui.key_choice(t('cli.edit_what_prompt'))
+  # The third way is offered only where there is a language to offer: a
+  # site that publishes one sees exactly the prompt it always saw.
+  langs = other_languages
+  prompt = case langs.size
+           when 0 then t('cli.edit_what_prompt')
+           when 1 then t('cli.edit_what_prompt_one', language: language_name(langs.first))
+           else t('cli.edit_what_prompt_many')
+           end
+  # Enter edits, the offered default; Esc leaves. As Enter's twin it opened
+  # the editor on the one key people press to back out.
+  case Tui.key_choice(prompt, escape: :cancel)
   when '', 'e' then cmd_edit(slug)
   when 'v' then cmd_props(slug)
+  when t('cli.translation_key')
+    # Nothing to translate into means the key is not a key: a site that
+    # publishes one language never had it on the prompt, and a letter that
+    # does something invisible is worse than one that does nothing.
+    if langs.empty?
+      puts t('cli.cancelled')
+      puts
+    else
+      chosen = langs.size == 1 ? langs.first : pick_language_interactively(path, langs)
+      chosen ? cmd_translate(slug, chosen) : (puts t('cli.cancelled'); puts)
+    end
   else
     puts t('cli.cancelled')
     puts
   end
+end
+
+# Which language to write, when the site publishes more than one. The row
+# says what is already there, in the three states `check --languages`
+# prints: a language with words, one somebody started, one with nothing.
+def pick_language_interactively(path, langs)
+  post = begin
+    JSON.parse(File.read(path, encoding: 'utf-8'))
+  rescue StandardError
+    {}
+  end
+  marks = { written: '✅', started: '◐', none: '·' }
+  rows = langs.map do |lang|
+    t('cli.language_row', mark: marks[language_state(post, lang)], name: language_name(lang),
+                          state: t("cli.language_state_#{language_state(post, lang)}"))
+  end
+  index = properties_pick(rows, [t('cli.language_heading'), ''], t('cli.properties_hint'))
+  index.nil? ? nil : langs[index]
 end
 
 def run_wizard_choice(command)
@@ -6386,7 +6988,7 @@ SiteConfig.data unless ['help', '--help', '-h', 'version', '--version', '-v'].in
 # clear reprints) its own copy, `version`'s output IS the identity,
 # help puts it above the usage, and a piped stdout gets data only:
 # `./blog.sh list | wc -l` must keep counting posts, not banner lines.
-HEADER_MODES = %w[add edit props publish unpublish schedule queue delete
+HEADER_MODES = %w[add edit translate props publish unpublish schedule queue delete
                   restore toot bluesky rebuild preview list browse].freeze
 # ⚠️ ...and neither does a run that promised its whole output would be
 # one JSON object. The tty guard above reads as "a person is watching",
@@ -6399,141 +7001,196 @@ if HEADER_MODES.include?(command) && $stdout.tty? && !ARGV.include?('--json')
   puts
 end
 
-if command.nil?
-  run_wizard
-else
-  case command
-  when 'add'
-    # Read here rather than inside cmd_add, the way `rebuild` reads --full:
-    # the dispatcher is where this file turns a command line into
-    # arguments, and the wizard calls cmd_add with none.
-    json = !ARGV.delete('--json').nil?
-    # --untrusted says the markdown did not come from somebody with a
-    # shell. Everything an author at their own desk may do -- naming any
-    # path on the machine in a picture reference -- stops being allowed,
-    # because over a wire that is how a stranger reads /etc/passwd into a
-    # post. The receiver (scripts/receive.sh) passes it always.
-    untrusted = !ARGV.delete('--untrusted').nil?
-    # Before the shift, so a mistyped flag is refused instead of being
-    # taken for the name of a file to read (and reported as "no such
-    # file: --yes", which sends the reader looking in the wrong place).
-    unknown = ARGV.find { |arg| arg.start_with?('--') }
-    abort t('cli.add_unknown_option', option: unknown) if unknown
-    file = ARGV.shift
-    # One file, one post. A second name was shifted off into nothing: the
-    # run wrote the first, said not a word about the rest, and exited 0 --
-    # so a script looping wrongly lost posts it believed it had made.
-    abort t('cli.add_extra_arguments', extra: ARGV.join(', ')) unless ARGV.empty?
-
-    if file
-      add_from_file(file, json: json, confined: untrusted)
-    else
-      # There is nothing to print as JSON when the post is still being
-      # typed, and an editor session that ends by printing a machine's
-      # answer would be a promise this cannot keep.
-      abort t('cli.add_json_needs_file') if json
-
-      cmd_add
-    end
-  when 'edit'
-    slug = ARGV.shift || pick_slug_interactively
-    cmd_edit(slug)
-  when 'props'
-    slug = ARGV.shift || pick_slug_interactively
-    cmd_props(slug)
-  when 'delete'
-    slug = ARGV.shift || pick_slug_interactively
-    cmd_delete(slug)
-  when 'restore'
-    slug = ARGV.shift || pick_trash_interactively
-    cmd_restore(slug)
-  when 'empty'
-    cmd_empty(ARGV.shift)
-  when 'publish'
-    yes = !ARGV.delete('--yes').nil?
-    announce = ARGV.delete('--no-announce').nil?
-    json = !ARGV.delete('--json').nil?
-    unknown = ARGV.find { |arg| arg.start_with?('--') }
-    abort t('cli.publish_unknown_option', option: unknown) if unknown
-    # An object for an answer means nobody is watching, and the dialog
-    # this skips is the only thing that would ask.
-    abort t('cli.publish_json_needs_yes') if json && !yes
-    # --no-announce on its own still shows the dialog; it only says what
-    # [p] must not do when it gets there. Refusing the combination would
-    # be refusing "let me look first, and keep it off Mastodon".
-    slug = ARGV.shift
-    # ⚠️ --yes has to name its post. Without a slug this fell into the
-    # draft picker and then published WITHOUT the dialog -- so one Enter
-    # over a highlighted row published a post and announced it, with no
-    # preview and no confirmation anywhere in between. The picker is for
-    # people who are about to be shown what they picked.
-    abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
-
-    slug ||= pick_draft_interactively
-    cmd_publish(slug, yes: yes, announce: announce, json: json)
-  when 'schedule'
-    slug = ARGV.shift || pick_draft_interactively
-    cmd_schedule(slug)
-  when 'queue'
-    cmd_queue
-  when 'unpublish'
-    slug = ARGV.shift || pick_published_interactively
-    cmd_unpublish(slug)
-  when 'toot'
-    slug = ARGV.shift || pick_published_interactively
-    cmd_toot(slug)
-  when 'bluesky'
-    slug = ARGV.shift || pick_published_interactively
-    cmd_bluesky(slug)
-  when 'rebuild'
-    # Read here rather than inside cmd_rebuild, the way `list` and `browse`
-    # read their filters: the dispatcher is where this file turns a command
-    # line into arguments, and the wizard calls cmd_rebuild with none.
-    cmd_rebuild(full: ARGV.include?('--full'))
-  when 'preview'
-    # A local static server over the build output -- the quickest way to
-    # look at the site before deploying anywhere.
-    unless Dir.exist?(File.join(ROOT, 'public.nosync'))
-      abort t('cli.preview_missing_public')
-    end
-    # "preview draft" is a thing somebody types, and to_i turned it into
-    # port 0 -- the system then handed out a random port and the line on
-    # screen said http://localhost:0/, which is not where it is listening.
-    asked = ARGV.shift || '8000'
-    abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
-
-    port = asked.to_i
-    puts t('cli.preview_serving', url: "http://localhost:#{port}/")
-    # The serve loop below blocks forever -- with stdout piped (not a TTY)
-    # the URL line would sit in the buffer the whole time, so push it out.
-    $stdout.flush
-    PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
-  when 'list', 'browse'
-    filters = {}
-    ARGV.each do |arg|
-      # ⚠️ force_encoding, because ARGV arrives in the encoding the
-      # ENVIRONMENT declares -- and with LANG unset that is ASCII-8BIT.
-      # LANG unset is not exotic: it is `docker exec` without -e LANG,
-      # which is how this engine is operated, and it is cron, systemd and
-      # launchd. `browse --tag=kočky` then reached Slug.fold, whose
-      # unicode_normalize refuses a binary string, and the terminal died
-      # with a stack trace; down a pipe the comparison is a plain downcase
-      # that does not raise, so it quietly matched nothing instead. The
-      # bytes are UTF-8 either way -- only the label on them was wrong.
-      filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
-      filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
-      filters[:drafts] = true if arg == '--drafts'
-    end
-    # Same filters, two ways to read the answer: `list` prints it,
-    # `browse` puts you inside it. Down a pipe they are the same command,
-    # because a screen you can't press keys in is just a list.
-    command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
-  when 'help'
-    print_usage
-  when 'version', '--version', '-v'
-    puts "blog.sh #{BlogSh::VERSION}"
+# Ctrl+C in a raw-mode screen arrives as a byte, and Tui.read_key turns it
+# back into an Interrupt. setup.sh, style.sh and import.sh each catch it;
+# this dispatcher did not, so leaving any screen of ./blog.sh that way
+# printed a backtrace and died on signal 2 (#54). One catch here covers
+# every screen, since they all come through this one place. 130 is what a
+# shell reports for a run stopped by Ctrl+C, and it is what the wizards say.
+begin
+  if command.nil?
+    run_wizard
   else
-    print_usage
-    exit 1
+    case command
+    when 'add'
+      # Read here rather than inside cmd_add, the way `rebuild` reads --full:
+      # the dispatcher is where this file turns a command line into
+      # arguments, and the wizard calls cmd_add with none.
+      json = !ARGV.delete('--json').nil?
+      # --untrusted says the markdown did not come from somebody with a
+      # shell. Everything an author at their own desk may do -- naming any
+      # path on the machine in a picture reference -- stops being allowed,
+      # because over a wire that is how a stranger reads /etc/passwd into a
+      # post. The receiver (scripts/receive.sh) passes it always.
+      untrusted = !ARGV.delete('--untrusted').nil?
+      # Before the shift, so a mistyped flag is refused instead of being
+      # taken for the name of a file to read (and reported as "no such
+      # file: --yes", which sends the reader looking in the wrong place).
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.add_unknown_option', option: unknown) if unknown
+      file = ARGV.shift
+      # One file, one post. A second name was shifted off into nothing: the
+      # run wrote the first, said not a word about the rest, and exited 0 --
+      # so a script looping wrongly lost posts it believed it had made.
+      abort t('cli.add_extra_arguments', extra: ARGV.join(', ')) unless ARGV.empty?
+
+      if file
+        add_from_file(file, json: json, confined: untrusted)
+      else
+        # There is nothing to print as JSON when the post is still being
+        # typed, and an editor session that ends by printing a machine's
+        # answer would be a promise this cannot keep.
+        abort t('cli.add_json_needs_file') if json
+
+        cmd_add
+      end
+    when 'translate'
+      # `--lang de`, or the second word: a translation is always OF a post
+      # INTO a language, so both are required and neither has a default.
+      args = ARGV.dup
+      lang = args.find { |arg| arg.start_with?('--lang=') }&.delete_prefix('--lang=')
+      args.reject! { |arg| arg.start_with?('--lang=') }
+      if lang.nil? && (at = args.index('--lang'))
+        lang = args[at + 1]
+        args.slice!(at, 2)
+      end
+      slug = args.shift || pick_slug_interactively
+      lang ||= args.shift unless args.first.to_s.start_with?('--')
+      # 🪤 Whatever is still here was not asked for: a typo in `--lang`, a
+      # second `--lang`, a stray word. Swallowing it silently is how a
+      # translation ends up in a language nobody typed -- and the one
+      # message that came out named the typo as the language, which sent
+      # the reader to site.locales to add it.
+      abort t('cli.translate_unknown_args', args: args.join(' ')) unless args.empty?
+      lang = nil if lang.to_s.start_with?('--')
+      abort t('cli.translate_needs_language') if lang.to_s.strip.empty?
+      cmd_translate(slug, lang.to_s.strip)
+    when 'edit'
+      slug = ARGV.shift || pick_slug_interactively
+      cmd_edit(slug)
+    when 'props'
+      slug = ARGV.shift || pick_slug_interactively
+      cmd_props(slug)
+    when 'delete'
+      slug = ARGV.shift || pick_slug_interactively
+      cmd_delete(slug)
+    when 'restore'
+      slug = ARGV.shift || pick_trash_interactively
+      cmd_restore(slug)
+    when 'empty'
+      cmd_empty(ARGV.shift)
+    when 'publish'
+      yes = !ARGV.delete('--yes').nil?
+      announce = ARGV.delete('--no-announce').nil?
+      json = !ARGV.delete('--json').nil?
+      allow_partial = !ARGV.delete('--allow-partial').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.publish_unknown_option', option: unknown) if unknown
+      # An object for an answer means nobody is watching, and the dialog
+      # this skips is the only thing that would ask.
+      abort t('cli.publish_json_needs_yes') if json && !yes
+      # --no-announce on its own still shows the dialog; it only says what
+      # [p] must not do when it gets there. Refusing the combination would
+      # be refusing "let me look first, and keep it off Mastodon".
+      slug = ARGV.shift
+      # ⚠️ --yes has to name its post. Without a slug this fell into the
+      # draft picker and then published WITHOUT the dialog -- so one Enter
+      # over a highlighted row published a post and announced it, with no
+      # preview and no confirmation anywhere in between. The picker is for
+      # people who are about to be shown what they picked.
+      abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
+
+      slug ||= pick_draft_interactively
+      cmd_publish(slug, yes: yes, announce: announce, json: json, allow_partial: allow_partial)
+    when 'schedule'
+      allow_partial = !ARGV.delete('--allow-partial').nil?
+      slug = ARGV.shift || pick_draft_interactively
+      cmd_schedule(slug, allow_partial: allow_partial)
+    when 'queue'
+      cmd_queue
+    when 'unpublish'
+      slug = ARGV.shift || pick_published_interactively
+      cmd_unpublish(slug)
+    when 'toot'
+      slug = ARGV.shift || pick_published_interactively
+      cmd_toot(slug)
+    when 'bluesky'
+      slug = ARGV.shift || pick_published_interactively
+      cmd_bluesky(slug)
+    when 'rebuild'
+      # Read here rather than inside cmd_rebuild, the way `list` and `browse`
+      # read their filters: the dispatcher is where this file turns a command
+      # line into arguments, and the wizard calls cmd_rebuild with none.
+      #
+      # Only the switches it has. `rebuild --help` used to build and deploy
+      # the site, and `rebuild --force` -- which the deploy's own guard
+      # tells you to run -- was taken for nothing and stopped again on the
+      # same guard: any word was accepted and all but --full ignored.
+      # `&`, not Array#intersect? -- that is Ruby 3.1, and Ubuntu 22.04's
+      # ruby-full is 3.0: every `rebuild` died on it (newcomer trial).
+      if (ARGV & %w[--help -h]).any?
+        print_usage
+        exit 0
+      end
+      unknown = ARGV.reject { |arg| %w[--full --force].include?(arg) }
+      abort t('cli.rebuild_unknown_option', option: unknown.join(' ')) unless unknown.empty?
+      cmd_rebuild(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
+    when 'preview'
+      # A local static server over the build output -- the quickest way to
+      # look at the site before deploying anywhere.
+      unless Dir.exist?(File.join(ROOT, 'public.nosync'))
+        abort t('cli.preview_missing_public')
+      end
+      # "preview draft" is a thing somebody types, and to_i turned it into
+      # port 0 -- the system then handed out a random port and the line on
+      # screen said http://localhost:0/, which is not where it is listening.
+      asked = ARGV.shift || '8000'
+      abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
+
+      port = asked.to_i
+      puts t('cli.preview_serving', url: "http://localhost:#{port}/")
+      # The serve loop below blocks forever -- with stdout piped (not a TTY)
+      # the URL line would sit in the buffer the whole time, so push it out.
+      $stdout.flush
+      PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
+    when 'list', 'browse'
+      filters = {}
+      ARGV.each do |arg|
+        # ⚠️ force_encoding, because ARGV arrives in the encoding the
+        # ENVIRONMENT declares -- and with LANG unset that is ASCII-8BIT.
+        # LANG unset is not exotic: it is `docker exec` without -e LANG,
+        # which is how this engine is operated, and it is cron, systemd and
+        # launchd. `browse --tag=kočky` then reached Slug.fold, whose
+        # unicode_normalize refuses a binary string, and the terminal died
+        # with a stack trace; down a pipe the comparison is a plain downcase
+        # that does not raise, so it quietly matched nothing instead. The
+        # bytes are UTF-8 either way -- only the label on them was wrong.
+        filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
+        filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
+        filters[:drafts] = true if arg == '--drafts'
+      end
+      # Same filters, two ways to read the answer: `list` prints it,
+      # `browse` puts you inside it. Down a pipe they are the same command,
+      # because a screen you can't press keys in is just a list.
+      command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
+    when 'help'
+      print_usage
+    when 'version', '--version', '-v'
+      puts "blog.sh #{BlogSh::VERSION}"
+    else
+      # Not the whole usage: 43 lines scrolled a mistyped `publsh` off the
+      # screen without ever saying the command does not exist. One line
+      # that does, the nearest real command if there is one, and where the
+      # full list is.
+      warn t('cli.unknown_command', command: command)
+      nearest = nearest_command(command)
+      warn t('cli.unknown_command_nearest', command: nearest) if nearest
+      warn t('cli.unknown_command_help')
+      exit 1
+    end
   end
+rescue Interrupt
+  puts
+  puts t('cli.interrupted')
+  exit 130
 end

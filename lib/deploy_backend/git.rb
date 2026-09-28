@@ -2,6 +2,8 @@
 
 require 'fileutils'
 require 'tmpdir'
+require_relative 'listing'
+require_relative '../i18n'
 
 module DeployBackend
   # Pushes the build as a single-commit snapshot to a git branch --
@@ -24,7 +26,7 @@ module DeployBackend
     module_function
 
     def label
-      'git pages'
+      I18n.t('cli.backend_label_git')
     end
 
     def configured?
@@ -46,6 +48,22 @@ module DeployBackend
 
     def manifest_suffix
       '.git'
+    end
+
+    # nil: the branch is replaced whole on every deploy, so nothing that is
+    # not the site can survive in it and there is no root to look through.
+    # Whether the remote answers is the whole question.
+    #
+    # Asked without a terminal to ask on: ssh in batch mode unless the user
+    # has an ssh command of their own for git, and no https credential
+    # prompt. Either question used to go to a terminal the process could
+    # not reach, and the deadline then called a host that had answered at
+    # once one that never did.
+    def list_root
+      env = { 'GIT_TERMINAL_PROMPT' => '0' }
+      env['GIT_SSH_COMMAND'] = Listing::BATCH_SSH if ENV['GIT_SSH_COMMAND'].to_s.empty? && ENV['GIT_SSH'].to_s.empty?
+      Listing.run(['git', 'ls-remote', '--heads', remote, branch], env: env)
+      nil
     end
 
     # A snapshot mirrors the whole build every run, so orphaned files are

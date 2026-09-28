@@ -203,7 +203,7 @@
     function loadArchiveIfNeeded(query) {
       if (archiveState !== 'idle' || !query.trim()) return;
       archiveState = 'loading';
-      fetch('/search-index-archive.json')
+      fetch((i18n.lang_root || '') + '/search-index-archive.json')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           archiveIndex = data;
@@ -254,7 +254,7 @@
     }
 
     results.innerHTML = '<p class="search-status">' + escapeHtml(i18n.loading_index) + '</p>';
-    fetch('/search-index.json')
+    fetch((i18n.lang_root || '') + '/search-index.json')
       .then(function (r) { return r.json(); })
       .then(function (data) { index = data; run(); })
       .catch(function () {

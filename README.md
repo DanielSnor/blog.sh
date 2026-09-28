@@ -4,7 +4,7 @@
 
 *minimalistic static web/log cms*
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
 [![Shell](https://img.shields.io/badge/Shell-CLI_wrapper-4EAA25?logo=gnubash&logoColor=white)](https://www.gnu.org/software/bash/)
 [![Ruby](https://img.shields.io/badge/Ruby-Pure_stdlib-CC342D?logo=ruby&logoColor=white)](https://www.ruby-lang.org)
 [![JSON](https://img.shields.io/badge/JSON-Content_format-000000?logo=json&logoColor=white)](https://www.json.org)
@@ -101,6 +101,7 @@ Each part says where it is described in full.
   432 kB against 4.3 MB. Beside it, `/archive/` maps the whole site in two levels and `/tag/`
   lists every tag with its count. → [architecture.md](docs/architecture.md#the-client-side),
   [operations.md](docs/operations.md#reading-the-archive)
+- **More than one language.** A post keeps one set of metadata and a text per language; each language gets a root of its own (`/de/`) with its own addresses, feed and listings, the site's own language keeps the root, and a post nobody translated is shown with a link to the one copy it has. The site's own words -- title, about, footer, menu, tags -- are translated in `config/site.<lang>.yml`; the engine's words already are, in English, Czech and German. → [localization.md](docs/localization.md#publishing-in-more-than-one-language)
 - **Build.** Static HTML from JSON through ERB templates: stable pagination, tag, series and type archives, RSS, sitemap, `robots.txt`, a generated favicon, a 404 in the site's own chrome. A page whose inputs have not moved is not rendered again. → [architecture.md](docs/architecture.md#build-pipeline-buildbuild_blogrb)
 - **Deploy.** Cloudron Surfer, a local directory, rsync over SSH, a git-pages push, any rclone remote, or SFTP. A SHA-256 manifest ships only what changed and refuses a build that swings too far from the last one. → [operations.md](docs/operations.md#deploying)
 - **Comments.** The announcement's replies are the thread; `comments.approval: fav` publishes only the ones you favourite. → [Why this exists](#why-this-exists)
@@ -148,10 +149,11 @@ assets/                  CSS/JS/fonts (drop your own images into assets/images/)
 write/                   The page served at /write/ when write: true -- the editor itself, its
                          locale sources and the script that turns them into i18n.js
 config/site.yml.example  Documented config template -- copy to config/site.yml (gitignored) per deployment
+config/site.lang.yml.example  One more published language, described -- copy to config/site.<lang>.yml
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment
 docs/                    Install, operations, importing, architecture, decisions, skinning and
                          localization guides; this README's screenshots; and shortcuts/,
-                         the two iOS shortcuts that send a post from a phone
+                         the shortcut that sends a post from a phone (iOS, and macOS too)
 
 content.nosync/, media.nosync/, public.nosync/, incoming/, trash/, drafts/, env.sh, config/site.yml
                          Per-deployment/generated, not part of the engine -- see .gitignore
@@ -231,6 +233,8 @@ says what you are running.
                                # with a markdown file it asks nothing, and --json answers as data;
                                # --untrusted refuses a picture reference that is not a bare filename
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
+./blog.sh translate <slug> --lang <code>
+                               # writes the post's text in another language the site publishes
 ./blog.sh props [<slug>]       # a post's state and its actions; [e] changes what the post IS --
                                # its series and part, tags, type, and the unlisted/hero/toc flags
 ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
@@ -246,20 +250,25 @@ says what you are running.
 ./blog.sh empty versions       # keeps each post's newest version, removes the older ones
 ./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
-./blog.sh rebuild [--full]     # rebuilds and deploys the whole site;
-                               # --full builds every page again instead of only the changed ones
+./blog.sh rebuild [--full] [--force]
+                               # rebuilds and deploys the whole site, every language it publishes;
+                               # --full builds every page again instead of only the changed ones;
+                               # --force lets the deploy past its guards and uploads everything
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                # the archive on screen: filters, search, preview, Enter opens the post
 ./blog.sh list [--type=image] [--tag=foo] [--drafts]
                                # the same, printed one line per post
-./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it
+./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it;
+                               # --online also asks the feeds, the analytics script, the access
+                               # token and the deploy target -- whether it answers, what is in its root
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
-./blog.sh check [--online] [--json] [--repair]
+./blog.sh check [--online] [--json] [--repair] [--languages]
                                # walks the archive and says what is broken in it;
                                # --json prints every finding as data instead of a screenful;
-                               # --repair offers, per finding, the one repair that finding allows
+                               # --repair offers, per finding, the one repair that finding allows;
+                               # --languages shows instead which post is written in which language
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                # writes the whole archive out as a tree of markdown files
 ./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources
@@ -277,10 +286,12 @@ laptop for a local one.
 ```bash
 export SITE_BASE_URL=https://example.com
 export MASTODON_ACCESS_TOKEN=...   # comment toots (optional)
+export BLUESKY_APP_PASSWORD=...    # Bluesky announcements (optional)
 export TUMBLR_API_KEY=...          # importing a Tumblr blog (wizard or script)
 export DEPLOY_BACKEND=...          # surfer (default) | local | rsync | git | rclone | sftp
 export SURFER_URL=...              # surfer backend
-export SURFER_TOKEN=...
+export SURFER_USERNAME=...         # Cloudron username + app password (Surfer 7)
+export SURFER_PASSWORD=...
 export SURFER_REMOTE_DIR=...
 export DEPLOY_TARGET_DIR=...       # local backend
 export RSYNC_TARGET=...            # rsync backend (+ optional RSYNC_SSH)
@@ -351,12 +362,14 @@ how an installation moves.
 ## Deploy
 
 ```bash
-ruby build/build_blog.rb   # rebuild into public.nosync/
-./scripts/deploy-web.sh            # uploads only new/changed files (SHA256 manifest)
+./blog.sh rebuild                  # builds every language into public.nosync/, then deploys
+./scripts/deploy-web.sh            # deploys only: uploads new/changed files (SHA256 manifest)
 ./scripts/deploy-web.sh --prune    # also deletes orphaned files on the target
 ```
 
-`./blog.sh rebuild` does both steps at once.
+`ruby build/build_blog.rb` builds without deploying -- one language per run
+(the site's own, or the one `BLOG_SH_LANG` names), so on a site with more
+than one, `./blog.sh rebuild` is the way to build them all.
 
 ### Cron (sidebar widgets and post stats)
 
@@ -430,6 +443,10 @@ where the GoToSocial comments in 1.4 were found.
 Czech self-hosting community, skinned the same way. The tag index and the
 copy button on code blocks were both their requests -- a blog of terminal
 how-tos wanted them first.
+
+[pavelchcepsat.cz](https://pavelchcepsat.cz) is a personal blog in Czech,
+and the first to be written from an Android phone: the writing app sends
+its text from Chrome and Edge because its owner tested what they refuse.
 
 [archive.bierfaristo.com](https://archive.bierfaristo.com) is the largest
 archive we know of running this engine, some 13,700 posts -- a working

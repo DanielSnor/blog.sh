@@ -9,7 +9,10 @@ module Import
   # Feed already knows how to read the XML, dates, ids and shownote HTML;
   # what a podcast adds is the media itself: each episode's file downloads
   # and leads the post as a native audio (or video) block, with the
-  # episode artwork above it. Local files on purpose -- the archive has to
+  # episode's own artwork above it -- when it has one. Anchor and others
+  # repeat the SHOW's cover in every item, and that is the podcast's
+  # picture, not the episode's: over every post it said nothing about the
+  # episode below it. Local files on purpose -- the archive has to
   # outlive the hosting account, which is usually why anyone migrates a
   # podcast.
   #
@@ -31,6 +34,12 @@ module Import
       @bytes = 0
     end
 
+    # The cover the channel declares for the whole show -- an episode that
+    # carries the same address carries no artwork of its own.
+    def show_cover
+      @show_cover ||= document.elements['rss/channel/itunes:image']&.attribute('href')&.value.to_s
+    end
+
     def label
       title = channel_title
       title.empty? ? 'Podcast feed' : "Podcast (#{title})"
@@ -46,7 +55,7 @@ module Import
       @bytes += enclosure_bytes(item)
       leading = []
       artwork = item.elements['itunes:image']&.attribute('href')&.value.to_s
-      unless artwork.empty?
+      unless artwork.empty? || artwork == show_cover
         filename = media.from_url(artwork)
         if filename
           entry = { 'url' => filename }

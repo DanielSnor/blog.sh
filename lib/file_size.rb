@@ -54,6 +54,16 @@ module FileSize
     # 2_900_000 back as 28 (28.999999999999996 floored), and a size that
     # shrinks by a tenth for no visible reason is worse than the rounding
     # this replaces.
-    format('%.1f MB', (value / 100_000) / 10.0).sub('.0 ', ' ')
+    format('%.1f MB', (value / 100_000) / 10.0).sub('.0 ', ' ').sub('.', decimal_point)
+  end
+
+  # The decimal mark of the language this run speaks -- "2,9 MB" in Czech
+  # and German. It was the one number `stats` printed with a dot on a
+  # screen that said "34,4 hodiny", and the size beside an attachment on a
+  # Czech page read the same way. English wherever there is no locale to
+  # ask: the file is required by scripts that load no I18n.
+  def decimal_point
+    mark = defined?(I18n) && I18n.respond_to?(:lookup) ? I18n.lookup('decimal_point') : nil
+    mark.to_s.empty? ? '.' : mark
   end
 end

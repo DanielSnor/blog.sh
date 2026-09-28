@@ -31,6 +31,12 @@ require_relative 'deploy_backend/sftp'
 #                    mirrors the build exactly, deleting orphans with or
 #                    without --prune -- deploy_web.rb keeps its manifest
 #                    and messages honest about that
+#   location         where the site lands, for a person to read, when
+#                    `target` leaves part of it out (sftp's directory)
+# and for `doctor --online` (lib/deploy_backend/listing.rb):
+#   list_root        [name, directory?] for what stands in the target's
+#                    root, or nil where only reaching it means anything
+#                    (git); raises Listing::Failed when it cannot be read
 #
 # deploy_web.rb's manifest diff and the shrink/growth safeguards run
 # BEFORE either path -- they're target-independent on purpose, so even a
@@ -38,6 +44,13 @@ require_relative 'deploy_backend/sftp'
 # a broken build) stays behind the same guards.
 #
 module DeployBackend
+  # deploy_web's exit when the target refused the sign-in (Surfer's 401,
+  # 403, or an older Surfer's 500 to a password). Told apart from 1 so the
+  # rebuild that ran it does not advise running the transfer again: that
+  # only helps a transfer that broke off, and a refused sign-in is refused
+  # again until env.sh changes (Surfer 7, 26. 9. 2026). 3 is RunLock's.
+  REFUSED_EXIT = 4
+
   BACKENDS = {
     'surfer' => Surfer,
     'local' => Local,

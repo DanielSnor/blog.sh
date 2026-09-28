@@ -145,6 +145,63 @@ This exact bug shipped, and it was reported by somebody else. It survived
 because the switch had been exercised by setting the theme directly rather
 than by clicking it -- see *Checking a skin* below.
 
+### The corner of the banner holds two controls, not one
+
+On a site that publishes more than one language (`site.locales`), the
+banner's top right corner is a row, `.banner-tools`, holding the language
+switcher and the appearance button side by side. They are the same kind of
+thing -- a choice about this visit rather than a place to go -- so they are
+styled as one pair: two chips of the same height, the row stretching the
+shorter one so no number has to be kept in step.
+
+```
+.banner-tools          the row (absolute, top/right)
+  a.lang-switch        the chip
+    .lang-switch__item   a language; .is-current is the one being read
+  #theme-toggle        the appearance button
+```
+
+A site with one language has no row: `#theme-toggle` stands in the corner
+on its own, absolute, exactly as before 1.9 -- so a skin that places it
+with `top`, `right` or a `transform` keeps working untouched.
+
+Inside the row the ROW places the button, and the engine resets its
+`top`, `right`, `bottom`, `left` and `transform` there, at a weight a bare
+`#theme-toggle { ... }` in a skin does not outrank. Numbers written for
+the corner would otherwise move the button off its place beside the chip.
+So when a skin that places the button meets a site with languages, place
+`.banner-tools` with the same numbers instead -- and leave room for it: the
+row is wider than the button alone, and a menu that ran up to the button
+will run under the chip.
+
+The chip is ONE link, not a link per language: a click anywhere on it
+moves to the next language the site publishes and wraps around at the
+end, the way the button beside it cycles light → dark → system. The codes
+inside it are spans, so style `.lang-switch__item` for how a language
+looks and `a.lang-switch` for how the control behaves.
+
+The row deliberately has **no `z-index`**: with one it would become a
+stacking context, and `#theme-toggle { z-index: 6 }` -- which the section
+above tells you to write when your skin unsticks the bar -- would stop
+lifting the button above it. Both children carry `z-index: 3` themselves
+instead. If your skin gives the row a layer, give the children one too.
+
+Recolour the switcher with three custom properties rather than by
+restating the selectors; each falls back to what the button beside it
+uses, so setting none of them keeps the pair in step:
+
+```css
+:root {
+  --lang-switch-bg: var(--accent);            /* the chip */
+  --lang-switch-text: #ffffff;                /* the language being read */
+  --lang-switch-dim: rgba(255, 255, 255, .65); /* the others, and the / */
+}
+```
+
+The chip is a `<nav>`, so the menu's own rules reach it -- gap, minimum
+height, borders. Its rule says all of them again; if you restyle it from
+scratch, say them again too, or it will quietly grow into a menu bar.
+
 ### The excerpt is a positioning context
 
 `.content.excerpt` is `max-height: 500px; overflow: hidden; position:

@@ -54,7 +54,7 @@ switches something off and says so.
 | rsync | any | the `rsync` deploy backend | that backend only |
 | ssh + sftp | any | the `sftp` backend | that backend only |
 | git | any | the `git` backend (Pages) | that backend only |
-| rclone | any | the `rclone` backend (S3, R2, B2, WebDAV) | that backend only |
+| rclone | any | the `rclone` backend (S3, R2, B2, WebDAV, FTP) | that backend only |
 | nothing extra | — | the `surfer` and `local` backends | — |
 
 No gems, no Bundler, no lockfile: the engine is the standard library and
@@ -298,6 +298,16 @@ does nothing for a Bluesky entry.
 `en`, `cs` and `de` ship with the engine; a partial locale falls back to
 English per key. Adding another language is data, not code -- see
 [localization.md](localization.md).
+
+`site.locales` is the list of languages the site **publishes**, and it is
+only needed when that is more than one. The language in `site.lang` keeps
+the site root; every other one is built into a root of its own (`/de/`),
+with one copy of `/assets/` and one writing app shared between them. The
+words of a post in another language are written with `./blog.sh translate`
+(see [operations.md](operations.md#writing-a-post-in-another-language)),
+and `./blog.sh rebuild` produces every language in one go. Leave the key
+out and nothing about the site changes -- no switcher, no alternates,
+nothing in the markup.
 
 `site.timezone` (an IANA name like `Europe/Prague`) is the zone every
 timestamp the engine writes is expressed in. **Set it if you'll ever
@@ -549,6 +559,22 @@ into before any address of yours is touched; set the target when the site
 is ready to be seen. Reported from the outside, and it cost somebody their
 placeholder.
 
+The other way round, **nothing is removed**. A deploy writes the site's
+files and deletes only files an earlier deploy of this site wrote;
+whatever else was in the target stays. After a previous site that
+matters: a host typically serves `index.php` before `index.html`, so an
+old WordPress front page goes on answering over the new one, and an old
+`.htaccess` can go on rewriting addresses the new site depends on. Clear
+the old site out of the target before the first deploy -- over FTP, with
+the client or file manager you used for it -- and keep only what the
+host itself put there. (The git backend is the exception: every push
+replaces the whole branch.) `./blog.sh doctor --online` lists what stands
+in the target's root that the site does not put there -- run it once the
+target is set, before the first deploy. What stands there on purpose
+(screenshots an issue links to, a file a search console asked for) goes
+under `deploy.keep` in `config/site.yml`, and doctor stops naming it;
+`.well-known/` it never names.
+
 One thing to know before you write your first post with a big attachment:
 a single file over 100 MB is refused, at save time and again at deploy
 time. The limit is the same for every backend so the site stays portable
@@ -559,12 +585,25 @@ See [Deploying](operations.md#deploying) for the rest of the guards.
 
 ```bash
 export SURFER_URL=https://surfer.example.com
-export SURFER_TOKEN=...        # create an access token in the Surfer admin UI (/_admin)
+export SURFER_USERNAME=...     # your Cloudron username, not the e-mail
+export SURFER_PASSWORD=...     # an app password: Cloudron profile -> App Passwords
 export SURFER_REMOTE_DIR=      # optional subdirectory; empty = app root
 ```
 
 No `DEPLOY_BACKEND` needed -- surfer is the default whenever
 `SURFER_URL` is set.
+
+Surfer 7 (September 2026) signs in with the Cloudron user and an **app
+password** -- one you create for the Surfer app in your Cloudron profile,
+not the password you sign in to Cloudron with. The access token of Surfer
+6 and earlier (`SURFER_TOKEN`) is still read, but Surfer 7 answers it with
+HTTP 401, and the deploy then stops at the first file and says so. Moving
+over is two lines in `env.sh`: add `SURFER_USERNAME` and `SURFER_PASSWORD`
+and leave `SURFER_TOKEN` where it is. They can go in before the app has
+updated: a Surfer older than 7 answers the password with an error (HTTP
+500), and the run then goes on with the token -- every run tries the
+password first, so the day Surfer 7 arrives it takes over by itself.
+`./blog.sh doctor --online` says which of the two Surfer took.
 
 ### local (a directory on the same machine)
 
@@ -606,7 +645,7 @@ Every deploy force-pushes the build as a single-commit snapshot; a custom domain
 `GIT_PAGES_CNAME` (the host stores it as a CNAME file *in the branch*,
 which a snapshot push would otherwise wipe).
 
-### rclone (S3, R2, B2, WebDAV, ...)
+### rclone (S3, R2, B2, WebDAV, FTP, ...)
 
 ```bash
 export DEPLOY_BACKEND=rclone
@@ -616,7 +655,40 @@ export RCLONE_ARGS="--s3-acl public-read"   # optional provider flags
 
 Run `rclone config` once to set up the remote -- credentials live in
 rclone's own config, never in env.sh. Needs the `rclone` binary
-installed.
+installed -- from your distribution's packages or from rclone.org, not
+as a snap. The snap is not published by the rclone project, and it is
+confined to your home directory: with the site anywhere else (`/srv`,
+`/var/www`, `/opt`) it cannot read a single file of it, and says so as
+"no such file or directory" about a file that is plainly there.
+`./blog.sh doctor` notices the snap and says when the site is out of its
+reach.
+
+A plain **FTP** host -- the kind a shared hosting plan gives you, with no
+SSH to it at all -- goes through rclone as well. In `rclone config` pick
+the type `ftp` and give it the host, the user and the password; then
+
+```bash
+export DEPLOY_BACKEND=rclone
+export RCLONE_TARGET=myftp:public_html   # remote name : the directory the host serves
+```
+
+Nothing else is needed: the engine tells rclone exactly which files to
+send and which to delete, so it never asks the server for checksums,
+which FTP cannot give. If the host offers FTPS, turn it on in `rclone
+config` (`explicit_tls`) -- plain FTP sends the password in the clear.
+
+If the deploy fails with the server complaining about too many
+connections -- shared hosting often allows only a few per account --
+make rclone open one at a time:
+
+```bash
+export RCLONE_ARGS="--checkers 1 --transfers 1"
+```
+
+rclone also has `--ftp-concurrency`, but its own documentation warns that
+setting it is very likely to deadlock unless it is one more than
+`--checkers` and `--transfers` together; the two flags above are the
+simpler way to the same limit.
 
 ### sftp (hosts with neither rsync nor git)
 
@@ -782,6 +854,15 @@ Worth knowing before switching it on:
 ```bash
 git pull
 ruby build/build_blog.rb && ./scripts/deploy-web.sh
+```
+
+`main` is the release branch: a clone on it gets each release by `git
+pull`. A clone that was put on a release tag (`git checkout v1.8`) is on
+no branch, and `git pull` refuses with "You are not currently on a
+branch"; move it to the next release by name instead:
+
+```bash
+git fetch --tags && git checkout v1.9
 ```
 
 The first build after an upgrade may be a full one -- the engine's own

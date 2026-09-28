@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'yaml'
+require_relative 'language_file'
 
 # Every entry point requires this file, so the two process-wide
 # prerequisites live here, next to the timezone handling below.
@@ -32,6 +33,56 @@ module SiteConfig
   PATH = File.join(File.expand_path('..', __dir__), 'config', 'site.yml')
 
   module_function
+
+  # What a language of this site says about itself, in a file of its own:
+  # config/site.cs.yml beside config/site.yml.
+  #
+  # The site's own language has no such file -- site.yml IS its file -- and
+  # everything that used to be a table keyed by language inside site.yml
+  # (which language stands in for this one, which language's interface it
+  # borrows) is written here instead, where that language is described.
+  # A site that publishes one language never has one of these.
+  def language_path(lang)
+    File.join(File.dirname(PATH), "site.#{lang}.yml")
+  end
+
+  # Empty when there is no such file, which is the ordinary case. A file
+  # that exists and will not parse stops the build the way site.yml does:
+  # it was written to be read.
+  def language_data(lang)
+    path = language_path(lang)
+    return {} unless File.exist?(path)
+
+    loaded = load_yaml(path)
+    loaded.is_a?(Hash) ? loaded : {}
+  end
+
+  # The chrome of one language laid over site.yml, for the rest of this
+  # process: the title, the description, the banner's words, the about
+  # text, the footer, the menu and the widget headings that
+  # config/site.<lang>.yml translates (lib/language_file.rb says which).
+  #
+  # 🪤 The BUILD calls this, and nothing else may. Every other program that
+  # reads the config -- setup, style, the wizards -- also WRITES it back,
+  # and a Czech title read here would be written into site.yml as the
+  # site's own. The site's own language has no file, so its run is left as
+  # it is.
+  def localize!(lang)
+    lang = lang.to_s.strip
+    return if lang.empty? || lang == get('site', 'lang', default: 'en').to_s
+
+    @data = LanguageFile.localize(data, language_data(lang))
+  end
+
+  # Every language file lying in config/, by the language each one names.
+  # Read by the build and by `check` to refuse one that nothing publishes:
+  # a file nobody reads is worse than a missing one, because it looks like
+  # the work is done.
+  def language_files
+    Dir.glob(File.join(File.dirname(PATH), 'site.*.yml')).to_h do |path|
+      [File.basename(path).sub(/\Asite\./, '').sub(/\.yml\z/, ''), path]
+    end
+  end
 
   def data
     @data ||= begin
@@ -66,11 +117,25 @@ module SiteConfig
     # section before it. Said out loud, because the first person to report
     # this had read the named line, found it blameless, and gone looking
     # through the engine's source instead.
-    abort("❌ #{path} is not valid YAML: #{e.problem} at line #{e.line}, column #{e.column}. " \
-          "Usually indentation (spaces only, never tabs), a missing quote, or a colon inside an unquoted value. " \
-          "If that line looks fine, the cause is elsewhere -- most often a commented-out section header " \
-          "with its keys left behind, or an unclosed quote earlier. " \
-          "Run ./blog.sh doctor for the full picture.")
+    #
+    # In the site's language, dug out of the raw file the way doctor does
+    # it -- I18n would ask this very method -- and with doctor's hint, so a
+    # quote left open is named by its own line (second trial, 25. 9. 2026:
+    # English on a Czech site, and the wrong line).
+    require_relative 'config_lang'
+    require_relative 'yaml_compat'
+    require_relative 'i18n'
+    # The site's language lives in site.yml, also when the file that broke
+    # is a site.<lang>.yml, which has no lang: of its own (fleet, 26. 9.).
+    lang = ConfigLang.of(File.join(File.dirname(path), 'site.yml'))
+    I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)
+    open_quote = YamlCompat.open_quote_line(File.read(path, encoding: 'utf-8'))
+    fix = if open_quote
+            I18n.t('doctor.site_yml_open_quote_fix', line: open_quote)
+          else
+            I18n.t('doctor.site_yml_syntax_fix', line: e.line, column: e.column)
+          end
+    abort("❌ #{I18n.t('cli.yaml_invalid', path: path, message: e.problem)} #{fix} #{I18n.t('cli.yaml_invalid_doctor')}")
   rescue SystemCallError => e
     # A file that exists but cannot be OPENED. Wrong owner after a wizard
     # ran under sudo is the usual story, and until this rescue existed the

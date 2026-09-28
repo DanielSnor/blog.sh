@@ -247,7 +247,17 @@ module MarkdownParser
   # markdown: the image block is gone, its file is pruned as unreferenced
   # a moment later, and the page then shows the author's absolute disk path
   # as text. VIDEO_RE has always been written this way; this one was not.
-  IMAGE_RE = /\A!\[(.*?)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
+  #
+  # 🪤 The title may be in straight quotes or in typographic ones -- \u201E\u201C as
+  # Czech and German write them, \u201C\u201D as English does. Only straight ones
+  # were read, and the failure was silent in the worst way: the quotes and
+  # the caption were swallowed into the FILENAME, so the picture pointed at
+  # a file nobody has, the build dropped it without a word and the page
+  # went out with a hole in it. Every translator, word processor and phone
+  # keyboard produces the typographic pair, so refusing to read it is a
+  # trap rather than a rule (Daniel, 21. 9. 2026, on a translated post
+  # whose two pictures vanished).
+  IMAGE_RE = /\A!\[(?<alt>.*?)\]\((?<target>[^)"\u201E\u201C\u201D]+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
   # Two exclamation marks = video, whether a local file or YouTube.
   # Deliberately explicit: a bare address on its own line stays a plain
   # paragraph, so a video can also just be linked to instead of every link
@@ -302,7 +312,8 @@ module MarkdownParser
   # link's affordance, an attachment has nowhere to put it, and turning
   # one into an upload would both discard the title and demand a file
   # the author never meant to publish.
-  LINK_LINE_RE = /\A\[([^\]]*)\]\(([^)"]+?)(?:\s+"((?:\\.|[^"\\])*)")?\)\z/
+  # Typographic quotes here too, for the reason IMAGE_RE gives.
+  LINK_LINE_RE = /\A\[(?<label>[^\]]*)\]\((?<target>[^)"\u201E\u201C\u201D]+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
 
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
@@ -1012,12 +1023,12 @@ module MarkdownParser
       # picture that was never anywhere. Kept as a link, which is what the
       # line actually is, and said out loud so the author can download the
       # picture and write it as a file if they meant to keep it.
-      if m[2].to_s.match?(%r{\Ahttps?://})
-        warn "Note: #{m[2]} is on another server, so it stays a link. Download it into " \
+      if m[:target].to_s.match?(%r{\Ahttps?://})
+        warn "Note: #{m[:target]} is on another server, so it stays a link. Download it into " \
              'incoming/ and write ![alt](filename.jpg) to publish it with the post.'
-        return [{ 'type' => 'text', 'text' => "[#{m[1]}](#{m[2]})",
-                  'formatting' => [{ 'type' => 'link', 'url' => m[2], 'start' => 1,
-                                     'end' => 1 + m[1].to_s.length }] }, counter]
+        return [{ 'type' => 'text', 'text' => "[#{m[:alt]}](#{m[:target]})",
+                  'formatting' => [{ 'type' => 'link', 'url' => m[:target], 'start' => 1,
+                                     'end' => 1 + m[:alt].to_s.length }] }, counter]
       end
 
       counter += 1
@@ -1025,7 +1036,7 @@ module MarkdownParser
       # "[" and "]" so an alt text holding one cannot end the label early,
       # and reading it back raw left the backslashes where the reader could
       # see them -- and put them into the alt attribute on the page.
-      alt, path, caption = unescape_title(m[1]), m[2], unescape_title(m[3])
+      alt, path, caption = unescape_title(m[:alt]), m[:target], unescape_title(m[:title])
       # A single exclamation mark is for images only. A video with just one
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.
@@ -1034,14 +1045,14 @@ module MarkdownParser
       media_files[src] = filename if src
       counter -= 1 unless src
       return [{ 'type' => 'image', 'media' => [{ 'url' => filename }], 'alt_text' => (alt.empty? ? nil : alt), 'caption' => caption }.compact, counter]
-    elsif (m = LINK_LINE_RE.match(para)) && m[3].nil? && file_line?(m[2], media_dir)
+    elsif (m = LINK_LINE_RE.match(para)) && m[:title].nil? && file_line?(m[:target], media_dir)
       # A whole line that is just [label](file.pdf) with a bare filename:
       # the file travels with the post like a photo does, and the block
       # carries its size so the page can say what a click costs. The label
       # falls back to the filename -- an attachment with no words is still
       # better than a link reading "download".
       counter += 1
-      label, target = m[1].strip, m[2].strip
+      label, target = m[:label].strip, m[:target].strip
       filename, src = resolve_image(target, media_dir, counter, media_files, incoming_dir: incoming_dir, confined: confined)
       media_files[src] = filename if src
       counter -= 1 unless src

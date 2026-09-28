@@ -2,6 +2,8 @@
 
 require 'fileutils'
 require_relative '../path_safety'
+require_relative 'listing'
+require_relative '../i18n'
 
 module DeployBackend
   # Copies the build into a directory on this machine -- for a site served
@@ -11,7 +13,9 @@ module DeployBackend
     module_function
 
     def label
-      'local directory'
+      # Words, not a name like Surfer or rsync, so they speak the site's
+      # language: "Nasazení webu -> local directory" on a Czech site.
+      I18n.t('cli.backend_label_local')
     end
 
     def configured?
@@ -23,10 +27,32 @@ module DeployBackend
     # an unmounted mountpoint has -- and the whole site was deployed into
     # a directory of that name INSIDE the installation, quietly and
     # successfully. A relative target is not a target anybody meant.
+    # A leading ~ is not relative: env.sh quotes the value, so the shell
+    # leaves the tilde alone, and #session expands it -- the newcomer
+    # trial's ~/fresh-www was refused by doctor while the deploy found it.
     def problem
       return nil if dir.empty? || dir.start_with?('/')
+      return unknown_user(dir) if dir.start_with?('~')
 
       I18n.t('cli.deploy_target_relative', dir: dir)
+    end
+
+    # ~name/... expands to name's home -- and to an ArgumentError backtrace
+    # from the middle of a deploy when there is no such user, which is what
+    # a typo'd ~www/blog for ~/www/blog is (fleet, 26. 9. 2026). Said here
+    # instead, where doctor and the deploy's own check ask first.
+    def unknown_user(path)
+      File.expand_path(path)
+      nil
+    rescue ArgumentError
+      I18n.t('cli.deploy_target_no_user', dir: path, user: path[%r{\A~([^/]*)}, 1])
+    end
+
+    # The sentence above says what to write instead; the generic advice
+    # about unclosed quotes in the extra switches belongs to backends
+    # that take switches.
+    def problem_fix
+      nil
     end
 
     def dir
@@ -39,6 +65,16 @@ module DeployBackend
 
     def manifest_suffix
       '.local'
+    end
+
+    # [name, directory?] for what stands in the target directory.
+    def list_root
+      base = File.expand_path(dir)
+      Dir.children(base).map { |name| [name, File.directory?(File.join(base, name))] }
+    rescue Errno::ENOENT
+      raise Listing::Missing, base
+    rescue SystemCallError => e
+      raise Listing::Failed, e.message.sub(/ @ \w+ - .*\z/, '')
     end
 
     def session

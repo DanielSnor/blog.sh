@@ -758,6 +758,13 @@ module Import
     # posts out of 404.html and the feed. The narrower net loses the
     # rare .html post in a folder with no _posts/; the wider one loses
     # the author's confidence in the whole import.
+    # Markdown only, where _posts/ and _drafts/ take .html too. In _posts/ a
+    # .html file is a post by where it stands; in a tree with no _posts/ it
+    # is the other way round -- an .html file there is the site's own
+    # furniture far more often than an article: index.html, 404.html, a
+    # feed or sitemap template, a collection's layout page. Swept in, each
+    # would be published as a post dated the day of the import. A blog
+    # written in HTML keeps it in _posts/, which reads it.
     def wider_net
       PathGlob.under(tree_root, '**', '*.{md,markdown}').reject do |path|
         parts = path.delete_prefix("#{tree_root}#{File::SEPARATOR}").split(File::SEPARATOR)
@@ -926,8 +933,12 @@ module Import
     # who cannot see it. Every part is CGI-escaped, so a colon inside
     # any of them arrives as %3A and the split stays unambiguous.
     def images_to_sentinels(body)
+      # By NAME: IMAGE_RE carries the title in one of three alternatives
+      # (straight quotes and the two typographic pairs), so its groups are
+      # not countable any more.
       body = body.gsub(MarkdownParser::IMAGE_RE) do
-        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
+        m = Regexp.last_match
+        image_sentinel(m[:target], m[:alt], m[:title])
       end
       # Line-anchored form ([ \t], NOT \s -- \s eats the newlines and
       # with them the paragraph break after the image).

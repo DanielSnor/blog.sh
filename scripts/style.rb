@@ -650,13 +650,26 @@ end
 # hard way.
 def section_layout
   sidebar = Wizard.confirm(t('q_layout_sidebar'), default: at('layout', 'sidebar') != false)
-  site.set(%w[layout sidebar], sidebar)
+  set_switch(%w[layout sidebar], sidebar, default: true)
 
   hero = Wizard.confirm(t('q_layout_hero'), default: at('layout', 'hero') == true)
-  site.set(%w[layout hero], hero)
+  set_switch(%w[layout hero], hero, default: false)
 
   puts
   section_extra_css
+end
+
+# A switch written only when the answer changes what the site does. Enter
+# through Layout on a site that never set it wrote `layout: sidebar: true /
+# hero: false` into site.yml -- the values the engine uses anyway -- and the
+# wizard showed that as a change to write (newcomer trial, 25. 9. 2026).
+# Absent means the default, so the default goes on being absent.
+def set_switch(path, value, default:)
+  current = at(*path)
+  return if current == value
+  return if current.nil? && value == default
+
+  site.set(path, value)
 end
 
 # The skin. A list, in load order, of stylesheets the browser gets after
@@ -984,7 +997,13 @@ def nav_tags
 end
 
 def nav_known
-  @nav_known ||= Checker.known_paths(nav_posts)
+  # 🪤 With the root, because two of the answers depend on it: `/write/`
+  # exists only on a site that publishes the writing app, and a site
+  # published in more than one language answers under each language's own
+  # root. Asked without it, the wizard told the person their own address
+  # was a 404 -- the same defect check carried for `/write/` until 1.9,
+  # in the other tool.
+  @nav_known ||= Checker.known_paths(nav_posts, root: ROOT)
 end
 
 def nav_pages
@@ -1082,9 +1101,20 @@ end
 def configure_widget(name)
   # Setting one up again is the undo for having removed it.
   removed_widgets.delete(name)
-  heading = Wizard.ask(t('q_widget_heading'),
-                       at('widgets', name, 'heading') || inactive_default(name, 'heading') || t("widget_heading_#{name}"))
-  site.set(['widgets', name, 'heading'], heading) if heading
+  # The engine says a widget's heading itself, in every language the site
+  # publishes (chrome.* in locales/). Only a heading of the site's OWN is
+  # written: the engine's words written into site.yml used to freeze there
+  # in one language, and a second language then had to translate what the
+  # engine already says in it. Taking the engine's words over one that
+  # froze earlier switches the frozen one off.
+  engine = I18n.t("chrome.widget_#{name}")
+  written = at('widgets', name, 'heading')
+  heading = Wizard.ask(t('q_widget_heading'), written || inactive_default(name, 'heading') || engine)
+  if heading && heading != engine
+    site.set(['widgets', name, 'heading'], heading)
+  elsif heading == engine && written
+    site.deactivate(['widgets', name, 'heading'])
+  end
 
   WIDGETS[name].each do |key|
     value = Wizard.ask_valid(t("q_widget_#{key}"),

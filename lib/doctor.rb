@@ -9,6 +9,7 @@ require 'yaml'
 # NoMethodError just as happily.
 require 'time'
 require_relative 'site_config'
+require_relative 'yaml_compat'
 require_relative 'icons'
 require_relative 'i18n'
 require_relative 'media_dimensions'
@@ -110,12 +111,24 @@ module Doctor
   # to be specific, not theirs -- but that does mean a backend which grows
   # a new required value needs a line here too.
   BACKEND_VALUES = {
-    'surfer' => %w[SURFER_URL SURFER_TOKEN],
+    # The sign-in is added below: it is either of two pairs.
+    'surfer' => %w[SURFER_URL],
     'local' => %w[DEPLOY_TARGET_DIR],
     'rsync' => %w[RSYNC_TARGET],
     'git' => %w[GIT_PAGES_REMOTE],
     'rclone' => %w[RCLONE_TARGET],
     'sftp' => %w[SFTP_TARGET]
+  }.freeze
+
+  # The program each backend shells out to. Surfer talks HTTP from Ruby and
+  # local copies files, so neither needs one. Without the program every
+  # deploy fails with the shell's "command not found" -- after the build,
+  # in cron output nobody reads, which is exactly what doctor is for.
+  BACKEND_PROGRAMS = {
+    'rsync' => 'rsync',
+    'rclone' => 'rclone',
+    'sftp' => 'sftp',
+    'git' => 'git'
   }.freeze
 
   module_function
@@ -147,6 +160,7 @@ module Doctor
     findings.concat(parse_findings)
     return findings unless data
 
+    findings.concat(check_language_yml(root, data))
     findings.concat(check_identity(data))
     findings.concat(check_placeholders(data))
     findings.concat(check_locale(data))
@@ -168,8 +182,9 @@ module Doctor
     findings.concat(check_social_icons(data))
     findings.concat(check_share(data))
     findings.concat(check_trash(root))
-    findings.concat(check_deploy)
-    findings.concat(check_online(data)) if online
+    findings.concat(check_deploy(root))
+    findings.concat(check_deploy_keep(data))
+    findings.concat(check_online(data, root)) if online
     findings
   end
 
@@ -207,12 +222,12 @@ module Doctor
       data = begin
         YAML.load_file(path)
       rescue Psych::SyntaxError => e
-        return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), t('site_yml_syntax_fix', line: e.line, column: e.column))]]
+        return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), yaml_syntax_fix(e, path))]]
       rescue SystemCallError => e
         return [nil, [error(t('site_yml_unreadable', message: e.message), t('site_yml_unreadable_fix'))]]
       end
     rescue Psych::SyntaxError => e
-      return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), t('site_yml_syntax_fix', line: e.line, column: e.column))]]
+      return [nil, [error(t('site_yml_syntax', message: e.problem.to_s), yaml_syntax_fix(e, path))]]
     rescue SystemCallError => e
       # A file that exists but cannot be OPENED -- wrong permissions after
       # a root-run wizard is the usual story. The one command whose whole
@@ -223,6 +238,83 @@ module Doctor
     return [nil, [error(t('site_yml_empty'), t('site_yml_missing_fix'))]] unless data.is_a?(Hash)
 
     [data, [ok(t('site_yml_ok'))]]
+  end
+
+  # The language files beside site.yml parse. One that does not stops the
+  # build of every language, and the build's message sends the reader
+  # here -- which used to say nothing about it. Whether the keys inside are
+  # right is `check`'s question, and the build's; this is only whether the
+  # file can be read at all.
+  # Where the fault is, as near as it can be said. A quote left open is
+  # found by reading the file, since Psych names the wrong line for it.
+  def yaml_syntax_fix(error, path)
+    open_quote = YamlCompat.open_quote_line(File.read(path, encoding: 'utf-8'))
+    return t('site_yml_open_quote_fix', line: open_quote) if open_quote
+
+    t('site_yml_syntax_fix', line: error.line, column: error.column)
+  rescue SystemCallError
+    t('site_yml_syntax_fix', line: error.line, column: error.column)
+  end
+
+  #
+  # Two more things about them, both from the second new-user trial
+  # (25. 9. 2026): a file left behind for a language taken out of
+  # site.locales stops the build of every language, and doctor -- where
+  # the build's message sends you -- did not name it; and a file copied
+  # from the example and never rewritten put the example's German on the
+  # Czech pages, with nobody saying so.
+  def check_language_yml(root, data)
+    files = Dir.glob(File.join(root, 'config', 'site.*.yml')).sort
+    parsed = {}
+    findings = files.filter_map do |path|
+      parsed[path] = YAML.load_file(path)
+      nil
+    rescue Psych::SyntaxError => e
+      error(t('language_yml_syntax', file: File.basename(path), message: e.problem.to_s),
+            yaml_syntax_fix(e, path))
+    rescue StandardError
+      nil
+    end
+    stray = stray_language_files(files, data)
+    # A stray file is not read at all, so what text it holds shows nowhere:
+    # "nothing reads it" beside "its pages show it" said both (fleet, 26. 9.).
+    published = parsed.reject { |path, _| stray.any? { |finding| finding.text.include?("config/#{File.basename(path)}") } }
+    findings + stray + template_language_texts(root, published)
+  end
+
+  # The build's own rule: a file for every published language but the
+  # site's own, which config/site.yml speaks.
+  def stray_language_files(files, data)
+    own = dig(data, 'site', 'lang').to_s
+    own = 'en' if own.empty?
+    published = Array(dig(data, 'site', 'locales')).map(&:to_s) - [own]
+    files.filter_map do |path|
+      code = File.basename(path)[/\Asite\.(.+)\.yml\z/, 1]
+      next if published.include?(code)
+
+      error(I18n.t('check.language_file_stray', file: "config/#{File.basename(path)}"), I18n.t('check.language_file_stray_fix'))
+    end
+  end
+
+  def template_language_texts(root, parsed)
+    example = begin
+      YAML.load_file(File.join(root, 'config', 'site.lang.yml.example'))
+    rescue StandardError
+      nil
+    end
+    return [] unless example.is_a?(Hash)
+
+    parsed.filter_map do |path, lang_data|
+      next unless lang_data.is_a?(Hash)
+
+      stale = LanguageFile::TEXTS.flat_map do |section, keys|
+        keys.select { |key| !dig(example, section, key).nil? && dig(lang_data, section, key) == dig(example, section, key) }
+            .map { |key| "#{section}.#{key}" }
+      end
+      next if stale.empty?
+
+      warn(t('language_yml_template', file: File.basename(path), keys: stale.join(', ')), t('language_yml_template_fix'))
+    end
   end
 
   # --- identity ------------------------------------------------------
@@ -279,7 +371,11 @@ module Doctor
       findings << warn(t('locale_mismatch', locale: locale, lang: lang), t('locale_mismatch_fix'))
     end
 
-    findings << ok(t('identity_ok')) if findings.empty?
+    # Not "filled in" while any of it is still the example's own text: the
+    # placeholder warning names those keys a line above, and a tick right
+    # under it said the opposite (newcomer trial, 25. 9. 2026).
+    example = REQUIRED.any? { |path| PLACEHOLDERS.key?(path) && dig(data, *path) == PLACEHOLDERS[path] }
+    findings << ok(t('identity_ok')) if findings.empty? && !example
     findings
   end
 
@@ -526,6 +622,12 @@ module Doctor
   # getting them wrong is a layout jump on every page -- and they are
   # copied by hand from whatever the file used to be, which is exactly the
   # kind of thing that goes stale the first time the banner is redrawn.
+  def same_ratio?(one, other)
+    return false if one.any? { |v| v <= 0 } || other.any? { |v| v <= 0 }
+
+    ((one[0] / one[1]) - (other[0] / other[1])).abs <= (one[0] / one[1]) * 0.005
+  end
+
   def check_banner(data, root)
     src = dig(data, 'banner', 'src').to_s
     return [] if src.empty?
@@ -546,6 +648,12 @@ module Doctor
     end
     return [ok(t('banner_ok'))] if actual.nil? || declared.any?(&:nil?)
     return [ok(t('banner_ok'))] if declared.map(&:to_i) == actual.map(&:to_i)
+    # What reserves the space is the RATIO: the page scales the banner to
+    # its column, and width/height only tell the browser how tall that
+    # will be. The default header is declared 940x300 and drawn 1880x600
+    # for sharp screens -- nothing moves, and the warning said it would
+    # (second trial, 25. 9. 2026).
+    return [ok(t('banner_ok'))] if same_ratio?(declared.map(&:to_f), actual.map(&:to_f))
 
     [warn(t('banner_dimensions', declared: declared.join('x'), actual: actual.join('x')),
           t('banner_dimensions_fix', width: actual[0], height: actual[1]))]
@@ -643,7 +751,7 @@ module Doctor
     return [] unless entries.is_a?(Array) && entries.any?
 
     posts = Checker.load_posts(root)
-    known = Checker.known_paths(posts)
+    known = Checker.known_paths(posts, root: root)
     # Asked of Checker, because the build only writes a tag page for a tag
     # some post in the STREAM carries: counting a draft's tag as known let
     # doctor tick a menu whose items 404 on every page of the site.
@@ -873,7 +981,9 @@ module Doctor
         end
       end
 
-      findings << warn(t('widget_heading', name: name)) if conf['heading'].to_s.empty?
+      # No word about a missing heading any more: the engine says one itself
+      # (chrome.* in locales/), and one written empty is the site deciding it
+      # wants none.
       limit = conf['limit']
       findings << error(t('widget_limit', name: name, value: limit.inspect)) if limit && !(limit.is_a?(Integer) && limit.positive?)
     end
@@ -1186,7 +1296,7 @@ module Doctor
     [warn(I18n.t('doctor.trash_holds', count: held.length, size: FileSize.human(bytes)))]
   end
 
-  def check_deploy
+  def check_deploy(root = ROOT)
     name = ENV['DEPLOY_BACKEND'].to_s
 
     # An unset DEPLOY_BACKEND means Surfer -- that is the compatibility
@@ -1206,14 +1316,24 @@ module Doctor
     end
 
     missing = BACKEND_VALUES.fetch(name, []).select { |v| ENV[v].to_s.empty? }
+    missing << 'SURFER_USERNAME + SURFER_PASSWORD' if name == 'surfer' && ::Surfer.sign_in.nil?
     # A backend can be fully configured and still refuse to run: an
     # unmatched quote in its extra switches aborts every deploy. doctor
     # exists so that the state of an install is known before the deploy
     # that needs it, so it must not tick a line that will stop on sight.
     backend = DeployBackend::BACKENDS[name]
     trouble = backend.respond_to?(:problem) ? backend.problem : nil
-    return [error(trouble, I18n.t('cli.deploy_args_fix'))] if trouble
+    return [error(trouble, backend.respond_to?(:problem_fix) ? backend.problem_fix : I18n.t('cli.deploy_args_fix'))] if trouble
 
+    program_trouble = check_backend_program(name, root)
+    return program_trouble if program_trouble
+
+    # A token still signs in to Surfer 6, so it is not an error -- but
+    # Cloudron updates its apps by itself, and the day it brings Surfer 7
+    # every deploy stops on 401 (September 2026).
+    if missing.empty? && name == 'surfer' && ::Surfer.sign_in == :token
+      return [ok(t('backend_ok', name: name)), warn(t('surfer_token_only'), t('surfer_token_only_fix'))]
+    end
     return [ok(t('backend_ok', name: name))] if missing.empty?
 
     # Not an error: an unconfigured backend is the documented state of a
@@ -1221,12 +1341,91 @@ module Doctor
     [warn(t('backend_incomplete', name: name, values: missing.join(', ')), t('backend_incomplete_fix'))]
   end
 
+  # nil when the backend's program is there and can do its job, otherwise
+  # the one finding that says why not. Asked before the values: somebody
+  # who has chosen rsync and not yet filled RSYNC_TARGET is better told now
+  # that rsync is not installed than after they have filled it in.
+  def check_backend_program(name, root)
+    program = BACKEND_PROGRAMS[name]
+    return nil unless program
+
+    path = find_program(program)
+    unless path
+      fix = name == 'rclone' ? t('program_missing_fix_rclone') : t('program_missing_fix', program: program)
+      return [error(t('program_missing', name: name, program: program), fix)]
+    end
+    return nil unless name == 'rclone' && snap_program?(path)
+
+    # The rclone snap is not the rclone project's, and it is confined: it
+    # reads your home directory and nothing else, so a site in /srv or
+    # /var/www fails every deploy with "no such file or directory" about a
+    # file that is plainly there, and one under ~/.hidden with "permission
+    # denied" (both reproduced, Ubuntu 22.04, snap rclone 1.75.1).
+    # The build as well as the site: a public.nosync linked out of home is
+    # where rclone actually reads, and the site around it being in home
+    # does not bring it back in.
+    [root, File.join(root, 'public.nosync')].each do |dir|
+      next unless dir == root || File.exist?(dir)
+
+      place = resolved_path(dir)
+      next if snap_can_read?(place)
+
+      return [error(t('rclone_snap_confined', path: path, dir: place), t('rclone_snap_confined_fix'))]
+    end
+    nil
+  end
+
+  # The full path of a program the way the shell would find it, or nil.
+  # Walked by hand rather than asking `which`, which is not on every
+  # system and says "not found" in a dozen different ways.
+  def find_program(program, search = ENV['PATH'])
+    search.to_s.split(File::PATH_SEPARATOR).each do |dir|
+      next if dir.empty?
+
+      candidate = File.join(dir, program)
+      return candidate if File.file?(candidate) && File.executable?(candidate)
+    end
+    nil
+  end
+
+  # A snap is started through /snap/bin, whose entries are links to
+  # /usr/bin/snap -- either end gives it away.
+  def snap_program?(path)
+    return true if path.start_with?('/snap/')
+
+    File.realpath(path).end_with?('/bin/snap')
+  rescue SystemCallError
+    false
+  end
+
+  # What snapd's `home` interface lets a snap read: anything under the home
+  # directory whose first step below it is not hidden (~/blog is readable,
+  # ~/.local/blog is not). Everything outside home is out of reach.
+  def snap_can_read?(dir, home = ENV['HOME'])
+    return true if home.to_s.empty?
+
+    home = resolved_path(home)
+    dir = resolved_path(dir)
+    return true if dir == home
+    return false unless dir.start_with?("#{home}/")
+
+    !dir.delete_prefix("#{home}/").start_with?('.')
+  end
+
+  # The confinement judges the path the kernel opens, so a site reached
+  # through a link from home into /srv is still in /srv.
+  def resolved_path(path)
+    File.realpath(File.expand_path(path))
+  rescue SystemCallError
+    File.expand_path(path)
+  end
+
   # --- online --------------------------------------------------------
 
   # Everything that needs the network, and nothing that doesn't. Failures
   # here are warnings, never errors: a host being down right now says
   # nothing about whether the config is right.
-  def check_online(data)
+  def check_online(data, root = ROOT)
     require_relative 'feed_http'
     findings = []
 
@@ -1271,7 +1470,160 @@ module Doctor
     findings.concat(check_online_network(data))
     findings.concat(check_online_thread_readable(data))
     findings.concat(check_online_approval(data))
+    findings.concat(check_online_deploy(root, data))
     findings
+  end
+
+  # What a host serves ahead of index.html: shared hosting lists the PHP
+  # front page first in its DirectoryIndex.
+  INDEX_SHADOWS = %w[index.php].freeze
+
+  # How many foreign names a finding spells out before it only counts.
+  FOREIGN_SHOWN = 10
+
+  # Whether the deploy target answers, and what stands in its root that
+  # this site does not put there -- the files an earlier site leaves
+  # behind. A deploy never deletes what it did not write, so they stay,
+  # and a host serves index.php before index.html: the new site is
+  # uploaded and the old front page goes on being what people see.
+  #
+  # Only when the offline check has nothing against the backend: an
+  # unchosen, unknown, unfinished or uninstalled one is reported there,
+  # and asking it over the network could only repeat that less clearly.
+  # The listing got in with the token after the password was not taken: a
+  # Surfer older than 7. Nothing is wrong -- the deploy goes on the same
+  # way -- but whoever just filled in the password should hear why it is
+  # not the one being used yet.
+  def check_online_deploy(root, data = nil)
+    findings = online_deploy_target(root, data)
+    return findings unless deploy_backend_name.to_s.then { |n| n.empty? || n == 'surfer' } && ::Surfer.fell_back?
+    # Only when the token then got in: beside "the token was refused" a
+    # note saying "nothing to do" contradicted it (fleet, 26. 9. 2026).
+    return findings if findings.any?(&:error?)
+
+    findings + [warn(t('surfer_fell_back'), t('surfer_fell_back_fix'))]
+  end
+
+  def online_deploy_target(root, data)
+    name = deploy_backend_name
+    backend = name && DeployBackend::BACKENDS[name]
+    return [] unless backend&.configured?
+    return [] if backend.respond_to?(:problem) && backend.problem
+    return [] if BACKEND_PROGRAMS[name] && !find_program(BACKEND_PROGRAMS[name])
+
+    # Where the listing looked: sftp's target is only the login, and the
+    # directory is half of the answer.
+    where = backend.respond_to?(:location) ? backend.location : backend.target
+    begin
+      entries = backend.list_root
+    rescue DeployBackend::Listing::Missing
+      return [warn(t('deploy_target_missing', target: where), t('deploy_target_missing_fix'))]
+    rescue ::Surfer::Unauthorized => e
+      # It answered -- with no. Every deploy will get the same answer, so
+      # this one is an error, and its sentence already says what to do.
+      return [error(e.message)]
+    rescue StandardError => e
+      return [warn(t('deploy_target_failed', target: where,
+                                             message: e.message.to_s.lines.first.to_s.strip.sub(/\.\z/, '')))]
+    end
+    return [ok(t('deploy_target_answers', target: where))] if entries.nil?
+
+    ours = site_root_names(root, backend) + kept_names(data || load_site_yml(root).first)
+    foreign = entries.reject { |entry_name, _| ours.include?(entry_name) }
+                     .map { |entry_name, dir| dir ? "#{entry_name}/" : entry_name }
+                     .sort
+    return [ok(t('deploy_target_clean', target: where))] if foreign.empty?
+
+    shown = foreign.first(FOREIGN_SHOWN).join(', ')
+    shown += t('deploy_target_more', count: foreign.size - FOREIGN_SHOWN) if foreign.size > FOREIGN_SHOWN
+    # The index.php sentence only where there is one: said about every
+    # stray file, it sent the second trial hunting for a file that was not
+    # there (25. 9. 2026).
+    shadowing = foreign.find { |entry_name| INDEX_SHADOWS.include?(entry_name) }
+    fix = [shadowing && t('deploy_target_foreign_index', name: shadowing), t('deploy_target_foreign_fix')].compact.join(' ')
+    [warn(t('deploy_target_foreign', target: where, count: foreign.size, names: shown), fix)]
+  end
+
+  # What stands in the target's root on purpose although the build does
+  # not put it there: `deploy.keep` in site.yml -- screenshots an issue
+  # links to, a file a search console asked for -- and .well-known/, where
+  # a host keeps its certificate challenge, always. Exact names, the way
+  # the listing prints them; a trailing slash is allowed and means nothing.
+  # Only doctor reads it: a deploy never deletes what it did not write, so
+  # there is nothing for the list to protect -- it only stops a warning
+  # nobody acts on from teaching its reader to skip the one that matters.
+  ALWAYS_KEPT = %w[.well-known].freeze
+
+  def kept_names(data)
+    keep = dig(data, 'deploy', 'keep')
+    listed = keep.is_a?(Array) ? keep.filter_map { |entry| keep_name(entry) } : []
+    ALWAYS_KEPT + listed
+  end
+
+  # A name in the root, or nil for anything that is not one: a path with a
+  # directory in it, a pattern, a non-string.
+  def keep_name(entry)
+    return nil unless entry.is_a?(String)
+
+    name = entry.strip.delete_prefix('/').delete_suffix('/')
+    return nil if name.empty? || name.include?('/') || name.match?(/[*?\[\]]/)
+
+    name
+  end
+
+  # deploy.keep written the way it means: a list of names. What is not
+  # one is said here, offline, because the online check would only skip
+  # it -- and a pattern that silently matches nothing leaves the warning
+  # it was written to quiet exactly where it was.
+  def check_deploy_keep(data)
+    return [] unless data.is_a?(Hash) && data.key?('deploy')
+
+    section = data['deploy']
+    return [warn(t('deploy_keep_shape'), t('deploy_keep_fix'))] unless section.nil? || section.is_a?(Hash)
+
+    keep = section.is_a?(Hash) ? section['keep'] : nil
+    return [] if keep.nil?
+    return [warn(t('deploy_keep_shape'), t('deploy_keep_fix'))] unless keep.is_a?(Array)
+
+    bad = keep.reject { |entry| keep_name(entry) }.map { |entry| entry.is_a?(String) ? entry : entry.inspect }
+    return [] if bad.empty?
+
+    [warn(t('deploy_keep_invalid', entries: bad.join(', ')), t('deploy_keep_fix'))]
+  end
+
+  # The backend DEPLOY_BACKEND names, Surfer when it is unset but Surfer's
+  # values are there (the compatibility default), nil when nothing is
+  # chosen or the name is not a backend.
+  def deploy_backend_name
+    name = ENV['DEPLOY_BACKEND'].to_s
+    if name.empty?
+      return nil if BACKEND_VALUES['surfer'].all? { |v| ENV[v].to_s.empty? }
+
+      name = 'surfer'
+    end
+    DeployBackend::BACKENDS.key?(name) ? name : nil
+  end
+
+  # The top-level names this site puts on a target: what the build holds
+  # now, and what the manifest says an earlier deploy put there (a page
+  # since deleted is still the site's own, waiting for --prune, not
+  # somebody else's). Before the first build and the first deploy there
+  # is nothing, and then everything on the target is foreign -- which is
+  # exactly the moment the question matters.
+  def site_root_names(root, backend)
+    names = []
+    public_dir = File.join(root, 'public.nosync')
+    names.concat(Dir.children(public_dir)) if File.directory?(public_dir)
+    manifest = File.join(root, ".deploy_manifest#{backend.manifest_suffix}.json")
+    if File.file?(manifest)
+      begin
+        data = JSON.parse(File.read(manifest, encoding: 'utf-8'))
+        names.concat(data.keys.reject { |k| k == '_target' }.map { |k| k.split('/').first }) if data.is_a?(Hash)
+      rescue JSON::ParserError, SystemCallError
+        nil
+      end
+    end
+    names.uniq
   end
 
   # Whether the credentials can actually see which replies the author

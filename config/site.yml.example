@@ -34,7 +34,7 @@
 # (brackets) is optional and commented out where it lives; the rest of
 # this file explains each one where it stands.
 #
-#   site        title, short_name, description, author, lang, locale,
+#   site        title, short_name, description, author, lang, locale, (locales),
 #               timezone, base_url, (page_size), (extra_css)
 #   banner      src, alt, width, height, (show_title), (show_claim), (claim)
 #   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
@@ -43,10 +43,10 @@
 #               (banner_claim), (banner_claim_size)
 #   layout      (sidebar), (hero)
 #   nav         (the menu bar: label with tag or url -- or [] for none)
-#   about       heading, html
+#   about       (heading), html
 #   widgets     (toots, pixelfed, commits, bluesky, rss)
-#   footer      links_heading, links, note_heading, note_html, copyright,
-#               social_heading
+#   footer      (links_heading), links, note_heading, note_html, copyright,
+#               (social_heading)
 #   social      name, url, icon or icon_svg, (rel)
 #   tag_icons   (a list: tag with icon or icon_svg)
 #   share       (the share block: a list of network names)
@@ -58,6 +58,7 @@
 #   media       (convert_heic), (remux_video), (strip_location)
 #   seo         (block_ai_crawlers), (robots_extra)
 #   analytics   (src), (website_id)
+#   deploy      (keep)
 #
 # The order is the order the page reads, top to bottom -- identity, then
 # the header, the palette and the type, then the regions, the menu, the
@@ -85,6 +86,22 @@ site:
   # any key missing from it falls back to English.
   lang: "en"
   locale: "en_US"
+  # The languages this site PUBLISHES, when that is more than the one above.
+  # Each one is built into its own root (/de/), the language in `lang` keeps
+  # the site root, and the words of a post in another language are written
+  # with `./blog.sh translate <slug> --lang de`. A site that publishes one
+  # language leaves this out and nothing about it changes.
+  # locales: [en, de]
+  # Everything else about a language lives in a file of its own beside this
+  # one -- config/site.de.yml, config/site.sk.yml -- where that language is
+  # described: `fallback:` (which language stands in when this one has
+  # nothing for a post), `ui_language:` (which language's interface
+  # words it borrows, for a language the engine has not been translated
+  # into), and the site's own words in that language -- the title, the
+  # description, the banner claim, about, footer, menu and widget headings,
+  # under the same keys as here. Start one from config/site.lang.yml.example.
+  # The site's own language has no such file: this one is it.
+  # See docs/localization.md.
   # The timezone every timestamp this engine writes is expressed in: publish
   # times, "publish now", the date you type into `schedule`. An IANA zone
   # name (see /usr/share/zoneinfo) -- DST is handled for you.
@@ -269,7 +286,10 @@ colors:
 # emptied html takes the card with it, heading and all, and deleting
 # the whole block reads the same as emptying it.
 about:
-  heading: "About"
+  # The heading over the card. Left out, the engine says "About" itself --
+  # in every language the site publishes; write one only to say something
+  # else, and "" for a card with no heading at all.
+  # heading: "About"
   # Markdown, the same as in a post: **bold**, [links](https://example.com),
   # lists, a blank line for a new paragraph. Raw HTML still works too and is
   # how a photo gets in (<img>) -- Markdown images are left out on purpose,
@@ -288,21 +308,22 @@ about:
 # by cron via ./scripts/refresh-sidebar.sh. Commented out here because the
 # placeholder accounts don't exist -- uncomment an entry once you've put
 # your own values in; omitting any entry (or the whole `widgets:` key)
-# just means no such widget.
+# just means no such widget. A widget's heading is the engine's words
+# (in every language the site publishes) unless you write your own.
 # widgets:
 #   toots:
-#     heading: "Recent toots"
+#     # heading: "Recent toots"
 #     # instance is optional -- it falls back to mastodon.instance below,
 #     # so set it only when the widget shows an account living elsewhere.
 #     # instance: "mastodon.social"
 #     account_id: "000000000000000000" # the account's API id, not the @handle -- a number on Mastodon, a ULID on GoToSocial
 #     limit: 3
 #   pixelfed:
-#     heading: "Recent Pixelfed posts"
+#     # heading: "Recent Pixelfed posts"
 #     feed_url: "https://pixelfed.social/users/yourname.atom"
 #     limit: 3
 #   commits:
-#     heading: "Recent commits"
+#     # heading: "Recent commits"
 #     username: "yourname"
 #     limit: 3
 #     # GitHub unless you say otherwise. For a Gitea or Forgejo server --
@@ -310,13 +331,13 @@ about:
 #     # reads that instead; the address is the whole configuration.
 #     # instance: "https://codeberg.org"
 #   bluesky:
-#     heading: "Recent Bluesky posts"
+#     # heading: "Recent Bluesky posts"
 #     # handle is optional -- it falls back to bluesky.handle below, so set
 #     # it only when the widget shows an account other than the site's own.
 #     # handle: "you.bsky.social"
 #     limit: 3
 #   rss:
-#     heading: "Elsewhere"
+#     # heading: "Elsewhere"
 #     # Any RSS 2.0 or Atom feed: another blog, a YouTube channel, a
 #     # podcast -- or X through a self-hosted Nitter instance.
 #     feed_url: "https://example.com/feed.xml"
@@ -329,7 +350,10 @@ about:
 # included, rather than a title over an empty list. Same for the note,
 # the copyright and the icons; a deleted block reads as all-empty.
 footer:
-  links_heading: "Links"
+  # The two column headings are the engine's words when left out --
+  # "Links" and "Find me on", in every language the site publishes. Write
+  # them only to say something else; "" means no heading at all.
+  # links_heading: "Links"
   links:
     - title: "Example"
       url: "https://example.com"
@@ -346,7 +370,7 @@ footer:
   # default_external the caller has, which under cron or the system Ruby is
   # US-ASCII -- one accented character here and both wizards stop working.)
   copyright: "All rights reserved &copy; 2026"
-  social_heading: "Find me on"
+  # social_heading: "Find me on"
 
 # icon = a name from the built-in set. The network marks: mastodon,
 # pixelfed, linkedin, github, gitea, forgejo, codeberg, gitlab, bluesky,
@@ -598,3 +622,16 @@ social:
 #   src: "https://analytics.example.com/script.js"
 #   website_id: "00000000-0000-0000-0000-000000000000"
 # --- end of analytics ---
+
+# Optional. What stands in the root of the deploy target on purpose
+# although the build does not put it there -- screenshots an issue links
+# to, a file a search console asked for. `./blog.sh doctor --online` lists
+# everything else in the root as foreign (the files an earlier site left
+# behind); a name here is left off that list. Exact names as they stand in
+# the root, a directory with or without its slash. .well-known, where a
+# host keeps its certificate challenge, is never listed. Only doctor reads
+# the list -- a deploy never deletes what it did not write either way.
+# deploy:
+#   keep:
+#     - issue-45/
+# --- end of deploy ---

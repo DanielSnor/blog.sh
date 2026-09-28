@@ -466,6 +466,28 @@
     return (base || "post").slice(0, 40) + ".md";
   }
 
+  // ⚠️ Chromium -- Chrome and Edge, on Android and at a desk -- shares
+  // from a page only a file whose extension is on its own list, and ".md"
+  // is not on it (chrome/browser/webshare/share_service_impl.cc; ".txt" and
+  // ".text" are, and the check is "ends with"). A ".md" handed to share()
+  // there is refused as NotAllowedError before any sheet opens, and
+  // canShare answers true all the same. So under Chromium the text goes
+  // as "<name>.md.txt" and the receiver puts the ".md" back -- and NOT
+  // under WebKit: iOS reads a ".txt" as text rather than a file and hands
+  // the shortcut its first line for a name ("---.txt", measured on an
+  // iPad, 26. 9. 2026). Chromium is told by navigator.userAgentData, which
+  // WebKit has not got -- Arc on an iPad is WebKit too, and was checked.
+  // sendTextAsTxt is the net for a browser this misses: a NotAllowedError
+  // on ".md" says "tap again", and the next tap sends ".md.txt".
+  var sendTextAsTxt = false;
+  function chromiumShare() {
+    return typeof navigator !== "undefined" && !!navigator.userAgentData;
+  }
+  function textName() {
+    var name = slugForFile();
+    return (chromiumShare() || sendTextAsTxt) ? name + ".txt" : name;
+  }
+
   // ---------------------------------------------------------------- size
   // What is about to travel, counted from what is on the device, so the
   // wait afterwards is not a mystery. The wire carries a third more --
@@ -632,7 +654,7 @@
     // IS from its filename extension and never reads this field, so the .md
     // survives either way; elsewhere text/plain is a type share targets
     // actually accept, and the far end reads only the name.
-    files.push(new File([enc.encode(markdown())], slugForFile(), { type: "text/plain" }));
+    files.push(new File([enc.encode(markdown())], textName(), { type: "text/plain" }));
     return files;
   }
 
@@ -885,7 +907,7 @@
     });
     if (mute.length && this.dataset.anyway !== "alt") {
       this.dataset.anyway = "alt";
-      say(t("app.alt_missing") + ": " + mute.map(function (s) { return s.name; }).join(", "), "bad");
+      say(t("app.alt_missing_send").replace("{names}", mute.map(function (s) { return s.name; }).join(", ")), "bad");
       return;
     }
     // Over the server's ceiling as this page knows it. A second tap
@@ -938,6 +960,17 @@
           if (err && err.name === "AbortError") {
             say(t("app.share_cancelled"), "good");
             askReceipt(state.receipt, false);
+            return;
+          }
+          // NotAllowedError on a ".md" is a browser's list saying no (see
+          // textName), and it comes before any sheet. This tap is spent --
+          // share() consumes the gesture, so the retry cannot be made from
+          // here -- but the next one sends the text as ".md.txt", and this
+          // one says so. Under Chromium the text already went that way, so
+          // there the error is about something else and the net below holds.
+          if (err && err.name === "NotAllowedError" && !sendTextAsTxt && !chromiumShare()) {
+            sendTextAsTxt = true;
+            say(t("app.share_retry_txt"), "bad");
             return;
           }
           try { saveBundle(); } catch (e2) { say(t("app.picture_failed"), "bad"); }
@@ -1631,6 +1664,11 @@
   // it. The reply through the address bar still works and still wins --
   // this is the road that does not depend on anything coming back.
   var pending = null;
+  // How long an answer is waited for. Fifteen minutes, not five: where
+  // the phone hands the post to a computer rather than to a server, the
+  // post waits for somebody to walk over to it, and five minutes ran out
+  // before the blog had been built (Android and KDE Connect, 27. 9. 2026).
+  var ANSWER_WINDOW = 15 * 60 * 1000;
 
   function newReceipt() {
     var bytes = new Uint8Array(8);
@@ -1639,21 +1677,21 @@
     return Array.prototype.map.call(bytes, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
   }
 
-  // Asks every three seconds for five minutes. The build writes the file,
-  // so the wait is a build and a deploy of the blog -- seconds on a small
-  // one, a minute on a large one -- and a post sent over a slow
-  // connection can take longer than either. It stops asking when the file
-  // says what it was waiting to hear, and says so if it never does: a
-  // page that gave up in silence would be indistinguishable from a post
-  // that never arrived.
-  function askReceipt(receipt, wantPublished) {
+  // Asks every three seconds for fifteen minutes (ANSWER_WINDOW). The
+  // build writes the file, so the wait is a build and a deploy of the
+  // blog -- seconds on a small one, a minute on a large one -- and a post
+  // sent over a slow connection can take longer than either. It stops
+  // asking when the file says what it was waiting to hear, and says so if
+  // it never does: a page that gave up in silence would be
+  // indistinguishable from a post that never arrived.
+  function askReceipt(receipt, wantPublished, until) {
     if (!/^[0-9a-f]{16}$/.test(receipt)) return;
     if (pending && pending.timer) clearTimeout(pending.timer);
     // This asking's OWN record, and what everything below compares itself
     // against. The receipt cannot do that job: Publish on the answer card
     // asks again with the SAME receipt, so a receipt tells the second
     // asking from the first not at all.
-    var mine = { receipt: receipt, until: Date.now() + 5 * 60 * 1000, timer: 0, published: !!wantPublished };
+    var mine = { receipt: receipt, until: until || Date.now() + ANSWER_WINDOW, timer: 0, published: !!wantPublished };
     pending = mine;
     tick();
 
@@ -1751,12 +1789,14 @@
   // send behind it is a name for an answer nobody is coming to give.
   function resumeAsking() {
     if (!state.receipt || !state.sentAt) return;
-    // Five minutes from the send, not from the reload, so a page opened
-    // an hour later does not sit there asking about a post whose answer
-    // was read long ago.
-    if (Date.now() - state.sentAt > 5 * 60 * 1000) return;
-
-    askReceipt(state.receipt, false);
+    // The window runs from the send, not from the reload. A page reopened
+    // after it has closed still asks, once: it used to return here without
+    // a word, and a phone that had put the browser to sleep while the post
+    // was on its way came back to the draft and nothing else -- neither the
+    // answer that was waiting on the blog nor the sentence saying none had
+    // come. One asking -- the second tick is past the second it is given --
+    // then the answer or answer_late.
+    askReceipt(state.receipt, false, Math.max(state.sentAt + ANSWER_WINDOW, Date.now() + 1000));
   }
 
   function answerFromAddress() {

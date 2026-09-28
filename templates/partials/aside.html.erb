@@ -5,37 +5,31 @@
     a guard on its own line would add a blank line to every page that does
     have an about text. Same reason as in nav.html.erb. %><aside><% unless ABOUT['html'].to_s.strip.empty? %>
         <div class="card">
-          <h3><%= h(ABOUT['heading']) %></h3>
-          <div class="chrome-text"><%= config_html(ABOUT['html']) %></div>
+<%= chrome_heading_line(site_heading(ABOUT, 'heading', 'about_heading'), indent: 10) %>          <div class="chrome-text"><%= config_html(ABOUT['html']) %></div>
         </div><% end %>
 <% if WIDGETS['toots'] %>
         <div class="card">
-          <h3><%= h(WIDGETS['toots']['heading']) %></h3>
-          <div id="last-toots"></div>
+<%= chrome_heading_line(widget_heading('toots'), indent: 10) %>          <div id="last-toots"></div>
         </div>
 <% end %>
 <% if WIDGETS['pixelfed'] %>
         <div class="card">
-          <h3><%= h(WIDGETS['pixelfed']['heading']) %></h3>
-          <div id="last-pixelfeds"></div>
+<%= chrome_heading_line(widget_heading('pixelfed'), indent: 10) %>          <div id="last-pixelfeds"></div>
         </div>
 <% end %>
 <% if WIDGETS['commits'] %>
         <div class="card">
-          <h3><%= h(WIDGETS['commits']['heading']) %></h3>
-          <div id="last-commits"></div>
+<%= chrome_heading_line(widget_heading('commits'), indent: 10) %>          <div id="last-commits"></div>
         </div>
 <% end %>
 <% if WIDGETS['bluesky'] %>
         <div class="card">
-          <h3><%= h(WIDGETS['bluesky']['heading']) %></h3>
-          <div id="last-bluesky"></div>
+<%= chrome_heading_line(widget_heading('bluesky'), indent: 10) %>          <div id="last-bluesky"></div>
         </div>
 <% end %>
 <% if WIDGETS['rss'] %>
         <div class="card">
-          <h3><%= h(WIDGETS['rss']['heading']) %></h3>
-          <div id="last-rss"></div>
+<%= chrome_heading_line(widget_heading('rss'), indent: 10) %>          <div id="last-rss"></div>
         </div>
 <% end %>
       </aside>

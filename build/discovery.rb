@@ -37,7 +37,7 @@ module Discovery
     # "foto " and gets a 404. The link card on Mastodon and Bluesky and the
     # search engine's thumbnail were then blank for exactly the pictures
     # whose names needed the encoding most.
-    "#{SITE_BASE_URL}#{post_path(post)}#{media_name_encoded(media['url'])}"
+    "#{SITE_BASE_URL}#{post_href(post)}#{media_name_encoded(media['url'])}"
   end
 
   def post_description(post)
@@ -85,20 +85,28 @@ module Discovery
     published = post_display_time(post).iso8601
     tags = post['tags'] || []
     lines = [%(<meta property="article:published_time" content="#{h(published)}">)]
-    lines += tags.map { |tag| %(<meta property="article:tag" content="#{h(tag)}">) }
+    # The tag's word in this language, as on the pill and in `keywords`
+    # below -- the raw tag here made the two lines of one head disagree.
+    lines += tags.map { |tag| %(<meta property="article:tag" content="#{h(tag_label(tag))}">) }
 
     data = {
       '@context' => 'https://schema.org',
       '@type' => 'BlogPosting',
       'headline' => post_title_for(post),
       'datePublished' => published,
-      'url' => "#{SITE_BASE_URL}#{post_path(post)}",
-      'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_path(post)}",
+      'url' => "#{SITE_BASE_URL}#{post_href(post)}",
+      'mainEntityOfPage' => "#{SITE_BASE_URL}#{post_href(post)}",
+      # The language the page is WRITTEN in -- everything else on it says
+      # so (<html lang>, og:locale, the feed, hreflang) and this was the
+      # one place that left a machine to guess. SITE_LANG, not the
+      # language the engine speaks here: a Slovak branch borrowing Czech
+      # furniture (site.ui_language) is still Slovak to a reader.
+      'inLanguage' => SITE_LANG,
       'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR },
       'image' => post_og_image(post),
       'description' => post_description(post)
     }
-    data['keywords'] = tags.join(', ') unless tags.empty?
+    data['keywords'] = tags.map { |tag| tag_label(tag) }.join(', ') unless tags.empty?
     # Both sequences that can end a script block from inside a JSON string:
     # "</" closes it, and "<!--" opens an HTML comment whose scope runs to the
     # next "-->" -- so a post whose text held an unterminated comment followed

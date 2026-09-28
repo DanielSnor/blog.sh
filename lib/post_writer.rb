@@ -891,6 +891,16 @@ module PostWriter
     !name.empty? && !name.start_with?('.') && !name.include?('/') && !name.include?('\\')
   end
 
+  # What a re-import takes from the source rather than from the post it
+  # overwrites: the item itself (text, title, date, tags, where it came
+  # from), whether it is out -- state, and the scheduling and draft link
+  # that only mean something together with it -- and the one visibility
+  # an importer reads (Mastodon unlisted). receipt_warnings describe the
+  # text as the phone sent it, which the source has just replaced.
+  # redirect_from is merged below, not carried.
+  IMPORT_DECIDES = %w[slug title date tags type content source state draft_token scheduled
+                      date_before_schedule unlisted receipt_warnings redirect_from].freeze
+
   # Overwrites the matched post in place -- or moves it when the source
   # changed the item's date across a year boundary, since the build derives
   # both the URL and the media lookup from the date, and a file left in the
@@ -922,9 +932,16 @@ module PostWriter
     # rest: carried over only when the importer said nothing itself, so an
     # adapter that DOES recognise a page still wins, and a series -- which
     # no source has a notion of -- survives every re-import.
-    %w[mastodon_url bluesky_url bluesky_uri former_slugs unpublished_from pinned created_at
-       page series series_part].each do |key|
-      post[key] = old[key] if old && old[key] && !post[key]
+    # translations: a text somebody wrote in another language after the
+    # import is theirs, and no source has one to replace it with.
+    #
+    # Since 1.9 the list is turned around: everything the post carried is
+    # kept unless the source decides it (IMPORT_DECIDES). A list of what to
+    # keep is a list of what somebody remembered, and the rest -- a receipt,
+    # any key a later version adds -- was dropped without a word, the same
+    # hole the edit round trip had with translations.
+    old&.each do |key, value|
+      post[key] = value unless value.nil? || post[key] || IMPORT_DECIDES.include?(key)
     end
     # redirect_from is the one key where "the importer set it itself" is NOT
     # a reason to drop what the post already carried, so it cannot ride in

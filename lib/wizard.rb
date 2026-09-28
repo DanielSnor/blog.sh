@@ -208,11 +208,26 @@ module Wizard
     answer = $stdin.gets
     raise Interrupt if answer.nil?
 
-    answer = answer.strip
     puts unless Tui.interactive?
-    value = answer.empty? ? current : answer
+    value = typed_answer(answer, current)
     self.record(label, value) if record && Tui.interactive?
     value
+  end
+
+  # A typed line as the answer to a question with a current value. The
+  # line is read cooked, so the keys a person presses to back out arrive as
+  # characters: Esc and Enter came back as "\e", and a site title was set
+  # to an invisible control character -- while the menu of the same wizard
+  # promises "Esc keep current". So Esc anywhere in the line keeps the
+  # current value (an arrow key is Esc followed by "[A", and is no answer
+  # either), and any other control character -- a Tab, a stray ^A -- is a
+  # space rather than a byte written into site.yml.
+  def typed_answer(raw, current)
+    line = raw.to_s
+    return current if line.include?("\e")
+
+    line = line.gsub(/[[:cntrl:]]+/, ' ').strip
+    line.empty? ? current : line
   end
 
   # The same, with a check that runs before the answer is accepted. The
@@ -270,9 +285,8 @@ module Wizard
       answer = $stdin.gets
       raise Interrupt if answer.nil?
 
-      answer = answer.strip
       puts
-      return answer.empty? ? current : answer
+      return typed_answer(answer, current)
     end
 
     return current unless confirm(t('edit_in_editor'))
@@ -369,7 +383,7 @@ module Wizard
     header = context_above(options.size + header.size) + header
     index = Tui.menu(options.map { |(_, desc)| desc },
                      header: header + [Tui.paint(label, :bold), ''],
-                     hint: t('menu_hint', count: [options.size, 9].min),
+                     hint: t('menu_hint', count: options.size),
                      initial: current_index)
     chosen = index || current_index
     record(label, options[chosen].last)
@@ -419,7 +433,7 @@ module Wizard
     # wipe them; carried in, they read as the receipt for the section while
     # the next one is being chosen.
     index = Tui.menu(rows, header: context_above(rows.size) + [Tui.paint(label, :bold), ''],
-                           hint: t('menu_hint_exit', count: [rows.size, 9].min))
+                           hint: t('menu_hint_exit', count: rows.size))
     if index.nil? || index >= options.size
       self.context = []
       return nil
@@ -495,9 +509,8 @@ module Wizard
     end
     # ESCAPED is a value no keypress and no typed line can produce, so it
     # cannot collide with a real answer.
-    answer = Tui.key_choice(prompt, escape: escape == :default ? '' : ESCAPED)
+    answer = Tui.key_choice(with_choices(prompt, default), escape: escape == :default ? '' : ESCAPED)
     return false if answer == ESCAPED
-    return default if default != nil && answer.to_s.empty?
 
     # The key that means yes comes from the locale, the way the prompt
     # does. The three shipped languages were listed here by hand, which
@@ -511,7 +524,24 @@ module Wizard
     # letter, which down a pipe made "abort" mean yes. Two definitions of
     # what counts as consent is one too many, so there is now one, and it
     # is this one -- moved to Tui.yes? where the answer is read.
-    Tui.yes?(answer)
+    result = default != nil && answer.to_s.empty? ? default : Tui.yes?(answer)
+    # A question about a setting joins the record above the next one, as
+    # every typed answer does: style.sh's Layout asked two of these and
+    # left no trace of either on the screen that followed.
+    record(prompt.sub(/\s*\[[^\]]*\]\s*\z/, '').rstrip, t(result ? 'answer_yes' : 'answer_no')) if default != nil && Tui.interactive?
+    result
+  end
+
+  # The keys a yes/no question takes, when its text does not already say:
+  # the capital letter is what Enter answers. style.sh's Layout questions
+  # were bare sentences -- no [Y/n], no default shown -- while every other
+  # question in both wizards said both (newcomer trial, 25. 9. 2026).
+  def with_choices(prompt, default)
+    return prompt if prompt.match?(/\[[^\]]+\/[^\]]+\]\s*\z/)
+
+    yes = I18n.t('cli.confirm_yes_char').to_s
+    keys = default == true ? "#{yes.upcase}/n" : "#{yes}/N"
+    "#{prompt.rstrip} [#{keys}] "
   end
 
   # Everything a run collected, shown once and written once.

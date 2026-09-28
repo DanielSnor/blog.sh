@@ -2,6 +2,7 @@
 
 require 'tempfile'
 require 'digest'
+require_relative 'listing'
 
 module DeployBackend
   # One rsync run instead of per-file uploads -- rsync does its own
@@ -30,6 +31,39 @@ module DeployBackend
 
     def manifest_suffix
       '.rsync'
+    end
+
+    # [name, directory?] for what stands in the target directory.
+    # `--list-only` with the trailing slash lists the directory's contents,
+    # one level: "drwxr-xr-x  4,096 2026/09/24 10:00:00 name". The name is
+    # read after the timestamp, not as the fifth field: macOS's rsync
+    # (openrsync) leaves the size out for an empty file, and an empty
+    # index.php went unseen.
+    #
+    # ssh in batch mode, RSYNC_SSH's own included (its options come before
+    # the host rsync appends, so one more is safe), so a host-key question
+    # or a password prompt fails at once instead of waiting for a reply
+    # nobody will type.
+    LIST_LINE = %r{\A(\S+)\s+(?:[\d,.]+\s+)?\d{4}/\d\d/\d\d \d\d:\d\d:\d\d (.+)\z}.freeze
+
+    def list_root
+      ssh = ENV['RSYNC_SSH'].to_s.empty? ? Listing::BATCH_SSH : "#{ENV['RSYNC_SSH']} -o BatchMode=yes"
+      Listing.run(['rsync', '--list-only', '-e', ssh, list_address]).lines.filter_map do |line|
+        perms, name = LIST_LINE.match(line.chomp)&.captures
+        next if name.nil? || name == '.'
+
+        name = name.sub(/ -> .*\z/, '') if perms.start_with?('l')
+        [name, perms.start_with?('d')]
+      end
+    end
+
+    # The target with the slash that makes rsync list what is IN it. `host:`
+    # alone is the login directory, and `host:/` -- what appending the
+    # slash made of it -- is the root of the server's filesystem.
+    def list_address
+      return "#{target}./" if target.end_with?(':')
+
+      "#{target.chomp('/')}/"
     end
 
     # The manifest's own name for where this deploy goes. RSYNC_SSH carries

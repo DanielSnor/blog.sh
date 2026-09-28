@@ -179,8 +179,9 @@ say -- are published oldest first, in the order the queue was arranged in.
 The CLI adapts to where it runs. In an interactive terminal you get
 arrow-key menus (digits still quick-select, typing a slug still works),
 single-keypress answers without Enter, colored state markers and a
-**QR code of the draft preview URL** -- point your phone's camera at
-the screen instead of retyping a token. A menu longer than the terminal
+**QR code of the draft preview URL** -- after a save, and on `[q]` in a
+draft's properties -- point your phone's camera at the screen instead of
+retyping a token. A menu longer than the terminal
 is tall scrolls, showing your position in the list next to the hint;
 `Page Up`, `Page Down`, `Home` and `End` work in every list.
 
@@ -190,6 +191,14 @@ another copy on each keypress -- and not on the alternate screen, so the
 last screen and your scrollback survive. Resizing straightens a waiting
 menu, the queue or the properties screen on the spot; a picker or the
 archive browser keeps the size it opened with until you leave it.
+
+**Enter and Esc mean the same everywhere.** Enter takes what the question
+offers -- the capital letter in `[Y/n]`, the named `[Enter] …`, the row
+under the cursor. Esc leaves without doing anything: it never builds,
+deploys, opens the editor or writes a file, and in a question about a
+setting it keeps the current value. A question you type an answer into
+is read a whole line at a time, so there it is Esc and then Enter: the
+current value stays, and "publish when?" is left without a date.
 
 The three question-and-answer wizards -- `./setup.sh`, `./style.sh` and
 `./import.sh` -- keep the section you are in and the answers already given
@@ -210,8 +219,11 @@ the announcement -- and offers the guarded actions:
 
 - **published**: unpublish, (re-)announce, pin/unpin, rename the slug,
   review the old addresses that redirect here, delete;
-- **draft**: publish, schedule (or reschedule, or cancel the schedule),
-  rename the slug, delete;
+- **draft**: publish (asked first -- with a network configured it announces
+  too, which nothing takes back), schedule (or reschedule, or cancel the schedule),
+  rename the slug, delete -- and the screen names the draft's preview
+  address, with `[q]` for its QR code, so a draft can be read on a phone
+  without opening it in the editor first;
 - **either**: `[e]` opens the post's properties -- which series it is in
   and which part of it, its tags, its type, and the three flags (out of
   the listings, lead image, chapter list);
@@ -309,6 +321,66 @@ announcement live in this dialog (and the draft dialog) instead of
 being menu items. Every CLI command still exists unchanged --
 `./blog.sh unpublish <slug>` works exactly as before; only the menu
 stopped listing it.
+
+## Writing a post in another language
+
+Only on a site that publishes more than one -- `site.locales` in
+[install.md](install.md#2-configure-the-site----configsiteyml) is what
+says so.
+
+```bash
+./blog.sh translate my-post --lang de
+```
+
+Or from the wizard, which is where the rest of the work happens: pick the
+post, and the crossroads that offers its text and its properties offers
+the languages too. With one other language it names it (`[l] language:
+Deutsch`); with several it opens a picker that says what is already
+written, what is only started, and what has nothing yet -- the same three
+states `check --languages` prints. The properties screen carries a
+`languages` row for the same reason.
+
+The editor that opens holds a title and a body, and nothing else. That is
+the whole of what a translation may carry: the date, the tags, the series,
+the pin and the state belong to the POST and are true in every language at
+once, so they are changed with `props` or `edit` and never here. A
+translation cannot quietly disagree with the post it belongs to.
+
+Save it and `./blog.sh rebuild` builds every language the site publishes:
+the language in `site.lang` at the site root, the others under `/de/`, all
+in one tree with one copy of `/assets/` between them.
+
+The header also holds the address that language serves the post at. Left
+alone it is made from the translated title, once, and then stays put --
+see [localization.md](localization.md#the-address-in-each-language).
+
+The post's own words come along as `//` lines the first time, so the
+text being translated is in front of you rather than in another window.
+The editor drops every `//` line on save, which is also why a translation
+left half-done cannot save the original as though it were this language's.
+
+**Publishing a post the site cannot show in every language it publishes**
+is a decision, not an accident: the command line refuses it and names
+`--allow-partial`, and the wizard asks -- write the missing language now,
+or publish it as it stands.
+
+**Taking a language off a post** is emptying the title and deleting the
+body. The post then looks exactly as it did before the translation existed
+-- which matters, because a half-empty translation would otherwise give
+that language a page with the wrong words on it.
+
+**A post you have not translated is not hidden.** It stays in the other
+language's listing and the link on it goes to the address the post really
+has, so the same words never stand at two addresses. The language switcher
+still offers every language; one with nothing of this post in it leads to
+that language's front page rather than to a 404. What is promised to a
+search engine (`hreflang`) is narrower on purpose: only the addresses that
+exist.
+
+**Pictures belong to the post**, not to one of its languages, so they are
+added with `edit` and referred to from a translation. `translate` refuses
+an attachment rather than putting a file in one language's copy of a post
+whose media the other languages share.
 
 ## Writing from a phone
 
@@ -551,21 +623,60 @@ saved as one archive instead -- a net, so a post written on the way home
 is not lost to a browser that will not share it, rather than a road this
 page offers. `/write/` is for a phone; on a phone the files go over.
 
-**Two shortcuts, because the one that receives the files may not open an
-SSH connection.** A shortcut started from the Share Sheet runs in
-Shortcuts' background runner, whose only screen is a banner; *Run Script
-over SSH* asks for a screen there -- the host prompt, the first-run
-privacy question -- and is refused with "This action could not be run
-with the current user interface", before any connection is made. The
-action that would hand the run over to the full app, *Continue in
-Shortcuts App*, is no longer offered. A shortcut started from a URL,
-on the other hand, always runs in the app. So the receiving shortcut
-writes a file and opens a URL, and the sending shortcut does the rest.
+**Under Chromium the text is called `<name>.md.txt`.** Chrome and Edge,
+on Android as at a desk, share from a page only a file whose extension is
+on their own list, and `.md` is not on it while `.txt` is; a `.md` is
+refused before any sheet opens, and `canShare` says true all the same.
+The page tells Chromium by `navigator.userAgentData` and names the text
+accordingly; the receiver puts the `.md` back, so whatever takes the
+files on such a phone passes them on under the names it was given and
+nothing else. WebKit keeps `.md`, and must: iOS reads a `.txt` as text
+rather than a file and hands the shortcut its first line for a name. A
+browser the page misjudges gets a second tap -- the refusal says so --
+which sends the text as `.md.txt`. Note what the list also leaves out:
+`.zip`, `.heic` and `.mov`. A video from an Android phone is `.mp4` and
+goes; the saved archive never went anywhere but a shortcut anyway.
 
-*Shortcut A* -- "Show in Share Sheet" on, accepting Images and Files;
-"If there's no input": Stop and Respond:
+**One shortcut, run twice, because the run that receives the files may
+not open an SSH connection.** A shortcut started from the Share Sheet
+runs in Shortcuts' background runner, whose only screen is a banner; *Run
+Script over SSH* asks for a screen there -- the host prompt, the
+first-run privacy question -- and is refused with "This action could not
+be run with the current user interface", before any connection is made.
+The action that would hand the run over to the full app, *Continue in
+Shortcuts App*, is no longer offered. A shortcut started from a URL, on
+the other hand, always runs in the app. So the same shortcut runs twice:
+from the Share Sheet it packs the files into one batch, writes it to a
+file and opens a URL that names itself; from that URL, with nothing
+handed to it, it reads the file back and sends it. The two runs are told
+apart by the one thing that differs between them, whether there is a
+Shortcut Input. One shortcut per blog.
 
-1. **Repeat with Each** over Shortcut Input, and inside it: Get **Name**,
+"Show in Share Sheet" on, accepting Images and Files; "If there's no
+input": **Continue** -- not Stop and Respond, because the second run has
+none and has to go on. Then:
+
+1. **If** *Shortcut Input* **does not have any value** -- the second run.
+   Inside it:
+   1. **Get File** `incoming/batch.txt` from the **Shortcuts** folder in
+      iCloud Drive, without the document picker. A folder chosen in the
+      action, not a variable; see the warning below.
+   2. **Run Script over SSH** with that file as the **Input**; the script
+      is the receiver, or the wrapper that reaches it.
+   3. **Base64 Encode** the *Shell Script Result* (Line Breaks: None, if
+      the option is offered; the page copes either way).
+   4. **Delete Files** with the *File* from Get File, *Immediately
+      Delete* on. Without the switch it asks before every post; without
+      the action a batch already sent would wait for the next run that
+      finds nothing to share, and go out a second time.
+   5. **Text**: `https://YOUR-BLOG-URL/write/#b=` followed by the *Base64
+      Encoded* variable, with nothing between them.
+   6. **Open URLs** with that text.
+   7. **Stop and Output** the result, or **Stop This Shortcut** -- the
+      second run ends here and never reaches the loop below.
+
+   **End If.**
+2. **Repeat with Each** over Shortcut Input -- the first run -- and inside it: Get **Name**,
    Get **File Extension**, then a **Text** holding `mov mp4 m4v MOV MP4
    M4V` and an **If** *Text contains File Extension*. Inside the If:
    **Encode Media** the Repeat Item with Size **1280x720**, and **Set
@@ -581,40 +692,43 @@ writes a file and opens a URL, and the sending shortcut does the rest.
    page cannot know the shortcut does this, so its red line for a video
    measures the original; send anyway, and the answer says what
    arrived.
-2. After the loop: **Combine Text** `batch` with New Lines.
-3. **Save File** the combined text to iCloud Drive, into the Shortcuts
+3. After the loop: **Combine Text** `batch` with New Lines.
+4. **Save File** the combined text to iCloud Drive, into the Shortcuts
    folder, *Ask Where to Save* off, subpath `incoming/batch.txt`,
-   *Overwrite If File Exists* on -- the same folder shortcut B reads it
-   back from.
-4. **Open URLs**: `shortcuts://run-shortcut?name=UploadIncoming`.
+   *Overwrite If File Exists* on -- the same file step 1 reads back.
+5. **Open URLs**: `shortcuts://run-shortcut?name=SendPost`, where
+   `SendPost` is the shortcut's own name, spelled as the library spells
+   it. Rename the shortcut and this line has to change with it; a name
+   without spaces or punctuation saves percent-encoding it.
 
-![Shortcut A as the Shortcuts app shows it: the Repeat with Each loop with the If around Encode Media, the base64 Text and Add to Variable, then Combine Text, Save File and Open URLs](shortcut-a.png)
+![The shortcut as the Shortcuts app shows it, with placeholders where the server's details go: the If with Get File, Run Script over SSH, Base64 Encode, Delete Files, the Text with #b=, Open URLs and Stop and Output; then the Repeat with Each loop with the If around Encode Media, Combine Text, Save File, and the Open URLs that names the shortcut itself](shortcut.png)
 
-*Shortcut B*, named exactly `UploadIncoming`, not in the Share Sheet:
+It can be imported instead of built: [SendPost](shortcuts/SendPost.shortcut),
+signed so that anyone may import it. It arrives called `SendPost`, and
+the last *Open URLs* opens it by that name; rename it and change the name
+there to match. Then fill in what is yours.
+In *Run Script over SSH*: the machine you log into (a host name or an IP
+address), its SSH port, the user, and the path to `scripts/receive.sh` or
+the wrapper that reaches it. In the *Text*: `YOUR-BLOG-URL` is the address
+the site is served at, `base_url` in `config/site.yml`. The SSH action
+carries no key; pick or generate one there and put its public half on the
+server, as the key line below shows.
 
-1. **Get File** `incoming/batch.txt` from the Shortcuts folder, without
-   the document picker.
-2. **Run Script over SSH** with that file as the **Input**; the script is
-   the receiver, or the wrapper that reaches it.
-3. **Base64 Encode** the *Shell Script Result* (Line Breaks: None, if
-   the option is offered; the page copes either way).
-4. **Text**: `https://YOUR-BLOG-URL/write/#b=` followed by the *Base64
-   Encoded* variable, with nothing between them.
-5. **Open URLs** with that text.
+⚠️ **Pasting actions between shortcuts rewires them.** Shortcuts reconnects
+a pasted action's inputs to whatever stands above the place it lands. A
+Get File copied in this way came back reading from a *Text*, then from
+*If Result*, then from *Shortcut Input* -- which is empty in the second
+run, so it read nothing, the SSH action sent nothing, and the server
+answered `empty_input` for a batch that was whole. After any paste or
+move, check that Get File still reads *from Shortcuts*, and that the SSH
+*Input* and *Delete Files* both name the *File* it produces.
 
-![Shortcut B as the Shortcuts app shows it, with placeholders where the server's details go: Get File, Run Script over SSH, Base64 Encode, the Text with #b=, Open URLs](shortcut-b.png)
-
-Both can be imported instead of built: [blog.sh Send post](shortcuts/blog.sh-send-post.shortcut)
-is shortcut A and [UploadIncoming template](shortcuts/UploadIncoming-template.shortcut)
-is shortcut B, signed so that anyone may import them. After importing,
-rename the second to exactly `UploadIncoming` -- the first opens it by
-that name -- and fill in what is yours. In *Run Script over SSH*: the
-machine you log into (a host name or an IP address), its SSH port, the
-user, and the path to `scripts/receive.sh` or the wrapper that reaches
-it. In the *Text*: `YOUR-BLOG-URL` is the address the site is served at,
-`base_url` in `config/site.yml`. The SSH action carries no key; pick or
-generate one there and put its public half on the server, as the key
-line below shows. The first shortcut needs nothing changed.
+**It runs on a Mac as well.** The Shortcuts app there has the same
+shortcut through iCloud, Safari's Share Sheet offers it, and the terminal
+runs it: `shortcuts run SendPost` with a `batch.txt` in the Shortcuts
+folder sends that batch and prints the address it would have opened --
+which is how the sending half is tested without a phone. `/write/`
+itself is still made for a phone.
 
 Base64, not URL Encode, and not for taste: Shortcuts reads a reply
 that is JSON as a Dictionary and then refuses to hand a Dictionary to
@@ -622,7 +736,7 @@ URL Encode -- "couldn't convert from Dictionary to Text" -- on exactly
 the replies that matter, the refusals. Base64 Encode takes anything.
 (The page also still reads a percent-encoded reply after `#r=`.)
 
-The last three carry the answer back to the page. It opens with the
+Base64 Encode, the Text and Open URLs carry the answer back to the page. It opens with the
 reply after `#b=` -- a fragment, so it never leaves the browser -- and
 says what the server did: the pictures it kept, the draft's preview
 address or the post's public one, the command that publishes a draft
@@ -647,9 +761,10 @@ the phone is the one place with no terminal to read them in. Only what
 was said about the POST: the file is served to anyone who has the
 sixteen characters, so what the run says about the SITE afterwards (a
 missing `base_url`, whatever the rebuild warns about) stays out of it.
-The page asks for it every three seconds for five minutes, and says so
-if it never comes. Whichever answer arrives first is the one that is
-shown.
+The page asks for it every three seconds for fifteen minutes, and says
+so if it never comes; a page reopened later asks once more, and shows
+the answer or says it did not come. Whichever answer arrives first is
+the one that is shown.
 
 The file is written by the BUILD, which is what keeps it true: publish
 the post and the next build says published and gives the public address;
@@ -659,7 +774,7 @@ that asked for one.
 
 **Publishing from the phone.** The answer for a draft carries a Publish
 button, and it sends one file called `publish.txt` holding the slug --
-down the same connection, through the same two shortcuts. The receiver
+down the same connection, through the same shortcut. The receiver
 knows that shape: exactly one file, called that, and it runs
 `publish <slug> --yes --json` rather than storing anything. The slug is
 checked as hard as a filename is, because it becomes an argument to a
@@ -695,7 +810,7 @@ could not put on screen.
 
 The page that sent the files sees the share end in an abort -- that is
 how the hand-off to the app looks from a web page, not a failure -- so it
-says the files have left. The answer arrives when shortcut B opens the
+says the files have left. The answer arrives when the second run opens the
 page again with it.
 
 The order inside the batch matters, because the markdown arriving is what
@@ -757,7 +872,7 @@ worked.** A refusal leaves with zero -- deliberately, because iOS Shortcuts
 discards the output of a remote command that failed, and the reason is the
 whole point of the answer. The cost is that Shortcuts then reports a tick
 for a refusal exactly as it does for a post. End the shortcut by opening the
-page with the answer, as shortcut B above does, or with a *Show Content*
+page with the answer, as the second run above does, or with a *Show Content*
 of the SSH output. The reply is one JSON object per file, so read it
 whole: a picture answers `"ok":true`, a refusal answers `"ok":false` and
 names the reason, and the post that was written answers with a `slug`
@@ -1336,6 +1451,23 @@ What it looks for, each with a line saying what to do about it:
   upgrading cannot help, since by then they are in the posts. Reported
   rather than corrected: somebody writing *about* html has every right to
   `&amp;` in their text.
+- **Two posts asking for one address in one language** -- a translation
+  and another post that both claim `/de/…`, which the build would resolve
+  by serving one of them and dropping the other.
+
+- **A `config/site.<lang>.yml` that nothing reads** -- written for a
+  language the site does not publish, carrying a key the engine does not
+  know, or translating something site.yml does not have. All of them do
+  nothing at all, and all of them look like the work is done. And one
+  whose menu or footer links go to other places than site.yml's: a
+  translation changes the words, not where they lead. A word for a tag no
+  published post carries is worth a look rather than an error: it shows
+  nowhere, and nothing is broken.
+
+- **A language named in `site.locales` that the engine has no locale file
+  for.** A typo there is not a typo in one language: the build stops on it
+  in EVERY language of the site, its own included, because the menu that
+  offers the other languages needs each one's name.
 
 It only reports, unless you ask it not to. On its own -- and that is how
 cron runs it -- nothing here deletes a directory or rewrites a post: the
@@ -1599,6 +1731,14 @@ Things worth knowing:
   The absolute floors keep the percentages usable on a small site, where
   two posts published at once would otherwise read as an explosion.
 
+  A change of the site's languages is not a swing. Adding one grows the
+  build by a whole tree (`/en/`, every listing, tag and feed in it) and
+  removing one shrinks it by as much, so the deploy says the languages
+  changed, leaves those trees out of the comparison and holds the rest of
+  the site to the limits above -- a broken build on the same day still
+  stops. The files of a language the site no longer publishes are deleted
+  from the target by that deploy, without `--prune`.
+
   A drop also measures against the manifest when that is larger, since
   every entry in it is a file that really did upload. Growth never does:
   the manifest legitimately lags the build after a failed upload or on a
@@ -1808,7 +1948,7 @@ whole), but restoring from the archive itself is exact.
 | --- | --- |
 | Anything at all, and you need to know what you're running | `./blog.sh version` -- it needs neither `env.sh` nor a config, on purpose. |
 | The site looks wrong, or you want to change how it looks | `./style.sh` -- a menu over everything that decides how the site looks and what it says about itself; it lists its own sections. The bio, the footer note, the copyright line and the banner's claim are Markdown, the same as a post, and raw HTML still works in them; a multi-paragraph value needs YAML's literal block (`|-`) -- the notes in `config/site.yml.example` show why. Picking a palette offers a preview (light and dark side by side, uploaded to the site too so a phone can see it) before anything is written -- temporary on purpose, the next build takes it down -- and the run ends by offering a rebuild. |
-| Anything config-shaped, and you want the whole picture | `./blog.sh doctor` -- it reads whatever is on disk and reports every problem at once, each with a fix line. It runs on a config too broken for anything else to load, including one whose YAML won't parse, and needs neither `env.sh` nor a valid config. Add `--online` to also ask whether the feeds, the analytics script and the access token still answer, and `--strip-location` to clean the location out of photos saved before the engine did it on the way in ([Writing from a phone](#writing-from-a-phone)); rebuild afterwards, since the site is built from what it cleans. |
+| Anything config-shaped, and you want the whole picture | `./blog.sh doctor` -- it reads whatever is on disk and reports every problem at once, each with a fix line. It runs on a config too broken for anything else to load, including one whose YAML won't parse, and needs neither `env.sh` nor a valid config. Add `--online` to also ask whether the feeds, the analytics script and the access token still answer, and whether the deploy target does -- with what stands in its root that the site did not put there, and `--strip-location` to clean the location out of photos saved before the engine did it on the way in ([Writing from a phone](#writing-from-a-phone)); rebuild afterwards, since the site is built from what it cleans. |
 | Anything archive-shaped -- a hole where a picture should be, a link that leads nowhere | `./blog.sh check` -- it walks every post and every media file and says what is broken *inside the archive*, each finding with a fix line; `--online` additionally asks whether the links that leave the site still answer ([Checking the archive](#checking-the-archive)). It only ever reports: nothing is deleted or rewritten, so it is safe to run at any time, including from cron. |
 | `config/site.yml is not valid YAML` | The message names the line and column. Almost always a tab where spaces belong, a missing quote, or a colon inside an unquoted value (`title: Colon: here`). `./blog.sh doctor` says the same thing without stopping at the first problem. |
 | A save aborted and took your text with it | It didn't: the text is in `.last-edit.md`, and the next `add`/`edit` offers it back -- `[r]` opens the editor on it, `[d]` throws it away, `[c]` leaves it alone. Text from an interrupted `edit <slug>` is only offered to that same post: restoring it into an `add` would make a second post out of it, so the offer names the command that does continue it. |
@@ -1818,7 +1958,8 @@ whole), but restoring from the archive itself is exact.
 | Deploy stopped with a "% drop/increase" message | One of the four guards ([Deploying](#deploying)) -- broken build until proven otherwise, `--force` only when the change is intended. |
 | Deploy or save stopped naming an oversized file | The one file-size limit ([Deploying](#deploying)) -- shrink the file, or take it out of the post and link to it instead. |
 | `N deploys in a row have not finished` | Something is refused every time; the failures listed under that line say which ([Deploying](#deploying)). |
-| `upload -> ... (HTTP 401)` on Surfer | Token expired or wrong -- create a fresh one in the Surfer admin UI (/_admin) and update `SURFER_TOKEN`. |
+| `Surfer ... refused the access token (HTTP 401)` | Surfer 7 no longer takes access tokens. Create an app password in your Cloudron profile (Profile -> App Passwords) and set `SURFER_USERNAME` and `SURFER_PASSWORD` in `env.sh` ([install.md](install.md#surfer-cloudron-surfer----the-default)). |
+| `Surfer ... refused the username and password (HTTP 401)` | `SURFER_USERNAME` is the Cloudron username, not the e-mail, and `SURFER_PASSWORD` an app password, not the Cloudron sign-in password. A refused sign-in stops the deploy at the first file, and `./scripts/deploy-web.sh` then exits with 4 rather than 1, so a script can tell "fix env.sh" from "try again". |
 | `Mastodon API returned 401` / toot was not created | `MASTODON_ACCESS_TOKEN` missing, expired, or lacking the `write:statuses` scope. The post itself is fine -- fix the token and use `./blog.sh toot <slug>`. |
 | `Posting to Bluesky failed` / announcement not sent | `BLUESKY_APP_PASSWORD` missing, revoked, or it's the account password instead of an app password (Settings → Privacy and security → App Passwords). The post itself is fine -- fix it and use `./blog.sh bluesky <slug>`. |
 | Every comment disappeared after turning on `comments.approval` | Expected until you star them -- moderation publishes only favourited replies ([Cron](#cron-sidebar-widgets-and-post-stats)). If starring changes nothing either, `./blog.sh doctor --online` catches the usual cause: a token without `read:statuses`. |

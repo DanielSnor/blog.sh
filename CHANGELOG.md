@@ -11,6 +11,81 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.9 -- 2026-09-28
+
+The release about publishing in more than one language. A post keeps one set of metadata and a
+text per language, every language in `site.locales` beyond the site's own gets a root of its own,
+and one `rebuild` builds them all. Beside that, the first hour: everything two people setting
+blog.sh up from scratch tripped over is fixed. One thing to do, on Cloudron's Surfer only: Surfer 7
+signs in with `SURFER_USERNAME` and an app password in `SURFER_PASSWORD`.
+
+### Added
+
+- **More than one language.** `site.locales` names them; one post, a text per language.
+- **`./blog.sh translate <slug> --lang de`.** Or from the wizard's crossroads and the post's properties.
+- **A root per language.** The site's own keeps `/`; one `rebuild` builds them all, one sitemap names them.
+- **A post nobody has translated still shows**, linking to the one copy that exists.
+- **A language switcher.** A chip beside the light/dark button; a click moves to the next language.
+- **`fallback:` and `ui_language:`.** What stands in for a missing text, or a missing interface.
+- **`config/site.<lang>.yml`.** Title, description, banner, about, footer, menu and tag names per language.
+- **Pages are translated like posts.** Under the language's root (`/de/ueber-mich/`).
+- **`check --languages`.** A row per post, a column per language.
+- **`publish` and `schedule` refuse a post missing a language.** `--allow-partial` says otherwise.
+- **`doctor --online` asks the deploy target.** Whether it answers, and what stands in its root.
+- **`deploy.keep` in `config/site.yml`.** What stands in the target's root on purpose.
+- **A draft's properties show its preview address.** `[q]` puts it on a phone as a QR code.
+- **Setup says what went into a hidden prompt.** Its length and its last two characters.
+
+### Changed
+
+- **Surfer 7 signs in with the Cloudron username and an app password.** `SURFER_USERNAME`, `SURFER_PASSWORD`.
+- **Adding or removing a language is a deploy like any other.** No `--force`, no `--prune`.
+- **Structured data names the page's language.** `inLanguage` in every post's JSON-LD.
+- **A heading the site does not write is the engine's**, in the language of the page.
+- **The Czech interface says "příspěvek", "sestavení" and "koncept".**
+- **One phone shortcut instead of two.** It runs on a Mac too.
+- **`./blog.sh rebuild` takes `--full` and `--force`, and nothing else.** A failed one exits 1.
+- **A cold build costs about 6% more than 1.8's.** A cached rebuild costs what it did.
+
+### Fixed
+
+- **A picture captioned in typographic quotes vanished from the page.**
+- **Embedded players were black on a host with a tight referrer policy.** YouTube's "Error 153".
+- **`check` called `/write/` dead on the sites that publish it.**
+- **The import menu did not say WordPress takes a file.**
+- **A re-import dropped what it had no name for.** A phone receipt, among others. It keeps everything the source does not decide.
+- **A token pasted with a space around it was saved with it.**
+- **`install.md` never said a deploy leaves an old site's files in place.**
+- **In the writing app, "Add a picture or video" did not look like a button.**
+- **The writing app's warning about a missing description read like a rule.** A second tap sends.
+- **Chrome and Edge could not send the text from the writing app.** It goes as `.md.txt` now.
+- **The writing app, reopened more than five minutes after sending, said nothing.** It waits fifteen now, and a page reopened later asks once.
+- **rclone installed as a snap failed every deploy.**
+- **`doctor` ticked a backend whose program is not installed.**
+- **The warning before an edit loses something spoke the schema's English.**
+- **A file size used the English decimal point in every language.**
+- **Ctrl+C in any screen of `./blog.sh` ended in a stack trace.** It exits 130.
+- **FTP was nowhere in the docs.** The rclone backend has always reached it.
+- **`publish --json` fell over on a post whose date nobody can read.**
+- **A podcast import put the show's cover over every episode.**
+- **Esc did things.** It deployed, opened the editor, wrote a control character. Now it never does.
+- **`rebuild --help` built and deployed the site.** And `--force` was ignored.
+- **A mistyped command scrolled the whole usage past** without saying it does not exist.
+- **`[p]` in a draft's properties published and announced on one key.** It asks first.
+- **A site that announces nowhere, or has no token, was promised an announcement.**
+- **After a failed build, the last line said to wait for another run.** There was none.
+- **A slug pasted into a picker kept its first character.** A menu past nine rows takes two digits.
+- **`./setup.sh` took the template's examples as the site's name and address.** And spoke English above a Czech run.
+- **`./setup.sh` wrote `~/www` as typed**, and `doctor` then called it a relative path.
+- **Enter through Layout in `./style.sh` wrote the engine's defaults into `site.yml`.**
+- **Cancelling a plan left the slot's date on the post.**
+- **A site deploying to a directory was told it "goes nowhere yet".**
+- **Every publish on a site with no network advised checking the config.**
+- **`doctor --onlien` ran the offline checks and said nothing.**
+- **The shipped banner was said to jump.** Only the ratio holds the space open.
+- **A quote left open in `site.yml` was reported on the wrong line.**
+- **Pickers said `[DRAFT]` on a Czech screen.** `list`, which scripts read, keeps it.
+
 ## 1.8 -- 2026-09-14
 
 The release about what happens when something goes wrong. A page is written whole or not at all, a

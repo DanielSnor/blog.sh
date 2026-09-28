@@ -16,7 +16,7 @@ window.I18N = {
       "bad_limit": "Limit velikosti na serveru je nastavený na něco, co není číslo. Oprav BLOGSH_MAX_MB na serveru.",
       "truncated": "Přenos skončil dřív, než měl -- spojení se přerušilo, nebo nedorazila závěrečná tečka. Pošli to znovu.",
       "bad_name": "Server odmítl jméno souboru: obsahovalo cestu, začínalo tečkou, bylo prázdné nebo příliš dlouhé, nebo v něm byl řídicí znak.",
-      "bad_slug": "Žádost o publikaci nenesla použitelný slug, takže se nic nepublikovalo. Slug je adresa, pod kterou je post uložený: malá písmena, číslice a pomlčky.",
+      "bad_slug": "Žádost o publikaci nenesla použitelný slug, takže se nic nepublikovalo. Slug je adresa, pod kterou je příspěvek uložený: malá písmena, číslice a pomlčky.",
       "empty_file": "Dorazil soubor, ve kterém nic není.",
       "missing_images": "Text odkazuje na obrázek, který nedorazil. Přidej ho znovu a pošli ještě jednou.",
       "bad_markdown": "Blog nedokázal text přečíst.",
@@ -26,7 +26,7 @@ window.I18N = {
       "name_taken": "V incoming/ je pod tím jménem něco, co není obyčejný soubor -- složka nebo symbolický odkaz. Nic se nepřepsalo. Přejmenuj obrázek, nebo na serveru ukliď, co pod tím jménem leží."
     },
     "app": {
-      "mode_draft": "Draft",
+      "mode_draft": "Koncept",
       "mode_publish": "Rovnou publikovat",
       "send_publish": "Publikovat na blog",
       "insert": "Vložit do textu",
@@ -46,6 +46,7 @@ window.I18N = {
       "add_image": "Přidat obrázek nebo video",
       "alt_hint": "Co je na obrázku. Kdo čte přes odečítač, má jenom tohle.",
       "alt_missing": "Zatím bez popisu",
+      "alt_missing_send": "Zatím bez popisu: {names}. Popis je pro čtenáře, kteří obrázek nebo video nevidí. Doplň ho, nebo klepni znovu a pošli to i bez něj.",
       "used_in_text": "V textu použit",
       "unused_image": "V textu se na něj neodkazuješ — nahraje se, ale nikde se neukáže.",
       "send": "Odeslat na blog",
@@ -62,10 +63,10 @@ window.I18N = {
       "result_refused": "Server to odmítl",
       "result_publish_hint": "Publikovat od klávesnice:",
       "publish_now": "Publikovat",
-      "publish_sent": "Žádost o publikaci je na cestě. Tahle stránka řekne, až bude post venku.",
-      "publish_saved": "Žádost se uložila jako publish.txt. Předej ten jeden soubor odesílací zkratce a post půjde ven.",
+      "publish_sent": "Žádost o publikaci je na cestě. Tahle stránka řekne, až bude příspěvek venku.",
+      "publish_saved": "Žádost se uložila jako publish.txt. Předej ten jeden soubor odesílací zkratce a příspěvek půjde ven.",
       "publish_failed": "Žádost o publikaci se nepodařilo předat. Od stolu to jde pořád: ./blog.sh publish <slug>",
-      "answer_late": "Odpověď zatím nedorazila. Blog se možná ještě staví, nebo zásilka nedošla — než to pošleš znovu, mrkni na blog.",
+      "answer_late": "Odpověď zatím nedorazila. Blog se možná ještě sestavuje, nebo zásilka nedošla — než to pošleš znovu, mrkni na blog.",
       "result_unreadable": "Stránka odpovědi serveru nerozumí. Přišlo tohle:",
       "result_close": "OK",
       "pictures_1": "fotka",
@@ -77,7 +78,7 @@ window.I18N = {
       "handing": "Předávám {what}…",
       "preview": "Náhled",
       "preview_hide": "Skrýt náhled",
-      "preview_note": "Přibližně, ne přesně: post vykresluje až blog a skutečný náhled je ten draftový po odeslání.",
+      "preview_note": "Přibližně, ne přesně: příspěvek vykresluje až blog a skutečný náhled je náhled konceptu po odeslání.",
       "preview_missing_picture": "Obrázek {name} -- v tomto zařízení bez náhledu",
       "mark_bold": "Tučně",
       "mark_italic": "Kurzíva",
@@ -105,12 +106,13 @@ window.I18N = {
       "sent_elsewhere": "Odesláno z jiného okna tohoto webu; tahle kopie byla vymazána.",
       "files_skipped": "Něco z vybraného není obrázek ani video a zůstalo stranou.",
       "preview_picture_glued": "{name}: obrázek musí stát na vlastním řádku s prázdným řádkem před sebou i za sebou -- jinak blog příspěvek odmítne",
-      "result_saved": "Uloženo jako draft.",
+      "result_saved": "Uloženo jako koncept.",
       "result_preview": "Náhled",
-      "result_pending": "Web se přestaví do čtvrt hodiny.",
+      "result_pending": "Web se znovu sestaví do čtvrt hodiny.",
       "result_warnings": "Za pozornost stojí",
       "saved_instead": "Tenhle prohlížeč soubory předat neumí, takže jsou uložené v jednom archivu. ROZBAL ho a zkratce předej soubory z něj -- blog bere soubory, ne archivy.",
       "share_cancelled": "Předáno. Až zkratka doběhne, otevře se tu odpověď -- pokud jsi místo toho zavřel panel sdílení, neodešlo nic.",
+      "share_retry_txt": "Tenhle prohlížeč soubor .md nesdílí, tak klepni znovu: text pak půjde jako .md.txt a blog mu jméno vrátí.",
       "not_saved": "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."
     }
   },
@@ -159,6 +161,7 @@ window.I18N = {
       "add_image": "Bild oder Video hinzufügen",
       "alt_hint": "Was auf dem Bild zu sehen ist. Wer einen Screenreader nutzt, hat nur das.",
       "alt_missing": "Noch ohne Beschreibung",
+      "alt_missing_send": "Noch ohne Beschreibung: {names}. Sie ist für alle, die das Bild oder Video nicht sehen. Ergänzen, oder noch einmal tippen und ohne sie senden.",
       "used_in_text": "Im Text verwendet",
       "unused_image": "Im Text nicht erwähnt — es wird hochgeladen, aber nirgends gezeigt.",
       "send": "Ans Blog senden",
@@ -224,6 +227,7 @@ window.I18N = {
       "result_warnings": "Wissenswert",
       "saved_instead": "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive.",
       "share_cancelled": "Übergeben. Sobald der Kurzbefehl fertig ist, erscheint die Antwort auf dieser Seite -- wurde stattdessen das Teilen-Menü geschlossen, ist nichts abgeschickt.",
+      "share_retry_txt": "Dieser Browser gibt eine .md-Datei nicht weiter, also noch einmal tippen: der Text geht dann als .md.txt, das Blog stellt den Namen wieder her.",
       "not_saved": "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."
     }
   },
@@ -272,6 +276,7 @@ window.I18N = {
       "add_image": "Add a picture or video",
       "alt_hint": "What is in the picture. Someone using a screen reader has only this.",
       "alt_missing": "No description yet",
+      "alt_missing_send": "No description yet: {names}. It is for readers who cannot see the picture or the video. Add one, or tap again to send without it.",
       "used_in_text": "Used in the text",
       "unused_image": "Not mentioned in the text -- it will be uploaded but nothing will show it.",
       "send": "Send to blog",
@@ -337,6 +342,7 @@ window.I18N = {
       "result_warnings": "Worth knowing",
       "saved_instead": "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives.",
       "share_cancelled": "Handed over. The answer opens on this page once the shortcut is done -- if you closed the sheet instead, nothing was sent.",
+      "share_retry_txt": "This browser will not share a file called .md, so tap again: the text then goes as .md.txt and the blog puts the name back.",
       "not_saved": "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
     }
   }

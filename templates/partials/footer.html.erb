@@ -6,7 +6,7 @@
 <footer>
       <div>
 <% unless footer_links_html.empty? %>
-<%= chrome_heading_line(FOOTER['links_heading']) %>        <ul>
+<%= chrome_heading_line(site_heading(FOOTER, 'links_heading', 'links_heading')) %>        <ul>
 <%= footer_links_html %>
         </ul>
 <% end %>
@@ -21,7 +21,7 @@
       </div>
       <div>
 <% unless social_links_html.empty? %>
-<%= chrome_heading_line(FOOTER['social_heading']) %>        <div class="social-icons">
+<%= chrome_heading_line(site_heading(FOOTER, 'social_heading', 'social_heading')) %>        <div class="social-icons">
 <%= social_links_html %>
         </div>
 <% end %>
