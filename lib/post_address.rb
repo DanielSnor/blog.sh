@@ -190,6 +190,15 @@ module PostAddress
   LOCALE_ROOTS = Dir.glob(File.join(__dir__, '..', 'locales', '*.yml'))
                     .map { |path| File.basename(path, '.yml') }.sort.freeze
   RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + LOCALE_ROOTS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
+  # The longest a single segment of a redirect origin may be. POSIX NAME_MAX
+  # is 255 bytes on macOS and Linux alike, and mkdir_p raises ENAMETOOLONG
+  # past it -- which killed the build at its very LAST stage, after the
+  # whole site had already been written, with a backtrace naming no post. An
+  # imported permalink is where such a segment comes from: 36 Japanese
+  # characters percent-encode to 333 bytes, and importers put the source
+  # URL's path straight into redirect_from. One bad imported entry must not
+  # kill the build, so such an origin is refused (and said so) rather than
+  # written.
   REDIRECT_SEGMENT_MAX_BYTES = 255
 
   def redirect_refusal(origin)

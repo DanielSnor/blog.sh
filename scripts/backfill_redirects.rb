@@ -30,8 +30,8 @@ require_relative '../lib/post_address'
 ROOT = File.expand_path('..', __dir__)
 CONTENT_DIR = File.join(ROOT, 'content.nosync', 'posts')
 
-# Mirrors the build's REDIRECT_FROM_RESERVED: entries under these would be
-# refused there with a warning on every build -- better never written.
+# The first segments the build refuses a redirect_from entry under: written
+# anyway, they would be refused there with a warning on every build.
 RESERVED = PostAddress::REDIRECT_RESERVED
 
 domain = ARGV[0] || abort('usage: backfill_redirects.rb <old-domain>   (WRITE=1 to apply)')

@@ -579,11 +579,6 @@ BANNER = SiteConfig.fetch('banner')
 # per visual property would turn config/site.yml into a stylesheet written
 # in YAML.
 LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
-# The column is only worth reserving when something would stand in it. A site
-# with no about text and no widgets kept an empty <aside> and the grid kept
-# its 260px beside it, so the content sat in a narrowed column with a blank
-# strip alongside -- held space for furniture that was never coming.
-ASIDE_CARDS = %w[toots pixelfed commits bluesky rss].freeze
 # The lead image lifted out of the text and shown above the title. Off
 # unless a site asks for it, because it reshapes every post page it
 # touches -- and a site is entitled to have had the shape it has.
@@ -623,8 +618,6 @@ SOCIAL = SiteConfig::Chrome.list(SiteConfig.data, 'social')
 # inside an ERB line. Names outside the list and wrong shapes are named by
 # the warning above and by doctor -- they do not also get to stop the build.
 WIDGETS = SiteConfig::Chrome.widgets(SiteConfig.data)
-# ...so the switch that decides the column asks both questions: does the
-# author want a sidebar, and is there anything to put in it.
 # Anything the config says that the engine cannot use is said here, once,
 # at the start of the build -- and it is the SAME list doctor reports, read
 # from the same function, so the two cannot name different keys. Read as
@@ -634,6 +627,12 @@ SiteConfig::Chrome.complaint_sentences(SiteConfig.data,
                                        ->(key, what) { I18n.t("doctor.#{key}", key: what, name: what, index: what) })
                   .each { |sentence| warn "config/site.yml: #{sentence}" }
 
+# The column is only worth reserving when something would stand in it. A site
+# with no about text and no widgets kept an empty <aside> and the grid kept
+# its 260px beside it, so the content sat in a narrowed column with a blank
+# strip alongside -- held space for furniture that was never coming.
+# ...so the switch that decides the column asks both questions: does the
+# author want a sidebar, and is there anything to put in it.
 SIDEBAR_SHOWN = LAYOUT_SIDEBAR &&
                 (!ABOUT['html'].to_s.strip.empty? ||
                  SiteConfig::Chrome.widgets(SiteConfig.data).any?)
@@ -1636,18 +1635,6 @@ def post_content_html(post)
   CONTENT_CACHE[post] ||= Blocks.render_content(post['content'], post_href(post), lifted: link_title_block(post))
 end
 
-def plain_text_length(post)
-  post['content'].sum do |b|
-    case b['type']
-    when 'text', 'code' then b['text'].to_s.length
-    when 'chat' then Array(b['lines']).sum { |l| l['text'].to_s.length }
-    when 'list' then (b['items'] || []).sum { |it| it['text'].to_s.length }
-    when 'table' then ((b['header'] || []) + (b['rows'] || []).flatten).sum { |c| c['text'].to_s.length }
-    else 0
-    end
-  end
-end
-
 # Lives in lib/post_text.rb, shared with the CLI's archive browser -- the
 # terminal searches these same words with no index to consult, so the two
 # must extract the same text or the same query would answer differently
@@ -2610,7 +2597,6 @@ WRITTEN = {}
 # served holes. Reported from an install doing exactly that.
 # Defined in lib/public_file.rb, not here: the build is not the only writer
 # into public/ and a rule kept in the build is a rule the cron cannot read.
-PUBLIC_READABLE = PublicFile::READABLE
 PUBLIC_TRAVERSABLE = PublicFile::TRAVERSABLE
 
 # Where the site keeps its favicon. Above the writing layer rather than
@@ -3418,17 +3404,6 @@ def written_already?(dest)
   @written_folded.key?(fold_path(dest))
 end
 
-# The longest a single path segment may be. POSIX NAME_MAX is 255 bytes on
-# macOS and Linux alike, and mkdir_p raises ENAMETOOLONG past it -- which
-# killed the build at its very LAST stage, after the whole site had already
-# been written, with a backtrace naming no post. An imported permalink is
-# where such a segment comes from: 36 Japanese characters percent-encode to
-# 333 bytes, and importers put the source URL's path straight into
-# redirect_from. The three collisions below are already guarded on the
-# stated grounds that one bad imported entry must not kill the build; a
-# name the filesystem refuses is the fourth.
-NAME_MAX_BYTES = 255
-
 (posts + pages + unlisted_posts).each do |post|
   Array(post['former_slugs']).each do |former|
     # Asked of PostAddress, which is where redirect_from's own refusal
@@ -4211,9 +4186,9 @@ Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:robots]), robots_txt)
 # are arbitrary, so unlike the former_slugs loop this one runs after
 # EVERYTHING real -- posts, listings, search, feeds, root files -- and a
 # stub yields to whatever the build already produced, out loud.
-# The list itself now lives in PostAddress, so the build, the checker and
-# the repair pass cannot drift apart about it.
-REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
+# The list of first segments it refuses lives in PostAddress
+# (REDIRECT_RESERVED), so the build, the checker and the repair pass cannot
+# drift apart about it.
 # Pages too, for the reason above -- and because a source like Substack
 # serves its pages under /p/<slug>, so the old address is a real one the
 # importer records and this loop is the only thing that answers it.
