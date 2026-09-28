@@ -36,6 +36,8 @@ require_relative 'output'
 require_relative 'discovery'
 require_relative 'cards'
 require_relative 'languages'
+require_relative 'tags'
+require_relative 'archive'
 require_relative '../lib/series'
 require_relative '../lib/on_this_day'
 
@@ -3195,40 +3197,9 @@ end
 # as a copy of /. Empty on the site's own language, where nothing changes.
 page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post)
 
-tags_map = {}
-overlong_tags = []
-posts.each do |post|
-  # Folded by SLUG before anything is appended, because the map groups by
-  # slug while the loop walked tag STRINGS: "sci-fi" and "Sci Fi", "Praha"
-  # and "praha", "Cesko" and "Česko" -- or the same tag simply typed twice
-  # -- are one page, and the post was appended to it once per spelling. The
-  # listing then showed the post twice in a row, the tag's feed carried two
-  # <item>s with the same guid, and the index said 2 beside a tag that one
-  # post carries. First spelling wins, matching how the map already picks a
-  # display name across posts.
-  (post['tags'] || []).uniq { |tag| tag_slug(tag) }.each do |tag|
-    slug = tag_slug(tag)
-    next if slug.empty?
-
-    # An address that will not fit a filename: mkdir died on it with a raw
-    # ENAMETOOLONG, partway through writing the site. The tag stays on its
-    # posts (as a pill that is not a link); only the listing page is
-    # refused, and refused with a sentence.
-    unless Slug.pageable?(slug)
-      overlong_tags << tag.to_s[0, 60] unless overlong_tags.include?(tag.to_s[0, 60])
-      next
-    end
-
-    # The name the pages and the index show: this language's word for the
-    # tag where it has one (tag_label), so the listing, its title, its feed
-    # and the index cannot disagree with the pills.
-    tags_map[slug] ||= { name: tag_label(tag), posts: [] }
-    tags_map[slug][:posts] << post
-  end
-end
-overlong_tags.each do |name|
-  warn t('build.tag_too_long', name: name)
-end
+# Which tags the posts carry, by address (build/tags.rb). Early, because
+# the writing app below counts them too; the sitemap reads the map at the end.
+tags_map = Tags.collect(posts)
 
 # What the writer page knows about the blog it belongs to, written beside
 # it as site.js: the name and claim for its header, the palette so it is
@@ -3336,102 +3307,11 @@ FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _|
   bare[%r{\A/tag/([^/]+)/\z}, 1]
 }.freeze
 
-tags_map.each do |slug, data|
-  if FEED_TAG_SLUGS.include?(slug)
-    Output.emit(File.join(CONTENT_ROOT, 'tag', slug, 'rss.xml'),
-         Feeds.render_rss(data[:posts], path: loc("/tag/#{slug}/rss.xml"),
-                    title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
-                    description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
-                    # The page this feed belongs to, in the language the
-                    # feed is written in -- the site root was every
-                    # language's answer, which sent a German subscriber
-                    # to the Czech page.
-                    link: "#{SITE_BASE_URL}#{loc("/tag/#{slug}/")}"))
-  end
-  write_listing(data[:posts], index_template, File.join(CONTENT_ROOT, 'tag', slug),
-                base_path: loc("/tag/#{slug}"), heading: data[:name],
-                heading_kind: t('tag.kind'), heading_variant: 'tag',
-                # The page's own slug, not its display name: the name is
-                # whichever spelling the archive used first, and looking
-                # the icon up by that made the heading depend on which
-                # post happened to come first.
-                heading_icon: TAG_ICONS[slug] || :tag,
-                # Only when there IS an index to go back to: a site whose
-                # tags all live on drafts builds no /tag/, and a heading
-                # linking there would be the dead menu item doctor refuses.
-                heading_href: (tags_map.empty? ? nil : loc('/tag/')),
-                feed_path: FEED_TAG_SLUGS.include?(slug) ? loc("/tag/#{slug}/rss.xml") : nil,
-                title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
-                description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
-end
+# A listing, and for a tag in the menu a feed, per tag (build/tags.rb).
+Tags.write_pages(tags_map, index_template)
 
-# --- The tag index ------------------------------------------------------
-#
-# /tag/ was a dead address: the site built a listing per tag and nothing
-# that showed them all, so the only complete list of a site's own subjects
-# lived in the terminal. Asked for by a site whose tags are subjects rather
-# than provenance, where the list is short enough to read at a glance.
-#
-# Every tag that has a page, and no others: a tag carried only by a draft,
-# a page or an unlisted post is drawn under its post as a flat pill with no
-# link, and listing it here would point at a 404.
-#
-# Sorted by the FOLDED name, not the raw one. Ruby sorts strings by bytes,
-# which puts every accented tag after z -- on one real archive that is
-# fifty-two of them, and the last six in byte order are `skoleni`,
-# `skolitel`, `sumava`, `svihov`, `zelnava`, `zivotvkorporatu` (with their
-# diacritics). A reader looking for one between `sirky` and `sport` would
-# not find it there. `browse` in the CLI already folds for this reason.
-unless tags_map.empty?
-  tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
-                           .sort_by { |_, name, _| [Slug.fold(name), name] }
-  # Names and counts are the whole page, so that is the whole key.
-  tag_index_dest = File.join(CONTENT_ROOT, 'tag', 'index.html')
-  tag_index_key = Digest::SHA256.hexdigest(tag_index_rows.map { |row| row.join(':') }.join(','))
-  # A letter above each run of names, so seven hundred tags read as a
-  # dictionary rather than as a wall. Taken from the FOLDED name, because
-  # that is the order the list is in: `škola` belongs under S, where the
-  # reader looking between `sirky` and `sport` will be. Anything that is
-  # not a letter -- a tag that starts with a digit -- goes under `#`.
-  #
-  # Emitted as list items rather than as headings between lists: the list
-  # is one <ul> and breaking it into twenty-seven of them would break the
-  # wrapping with it -- a band is a full-width item in the same flow, the
-  # way the archive's month is. The switch to count order takes them back
-  # out (see assets/js/tag-index.js).
-  last_letter = nil
-  build_tag_index_items = lambda do
-    tag_index_rows.flat_map do |slug, name, count|
-    letter = Slug.fold(name).to_s[0].to_s.upcase
-    letter = '#' unless letter.match?(/[A-Z]/)
-    head = if letter == last_letter
-             []
-           else
-             last_letter = letter
-             [%(<li class="tag-index-letter" aria-hidden="true">#{h(letter)}</li>)]
-           end
-    # The count travels in an attribute as well as in the text: the switch
-    # reorders these in the DOM, and reading a number back out of rendered
-    # markup is how a sort starts depending on how a number is punctuated.
-    # Name and count in ONE pill, one link, one target: the count is what
-    # makes the index a diagnostic rather than a menu (`pacmam 1` beside
-    # `pacman 12` says on sight what a list of names alone never would),
-    # and hung outside the pill it detached from its own name -- with the
-    # list wrapped into lines, a number between two pills reads as easily
-    # for the one that follows it.
-    head + [%(<li class="tag-index-item" data-count="#{count}">) +
-            %(<a class="tag-pill" href="#{loc("/tag/#{h(slug)}/")}">#{h(name)}) +
-            %(<sup class="tag-index-count">#{count}</sup></a></li>)]
-    end
-  end
-  Output.cached_emit(tag_index_dest, tag_index_key) do
-    layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
-           %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
-           title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
-           description: t('tags.description', site_title: SITE_TITLE),
-           path: loc('/tag/'))
-  end
-end
+# The index of every tag (build/tags.rb).
+Tags.write_index(tags_map)
 
 # A series gets a listing of its own, in series order rather than newest
 # first: the whole point of one is that it is meant to be read from the
@@ -3525,165 +3405,8 @@ def searchable_tags(post)
   (tags + tags.map { |tag| tag_label(tag) }).uniq
 end
 
-# --- The archive index -------------------------------------------------
-#
-# A map of the whole archive in two levels and no more. /archive/ is a row
-# per year with a strip of twelve months; /archive/<year>/ is one line per
-# post. No excerpts and no pictures: this is an index, not another listing,
-# and the point of it is that a reader can see the shape of twenty-three
-# years at once -- which nothing on the site could show before. Pagination
-# cannot: it is anchored from the oldest post, so /page/128/ says nothing
-# about whether it is 2009 or 2014.
-#
-# Grouped by the year of the post's ADDRESS, not of its displayed date.
-# Those two can differ by one for a post published either side of midnight
-# on 31 December, and the address is what this is a map OF -- the checker
-# compares paths, and a row pointing at a year the post does not live in
-# would be a dead link the moment it happened.
-#
-# Cheap by construction, which is why the year pages are safe to have: a
-# new post rewrites the map and the current year and nothing else. 2014 has
-# not changed since new year's eve 2014 and never will, so a deploy that
-# compares content has nothing to upload for it.
-ARCHIVE_PATH = loc('/archive/')
-# Longer than any blog, shorter than a typo. 200 years of empty rows is
-# already nonsense to look at; 18,000 is a page nobody can open.
-ARCHIVE_SPAN_MAX = 200
-archive_by_year = posts.group_by { |post| post_time(post).year }
-
-unless archive_by_year.empty?
-  # Every year between the first and the last, including the ones with
-  # nothing in them -- sean.cz has a silent 2025 between 2024 and 2026, and
-  # a map that skipped it would draw an axis that lies about the gap.
-  #
-  # ...up to a point. The span was unbounded, and one mistyped year is all
-  # it takes: 20226 for 2026 parses, gives the post a real address, and
-  # draws 18,201 rows -- a 12.8 MB page that hangs a browser and that
-  # deploy then uploads, while the build's summary says "posts: 2" and both
-  # check and doctor call the archive sound. Past the bound the map falls
-  # back to the years that actually hold something, so a typo costs the
-  # empty-year axis rather than the whole page, and it is said out loud.
-  span_from = archive_by_year.keys.min
-  span_to = archive_by_year.keys.max
-  archive_span = if span_to - span_from >= ARCHIVE_SPAN_MAX
-                   warn t('build.archive_span_absurd', from: span_from, to: span_to)
-                   archive_by_year.keys.sort.reverse
-                 else
-                   span_to.downto(span_from).to_a
-                 end
-
-  month_cells = lambda do |year, by_month|
-    (1..12).map do |m|
-      count = (by_month[m] || []).length
-      label = CGI.escapeHTML(m.to_s)
-      if count.zero?
-        %(<span class="archive-month is-empty">#{label}</span>)
-      else
-        # Four steps of shading, because "has posts / has none" is not the
-        # thing worth seeing: on this archive a month holds anywhere from
-        # one post to eighty-seven, and a map that draws those the same
-        # answers a question nobody asked. The thresholds are read off a
-        # real archive rather than picked round: most months sit under
-        # fifteen, and the handful above forty are the bursts.
-        level = if count < 5 then 1
-                elsif count < 15 then 2
-                elsif count < 40 then 3
-                else 4
-                end
-        %(<a class="archive-month is-l#{level}" href="#{loc("/archive/#{year}/#m#{format('%02d', m)}")}" ) +
-          %(title="#{count}">#{label}</a>)
-      end
-    end.join
-  end
-
-  rows = archive_span.map do |year|
-    in_year = archive_by_year[year] || []
-    by_month = in_year.group_by { |post| post_time(post).month }
-    name = in_year.empty? ? %(<span class="archive-year-name">#{year}</span>) : %(<a class="archive-year-name" href="#{loc("/archive/#{year}/")}">#{year}</a>)
-    %(<li class="archive-year#{in_year.empty? ? ' is-empty' : ''}">#{name}) +
-      %(<span class="archive-year-count">#{in_year.length}</span>) +
-      %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
-  end
-
-  # Keyed on the digest of the rows themselves, not on a summary of them.
-  # The summary was "year:count" -- and the map draws MONTHS: a cell per
-  # month, shaded in four steps by how many posts it holds, linking to an
-  # anchor on the year page. So a post whose date moved from March to
-  # January changed the cells at both ends, the shading of one of them and
-  # the anchor the other pointed at, while the year's count sat exactly
-  # where it was and the key never moved. The map then disagreed with the
-  # year page it links to, and kept disagreeing.
-  #
-  # The rows are built above whatever the cache decides, so this costs one
-  # hash of a few kilobytes -- and, unlike a summary, it cannot drift from
-  # what is drawn: anything added to a cell is in the key the same day it
-  # is on the page.
-  #
-  # The YEAR pages below are what this buys something on anyway: 2014 has
-  # not changed since new year's eve 2014 and never will.
-  Output.cached_emit(File.join(CONTENT_ROOT, 'archive', 'index.html'),
-              Digest::SHA256.hexdigest(rows.join)) do
-    layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
-           %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
-           title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
-           description: t('archive.description', site_title: SITE_TITLE),
-           path: ARCHIVE_PATH)
-  end
-
-  archive_span.each do |year|
-    in_year = archive_by_year[year] || []
-    # A year nobody wrote in gets a row on the map but no page of its own:
-    # there is nothing to put on it, and an empty page is an invitation to
-    # a dead end.
-    next if in_year.empty?
-
-    year_dest = File.join(CONTENT_ROOT, 'archive', year.to_s, 'index.html')
-    year_key = Output.posts_digest(in_year)
-    if BuildCache.page_fresh?(year_dest, year_key)
-      Output.keep(year_dest)
-      next
-    end
-
-    sections = in_year.group_by { |post| post_time(post).month }.sort.map do |month, in_month|
-      # The month heading is a number, the way this site writes dates: two
-      # of the three shipped languages spell months with digits anyway, and
-      # spelling them out would mean thirty-six new translations for the
-      # one language that does not.
-      # Its own copy of the key above, and it has to say the same thing:
-      # the year page's stated contract is date order inside the month.
-      lines = in_month.sort_by { |post| [post_time(post), post['slug']] }.map do |post|
-        # The attribute and the text are the same date said twice, one for
-        # a machine and one for a reader -- that is what <time> means. The
-        # attribute used to carry the STORED date while the text showed the
-        # local day, so a post filed at a year's turn read
-        # `<time datetime="2025-12-31">1.</time>`: a value and a rendering
-        # of it that disagree. Which year the post is FILED under is a
-        # separate decision and stays as it was -- the address year, so the
-        # page and /posts/<year>/ agree.
-        %(<li><time datetime="#{h(post_display_time(post).strftime('%Y-%m-%d'))}">) +
-          %(#{post_display_time(post).day}.</time> ) +
-          %(<a href="#{h(post_href(post))}">#{h(post_title_for(post))}</a></li>)
-      end
-      %(<section class="archive-section" id="m#{format('%02d', month)}">) +
-        %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
-    end
-
-    BuildCache.remember_page(year_dest, year_key)
-    Output.emit(year_dest,
-         layout(listing_heading_html(t('archive.year_title', year: year),
-                                     variant: 'archive', icon: :calendar,
-                                     value_href: ARCHIVE_PATH) + "\n" +
-                sections.join("\n") +
-                # Below the list and on the left, which is where a post's own
-                # "back" link has always sat. A way out belongs at the end of
-                # the thing you are reading, not above it.
-                %(\n<nav class="pagination back" aria-label="#{h(t('pagination.nav_label'))}">) +
-                %(<a href="#{ARCHIVE_PATH}">#{h(t('archive.back'))}</a></nav>),
-                title: "#{t('archive.year_title', year: year)} – #{SITE_SHORT_NAME}",
-                description: t('archive.year_description', year: year, site_title: SITE_TITLE),
-                path: loc("/archive/#{year}/")))
-  end
-end
+# The map of the archive and a page per year (build/archive.rb).
+Archive.write(posts)
 
 # posts is sorted newest-first, so splitting into "first N" / "the rest" is
 # also the split into recent / archive -- no further sorting needed.

@@ -533,8 +533,15 @@ file each -- `build/blocks.rb` (a content block becomes HTML),
 `build/output.rb` (writing, pruning, and getting a file into
 `public.nosync`), `build/feeds.rb` (RSS, Atom, JSON Feed, sitemap),
 `build/discovery.rb` (the search index and what feeds it),
-`build/cards.rb` (link and social cards) and `lib/series.rb` (what a
-series is and what order its parts go in, which the CLI needs too).
+`build/cards.rb` (link and social cards), `build/languages.rb` (which
+language a run renders, where its reader is sent, and the checks a
+language configuration has to pass), `build/tags.rb` (the tag pages and
+the index of them), `build/archive.rb` (the archive map and a page per
+year) and `lib/series.rb` (what a series is and what order its parts go
+in, which the CLI needs too). The phases in `tags.rb` and `archive.rb`
+are functions with their inputs spelled out -- the posts, the tag map --
+called from the point in the pass where they always ran, so the pages
+are written in the order they always were.
 
 ⚠️ Moving a method out of `build_blog.rb` is not a free refactor: the
 templates in `templates/` are rendered against the script's own binding,
