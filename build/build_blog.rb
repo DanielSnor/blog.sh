@@ -35,6 +35,7 @@ require_relative 'feeds'
 require_relative 'output'
 require_relative 'discovery'
 require_relative 'cards'
+require_relative 'languages'
 require_relative '../lib/series'
 require_relative '../lib/on_this_day'
 
@@ -295,277 +296,26 @@ LANG_ROOT = SITE_LANG == SITE_OWN_LANG ? '' : "/#{SITE_LANG}"
 CONTENT_ROOT = LANG_ROOT.empty? ? PUBLIC_DIR : File.join(PUBLIC_DIR, SITE_LANG)
 SHARED_ROOTS = %w[/assets/ /write/].freeze
 
-# An address inside this run's language.
+# Everything about languages -- addresses inside this run's language, the
+# stand-in for a missing text, the sweep's share of the tree, alternates,
+# the switcher and the checks a language configuration has to pass --
+# lives in build/languages.rb. The templates call two of its answers by
+# name, so those two keep a name here.
 def loc(path)
-  return path if LANG_ROOT.empty?
-
-  text = path.to_s
-  return text unless text.start_with?('/')
-  return text if SHARED_ROOTS.any? { |root| text.start_with?(root) }
-
-  "#{LANG_ROOT}#{text}"
+  Languages.loc(path)
 end
 
-# Whether this run has a text of its own for the post. In the site's own
-# language always: that text IS the post.
-def translated_here?(post)
-  LANG_ROOT.empty? || Translations.languages(post).include?(SITE_LANG)
-end
-
-# Where a link to the post goes from a page of this language. A post with
-# no text here keeps the one address it has, and gets no page of its own:
-# the same words standing at two addresses is what would otherwise need a
-# canonical, and what hreflang must never be told about (Daniel, 20. 9.
-# 2026 -- the listing carries it, the link goes where the piece really is).
 def post_href(post)
-  lang = stand_in_lang(post)
-  "#{lang_root_for(lang)}#{address_of(post, lang)}"
+  Languages.post_href(post)
 end
 
-# Which languages this site publishes, the site's own first. Absent -- and
-# it is absent on every site today -- means one, and then nothing below
-# renders at all: no switcher and no alternates, because there is nothing
-# to offer and nothing to compare.
-SITE_LOCALES = begin
-  named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
-  all = ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq
-  # 🪤 A code with no locale file used to be met far from here, in the
-  # language switcher, where `I18n.load_locale` aborts -- and it aborts
-  # with SystemExit, which the rescue there does not catch. So a typo in
-  # `site.locales` stopped the build of EVERY language, including the
-  # site's own, with a sentence telling the reader to change `site.lang`.
-  # A language the engine has no words for is refused -- unless the site
-  # says where to borrow them from, which is what `site.ui_language` is
-  # for. Publishing Slovak with Czech furniture is a decision somebody can
-  # make; inheriting English by accident is not.
-  missing = all.reject do |code|
-    I18n.locale_file?(code) || I18n.locale_file?(SiteConfig.language_data(code)['ui_language'].to_s)
-  end
-  abort(I18n.t('build.unknown_locale', langs: missing.join(', '))) unless missing.empty?
+# Which languages this site publishes, the site's own first -- checked
+# before a single page is written, and aborting on a configuration no
+# run could render (Languages.site_locales says which, and why).
+SITE_LOCALES = Languages.site_locales
 
-  # What a language says about itself lives in config/site.<lang>.yml, and
-  # three things about that are worth stopping for rather than ignoring.
-  #
-  # A table keyed by language inside site.yml is the shape these keys had
-  # before 1.9 shipped: two places to say one thing is how a site ends up
-  # with two answers, so the old one is refused by name rather than read.
-  %w[fallback ui_language].each do |key|
-    next unless SiteConfig.key?('site', key)
-
-    abort(I18n.t('build.language_key_moved', key: key, file: File.basename(SiteConfig.language_path('cs'))))
-  end
-  # A file for a language nothing publishes -- a typo in the name, or a
-  # language taken out of site.locales and its file left behind. Nothing
-  # would ever read it, and a file that does nothing looks like work done.
-  stray = SiteConfig.language_files.keys - (all - [SITE_OWN_LANG])
-  unless stray.empty?
-    abort(I18n.t('build.language_file_stray', files: stray.map { |code| "site.#{code}.yml" }.join(', ')))
-  end
-  # ...and what is wrong inside one (lib/language_file.rb): a key the
-  # engine does not read, a translation of something site.yml does not
-  # have, and a menu or footer list that goes to other places than the
-  # site's own. Each of them silently does nothing, or does something the
-  # site never said -- so every language is asked, not only this run's.
-  #
-  # Read against the file as WRITTEN: by now this run's own config has the
-  # chrome of its language laid over it, and comparing a Czech menu with
-  # itself would find nothing.
-  own_config = SiteConfig.load_yaml(SiteConfig::PATH)
-  sentences = (all - [SITE_OWN_LANG]).flat_map do |code|
-    file = "site.#{code}.yml"
-    LanguageFile.problems(own_config, SiteConfig.language_data(code)).group_by(&:first).flat_map do |kind, found|
-      case kind
-      when :unknown
-        [I18n.t('build.language_key_unknown', file: file, keys: found.map { |f| f[1] }.join(', '),
-                                              known: LanguageFile.known.join(', '))]
-      when :orphan
-        [I18n.t('build.language_key_orphan', file: file, keys: found.map { |f| f[1] }.join(', '))]
-      when :empty
-        [I18n.t('build.language_label_empty', file: file, keys: found.map { |f| f[1] }.join(', '))]
-      else
-        found.map do |_, key, detail|
-          I18n.t('build.language_list_mismatch', file: file, key: key,
-                                                 detail: LanguageFile.describe(detail, file) { |k, **v| I18n.t(k, **v) })
-        end
-      end
-    end
-  end
-  abort(sentences.join("\n")) unless sentences.empty?
-  all.freeze
-end
-
-# Which part of the tree this run's sweep owns.
-#
-# The sweep takes down whatever the build did not write, and two languages
-# are two runs -- so without this the second one carries off the first
-# one's site. A run in another language owns its own root and nothing else;
-# the site's own run owns the tree except the roots that belong to the
-# other languages. Everything else about the sweep is unchanged: an orphan
-# inside a language still goes on the next build OF THAT LANGUAGE.
-def prune_root
-  LANG_ROOT.empty? ? PUBLIC_DIR : CONTENT_ROOT
-end
-
-def foreign_language_roots
-  @foreign_language_roots ||= (SITE_LOCALES - [SITE_LANG]).reject { |lang| lang == SITE_OWN_LANG }
-                                                          .map { |lang| File.join(PUBLIC_DIR, lang) }
-end
-
-def outside_this_language?(path)
-  foreign_language_roots.any? { |root| path == root || path.start_with?("#{root}/") }
-end
-
-# What stands in for this language when a post has nothing in it, nearest
-# first. Only languages the site actually publishes, and never this one:
-# a chain that named a language nobody builds would point readers at a
-# tree that does not exist.
-#
-# 🪤 The site's own language is where every chain ENDS, so it never starts
-# one: a table written symmetrically (`cs: [de]` next to `de: [cs]`) reads
-# as the obvious thing to write and used to take the site apart, because
-# the run that builds the root then rendered the other language's words at
-# the other language's address -- and the permalink every link in the world
-# points at was gone.
-FALLBACK_CHAIN = begin
-  named = LANG_ROOT.empty? ? [] : Array(SiteConfig.language_data(SITE_LANG)['fallback'])
-  (named.map { |code| code.to_s.strip } & SITE_LOCALES) - [SITE_LANG]
-end.freeze
-
-# Which language a post is SHOWN in here: its own words when it has them,
-# then the chain, and the site's own language at the end of it. The words
-# and the address come from this one answer together -- Czech words under
-# a link to the English page is worse than either of them alone.
-def stand_in_lang(post)
-  return SITE_LANG if LANG_ROOT.empty?
-
-  written = Translations.languages(post)
-  return SITE_LANG if written.include?(SITE_LANG)
-
-  FALLBACK_CHAIN.find { |lang| written.include?(lang) } || SITE_OWN_LANG
-end
-
-def lang_root_for(lang)
-  lang.to_s == SITE_OWN_LANG ? '' : "/#{lang}"
-end
-
-# The address without this run's language on it, so another one can be put
-# there instead.
-def bare_path(path)
-  return path.to_s if LANG_ROOT.empty?
-
-  text = path.to_s
-  text.start_with?("#{LANG_ROOT}/") ? text.delete_prefix(LANG_ROOT) : text
-end
-
-# Every language this page can be offered in, and where each one goes.
-#
-# 🪤 For a POST the answer comes from the post, never from rewriting the
-# address: a language it has no words in has no page, so the offer leads to
-# that language's front page instead of a 404 -- and `has` is false, which
-# is what keeps it out of the alternates below. Listings, tags, the archive
-# and the feed are built in every language and carry no per-language name,
-# so for those the language on the address is simply swapped.
-def language_links(path, post: nil)
-  return [] if SITE_LOCALES.length < 2
-
-  bare = bare_path(path)
-  SITE_LOCALES.map do |lang|
-    root = lang_root_for(lang)
-    has = post.nil? || lang == SITE_OWN_LANG || Translations.languages(post).include?(lang)
-    href = if !has
-             "#{root}/"
-           elsif post
-             # 🪤 Asked of the POST, never worked out from the address being
-             # read: the other language serves it under a slug of its own
-             # (lib/translations.rb), so rewriting this one would offer an
-             # address in the right language and the wrong words.
-             "#{root}#{address_of(post, lang)}"
-           else
-             bare == '/' ? "#{root}/" : "#{root}#{bare}"
-           end
-    { 'lang' => lang, 'href' => href, 'has' => has }
-  end
-end
-
-# A post's address in one language, without the language on it. The post's
-# own language answers with the post's own slug, which is what a post that
-# was never translated has everywhere.
-def address_of(post, lang)
-  entry = post['translations'].is_a?(Hash) ? post['translations'][lang.to_s] : nil
-  named = entry.is_a?(Hash) ? entry[Translations::ADDRESS_KEY].to_s.strip : ''
-  PostAddress.path(post.merge('address_slug' => (named.empty? ? post['slug'] : named)),
-                   year: post_time(post).year)
-end
-
-# What a crawler is told about the other languages of THIS page -- built
-# from the ones that exist, never from the list of languages the site
-# publishes. A site that promises an address it never wrote is a site that
-# sends readers to its own 404.
-def alternates_head(links)
-  offered = links.select { |link| link['has'] }
-  return '' if offered.length < 2
-
-  rows = offered.map do |link|
-    %(\n  <link rel="alternate" hreflang="#{h(link['lang'])}" href="#{h(SITE_BASE_URL + link['href'])}">)
-  end
-  own = offered.find { |link| link['lang'] == SITE_OWN_LANG }
-  rows << %(\n  <link rel="alternate" hreflang="x-default" href="#{h(SITE_BASE_URL + own['href'])}">) if own
-  rows.join
-end
-
-# A language's name in its own language, which is the only name a reader
-# looking for it can recognise: somebody who reads German is looking for
-# "Deutsch", not for "nemecky".
-LANGUAGE_NAMES = Hash.new do |cache, code|
-  # Only for a language that has a file: `I18n.load_locale` aborts on one
-  # that has none, and an abort is a SystemExit that no `rescue` here
-  # would catch. SITE_LOCALES refuses those long before this runs.
-  cache[code] = begin
-    I18n.locale_file?(code) ? I18n.load_locale(code.to_s)['language_name'].to_s : ''
-  rescue StandardError
-    ''
-  end
-end
-
-# A language's name, or its code when the engine has no name for it.
-def language_label(code)
-  name = LANGUAGE_NAMES[code]
-  name.empty? ? code.to_s.upcase : name
-end
-
-# The chip in the banner's corner, and it works the way the button beside
-# it works: ONE target, and a click anywhere on it moves you on. The
-# button cycles light → dark → system; this cycles to the next language
-# the site publishes and wraps around at the end.
-#
-# 🪤 It was a row of separate links at first, which looked the same and
-# behaved differently -- a reader had to hit two letters rather than the
-# chip (Daniel, 21. 9. 2026: "ne abych se musel trefovat"). Two controls
-# side by side that take a click differently are one control too many.
-#
-# The face still shows every language it publishes, with the one being
-# read marked, because that is what says where you are; what changed is
-# that the whole chip, not the code inside it, is the thing you click.
-def language_switcher_html(links)
-  return '' if links.length < 2
-
-  here = links.index { |link| link['lang'] == SITE_LANG } || 0
-  nxt = links[(here + 1) % links.length]
-  items = links.map do |link|
-    classes = ['lang-switch__item']
-    classes << 'is-current' if link['lang'] == SITE_LANG
-    classes << 'is-elsewhere' unless link['has']
-    current = link['lang'] == SITE_LANG ? ' aria-current="true"' : ''
-    %(<span class="#{classes.join(' ')}"#{current}>#{h(link['lang'].to_s.upcase)}</span>)
-  end
-  # The name of the language the click LEADS TO -- a label saying "English"
-  # on a control that takes you to Czech is the one thing worse than no
-  # label at all. The same division the button keeps: codes on the face,
-  # the sentence in the title and to a screen reader.
-  name = language_label(nxt['lang'])
-  %(<a class="lang-switch" href="#{h(nxt['href'])}" hreflang="#{h(nxt['lang'])}" ) +
-    %(title="#{h(name)}" aria-label="#{h(name)}">#{items.join}</a>)
-end
+# What stands in for this run's language when a post has nothing in it.
+FALLBACK_CHAIN = Languages.fallback_chain
 
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
@@ -2269,7 +2019,7 @@ end
 # again further down.
 def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website',
            extra_head: '', frame_origins: [], comment_origins: [], body_class: nil, post: nil)
-  links = language_links(path, post: post)
+  links = Languages.language_links(path, post: post)
   LAYOUT.result_with_hash(
     # Pre-rendered as the whole attribute, so a page without one keeps a bare
     # <body> rather than an empty class="" on every page of every site.
@@ -2281,8 +2031,8 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     nav_active: nav_active_for(path),
     og_image: image,
     og_type: og_type,
-    extra_head: alternates_head(links) + extra_head,
-    lang_switcher: language_switcher_html(links),
+    extra_head: Languages.alternates_head(links) + extra_head,
+    lang_switcher: Languages.language_switcher_html(links),
     # The players a page carries decide its frame-src, so the policy is
     # computed here rather than widened for the whole site (csp_content).
     page_frame_origins: frame_origins,
@@ -2767,7 +2517,7 @@ collisions = {}
 # counting it stopped the whole language dead on a collision that does not
 # exist, with `check` calling the archive sound because it asks the same
 # question of the posts that are really built.
-posts.select { |p| translated_here?(p) }.each do |p|
+posts.select { |p| Languages.translated_here?(p) }.each do |p|
   PostAddress.collision_keys(p, year: post_time(p).year).each { |key| (collisions[key] ||= []) << p }
 end
 duplicates = collisions.select { |_, v| v.size > 1 }
@@ -3042,7 +2792,7 @@ end
 # partitioned off, so all three lists are asked. Not drafts: one is served
 # under a token, and a menu item pointing into a token is not a menu item.
 NAV_POSTS_BY_ADDRESS = (pages + posts + unlisted_posts)
-                       .to_h { |p| [address_of(p, SITE_OWN_LANG), p] }.freeze
+                       .to_h { |p| [Languages.address_of(p, SITE_OWN_LANG), p] }.freeze
 NAV_ITEMS = (configured_nav_items || ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
@@ -3269,7 +3019,7 @@ end
   # Nothing of a post this language has no words for: no page, and no copy
   # of its media either -- both belong to the address it does have, which
   # is where every link to it from this language points.
-  next unless translated_here?(post)
+  next unless Languages.translated_here?(post)
 
   year = post_time(post).year
   dir = output_dir(post)
@@ -4123,8 +3873,8 @@ end
 # do read had no Czech address in it at all.
 SITEMAP_LANGUAGES = SITE_LOCALES.map do |lang|
   { 'lang' => lang,
-    'root' => lang_root_for(lang),
-    'address' => ->(entry) { address_of(entry, lang) },
+    'root' => Languages.lang_root_for(lang),
+    'address' => ->(entry) { Languages.address_of(entry, lang) },
     # A post has a page in a language when it has WORDS there; the site's
     # own language is where every post always has them.
     'has' => ->(entry) { lang == SITE_OWN_LANG || Translations.languages(entry).include?(lang) } }
@@ -4272,7 +4022,7 @@ puts
 # The posts this run gave a page of their own: on a language's branch that
 # is the translated ones, not every post its listings show -- "posts: 6642"
 # over /en/ with one post translated read as 6642 English pages.
-puts t('build.summary', posts: posts.count { |post| translated_here?(post) }, pages: page_count,
+puts t('build.summary', posts: posts.count { |post| Languages.translated_here?(post) }, pages: page_count,
                         dir: CONTENT_ROOT, tags: tags_map.size)
 # Said out loud, because a cache nobody can see is a cache nobody can
 # check. When a build takes longer than it should, this line is the first
