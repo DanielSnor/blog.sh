@@ -1050,7 +1050,9 @@ WIDGETS = {
   # username" on a site pointed at Codeberg.
   'commits' => %w[username instance limit],
   'bluesky' => %w[limit],
-  'rss' => %w[feed_url limit]
+  'rss' => %w[feed_url limit],
+  # Nothing to ask but the heading: the card reads the site's own archive.
+  'on_this_day' => []
 }.freeze
 
 def section_widgets
@@ -1115,6 +1117,10 @@ def configure_widget(name)
   elsif heading == engine && written
     site.deactivate(['widgets', name, 'heading'])
   end
+  # A card with nothing else to set up exists by its name alone. Without
+  # this, keeping the engine's heading wrote nothing at all, and the card
+  # the wizard had just said was set up never appeared.
+  site.switch_on(['widgets', name]) if WIDGETS[name].empty? && !(heading && heading != engine)
 
   WIDGETS[name].each do |key|
     value = Wizard.ask_valid(t("q_widget_#{key}"),

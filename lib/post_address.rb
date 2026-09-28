@@ -170,10 +170,14 @@ module PostAddress
   }.freeze
   # Written only by cron -- the widget files by lib/sidebar.rb, comments.json
   # by scripts/refresh_sidebar.rb while moderation is on (the build merely
-  # keeps it from being pruned) -- into the same root.
+  # keeps it from being pruned) -- into the same root. on-this-day.json is
+  # the one of them that exists once per LANGUAGE (lib/on_this_day.rb): its
+  # titles and addresses are the language's own, so it lands in the root of
+  # every language tree rather than only in the site root.
   CRON_FILES = {
     pixelfed: 'pixelfed.json', toots: 'toots.json', commits: 'commits.json',
-    bluesky: 'bluesky.json', rss: 'rss.json', comments: 'comments.json'
+    bluesky: 'bluesky.json', rss: 'rss.json', comments: 'comments.json',
+    on_this_day: 'on-this-day.json'
   }.freeze
   # Every language this installation has a locale file for is a root the
   # build may write: a site published in more than one renders each into

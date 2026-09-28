@@ -13,6 +13,9 @@ env.sh
 # always safe to delete -- it belongs no more in the repo than the deploy
 # manifest beside it does.
 .build_cache*.json
+# The on-this-day catalogues each build leaves for the cron (lib/on_this_day.rb):
+# per-machine, rewritten by every build, like the cache above.
+.on-this-day*.json
 .deploy-pending
 # The scheduler's heartbeat -- one line, rewritten every fifteen minutes.
 .last-scheduled-run

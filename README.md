@@ -272,6 +272,8 @@ says what you are running.
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                # writes the whole archive out as a tree of markdown files
 ./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources
+./blog.sh on-this-day [--date MM-DD] [--json]
+                               # what this day holds from earlier years, and what the on_this_day card shows of it
 ./blog.sh version              # which version this installation is running
 ./blog.sh help
 ```
@@ -377,7 +379,9 @@ The sidebar widgets and per-post stats are refreshed by
 `scripts/refresh-sidebar.sh` -- it fetches the data, rewrites only the
 JSON files (six at most: toots, Pixelfed, commits, Bluesky, RSS, stats)
 and uploads just the ones the site's configured widgets produce, no site
-rebuild. Run it from cron wherever the site is built:
+rebuild. With the `on_this_day` card it also turns the day over: that
+card's file changes once a day, and this is the job that runs after
+midnight. Run it from cron wherever the site is built:
 
 ```
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh

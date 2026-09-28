@@ -198,6 +198,9 @@ ui:
 # read locales/*.yml directly since it runs in the browser, not at build time.
 js:
   date_locale: "en-US"
+  on_this_day_ago_one: "a year ago"
+  on_this_day_ago_other: "%{n} years ago"
+  on_this_day_all: "Everything from this day (%{count})"
   stats_favourited: "Favourited"
   stats_boosted: "Boosted"
   stats_comments: "Comments"
@@ -662,6 +665,8 @@ cli:
       ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                      writes the whole archive out as a tree of markdown files (default tmp/export)
       ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from
+      ./blog.sh on-this-day [--date MM-DD] [--json]
+                                     what this day holds from earlier years, and what the widget shows of it
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard
@@ -853,6 +858,7 @@ cron:
   sidebar_empty_pass: "⚠️  The full pass fetched nothing at all, so it is not recorded as done -- the next run will try again instead of waiting a week."
   sidebar_stats_full: "stats.json: %{updated} post(s) updated (%{total} total) [full refresh]"
   sidebar_stats_recent: "stats.json: %{updated} post(s) updated (%{total} total) [last ~90 days only]"
+  on_this_day: "%{file}: %{count} post(s) from earlier years on this day"
   sidebar_comments_removed: "comments.json: removed (comments.approval is off)"
   sidebar_comments: "comments.json: %{threads} thread(s) updated, %{comments} approved comment(s) total"
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
@@ -1203,7 +1209,7 @@ doctor:
   map_shape: "`%{key}` is not a section of settings."
   map_shape_fix: "This key holds settings written as `name: value` lines indented under it. A key with nothing under it means none of them, which is allowed."
   widget_unknown: "The sidebar has no card called %{name}."
-  widget_unknown_fix: "The cards are toots, pixelfed, commits, bluesky and rss. A name outside that list is drawn by nothing -- and if it is the only widget written down, the column disappears from every page."
+  widget_unknown_fix: "The cards are toots, pixelfed, commits, bluesky, rss and on_this_day. A name outside that list is drawn by nothing -- and if it is the only widget written down, the column disappears from every page."
   nav_item_shape: "Menu item %{index} has no label, or nowhere to go."
   nav_item_shape_fix: "Each item takes a `label` plus either a `tag` (a tag slug) or a `url`. An item missing either half is skipped rather than drawn empty."
   sidebar_ok: "Sidebar: %{count} card(s)."
@@ -1468,6 +1474,18 @@ stats:
   tags_line: "%{unique} different, %{per_post} per post"
   media_line: "%{files} file(s), %{size}, across %{posts} post(s)"
   media_referenced_line: "%{referenced} file(s) the posts ask for, across %{posts} post(s) -- media.nosync is not here"
+
+on_this_day:
+  unknown_option: "Unknown option: %{option}. on-this-day takes --date and --json, nothing else."
+  bad_date: "%{value} is not a date -- write it as MM-DD or YYYY-MM-DD."
+  no_posts: "There is nothing in the archive yet."
+  heading: "On this day: %{date}"
+  summary: "%{posts} post(s) from %{years} earlier year(s)"
+  nothing: "Nothing from earlier years on this day -- the widget hides itself today."
+  windows: "What the widget shows (%{count} window(s)):"
+  all_heading: "Everything from this day"
+  legend: "● on the widget today"
+  widget_off: "The on_this_day widget is not switched on -- write it under widgets: in config/site.yml, or switch it on in ./style.sh."
 
 export:
   heading: "Writing this archive out to %{path}"
@@ -1744,6 +1762,7 @@ style:
   widget_commits: "Recent commits from a GitHub, Gitea or Forgejo account"
   widget_bluesky: "Recent posts from a Bluesky account"
   widget_rss: "Anything with an RSS or Atom feed"
+  widget_on_this_day: "Your own posts from this day in earlier years"
   q_widget_heading: "Heading over the widget"
   q_widget_account_id: "Account id"
   h_widget_account_id: "The id, not the @handle -- a number on Mastodon, a ULID on GoToSocial. ./setup.sh finds it when the token is filled in. By hand: open https://your-instance/api/v1/accounts/lookup?acct=yourname and copy \"id\"."
@@ -1888,3 +1907,4 @@ chrome:
   widget_commits: "Recent commits"
   widget_bluesky: "Recent Bluesky posts"
   widget_rss: "Elsewhere"
+  widget_on_this_day: "On this day"

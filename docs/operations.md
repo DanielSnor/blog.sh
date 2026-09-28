@@ -1561,6 +1561,62 @@ each line is there:
 `--json` prints the same figures unlocalized and unrounded, so the
 numbers can go into a post, a cron job or a graph.
 
+## On this day
+
+```bash
+./blog.sh on-this-day                    # today: every post from earlier years, and what the card shows
+./blog.sh on-this-day --date 12-24       # another day of this year
+./blog.sh on-this-day --date 2030-12-24  # ...or of another year, ages counted from then
+./blog.sh on-this-day --json             # the same, as data
+```
+
+The same selection feeds a sidebar card, switched on by its name alone:
+
+```yaml
+widgets:
+  on_this_day:
+    # heading: "On this day"    # optional -- the engine says it in every language
+```
+
+(or in `./style.sh`, under the sidebar). The card reads the site's own
+archive, so there is no account to give and nothing to fetch. What it
+shows, and why each rule is there:
+
+- **Only the day itself.** A post from an earlier year on today's date,
+  in the site's time zone. A day with nothing from an earlier year hides
+  the card, heading and all -- there is no "this week" fallback, which on
+  a small archive showed one post seven days running. A post written on
+  29 February is remembered on the 28th in the years without the day.
+- **One row per year, five at most.** Round anniversaries (5, 10, 15, 20
+  years...) always get a row. The rest are spread along the years with
+  today counted as taken, so the older a year is, the stronger its
+  claim -- "a year ago" appears when there is too little older to fill
+  the card, not every day.
+- **A titled post stands for its year**, the longest first; an untitled
+  one only when the year has nothing titled that day. Titles decide
+  inside a year and never between years: on an archive grown from
+  several platforms they mark where a post came from, not how good it
+  is.
+- **The day rotates.** One window for every five posts the day has,
+  three at most, dividing the day evenly by the clock (0-12-24,
+  0-8-16-24). Anniversaries stay; the other rows go first to years the
+  day has not shown yet, and a year shown again brings its next post.
+  Under the rows, the rest of the day folds away in a list.
+
+Drafts, pages and unlisted posts never take part. The rule has no
+settings: it behaves the same on a hundred posts as on thirteen
+thousand, because what it depends on is how many years an archive
+spans and how many posts one year has on one day.
+
+The card's file (`on-this-day.json`, in the root of every language's
+tree) is written by every build, and turned over after midnight by
+the sidebar cron below -- which is why a site with the card wants that
+cron even with no other widget. The cron chooses from a catalogue each
+build leaves beside the build cache (`.on-this-day.<lang>.json`), so it
+never needs to know what a translation is; a file from another day has
+no window for the page's clock and hides the card rather than show
+yesterday as today.
+
 ## Letting a reader pass a post on
 
 The old way to do this was a row of buttons for Facebook, Twitter and
@@ -1832,6 +1888,11 @@ network hiccup never blanks the sidebar. Systems without cron: a
 systemd timer or launchd job invoking the same script does the same
 thing. No widgets configured = no cron needed.
 
+The `on_this_day` card (see [On this day](#on-this-day)) fetches nothing,
+but its day turns over only here: its file is rewritten when the date
+changes and left alone on every other tick, in the site root and in
+every language tree.
+
 **With `comments.approval: fav` this job stops being optional.** It is
 what reads which replies you favourited and writes `comments.json`, so
 without it a newly starred comment never reaches the site -- the pages
@@ -1924,7 +1985,9 @@ Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
 reference; losing it costs one deploy with the growth guard standing down,
 and it is rewritten by that same run), `incoming/` (transient staging),
 `.build_cache*.json` (what the last build wrote, so the next one can skip
-re-making it -- per-machine, and deleting it costs one full build), and
+re-making it -- per-machine, and deleting it costs one full build),
+`.on-this-day.*.json` (the on-this-day catalogues, rewritten by every
+build), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still

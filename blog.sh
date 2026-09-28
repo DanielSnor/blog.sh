@@ -17,6 +17,7 @@
 #   ./blog.sh check [--online] [--json] [--repair]
 #   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
 #   ./blog.sh stats [--json]
+#   ./blog.sh on-this-day [--date MM-DD] [--json]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -101,6 +102,12 @@ case "${1:-}" in
   stats)
     shift
     exec ruby scripts/stats.rb "$@"
+    ;;
+  # Reads the archive on disk like stats, for the same reasons: no env.sh,
+  # no network, and --json for whatever reads it next.
+  on-this-day)
+    shift
+    exec ruby scripts/on_this_day.rb "$@"
     ;;
 esac
 

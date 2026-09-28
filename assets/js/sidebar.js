@@ -63,7 +63,68 @@
     }
   ];
 
+// On this day (lib/on_this_day.rb). Not one of the list above: its file
+// is this LANGUAGE's (the card names it in data-src), and what it holds is
+// a whole day cut into windows -- the card shows the one the clock is in.
+// A file from another day has no window for now, so a cron that stopped
+// turning the day over hides the card rather than showing yesterday as
+// today. Titles and addresses are escaped like every other foreign string
+// here, even though the build wrote them: a title is whatever the author
+// typed, and that includes a "<".
+var i18n = window.BLOG_I18N || {};
+
+function yearsAgo(n) {
+  var one = i18n.on_this_day_ago_one || 'a year ago';
+  var other = i18n.on_this_day_ago_other || '%{n} years ago';
+  return n === 1 ? one : other.replace('%{n}', String(n));
+}
+
+function dayRow(it) {
+  return (
+    '<div class="last">' +
+      '<div class="last-date">' + esc(yearsAgo(it.ago)) + ' · ' + esc(String(it.year)) + '</div>' +
+      '<div class="last-content"><p><a href="' + esc(it.url) + '">' + esc(it.title) + '</a></p></div>' +
+    '</div>'
+  );
+}
+
+function wholeDay(all) {
+  var label = (i18n.on_this_day_all || 'Everything from this day (%{count})').replace('%{count}', String(all.length));
+  return (
+    '<details class="on-this-day-all"><summary>' + esc(label) + '</summary><ul>' +
+      all.map(function (it) {
+        return '<li><span class="last-date">' + esc(String(it.year)) + '</span> ' +
+               '<a href="' + esc(it.url) + '">' + esc(it.title) + '</a></li>';
+      }).join('') +
+    '</ul></details>'
+  );
+}
+
+function onThisDay() {
+  var box = document.getElementById('on-this-day');
+  if (!box) return; // the site has not switched the card on
+
+  var card = box.closest('.card');
+  fetch(box.getAttribute('data-src') || '/on-this-day.json')
+    .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
+    .then(function (data) {
+      var now = Date.now();
+      var current = ((data && data.windows) || []).filter(function (w) {
+        return Date.parse(w.from) <= now && now < Date.parse(w.to);
+      })[0];
+      if (!current || !current.rows || !current.rows.length) return Promise.reject('nothing today');
+      var all = data.all || [];
+      box.innerHTML = current.rows.map(dayRow).join('') +
+                      (all.length > current.rows.length ? wholeDay(all) : '');
+      return null;
+    })
+    .catch(function () {
+      if (card) card.style.display = 'none';
+    });
+}
+
   document.addEventListener('DOMContentLoaded', function () {
+    onThisDay();
     WIDGETS.forEach(function (widget) {
       var container = document.getElementById(widget.id);
       if (!container) return; // widget not configured for this site -- its card wasn't rendered at all

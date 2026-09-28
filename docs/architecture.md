@@ -497,6 +497,35 @@ sizes, and the build's own 200-words-per-minute constant for reading
 time -- two places telling a reader how long something takes must not
 disagree.
 
+## On this day (`lib/on_this_day.rb`)
+
+One module decides which posts from earlier years stand on a date and
+which of them the card shows; the command (`scripts/on_this_day.rb`),
+the build and the cron all call it, so what the author sees in the
+terminal is what a reader gets. It is data in, data out: entries (day,
+year, time, titled, word count, plus whatever the caller carries) and a
+date go in, windows of rows come out. It never reads the config and
+never decides a language.
+
+The split between build and cron is the part worth knowing. What a post
+is called and where it lives depends on the language -- a translation's
+own title and address, a fallback's, the site's -- and only the build
+knows that. The day, on the other hand, changes at midnight, when only
+the cron runs. So every build run writes a catalogue for its language
+beside the build cache (`.on-this-day.<lang>.json`: every listed post
+with its selection facts, its title and its address in that language,
+and the tree it belongs to), plus today's file; the cron re-chooses
+from the catalogues and rewrites a file only when its content changed.
+A build with the card off removes its catalogue, and the run that owns
+the site root removes catalogues of languages the site stopped
+publishing -- otherwise the cron would keep writing a tree nobody
+builds.
+
+The page's file carries every window with its start and end in UTC, and
+`sidebar.js` shows the one the clock is in. That is also the staleness
+check: yesterday's file has no window for now, so a stopped cron hides
+the card instead of showing the wrong day.
+
 ## Build pipeline (`build/build_blog.rb`)
 
 The script is the pass itself; the domains it calls live beside it, one
@@ -812,7 +841,7 @@ wrote. Then, in load order:
   wholesale.
 - **Widgets** (`sidebar.js`) read same-origin JSON (`toots.json`,
   `bluesky.json`, `pixelfed.json`, `commits.json`, `rss.json`,
-  `stats.json`) that
+  `stats.json`, and each language tree's `on-this-day.json`) that
   **cron** (`scripts/refresh_sidebar.rb`) fetched server-side -- the
   visitor's browser never contacts GitHub, the Fediverse or Bluesky for
   them. A failed cron fetch keeps the previous JSON rather than

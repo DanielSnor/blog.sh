@@ -57,9 +57,25 @@ module LanguageFile
     %w[footer links] => ->(entry) { entry['url'].to_s.strip }
   }.freeze
 
-  module_function
+# Sidebar cards with nothing to set up but their name. Kept here rather
+# than beside SiteConfig::Chrome::CARDS because this file is required BY
+# site_config.rb and needs the same answer: a heading given for
+# `on_this_day:` written bare is a heading for a card the site has.
+BARE_CARDS = %w[on_this_day].freeze
 
-  # Every key a language file may carry, as the one-line list a refusal
+module_function
+
+# Whether the site's own config has this card at all, in any shape the
+# engine draws.
+def own_card?(data, name)
+  widgets = dig(data, 'widgets')
+  return false unless widgets.is_a?(Hash) && widgets.key?(name)
+
+  conf = widgets[name]
+  conf.is_a?(Hash) || (BARE_CARDS.include?(name) && (conf.nil? || conf == true))
+end
+
+# Every key a language file may carry, as the one-line list a refusal
   # names.
   def known
     SETTINGS + TEXTS.flat_map { |section, keys| keys.map { |key| "#{section}.#{key}" } } +
@@ -85,8 +101,9 @@ module LanguageFile
     merged[TAG_LABELS] = lang_data[TAG_LABELS] if lang_data[TAG_LABELS].is_a?(Hash)
     widgets = lang_data['widgets'].is_a?(Hash) ? lang_data['widgets'] : {}
     widgets.each do |name, conf|
-      next unless conf.is_a?(Hash) && dig(merged, 'widgets', name).is_a?(Hash)
+      next unless conf.is_a?(Hash) && own_card?(merged, name)
 
+      merged['widgets'][name] = {} unless merged['widgets'][name].is_a?(Hash)
       WIDGET_TEXTS.each { |key| merged['widgets'][name][key] = conf[key] if conf.key?(key) }
     end
     merged
@@ -134,7 +151,7 @@ module LanguageFile
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
         value.each do |name, conf|
-          next found << [:orphan, "widgets.#{name}", nil] unless dig(own, 'widgets', name).is_a?(Hash)
+          next found << [:orphan, "widgets.#{name}", nil] unless own_card?(own, name)
           next found << [:unknown, "widgets.#{name}", nil] unless conf.is_a?(Hash)
 
           conf.each_key { |sub| found << [:unknown, "widgets.#{name}.#{sub}", nil] unless WIDGET_TEXTS.include?(sub) }

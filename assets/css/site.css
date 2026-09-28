@@ -1407,6 +1407,16 @@ aside .card { margin-bottom: 1.5rem; }
   word-break: break-all;
   overflow-wrap: break-word;
 }
+/* On this day: the rest of the day, folded under the rows it chose. */
+.on-this-day-all {
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  font-size: 0.85rem;
+}
+.on-this-day-all summary { cursor: pointer; color: var(--meta-text); font-size: 0.75rem; }
+.on-this-day-all ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.on-this-day-all li { margin: 0.3rem 0; }
+.on-this-day-all a { word-break: break-word; }
 
 /* Sharing sits between the post and its comments: after the words, before
    the conversation about them. The button and the links have to be the

@@ -16,6 +16,18 @@ prints what an installation is running.
 Opened the morning 1.9 went out, so `version` does not claim a release nobody has cut. What
 goes in is still being decided; the suffix and the date both come off at the tag.
 
+### Added
+
+- **On this day.** A sidebar card with posts from this day in earlier years, switched on by
+  `on_this_day:` under `widgets:` (or in `./style.sh`). One row per year, five at most: round
+  anniversaries always, the rest spread along the years with the oldest claiming first, a titled
+  post standing for its year. A busy day rotates through up to three windows; a day with nothing
+  hides the card. No settings -- the same rule from a hundred posts to thirteen thousand.
+- **`./blog.sh on-this-day [--date MM-DD] [--json]`.** The same selection in the terminal: every
+  post of the day, and which of them the card shows in which window.
+- **The sidebar cron turns the day over.** A site with the card wants `refresh-sidebar.sh` in
+  cron even with no other widget; it rewrites the card's file once a day, per language.
+
 
 ## 1.9 -- 2026-09-28
 

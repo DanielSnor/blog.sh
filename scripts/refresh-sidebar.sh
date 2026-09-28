@@ -71,7 +71,14 @@ ruby scripts/refresh_sidebar.rb "$@" || code=$?
 # non-zero when any name is missing and `set -euo pipefail` then killed
 # the script here, leaving every site with fewer than all the widgets
 # regenerating its JSONs and silently never uploading them.
-only="pixelfed.json,toots.json,commits.json,bluesky.json,rss.json,stats.json,comments.json"
+only="pixelfed.json,toots.json,commits.json,bluesky.json,rss.json,stats.json,comments.json,on-this-day.json"
+# on-this-day.json exists once per language tree (lib/on_this_day.rb), so
+# it is named under every language the engine has words for. A language
+# the site does not publish is a name that is neither built nor on the
+# target -- passed over in silence, like an unconfigured widget above.
+for locale in locales/*.yml; do
+  only="$only,$(basename "$locale" .yml)/on-this-day.json"
+done
 
 # Nothing has ever been built here, so there is nothing to send and nothing
 # on the target to take down either -- a site that has not been deployed has

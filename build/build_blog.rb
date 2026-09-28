@@ -36,6 +36,7 @@ require_relative 'output'
 require_relative 'discovery'
 require_relative 'cards'
 require_relative '../lib/series'
+require_relative '../lib/on_this_day'
 
 # ⚠️ Before moving a method out of this file: the templates in templates/
 # are rendered against this script's binding, so every helper they call
@@ -636,6 +637,11 @@ SiteConfig::Chrome.complaint_sentences(SiteConfig.data,
 SIDEBAR_SHOWN = LAYOUT_SIDEBAR &&
                 (!ABOUT['html'].to_s.strip.empty? ||
                  SiteConfig::Chrome.widgets(SiteConfig.data).any?)
+# The on-this-day card is the one widget whose data is this language's
+# own -- titles and addresses in the language being rendered -- so it is
+# decided here once and read by the aside, the client strings and the
+# file written near the end of the run.
+ON_THIS_DAY = SIDEBAR_SHOWN && WIDGETS.key?('on_this_day')
 MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 # Computed once, here, because both halves it needs (the instance and the
 # social links) exist by this line and not before it.
@@ -675,7 +681,19 @@ def client_i18n_json
              lang_root: LANG_ROOT
            }
          end
-  root.merge(
+  # The on-this-day card's words only on a site that shows the card: this
+  # script is inline on every page, and three strings nobody reads would
+  # change the whole archive on the upgrade that introduced them.
+  card = if ON_THIS_DAY
+           {
+             on_this_day_ago_one: t('js.on_this_day_ago_one'),
+             on_this_day_ago_other: t('js.on_this_day_ago_other'),
+             on_this_day_all: t('js.on_this_day_all')
+           }
+         else
+           {}
+         end
+  root.merge(card).merge(
     date_locale: t('js.date_locale'),
     tags_sort_alpha: t('tags.sort_alpha'),
     tags_sort_count: t('tags.sort_count'),
@@ -4044,6 +4062,35 @@ end
 if LANG_ROOT.empty?
   Sidebar.write_all(PUBLIC_DIR).each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
 end
+
+# On this day (lib/on_this_day.rb). Unlike the files above it belongs to
+# a LANGUAGE: every run writes its own, into its own root, with the titles
+# and addresses a reader of that language is sent to -- a translation's
+# own, a fallback's, the site's.
+#
+# Two things are written. The catalogue, beside the build cache and never
+# published, is every listed post of this run with what the selection
+# needs and what a row shows; the cron (scripts/refresh_sidebar.rb) turns
+# the day over from it at midnight without having to know what a
+# translation is. And today's file, so a build leaves the card current
+# instead of waiting for the next tick.
+#
+# Off, the catalogue goes too: a cron that still found one would keep
+# writing a file the sweep takes down again on every build.
+ON_THIS_DAY_PATH = File.join(CONTENT_ROOT, OnThisDay::FILE)
+if ON_THIS_DAY
+  catalogue = posts.map do |post|
+    OnThisDay.entry(post, post_display_time(post), title: post_title_for(post), url: post_href(post))
+  end
+  OnThisDay.write_catalogue(ROOT, SITE_LANG, LANG_ROOT.delete_prefix('/'), catalogue)
+  PublicFile.write(ON_THIS_DAY_PATH, OnThisDay.reader_json(catalogue, Date.today))
+  WRITTEN[ON_THIS_DAY_PATH] = true
+else
+  OnThisDay.remove_catalogue(ROOT, SITE_LANG)
+end
+# The run that owns the site root also forgets the languages the site no
+# longer publishes -- nothing else would ever rebuild their catalogues.
+OnThisDay.prune_catalogues(ROOT, SITE_LOCALES) if LANG_ROOT.empty?
 
 # Stats for tooted posts are filled in by cron (scripts/refresh_sidebar.rb) --
 # the build just registers the file so prune doesn't delete it, and creates

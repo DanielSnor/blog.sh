@@ -44,7 +44,7 @@
 #   layout      (sidebar), (hero)
 #   nav         (the menu bar: label with tag or url -- or [] for none)
 #   about       (heading), html
-#   widgets     (toots, pixelfed, commits, bluesky, rss)
+#   widgets     (toots, pixelfed, commits, bluesky, rss, on_this_day)
 #   footer      (links_heading), links, note_heading, note_html, copyright,
 #               (social_heading)
 #   social      name, url, icon or icon_svg, (rel)
@@ -342,6 +342,12 @@ about:
 #     # podcast -- or X through a self-hosted Nitter instance.
 #     feed_url: "https://example.com/feed.xml"
 #     limit: 3
+#   # Posts from this day in earlier years, from the site's own archive --
+#   # no account, nothing to fetch. The name alone switches it on; a day
+#   # with nothing from an earlier year hides the card. See
+#   # `./blog.sh on-this-day` for what it shows today, and why.
+#   on_this_day:
+#     # heading: "On this day"
 # --- end of widgets ---
 
 # Three columns: links, a note with the copyright line, social icons.

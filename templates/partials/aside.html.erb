@@ -7,6 +7,11 @@
         <div class="card">
 <%= chrome_heading_line(site_heading(ABOUT, 'heading', 'about_heading'), indent: 10) %>          <div class="chrome-text"><%= config_html(ABOUT['html']) %></div>
         </div><% end %>
+<% if ON_THIS_DAY %>
+        <div class="card">
+<%= chrome_heading_line(widget_heading('on_this_day'), indent: 10) %>          <div id="on-this-day" data-src="<%= h(loc('/' + OnThisDay::FILE)) %>"></div>
+        </div>
+<% end %>
 <% if WIDGETS['toots'] %>
         <div class="card">
 <%= chrome_heading_line(widget_heading('toots'), indent: 10) %>          <div id="last-toots"></div>

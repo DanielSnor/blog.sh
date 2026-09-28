@@ -277,6 +277,7 @@ module ConfigWriter
       @original = read_or_seed
       @lines = @original.lines
       @intended = {}
+      @switched_on = []
     end
 
     # True once a set/activate/deactivate actually changed a byte. A
@@ -296,7 +297,24 @@ module ConfigWriter
     # before saving -- a wizard whose second visit to a section must
     # offer the value the first visit set, not the one still on disk.
     def intended
-      @intended.dup
+      found = @intended.dup
+      # A key switched on bare reads as nil -- unless this run has also given
+      # it something to hold, in which case that is what it will say.
+      @switched_on.each do |path|
+        found[path] = nil unless found.keys.any? { |key| key.size > path.size && key[0, path.size] == path }
+      end
+      found
+    end
+
+    # Turns on a key that is a whole setting by being there: a sidebar card
+    # with nothing to set up but its name (`on_this_day:`). The template keeps
+    # it commented like every other card, so this is activation and nothing
+    # more -- no value is written, and the file says `on_this_day:` with the
+    # card's commented heading under it, ready for somebody to fill in.
+    def switch_on(key_path)
+      resolve!(key_path)
+      @switched_on << key_path unless @switched_on.include?(key_path)
+      self
     end
 
     # The line where `key_path` is declared, active or commented, or nil.
@@ -565,6 +583,7 @@ module ConfigWriter
                     end
       end
       @intended.delete_if { |path, _| path[0, key_path.size] == key_path }
+      @switched_on.reject! { |path| path[0, key_path.size] == key_path }
       self
     end
 
@@ -973,6 +992,12 @@ module ConfigWriter
     # is what YAML gives back).
     def verify!
       data = YamlCompat.load_file(@path) || {}
+      @switched_on.each do |key_path|
+        parent = key_path[0..-2].reduce(data) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
+        next if parent.is_a?(Hash) && parent.key?(key_path.last)
+
+        raise "#{key_path.join('.')} is not switched on"
+      end
       @intended.each do |key_path, expected|
         actual = key_path.reduce(data) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
         # Sequences of mappings get their keys stringified before the

@@ -193,6 +193,9 @@ ui:
 
 js:
   date_locale: "cs-CZ"
+  on_this_day_ago_one: "před rokem"
+  on_this_day_ago_other: "před %{n} lety"
+  on_this_day_all: "Všechno z tohoto dne (%{count})"
   stats_favourited: "Oblíbeno"
   stats_boosted: "Boostnuto"
   stats_comments: "Komentářů"
@@ -641,6 +644,8 @@ cli:
       ./blog.sh export [<adresář>] [--no-drafts] [--dry-run] [--force]
                                      zapíše celý archiv jako strom markdownových souborů (výchozí tmp/export)
       ./blog.sh stats [--json]       spočítá archiv — příspěvky, roky, slova, štítky, média, odkud to je
+      ./blog.sh on-this-day [--date MM-DD] [--json]
+                                     co tenhle den skrývá z dřívějších let a co z toho ukáže widget
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
@@ -828,6 +833,7 @@ cron:
   sidebar_empty_pass: "⚠️  Úplný průchod nestáhl vůbec nic, takže se nezapisuje jako hotový — příští běh to zkusí znovu místo aby čekal týden."
   sidebar_stats_full: "stats.json: aktualizováno příspěvků: %{updated} (celkem %{total}) [úplný průchod]"
   sidebar_stats_recent: "stats.json: aktualizováno příspěvků: %{updated} (celkem %{total}) [jen posledních ~90 dní]"
+  on_this_day: "%{file}: příspěvků z dřívějších let na tento den: %{count}"
   sidebar_comments_removed: "comments.json: smazán (comments.approval je vypnuté)"
   sidebar_comments: "comments.json: aktualizovaných vláken: %{threads}, schválených komentářů celkem: %{comments}"
   published_scheduled: "Publikován naplánovaný příspěvek '%{slug}' (datum %{date})."
@@ -1173,7 +1179,7 @@ doctor:
   map_shape: "`%{key}` není sekce nastavení."
   map_shape_fix: "Tenhle klíč drží nastavení psaná jako řádky `jméno: hodnota` odsazené pod ním. Klíč, pod kterým nic není, znamená žádná — a to je v pořádku."
   widget_unknown: "Postranní panel žádnou kartu %{name} nemá."
-  widget_unknown_fix: "Karty jsou toots, pixelfed, commits, bluesky a rss. Jméno mimo ten výčet nekreslí nic — a když je to jediný zapsaný widget, zmizí sloupec ze všech stránek."
+  widget_unknown_fix: "Karty jsou toots, pixelfed, commits, bluesky, rss a on_this_day. Jméno mimo ten výčet nekreslí nic — a když je to jediný zapsaný widget, zmizí sloupec ze všech stránek."
   nav_item_shape: "Položka menu %{index} nemá popisek, nebo nemá kam vést."
   nav_item_shape_fix: "Každá položka bere `label` a k tomu buď `tag` (slug štítku), nebo `url`. Položka bez jedné z těch půlek se přeskočí, místo aby se vykreslila prázdná."
   sidebar_ok: "Postranní panel: karet %{count}."
@@ -1437,6 +1443,18 @@ stats:
   tags_line: "různých: %{unique}, na příspěvek %{per_post}"
   media_line: "souborů: %{files}, %{size}, příspěvků s médii: %{posts}"
   media_referenced_line: "souborů, o které si příspěvky říkají: %{referenced}, příspěvků s médii: %{posts} — media.nosync tu není"
+
+on_this_day:
+  unknown_option: "Neznámá volba: %{option}. on-this-day bere --date a --json, nic jiného."
+  bad_date: "%{value} není datum — napiš ho jako MM-DD nebo RRRR-MM-DD."
+  no_posts: "V archivu zatím nic není."
+  heading: "Tento den: %{date}"
+  summary: "příspěvků: %{posts}, z dřívějších let: %{years}"
+  nothing: "Z dřívějších let na tento den nic není — widget se dnes schová."
+  windows: "Co ukáže widget (oken: %{count}):"
+  all_heading: "Všechno z tohoto dne"
+  legend: "● dnes ve widgetu"
+  widget_off: "Widget on_this_day není zapnutý — zapiš ho pod widgets: v config/site.yml, nebo ho zapni v ./style.sh."
 
 export:
   heading: "Zapisuju archiv do %{path}"
@@ -1713,6 +1731,7 @@ style:
   widget_commits: "Poslední commity z účtu na GitHubu, Gitee nebo Forgejo"
   widget_bluesky: "Poslední příspěvky z Bluesky"
   widget_rss: "Cokoli, co má RSS nebo Atom feed"
+  widget_on_this_day: "Tvoje vlastní příspěvky z tohoto dne v dřívějších letech"
   q_widget_heading: "Nadpis nad widgetem"
   q_widget_account_id: "ID účtu"
   h_widget_account_id: "ID, ne @jméno — číslo na Mastodonu, ULID na GoToSocial. Najde ho ./setup.sh s tokenem, nebo otevři https://tvoje-instance/api/v1/accounts/lookup?acct=tvojejmeno a opiš „id“."
@@ -1857,3 +1876,4 @@ chrome:
   widget_commits: "Poslední commity"
   widget_bluesky: "Poslední na Bluesky"
   widget_rss: "Jinde"
+  widget_on_this_day: "Tento den"
