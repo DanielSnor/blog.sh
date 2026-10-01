@@ -377,6 +377,14 @@ cli:
   base_url_missing_preview: "SITE_BASE_URL is not set, can't build the preview URL."
   preview_label: "Preview: %{url}"
   mark_scheduled: "[SCHEDULED]"
+  edit_from_not_found: "There is no post called %{slug} -- nothing was written."
+  edit_from_not_a_draft: "%{slug} is published, and only a draft can be edited this way -- nothing was written. Edit it at the desk: ./blog.sh edit %{slug}"
+  edit_from_changed: "%{slug} changed after this text was taken from it -- edited elsewhere or published in the meantime. Nothing was written; open the draft again and start from what it says now."
+  drafts_none: "No drafts."
+  drafts_problem_content_lost: "not from the phone: markdown would lose part of it"
+  drafts_problem_missing_media: "not from the phone: a picture it names is missing"
+  drafts_problem_unreadable: "not from the phone: its text does not read back"
+  drafts_unknown_option: "Unknown option: %{option}. drafts takes --json and a slug, nothing else."
   mark_draft: "[DRAFT]"
   mark_pinned: "[PINNED]"
   local_preview_hint_deployed: "The address above is the template's example -- the site does deploy, only site.base_url does not say where yet (./setup.sh fixes it). To look here: ./blog.sh preview and %{url}."
@@ -667,6 +675,8 @@ cli:
       ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from
       ./blog.sh on-this-day [--date MM-DD] [--json]
                                      what this day holds from earlier years, and what the widget shows of it
+      ./blog.sh drafts [--json] [<slug>]
+                                     lists the drafts; --json with each one's text, as the phone opens it
       ./blog.sh help                 shows this help
       ./blog.sh version              prints the engine version
       ./blog.sh                      launches the interactive wizard

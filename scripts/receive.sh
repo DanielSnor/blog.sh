@@ -96,6 +96,35 @@ fail() {  # an answer, so: 0
 # in the error code, which arrives; the status only said it to nobody.
 unavailable() { fail "$1" "$2"; }
 
+# ⚠️ Captured, not relayed: when the engine answers in prose (no env.sh, no
+# ruby, a config that will not parse, a backtrace) that prose went out as
+# the answer and its exit status became this script's -- a 1 that cost the
+# phone every picture's receipt before it. An answer is an object, always.
+answer_from_engine() {
+  OUT=$(./blog.sh "$@" 2>"$WORK/engine-err")
+  case "$OUT" in
+    \{*) printf '%s\n' "$OUT" ;;
+    *)
+      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | tail -c 600)
+      printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | tr '\n' ' ')")"
+      ;;
+  esac
+}
+
+# ⚠️ A word that becomes an argument is checked as hard as a filename: a
+# leading dash is a flag to the engine, the alphabet is the one slugs are
+# made of, and a newline in the MIDDLE is refused -- deleting it would
+# glue two lines into one word and act on whatever that spelled.
+check_word() {  # the file it came in, the word
+  case "$2" in
+    '' | -* | *"
+"*) fail "bad_slug" "$1 has to hold the slug of a post, and nothing else." ;;
+  esac
+  if [ "${#2}" -gt 200 ] || [ "$2" != "$(printf %s "$2" | LC_ALL=C tr -cd 'a-z0-9-')" ]; then
+    fail "bad_slug" "$1 has to hold the slug of a post, and nothing else."
+  fi
+}
+
 [ -d "$INSTALL/incoming" ] || unavailable "no_incoming" "No incoming/ directory in $INSTALL."
 [ -x "$INSTALL/blog.sh" ] || unavailable "no_engine" "No executable blog.sh in $INSTALL."
 # A ceiling that is not a number went into arithmetic as it was: "64M"
@@ -292,44 +321,29 @@ while IFS= read -r NAME; do
     || fail "empty_file" "$NAME arrived with its name and its closing dot and nothing between them."
 done < "$WORK/names"
 
-# A delivery of exactly one file called publish.txt is not a post: it is a
-# request to publish one that is already here, and its body is the slug.
-# The page at /write/ sends it after a draft has gone out and been looked
-# at -- which is the one thing that could not be done from a phone at all,
-# because publishing needs a terminal and a phone has none.
-#
-# Nothing is written to incoming/ for it: the slug is a word, not a file,
-# and staging it would leave litter nobody consumes.
-#
-# ⚠️ That word becomes an argument to a command, so it is checked as
-# hard as a filename is. A leading dash is a flag to the engine, and the
-# rest of the alphabet here is the one slugs are made of -- anything else
-# is refused rather than passed on and explained by whatever it hits.
-if [ "$(wc -l < "$WORK/names")" -eq 1 ] && [ "$(head -1 "$WORK/names")" = "publish.txt" ]; then
-  # Carriage returns out (a phone writes them), trailing newlines dropped
-  # by the substitution itself -- but a newline in the MIDDLE stays, and
-  # is refused. Deleting it would have glued two lines into one word and
-  # published whatever that spelled.
-  SLUG=$(LC_ALL=C tr -d '\r' < "$WORK/file-001")
-  case "$SLUG" in
-    '' | -* | *"
-"*) fail "bad_slug" "publish.txt has to hold the slug of a post, and nothing else." ;;
-  esac
-  if [ "${#SLUG}" -gt 200 ] || [ "$SLUG" != "$(printf %s "$SLUG" | LC_ALL=C tr -cd 'a-z0-9-')" ]; then
-    fail "bad_slug" "publish.txt has to hold the slug of a post, and nothing else."
-  fi
-  cd "$INSTALL" || unavailable "no_cd" "Cannot enter $INSTALL."
-  # The same capture as the markdown route below, and for the same reason:
-  # an engine that answers in prose gets answered for.
-  OUT=$(./blog.sh publish "$SLUG" --yes --json 2>"$WORK/engine-err")
-  case "$OUT" in
-    \{*) printf '%s\n' "$OUT" ;;
-    *)
-      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | tail -c 600)
-      printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | tr '\n' ' ')")"
+# One file called publish.txt or drafts.txt is a request, not a post, and
+# its body is one word. publish.txt: the slug of a draft to publish --
+# publishing needs a terminal, and a phone has none. drafts.txt: `all`, or
+# the slug of a draft whose text did not fit the first answer, for the
+# page to open and edit (a draft edited there comes back as a post whose
+# header says `edits: <slug>`, which `add` handles). Nothing is staged.
+if [ "$(wc -l < "$WORK/names")" -eq 1 ]; then
+  REQ=$(head -1 "$WORK/names")
+  case "$REQ" in
+    publish.txt | drafts.txt)
+      WORD=$(LC_ALL=C tr -d '\r' < "$WORK/file-001")  # a phone writes CRs
+      check_word "$REQ" "$WORD"
+      cd "$INSTALL" || unavailable "no_cd" "Cannot enter $INSTALL."
+      if [ "$REQ" = publish.txt ]; then
+        answer_from_engine publish "$WORD" --yes --json
+      elif [ "$WORD" = all ]; then
+        answer_from_engine drafts --json
+      else
+        answer_from_engine drafts --json "$WORD"
+      fi
+      exit 0
       ;;
   esac
-  exit 0
 fi
 
 INDEX=0
@@ -372,21 +386,7 @@ while IFS= read -r NAME; do
       # signal that the post is whole. --untrusted: it came off a network,
       # so a picture may be named only by a bare filename -- the engine
       # refuses a path, in the method that resolves it.
-      #
-      # ⚠️ Captured, not relayed. The engine's answer is relayed when it
-      # is one; when it is not -- a missing env.sh, no ruby, a
-      # configuration that will not parse, a backtrace -- the prose it
-      # printed instead went out as the answer, or nothing did, and its
-      # exit status became this script's: a 1 that cost the phone every
-      # picture's receipt before it. An answer is an object, always.
-      OUT=$(./blog.sh add "$NAME" --json --untrusted 2>"$WORK/engine-err")
-      case "$OUT" in
-        \{*) printf '%s\n' "$OUT" ;;
-        *)
-          REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | tail -c 600)
-          printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | tr '\n' ' ')")"
-          ;;
-      esac
+      answer_from_engine add "$NAME" --json --untrusted
       ;;
     *)
       # A picture, stored and waiting for the text that names it.

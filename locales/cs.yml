@@ -360,6 +360,14 @@ cli:
   base_url_missing_preview: "SITE_BASE_URL není nastavený, adresu náhledu neumím složit."
   preview_label: "Náhled: %{url}"
   mark_scheduled: "[NAPLÁNOVÁNO]"
+  edit_from_not_found: "Příspěvek %{slug} neexistuje — nic se nezapsalo."
+  edit_from_not_a_draft: "%{slug} je publikovaný a takhle jde upravit jen koncept — nic se nezapsalo. Uprav ho u počítače: ./blog.sh edit %{slug}"
+  edit_from_changed: "%{slug} se změnil potom, co z něj byl vzat tenhle text — mezitím ho někdo upravil nebo publikoval. Nic se nezapsalo; otevři koncept znovu a začni od toho, co v něm je teď."
+  drafts_none: "Žádné koncepty."
+  drafts_problem_content_lost: "z telefonu ne: markdown by část ztratil"
+  drafts_problem_missing_media: "z telefonu ne: chybí obrázek, který jmenuje"
+  drafts_problem_unreadable: "z telefonu ne: text nejde přečíst zpět"
+  drafts_unknown_option: "Neznámá volba: %{option}. drafts bere --json a slug, nic jiného."
   mark_draft: "[KONCEPT]"
   mark_pinned: "[PŘIPNUTO]"
   local_preview_hint_deployed: "Adresa výše je příklad ze šablony — web se nasazuje, jen site.base_url ještě neříká kam (opraví to ./setup.sh). Náhled tady: ./blog.sh preview a %{url}."
@@ -646,6 +654,8 @@ cli:
       ./blog.sh stats [--json]       spočítá archiv — příspěvky, roky, slova, štítky, média, odkud to je
       ./blog.sh on-this-day [--date MM-DD] [--json]
                                      co tenhle den skrývá z dřívějších let a co z toho ukáže widget
+      ./blog.sh drafts [--json] [<slug>]
+                                     vypíše koncepty; --json i s textem každého, jak ho otevírá telefon
       ./blog.sh help                 zobrazí tuhle nápovědu
       ./blog.sh version              vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce

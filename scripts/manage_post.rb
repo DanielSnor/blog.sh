@@ -14,6 +14,7 @@ require 'securerandom'
 require 'shellwords'
 require 'stringio'
 require 'tempfile'
+require 'digest'
 require_relative '../lib/post_writer'
 require_relative '../lib/post_versions'
 require_relative '../lib/atomic_write'
@@ -168,7 +169,7 @@ FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series seri
 # Read by `add <file>` alone. On every other route -- the wizard, edit --
 # the key would be accepted and do nothing, which is the one thing the
 # unknown-key rule below exists to prevent; so it is unknown there.
-FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt].freeze
+FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt edits base].freeze
 # What an edit decides: every key the editor shows in the header, and the
 # few the save computes on purpose (the address history, the state). Any
 # other key the post carries is kept as it was -- see edit_post.
@@ -1455,6 +1456,9 @@ def add_from_file(source, json: false, confined: false)
   # Absent, or anything but yes/true/1, means what it always meant: draft.
   meta, = MarkdownParser.parse_frontmatter(raw)
   publish = truthy_frontmatter?(meta['publish'])
+  # A file that names the draft it edits is not a new post: see edit_from_file.
+  return edit_from_file(file, raw, meta, json: json, confined: confined, publish: publish) unless meta['edits'].to_s.strip.empty?
+
   path, warnings = quietly(json, keep_stdout: true) do
     compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined,
                  extra_keys: FILE_ONLY_FRONTMATTER_KEYS)
@@ -1609,6 +1613,43 @@ def post_answer(path, warnings)
     'deploy' => File.exist?(Publishing::DEPLOY_PENDING) ? 'pending' : 'done',
     'warnings' => warnings
   }
+end
+
+# `add` of a file whose header says `edits: <slug>` saves it over that
+# draft rather than making a new post -- the way the phone saves a draft
+# it opened through `drafts --json`, and a way for any script to edit
+# without the $EDITOR trick. The same save `edit` does (apply_post_edit),
+# with every question turned into a refusal.
+#
+# Drafts only. A published post is live, announced and linked to; editing
+# one is a decision for somebody at their desk, not a side effect of a
+# file arriving.
+#
+# `base:` is the digest of the draft as it was when its text was handed
+# out. When the draft has changed since -- edited at the desk, published
+# by the scheduler -- the file is refused rather than saved over it: the
+# phone would otherwise quietly undo whatever happened in between.
+def edit_from_file(file, raw, meta, json:, confined:, publish:)
+  slug = meta['edits'].to_s.strip
+  path = PathSafety.safe_segment?(slug) ? find_post_path(slug) : nil
+  refuse('not_found', t('cli.edit_from_not_found', slug: slug)) unless path
+  original_raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(original_raw)
+  refuse('not_a_draft', t('cli.edit_from_not_a_draft', slug: slug)) unless draft?(post)
+  base = meta['base'].to_s.strip
+  if !base.empty? && base != Digest::SHA256.hexdigest(original_raw)
+    refuse('changed', t('cli.edit_from_changed', slug: slug))
+  end
+  # `edits:` and `base:` stay in the text: they belong to the delivery, and
+  # the save reads them as file-only keys, like `publish:` and `receipt:`.
+  (new_path, _updated), warnings = quietly(json, keep_stdout: true) do
+    apply_post_edit(slug, path, post, original_raw, raw, interactive: false, confined: confined,
+                    extra_keys: FILE_ONLY_FRONTMATTER_KEYS, consume: [file], receipt: meta['receipt'])
+  end
+  report_added(new_path, warnings, json: json, publish: publish)
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
 end
 
 def report_added(path, warnings, json:, publish: false)
@@ -5145,22 +5186,11 @@ rescue ArgumentError, TypeError
          t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect))
 end
 
-def edit_post(slug, path: nil)
-  path ||= find_post_path(slug)
-  abort t('cli.post_not_found', slug: slug) unless path
-
-  # Kept to compare against just before the save: an editor session is
-  # open-ended, and the scheduled-publish cron runs every 15 minutes. The
-  # post below was read BEFORE the editor opened, so writing it back after
-  # the cron published the post would revert it to a scheduled draft, drop
-  # the announcement URL it just stored, and let the next cron run publish
-  # -- and announce -- the same post a second time.
-  original_raw = File.read(path, encoding: 'utf-8')
-  post = JSON.parse(original_raw)
-  year = File.basename(File.dirname(path))
-  media_dir = File.join(MEDIA_DIR, year, slug)
-
-  date = post_time!(post)
+# The header and the body `edit` opens a post with. `drafts --json` hands
+# the same text to the phone, with media_dir nil so a picture is named by
+# its bare file name -- what the untrusted parser takes back, and all a
+# phone should learn about where the server keeps its media.
+def edit_markdown_for(post, media_dir)
   edited_card, = split_link_card(post['content'])
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
@@ -5202,12 +5232,32 @@ def edit_post(slug, path: nil)
   # floor -- markdown has no form for it -- and the save would then ask
   # whether to lose the thing the author never touched.
   body = MarkdownWriter.blocks_to_markdown(split_link_card(post['content']).last, media_dir)
+  frontmatter + body
+end
+
+def edit_post(slug, path: nil)
+  path ||= find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  # Kept to compare against just before the save: an editor session is
+  # open-ended, and the scheduled-publish cron runs every 15 minutes. The
+  # post below was read BEFORE the editor opened, so writing it back after
+  # the cron published the post would revert it to a scheduled draft, drop
+  # the announcement URL it just stored, and let the next cron run publish
+  # -- and announce -- the same post a second time.
+  original_raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(original_raw)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+
+  # Unreadable dates refuse here, before the editor opens on them.
+  post_time!(post)
 
   # Recovery is offered per post, not per command: text left over from
   # `edit <this slug>` continues here, text from anything else is named
   # rather than restored (see offer_editor_buffer).
   restored = offer_editor_buffer('edit', slug)
-  opened_with = restored || frontmatter + body
+  opened_with = restored || edit_markdown_for(post, media_dir)
   raw = edit_in_editor(opened_with, FRONTMATTER_HINT, { 'kind' => 'edit', 'slug' => slug })
 
   # Same no-op guard as cmd_add: editor closed without saving (or saved
@@ -5224,44 +5274,28 @@ def edit_post(slug, path: nil)
     return
   end
 
-  meta, new_body = MarkdownParser.parse_frontmatter(raw)
-  abort_on_double_frontmatter(new_body)
-  abort_on_unknown_frontmatter(meta)
+  new_path, updated = apply_post_edit(slug, path, post, original_raw, raw, interactive: true)
+  puts
+  puts t('cli.edited_label', path: new_path)
+  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+end
 
-  new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
-  new_title = meta['title'].to_s.empty? ? nil : meta['title']
-  new_tags = tags_from_frontmatter(meta['tags'])
-  new_type, new_page = frontmatter_type_and_page(meta)
-
-  blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
-  wait_for_missing_images(missing)
-  new_card = link_card_from_frontmatter(meta)
-  blocks.unshift(new_card) if new_card
-  heic_consumed = convert_heic_attachments(blocks, media_files)
-  video_names = {}
-  heic_consumed += remux_video_attachments(blocks, media_files, video_names)
-  check_attachment_sizes(media_files, video_names)
-  check_video_playback(media_files, video_names)
-  fill_image_dimensions(blocks, media_files, media_dir)
-  restore_posters(blocks, post['content'])
-  restore_media_src(blocks, post['content'])
-  # Before the lookup, not after it: a player the post already has is not
-  # worth a network call, and asking anyway is what made an edit depend on
-  # a service answering.
-  restore_embed_lookups(blocks, post['content'])
-  resolve_embed_lookups(blocks)
-
-  # Checks for a drop in every block type, not just images: markdown can't
-  # express a link card or a foreign embed (Instagram), so saving would
-  # otherwise silently delete them.
-  # ...and every formatting SPAN inside them. docs/architecture.md lists
-  # `small`, `mention` (carrying an account URL) and `color` (carrying a hex)
-  # as span types accepted from imports, and the build renders all three --
-  # a mention becomes a real link. MarkdownWriter has no markdown form for
-  # any of them, so wrap_markdown falls through to the bare text: the words
-  # survive and the span, with whatever it carried, is gone. The block
-  # stayed a text block, so counting block types alone said nothing had
-  # happened and no confirmation was asked for.
+# What saving `blocks` over the post would drop, by block type and by
+# formatting span. Shared by the save and by `drafts --json`, which marks a
+# draft the phone cannot edit without losing something.
+#
+# Checks for a drop in every block type, not just images: markdown can't
+# express a link card or a foreign embed (Instagram), so saving would
+# otherwise silently delete them.
+# ...and every formatting SPAN inside them. docs/architecture.md lists
+# `small`, `mention` (carrying an account URL) and `color` (carrying a hex)
+# as span types accepted from imports, and the build renders all three --
+# a mention becomes a real link. MarkdownWriter has no markdown form for
+# any of them, so wrap_markdown falls through to the bare text: the words
+# survive and the span, with whatever it carried, is gone. The block
+# stayed a text block, so counting block types alone said nothing had
+# happened and no confirmation was asked for.
+def edit_content_loss(post, blocks, new_card)
   counts = lambda do |list|
     list.each_with_object(Hash.new(0)) do |b, h|
       h[['block', b['type']]] += 1
@@ -5278,18 +5312,84 @@ def edit_post(slug, path: nil)
   # was lifted into the header, and without the one put back from it.
   before = counts.call(split_link_card(post['content']).last)
   after = counts.call(new_card ? blocks.drop(1) : blocks)
-  lost = before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
+  before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
+end
+
+# The losses named as the author knows them, in the site's language: the
+# summary used to be built as "1x small span", the schema's words, on a
+# Czech screen. A type the locale has no name for -- something a future
+# import brings -- is still named, by its schema word.
+def content_loss_summary(lost)
+  lost.map do |(kind, type), n|
+    t('cli.content_loss_item', count: n,
+                              kind: I18n.lookup("cli.content_kind.#{kind}.#{type}") || type.to_s)
+  end.join(', ')
+end
+
+# Everything `edit` does once it holds the new text: read it back, refuse
+# what cannot be saved, write the post and its media, keep the version it
+# replaces. Answers with the path the post now lives at and the post.
+#
+# interactive: false is the way in for a file that names the post it edits
+# (`add` of a file carrying `edits:`, which is how the phone saves a
+# draft): every question becomes a refusal, because there is nobody to
+# answer it. confined: the untrusted parser -- pictures by bare name, from
+# the post's own media or from incoming/, and nothing else on the machine.
+def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined: false, extra_keys: [],
+                    consume: [], receipt: nil)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+  date = post_time!(post)
+
+  meta, new_body = MarkdownParser.parse_frontmatter(raw)
+  abort_on_double_frontmatter(new_body)
+  abort_on_unknown_frontmatter(meta, interactive: interactive, extra: extra_keys)
+
+  new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'], interactive: interactive)
+  new_title = meta['title'].to_s.empty? ? nil : meta['title']
+  new_tags = tags_from_frontmatter(meta['tags'])
+  new_type, new_page = frontmatter_type_and_page(meta)
+
+  blocks, media_files, missing = begin
+    MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR, confined: confined)
+  rescue MarkdownParser::Rejected => e
+    refuse('bad_markdown', e.message)
+  rescue MarkdownParser::ConfinedPath => e
+    refuse('bad_reference', t('cli.bad_reference', reference: e.reference))
+  end
+  # Nobody is at a keyboard to upload what is missing: the same refusal
+  # `add` of a file gives, and nothing is written.
+  if interactive
+    wait_for_missing_images(missing)
+  elsif missing.any?
+    refuse('missing_images', t('cli.add_file_missing_images',
+                               files: missing.map { |m| File.basename(m) }.join(', '), dir: INCOMING_DIR))
+  end
+  new_card = link_card_from_frontmatter(meta)
+  blocks.unshift(new_card) if new_card
+  heic_consumed = convert_heic_attachments(blocks, media_files)
+  video_names = {}
+  heic_consumed += remux_video_attachments(blocks, media_files, video_names)
+  check_attachment_sizes(media_files, video_names)
+  check_video_playback(media_files, video_names)
+  fill_image_dimensions(blocks, media_files, media_dir)
+  restore_posters(blocks, post['content'])
+  restore_media_src(blocks, post['content'])
+  # Before the lookup, not after it: a player the post already has is not
+  # worth a network call, and asking anyway is what made an edit depend on
+  # a service answering.
+  restore_embed_lookups(blocks, post['content'])
+  resolve_embed_lookups(blocks)
+
+  lost = edit_content_loss(post, blocks, new_card)
   if lost.any?
+    summary = content_loss_summary(lost)
+    # Without a keyboard there is nobody to say "yes, lose it": refused,
+    # nothing written. The phone is offered no such draft in the first
+    # place (`drafts --json` marks it), so this is the second line.
+    refuse('content_lost', t('cli.content_loss_warning', summary: summary)) unless interactive
     puts
-    # Named as the author knows them, in the site's language: the summary
-    # used to be built here as "1x small span", the schema's words, on a
-    # Czech screen. A type the locale has no name for -- something a future
-    # import brings -- is still named, by its schema word.
-    summary = lost.map do |(kind, type), n|
-      t('cli.content_loss_item', count: n,
-                                kind: I18n.lookup("cli.content_kind.#{kind}.#{type}") || type.to_s)
-    end
-    puts t('cli.content_loss_warning', summary: summary.join(', '))
+    puts t('cli.content_loss_warning', summary: summary)
     # The word is compared against the locale's own confirm_word -- the
     # Czech prompt says to type "ano", so comparing against a hardcoded
     # 'yes' aborted exactly the users who followed the instruction.
@@ -5399,7 +5499,7 @@ def edit_post(slug, path: nil)
   if moving
     taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug,
                                   except: path, path: new_path)
-    abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+    refuse('post_exists', t('cli.post_already_exists', slug: slug, path: taken)) if taken
   end
 
   carried = Array(post['former_slugs']).map(&:to_s)
@@ -5423,7 +5523,15 @@ def edit_post(slug, path: nil)
   # public/write/r/<receipt>.json and the next prune deleted it, so the page
   # asked every three seconds for five minutes about a post that had gone
   # out perfectly well.
-  updated['receipt'] = post['receipt'] if post['receipt']
+  # A post edited from the phone carries the receipt of THAT send, so the
+  # page that sent it can ask after it; anything else keeps the one it has.
+  fresh = receipt.to_s.strip
+  refuse('bad_receipt', t('cli.receipt_shape')) unless fresh.empty? || PathSafety.hex_token?(fresh)
+  if !fresh.empty?
+    updated['receipt'] = fresh
+  elsif post['receipt']
+    updated['receipt'] = post['receipt']
+  end
   # And everything else the editor never showed is the post's to keep. The
   # save rebuilt the post from a list of what to carry, so whatever the
   # list had not heard of was dropped: every translation of a post went
@@ -5453,7 +5561,7 @@ def edit_post(slug, path: nil)
   # The text isn't lost either way: the editor buffer holds it and the
   # notice armed at edit time says where.
   if !File.exist?(path) || File.read(path, encoding: 'utf-8') != original_raw
-    abort t('cli.post_changed_while_editing', slug: slug)
+    refuse('changed', t('cli.post_changed_while_editing', slug: slug))
   end
 
   # The one place a post's TEXT is replaced by a person, so the one place
@@ -5513,15 +5621,13 @@ def edit_post(slug, path: nil)
       File.delete(File.join(new_media_dir, f)) unless keep.include?(f)
     end
   end
-  discard_editor_buffer
+  discard_editor_buffer if interactive
   File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
   # Housekeeping only, and it runs last on purpose: an incoming/ the CLI
   # user can't unlink in must not be able to abort a save that already
   # succeeded.
-  cleanup_incoming(media_files, heic_consumed)
-  puts
-  puts t('cli.edited_label', path: new_path)
-  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+  cleanup_incoming(media_files, heic_consumed + consume)
+  [new_path, updated]
 end
 
 # Confirm-by-typing-slug + move to trash, shared by the standalone
@@ -5900,6 +6006,119 @@ end
 
 def load_posts_summary
   PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map { |f| post_summary(f) }
+end
+
+# `./blog.sh drafts [--json] [<slug>]` -- the drafts, each with what the
+# phone needs to edit it: the text as `edit` would open it (pictures by
+# bare name, see edit_markdown_for), the media it has, where its preview
+# lives -- the build copies a draft's media next to that hidden page, so
+# the phone shows them from there instead of fetching them over SSH --
+# and the digest that `base:` hands back, so a draft that changed in the
+# meantime is refused instead of overwritten (edit_from_file).
+#
+# The texts travel back to the phone inside an address (scripts/receive.sh
+# answers, the shortcut opens /write/#b=<base64>), so they are handed out
+# up to a budget, newest first; a draft past it comes without its text,
+# and the phone asks for that one by name. Every draft is LISTED either
+# way.
+DRAFTS_TEXT_BUDGET = 48_000
+
+# What a reader would call the post: its own title, a link block's, or its
+# opening words -- the rule the build titles pages by.
+def post_name_for(post)
+  return post['title'].to_s unless post['title'].to_s.strip.empty?
+
+  block = PostText.link_title_block(post)
+  return block['title'].to_s if block
+
+  name, = PostText.name_and_rest(post.merge('title' => nil))
+  name || post['slug'].to_s
+end
+
+# Why the phone cannot edit a draft, or nil when it can. Asked of the very
+# text it would be handed: read back through the untrusted parser, every
+# picture has to be in the draft's own media, and nothing may be lost
+# that markdown has no words for -- the phone cannot answer the question
+# `edit` asks about that, so it is never offered such a draft.
+def draft_problem(post, text, media_dir)
+  meta, body = MarkdownParser.parse_frontmatter(text)
+  blocks, _files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: nil, confined: true)
+  return 'missing_media' if missing.any?
+
+  card = link_card_from_frontmatter(meta)
+  blocks.unshift(card) if card
+  edit_content_loss(post, blocks, card).any? ? 'content_lost' : nil
+rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
+  'unreadable'
+end
+
+def draft_entry(path, with_text:)
+  raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(raw)
+  slug = post['slug'].to_s
+  media_dir = File.join(MEDIA_DIR, File.basename(File.dirname(path)), slug)
+  text = edit_markdown_for(post, nil)
+  problem = draft_problem(post, text, media_dir)
+  media = Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []
+  {
+    'slug' => slug,
+    'title' => post_name_for(post),
+    'date' => post_time!(post).iso8601,
+    'scheduled' => post['scheduled'] == true,
+    'editable' => problem.nil?,
+    'problem' => problem,
+    'text' => with_text ? text : nil,
+    'media' => media,
+    'preview' => PostAddress.path(post),
+    'base' => Digest::SHA256.hexdigest(raw)
+  }
+end
+
+def cmd_drafts(json:, slug: nil)
+  JSON_REFUSALS[:enabled] = json
+  paths = PathGlob.under(CONTENT_DIR, '*', '*.json').select do |f|
+    post = JSON.parse(File.read(f, encoding: 'utf-8'))
+    post.is_a?(Hash) && draft?(post)
+  rescue JSON::ParserError, SystemCallError
+    false
+  end
+  if slug
+    paths.select! { |f| File.basename(f, '.json') == slug }
+    refuse('not_found', t('cli.edit_from_not_found', slug: slug)) if paths.empty?
+  end
+  entries = paths.map { |f| draft_entry(f, with_text: true) }
+                 .sort_by { |e| e['date'] }.reverse
+  unless slug
+    spent = 0
+    entries.each do |e|
+      next unless e['text']
+
+      if spent + e['text'].bytesize > DRAFTS_TEXT_BUDGET
+        e['text'] = nil
+        e['omitted'] = true
+      else
+        spent += e['text'].bytesize
+      end
+    end
+  end
+  if json
+    puts JSON.pretty_generate('ok' => true, 'drafts' => entries)
+    return
+  end
+  if entries.empty?
+    puts t('cli.drafts_none')
+    return
+  end
+  entries.each do |e|
+    marks = []
+    marks << t('cli.mark_scheduled') if e['scheduled']
+    marks << t("cli.drafts_problem_#{e['problem']}") if e['problem']
+    line = "#{e['date'][0, 10]}  #{e['slug']}  #{e['title'].to_s.gsub(/\s+/, ' ')[0, 60]}"
+    puts marks.empty? ? line : "#{line}  #{Tui.paint(marks.join(' · '), :yellow)}"
+  end
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
 end
 
 def cmd_list(filters)
@@ -7012,6 +7231,13 @@ begin
     run_wizard
   else
     case command
+    when 'drafts'
+      # Read-only and quick: what the phone asks for when it opens a draft
+      # (scripts/receive.sh, drafts.txt), and a plain list without --json.
+      json = !ARGV.delete('--json').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.drafts_unknown_option', option: unknown) if unknown
+      cmd_drafts(json: json, slug: ARGV.shift)
     when 'add'
       # Read here rather than inside cmd_add, the way `rebuild` reads --full:
       # the dispatcher is where this file turns a command line into

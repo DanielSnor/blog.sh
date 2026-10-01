@@ -49,9 +49,19 @@ module MarkdownWriter
 
   module_function
 
+  def media_path(media_dir, name)
+    media_dir.nil? ? name.to_s : File.join(media_dir, name.to_s)
+  end
+
   # The one entry point: renders a post's whole `content` array back to
   # markdown, given the directory its media files live in (image/video
   # paths are written as absolute paths into that directory).
+  #
+  # nil for the directory writes the bare file name instead. That is the
+  # form for markdown that leaves the machine -- the phone that edits a
+  # draft (`./blog.sh drafts --json`) has no business learning where the
+  # media live on the server, and sends back only names the untrusted
+  # parser accepts.
   def blocks_to_markdown(blocks, media_dir)
     blocks.filter_map do |b|
       case b['type']
@@ -99,7 +109,7 @@ module MarkdownWriter
         "#{fence}#{b['lang'].to_s.delete('`')}\n#{b['text']}\n#{fence}"
       when 'image'
         media = (b['media'] || []).first || {}
-        path = File.join(media_dir, media['url'].to_s)
+        path = media_path(media_dir, media['url'].to_s)
         # one_line here and not inside escape_title: that helper also writes a
         # LINK title, where a hard break is supported and round-trips through
         # the parser's own sentinel. An image caption shares the alt text's
@@ -115,7 +125,7 @@ module MarkdownWriter
         # Round-trips as the link line it came from: a bare filename, so
         # re-saving an edited post keeps the attachment instead of
         # turning it into a dead link to a name that isn't a URL.
-        "[#{escape_label(one_line(b['label']))}](#{File.join(media_dir, file['url'].to_s)})" if file
+        "[#{escape_label(one_line(b['label']))}](#{media_path(media_dir, file['url'].to_s)})" if file
       when 'audio'
         # Mirrors the video branch: a local file writes back as !![](file),
         # and so does a platform the engine can build a player for from the
@@ -134,7 +144,7 @@ module MarkdownWriter
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
         if media
-          "!![#{caption.empty? ? 'Audio' : one_line(caption)}](#{File.join(media_dir, media['url'].to_s)})"
+          "!![#{caption.empty? ? 'Audio' : one_line(caption)}](#{media_path(media_dir, media['url'].to_s)})"
         elsif Embed.src(b) || Embed.detect(b['url'].to_s)
           "!![#{caption.empty? ? 'Audio' : one_line(caption)}](#{b['url']})"
         end
@@ -146,7 +156,7 @@ module MarkdownWriter
         media = (b['media'] || []).first
         caption = b['caption'].to_s.strip
         if media
-          "!![#{caption.empty? ? 'Video' : one_line(caption)}](#{File.join(media_dir, media['url'].to_s)})"
+          "!![#{caption.empty? ? 'Video' : one_line(caption)}](#{media_path(media_dir, media['url'].to_s)})"
         elsif youtube_playable?(b)
           "!![#{caption.empty? ? 'YT Video' : one_line(caption)}](#{b['url']})"
         elsif Embed.src(b) || Embed.detect(b['url'].to_s)
