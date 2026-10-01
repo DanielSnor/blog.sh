@@ -107,9 +107,18 @@ already carries, so each can be read as well as changed:
   leaves behind when it straightens a relative link out of an import.
 - **`publish: yes`** publishes the post the moment `add <file>` writes
   it -- the date settled, the announcement sent, the site rebuilt -- the
-  road `publish <slug> --yes` takes at a desk. It is the one key only the
-  file route reads; the wizard never publishes directly. Absent, or
-  anything but yes/true/1, is a draft.
+  road `publish <slug> --yes` takes at a desk. Only the file route reads
+  it; the wizard never publishes directly. Absent, or anything but
+  yes/true/1, is a draft.
+- **`edits: <slug>`** makes the file not a new post but a new text for
+  that DRAFT -- the save `edit` does, with every question it would ask
+  turned into a refusal, because nobody is there to answer it. `base:`
+  beside it is the digest `./blog.sh drafts --json` handed out with the
+  text; when the draft has changed since, the file is refused instead of
+  undoing whatever happened in between. A published post is refused:
+  editing one is for the desk. This is how the phone saves a draft it
+  opened (see [Writing from a phone](#editing-a-draft-from-the-phone)),
+  and a way for a script to edit without the `$EDITOR` trick.
 - **`toc: true` / `toc: false`** overrides the table of contents. A post
   with four headings or more gets one on its own -- that is the length at
   which a reader starts scrolling to look for something rather than
@@ -781,6 +790,49 @@ checked as hard as a filename is, because it becomes an argument to a
 command: a leading dash is a flag, and anything outside a slug's own
 alphabet is refused here rather than explained by whatever it hits. The
 page then asks the same receipt again until it says published.
+
+### Editing a draft from the phone
+
+*Open a draft from the blog* at the top of `/write/` asks the blog for
+its drafts the way Publish asks it to publish: one file, `drafts.txt`,
+holding `all`, through the same shortcut. The receiver runs
+`./blog.sh drafts --json`, and the answer comes back in the address
+like any other -- a list of the drafts, newest first, each with:
+
+- its text as `edit` would open it, except that a picture is named by
+  its bare file name, which is all the phone needs and all the
+  untrusted parser takes back;
+- the pictures it has, which the page shows from the draft's hidden
+  preview address (the build copies a draft's media next to that page),
+  so they are never sent to the phone or back;
+- the digest of the draft as it was, which goes back as `base:`;
+- whether the phone can edit it at all. A draft with something markdown
+  cannot hold -- an imported mention, a colour, an embed with no form --
+  is listed with the reason and cannot be chosen: at the desk `edit`
+  asks before losing it, and a phone cannot answer.
+
+The texts travel inside an address, so they are handed out up to about
+48 kB, newest first; a draft past that is listed without its text and
+asks for it by name when tapped (`drafts.txt` with its slug).
+
+Choosing a draft puts it in the form, with a band above it saying which
+draft is being edited. Header keys the form has no field for (a series,
+`unlisted:`, a link card...) are carried back untouched. Sending sends
+the new pictures and the text, whose header says `edits: <slug>` and
+`base: <digest>`; `add` saves it over the draft (see the
+[header keys](#writing-and-publishing)). Two things to know:
+
+- **A picture the text stops naming is deleted from the server** -- that
+  is what `edit` does at a desk too, and `versions/` keeps texts, not
+  media. The page says which ones before it sends, and the second tap
+  means it.
+- **A draft that changed in the meantime is not overwritten.** Edited
+  at the desk, or published by the scheduler, after its text was handed
+  out: the save is refused with `changed`, and the draft is opened again
+  from what it says now.
+
+A scheduled draft keeps its time: the page hides "publish now" while one
+is open.
 
 **A delivery that arrives twice is one post.** The receipt is minted once
 per send, immediately before the files it names are built, so two

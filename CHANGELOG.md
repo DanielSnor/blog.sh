@@ -25,6 +25,15 @@ goes in is still being decided; the suffix and the date both come off at the tag
   hides the card. No settings -- the same rule from a hundred posts to thirteen thousand.
 - **`./blog.sh on-this-day [--date MM-DD] [--json]`.** The same selection in the terminal: every
   post of the day, and which of them the card shows in which window.
+- **A draft can be edited from the phone.** *Open a draft from the blog* in `/write/` lists the
+  drafts; choosing one puts it in the form, and sending saves it over the draft. Its pictures
+  stay on the blog and are shown from there; a picture the text stops naming is deleted, said
+  before sending. A draft markdown cannot hold whole is listed but cannot be chosen, and one
+  that changed in the meantime is not overwritten. The shortcut does not change.
+- **`./blog.sh drafts [--json] [<slug>]`.** The drafts, and with --json what the phone needs to
+  edit each one.
+- **`edits: <slug>` in a file for `add`.** Saves it over that draft, as `edit` would, with every
+  question a refusal; `base:` refuses a draft that changed after its text was handed out.
 - **The sidebar cron turns the day over.** A site with the card wants `refresh-sidebar.sh` in
   cron even with no other widget; it rewrites the card's file once a day, per language.
 
