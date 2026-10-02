@@ -1635,8 +1635,13 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
   refuse('not_found', t('cli.edit_from_not_found', slug: slug)) unless path
   original_raw = File.read(path, encoding: 'utf-8')
   post = JSON.parse(original_raw)
-  refuse('not_a_draft', t('cli.edit_from_not_a_draft', slug: slug)) unless draft?(post)
   base = meta['base'].to_s.strip
+  # A published post may be edited this way too, since 1.10: the app on a
+  # phone is a desk now. It has to say which version it edited -- `base:`
+  # is optional for a draft and required here, because the post is live
+  # and a change made elsewhere in the meantime would be overwritten in
+  # silence. The save rebuilds and deploys, as `edit` does at the desk.
+  refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty? && !draft?(post)
   if !base.empty? && base != Digest::SHA256.hexdigest(original_raw)
     refuse('changed', t('cli.edit_from_changed', slug: slug))
   end
@@ -6151,6 +6156,17 @@ def draft_entry(path, with_text:)
   }
 end
 
+# `edit <slug> --json`: one post, any state, with what a program needs to
+# edit its text elsewhere -- the same entry `drafts --json` hands out for
+# a draft, for a published post too. The text comes back through `add` of
+# a file saying `edits: <slug>` and `base: <digest>` (edit_from_file).
+def cmd_edit_json(slug)
+  answer_json do
+    path, = post_for_json(slug)
+    { 'ok' => true, 'post' => draft_entry(path, with_text: true) }
+  end
+end
+
 def cmd_drafts(json:, slug: nil)
   JSON_REFUSALS[:enabled] = json
   paths = PathGlob.under(CONTENT_DIR, '*', '*.json').select do |f|
@@ -7955,8 +7971,19 @@ begin
       abort t('cli.translate_needs_language') if lang.to_s.strip.empty?
       cmd_translate(slug, lang.to_s.strip)
     when 'edit'
-      slug = ARGV.shift || pick_slug_interactively
-      cmd_edit(slug)
+      json = !ARGV.delete('--json').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.edit_unknown_option', option: unknown) if unknown
+      if json
+        # The text as the editor would open it, handed out for a program
+        # to edit elsewhere and send back as a file saying `edits:`.
+        abort t('cli.edit_json_needs_slug') if ARGV.empty?
+
+        cmd_edit_json(ARGV.shift)
+      else
+        slug = ARGV.shift || pick_slug_interactively
+        cmd_edit(slug)
+      end
     when 'props'
       json = !ARGV.delete('--json').nil?
       yes = !ARGV.delete('--yes').nil?

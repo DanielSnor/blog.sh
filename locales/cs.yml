@@ -361,8 +361,10 @@ cli:
   preview_label: "Náhled: %{url}"
   mark_scheduled: "[NAPLÁNOVÁNO]"
   edit_from_not_found: "Příspěvek %{slug} neexistuje — nic se nezapsalo."
-  edit_from_not_a_draft: "%{slug} je publikovaný a takhle jde upravit jen koncept — nic se nezapsalo. Uprav ho u počítače: ./blog.sh edit %{slug}"
+  edit_from_base_required: "%{slug} je publikovaný a text, který ho upravuje, musí říct, kterou verzi upravoval (base:), aby se potichu nepřepsala změna udělaná mezitím jinde — nic se nezapsalo. Otevři příspěvek znovu a vyjdi z toho, co říká teď."
   edit_from_changed: "%{slug} se změnil potom, co z něj byl vzat tenhle text — mezitím ho někdo upravil nebo publikoval. Nic se nezapsalo; otevři koncept znovu a začni od toho, co v něm je teď."
+  edit_unknown_option: "Neznámá volba: %{option}. edit bere slug a --json, které text vydá jako data místo otevření editoru."
+  edit_json_needs_slug: "--json musí pojmenovat příspěvek: `edit <slug> --json`."
   drafts_none: "Žádné koncepty."
   drafts_problem_content_lost: "z telefonu ne: markdown by část ztratil"
   drafts_problem_missing_media: "z telefonu ne: chybí obrázek, který jmenuje"
@@ -652,7 +654,9 @@ cli:
       ./blog.sh add [<soubor>]       založí koncept, ukáže náhled a zeptá se, co dál;
                                      se souborem s markdownem se nezeptá na nic a jen zapíše koncept,
                                      což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
-      ./blog.sh edit [<slug>]        edituje příspěvek, bez slugu nabídne posledních %{recent_count} příspěvků k editaci
+      ./blog.sh edit [<slug>] [--json]
+                                     edituje příspěvek, bez slugu nabídne posledních %{recent_count} příspěvků k editaci;
+                                     --json vydá text jako data místo otevření editoru
       ./blog.sh translate <slug> --lang <kód>
                                      napíše text toho příspěvku v dalším jazyce, který web publikuje
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <jméno> --yes] [--rebuild]

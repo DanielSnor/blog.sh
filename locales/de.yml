@@ -373,8 +373,10 @@ cli:
   preview_label: "Vorschau: %{url}"
   mark_scheduled: "[GEPLANT]"
   edit_from_not_found: "Es gibt keinen Beitrag namens %{slug} -- nichts wurde geschrieben."
-  edit_from_not_a_draft: "%{slug} ist veröffentlicht, und so lässt sich nur ein Entwurf bearbeiten -- nichts wurde geschrieben. Bearbeite ihn am Rechner: ./blog.sh edit %{slug}"
+  edit_from_base_required: "%{slug} ist veröffentlicht, und ein Text, der ihn bearbeitet, muss sagen, welche Fassung er bearbeitet hat (base:), damit eine inzwischen anderswo gemachte Änderung nicht stillschweigend überschrieben wird -- nichts wurde geschrieben. Öffne den Beitrag erneut und geh von dem aus, was er jetzt sagt."
   edit_from_changed: "%{slug} hat sich geändert, nachdem dieser Text daraus genommen wurde -- woanders bearbeitet oder inzwischen veröffentlicht. Nichts wurde geschrieben; öffne den Entwurf erneut und fang bei dem an, was jetzt darin steht."
+  edit_unknown_option: "Unbekannte Option: %{option}. edit kennt einen Slug und --json, das den Text als Daten ausgibt, statt einen Editor zu öffnen."
+  edit_json_needs_slug: "--json muss den Beitrag benennen: `edit <slug> --json`."
   drafts_none: "Keine Entwürfe."
   drafts_problem_content_lost: "nicht vom Telefon: Markdown würde einen Teil verlieren"
   drafts_problem_missing_media: "nicht vom Telefon: ein genanntes Bild fehlt"
@@ -664,7 +666,9 @@ cli:
       ./blog.sh add [<Datei>]        legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht;
                                      mit einer Markdown-Datei fragt es gar nichts und schreibt nur den Entwurf --
                                      der Weg für Handy, Skript oder Kurzbefehl (--json meldet das Ergebnis als Daten)
-      ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+      ./blog.sh edit [<slug>] [--json]
+                                     bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten;
+                                     --json gibt den Text als Daten aus, statt einen Editor zu öffnen
       ./blog.sh translate <slug> --lang <code>
                                      schreibt den Text des Beitrags in einer weiteren Sprache der Website
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <Name> --yes] [--rebuild]

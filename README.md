@@ -232,7 +232,8 @@ says what you are running.
                                # creates a draft, shows a preview, asks what's next;
                                # with a markdown file it asks nothing, and --json answers as data;
                                # --untrusted refuses a picture reference that is not a bare filename
-./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
+./blog.sh edit [<slug>] [--json]
+                               # without a slug, offers the last 50 posts; --json hands the text out as data
 ./blog.sh translate <slug> --lang <code>
                                # writes the post's text in another language the site publishes
 ./blog.sh props [<slug>] [--json]

@@ -15,8 +15,9 @@
 # a slug, `trash`, `versions` -- is held to a slug's own alphabet. --json
 # is added when it is missing, so an answer is always an object.
 #
-# What is NOT here, on purpose: edit, translate, add (a post arrives as a
-# delivery through `receive`), export, preview, doctor's repairs, check's
+# What is NOT here, on purpose: translate, add (a post arrives as a
+# delivery through `receive`; `edit` is allowed because with --json it only
+# hands the text out), export, preview, doctor's repairs, check's
 # --repair and --online, browse and the wizard. Each either opens an
 # editor, asks a question, writes outside the archive or reaches the
 # network on somebody else's account; a program with a key is not the
@@ -62,6 +63,7 @@ ALLOWED = {
   'version' => %w[],
   'list' => %w[--drafts --type= --tag=],
   'drafts' => %w[],
+  'edit' => %w[],
   'props' => %w[--set= --drop-address= --rename= --versions --restore-version= --yes --rebuild],
   'queue' => %w[--up= --down= --move= --to=],
   'schedule' => %w[--at= --cancel --compact --allow-partial],

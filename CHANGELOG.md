@@ -63,6 +63,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
   close its side of the stream, handed to `receive.sh` whole; `version --json` says the receiver's
   ceiling (`max_mb`), and `props --json` which network [t] announces on, the slot the schedule
   dialog would offer, and the [e] rows in the words `--set` takes back.
+- **`edit <slug> --json`, and a published post edited from a file.** The text as the editor opens
+  it, handed out for any post; a file saying `edits: <slug>` may now edit a published post too, with
+  `base:` required so a change made elsewhere in the meantime is refused rather than overwritten.
+  The app on a phone is a desk now.
 
 
 ## 1.9 -- 2026-09-28
