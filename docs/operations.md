@@ -1058,7 +1058,14 @@ Three rules follow from "nobody is at the keyboard":
 |---|---|---|
 | `list [filters] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned), `count`, `drafts` | -- |
 | `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post | `not_found`, `ambiguous_slug` |
+| `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property` |
+| `props <slug> --drop-address <address> --json` | the screen after the drop | `address_unknown` |
+| `props <slug> --rename <slug> --yes --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable` |
+| `props <slug> --versions --json` | `versions`: name, date, label, newest first | -- |
+| `props <slug> --restore-version <name> --yes --json` | the screen after the restore, the preview rebuilt | `version_unknown`, `version_unreadable` |
 | `queue --json` | `queue`: position, date, slug, year, title, overdue | -- |
+| `queue --up <slug> --json`, `--down <slug>`, `--move <slug> --to <n>` | the queue afterwards, `warnings`; nothing is rebuilt -- the screen rebuilds once on the way out, a program calls `rebuild --json` when it is done | `not_scheduled`, `ambiguous_slug`, `not_moved` (first, last, or its time has passed), `bad_position`, `overdue` |
+| `toot <slug> [--force] --json`, `bluesky <slug> [--force] --json` | `url`, `recovered` (Bluesky found the announcement on the account instead of sending one) | `wrong_network`, `no_network`, `still_draft`, `already_announced`, `unlisted`, `outside_window` (unless `--force`), `failed`, `not_sent` |
 | `drafts --json [<slug>]` | the drafts with their text, as the phone opens them | `not_found` |
 | `schedule <slug> --at <time> --json` | the post, `position` in the queue, `compacted` (0) | `schedule_needs_at`, `bad_date`, `not_future`, `already_published`, `partial_translation`, `busy` |
 | `schedule <slug> --cancel [--compact] --json` | the post back among the drafts, `compacted`: how many moved forward | `not_scheduled`, `busy` |

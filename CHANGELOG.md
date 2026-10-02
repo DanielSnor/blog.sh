@@ -48,6 +48,12 @@ goes in is still being decided; the suffix and the date both come off at the tag
   the terminal asks is a flag or a refusal; a flag that answers a dialog's question is refused
   without `--json`, where the dialog is there to ask it. See *Driving the engine from a program*
   in docs/operations.md.
+- **The rest of the properties screen and the queue, for a program.** `props <slug> --set
+  series=... --set tags=... --json` writes the [e] rows and the pin; `--drop-address`, `--rename
+  <slug> --yes`, `--versions` and `--restore-version <name> --yes` are the [a], [r] and [v] keys;
+  `queue --up <slug>`, `--down <slug>` and `--move <slug> --to <n>` are [u], [d] and [m]; `toot` and
+  `bluesky` answer with the address or the reason, `--force` answering the "announce it anyway?"
+  question. Every answer is the screen as it stands afterwards.
 
 
 ## 1.9 -- 2026-09-28

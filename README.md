@@ -238,7 +238,9 @@ says what you are running.
 ./blog.sh props [<slug>] [--json]
                                # a post's state and its actions; [e] changes what the post IS --
                                # its series and part, tags, type, and the unlisted/hero/toc flags;
-                               # --json prints it all as data, with the actions that apply
+                               # --json prints it all as data, with the actions that apply, and takes
+                               # the screen's keys as flags: --set k=v, --drop-address, --rename --yes,
+                               # --versions, --restore-version --yes, --rebuild
 ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                # shows the draft's preview, asks what's next;
                                # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky;
@@ -246,7 +248,8 @@ says what you are running.
 ./blog.sh schedule [<slug>] [--at <time>] [--cancel] [--compact] [--json]
                                # asks for a date, then auto-publishes the draft when it arrives;
                                # --json with --at writes that date, --cancel takes the post out of the queue
-./blog.sh queue [--json]       # what is scheduled, when each one goes, and the slots it uses
+./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
+                               # what is scheduled, when each one goes, and the slots it uses
 ./blog.sh unpublish [<slug>] [--yes] [--json]
                                # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
@@ -257,8 +260,10 @@ says what you are running.
                                # deletes everything in the trash, for good
 ./blog.sh empty versions [--yes] [--json]
                                # keeps each post's newest version, removes the older ones
-./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
-./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
+./blog.sh toot [<slug>] [--force] [--json]
+                               # (re-)sends the comment toot (Mastodon sites)
+./blog.sh bluesky [<slug>] [--force] [--json]
+                               # (re-)sends the announcement (Bluesky sites)
 ./blog.sh rebuild [--full] [--force] [--json]
                                # rebuilds and deploys the whole site, every language it publishes;
                                # --full builds every page again instead of only the changed ones;

@@ -385,9 +385,24 @@ cli:
   drafts_problem_missing_media: "not from the phone: a picture it names is missing"
   drafts_problem_unreadable: "not from the phone: its text does not read back"
   drafts_unknown_option: "Unknown option: %{option}. drafts takes --json and a slug, nothing else."
-  props_unknown_option: "Unknown option: %{option}. props takes a slug and --json, nothing else."
+  props_unknown_option: "Unknown option: %{option}. props takes a slug and --json, and with --json also --set, --drop-address, --rename, --versions, --restore-version, --yes and --rebuild."
   props_json_needs_slug: "--json needs to name the post: `props <slug> --json`. Without a slug, props offers the posts to choose from, and an object for an answer means nobody is there to choose."
-  queue_unknown_option: "Unknown option: %{option}. queue takes --json, nothing else."
+  queue_unknown_option: "Unknown option: %{option}. queue takes --json, and with it --up, --down, --move and --to."
+  option_needs_value: "%{option} needs a value after it."
+  props_flags_need_json: "--set, --drop-address, --rename, --versions, --restore-version, --yes and --rebuild are the screen's keys answered for a program, and are for --json only; without it, props opens the screen."
+  props_one_action: "One action per call: --set (any number of times), --drop-address, --rename, --versions or --restore-version, not two of them."
+  props_bad_property: "Cannot set %{key} to \"%{value}\". The keys are %{keys}; series_part is a number or -, tags a comma-separated line or -, type one of the engine's eight or -, unlisted and pinned yes or no, hero and toc yes, no or default."
+  props_address_unknown: "This post has no old address %{address}."
+  props_version_unknown: "This post has no version called %{name} -- props --versions --json lists the ones it has."
+  props_rename_needs_yes: "--rename needs --yes beside it: the screen confirms a rename with a key, and a program confirms it with the flag."
+  props_restore_needs_yes: "--restore-version needs --yes beside it: it overwrites the text being worked on (the current text is kept as a version first)."
+  toot_unknown_option: "Unknown option: %{option}. %{command} takes a slug, and with --json also --force."
+  toot_json_needs_slug: "--json needs to name the post: `%{command} <slug> --json`."
+  toot_force_needs_json: "--force answers the \"announce it anyway?\" question for a program and is for --json only; without it, %{command} asks."
+  queue_one_move: "One move per call: --up, --down or --move, not two of them."
+  queue_flags_need_json: "--up, --down, --move and --to are the screen's keys answered for a program, and are for --json only; without them, queue opens the screen."
+  queue_to_missing: "--move needs --to <position> beside it: the slot the post is carried to, counted from 1."
+  queue_bad_position: "--to has to be a position in the queue, from 1 to %{count}."
   schedule_unknown_option: "Unknown option: %{option}. schedule takes a slug, --allow-partial, and with --json also --at <time>, --cancel and --compact."
   schedule_flags_need_json: "--at, --cancel and --compact answer the questions the dialog asks, and are for --json only: `schedule <slug> --at \"2026-08-15 09:00\" --json`. Without --json, schedule asks."
   schedule_json_needs_slug: "--json needs to name the post: `schedule <slug> --at <time> --json`."
@@ -661,7 +676,7 @@ cli:
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh translate <slug> --lang <code>
                                      writes that post's text in another language the site publishes
-      ./blog.sh props [<slug>] [--json]
+      ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <name> --yes] [--rebuild]
                                      a post's state, its properties (series, tags, type, flags) and its actions;
                                      --json prints them as data, with the actions that apply to it
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
@@ -670,7 +685,8 @@ cli:
       ./blog.sh schedule [<slug>] [--at <time>] [--cancel] [--compact] [--json]
                                      asks for a date and schedules the draft for automatic publishing then; run again to cancel;
                                      --json with --at writes that date, --cancel takes the post out of the queue (--compact shifts the rest forward)
-      ./blog.sh queue [--json]       the scheduled-post queue -- reorder, publish now, return a post to the drafts;
+      ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
+                                     the scheduled-post queue -- reorder, publish now, return a post to the drafts;
                                      --json prints it as data
       ./blog.sh unpublish [<slug>] [--yes] [--json]
                                      moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
@@ -682,8 +698,10 @@ cli:
                                      deletes everything in the trash for good, after telling you how much
       ./blog.sh empty versions [--yes] [--json]
                                      keeps each post's newest version and removes the older ones
-      ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
-      ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
+      ./blog.sh toot [<slug>] [--force] [--json]
+                                     (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
+      ./blog.sh bluesky [<slug>] [--force] [--json]
+                                     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
       ./blog.sh rebuild [--full] [--force] [--json]
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]

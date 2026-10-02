@@ -4594,6 +4594,14 @@ def props_versions(path, slug)
     return
   end
 
+  restore_version(path, restored)
+  puts t('cli.versions_restored', path: path)
+  puts
+  rebuild_and_deploy(t('cli.updating_preview'))
+end
+
+# The restore itself, shared with `props --restore-version --json`.
+def restore_version(path, restored)
   # The current text becomes a version too, so this is not the one move in
   # the engine that cannot be walked back.
   PostVersions.keep(path, content_dir: CONTENT_DIR)
@@ -4618,9 +4626,6 @@ def props_versions(path, slug)
   # exactly as edit_post takes it from the stored post.
   restore_media_src(current['content'], live_content)
   AtomicWrite.write_json(path, current)
-  puts t('cli.versions_restored', path: path)
-  puts
-  rebuild_and_deploy(t('cli.updating_preview'))
 end
 
 def props_addresses(path, slug)
@@ -4776,7 +4781,6 @@ end
 # rename, the old one after any kind of cancel.
 def rename_post(path, post, raw: nil)
   old_slug = post['slug']
-  year = File.basename(File.dirname(path))
 
   puts
   print t('cli.rename_prompt')
@@ -4786,65 +4790,19 @@ def rename_post(path, post, raw: nil)
   # itself -- "Přejmenovat na: Zrušeno." The same line Wizard.ask writes for
   # the same reason.
   puts unless Tui.interactive?
-  # Each of the five ways out below ends with one blank line, like every
-  # other command reachable from the wizard: this one is run from the
-  # properties dialog through screen.leave, and without it the "press a key"
-  # that follows sat flush against whatever was just refused.
+  # Each of the ways out below ends with one blank line, like every other
+  # command reachable from the wizard: this one is run from the properties
+  # dialog through screen.leave, and without it the "press a key" that
+  # follows sat flush against whatever was just refused.
   if input.empty?
     puts t('cli.cancelled')
     puts
     return old_slug
   end
 
-  new_slug = Slug.slugify(input)
-  if new_slug.empty?
-    puts t('cli.rename_unusable', input: input)
-    puts
-    return old_slug
-  end
-  # A slug is a filename (<slug>.json) and a URL segment; slugify keeps it
-  # to safe characters but not to a safe length, so a pasted paragraph
-  # reaches the write as a filename the filesystem rejects with a raw
-  # ENAMETOOLONG. cmd_add caps its slug at eight words for readability;
-  # this caps by bytes for correctness, well under any filesystem's limit.
-  if new_slug.bytesize > 200
-    puts t('cli.rename_too_long')
-    puts
-    return old_slug
-  end
-  if new_slug == old_slug
-    puts t('cli.rename_same')
-    puts
-    return old_slug
-  end
-
-  # Same guard as edit and publish, and it has to refuse EXACTLY what the
-  # build refuses -- so it asks PostAddress the same question the build
-  # asks, instead of working out its own answer. Comparing served
-  # addresses was its own answer, and it let through both pairs the build
-  # stops on: a draft (served under its token, but its file and media sit
-  # under year/slug like everyone else's) and a page (served at the root,
-  # so its year never seemed to matter). Either one turned a rename into a
-  # site that would not build.
-  new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
-  new_media_dir = File.join(MEDIA_DIR, year, new_slug)
-  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug,
-                                        path: new_path)
-  if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
-    # Not the shared post_already_exists text: that one says "continuing
-    # would overwrite it -- resolve manually", and a refused rename
-    # neither continues nor needs resolving. Picking another slug does.
-    #
-    # An occupant nobody can read is refused just the same -- a place whose
-    # owner will not open is not free space -- but it gets its own sentence,
-    # because "another post already uses that slug" is a claim about a file
-    # this process never managed to look at, and the reader would go
-    # looking for a post that may not be there.
-    if taken_address && AddressGuard.unreadable?(taken_address)
-      puts t('cli.rename_unreadable', slug: new_slug, path: taken_address)
-    else
-      puts t('cli.rename_taken', slug: new_slug)
-    end
+  new_slug, problem = rename_check(post, path, input)
+  if problem
+    puts problem.last
     puts
     return old_slug
   end
@@ -4874,6 +4832,71 @@ def rename_post(path, post, raw: nil)
   # draft -- no former_slugs, and the address it has been live at since
   # then dies with no redirect.
   abort_if_post_changed(path, raw, old_slug) if raw
+  rename_apply(path, post, new_slug)
+
+  puts Tui.paint(t('cli.renamed_label', slug: new_slug), :green)
+  if draft?(post)
+    rebuild_and_deploy(t('cli.updating_preview'))
+  else
+    maybe_rebuild
+  end
+  new_slug
+end
+
+# What the typed name becomes, or why it cannot: [new_slug, nil] or
+# [nil, [code, sentence]]. Shared with `props --rename --json`, so the
+# dialog and the program refuse exactly the same names.
+def rename_check(post, path, input)
+  old_slug = post['slug']
+  year = File.basename(File.dirname(path))
+
+  new_slug = Slug.slugify(input)
+  return [nil, ['rename_unusable', t('cli.rename_unusable', input: input)]] if new_slug.empty?
+  # A slug is a filename (<slug>.json) and a URL segment; slugify keeps it
+  # to safe characters but not to a safe length, so a pasted paragraph
+  # reaches the write as a filename the filesystem rejects with a raw
+  # ENAMETOOLONG. cmd_add caps its slug at eight words for readability;
+  # this caps by bytes for correctness, well under any filesystem's limit.
+  return [nil, ['rename_too_long', t('cli.rename_too_long')]] if new_slug.bytesize > 200
+  return [nil, ['rename_same', t('cli.rename_same')]] if new_slug == old_slug
+
+  # Same guard as edit and publish, and it has to refuse EXACTLY what the
+  # build refuses -- so it asks PostAddress the same question the build
+  # asks, instead of working out its own answer. Comparing served
+  # addresses was its own answer, and it let through both pairs the build
+  # stops on: a draft (served under its token, but its file and media sit
+  # under year/slug like everyone else's) and a page (served at the root,
+  # so its year never seemed to matter). Either one turned a rename into a
+  # site that would not build.
+  new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
+  new_media_dir = File.join(MEDIA_DIR, year, new_slug)
+  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug,
+                                        path: new_path)
+  if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
+    # Not the shared post_already_exists text: that one says "continuing
+    # would overwrite it -- resolve manually", and a refused rename
+    # neither continues nor needs resolving. Picking another slug does.
+    #
+    # An occupant nobody can read is refused just the same -- a place whose
+    # owner will not open is not free space -- but it gets its own sentence,
+    # because "another post already uses that slug" is a claim about a file
+    # this process never managed to look at, and the reader would go
+    # looking for a post that may not be there.
+    if taken_address && AddressGuard.unreadable?(taken_address)
+      return [nil, ['rename_unreadable', t('cli.rename_unreadable', slug: new_slug, path: taken_address)]]
+    end
+
+    return [nil, ['rename_taken', t('cli.rename_taken', slug: new_slug)]]
+  end
+  [new_slug, nil]
+end
+
+# The rename itself. Returns the post's new path.
+def rename_apply(path, post, new_slug)
+  old_slug = post['slug']
+  year = File.basename(File.dirname(path))
+  new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
+  new_media_dir = File.join(MEDIA_DIR, year, new_slug)
 
   updated = post.merge('slug' => new_slug)
   unless draft?(post)
@@ -4901,14 +4924,7 @@ def rename_post(path, post, raw: nil)
                     to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, new_slug))
   AtomicWrite.write_json(new_path, updated)
   File.delete(path)
-
-  puts Tui.paint(t('cli.renamed_label', slug: new_slug), :green)
-  if draft?(post)
-    rebuild_and_deploy(t('cli.updating_preview'))
-  else
-    maybe_rebuild
-  end
-  new_slug
+  new_path
 end
 
 # Which languages the site publishes that this post has no words in.
@@ -6309,6 +6325,13 @@ end
 # and `publish --json` answer with, plus whether the site was rebuilt.
 # `deploy` is 'skipped' when the caller did not ask for a rebuild (the
 # terminal would have asked them; a program says --rebuild or nothing).
+def deploy_word(rebuilt)
+  if rebuilt.nil? then 'skipped'
+  elsif rebuilt then 'done'
+  else 'pending'
+  end
+end
+
 def acted_answer(path, warnings, rebuilt: nil)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   {
@@ -6320,10 +6343,7 @@ def acted_answer(path, warnings, rebuilt: nil)
     # nil for a plain draft, the rule props_as_json follows.
     'date' => draft?(post) && !post['scheduled'] ? nil : post_time!(post).iso8601,
     'url' => url_for_json(post),
-    'deploy' => if rebuilt.nil? then 'skipped'
-                elsif rebuilt then 'done'
-                else 'pending'
-                end,
+    'deploy' => deploy_word(rebuilt),
     'warnings' => warnings
   }
 end
@@ -6403,10 +6423,7 @@ def delete_as_json(slug, rebuild:)
     deployed = rebuild_if_asked(rebuild, warnings)
     { 'ok' => true, 'slug' => slug, 'year' => year, 'trash' => trash_dir,
       'announcement_kept' => [trashed['mastodon_url'], trashed['bluesky_url']].compact,
-      'deploy' => if deployed.nil? then 'skipped'
-                  elsif deployed then 'done'
-                  else 'pending'
-                  end,
+      'deploy' => deploy_word(deployed),
       'warnings' => warnings }
   end
 end
@@ -6476,13 +6493,246 @@ def empty_as_json(what, yes:)
   end
 end
 
-def queue_as_json
-  rows = queue_entries.each_with_index.map do |entry, index|
+# `toot <slug> --json` / `bluesky <slug> --json`: the announcement sent by
+# hand, with every reason it would not be as a code. --force answers the
+# "this post is old -- announce it anyway?" question the terminal asks.
+def announce_as_json(slug, wanted, force:)
+  answer_json do
+    network = SiteConfig.comment_network
+    if wanted == :mastodon
+      refuse('wrong_network', t('cli.use_bluesky_command')) if network == :bluesky
+      refuse('no_network', t('cli.no_network_toot')) if network.nil?
+    else
+      refuse('wrong_network', t('cli.use_toot_command')) unless network == :bluesky
+    end
+    path, _raw, post = post_for_json(slug)
+    refuse('still_draft', t('cli.still_draft_toot', slug: slug)) if draft?(post)
+    refuse('already_announced', t('cli.announcement_exists', url: Publishing.announcement_url(post))) if Publishing.announced?(post)
+    refuse('unlisted', t('cli.unlisted_no_toot')) if Publishing.unlisted?(post)
+    date = post_time!(post)
+    year = PostAddress.date_year(post)
+    unless force || Publishing.within_recency_window?(date)
+      refuse('outside_window', t('cli.toot_skipped_old', date: date.strftime(t('date_format'))))
+    end
+    if network == :bluesky
+      # The same recovery cmd_bluesky runs first: an announcement whose
+      # reply never came back is found on the account, not sent twice.
+      candidates = [Publishing.post_url(post['slug'], year, page: PostAddress.page?(post))]
+      candidates << Publishing.post_url(post['slug'], year, page: false) if PostAddress.page?(post)
+      if (found = candidates.uniq.filter_map { |url| BlueskyPoster.find_announcement(url) }.first)
+        AtomicWrite.write_json(path, post.merge('bluesky_url' => found[:url], 'bluesky_uri' => found[:uri]))
+        next { 'ok' => true, 'slug' => slug, 'url' => found[:url], 'recovered' => true, 'warnings' => [] }
+      end
+    end
+    fields, warnings = quietly(true, keep_stdout: true) { announce_post(post, year: year, date: date, force: force) }
+    refuse('failed', warnings.last || t('cli.toot_failed')) if fields == false
+    refuse('not_sent', warnings.join(' ')) if fields.nil?
+    AtomicWrite.write_json(path, post.merge(fields))
+    { 'ok' => true, 'slug' => slug, 'url' => fields['mastodon_url'] || fields['bluesky_url'],
+      'recovered' => false, 'warnings' => warnings }
+  end
+end
+
+# `props <slug> --set key=value --json`: the [e] screen's rows and the [c]
+# key, written in one go. The words are the ones the screen shows --
+# yes/no, and default for the two flags that have the site's own answer
+# -- and a dash clears what the screen's first row would clear.
+PROPERTY_KEYS = %w[series series_part tags type unlisted hero toc pinned].freeze
+
+def apply_property_sets(post, sets)
+  updated = post.dup
+  sets.each do |pair|
+    key, _, value = pair.partition('=')
+    value = value.strip
+    bad = -> { refuse('bad_property', t('cli.props_bad_property', key: key, value: value, keys: PROPERTY_KEYS.join(', '))) }
+    case key
+    when 'series'
+      if value == '-' || value.empty?
+        # The part number goes with it, the way the screen's first row
+        # takes it: a number without a series is a field nothing reads.
+        updated.delete('series')
+        updated.delete('series_part')
+      else
+        updated['series'] = value
+      end
+    when 'series_part'
+      if value == '-' then updated.delete('series_part')
+      elsif value.match?(/\A[1-9]\d{0,3}\z/) then updated['series_part'] = value.to_i
+      else bad.call
+      end
+    when 'tags'
+      if value == '-'
+        updated['tags'] = []
+      else
+        tags = tags_from_frontmatter(value)
+        tags.empty? ? bad.call : updated['tags'] = tags
+      end
+    when 'type'
+      if value == '-' then updated.delete('type')
+      elsif ContentType::PRIORITY.include?(value) then updated['type'] = value
+      else bad.call
+      end
+    when 'unlisted', 'pinned'
+      case value
+      when 'yes' then updated[key] = true
+      when 'no' then updated.delete(key)
+      else bad.call
+      end
+    when 'hero', 'toc'
+      case value
+      when 'yes' then updated[key] = true
+      when 'no' then updated[key] = false
+      when 'default' then updated.delete(key)
+      else bad.call
+      end
+    else
+      bad.call
+    end
+  end
+  if updated['series_part'] && updated['series'].to_s.strip.empty?
+    refuse('bad_property', t('cli.series_part_needs_series'))
+  end
+  updated
+end
+
+# The properties screen after a write: the same object `props --json`
+# reads, plus what the write did to the site.
+def props_after(slug, warnings, deployed)
+  props_as_json(slug).merge('deploy' => deploy_word(deployed), 'warnings' => warnings)
+end
+
+def props_set_as_json(slug, sets:, rebuild:)
+  answer_json do
+    path, _raw, post = post_for_json(slug)
+    updated = apply_property_sets(post, sets)
+    warnings = []
+    if truthy_frontmatter?(updated['pinned']) && !truthy_frontmatter?(post['pinned'])
+      # The note toggle_pin prints: only one pin ever shows.
+      other = load_posts_summary.find { |p| p[:pinned] && p[:slug] != slug }
+      warnings << t('cli.pin_other', slug: other[:slug]) if other
+    end
+    AtomicWrite.write_json(path, updated)
+    props_after(slug, warnings, rebuild_if_asked(rebuild, warnings))
+  end
+end
+
+# `props <slug> --drop-address <address> --json`: the [a] screen's one action.
+def props_drop_address_as_json(slug, address, rebuild:)
+  answer_json do
+    path, _raw, post = post_for_json(slug)
+    entry = address_entries(post).find { |_, value| value == address }
+    refuse('address_unknown', t('cli.props_address_unknown', address: address)) unless entry
+    key, former = entry
+    updated = post.dup
+    remaining = Array(updated[key]).map(&:to_s) - [former]
+    remaining.empty? ? updated.delete(key) : updated[key] = remaining
+    AtomicWrite.write_json(path, updated)
+    warnings = []
+    props_after(slug, warnings, rebuild_if_asked(rebuild, warnings))
+  end
+end
+
+# `props <slug> --rename <new> --yes --json`: the [r] key with its answer
+# and its confirmation given. A draft's preview is rebuilt as the screen
+# rebuilds it; a published post's rename waits for --rebuild like the
+# screen waits for the answer to its question.
+def rename_as_json(slug, input, rebuild:)
+  answer_json do
+    path, _raw, post = post_for_json(slug)
+    new_slug, problem = rename_check(post, path, input)
+    refuse(problem.first, problem.last) if problem
+    _new_path, warnings = quietly(true, keep_stdout: true) { rename_apply(path, post, new_slug) }
+    deployed = if draft?(post)
+                 done, more = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+                 warnings.concat(more)
+                 done
+               else
+                 rebuild_if_asked(rebuild, warnings)
+               end
+    props_after(new_slug, warnings, deployed)
+  end
+end
+
+# `props <slug> --versions --json`: the [v] list.
+def version_time(name)
+  m = name.match(/\A(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/)
+  m && Time.new(m[1].to_i, m[2].to_i, m[3].to_i, m[4].to_i, m[5].to_i, m[6].to_i)
+end
+
+def versions_as_json(slug)
+  answer_json do
+    path, = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    rows = PostVersions.list(slug, year, content_dir: CONTENT_DIR).map do |file|
+      name = File.basename(file, '.json')
+      { 'name' => name, 'date' => version_time(name)&.iso8601, 'label' => PostVersions.human_stamp(name) }
+    end
+    { 'ok' => true, 'slug' => slug, 'year' => year, 'versions' => rows }
+  end
+end
+
+# `props <slug> --restore-version <name> --yes --json`: one of them chosen.
+# The preview is rebuilt as the screen rebuilds it, without asking.
+def restore_version_as_json(slug, name)
+  answer_json do
+    path, = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    file = PostVersions.list(slug, year, content_dir: CONTENT_DIR).find { |f| File.basename(f, '.json') == name }
+    refuse('version_unknown', t('cli.props_version_unknown', name: name)) unless file
+    restored = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue JSON::ParserError, SystemCallError => e
+      refuse('version_unreadable', "#{File.basename(file)}: #{e.class} -- #{e.message.lines.first.to_s.strip[0, 80]}")
+    end
+    restore_version(path, restored)
+    deployed, warnings = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+    props_after(slug, warnings, deployed)
+  end
+end
+
+# `queue --up <slug> --json`, `--down`, `--move <slug> --to <n>`: the [u],
+# [d] and [m] keys, the post named rather than under a cursor. The answer
+# is the queue as it stands afterwards. Nothing is rebuilt: the screen
+# rebuilds once on the way out, and a program calls `rebuild --json` when
+# it is done moving things.
+def queue_move_as_json(which, slug, to)
+  answer_json do
+    entries = queue_entries
+    matches = entries.each_index.select do |i|
+      [entries[i][:slug], "#{File.basename(File.dirname(entries[i][:path]))}/#{entries[i][:slug]}"].include?(slug)
+    end
+    refuse('not_scheduled', t('cli.schedule_not_scheduled', slug: slug)) if matches.empty?
+    refuse('ambiguous_slug', t('cli.ambiguous_slug', slug: slug, count: matches.size)) if matches.size > 1
+    index = matches.first
+    first_future = entries.index { |entry| entry[:time] > Time.now }
+    overdue = ->(i) { first_future.nil? || i < first_future }
+    moved, warnings = quietly(true, keep_stdout: true) do
+      case which
+      when :up then queue_swap(entries, index, index - 1)
+      when :down then queue_swap(entries, index, index + 1)
+      when :move
+        target = Integer(to.to_s, exception: false)
+        refuse('bad_position', t('cli.queue_bad_position', count: entries.size)) unless target&.between?(1, entries.size)
+        target -= 1
+        refuse('overdue', t('cli.queue_swap_overdue')) if overdue.call(index) || overdue.call(target)
+        target == index ? true : queue_carry_apply(entries, index, target)
+      end
+    end
+    refuse('not_moved', warnings.join(' ')) unless moved
+    { 'ok' => true, 'queue' => queue_rows, 'warnings' => warnings }
+  end
+end
+
+def queue_rows
+  queue_entries.each_with_index.map do |entry, index|
     { 'position' => index + 1, 'date' => entry[:time].iso8601, 'slug' => entry[:slug],
       'year' => File.basename(File.dirname(entry[:path])), 'title' => post_name_for(entry[:post]),
       'overdue' => entry[:time] <= Time.now }
   end
-  puts JSON.pretty_generate('ok' => true, 'queue' => rows)
+end
+
+def queue_as_json
+  puts JSON.pretty_generate('ok' => true, 'queue' => queue_rows)
 end
 
 def cmd_list(filters)
@@ -7567,6 +7817,33 @@ end
 
 # --- CLI dispatch ----------------------------------------------------------
 
+# `--name value` or `--name=value`, taken out of ARGV; nil when absent. A
+# name with nothing after it is refused rather than read as nothing.
+# ⚠️ Through utf8, for the reason the list filters go through it: ARGV
+# arrives in the encoding the ENVIRONMENT declares, and with LANG unset --
+# docker exec, cron, the forced command a phone's key runs -- that is
+# ASCII-8BIT. A series called Procházky then reached JSON.generate as
+# binary and a rename to "Venku a dál" died in unicode_normalize.
+def option_value!(name)
+  value = ARGV.find { |arg| arg.start_with?("#{name}=") }&.delete_prefix("#{name}=")
+  ARGV.reject! { |arg| arg.start_with?("#{name}=") }
+  if value.nil? && (index = ARGV.index(name))
+    value = ARGV[index + 1]
+    abort t('cli.option_needs_value', option: name) if value.nil? || value.start_with?('--')
+    ARGV.slice!(index, 2)
+  end
+  value && utf8(value)
+end
+
+# `--set key=value`, as many times as it is said.
+def option_values!(name)
+  values = []
+  while (value = option_value!(name))
+    values << value
+  end
+  values
+end
+
 command = ARGV.shift
 
 # `help` and `version` are the two commands a fresh (or broken) install
@@ -7671,15 +7948,46 @@ begin
       cmd_edit(slug)
     when 'props'
       json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      rebuild = !ARGV.delete('--rebuild').nil?
+      versions = !ARGV.delete('--versions').nil?
+      sets = option_values!('--set')
+      drop = option_value!('--drop-address')
+      rename = option_value!('--rename')
+      restore = option_value!('--restore-version')
       unknown = ARGV.find { |arg| arg.start_with?('--') }
       abort t('cli.props_unknown_option', option: unknown) if unknown
+      # One key of the screen per call, the way one keypress does one thing.
+      actions = [sets.any?, !drop.nil?, !rename.nil?, versions, !restore.nil?].count(true)
+      abort t('cli.props_one_action') if actions > 1
       if json
         # An object for an answer means nobody is watching, and the picker
         # this skips is the only thing that would ask.
         abort t('cli.props_json_needs_slug') if ARGV.empty?
 
-        cmd_props_json(ARGV.shift)
+        slug = ARGV.shift
+        if sets.any?
+          props_set_as_json(slug, sets: sets, rebuild: rebuild)
+        elsif drop
+          props_drop_address_as_json(slug, drop, rebuild: rebuild)
+        elsif rename
+          # The screen confirms a rename with a key; a program says --yes.
+          abort t('cli.props_rename_needs_yes') unless yes
+
+          rename_as_json(slug, rename, rebuild: rebuild)
+        elsif versions
+          versions_as_json(slug)
+        elsif restore
+          abort t('cli.props_restore_needs_yes') unless yes
+
+          restore_version_as_json(slug, restore)
+        else
+          cmd_props_json(slug)
+        end
       else
+        # The screen's keys answer these at the terminal.
+        abort t('cli.props_flags_need_json') if actions.positive? || yes || rebuild
+
         slug = ARGV.shift || pick_slug_interactively
         cmd_props(slug)
       end
@@ -7759,12 +8067,7 @@ begin
       cancel = !ARGV.delete('--cancel').nil?
       compact = !ARGV.delete('--compact').nil?
       # `--at <time>` or `--at=<time>`: the date the dialog would ask for.
-      at = ARGV.find { |arg| arg.start_with?('--at=') }&.delete_prefix('--at=')
-      ARGV.reject! { |arg| arg.start_with?('--at=') }
-      if at.nil? && (index = ARGV.index('--at'))
-        at = ARGV[index + 1]
-        ARGV.slice!(index, 2)
-      end
+      at = option_value!('--at')
       unknown = ARGV.find { |arg| arg.start_with?('--') }
       abort t('cli.schedule_unknown_option', option: unknown) if unknown
       # The date, the cancellation and the shift are answers to questions
@@ -7780,8 +8083,27 @@ begin
       end
     when 'queue'
       json = !ARGV.delete('--json').nil?
+      up = option_value!('--up')
+      down = option_value!('--down')
+      move = option_value!('--move')
+      to = option_value!('--to')
       abort t('cli.queue_unknown_option', option: ARGV.first) unless ARGV.empty?
-      json ? queue_as_json : cmd_queue
+      moves = [up, down, move].compact
+      abort t('cli.queue_one_move') if moves.size > 1
+      abort t('cli.queue_flags_need_json') if (moves.any? || to) && !json
+      if up
+        queue_move_as_json(:up, up, nil)
+      elsif down
+        queue_move_as_json(:down, down, nil)
+      elsif move
+        abort t('cli.queue_to_missing') if to.nil?
+
+        queue_move_as_json(:move, move, to)
+      elsif json
+        queue_as_json
+      else
+        cmd_queue
+      end
     when 'unpublish'
       json = !ARGV.delete('--json').nil?
       yes = !ARGV.delete('--yes').nil?
@@ -7799,12 +8121,22 @@ begin
         slug = ARGV.shift || pick_published_interactively
         cmd_unpublish(slug)
       end
-    when 'toot'
-      slug = ARGV.shift || pick_published_interactively
-      cmd_toot(slug)
-    when 'bluesky'
-      slug = ARGV.shift || pick_published_interactively
-      cmd_bluesky(slug)
+    when 'toot', 'bluesky'
+      json = !ARGV.delete('--json').nil?
+      force = !ARGV.delete('--force').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.toot_unknown_option', option: unknown, command: command) if unknown
+      if json
+        abort t('cli.toot_json_needs_slug', command: command) if ARGV.empty?
+
+        announce_as_json(ARGV.shift, command == 'toot' ? :mastodon : :bluesky, force: force)
+      else
+        # "This post is old -- announce it anyway?" is asked at the terminal.
+        abort t('cli.toot_force_needs_json', command: command) if force
+
+        slug = ARGV.shift || pick_published_interactively
+        command == 'toot' ? cmd_toot(slug) : cmd_bluesky(slug)
+      end
     when 'rebuild'
       # Read here rather than inside cmd_rebuild, the way `list` and `browse`
       # read their filters: the dispatcher is where this file turns a command

@@ -380,9 +380,24 @@ cli:
   drafts_problem_missing_media: "nicht vom Telefon: ein genanntes Bild fehlt"
   drafts_problem_unreadable: "nicht vom Telefon: der Text lässt sich nicht zurücklesen"
   drafts_unknown_option: "Unbekannte Option: %{option}. drafts kennt --json und einen Slug, sonst nichts."
-  props_unknown_option: "Unbekannte Option: %{option}. props kennt einen Slug und --json, sonst nichts."
+  props_unknown_option: "Unbekannte Option: %{option}. props kennt einen Slug und --json, und mit --json auch --set, --drop-address, --rename, --versions, --restore-version, --yes und --rebuild."
   props_json_needs_slug: "--json muss den Beitrag benennen: `props <slug> --json`. Ohne Slug bietet props die Beiträge zur Auswahl an, und eine Antwort als Objekt heißt, dass niemand da ist, der wählt."
-  queue_unknown_option: "Unbekannte Option: %{option}. queue kennt --json, sonst nichts."
+  queue_unknown_option: "Unbekannte Option: %{option}. queue kennt --json und damit --up, --down, --move und --to."
+  option_needs_value: "%{option} braucht dahinter einen Wert."
+  props_flags_need_json: "--set, --drop-address, --rename, --versions, --restore-version, --yes und --rebuild sind die Tasten des Bildschirms, für ein Programm beantwortet, und gelten nur mit --json; ohne öffnet props den Bildschirm."
+  props_one_action: "Eine Aktion pro Aufruf: --set (beliebig oft), --drop-address, --rename, --versions oder --restore-version, nicht zwei davon."
+  props_bad_property: "%{key} lässt sich nicht auf \"%{value}\" setzen. Die Schlüssel sind %{keys}; series_part ist eine Zahl oder -, tags eine kommagetrennte Zeile oder -, type einer der acht Typen der Engine oder -, unlisted und pinned yes oder no, hero und toc yes, no oder default."
+  props_address_unknown: "Dieser Beitrag hat keine alte Adresse %{address}."
+  props_version_unknown: "Dieser Beitrag hat keine Version namens %{name} -- props --versions --json listet die vorhandenen."
+  props_rename_needs_yes: "--rename braucht --yes daneben: der Bildschirm bestätigt eine Umbenennung mit einer Taste, ein Programm mit dem Schalter."
+  props_restore_needs_yes: "--restore-version braucht --yes daneben: es überschreibt den Text in Arbeit (der aktuelle wird zuerst als Version behalten)."
+  toot_unknown_option: "Unbekannte Option: %{option}. %{command} kennt einen Slug und mit --json auch --force."
+  toot_json_needs_slug: "--json muss den Beitrag benennen: `%{command} <slug> --json`."
+  toot_force_needs_json: "--force beantwortet die Frage „trotzdem ankündigen?“ für ein Programm und gilt nur mit --json; ohne fragt %{command} selbst."
+  queue_one_move: "Ein Zug pro Aufruf: --up, --down oder --move, nicht zwei davon."
+  queue_flags_need_json: "--up, --down, --move und --to sind die Tasten des Bildschirms, für ein Programm beantwortet, und gelten nur mit --json; ohne öffnet queue den Bildschirm."
+  queue_to_missing: "--move braucht --to <Position> daneben: der Platz, an den der Beitrag getragen wird, ab 1 gezählt."
+  queue_bad_position: "--to muss eine Position in der Warteschlange sein, von 1 bis %{count}."
   schedule_unknown_option: "Unbekannte Option: %{option}. schedule kennt einen Slug, --allow-partial und mit --json auch --at <Zeit>, --cancel und --compact."
   schedule_flags_need_json: "--at, --cancel und --compact beantworten die Fragen des Dialogs und gelten nur mit --json: `schedule <slug> --at \"2026-08-15 09:00\" --json`. Ohne --json fragt schedule selbst."
   schedule_json_needs_slug: "--json muss den Beitrag benennen: `schedule <slug> --at <Zeit> --json`."
@@ -652,7 +667,7 @@ cli:
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh translate <slug> --lang <code>
                                      schreibt den Text des Beitrags in einer weiteren Sprache der Website
-      ./blog.sh props [<slug>] [--json]
+      ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <Name> --yes] [--rebuild]
                                      Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen;
                                      --json gibt sie als Daten aus, mit den Aktionen, die auf ihn zutreffen
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
@@ -661,7 +676,8 @@ cli:
       ./blog.sh schedule [<slug>] [--at <Zeit>] [--cancel] [--compact] [--json]
                                      fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab;
                                      --json mit --at schreibt diese Zeit, --cancel nimmt den Beitrag aus der Warteschlange (--compact rückt den Rest vor)
-      ./blog.sh queue [--json]       die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen;
+      ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
+                                     die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen;
                                      --json gibt sie als Daten aus
       ./blog.sh unpublish [<slug>] [--yes] [--json]
                                      setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
@@ -673,8 +689,10 @@ cli:
                                      löscht den Papierkorb endgültig; sagt vorher, wie viel darin ist
       ./blog.sh empty versions [--yes] [--json]
                                      behält je Beitrag die neueste Fassung und entfernt die älteren
-      ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
-      ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
+      ./blog.sh toot [<slug>] [--force] [--json]
+                                     verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
+      ./blog.sh bluesky [<slug>] [--force] [--json]
+                                     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
       ./blog.sh rebuild [--full] [--force] [--json]
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
