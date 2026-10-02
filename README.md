@@ -235,14 +235,16 @@ says what you are running.
 ./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
 ./blog.sh translate <slug> --lang <code>
                                # writes the post's text in another language the site publishes
-./blog.sh props [<slug>]       # a post's state and its actions; [e] changes what the post IS --
-                               # its series and part, tags, type, and the unlisted/hero/toc flags
+./blog.sh props [<slug>] [--json]
+                               # a post's state and its actions; [e] changes what the post IS --
+                               # its series and part, tags, type, and the unlisted/hero/toc flags;
+                               # --json prints it all as data, with the actions that apply
 ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                # shows the draft's preview, asks what's next;
                                # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky;
                                # --json (with --yes) answers as one object, for a script or a phone
 ./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
-./blog.sh queue                # what is scheduled, when each one goes, and the slots it uses
+./blog.sh queue [--json]       # what is scheduled, when each one goes, and the slots it uses
 ./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
 ./blog.sh delete [<slug>]      # deletes a post to trash/
 ./blog.sh restore [<slug>]     # restores a post from trash
@@ -257,8 +259,8 @@ says what you are running.
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                # the archive on screen: filters, search, preview, Enter opens the post
-./blog.sh list [--type=image] [--tag=foo] [--drafts]
-                               # the same, printed one line per post
+./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
+                               # the same, printed one line per post; --json as data
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it;
                                # --online also asks the feeds, the analytics script, the access
                                # token and the deploy target -- whether it answers, what is in its root

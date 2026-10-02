@@ -385,6 +385,9 @@ cli:
   drafts_problem_missing_media: "not from the phone: a picture it names is missing"
   drafts_problem_unreadable: "not from the phone: its text does not read back"
   drafts_unknown_option: "Unknown option: %{option}. drafts takes --json and a slug, nothing else."
+  props_unknown_option: "Unknown option: %{option}. props takes a slug and --json, nothing else."
+  props_json_needs_slug: "--json needs to name the post: `props <slug> --json`. Without a slug, props offers the posts to choose from, and an object for an answer means nobody is there to choose."
+  queue_unknown_option: "Unknown option: %{option}. queue takes --json, nothing else."
   mark_draft: "[DRAFT]"
   mark_pinned: "[PINNED]"
   local_preview_hint_deployed: "The address above is the template's example -- the site does deploy, only site.base_url does not say where yet (./setup.sh fixes it). To look here: ./blog.sh preview and %{url}."
@@ -641,12 +644,15 @@ cli:
       ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
       ./blog.sh translate <slug> --lang <code>
                                      writes that post's text in another language the site publishes
-      ./blog.sh props [<slug>]       a post's state, its properties (series, tags, type, flags) and its actions
+      ./blog.sh props [<slug>] [--json]
+                                     a post's state, its properties (series, tags, type, flags) and its actions;
+                                     --json prints them as data, with the actions that apply to it
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
                                      --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
       ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
-      ./blog.sh queue                the scheduled-post queue -- reorder, publish now, return a post to the drafts
+      ./blog.sh queue [--json]       the scheduled-post queue -- reorder, publish now, return a post to the drafts;
+                                     --json prints it as data
       ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
       ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
       ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
@@ -659,7 +665,7 @@ cli:
                                      --full builds every page again instead of only the ones that changed;
                                      --force lets the deploy past its guards and uploads everything
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
-      ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      walks the archive on screen: filters, search, preview, Enter opens the post

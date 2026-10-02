@@ -368,6 +368,9 @@ cli:
   drafts_problem_missing_media: "z telefonu ne: chybí obrázek, který jmenuje"
   drafts_problem_unreadable: "z telefonu ne: text nejde přečíst zpět"
   drafts_unknown_option: "Neznámá volba: %{option}. drafts bere --json a slug, nic jiného."
+  props_unknown_option: "Neznámá volba: %{option}. props bere slug a --json, nic jiného."
+  props_json_needs_slug: "--json musí pojmenovat příspěvek: `props <slug> --json`. Bez slugu nabídne props příspěvky na výběr — a odpověď jako objekt znamená, že u toho nikdo nesedí."
+  queue_unknown_option: "Neznámá volba: %{option}. queue bere --json, nic jiného."
   mark_draft: "[KONCEPT]"
   mark_pinned: "[PŘIPNUTO]"
   local_preview_hint_deployed: "Adresa výše je příklad ze šablony — web se nasazuje, jen site.base_url ještě neříká kam (opraví to ./setup.sh). Náhled tady: ./blog.sh preview a %{url}."
@@ -620,12 +623,15 @@ cli:
       ./blog.sh edit [<slug>]        edituje příspěvek, bez slugu nabídne posledních %{recent_count} příspěvků k editaci
       ./blog.sh translate <slug> --lang <kód>
                                      napíše text toho příspěvku v dalším jazyce, který web publikuje
-      ./blog.sh props [<slug>]       stav příspěvku, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním
+      ./blog.sh props [<slug>] [--json]
+                                     stav příspěvku, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním;
+                                     --json je vypíše jako data, včetně akcí, které na něj platí
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      ukáže náhled konceptu a zeptá se, co dál (bez slugu nabídne rozepsané koncepty);
                                      --yes publikuje rovnou bez ptaní, --no-announce nechá příspěvek mimo Mastodon a Bluesky
       ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje koncept k automatické publikaci v něm; opětovné spuštění plán zruší
-      ./blog.sh queue                fronta naplánovaných příspěvků — pořadí, publikace hned, vyřazení zpět do konceptů
+      ./blog.sh queue [--json]       fronta naplánovaných příspěvků — pořadí, publikace hned, vyřazení zpět do konceptů;
+                                     --json ji vypíše jako data
       ./blog.sh unpublish [<slug>]   vrátí publikovaný příspěvek zpátky do konceptu, smaže i jeho toot (bez slugu nabídne publikované příspěvky)
       ./blog.sh delete [<slug>]      smaže příspěvek do koše, bez slugu nabídne posledních %{recent_count} příspěvků ke smazání
       ./blog.sh restore [<slug>]     obnoví příspěvek z koše, bez slugu nabídne obsah koše
@@ -638,7 +644,7 @@ cli:
                                      --full sestaví znovu každou stránku, ne jen ty změněné;
                                      --force pustí nasazení přes pojistky a nahraje všechno
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
-      ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
                                      vypíše příspěvky po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek

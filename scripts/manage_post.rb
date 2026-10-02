@@ -5959,7 +5959,11 @@ def post_summary(file)
     # already has, instead of asking somebody to spell one again -- which
     # is how an archive grows two series that differ by a capital letter.
     series: post['series'],
-    pinned: truthy_frontmatter?(post['pinned']) }
+    pinned: truthy_frontmatter?(post['pinned']),
+    # The year of the file, for a caller that reads `list --json`: the
+    # same slug can live in two years, and a program picking one of them
+    # has nothing else to tell them apart by.
+    year: File.basename(File.dirname(file)) }
 rescue JSON::ParserError, SystemCallError => e
   warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
   nil
@@ -6121,6 +6125,103 @@ rescue Refused => e
   exit 0
 end
 
+# --- answers for a program (--json) ---------------------------------------
+#
+# `list --json`, `props <slug> --json` and `queue --json`: the three
+# screens somebody reads BEFORE acting, as data. A program that cannot
+# press a key in a dialog -- a phone app, a script -- reads these and then
+# calls the command whose answer it wants. The promise is the one `add
+# --json` makes: one object on standard output, every key always present,
+# a refusal as an object with "ok":false and a zero exit -- a caller that
+# has to test for a missing key is a caller writing its own parser.
+
+def list_as_json(posts)
+  rows = posts.map do |p|
+    { 'slug' => p[:slug], 'year' => p[:year], 'date' => p[:date], 'title' => p[:title],
+      'type' => p[:type], 'tags' => p[:tags], 'state' => p[:state],
+      'scheduled' => p[:scheduled] == true, 'series' => p[:series], 'pinned' => p[:pinned] }
+  end
+  puts JSON.pretty_generate('ok' => true, 'posts' => rows, 'count' => rows.size,
+                            'drafts' => posts.count { |p| p[:state] == DRAFT })
+end
+
+# The properties screen as data, with the keys it would offer named as
+# actions -- so a program learns what applies to THIS post (a scheduled
+# draft can be unscheduled, a published post on a site with a network can
+# be announced) without re-deriving the rules of the screen.
+def props_as_json(slug)
+  path = find_post_path(slug, ask: false)
+  refuse('not_found', t('cli.post_not_found', slug: slug).strip) unless path
+
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  year = File.basename(File.dirname(path))
+  draft = draft?(post)
+  network = SiteConfig.comment_network
+  announced = Publishing.announcement_url(post)
+  # The same ladder props_frame_lines climbs, as a word instead of a
+  # sentence: what the screen SAYS about the announcement is translated,
+  # what a program needs is which of the six cases it is.
+  announces = if announced then 'announced'
+              elsif network.nil? then 'nowhere'
+              elsif Publishing.unlisted?(post) then 'never_unlisted'
+              elsif !Publishing.announces? then 'no_secret'
+              elsif draft then 'on_publish'
+              else 'not_announced'
+              end
+  actions = if draft
+              %w[publish schedule properties rename delete] + (post['scheduled'] ? %w[unschedule] : [])
+            else
+              %w[unpublish pin properties rename addresses delete] + (network ? %w[announce] : [])
+            end
+  actions << 'versions' unless PostVersions.list(slug, year, content_dir: CONTENT_DIR).empty?
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  {
+    'ok' => true,
+    'slug' => post['slug'], 'year' => year, 'path' => path,
+    'title' => post_name_for(post),
+    'state' => post['state'] || PUBLISHED,
+    'scheduled' => post['scheduled'] == true,
+    # A plain draft has no time -- the screen shows none, for the reason
+    # row_date gives -- so the answer says so rather than handing out the
+    # bookkeeping timestamp as if it meant something.
+    'date' => draft && !post['scheduled'] ? nil : post_time!(post).iso8601,
+    'url' => if draft then props_preview_url(post)
+             elsif SITE_BASE_URL.to_s.empty? then ''
+             else published_url(post['slug'], post_time!(post).year, page: PostAddress.page?(post))
+             end,
+    'address' => PostAddress.path(post),
+    'type' => ContentType.dominant(post),
+    'tags' => post['tags'] || [],
+    'series' => post['series'].to_s.strip.empty? ? nil : post['series'].to_s,
+    'series_part' => post['series_part'].to_s.empty? ? nil : post['series_part'].to_s,
+    'pinned' => truthy_frontmatter?(post['pinned']),
+    'unlisted' => Publishing.unlisted?(post),
+    'languages' => { 'own' => own,
+                     'others' => other_languages.to_h { |lang| [lang, language_state(post, lang).to_s] } },
+    'announced' => announced,
+    'announces' => announces,
+    'addresses' => address_entries(post).map { |kind, value| { 'kind' => kind, 'value' => value } },
+    'actions' => actions
+  }
+end
+
+def cmd_props_json(slug)
+  JSON_REFUSALS[:enabled] = true
+  puts JSON.pretty_generate(props_as_json(slug))
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
+end
+
+def queue_as_json
+  rows = queue_entries.each_with_index.map do |entry, index|
+    { 'position' => index + 1, 'date' => entry[:time].iso8601, 'slug' => entry[:slug],
+      'year' => File.basename(File.dirname(entry[:path])), 'title' => post_name_for(entry[:post]),
+      'overdue' => entry[:time] <= Time.now }
+  end
+  puts JSON.pretty_generate('ok' => true, 'queue' => rows)
+end
+
 def cmd_list(filters)
   posts = load_posts_summary.select do |p|
     next false if filters[:tag] && !p[:tags].map(&:downcase).include?(filters[:tag].downcase)
@@ -6135,6 +6236,8 @@ def cmd_list(filters)
   # named neither the file nor the problem.
   posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
+  return list_as_json(posts) if filters[:json]
+
   posts.each { |p| puts summary_row(p, localized: false) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   count = t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
@@ -7295,8 +7398,19 @@ begin
       slug = ARGV.shift || pick_slug_interactively
       cmd_edit(slug)
     when 'props'
-      slug = ARGV.shift || pick_slug_interactively
-      cmd_props(slug)
+      json = !ARGV.delete('--json').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.props_unknown_option', option: unknown) if unknown
+      if json
+        # An object for an answer means nobody is watching, and the picker
+        # this skips is the only thing that would ask.
+        abort t('cli.props_json_needs_slug') if ARGV.empty?
+
+        cmd_props_json(ARGV.shift)
+      else
+        slug = ARGV.shift || pick_slug_interactively
+        cmd_props(slug)
+      end
     when 'delete'
       slug = ARGV.shift || pick_slug_interactively
       cmd_delete(slug)
@@ -7333,7 +7447,9 @@ begin
       slug = ARGV.shift || pick_draft_interactively
       cmd_schedule(slug, allow_partial: allow_partial)
     when 'queue'
-      cmd_queue
+      json = !ARGV.delete('--json').nil?
+      abort t('cli.queue_unknown_option', option: ARGV.first) unless ARGV.empty?
+      json ? queue_as_json : cmd_queue
     when 'unpublish'
       slug = ARGV.shift || pick_published_interactively
       cmd_unpublish(slug)
@@ -7394,11 +7510,14 @@ begin
         filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
         filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
         filters[:drafts] = true if arg == '--drafts'
+        filters[:json] = true if arg == '--json'
       end
       # Same filters, two ways to read the answer: `list` prints it,
       # `browse` puts you inside it. Down a pipe they are the same command,
       # because a screen you can't press keys in is just a list.
-      command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
+      # ...and with --json they are the same command everywhere, because
+      # an object is not something a screen can be opened over.
+      command == 'browse' && !filters[:json] ? cmd_browse(filters) : cmd_list(filters)
     when 'help'
       print_usage
     when 'version', '--version', '-v'

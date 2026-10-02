@@ -259,6 +259,19 @@ The lead image and the chapter list have three states, not two: on, off,
 and whatever the site does -- which is what a post that says nothing
 about them takes, and a different thing from saying no.
 
+**`props <slug> --json`** prints the same screen as one object and
+exits: state, date, address, type, tags, series, the flags, which
+languages the post is written in, whether and where it was announced
+(`announces` says which of the six cases it is), the old addresses --
+and `actions`, the keys the screen would offer this post, by name
+(`publish`, `schedule`, `unschedule`, `unpublish`, `announce`, `pin`,
+`properties`, `rename`, `addresses`, `versions`, `delete`). A program
+reads that instead of re-deriving the screen's rules, then calls the
+command it wants. A slug nobody has, or one that lives in two years, is
+refused as an object (`"ok": false`, `not_found` or `ambiguous_slug`)
+with a zero exit, the way `add --json` refuses; the slug is required,
+because an object for an answer means nobody is there to pick one.
+
 **Undoing an edit** is what `[v]` is for. Every `edit` keeps the previous
 text first, up to ten of them per post, and `[v]` lists them newest first
 with the line under the cursor showing what that version said -- its
@@ -1101,6 +1114,10 @@ time. Press the key again in a moment.
 
 The preview rebuilds once, when you leave the screen, not after every
 move.
+
+`./blog.sh queue --json` prints the queue as data instead -- one row per
+scheduled post in publish order, with its position, time, slug, year,
+title and whether its time has already passed -- and acts on nothing.
 
 ## Attachments and the document type
 

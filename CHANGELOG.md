@@ -36,6 +36,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
   question a refusal; `base:` refuses a draft that changed after its text was handed out.
 - **The sidebar cron turns the day over.** A site with the card wants `refresh-sidebar.sh` in
   cron even with no other widget; it rewrites the card's file once a day, per language.
+- **`list --json`, `props <slug> --json`, `queue --json`.** The three screens somebody reads before
+  acting, as data: the archive with its filters, one post with its properties and the actions that
+  apply to it by name, the queue in publish order. One object each, every key always present, a
+  refusal as an object with a zero exit -- the promise `add --json` already keeps. For a program
+  that cannot press a key in a dialog: a phone app, a script.
 
 
 ## 1.9 -- 2026-09-28

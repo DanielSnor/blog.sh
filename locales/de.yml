@@ -380,6 +380,9 @@ cli:
   drafts_problem_missing_media: "nicht vom Telefon: ein genanntes Bild fehlt"
   drafts_problem_unreadable: "nicht vom Telefon: der Text lässt sich nicht zurücklesen"
   drafts_unknown_option: "Unbekannte Option: %{option}. drafts kennt --json und einen Slug, sonst nichts."
+  props_unknown_option: "Unbekannte Option: %{option}. props kennt einen Slug und --json, sonst nichts."
+  props_json_needs_slug: "--json muss den Beitrag benennen: `props <slug> --json`. Ohne Slug bietet props die Beiträge zur Auswahl an, und eine Antwort als Objekt heißt, dass niemand da ist, der wählt."
+  queue_unknown_option: "Unbekannte Option: %{option}. queue kennt --json, sonst nichts."
   mark_draft: "[ENTWURF]"
   mark_pinned: "[ANGEHEFTET]"
   local_preview_hint_deployed: "Die Adresse oben ist das Beispiel der Vorlage -- die Website wird bereitgestellt, nur sagt site.base_url noch nicht wohin (./setup.sh behebt das). Hier ansehen: ./blog.sh preview und %{url}."
@@ -632,12 +635,15 @@ cli:
       ./blog.sh edit [<slug>]        bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh translate <slug> --lang <code>
                                      schreibt den Text des Beitrags in einer weiteren Sprache der Website
-      ./blog.sh props [<slug>]       Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen
+      ./blog.sh props [<slug>] [--json]
+                                     Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen;
+                                     --json gibt sie als Daten aus, mit den Aktionen, die auf ihn zutreffen
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit);
                                      --yes veröffentlicht sofort ohne Rückfrage, --no-announce hält ihn von Mastodon und Bluesky fern
       ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
-      ./blog.sh queue                die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen
+      ./blog.sh queue [--json]       die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen;
+                                     --json gibt sie als Daten aus
       ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
       ./blog.sh delete [<slug>]      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
       ./blog.sh restore [<slug>]     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt
@@ -650,7 +656,7 @@ cli:
                                      --full baut jede Seite neu, nicht nur die geänderten;
                                      --force lässt den Deploy an den Schutzprüfungen vorbei und lädt alles hoch
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
-      ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
