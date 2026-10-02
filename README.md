@@ -243,16 +243,23 @@ says what you are running.
                                # shows the draft's preview, asks what's next;
                                # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky;
                                # --json (with --yes) answers as one object, for a script or a phone
-./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
+./blog.sh schedule [<slug>] [--at <time>] [--cancel] [--compact] [--json]
+                               # asks for a date, then auto-publishes the draft when it arrives;
+                               # --json with --at writes that date, --cancel takes the post out of the queue
 ./blog.sh queue [--json]       # what is scheduled, when each one goes, and the slots it uses
-./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
-./blog.sh delete [<slug>]      # deletes a post to trash/
-./blog.sh restore [<slug>]     # restores a post from trash
-./blog.sh empty trash          # deletes everything in the trash, for good
-./blog.sh empty versions       # keeps each post's newest version, removes the older ones
+./blog.sh unpublish [<slug>] [--yes] [--json]
+                               # moves a published post back to draft (also deletes its announcement)
+./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
+                               # deletes a post to trash/
+./blog.sh restore [<slug>] [--rebuild] [--json]
+                               # restores a post from trash; --json without a slug lists the trash
+./blog.sh empty trash [--yes] [--json]
+                               # deletes everything in the trash, for good
+./blog.sh empty versions [--yes] [--json]
+                               # keeps each post's newest version, removes the older ones
 ./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
 ./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
-./blog.sh rebuild [--full] [--force]
+./blog.sh rebuild [--full] [--force] [--json]
                                # rebuilds and deploys the whole site, every language it publishes;
                                # --full builds every page again instead of only the changed ones;
                                # --force lets the deploy past its guards and uploads everything

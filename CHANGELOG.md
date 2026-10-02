@@ -41,6 +41,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
   apply to it by name, the queue in publish order. One object each, every key always present, a
   refusal as an object with a zero exit -- the promise `add --json` already keeps. For a program
   that cannot press a key in a dialog: a phone app, a script.
+- **The actions of those screens, for a program.** `schedule <slug> --at <time> --json` and
+  `--cancel` (with `--compact` to shift the queue behind it), `publish --compact`, `unpublish --yes`,
+  `delete --yes`, `restore` (without a slug: the trash as data), `rebuild` and `empty trash` /
+  `empty versions` (without `--yes`: the count and the size), all under `--json`. Every question
+  the terminal asks is a flag or a refusal; a flag that answers a dialog's question is refused
+  without `--json`, where the dialog is there to ask it. See *Driving the engine from a program*
+  in docs/operations.md.
 
 
 ## 1.9 -- 2026-09-28

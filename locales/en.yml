@@ -388,6 +388,23 @@ cli:
   props_unknown_option: "Unknown option: %{option}. props takes a slug and --json, nothing else."
   props_json_needs_slug: "--json needs to name the post: `props <slug> --json`. Without a slug, props offers the posts to choose from, and an object for an answer means nobody is there to choose."
   queue_unknown_option: "Unknown option: %{option}. queue takes --json, nothing else."
+  schedule_unknown_option: "Unknown option: %{option}. schedule takes a slug, --allow-partial, and with --json also --at <time>, --cancel and --compact."
+  schedule_flags_need_json: "--at, --cancel and --compact answer the questions the dialog asks, and are for --json only: `schedule <slug> --at \"2026-08-15 09:00\" --json`. Without --json, schedule asks."
+  schedule_json_needs_slug: "--json needs to name the post: `schedule <slug> --at <time> --json`."
+  schedule_json_needs_at: "--json needs the time: `schedule <slug> --at \"2026-08-15 09:00\" --json` -- or --cancel to take the post out of the queue."
+  schedule_not_scheduled: "Post '%{slug}' is not scheduled -- there is no plan to cancel."
+  publish_compact_needs_json: "--compact answers the queue's question for a program, and is for --json only: `publish <slug> --yes --compact --json`."
+  unpublish_unknown_option: "Unknown option: %{option}. unpublish takes a slug, and with --json also --yes."
+  unpublish_json_needs_yes: "--json needs the post named and the confirmation given: `unpublish <slug> --yes --json`. Typing the slug is the confirmation at the terminal; the flag is it for a program."
+  unpublish_yes_needs_json: "--yes is for --json only; without it, unpublish asks for the slug itself."
+  delete_unknown_option: "Unknown option: %{option}. delete takes a slug, and with --json also --yes and --rebuild."
+  delete_json_needs_yes: "--json needs the post named and the confirmation given: `delete <slug> --yes --json`. Typing the slug is the confirmation at the terminal; the flag is it for a program."
+  delete_yes_needs_json: "--yes and --rebuild are for --json only; without it, delete asks for the slug and offers the rebuild itself."
+  restore_unknown_option: "Unknown option: %{option}. restore takes a slug, and with --json also --rebuild."
+  restore_rebuild_needs_json: "--rebuild is for --json only; without it, restore offers the rebuild itself."
+  restore_media_json: "The trash holds only media for '%{slug}' (set aside by check --repair), not a post -- restore them at the terminal: ./blog.sh restore %{slug}."
+  empty_unknown_option: "Unknown option: %{option}. empty takes trash or versions, and with --json also --yes."
+  empty_yes_needs_json: "--yes is for --json only; without it, empty asks for the count itself."
   mark_draft: "[DRAFT]"
   mark_pinned: "[PINNED]"
   local_preview_hint_deployed: "The address above is the template's example -- the site does deploy, only site.base_url does not say where yet (./setup.sh fixes it). To look here: ./blog.sh preview and %{url}."
@@ -630,7 +647,7 @@ cli:
   yaml_invalid: "%{path} is not valid YAML (%{message})."
   yaml_invalid_doctor: "Run ./blog.sh doctor for the full picture."
   doctor_unknown_option: "doctor does not know %{option} -- it takes --online (also checks what needs trying over the network) and --strip-location (removes the location from photos)."
-  rebuild_unknown_option: "rebuild does not know %{option} -- it takes --full (build every page again) and --force (let the deploy through its guards and upload everything)."
+  rebuild_unknown_option: "rebuild does not know %{option} -- it takes --full (build every page again), --force (let the deploy through its guards and upload everything) and --json (answer as data)."
   unknown_command: "❌ ./blog.sh has no command \"%{command}\"."
   unknown_command_nearest: "   Did you mean ./blog.sh %{command}?"
   unknown_command_help: "   ./blog.sh help lists every command."
@@ -650,20 +667,24 @@ cli:
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
                                      --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
-      ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
+      ./blog.sh schedule [<slug>] [--at <time>] [--cancel] [--compact] [--json]
+                                     asks for a date and schedules the draft for automatic publishing then; run again to cancel;
+                                     --json with --at writes that date, --cancel takes the post out of the queue (--compact shifts the rest forward)
       ./blog.sh queue [--json]       the scheduled-post queue -- reorder, publish now, return a post to the drafts;
                                      --json prints it as data
-      ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
-      ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
-      ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
-      ./blog.sh empty trash          deletes everything in the trash for good, after telling you how much
-      ./blog.sh empty versions       keeps each post's newest version and removes the older ones
+      ./blog.sh unpublish [<slug>] [--yes] [--json]
+                                     moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
+      ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
+                                     deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
+      ./blog.sh restore [<slug>] [--rebuild] [--json]
+                                     restores a post from trash; without a slug, offers what's in trash (--json lists it)
+      ./blog.sh empty trash [--yes] [--json]
+                                     deletes everything in the trash for good, after telling you how much
+      ./blog.sh empty versions [--yes] [--json]
+                                     keeps each post's newest version and removes the older ones
       ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
       ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
-      ./blog.sh rebuild [--full] [--force]
-                                     rebuilds and deploys the whole site, not tied to a specific post;
-                                     --full builds every page again instead of only the ones that changed;
-                                     --force lets the deploy past its guards and uploads everything
+      ./blog.sh rebuild [--full] [--force] [--json]
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
                                      prints the posts one per line, newest first -- plain text for pipes and scripts

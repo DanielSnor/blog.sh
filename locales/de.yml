@@ -383,6 +383,23 @@ cli:
   props_unknown_option: "Unbekannte Option: %{option}. props kennt einen Slug und --json, sonst nichts."
   props_json_needs_slug: "--json muss den Beitrag benennen: `props <slug> --json`. Ohne Slug bietet props die Beiträge zur Auswahl an, und eine Antwort als Objekt heißt, dass niemand da ist, der wählt."
   queue_unknown_option: "Unbekannte Option: %{option}. queue kennt --json, sonst nichts."
+  schedule_unknown_option: "Unbekannte Option: %{option}. schedule kennt einen Slug, --allow-partial und mit --json auch --at <Zeit>, --cancel und --compact."
+  schedule_flags_need_json: "--at, --cancel und --compact beantworten die Fragen des Dialogs und gelten nur mit --json: `schedule <slug> --at \"2026-08-15 09:00\" --json`. Ohne --json fragt schedule selbst."
+  schedule_json_needs_slug: "--json muss den Beitrag benennen: `schedule <slug> --at <Zeit> --json`."
+  schedule_json_needs_at: "--json braucht die Zeit: `schedule <slug> --at \"2026-08-15 09:00\" --json` -- oder --cancel, das den Beitrag aus der Warteschlange nimmt."
+  schedule_not_scheduled: "Beitrag '%{slug}' ist nicht geplant -- es gibt nichts abzusagen."
+  publish_compact_needs_json: "--compact beantwortet die Frage der Warteschlange für ein Programm und gilt nur mit --json: `publish <slug> --yes --compact --json`."
+  unpublish_unknown_option: "Unbekannte Option: %{option}. unpublish kennt einen Slug und mit --json auch --yes."
+  unpublish_json_needs_yes: "--json braucht den benannten Beitrag und die Bestätigung: `unpublish <slug> --yes --json`. Im Terminal ist der getippte Slug die Bestätigung; für ein Programm ist es der Schalter."
+  unpublish_yes_needs_json: "--yes gilt nur mit --json; ohne fragt unpublish selbst nach dem Slug."
+  delete_unknown_option: "Unbekannte Option: %{option}. delete kennt einen Slug und mit --json auch --yes und --rebuild."
+  delete_json_needs_yes: "--json braucht den benannten Beitrag und die Bestätigung: `delete <slug> --yes --json`. Im Terminal ist der getippte Slug die Bestätigung; für ein Programm ist es der Schalter."
+  delete_yes_needs_json: "--yes und --rebuild gelten nur mit --json; ohne fragt delete selbst nach dem Slug und bietet den Neubau selbst an."
+  restore_unknown_option: "Unbekannte Option: %{option}. restore kennt einen Slug und mit --json auch --rebuild."
+  restore_rebuild_needs_json: "--rebuild gilt nur mit --json; ohne bietet restore den Neubau selbst an."
+  restore_media_json: "Der Papierkorb hält für '%{slug}' nur Medien (von check --repair beiseitegelegt), keinen Beitrag -- hol sie im Terminal zurück: ./blog.sh restore %{slug}."
+  empty_unknown_option: "Unbekannte Option: %{option}. empty kennt trash oder versions und mit --json auch --yes."
+  empty_yes_needs_json: "--yes gilt nur mit --json; ohne fragt empty selbst nach der Zahl."
   mark_draft: "[ENTWURF]"
   mark_pinned: "[ANGEHEFTET]"
   local_preview_hint_deployed: "Die Adresse oben ist das Beispiel der Vorlage -- die Website wird bereitgestellt, nur sagt site.base_url noch nicht wohin (./setup.sh behebt das). Hier ansehen: ./blog.sh preview und %{url}."
@@ -621,7 +638,7 @@ cli:
   yaml_invalid: "%{path} ist kein gültiges YAML (%{message})."
   yaml_invalid_doctor: "Das ganze Bild zeigt ./blog.sh doctor."
   doctor_unknown_option: "doctor kennt %{option} nicht -- es nimmt --online (prüft auch, was übers Netz versucht werden muss) und --strip-location (entfernt den Standort aus Fotos)."
-  rebuild_unknown_option: "rebuild kennt %{option} nicht -- es nimmt --full (jede Seite neu bauen) und --force (den Deploy an seinen Schutzprüfungen vorbeilassen und alles hochladen)."
+  rebuild_unknown_option: "rebuild kennt %{option} nicht -- es nimmt --full (jede Seite neu bauen), --force (den Deploy an seinen Schutzprüfungen vorbeilassen und alles hochladen) und --json (als Daten antworten)."
   unknown_command: "❌ ./blog.sh hat keinen Befehl „%{command}“."
   unknown_command_nearest: "   Meintest du ./blog.sh %{command}?"
   unknown_command_help: "   ./blog.sh help listet alle Befehle."
@@ -641,20 +658,24 @@ cli:
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit);
                                      --yes veröffentlicht sofort ohne Rückfrage, --no-announce hält ihn von Mastodon und Bluesky fern
-      ./blog.sh schedule [<slug>]    fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab
+      ./blog.sh schedule [<slug>] [--at <Zeit>] [--cancel] [--compact] [--json]
+                                     fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab;
+                                     --json mit --at schreibt diese Zeit, --cancel nimmt den Beitrag aus der Warteschlange (--compact rückt den Rest vor)
       ./blog.sh queue [--json]       die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen;
                                      --json gibt sie als Daten aus
-      ./blog.sh unpublish [<slug>]   setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
-      ./blog.sh delete [<slug>]      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
-      ./blog.sh restore [<slug>]     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt
-      ./blog.sh empty trash          löscht den Papierkorb endgültig; sagt vorher, wie viel darin ist
-      ./blog.sh empty versions       behält je Beitrag die neueste Fassung und entfernt die älteren
+      ./blog.sh unpublish [<slug>] [--yes] [--json]
+                                     setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
+      ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
+                                     löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+      ./blog.sh restore [<slug>] [--rebuild] [--json]
+                                     holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt (--json listet es)
+      ./blog.sh empty trash [--yes] [--json]
+                                     löscht den Papierkorb endgültig; sagt vorher, wie viel darin ist
+      ./blog.sh empty versions [--yes] [--json]
+                                     behält je Beitrag die neueste Fassung und entfernt die älteren
       ./blog.sh toot [<slug>]        verschickt den Kommentar-Toot (erneut) (Mastodon-Seiten); ohne Slug: die letzten %{recent_count} Beiträge
       ./blog.sh bluesky [<slug>]     verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
-      ./blog.sh rebuild [--full] [--force]
-                                     baut und deployt die ganze Seite, unabhängig von einem Beitrag;
-                                     --full baut jede Seite neu, nicht nur die geänderten;
-                                     --force lässt den Deploy an den Schutzprüfungen vorbei und lädt alles hoch
+      ./blog.sh rebuild [--full] [--force] [--json]
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte

@@ -371,6 +371,23 @@ cli:
   props_unknown_option: "Neznámá volba: %{option}. props bere slug a --json, nic jiného."
   props_json_needs_slug: "--json musí pojmenovat příspěvek: `props <slug> --json`. Bez slugu nabídne props příspěvky na výběr — a odpověď jako objekt znamená, že u toho nikdo nesedí."
   queue_unknown_option: "Neznámá volba: %{option}. queue bere --json, nic jiného."
+  schedule_unknown_option: "Neznámá volba: %{option}. schedule bere slug, --allow-partial a s --json také --at <čas>, --cancel a --compact."
+  schedule_flags_need_json: "--at, --cancel a --compact odpovídají na otázky dialogu a jsou jen pro --json: `schedule <slug> --at \"2026-08-15 09:00\" --json`. Bez --json se schedule ptá sám."
+  schedule_json_needs_slug: "--json musí pojmenovat příspěvek: `schedule <slug> --at <čas> --json`."
+  schedule_json_needs_at: "--json potřebuje čas: `schedule <slug> --at \"2026-08-15 09:00\" --json` — nebo --cancel, které příspěvek z fronty vyřadí."
+  schedule_not_scheduled: "Příspěvek '%{slug}' není naplánovaný — není co rušit."
+  publish_compact_needs_json: "--compact odpovídá za program na otázku fronty a je jen pro --json: `publish <slug> --yes --compact --json`."
+  unpublish_unknown_option: "Neznámá volba: %{option}. unpublish bere slug a s --json také --yes."
+  unpublish_json_needs_yes: "--json potřebuje pojmenovaný příspěvek a potvrzení: `unpublish <slug> --yes --json`. V terminálu je potvrzením opsaný slug; pro program je jím ten přepínač."
+  unpublish_yes_needs_json: "--yes je jen pro --json; bez něj se unpublish na slug zeptá sám."
+  delete_unknown_option: "Neznámá volba: %{option}. delete bere slug a s --json také --yes a --rebuild."
+  delete_json_needs_yes: "--json potřebuje pojmenovaný příspěvek a potvrzení: `delete <slug> --yes --json`. V terminálu je potvrzením opsaný slug; pro program je jím ten přepínač."
+  delete_yes_needs_json: "--yes a --rebuild jsou jen pro --json; bez něj se delete na slug zeptá sám a sestavení sám nabídne."
+  restore_unknown_option: "Neznámá volba: %{option}. restore bere slug a s --json také --rebuild."
+  restore_rebuild_needs_json: "--rebuild je jen pro --json; bez něj restore sestavení sám nabídne."
+  restore_media_json: "V koši jsou pro '%{slug}' jen média (odložená přes check --repair), ne příspěvek — vrať je z terminálu: ./blog.sh restore %{slug}."
+  empty_unknown_option: "Neznámá volba: %{option}. empty bere trash nebo versions a s --json také --yes."
+  empty_yes_needs_json: "--yes je jen pro --json; bez něj se empty na počet zeptá sám."
   mark_draft: "[KONCEPT]"
   mark_pinned: "[PŘIPNUTO]"
   local_preview_hint_deployed: "Adresa výše je příklad ze šablony — web se nasazuje, jen site.base_url ještě neříká kam (opraví to ./setup.sh). Náhled tady: ./blog.sh preview a %{url}."
@@ -609,7 +626,7 @@ cli:
   yaml_invalid: "%{path} není platné YAML (%{message})."
   yaml_invalid_doctor: "Celý obrázek dá ./blog.sh doctor."
   doctor_unknown_option: "doctor nezná %{option} — umí --online (ověří i to, co je potřeba zkusit po síti) a --strip-location (odstraní polohu z fotek)."
-  rebuild_unknown_option: "rebuild nezná %{option} — umí --full (sestavit znovu všechny stránky) a --force (pustit nasazení přes pojistky a nahrát všechno)."
+  rebuild_unknown_option: "rebuild nezná %{option} — umí --full (sestavit znovu všechny stránky), --force (pustit nasazení přes pojistky a nahrát všechno) a --json (odpovědět jako data)."
   unknown_command: "❌ ./blog.sh nemá příkaz „%{command}“."
   unknown_command_nearest: "   Myslel jsi ./blog.sh %{command}?"
   unknown_command_help: "   ./blog.sh help vypíše všechny příkazy."
@@ -629,20 +646,24 @@ cli:
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
                                      ukáže náhled konceptu a zeptá se, co dál (bez slugu nabídne rozepsané koncepty);
                                      --yes publikuje rovnou bez ptaní, --no-announce nechá příspěvek mimo Mastodon a Bluesky
-      ./blog.sh schedule [<slug>]    zeptá se na datum a naplánuje koncept k automatické publikaci v něm; opětovné spuštění plán zruší
+      ./blog.sh schedule [<slug>] [--at <čas>] [--cancel] [--compact] [--json]
+                                     zeptá se na datum a naplánuje koncept k automatické publikaci v něm; opětovné spuštění plán zruší;
+                                     --json s --at zapíše ten čas, --cancel příspěvek z fronty vyřadí (--compact posune zbytek dopředu)
       ./blog.sh queue [--json]       fronta naplánovaných příspěvků — pořadí, publikace hned, vyřazení zpět do konceptů;
                                      --json ji vypíše jako data
-      ./blog.sh unpublish [<slug>]   vrátí publikovaný příspěvek zpátky do konceptu, smaže i jeho toot (bez slugu nabídne publikované příspěvky)
-      ./blog.sh delete [<slug>]      smaže příspěvek do koše, bez slugu nabídne posledních %{recent_count} příspěvků ke smazání
-      ./blog.sh restore [<slug>]     obnoví příspěvek z koše, bez slugu nabídne obsah koše
-      ./blog.sh empty trash          nadobro smaže všechno v koši; napřed řekne kolik toho je
-      ./blog.sh empty versions       nechá každému příspěvku poslední verzi a starší smaže
+      ./blog.sh unpublish [<slug>] [--yes] [--json]
+                                     vrátí publikovaný příspěvek zpátky do konceptu, smaže i jeho toot (bez slugu nabídne publikované příspěvky)
+      ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
+                                     smaže příspěvek do koše, bez slugu nabídne posledních %{recent_count} příspěvků ke smazání
+      ./blog.sh restore [<slug>] [--rebuild] [--json]
+                                     obnoví příspěvek z koše, bez slugu nabídne obsah koše (--json ho vypíše)
+      ./blog.sh empty trash [--yes] [--json]
+                                     nadobro smaže všechno v koši; napřed řekne kolik toho je
+      ./blog.sh empty versions [--yes] [--json]
+                                     nechá každému příspěvku poslední verzi a starší smaže
       ./blog.sh toot [<slug>]        (znovu) pošle komentářový toot (weby s Mastodonem), bez slugu nabídne posledních %{recent_count} příspěvků
       ./blog.sh bluesky [<slug>]     (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
-      ./blog.sh rebuild [--full] [--force]
-                                     znovu sestaví a nasadí celý web, bez vazby na konkrétní příspěvek;
-                                     --full sestaví znovu každou stránku, ne jen ty změněné;
-                                     --force pustí nasazení přes pojistky a nahraje všechno
+      ./blog.sh rebuild [--full] [--force] [--json]
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
                                      vypíše příspěvky po řádcích, od nejnovějšího — prostý text do roury nebo skriptu

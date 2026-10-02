@@ -2474,9 +2474,9 @@ end
 # draft dialog would be waiting for a keypress that a program is never
 # going to send, and a promise that the whole output is one object cannot
 # be kept by a run that stops to ask something.
-def cmd_publish(slug, yes: false, announce: true, json: false, allow_partial: false)
+def cmd_publish(slug, yes: false, announce: true, json: false, allow_partial: false, compact: false)
   JSON_REFUSALS[:enabled] = json
-  return publish_as_json(slug, announce: announce, allow_partial: allow_partial) if json
+  return publish_as_json(slug, announce: announce, allow_partial: allow_partial, compact: compact) if json
 
   publish_interactively(slug, yes: yes, announce: announce, allow_partial: allow_partial)
 end
@@ -2486,7 +2486,10 @@ end
 # status stays 0 because the object IS the answer. iOS Shortcuts throws
 # away the output of a command that failed, which is the same reason
 # `add --json` leaves with zero.
-def publish_as_json(slug, announce: true, allow_partial: false)
+# --compact: the post was scheduled, and the posts behind it in the queue
+# step forward into its slot -- the question the queue screen asks after
+# [p], answered in advance.
+def publish_as_json(slug, announce: true, allow_partial: false, compact: false)
   path = find_post_path(slug, ask: false)
   refuse('not_found', t('cli.post_not_found', slug: slug)) unless path
 
@@ -2502,12 +2505,25 @@ def publish_as_json(slug, announce: true, allow_partial: false)
   end
   refuse_partial!(post, slug, allow_partial, json: true)
 
+  rest = []
+  freed = nil
+  if compact && post['scheduled']
+    entries = queue_entries
+    index = entries.index { |e| File.expand_path(e[:path]) == File.expand_path(path) }
+    rest = index ? entries[(index + 1)..] : []
+    freed = post_time!(post)
+  end
   moved, warnings = begin
     quietly(true) { publish_draft(slug, path: path, announce: announce, asked: false) }
   rescue SystemExit => e
     refuse('publish_refused', e.message.to_s)
   end
-  puts JSON.pretty_generate(post_answer(moved || path, warnings))
+  compacted = 0
+  if freed
+    compacted, more = quietly(true, keep_stdout: true) { compact_queue(freed, rest) }
+    warnings += more
+  end
+  puts JSON.pretty_generate(post_answer(moved || path, warnings).merge('compacted' => compacted))
 rescue Refused => e
   puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
   exit 0
@@ -3623,6 +3639,15 @@ def queue_offer_compact(freed_time, rest)
   answer = Tui.key_choice(t('cli.queue_compact_prompt', count: rest.size))
   return false unless Tui.yes?(answer)
 
+  compact_queue(freed_time, rest).positive?
+end
+
+# The shift itself, for the screen above and for a program that answered
+# the question with a flag. How many posts moved, 0 when nothing did.
+def compact_queue(freed_time, rest)
+  rest = Array(rest)
+  return 0 if rest.empty? || freed_time <= Time.now
+
   times = [freed_time] + rest.map { |entry| entry[:time] }
   # The whole loop is checked before the first write, for the reason
   # queue_swap is: write_scheduled_date ABORTS the process, and an abort
@@ -3633,10 +3658,10 @@ def queue_offer_compact(freed_time, rest)
   applied = apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
     entry[:path] = write_scheduled_date(entry[:path], entry[:post], target, raw: entry[:raw])
   end
-  return false unless applied
+  return 0 unless applied
   puts Tui.paint(t('cli.queue_compacted'), :green)
   puts
-  true
+  rest.size
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -3666,6 +3691,24 @@ def cmd_unpublish(slug)
     return
   end
 
+  path, = unpublish_post(path, post, slug)
+  puts t('cli.reverted_to_draft', path: path)
+
+  final_slug = File.basename(path, '.json')
+  unless rebuild_and_deploy(t('cli.updating_preview'))
+    warn t('cli.draft_saved_preview_pending', slug: final_slug)
+    warn ''
+    return
+  end
+
+  draft_decision_loop(final_slug, path: path)
+end
+
+# The move back to draft itself, shared with `unpublish --json`: the
+# announcements taken down, the state and the vacated address recorded.
+# Returns the path and the announcement addresses that could NOT be
+# deleted and so stay on the post.
+def unpublish_post(path, post, slug)
   toot_gone, skeet_gone = retract_announcements(post)
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
@@ -3677,28 +3720,22 @@ def cmd_unpublish(slug)
                        'unpublished_from' => PostAddress.vacated_marker(post, slug: slug))
   # Kept when the delete failed, so the address survives to be retried --
   # and so a re-publish can see there is already an announcement out there.
+  kept = []
   if toot_gone
     updated.delete('mastodon_url')
   else
     warn t('cli.announcement_kept', url: post['mastodon_url'])
+    kept << post['mastodon_url']
   end
   if skeet_gone
     updated.delete('bluesky_url')
     updated.delete('bluesky_uri')
   else
     warn t('cli.announcement_kept', url: post['bluesky_url'])
+    kept << post['bluesky_url']
   end
   AtomicWrite.write_json(path, updated)
-  puts t('cli.reverted_to_draft', path: path)
-
-  final_slug = File.basename(path, '.json')
-  unless rebuild_and_deploy(t('cli.updating_preview'))
-    warn t('cli.draft_saved_preview_pending', slug: final_slug)
-    warn ''
-    return
-  end
-
-  draft_decision_loop(final_slug, path: path)
+  [path, kept]
 end
 
 # --- properties and actions ------------------------------------------
@@ -5659,25 +5696,29 @@ def retract_announcements(post)
   [toot_gone, skeet_gone]
 end
 
-def delete_post(slug, path: nil)
+# `confirmed:` is `delete --yes`: the slug typed before the command ran.
+# Returns the trash directory, or false when the person declined.
+def delete_post(slug, path: nil, confirmed: false)
   path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
-  text = post['content'].find { |b| b['type'] == 'text' }
-  puts "#{post['date']}  #{post['title'] || text&.fetch('text', '')&.slice(0, 60)}"
-  # Said BEFORE the confirmation, not after it: deleting the post takes
-  # the announcement down with it, and that part cannot be undone by
-  # `restore` -- the thread and whatever was said under it are gone for
-  # good. One confirmation is enough, as long as it is an informed one.
-  announced = [post['mastodon_url'], post['bluesky_url']].compact
-  puts t('cli.delete_takes_announcement', url: announced.first) unless announced.empty?
-  print t('cli.confirm_delete', slug: slug)
-  confirmation = $stdin.gets&.strip
-  unless confirmation == slug
-    puts t('cli.cancelled')
-    puts
-    return false
+  unless confirmed
+    text = post['content'].find { |b| b['type'] == 'text' }
+    puts "#{post['date']}  #{post['title'] || text&.fetch('text', '')&.slice(0, 60)}"
+    # Said BEFORE the confirmation, not after it: deleting the post takes
+    # the announcement down with it, and that part cannot be undone by
+    # `restore` -- the thread and whatever was said under it are gone for
+    # good. One confirmation is enough, as long as it is an informed one.
+    announced = [post['mastodon_url'], post['bluesky_url']].compact
+    puts t('cli.delete_takes_announcement', url: announced.first) unless announced.empty?
+    print t('cli.confirm_delete', slug: slug)
+    confirmation = $stdin.gets&.strip
+    unless confirmation == slug
+      puts t('cli.cancelled')
+      puts
+      return false
+    end
   end
 
   year = File.basename(File.dirname(path))
@@ -5747,7 +5788,7 @@ def delete_post(slug, path: nil)
   end
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)
-  true
+  trash_dir
 end
 
 def cmd_delete(slug)
@@ -5889,6 +5930,24 @@ def cmd_restore(slug)
   # Two years of the same slug can sit in the trash at once now, so the
   # same rule as everywhere else applies: never guess, show both and ask.
   trash_json = found.size == 1 ? found.first : pick_among_trashed(slug, found)
+  new_path = restore_post(slug, trash_json)
+  post = JSON.parse(File.read(new_path, encoding: 'utf-8'))
+
+  if draft?(post)
+    unless rebuild_and_deploy(t('cli.updating_preview'))
+      warn t('cli.draft_saved_preview_pending', slug: slug)
+      warn ''
+      return
+    end
+    draft_decision_loop(slug, path: new_path)
+  else
+    maybe_rebuild
+  end
+end
+
+# The move out of the trash itself, shared with `restore --json`: post,
+# media and history back where they were. Returns the post's new path.
+def restore_post(slug, trash_json)
   trash_dir = File.dirname(trash_json)
 
   post = JSON.parse(File.read(trash_json, encoding: 'utf-8'))
@@ -5924,17 +5983,7 @@ def cmd_restore(slug)
   FileUtils.rm_rf(trash_dir)
 
   puts t('cli.restored_label', path: new_path)
-
-  if draft?(post)
-    unless rebuild_and_deploy(t('cli.updating_preview'))
-      warn t('cli.draft_saved_preview_pending', slug: slug)
-      warn ''
-      return
-    end
-    draft_decision_loop(slug, path: new_path)
-  else
-    maybe_rebuild
-  end
+  new_path
 end
 
 # One post file -> the summary row that `list` and the pick_*_interactively
@@ -5946,6 +5995,12 @@ end
 # reach for to find the bad post were exactly the ones that stopped
 # working. Skipping it keeps the rest of the archive usable; the build
 # still refuses to run until it's dealt with.
+def summary_year(file)
+  folder = File.basename(file) == 'post.json' ? File.dirname(File.dirname(file)) : File.dirname(file)
+  year = File.basename(folder)
+  year.match?(/\A\d{4}\z/) ? year : nil
+end
+
 def post_summary(file)
   post = JSON.parse(File.read(file, encoding: 'utf-8'))
   # Valid JSON of the wrong shape is as unusable as unparseable JSON, and
@@ -5962,8 +6017,10 @@ def post_summary(file)
     pinned: truthy_frontmatter?(post['pinned']),
     # The year of the file, for a caller that reads `list --json`: the
     # same slug can live in two years, and a program picking one of them
-    # has nothing else to tell them apart by.
-    year: File.basename(File.dirname(file)) }
+    # has nothing else to tell them apart by. A trashed post sits one
+    # level deeper (trash/<year>/<slug>/post.json); a flat trash/<slug>/
+    # from before the trash grew years has no year to give.
+    year: summary_year(file) }
 rescue JSON::ParserError, SystemCallError => e
   warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
   nil
@@ -6205,12 +6262,218 @@ def props_as_json(slug)
   }
 end
 
-def cmd_props_json(slug)
+# One command's answer as an object. The block returns it; a Refused is
+# printed as the refusal object; and an abort reached INSIDE the engine --
+# prose meant for a terminal, from a guard that predates --json -- is
+# printed as one too, under the code the caller names, so the promise of
+# an object and a zero exit holds whichever guard spoke. (abort's message
+# has already gone to stderr by then, which the receiver throws away.)
+def answer_json(abort_code = 'refused')
   JSON_REFUSALS[:enabled] = true
-  puts JSON.pretty_generate(props_as_json(slug))
+  puts JSON.pretty_generate(yield)
 rescue Refused => e
   puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
   exit 0
+rescue SystemExit => e
+  raise if e.success?
+
+  puts JSON.generate('ok' => false, 'error' => abort_code, 'message' => e.message.to_s.strip)
+  exit 0
+end
+
+def cmd_props_json(slug)
+  answer_json { props_as_json(slug) }
+end
+
+# The post a program resolves by slug, or the refusal: the two answers
+# every action below opens with.
+def post_for_json(slug)
+  path = find_post_path(slug, ask: false)
+  refuse('not_found', t('cli.post_not_found', slug: slug).strip) unless path
+
+  raw = File.read(path, encoding: 'utf-8')
+  [path, raw, JSON.parse(raw)]
+end
+
+# The address a program is handed for a post in whatever state it is now:
+# the draft preview for a draft, the public one for a post that is out --
+# and nothing where the site has no base URL, for the reason report_added
+# gives (a hostless fragment under a key called url is a lie).
+def url_for_json(post)
+  return '' if SITE_BASE_URL.to_s.empty?
+
+  draft?(post) ? draft_url(post) : published_url(post['slug'], post_time!(post).year, page: PostAddress.page?(post))
+end
+
+# What an action says about the post it acted on: the keys `add --json`
+# and `publish --json` answer with, plus whether the site was rebuilt.
+# `deploy` is 'skipped' when the caller did not ask for a rebuild (the
+# terminal would have asked them; a program says --rebuild or nothing).
+def acted_answer(path, warnings, rebuilt: nil)
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  {
+    'ok' => true,
+    'slug' => post['slug'],
+    'path' => path,
+    'state' => post['state'] || PUBLISHED,
+    'scheduled' => post['scheduled'] == true,
+    # nil for a plain draft, the rule props_as_json follows.
+    'date' => draft?(post) && !post['scheduled'] ? nil : post_time!(post).iso8601,
+    'url' => url_for_json(post),
+    'deploy' => if rebuilt.nil? then 'skipped'
+                elsif rebuilt then 'done'
+                else 'pending'
+                end,
+    'warnings' => warnings
+  }
+end
+
+# The terminal asks "rebuild now?" after an action that changes a live
+# page (maybe_rebuild); a program says --rebuild. nil means not asked.
+def rebuild_if_asked(rebuild, warnings)
+  return nil unless rebuild
+
+  deployed, more = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+  warnings.concat(more)
+  deployed
+end
+
+# `schedule <slug> --at <time> --json`, `--cancel`: the [s] and [n] keys of
+# a draft's properties, with the date typed in advance. --compact after
+# --cancel is the "shift the posts behind it forward?" question answered
+# yes, the way the queue screen asks it.
+def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
+  answer_json do
+    path, raw, post = post_for_json(slug)
+    refuse('already_published', t('cli.schedule_only_drafts', slug: slug)) unless draft?(post)
+    if cancel
+      refuse('not_scheduled', t('cli.schedule_not_scheduled', slug: slug)) unless post['scheduled']
+      entries = queue_entries
+      index = entries.index { |e| File.expand_path(e[:path]) == File.expand_path(path) }
+      rest = index ? entries[(index + 1)..] : []
+      freed = post_time!(post)
+      done, warnings = quietly(true, keep_stdout: true) { unschedule_post(path, post, slug, raw: raw) }
+      refuse('busy', t('cli.queue_busy')) unless done
+      moved = 0
+      if compact
+        moved, more = quietly(true, keep_stdout: true) { compact_queue(freed, rest) }
+        warnings.concat(more)
+      end
+      acted_answer(find_post_path(slug, ask: false) || path, warnings).merge('position' => nil, 'compacted' => moved)
+    else
+      refuse('schedule_needs_at', t('cli.schedule_json_needs_at')) if at.nil?
+      time = begin
+        Time.parse(at)
+      rescue ArgumentError, TypeError
+        nil
+      end
+      refuse('bad_date', t('cli.schedule_date_invalid')) if time.nil?
+      refuse('not_future', t('cli.schedule_date_not_future')) if time <= Time.now
+      refuse_partial!(post, slug, allow_partial, json: true) unless post['scheduled']
+      others = scheduled_entries(except_slug: slug)
+      new_path, warnings = quietly(true, keep_stdout: true) { write_scheduled_date(path, post, time, raw: raw) }
+      refuse('busy', t('cli.queue_busy')) if new_path.nil?
+      acted_answer(new_path, warnings).merge('position' => others.count { |entry| entry.first <= time } + 1,
+                                             'compacted' => 0)
+    end
+  end
+end
+
+# `unpublish <slug> --yes --json`: the typed slug replaced by the flag.
+def unpublish_as_json(slug)
+  answer_json do
+    path, _raw, post = post_for_json(slug)
+    refuse('already_draft', t('cli.already_draft', slug: slug, url: draft_url(post))) if draft?(post)
+    (_, kept), warnings = quietly(true, keep_stdout: true) { unpublish_post(path, post, slug) }
+    # The preview of the draft it has become, the way the terminal rebuilds
+    # it before opening the draft dialog -- not asked, because the live
+    # page has to come down either way.
+    deployed, more = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+    acted_answer(path, warnings + more, rebuilt: deployed).merge('announcement_kept' => kept)
+  end
+end
+
+# `delete <slug> --yes --json`: into the trash, the slug typed in advance.
+def delete_as_json(slug, rebuild:)
+  answer_json do
+    path, _raw, = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    trash_dir, warnings = quietly(true, keep_stdout: true) { delete_post(slug, path: path, confirmed: true) }
+    trashed = JSON.parse(File.read(File.join(trash_dir, 'post.json'), encoding: 'utf-8'))
+    deployed = rebuild_if_asked(rebuild, warnings)
+    { 'ok' => true, 'slug' => slug, 'year' => year, 'trash' => trash_dir,
+      'announcement_kept' => [trashed['mastodon_url'], trashed['bluesky_url']].compact,
+      'deploy' => if deployed.nil? then 'skipped'
+                  elsif deployed then 'done'
+                  else 'pending'
+                  end,
+      'warnings' => warnings }
+  end
+end
+
+# `restore --json`: what the trash holds, the rows the picker would offer.
+def trash_as_json
+  answer_json do
+    rows = trash_summary.sort_by { |p| p[:date].to_s }.reverse.map do |p|
+      { 'slug' => p[:slug], 'year' => p[:year], 'date' => p[:date], 'title' => p[:title],
+        'type' => p[:type], 'tags' => p[:tags] || [], 'state' => p[:state],
+        # The media `check --repair` set aside for a post that was never
+        # deleted: restorable, but not a post.
+        'media_only' => p[:type].nil? }
+    end
+    { 'ok' => true, 'trash' => rows }
+  end
+end
+
+# `restore <slug> --json`: back from the trash, as a program would.
+def restore_as_json(slug, rebuild:)
+  answer_json do
+    found = trashed_paths(slug)
+    if found.empty?
+      refuse('media_only', t('cli.restore_media_json', slug: slug)) unless trashed_media_dirs(slug).empty?
+      refuse('not_found', t('cli.nothing_in_trash', slug: slug).strip)
+    end
+    refuse('ambiguous_slug', t('cli.ambiguous_slug', slug: slug, count: found.size)) if found.size > 1
+    new_path, warnings = quietly(true, keep_stdout: true) { restore_post(slug, found.first) }
+    deployed = rebuild_if_asked(rebuild, warnings)
+    acted_answer(new_path, warnings, rebuilt: deployed)
+  end
+end
+
+# `rebuild --json`: the same build and deploy, the lines it would print
+# kept out of the answer. A held lock is a refusal a program can retry.
+def rebuild_as_json(full:, force:)
+  answer_json do
+    ok, warnings = quietly(true) { rebuild_and_deploy(nil, full: full, force: force) }
+    unless ok
+      refuse('busy', t('cli.queue_busy')) if Publishing.stopped_on_busy_lock?
+      refuse('rebuild_failed', warnings.last(6).join(' '))
+    end
+    { 'ok' => true, 'deploy' => 'done', 'warnings' => warnings }
+  end
+end
+
+# `empty trash|versions --json`: the count and the size the terminal asks
+# somebody to type back; with --yes, the deletion too.
+def empty_as_json(what, yes:)
+  answer_json do
+    case what
+    when 'trash'
+      dirs = trashed_dirs
+      count = dirs.length
+      size = dirs.sum { |d| dir_size(d) }
+      sweep_trash(dirs) if yes && count.positive?
+    when 'versions'
+      doomed = doomed_versions
+      count = doomed.length
+      size = doomed.sum { |f| File.size(f) }
+      doomed.each { |f| File.unlink(f) } if yes && count.positive?
+    else
+      refuse('empty_what', t('cli.empty_what'))
+    end
+    { 'ok' => true, 'what' => what, 'count' => count, 'bytes' => size, 'size' => FileSize.human(size),
+      'emptied' => yes && count.positive? }
+  end
 end
 
 def queue_as_json
@@ -6744,6 +7007,7 @@ def trash_summary
     # and a bare year ("2026") is an ArgumentError -- which took down the
     # whole trash picker, and with it the only undo the engine has.
     { slug: slug, title: t('cli.restore_media_count', count: count),
+      year: File.basename(File.dirname(File.dirname(dir))),
       date: "#{File.basename(File.dirname(File.dirname(dir)))}-01-01T00:00:00+00:00" }
   end
   posts + media_only.uniq { |entry| entry[:slug] }
@@ -7002,6 +7266,11 @@ def cmd_empty_trash
   size = dirs.sum { |d| dir_size(d) }
   return unless confirm_count('cli.empty_trash_confirm', count: dirs.length, size: size)
 
+  sweep_trash(dirs)
+  puts t('cli.empty_trash_done', count: dirs.length, size: FileSize.human(size))
+end
+
+def sweep_trash(dirs)
   dirs.each { |d| FileUtils.rm_rf(d) }
   # The year directories the posts sat in, when nothing else is left in
   # them: an empty trash should look empty.
@@ -7010,16 +7279,19 @@ def cmd_empty_trash
   rescue SystemCallError
     nil
   end
-  puts t('cli.empty_trash_done', count: dirs.length, size: FileSize.human(size))
 end
 
 # The last version of each post stays. They exist to answer "give me back
 # what I just overwrote", and that answer is the newest one -- emptying
 # them completely would take away the thing they are for.
-def cmd_empty_versions
+def doomed_versions
   root = PostVersions.versions_root(CONTENT_DIR)
   dirs = Dir.exist?(root) ? PathGlob.under(root, '*', '*').select { |d| File.directory?(d) } : []
-  doomed = dirs.flat_map { |d| PathGlob.under(d, '*.json').sort[0...-1] }
+  dirs.flat_map { |d| PathGlob.under(d, '*.json').sort[0...-1] }
+end
+
+def cmd_empty_versions
+  doomed = doomed_versions
   if doomed.empty?
     puts t('cli.empty_versions_none')
     return
@@ -7412,23 +7684,62 @@ begin
         cmd_props(slug)
       end
     when 'delete'
-      slug = ARGV.shift || pick_slug_interactively
-      cmd_delete(slug)
+      json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      rebuild = !ARGV.delete('--rebuild').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.delete_unknown_option', option: unknown) if unknown
+      if json
+        abort t('cli.delete_json_needs_yes') if !yes || ARGV.empty?
+
+        delete_as_json(ARGV.shift, rebuild: rebuild)
+      else
+        abort t('cli.delete_yes_needs_json') if yes || rebuild
+
+        slug = ARGV.shift || pick_slug_interactively
+        cmd_delete(slug)
+      end
     when 'restore'
-      slug = ARGV.shift || pick_trash_interactively
-      cmd_restore(slug)
+      json = !ARGV.delete('--json').nil?
+      rebuild = !ARGV.delete('--rebuild').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.restore_unknown_option', option: unknown) if unknown
+      if json
+        # Without a slug the terminal offers what is in the trash; a
+        # program is handed the same list.
+        ARGV.empty? ? trash_as_json : restore_as_json(ARGV.shift, rebuild: rebuild)
+      else
+        abort t('cli.restore_rebuild_needs_json') if rebuild
+
+        slug = ARGV.shift || pick_trash_interactively
+        cmd_restore(slug)
+      end
     when 'empty'
-      cmd_empty(ARGV.shift)
+      json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.empty_unknown_option', option: unknown) if unknown
+      if json
+        empty_as_json(ARGV.shift.to_s, yes: yes)
+      else
+        abort t('cli.empty_yes_needs_json') if yes
+
+        cmd_empty(ARGV.shift)
+      end
     when 'publish'
       yes = !ARGV.delete('--yes').nil?
       announce = ARGV.delete('--no-announce').nil?
       json = !ARGV.delete('--json').nil?
       allow_partial = !ARGV.delete('--allow-partial').nil?
+      compact = !ARGV.delete('--compact').nil?
       unknown = ARGV.find { |arg| arg.start_with?('--') }
       abort t('cli.publish_unknown_option', option: unknown) if unknown
       # An object for an answer means nobody is watching, and the dialog
       # this skips is the only thing that would ask.
       abort t('cli.publish_json_needs_yes') if json && !yes
+      # The queue screen asks this question after [p]; the flag answers it
+      # for a program, and only there.
+      abort t('cli.publish_compact_needs_json') if compact && !json
       # --no-announce on its own still shows the dialog; it only says what
       # [p] must not do when it gets there. Refusing the combination would
       # be refusing "let me look first, and keep it off Mastodon".
@@ -7441,18 +7752,53 @@ begin
       abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
 
       slug ||= pick_draft_interactively
-      cmd_publish(slug, yes: yes, announce: announce, json: json, allow_partial: allow_partial)
+      cmd_publish(slug, yes: yes, announce: announce, json: json, allow_partial: allow_partial, compact: compact)
     when 'schedule'
       allow_partial = !ARGV.delete('--allow-partial').nil?
-      slug = ARGV.shift || pick_draft_interactively
-      cmd_schedule(slug, allow_partial: allow_partial)
+      json = !ARGV.delete('--json').nil?
+      cancel = !ARGV.delete('--cancel').nil?
+      compact = !ARGV.delete('--compact').nil?
+      # `--at <time>` or `--at=<time>`: the date the dialog would ask for.
+      at = ARGV.find { |arg| arg.start_with?('--at=') }&.delete_prefix('--at=')
+      ARGV.reject! { |arg| arg.start_with?('--at=') }
+      if at.nil? && (index = ARGV.index('--at'))
+        at = ARGV[index + 1]
+        ARGV.slice!(index, 2)
+      end
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.schedule_unknown_option', option: unknown) if unknown
+      # The date, the cancellation and the shift are answers to questions
+      # the dialog asks; without --json the dialog is there to ask them.
+      abort t('cli.schedule_flags_need_json') if (at || cancel || compact) && !json
+      if json
+        abort t('cli.schedule_json_needs_slug') if ARGV.empty?
+
+        schedule_as_json(ARGV.shift, at: at, cancel: cancel, compact: compact, allow_partial: allow_partial)
+      else
+        slug = ARGV.shift || pick_draft_interactively
+        cmd_schedule(slug, allow_partial: allow_partial)
+      end
     when 'queue'
       json = !ARGV.delete('--json').nil?
       abort t('cli.queue_unknown_option', option: ARGV.first) unless ARGV.empty?
       json ? queue_as_json : cmd_queue
     when 'unpublish'
-      slug = ARGV.shift || pick_published_interactively
-      cmd_unpublish(slug)
+      json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.unpublish_unknown_option', option: unknown) if unknown
+      if json
+        # The typed slug is the whole confirmation; a program types it as
+        # a flag and names the post, or the dialog is there to ask.
+        abort t('cli.unpublish_json_needs_yes') if !yes || ARGV.empty?
+
+        unpublish_as_json(ARGV.shift)
+      else
+        abort t('cli.unpublish_yes_needs_json') if yes
+
+        slug = ARGV.shift || pick_published_interactively
+        cmd_unpublish(slug)
+      end
     when 'toot'
       slug = ARGV.shift || pick_published_interactively
       cmd_toot(slug)
@@ -7474,9 +7820,13 @@ begin
         print_usage
         exit 0
       end
-      unknown = ARGV.reject { |arg| %w[--full --force].include?(arg) }
+      unknown = ARGV.reject { |arg| %w[--full --force --json].include?(arg) }
       abort t('cli.rebuild_unknown_option', option: unknown.join(' ')) unless unknown.empty?
-      cmd_rebuild(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
+      if ARGV.include?('--json')
+        rebuild_as_json(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
+      else
+        cmd_rebuild(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
+      end
     when 'preview'
       # A local static server over the build output -- the quickest way to
       # look at the site before deploying anywhere.

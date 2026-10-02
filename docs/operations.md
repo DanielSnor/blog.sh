@@ -1025,6 +1025,65 @@ bomb that wrote gigabytes from megabytes, a half-failed extraction that
 published a truncated photograph and reported success. None of that can
 be expressed when there is nothing to unpack.
 
+## Driving the engine from a program
+
+Every screen a person reads before acting, and every action those
+screens offer, has a `--json` form: one object on standard output,
+nothing else on it, every key always present -- a consumer that has to
+test for a missing key is a consumer writing its own parser. A refusal
+is an object too, `{"ok": false, "error": "<code>", "message": "<a
+sentence>"}`, with a **zero** exit: the status answers whether an
+answer arrived at all, the object says what it was. (The engine falling
+over is the one thing that still leaves with 1 and prose on stderr.)
+This is the contract `add --json` and `publish --yes --json` have kept
+since the phone first needed them; the rest of the engine keeps it now.
+
+Three rules follow from "nobody is at the keyboard":
+
+- **A question the dialog asks is a flag.** The slug typed back to
+  confirm a delete is `--yes`; the date the schedule dialog asks for is
+  `--at`; "shift the rest of the queue forward?" is `--compact`;
+  "rebuild and deploy now?" is `--rebuild`. Without the flag the answer
+  is no -- a program that did not say it did not mean it.
+- **Those flags are for `--json` only.** `delete <slug> --yes` without
+  `--json` is refused: at the terminal the dialog is there to ask, and
+  a flag that silently skips a confirmation is how a shell history
+  deletes a post.
+- **A post is named by its slug, and never guessed.** The same slug in
+  two years is refused as `ambiguous_slug` where the terminal would show
+  both and ask; `list --json` carries the year so a program can tell
+  them apart, and will be able to name one.
+
+| command | what it answers | refusals |
+|---|---|---|
+| `list [filters] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned), `count`, `drafts` | -- |
+| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post | `not_found`, `ambiguous_slug` |
+| `queue --json` | `queue`: position, date, slug, year, title, overdue | -- |
+| `drafts --json [<slug>]` | the drafts with their text, as the phone opens them | `not_found` |
+| `schedule <slug> --at <time> --json` | the post, `position` in the queue, `compacted` (0) | `schedule_needs_at`, `bad_date`, `not_future`, `already_published`, `partial_translation`, `busy` |
+| `schedule <slug> --cancel [--compact] --json` | the post back among the drafts, `compacted`: how many moved forward | `not_scheduled`, `busy` |
+| `publish <slug> --yes [--compact] --json` | the published post (`add --json`'s shape), `compacted` | `already_published`, `partial_translation`, `publish_refused` |
+| `unpublish <slug> --yes --json` | the post as a draft, `announcement_kept`: addresses that could not be deleted | `already_draft` |
+| `delete <slug> --yes [--rebuild] --json` | `trash`: where it went, `announcement_kept`, `deploy` | `not_found`, `ambiguous_slug` |
+| `restore --json` | `trash`: what is in it (slug, year, date, title, type, tags, state, media_only) | -- |
+| `restore <slug> [--rebuild] --json` | the post back in place | `not_found`, `ambiguous_slug`, `media_only` |
+| `rebuild [--full] [--force] --json` | `deploy: done`, `warnings` | `busy`, `rebuild_failed` |
+| `empty trash\|versions [--yes] --json` | `count`, `bytes`, `size`, `emptied` -- without `--yes` only the count, which is the question the terminal asks | `empty_what` |
+| `check --json`, `stats --json`, `on-this-day --json` | the findings, the figures, the day -- see their own sections | -- |
+
+`deploy` in an answer is `done` when the site was rebuilt and deployed,
+`pending` when the rebuild was attempted and the next scheduled run owes
+it (the `.deploy-pending` marker), and `skipped` when the action does
+not rebuild unless asked and `--rebuild` was not given. The actions that
+rebuild without asking at the terminal -- `publish`, `unpublish` -- do so
+here too; the ones the terminal asks about -- `delete`, `restore` --
+wait for the flag, so a program making three changes can rebuild once.
+
+What a refusal's `message` says is the sentence the terminal would have
+printed, in the site's language; the `error` code is the same in every
+language and is what a program should switch on. A new code may appear
+in a later version; an existing one does not change meaning.
+
 ## Pinning a post to the front page
 
 The `[c]` action in `./blog.sh props <slug>` pins a published post --
