@@ -291,6 +291,7 @@ cli:
   translate_own_language: "„%{lang}“ je jazyk, ve kterém je příspěvek napsaný — ten se edituje přes `./blog.sh edit`."
   translate_unknown_language: "Tenhle web „%{lang}“ nepublikuje. Publikuje: %{known}. Nejdřív jazyk doplň do `site.locales` v config/site.yml."
   translate_needs_language: "Do jakého jazyka? `./blog.sh translate <slug> --lang de`."
+  translate_json_needs_slug: "--json musí pojmenovat příspěvek: `translate <slug> --lang <kód> --json`."
   translate_unknown_args: "❌ `translate` neví, co si počít s: %{args}. Bere jeden příspěvek a jeden jazyk — `./blog.sh translate <slug> --lang <kód>`."
   translate_needs_locales: "Tenhle web publikuje jeden jazyk. Nejdřív ostatní vyjmenuj v `site.locales` v config/site.yml."
   publish_partial: "Publikovat „%{slug}“ by ho vydalo v jednom jazyce: web publikuje i %{langs} a tenhle příspěvek tam slova nemá. Napiš je přes `./blog.sh translate`, nebo řekni `--allow-partial` a vyjde, jak je."
@@ -657,8 +658,9 @@ cli:
       ./blog.sh edit [<slug>] [--json]
                                      edituje příspěvek, bez slugu nabídne posledních %{recent_count} příspěvků k editaci;
                                      --json vydá text jako data místo otevření editoru
-      ./blog.sh translate <slug> --lang <kód>
-                                     napíše text toho příspěvku v dalším jazyce, který web publikuje
+      ./blog.sh translate <slug> --lang <kód> [--json]
+                                     napíše text toho příspěvku v dalším jazyce, který web publikuje;
+                                     --json vydá text jako data místo otevření editoru
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <jméno> --yes] [--rebuild]
                                      stav příspěvku, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním;
                                      --json je vypíše jako data, včetně akcí, které na něj platí

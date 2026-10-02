@@ -299,6 +299,7 @@ cli:
   translate_own_language: "„%{lang}“ ist die Sprache, in der der Beitrag geschrieben ist -- die ändert `./blog.sh edit`."
   translate_unknown_language: "Diese Website veröffentlicht „%{lang}“ nicht. Sie veröffentlicht: %{known}. Trage die Sprache zuerst in `site.locales` in config/site.yml ein."
   translate_needs_language: "In welche Sprache? `./blog.sh translate <slug> --lang de`."
+  translate_json_needs_slug: "--json muss den Beitrag benennen: `translate <slug> --lang <Code> --json`."
   translate_unknown_args: "❌ `translate` weiß nichts anzufangen mit: %{args}. Es nimmt einen Beitrag und eine Sprache -- `./blog.sh translate <slug> --lang <Code>`."
   translate_needs_locales: "Diese Website veröffentlicht eine Sprache. Nenne die anderen zuerst in `site.locales` in config/site.yml."
   publish_partial: "Ein Veröffentlichen von „%{slug}“ ginge nur in einer Sprache: die Website veröffentlicht auch %{langs}, und dieser Beitrag hat dort keine Worte. Schreibe sie mit `./blog.sh translate`, oder sage `--allow-partial`, damit er so erscheint."
@@ -669,8 +670,9 @@ cli:
       ./blog.sh edit [<slug>] [--json]
                                      bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten;
                                      --json gibt den Text als Daten aus, statt einen Editor zu öffnen
-      ./blog.sh translate <slug> --lang <code>
-                                     schreibt den Text des Beitrags in einer weiteren Sprache der Website
+      ./blog.sh translate <slug> --lang <code> [--json]
+                                     schreibt den Text des Beitrags in einer weiteren Sprache der Website;
+                                     --json gibt den Text als Daten aus, statt einen Editor zu öffnen
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <Name> --yes] [--rebuild]
                                      Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen;
                                      --json gibt sie als Daten aus, mit den Aktionen, die auf ihn zutreffen

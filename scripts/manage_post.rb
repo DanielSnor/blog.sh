@@ -169,7 +169,7 @@ FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series seri
 # Read by `add <file>` alone. On every other route -- the wizard, edit --
 # the key would be accepted and do nothing, which is the one thing the
 # unknown-key rule below exists to prevent; so it is unknown there.
-FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt edits base].freeze
+FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt edits base lang].freeze
 # What an edit decides: every key the editor shows in the header, and the
 # few the save computes on purpose (the address history, the state). Any
 # other key the post carries is kept as it was -- see edit_post.
@@ -1644,6 +1644,11 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
   refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty? && !draft?(post)
   if !base.empty? && base != Digest::SHA256.hexdigest(original_raw)
     refuse('changed', t('cli.edit_from_changed', slug: slug))
+  end
+  # `lang:` makes it a translation: the words of one language, not the post.
+  unless meta['lang'].to_s.strip.empty?
+    refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty?
+    return translation_from_file(file, raw, meta, path, original_raw, post, json: json, confined: confined)
   end
   # `edits:` and `base:` stay in the text: they belong to the delivery, and
   # the save reads them as file-only keys, like `publish:` and `receipt:`.
@@ -5076,15 +5081,83 @@ end
 # empty entry: a language a post has no words in must look exactly like a
 # language it was never offered in, or the build would give it a page with
 # the wrong text in it.
+# Whether this site can be asked for `lang` at all: through refuse, so
+# `--json` and the file route answer with an object and the terminal with
+# its sentence, as everywhere else.
+def translate_language!(lang)
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  offered = ([own] + Array(SiteConfig.get('site', 'locales', default: nil)).map { |c| c.to_s.strip }).uniq.reject(&:empty?)
+  refuse('no_locales', t('cli.translate_needs_locales')) if offered.length < 2
+  refuse('own_language', t('cli.translate_own_language', lang: lang)) if lang == own
+  unless offered.include?(lang)
+    refuse('unknown_language', t('cli.translate_unknown_language', lang: lang, known: (offered - [own]).join(', ')))
+  end
+  own
+end
+
+# The translation as the editor opens it: a header of its title and its
+# address, then its words -- empty when the language has none yet. The
+# address line is shown with what it is, so it can be read as well as
+# changed -- and left alone it stays exactly as it was, which is what an
+# address is for.
+def translation_skeleton(entry, media_dir)
+  "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
+    MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+end
+
+# `translate <slug> --lang xx --json`: what a program needs to write the
+# post's text in another language elsewhere -- the translation as it
+# stands, the original beside it with its pictures by bare name, and the
+# digest `base:` hands back. The text comes back through `add` of a file
+# saying `edits:`, `base:` and `lang:` (translation_from_file).
+def translate_as_json(slug, lang)
+  answer_json do
+    translate_language!(lang)
+    path, raw, post = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    entry = post.dig('translations', lang)
+    entry = {} unless entry.is_a?(Hash)
+    media_dir = File.join(MEDIA_DIR, year, slug)
+    { 'ok' => true,
+      'post' => { 'slug' => slug, 'lang' => lang, 'title' => post_name_for(post),
+                  'written' => Translations.written?(entry),
+                  'text' => translation_skeleton(entry, nil),
+                  'original' => translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
+                                                       'content' => LinkCard.split(post['content']).last }, nil),
+                  'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
+                  'preview' => PostAddress.path(post),
+                  'base' => Digest::SHA256.hexdigest(raw) } }
+  end
+end
+
+# A file saying `edits: <slug>`, `base: <digest>` and `lang: <code>`: the
+# translation as the app sends it back. The same save the editor's
+# round-trip makes (apply_translation), with every question a refusal.
+def translation_from_file(file, raw, meta, path, original_raw, post, json:, confined:)
+  lang = meta['lang'].to_s.strip
+  translate_language!(lang)
+  slug = post['slug'].to_s
+  _said, warnings = quietly(json, keep_stdout: true) do
+    apply_translation(slug, lang, path, original_raw, post, raw, confined: confined)
+  end
+  begin
+    File.delete(file)
+  rescue SystemCallError
+    nil
+  end
+  deployed, more = quietly(json) { rebuild_and_deploy(t('cli.updating_preview')) }
+  if json
+    puts JSON.pretty_generate(acted_answer(path, warnings + more, rebuilt: deployed).merge('lang' => lang))
+  else
+    puts t('cli.translate_saved', lang: lang, slug: slug)
+  end
+end
+
 def cmd_translate(slug, lang)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
-  own = SiteConfig.get('site', 'lang', default: 'en').to_s
-  offered = ([own] + Array(SiteConfig.get('site', 'locales', default: nil)).map { |c| c.to_s.strip }).uniq.reject(&:empty?)
-  abort t('cli.translate_needs_locales') if offered.length < 2
-  abort t('cli.translate_own_language', lang: lang) if lang == own
-  abort t('cli.translate_unknown_language', lang: lang, known: (offered - [own]).join(', ')) unless offered.include?(lang)
+  translate_language!(lang)
 
   original_raw = File.read(path, encoding: 'utf-8')
   post = JSON.parse(original_raw)
@@ -5098,11 +5171,7 @@ def cmd_translate(slug, lang)
   # changed underneath), and a buffer nobody is ever offered is a promise
   # the next successful save of any post quietly breaks.
   restored = offer_editor_buffer('translate', "#{slug}@#{lang}")
-  # The address line is shown with what it is, so it can be read as well as
-  # changed -- and left alone it stays exactly as it was, which is what an
-  # address is for.
-  skeleton = "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
-             MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+  skeleton = translation_skeleton(entry, media_dir)
   # Nothing written in this language yet: the post's own words come in as
   # `//` lines, which the editor drops on the way back like every other
   # note. Translating with the original in the buffer beats translating
@@ -5123,14 +5192,32 @@ def cmd_translate(slug, lang)
     return
   end
 
+  said = apply_translation(slug, lang, path, original_raw, post, raw)
+  discard_editor_buffer
+  puts
+  puts said
+  draft?(post) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+end
+
+# The save itself: the words of one language parsed, checked for an
+# address another post has, and written onto the post -- or taken off it
+# when both the title and the body are empty. Returns the sentence said.
+# `confined:` is the file route's: a picture may be named only by a bare
+# name, and none at all here, since a translation carries no media.
+def apply_translation(slug, lang, path, original_raw, post, raw, confined: false)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+  entry = post.dig('translations', lang)
+  entry = {} unless entry.is_a?(Hash)
   meta, body = MarkdownParser.parse_frontmatter(raw)
-  blocks, media_files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: INCOMING_DIR)
-  wait_for_missing_images(missing)
-  # A boundary rather than half of a feature: pictures belong to the post
-  # and are copied in by `edit`, which knows how to convert, remux and
-  # measure them. A translation that could bring its own would put files
-  # in one language's copy of a post whose media the other language shares.
-  abort t('cli.translate_media_unsupported') unless media_files.empty?
+  blocks, media_files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: confined ? nil : INCOMING_DIR,
+                                                                              confined: confined)
+  if confined
+    refuse('media_unsupported', t('cli.translate_media_unsupported')) if missing.any?
+  else
+    wait_for_missing_images(missing)
+  end
+  refuse('media_unsupported', t('cli.translate_media_unsupported')) unless media_files.empty?
 
   title = meta['title'].to_s.strip
   translations = post['translations'].is_a?(Hash) ? post['translations'].dup : {}
@@ -5171,7 +5258,7 @@ def cmd_translate(slug, lang)
     # build refuses such a page in the site's own language and says so;
     # this is the same refusal, one language further in.
     if PostAddress.page?(post) && PostAddress::RESERVED_ROOT_SEGMENTS.include?(address.downcase)
-      abort t('cli.translate_address_reserved', address: address)
+      refuse('address_reserved', t('cli.translate_address_reserved', address: address))
     end
     # Two posts at one address is the one thing an address may not do, and
     # in this language the other posts' addresses are their own translated
@@ -5194,21 +5281,16 @@ def cmd_translate(slug, lang)
       localized = Translations.for_lang(other, lang)
       published_address(localized, localized['address_slug']) == wanted
     end
-    abort t('cli.translate_address_taken', address: address, slug: File.basename(clash.to_s, '.json')) if clash
+    refuse('address_taken', t('cli.translate_address_taken', address: address, slug: File.basename(clash.to_s, '.json'))) if clash
     translations[lang] = one
     said = t('cli.translate_saved', lang: lang, slug: slug)
   end
   updated = post.dup
   translations.empty? ? updated.delete('translations') : updated['translations'] = translations
 
-  # The same guard every editor-backed save carries: the cron may have
-  # published this post while the editor sat open.
   abort_if_post_changed(path, original_raw, slug)
   AtomicWrite.write_json(path, updated)
-  discard_editor_buffer
-  puts
-  puts said
-  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+  said
 end
 
 def cmd_edit(slug)
@@ -7953,12 +8035,14 @@ begin
       # `--lang de`, or the second word: a translation is always OF a post
       # INTO a language, so both are required and neither has a default.
       args = ARGV.dup
+      json = !args.delete('--json').nil?
       lang = args.find { |arg| arg.start_with?('--lang=') }&.delete_prefix('--lang=')
       args.reject! { |arg| arg.start_with?('--lang=') }
       if lang.nil? && (at = args.index('--lang'))
         lang = args[at + 1]
         args.slice!(at, 2)
       end
+      abort t('cli.translate_json_needs_slug') if json && (args.empty? || args.first.to_s.start_with?('--'))
       slug = args.shift || pick_slug_interactively
       lang ||= args.shift unless args.first.to_s.start_with?('--')
       # 🪤 Whatever is still here was not asked for: a typo in `--lang`, a
@@ -7969,7 +8053,7 @@ begin
       abort t('cli.translate_unknown_args', args: args.join(' ')) unless args.empty?
       lang = nil if lang.to_s.start_with?('--')
       abort t('cli.translate_needs_language') if lang.to_s.strip.empty?
-      cmd_translate(slug, lang.to_s.strip)
+      json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
     when 'edit'
       json = !ARGV.delete('--json').nil?
       unknown = ARGV.find { |arg| arg.start_with?('--') }
