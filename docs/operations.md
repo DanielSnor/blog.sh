@@ -1130,6 +1130,15 @@ no `env.sh`, a configuration that will not parse -- is wrapped as
 be ed25519; the forced command runs in the same environment
 `receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.
 
+The forced command runs in the account's non-interactive shell, which
+reads none of the files a terminal session reads -- so a Ruby that lives
+under rbenv or Homebrew is not on its `PATH`, and the engine refuses the
+system's old one. Put the path in the key's line, the way `BLOGSH_MAX_MB`
+goes there: `command="PATH=/home/me/.rbenv/shims:/usr/bin:/bin
+/path/to/blog/scripts/remote.sh"`. A path with a space in it is
+single-quoted inside the double quotes; the app writes the line that way
+itself.
+
 ## Pinning a post to the front page
 
 The `[c]` action in `./blog.sh props <slug>` pins a published post --
