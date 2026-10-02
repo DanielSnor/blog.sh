@@ -35,6 +35,15 @@
 require 'json'
 require 'open3'
 
+# ⚠️ The forced command runs with no LANG (sshd, docker exec, cron), and
+# Ruby then reads standard input as ASCII-8BIT -- on which a UTF-8 regexp
+# raises, so a series called Procházky took the whole request down with
+# it, answered by nothing at all. The bytes are UTF-8 either way; only
+# the label on them was wrong.
+Encoding.default_external = Encoding::UTF_8
+$stdin.set_encoding(Encoding::UTF_8)
+$stdout.set_encoding(Encoding::UTF_8)
+
 ROOT = File.expand_path('..', __dir__)
 LIMIT = 65_536
 FIRST_SECONDS = 30
@@ -164,8 +173,8 @@ def deliver
 
   # ⚠️ [path, name], never the bare path: a single string with a space in
   # it is handed to a shell, which splits it -- and an iCloud folder on a
-  # Mac has one ("Mobile Documents"). The first delivery from the app
-  # died with "sh: /Users/.../Mobile: No such file or directory".
+  # Mac has one (the iCloud documents folder). The first delivery from the app
+  # died with the shell complaining that half the path did not exist.
   receiver = File.join(ROOT, 'scripts', 'receive.sh')
   out, err, = begin
     Open3.capture3([receiver, 'receive.sh'], chdir: ROOT, stdin_data: collected)
