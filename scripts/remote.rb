@@ -159,8 +159,13 @@ def deliver
   end
   refuse('empty_input', 'Nothing arrived before the end.') if collected.strip.empty?
 
+  # ⚠️ [path, name], never the bare path: a single string with a space in
+  # it is handed to a shell, which splits it -- and an iCloud folder on a
+  # Mac has one ("Mobile Documents"). The first delivery from the app
+  # died with "sh: /Users/.../Mobile: No such file or directory".
+  receiver = File.join(ROOT, 'scripts', 'receive.sh')
   out, err, = begin
-    Open3.capture3(File.join(ROOT, 'scripts', 'receive.sh'), chdir: ROOT, stdin_data: collected)
+    Open3.capture3([receiver, 'receive.sh'], chdir: ROOT, stdin_data: collected)
   rescue SystemCallError => e
     refuse('engine_failed', "Could not run the receiver: #{e.message}")
   end
@@ -176,8 +181,9 @@ deliver if ARGV.first == '--deliver'
 
 args = check(read_request)
 
+engine = File.join(ROOT, 'blog.sh')
 out, err, status = begin
-  Open3.capture3({ 'BLOG_SH_REMOTE' => '1' }, File.join(ROOT, 'blog.sh'), *args, chdir: ROOT, stdin_data: '')
+  Open3.capture3({ 'BLOG_SH_REMOTE' => '1' }, [engine, 'blog.sh'], *args, chdir: ROOT, stdin_data: '')
 rescue SystemCallError => e
   refuse('engine_failed', "Could not run the engine: #{e.message}")
 end
