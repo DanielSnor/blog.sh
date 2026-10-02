@@ -1058,7 +1058,7 @@ Three rules follow from "nobody is at the keyboard":
 |---|---|---|
 | `version --json` | `engine`, `site`: name, claim, url, lang, locales -- the identity block as data; answers on a broken config with what it can | -- |
 | `list [filters] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned), `count`, `drafts` | -- |
-| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post | `not_found`, `ambiguous_slug` |
+| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft | `not_found`, `ambiguous_slug` |
 | `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property` |
 | `props <slug> --drop-address <address> --json` | the screen after the drop | `address_unknown` |
 | `props <slug> --rename <slug> --yes --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable` |

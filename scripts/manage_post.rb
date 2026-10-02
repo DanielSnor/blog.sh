@@ -6273,6 +6273,11 @@ def props_as_json(slug)
                      'others' => other_languages.to_h { |lang| [lang, language_state(post, lang).to_s] } },
     'announced' => announced,
     'announces' => announces,
+    # Which network [t] would announce on, so a program knows whether to
+    # call toot or bluesky -- and the slot the schedule dialog would offer
+    # a plain draft, so it can offer the same.
+    'network' => network&.to_s,
+    'slot' => draft && !post['scheduled'] ? next_publish_slot(slug)&.iso8601 : nil,
     'addresses' => address_entries(post).map { |kind, value| { 'kind' => kind, 'value' => value } },
     'actions' => actions
   }
