@@ -1102,9 +1102,11 @@ own with a forced command, the way the phone's shortcut does:
 
 `scripts/remote.sh` allows two words as the SSH command and nothing
 else. **`run`** runs one engine command: its argv arrives on standard
-input as JSON, `{"args": ["props", "venku", "--set", "tags=louka, les"]}`,
-word by word, so nothing is ever parsed as shell and a value with spaces
-or diacritics is one word on both ends. Before the engine sees it,
+input as one line of JSON, `{"args": ["props", "venku", "--set",
+"tags=louka, les"]}` and a newline -- the line ends the request, so a
+sender that cannot close its side of the stream is answered all the
+same -- word by word, so nothing is ever parsed as shell and a value
+with spaces or diacritics is one word on both ends. Before the engine sees it,
 `scripts/remote.rb` checks every word: the command has to be one a
 program may run (`version`, `list`, `drafts`, `props`, `queue`,
 `schedule`, `publish`, `unpublish`, `delete`, `restore`, `rebuild`,

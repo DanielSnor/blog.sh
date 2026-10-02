@@ -4,8 +4,9 @@
 # scripts/remote.rb -- `run`, the half of scripts/remote.sh that runs one
 # engine command for a program on the far end of SSH.
 #
-# Standard input is one JSON object, {"args": [...]}: the argv ./blog.sh
-# would get, word by word, so nothing here is ever parsed as shell -- a
+# Standard input is one JSON object on ONE LINE, {"args": [...]}: the argv
+# ./blog.sh would get, word by word, so nothing here is ever parsed as
+# shell -- a
 # series called "Procházky a výlety" travels as one word and arrives as
 # one argument. The words are checked against a whitelist before the
 # engine sees them: the commands a program may run, and for each the
@@ -71,7 +72,10 @@ def read_request
   ready = IO.select([$stdin], nil, nil, FIRST_SECONDS)
   refuse('empty_input', "Nothing arrived on standard input for #{FIRST_SECONDS} seconds.") if ready.nil?
 
-  raw = $stdin.read(LIMIT + 1).to_s
+  # One line, ended by its newline rather than by the end of the stream:
+  # an SSH library without a half-close (the app's) could never signal
+  # EOF, and JSON.generate never breaks a line, so the newline is enough.
+  raw = $stdin.gets(LIMIT + 1).to_s
   refuse('empty_input', 'Nothing arrived on standard input.') if raw.strip.empty?
   refuse('too_large', "The request is over #{LIMIT} bytes.") if raw.bytesize > LIMIT
 

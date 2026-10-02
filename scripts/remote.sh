@@ -3,8 +3,8 @@
 # phone, a script on another machine. Two words are allowed as the SSH
 # command, and nothing else:
 #
-#   run      one engine command; its argv arrives on standard input as
-#            JSON, {"args": ["props", "slug", "--set", "tags=a, b"]}, and
+#   run      one engine command; its argv arrives on standard input as one
+#            line of JSON, {"args": ["props", "slug", "--set", "tags=a, b"]}, and
 #            scripts/remote.rb checks every word against a whitelist before
 #            ./blog.sh sees it (see there for what is refused);
 #   receive  a delivery of files, the shape scripts/receive.sh takes.
