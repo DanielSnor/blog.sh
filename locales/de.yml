@@ -714,7 +714,7 @@ cli:
       ./blog.sh drafts [--json] [<slug>]
                                      listet die Entwürfe; --json mit dem Text jedes Entwurfs, wie das Telefon ihn öffnet
       ./blog.sh help                 zeigt diese Hilfe
-      ./blog.sh version              gibt die Version der Engine aus
+      ./blog.sh version [--json]     gibt die Version der Engine aus
       ./blog.sh                      startet den interaktiven Assistenten
 
   wizard_prompt_action: "Was möchtest du tun?"

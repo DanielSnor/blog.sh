@@ -702,7 +702,7 @@ cli:
       ./blog.sh drafts [--json] [<slug>]
                                      vypíše koncepty; --json i s textem každého, jak ho otevírá telefon
       ./blog.sh help                 zobrazí tuhle nápovědu
-      ./blog.sh version              vypíše verzi enginu
+      ./blog.sh version [--json]     vypíše verzi enginu
       ./blog.sh                      spustí interaktivního průvodce
 
   wizard_prompt_action: "Co chceš dělat?"

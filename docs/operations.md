@@ -1056,6 +1056,7 @@ Three rules follow from "nobody is at the keyboard":
 
 | command | what it answers | refusals |
 |---|---|---|
+| `version --json` | `engine`, `site`: name, claim, url, lang, locales -- the identity block as data; answers on a broken config with what it can | -- |
 | `list [filters] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned), `count`, `drafts` | -- |
 | `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post | `not_found`, `ambiguous_slug` |
 | `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property` |
@@ -1090,6 +1091,42 @@ What a refusal's `message` says is the sentence the terminal would have
 printed, in the site's language; the `error` code is the same in every
 language and is what a program should switch on. A new code may appear
 in a later version; an existing one does not change meaning.
+
+### Over SSH, from an app
+
+A program on another machine -- the blog.sh app on a phone, a script --
+reaches the engine over the SSH the server already has, on a key of its
+own with a forced command, the way the phone's shortcut does:
+
+    restrict,command="/path/to/blog/scripts/remote.sh" ssh-ed25519 AAAA... app
+
+`scripts/remote.sh` allows two words as the SSH command and nothing
+else. **`run`** runs one engine command: its argv arrives on standard
+input as JSON, `{"args": ["props", "venku", "--set", "tags=louka, les"]}`,
+word by word, so nothing is ever parsed as shell and a value with spaces
+or diacritics is one word on both ends. Before the engine sees it,
+`scripts/remote.rb` checks every word: the command has to be one a
+program may run (`version`, `list`, `drafts`, `props`, `queue`,
+`schedule`, `publish`, `unpublish`, `delete`, `restore`, `rebuild`,
+`empty`, `toot`, `bluesky`, `stats`, `on-this-day`, `check`), each flag
+one that command has in its `--json` form, every positional word a slug,
+and no word may hold a control character. `--json` is added when it is
+missing, so the answer is always an object. What is not on the list is
+what opens an editor, asks a question, writes outside the archive or
+reaches a network on somebody else's account: `edit`, `translate`, `add`
+(a post arrives through `receive`), `export`, `preview`, `browse`,
+`check --repair`, the wizard. **`receive`** is the delivery
+`scripts/receive.sh` takes -- pictures and a markdown, or a `publish.txt`
+or `drafts.txt` request -- for the same key.
+
+Every answer is one object and the status is 0, for the reason the
+receiver gives; a request that is not JSON, holds a word the whitelist
+refuses or is over 64 kB is refused as one (`bad_json`, `bad_args`,
+`unknown_command`, `too_large`), and the engine answering in prose --
+no `env.sh`, a configuration that will not parse -- is wrapped as
+`engine_failed` with its words. Unlike the shortcut's key this one may
+be ed25519; the forced command runs in the same environment
+`receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.
 
 ## Pinning a post to the front page
 

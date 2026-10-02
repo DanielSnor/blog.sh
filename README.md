@@ -290,7 +290,7 @@ says what you are running.
                                # the drafts; --json with each one's text, as the phone opens it
 ./blog.sh on-this-day [--date MM-DD] [--json]
                                # what this day holds from earlier years, and what the on_this_day card shows of it
-./blog.sh version              # which version this installation is running
+./blog.sh version [--json]     # which version this installation is running
 ./blog.sh help
 ```
 

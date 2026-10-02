@@ -18,6 +18,7 @@
 #   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
 #   ./blog.sh stats [--json]
 #   ./blog.sh on-this-day [--date MM-DD] [--json]
+#   ./blog.sh version [--json]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -63,7 +64,8 @@ case "${1:-}" in
   # parse these two died before they could answer -- exactly the install
   # whose owner is asking.
   version | --version | -v)
-    exec ruby scripts/info.rb version
+    shift
+    exec ruby scripts/info.rb version "$@"
     ;;
   # Doctor takes that furthest: it exists to explain an install with no
   # env.sh, no config, or a config that won't parse, so the "Missing

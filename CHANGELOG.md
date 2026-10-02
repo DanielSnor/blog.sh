@@ -54,6 +54,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `queue --up <slug>`, `--down <slug>` and `--move <slug> --to <n>` are [u], [d] and [m]; `toot` and
   `bluesky` answer with the address or the reason, `--force` answering the "announce it anyway?"
   question. Every answer is the screen as it stands afterwards.
+- **`version --json`**, and **`scripts/remote.sh`**: the forced command for a program's key. `run`
+  takes one engine command with its argv as JSON on standard input and checks every word against a
+  whitelist of commands and flags before the engine sees it -- nothing is ever parsed as shell, and
+  the key never gets one; `receive` is the delivery `receive.sh` takes. The identity block (engine,
+  site, claim, URL, languages) comes as data, for an app to show above its screens.
 
 
 ## 1.9 -- 2026-09-28

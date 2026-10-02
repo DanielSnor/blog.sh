@@ -42,7 +42,17 @@ RECENT_LIST_COUNT = 50
 
 case ARGV.first
 when 'version', '--version', '-v'
-  puts "blog.sh #{BlogSh::VERSION}"
+  if ARGV.include?('--json')
+    # The identity block as data: what an app shows above every screen,
+    # the way the terminal shows it. From the raw file, like the language
+    # above, so a broken config still answers with what it can.
+    require 'json'
+    locales = Array(data.is_a?(Hash) ? data.dig('site', 'locales') : nil).map(&:to_s).reject(&:empty?)
+    puts JSON.pretty_generate('ok' => true, 'engine' => BlogSh::VERSION,
+                              'site' => SiteHeader.identity.merge('lang' => I18n.lang.to_s, 'locales' => locales))
+  else
+    puts "blog.sh #{BlogSh::VERSION}"
+  end
 else
   puts SiteHeader.render
   puts
