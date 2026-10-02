@@ -6264,6 +6264,12 @@ def props_as_json(slug)
              end,
     'address' => PostAddress.path(post),
     'type' => ContentType.dominant(post),
+    # The [e] rows a program sets: the type the post says for itself (nil
+    # when the content decides), and the two three-state flags in the
+    # words --set takes back.
+    'type_set' => post['type'].to_s.empty? ? nil : post['type'].to_s,
+    'hero' => if post.key?('hero') then truthy_frontmatter?(post['hero']) ? 'yes' : 'no' else 'default' end,
+    'toc' => if post['toc'].nil? then 'default' else truthy_frontmatter?(post['toc']) ? 'yes' : 'no' end,
     'tags' => post['tags'] || [],
     'series' => post['series'].to_s.strip.empty? ? nil : post['series'].to_s,
     'series_part' => post['series_part'].to_s.empty? ? nil : post['series_part'].to_s,
