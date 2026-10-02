@@ -48,7 +48,11 @@ when 'version', '--version', '-v'
     # above, so a broken config still answers with what it can.
     require 'json'
     locales = Array(data.is_a?(Hash) ? data.dig('site', 'locales') : nil).map(&:to_s).reject(&:empty?)
+    # The receiver's ceiling, as the forced command's environment sets it,
+    # so an app can measure a delivery before sending it.
+    max_mb = ENV.fetch('BLOGSH_MAX_MB', '24').to_i
     puts JSON.pretty_generate('ok' => true, 'engine' => BlogSh::VERSION,
+                              'max_mb' => max_mb.positive? ? max_mb : 24,
                               'site' => SiteHeader.identity.merge('lang' => I18n.lang.to_s, 'locales' => locales))
   else
     puts "blog.sh #{BlogSh::VERSION}"

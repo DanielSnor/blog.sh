@@ -59,6 +59,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
   whitelist of commands and flags before the engine sees it -- nothing is ever parsed as shell, and
   the key never gets one; `receive` is the delivery `receive.sh` takes. The identity block (engine,
   site, claim, URL, languages) comes as data, for an app to show above its screens.
+- **`deliver`** on the same key: a delivery ended by a line saying `end`, for a sender that cannot
+  close its side of the stream, handed to `receive.sh` whole; `version --json` says the receiver's
+  ceiling (`max_mb`), and `props --json` which network [t] announces on, the slot the schedule
+  dialog would offer, and the [e] rows in the words `--set` takes back.
 
 
 ## 1.9 -- 2026-09-28

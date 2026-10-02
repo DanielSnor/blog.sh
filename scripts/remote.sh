@@ -7,7 +7,11 @@
 #            line of JSON, {"args": ["props", "slug", "--set", "tags=a, b"]}, and
 #            scripts/remote.rb checks every word against a whitelist before
 #            ./blog.sh sees it (see there for what is refused);
-#   receive  a delivery of files, the shape scripts/receive.sh takes.
+#   receive  a delivery of files, the shape scripts/receive.sh takes;
+#   deliver  the same delivery, ended by a line saying `end` instead of by
+#            the end of the stream -- for a sender that cannot close its
+#            side (the app's SSH library); scripts/remote.rb reads it up to
+#            that line and hands it to receive.sh whole.
 #
 #   restrict,command="/path/to/blog/scripts/remote.sh" ssh-ed25519 AAAA... app
 #
@@ -30,12 +34,19 @@ case "${SSH_ORIGINAL_COMMAND:-${1:-}}" in
   receive)
     exec scripts/receive.sh
     ;;
+  deliver)
+    if ! command -v ruby >/dev/null 2>&1; then
+      printf '{"ok":false,"error":"no_ruby","message":"Ruby is not on the PATH the forced command runs with."}\n'
+      exit 0
+    fi
+    exec ruby scripts/remote.rb --deliver
+    ;;
   '')
-    printf '{"ok":false,"error":"no_command","message":"Say run or receive."}\n'
+    printf '{"ok":false,"error":"no_command","message":"Say run, receive or deliver."}\n'
     exit 0
     ;;
   *)
-    printf '{"ok":false,"error":"unknown_command","message":"Only run and receive are allowed on this key."}\n'
+    printf '{"ok":false,"error":"unknown_command","message":"Only run, receive and deliver are allowed on this key."}\n'
     exit 0
     ;;
 esac

@@ -1119,7 +1119,14 @@ reaches a network on somebody else's account: `edit`, `translate`, `add`
 (a post arrives through `receive`), `export`, `preview`, `browse`,
 `check --repair`, the wizard. **`receive`** is the delivery
 `scripts/receive.sh` takes -- pictures and a markdown, or a `publish.txt`
-or `drafts.txt` request -- for the same key.
+or `drafts.txt` request -- for the same key. **`deliver`** is the same
+delivery for a sender that cannot close its side of the stream: it ends
+with a line saying `end` instead, which `scripts/remote.rb` reads up to
+and hands to `receive.sh` whole, so every check the receiver makes is
+made; a file may not be called `end`, and a delivery over twice the
+receiver's ceiling is dropped on the wire (`too_large`) before the
+receiver measures it exactly. `version --json` says the ceiling
+(`max_mb`), so a sender can weigh a delivery first.
 
 Every answer is one object and the status is 0, for the reason the
 receiver gives; a request that is not JSON, holds a word the whitelist

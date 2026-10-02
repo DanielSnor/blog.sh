@@ -25,6 +25,12 @@
 # Like receive.sh: an answer is an object and the status is 0, whatever
 # the answer. The engine speaking prose instead (no env.sh, a config that
 # will not parse, a backtrace) is wrapped as engine_failed with its words.
+#
+# `--deliver` is the other half: a delivery in receive.sh's own shape, read
+# up to a line saying `end` (or to the end of the stream, for a sender that
+# can close it) and handed to receive.sh whole on a pipe -- which is where
+# the EOF receive.sh waits for comes from. Nothing about the delivery is
+# judged here; every check stays in receive.sh.
 require 'json'
 require 'open3'
 
@@ -33,6 +39,12 @@ LIMIT = 65_536
 FIRST_SECONDS = 30
 # Long enough for a full rebuild of a large archive and its upload.
 RUN_SECONDS = 1800
+# A delivery's ceiling, the receiver's own plus room for the names and the
+# line breaks; the receiver measures the exact one. How long the lines may
+# take to keep coming is the receiver's BLOGSH_BODY_SECONDS too.
+MAX_MB = ENV.fetch('BLOGSH_MAX_MB', '24').to_i
+DELIVER_LIMIT = (MAX_MB.positive? ? MAX_MB : 24) * 1_048_576 * 2
+BODY_SECONDS = ENV.fetch('BLOGSH_BODY_SECONDS', '600').to_i
 
 def answer(object)
   puts JSON.generate(object)
@@ -125,6 +137,42 @@ def check(args)
   end
   args.include?('--json') ? args : args + ['--json']
 end
+
+# The delivery, line by line, up to `end`. A line is a name, a line of
+# base64 or the closing dot of receive.sh's frame; `end` is none of those
+# -- three characters are not a base64 line, and a file called `end` is
+# the one name this road cannot carry. The bytes go to receive.sh exactly
+# as they came, newline for newline.
+def deliver
+  collected = +''
+  deadline = FIRST_SECONDS
+  loop do
+    ready = IO.select([$stdin], nil, nil, deadline)
+    refuse('timeout', "The delivery stalled for #{deadline} seconds and was dropped.") if ready.nil?
+
+    line = $stdin.gets
+    break if line.nil? || line.chomp == 'end'
+
+    collected << line
+    refuse('too_large', "The delivery is over #{DELIVER_LIMIT / 1_048_576} MB on the wire.") if collected.bytesize > DELIVER_LIMIT
+    deadline = BODY_SECONDS
+  end
+  refuse('empty_input', 'Nothing arrived before the end.') if collected.strip.empty?
+
+  out, err, = begin
+    Open3.capture3(File.join(ROOT, 'scripts', 'receive.sh'), chdir: ROOT, stdin_data: collected)
+  rescue SystemCallError => e
+    refuse('engine_failed', "Could not run the receiver: #{e.message}")
+  end
+  if out.lstrip.start_with?('{')
+    print out
+    exit 0
+  end
+  reason = "#{out}\n#{err}".scrub('').gsub(/[\u0000-\u0008\u000b-\u001f\u007f]/, '').strip.tr("\n", ' ')
+  refuse('engine_failed', reason[-600..] || reason)
+end
+
+deliver if ARGV.first == '--deliver'
 
 args = check(read_request)
 
