@@ -35,6 +35,7 @@ require_relative '../lib/translations'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
+require_relative '../lib/search_index'
 require_relative '../lib/post_address'
 require_relative '../lib/address_guard'
 require_relative '../lib/path_safety'
@@ -6110,6 +6111,16 @@ def post_summary(file)
   # left to itself it crashes further along with no file named.
   raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)
 
+  post_summary_of(post, file)
+rescue JSON::ParserError, SystemCallError => e
+  warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
+  nil
+end
+
+# The row itself, from a post already read -- the search index keeps one
+# per post beside its words (lib/search_index.rb), so a search does not
+# read the archive twice.
+def post_summary_of(post, file)
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
     state: post['state'] || PUBLISHED, scheduled: post['scheduled'],
@@ -6124,9 +6135,6 @@ def post_summary(file)
     # level deeper (trash/<year>/<slug>/post.json); a flat trash/<slug>/
     # from before the trash grew years has no year to give.
     year: summary_year(file) }
-rescue JSON::ParserError, SystemCallError => e
-  warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
-  nil
 end
 
 # `list` is the plain-text face for pipes and scripts, and keeps the
@@ -6860,31 +6868,46 @@ LIST_MATCH_WIDTH = 120
 # (PostText.searchable) -- so the three answer one question one way. An
 # empty query, or one of nothing but exclusions, matches nothing, as it
 # does there.
-def list_search(posts, query)
+def list_search(query)
   tokens = SearchQuery.parse(query)
-  posts.filter_map do |summary|
-    post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
-    text = PostText.plain(post).gsub(/\s+/, ' ').strip
-    next unless SearchQuery.match?(PostText.searchable(post, text), tokens)
+  search_entries.filter_map do |file, entry|
+    next unless SearchQuery.match?(entry['folded'].to_s, tokens)
 
-    summary.merge(match: browse_context({ text: text }, tokens, LIST_MATCH_WIDTH, {}, summary[:key]))
-  rescue JSON::ParserError, SystemCallError
-    # post_summary already warned about this file; a post that cannot be
-    # read simply matches nothing.
+    summary = entry['summary'].transform_keys(&:to_sym)
+    key = "#{File.basename(File.dirname(file))}/#{summary[:slug]}"
+    summary.merge(path: file, key: key,
+                  match: browse_context({ text: entry['text'].to_s }, tokens, LIST_MATCH_WIDTH, {}, key))
+  end
+end
+
+# The archive's search index (lib/search_index.rb): every post file with
+# the row `list` prints for it and the words a query is matched against,
+# read from the posts only where a post changed since it was last asked.
+# The languages are all the site publishes: a label a language gives a
+# tag is a word a reader of that language types.
+def search_entries(warn_unreadable: true)
+  labels = SearchIndex.tag_labels(ROOT, Array(SiteConfig.get('site', 'locales', default: [])).map(&:to_s))
+  files = PathGlob.under(CONTENT_DIR, '*', '*.json')
+  SearchIndex.load(root: ROOT, files: files, stamp: SearchIndex.stamp(ROOT, labels)) do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8'))
+    raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)
+
+    { 'summary' => post_summary_of(post, file).transform_keys(&:to_s) }.merge(SearchIndex.words(post, labels))
+  rescue JSON::ParserError, SystemCallError => e
+    warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100]) if warn_unreadable
     nil
   end
 end
 
 def cmd_list(filters)
   searching = !filters[:search].nil?
-  posts = (searching ? browse_posts : load_posts_summary).select do |p|
+  posts = (searching ? list_search(filters[:search]) : load_posts_summary).select do |p|
     next false if filters[:tag] && !p[:tags].map(&:downcase).include?(filters[:tag].downcase)
     next false if filters[:type] && p[:type] != filters[:type]
     next false if filters[:drafts] && p[:state] != DRAFT
 
     true
   end
-  posts = list_search(posts, filters[:search]) if searching
   # A post whose date is missing or unreadable sorts last instead of
   # ending the command: `list` is one of the ways somebody goes LOOKING for
   # the post that is broken, and a raw comparison error out of sort_by
@@ -6952,16 +6975,13 @@ end
 # screen show WHY a post matched.
 def browse_index(posts)
   Tui.spinner(t('cli.browse_indexing', count: posts.size)) do
+    # Kept between runs (lib/search_index.rb): only a post that changed
+    # is read again. post_summary already warned about a file that
+    # cannot be read; here such a post simply matches nothing.
+    entries = search_entries(warn_unreadable: false)
     posts.each_with_object({}) do |summary, index|
-      begin
-        post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
-        text = PostText.plain(post).gsub(/\s+/, ' ').strip
-        index[summary[:key]] = { text: text, folded: PostText.searchable(post, text) }
-      rescue JSON::ParserError, SystemCallError
-        # post_summary already warned about this file; a post that cannot
-        # be read simply matches nothing.
-        index[summary[:key]] = { text: '', folded: '' }
-      end
+      entry = entries[summary[:path]]
+      index[summary[:key]] = entry ? { text: entry['text'].to_s, folded: entry['folded'].to_s } : { text: '', folded: '' }
     end
   end
 end

@@ -27,6 +27,12 @@ goes in is still being decided; the suffix and the date both come off at the tag
   no screen to type it into: the same query language as the screen and the site's search box,
   over the whole text. With `--json` each row carries `match`, the line that says why it is in
   the results, and the answer says the query back as `search`.
+- **The search in the terminal keeps its index.** `browse` and `list --search` read every post
+  and folded its text on every query -- 4.9 s on 6,600 posts, 3.8 s of it rebuilding what the
+  query before had built. The index is now written to `.search_index.json` and a post is read
+  again only when its file changed: the same search answers in a quarter of a second. It also
+  searches what the site's own search box searches, in every language the site publishes -- a
+  translation's title and text, and the label a language gives a tag.
 - **`version --json` says the site's accent.** `site.accent` carries the palette's accent for
   light and for dark, resolved as colors.css resolves it, so an app can wear the blog's colour
   the way `/write/` does.

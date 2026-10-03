@@ -2179,7 +2179,9 @@ and it is rewritten by that same run), `incoming/` (transient staging),
 `.build_cache*.json` (what the last build wrote, so the next one can skip
 re-making it -- per-machine, and deleting it costs one full build),
 `.on-this-day.*.json` (the on-this-day catalogues, rewritten by every
-build), and
+build), `.search_index.json` (the words `browse` and `list --search`
+search, kept between runs so a query reads only the posts that changed
+-- deleting it costs one slow search), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still
