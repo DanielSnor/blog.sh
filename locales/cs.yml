@@ -689,7 +689,7 @@ cli:
                                      (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
       ./blog.sh rebuild [--full] [--force] [--json]
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
-      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                      vypíše příspěvky po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek

@@ -51,9 +51,16 @@ when 'version', '--version', '-v'
     # The receiver's ceiling, as the forced command's environment sets it,
     # so an app can measure a delivery before sending it.
     max_mb = ENV.fetch('BLOGSH_MAX_MB', '24').to_i
+    # The accent the site wears, per scheme, resolved the way colors.css
+    # resolves it -- a palette the site never set answers with the shipped
+    # one -- so an app can wear the blog's colour, as /write/ does.
+    require_relative '../lib/colors_css'
+    colors = data.is_a?(Hash) ? data['colors'] : nil
+    accent = %w[light dark].to_h { |mode| [mode, ColorsCss.color_for(colors, mode, 'accent')] }
     puts JSON.pretty_generate('ok' => true, 'engine' => BlogSh::VERSION,
                               'max_mb' => max_mb.positive? ? max_mb : 24,
-                              'site' => SiteHeader.identity.merge('lang' => I18n.lang.to_s, 'locales' => locales))
+                              'site' => SiteHeader.identity.merge('lang' => I18n.lang.to_s, 'locales' => locales,
+                                                                  'accent' => accent))
   else
     puts "blog.sh #{BlogSh::VERSION}"
   end

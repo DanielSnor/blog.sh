@@ -273,7 +273,7 @@ says what you are running.
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                # the archive on screen: filters, search, preview, Enter opens the post
-./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
+./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                # the same, printed one line per post; --json as data
 ./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it;
                                # --online also asks the feeds, the analytics script, the access

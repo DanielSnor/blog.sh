@@ -701,7 +701,7 @@ cli:
                                      verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
       ./blog.sh rebuild [--full] [--force] [--json]
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
-      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--json]
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag

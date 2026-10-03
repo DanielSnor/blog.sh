@@ -6306,14 +6306,20 @@ end
 # a refusal as an object with "ok":false and a zero exit -- a caller that
 # has to test for a missing key is a caller writing its own parser.
 
-def list_as_json(posts)
+# `search` says the query back (nil when there was none): an engine from
+# before the flag ignores it and answers with the whole archive, and the
+# key is how a program tells "everything matched" from "nobody searched".
+# `match` is the line that says why a row is in the results, the one the
+# screen shows under the cursor; nil when the hit is in the title or a tag.
+def list_as_json(posts, search: nil)
   rows = posts.map do |p|
     { 'slug' => p[:slug], 'year' => p[:year], 'date' => p[:date], 'title' => p[:title],
       'type' => p[:type], 'tags' => p[:tags], 'state' => p[:state],
-      'scheduled' => p[:scheduled] == true, 'series' => p[:series], 'pinned' => p[:pinned] }
+      'scheduled' => p[:scheduled] == true, 'series' => p[:series], 'pinned' => p[:pinned],
+      'match' => p[:match] }
   end
   puts JSON.pretty_generate('ok' => true, 'posts' => rows, 'count' => rows.size,
-                            'drafts' => posts.count { |p| p[:state] == DRAFT })
+                            'drafts' => posts.count { |p| p[:state] == DRAFT }, 'search' => search)
 end
 
 # The properties screen as data, with the keys it would offer named as
@@ -6844,21 +6850,48 @@ def queue_as_json
   puts JSON.pretty_generate('ok' => true, 'queue' => queue_rows)
 end
 
+# How much of a post's text `match` carries: the terminal cuts the same
+# line to its own width, a program has none, and a phone shows about this.
+LIST_MATCH_WIDTH = 120
+
+# `list --search=<query>`: the search `browse` runs behind [/], for a
+# caller with no screen to type it into. The same query language as the
+# screen and the site's search box (SearchQuery), over the same text
+# (PostText.searchable) -- so the three answer one question one way. An
+# empty query, or one of nothing but exclusions, matches nothing, as it
+# does there.
+def list_search(posts, query)
+  tokens = SearchQuery.parse(query)
+  posts.filter_map do |summary|
+    post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
+    text = PostText.plain(post).gsub(/\s+/, ' ').strip
+    next unless SearchQuery.match?(PostText.searchable(post, text), tokens)
+
+    summary.merge(match: browse_context({ text: text }, tokens, LIST_MATCH_WIDTH, {}, summary[:key]))
+  rescue JSON::ParserError, SystemCallError
+    # post_summary already warned about this file; a post that cannot be
+    # read simply matches nothing.
+    nil
+  end
+end
+
 def cmd_list(filters)
-  posts = load_posts_summary.select do |p|
+  searching = !filters[:search].nil?
+  posts = (searching ? browse_posts : load_posts_summary).select do |p|
     next false if filters[:tag] && !p[:tags].map(&:downcase).include?(filters[:tag].downcase)
     next false if filters[:type] && p[:type] != filters[:type]
     next false if filters[:drafts] && p[:state] != DRAFT
 
     true
   end
+  posts = list_search(posts, filters[:search]) if searching
   # A post whose date is missing or unreadable sorts last instead of
   # ending the command: `list` is one of the ways somebody goes LOOKING for
   # the post that is broken, and a raw comparison error out of sort_by
   # named neither the file nor the problem.
   posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
-  return list_as_json(posts) if filters[:json]
+  return list_as_json(posts, search: filters[:search]) if filters[:json]
 
   posts.each { |p| puts summary_row(p, localized: false) }
   drafts = posts.count { |p| p[:state] == DRAFT }
@@ -8313,6 +8346,7 @@ begin
         # bytes are UTF-8 either way -- only the label on them was wrong.
         filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
         filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
+        filters[:search] = utf8(Regexp.last_match(1)) if arg =~ /\A--search=(.*)\z/m
         filters[:drafts] = true if arg == '--drafts'
         filters[:json] = true if arg == '--json'
       end

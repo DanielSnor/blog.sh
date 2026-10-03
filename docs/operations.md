@@ -1056,8 +1056,8 @@ Three rules follow from "nobody is at the keyboard":
 
 | command | what it answers | refusals |
 |---|---|---|
-| `version --json` | `engine`, `site`: name, claim, url, lang, locales -- the identity block as data; answers on a broken config with what it can | -- |
-| `list [filters] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned), `count`, `drafts` | -- |
+| `version --json` | `engine`, `site`: name, claim, url, lang, locales, accent (`light`, `dark`: the palette's accent as colors.css resolves it) -- the identity block as data; answers on a broken config with what it can | -- |
+| `list [filters] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned, match), `count`, `drafts`, `search`; `--search="words"` is the search `browse` runs behind [/] -- the same query language, over the whole text -- and `match` is the line that says why a row is there (null when the hit is in the title or a tag); `search` says the query back, null when there was none | -- |
 | `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back | `not_found`, `ambiguous_slug` |
 | `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property` |
 | `props <slug> --drop-address <address> --json` | the screen after the drop | `address_unknown` |

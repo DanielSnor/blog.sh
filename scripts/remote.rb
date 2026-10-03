@@ -70,7 +70,7 @@ end
 # next word; one without is a bare switch.
 ALLOWED = {
   'version' => %w[],
-  'list' => %w[--drafts --type= --tag=],
+  'list' => %w[--drafts --type= --tag= --search=],
   'drafts' => %w[],
   'edit' => %w[],
   'translate' => %w[--lang=],

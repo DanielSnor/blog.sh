@@ -23,6 +23,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
   anniversaries always, the rest spread along the years with the oldest claiming first, a titled
   post standing for its year. A busy day rotates through up to three windows; a day with nothing
   hides the card. No settings -- the same rule from a hundred posts to thirteen thousand.
+- **`./blog.sh list --search="words"`.** The search `browse` runs behind `/`, for a caller with
+  no screen to type it into: the same query language as the screen and the site's search box,
+  over the whole text. With `--json` each row carries `match`, the line that says why it is in
+  the results, and the answer says the query back as `search`.
+- **`version --json` says the site's accent.** `site.accent` carries the palette's accent for
+  light and for dark, resolved as colors.css resolves it, so an app can wear the blog's colour
+  the way `/write/` does.
 - **`./blog.sh on-this-day [--date MM-DD] [--json]`.** The same selection in the terminal: every
   post of the day, and which of them the card shows in which window.
 - **A draft can be edited from the phone.** *Open a draft from the blog* in `/write/` lists the
