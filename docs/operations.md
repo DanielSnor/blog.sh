@@ -1148,6 +1148,17 @@ goes there: `command="PATH=/home/me/.rbenv/shims:/usr/bin:/bin
 single-quoted inside the double quotes; the app writes the line that way
 itself.
 
+Where the blog lives in a container, the forced command is the one that
+enters it, and the word SSH was asked for -- which the script reads from
+`SSH_ORIGINAL_COMMAND` -- does not cross into the container by itself.
+Hand it over as the script's argument, which it takes the same way:
+
+    restrict,command="sudo docker exec -i blog /app/blog/scripts/remote.sh \"$SSH_ORIGINAL_COMMAND\"" ssh-ed25519 AAAA... app
+
+`-i` is what carries the request in; the account needs to run that one
+command without a password. The app writes this line too, from the
+blog's place and the command it is reached through.
+
 ## Pinning a post to the front page
 
 The `[c]` action in `./blog.sh props <slug>` pins a published post --
