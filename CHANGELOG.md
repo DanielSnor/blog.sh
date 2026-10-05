@@ -81,6 +81,12 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `base:` required so a change made elsewhere in the meantime is refused rather than overwritten.
   The app on a phone is a desk now. `translate <slug> --lang <code> --json` hands a language's text
   out the same way, and a file saying `lang:` beside `edits:` and `base:` brings it back.
+- **`layout.lead_card`.** With it on, the card that opens the front page -- the pinned post where
+  there is one -- leads with its post's first picture, under the title and above the opening
+  words. A card is cut by height, so a picture written after the first paragraph is usually left
+  out of it, and a stylesheet cannot show what the card was never given. Only that one card and
+  only the front page itself; it carries `post-list-item--lead` for a skin to dress. Off by
+  default, and a post with no picture keeps the card it had.
 
 ### Changed
 

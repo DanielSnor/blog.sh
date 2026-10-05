@@ -14,11 +14,14 @@
 module Cards
   module_function
 
-  def render_list_item(post, pinned: false, series: false)
+  def render_list_item(post, pinned: false, series: false, lead: false)
     # The pinned copy is rendered separately and NOT cached under the same
     # key: it differs from the post's ordinary appearance by exactly the
     # badge mark, and caching one over the other would leak the mark into
     # the chronological copy (or lose it from the pinned one).
+    # The card that opens the front page with its picture (layout.lead_card)
+    # is a third copy kept out of the cache, for the same reason.
+    return build_list_item(post, pinned: pinned, lead: true) if lead
     return build_list_item(post, pinned: true) if pinned
     # The copy on a series' own listing carries the part's number, and is
     # kept out of the cache for the same reason: the card every other
@@ -28,7 +31,25 @@ module Cards
     LIST_ITEM_CACHE[post] ||= build_list_item(post)
   end
 
-  def build_list_item(post, pinned: false, series: false)
+  # The lead card's body: the post's first picture, then its opening. The
+  # picture is taken by IDENTITY out of whatever follows, so a post that
+  # opens with it does not show it twice, and it is not weighed against
+  # the budget -- that it would not have fitted is the reason this exists.
+  # Nil for a post with no picture worth leading with: its card is then the
+  # card it always was.
+  def lead_content(post, prefix)
+    block, = first_usable_image(post)
+    return nil unless block
+
+    teaser = PostText.teaser_blocks(post['content'])
+    teaser = nil unless teaser&.any?
+    rest = (teaser || post['content'] || []).reject { |b| b.equal?(block) }
+    kept, cut = teaser ? [rest, true] : CardTeaser.blocks(rest)
+    html = Blocks.render_content([block] + kept, prefix, lifted: link_title_block(post))
+    [html, cut || kept.length < rest.length]
+  end
+
+  def build_list_item(post, pinned: false, series: false, lead: false)
     prefix = post_href(post)
     # A post that wrote its own teaser shows exactly that here, and nothing
     # below it: the listing is where the site invites, and an author who wrote
@@ -68,6 +89,8 @@ module Cards
     # and sends any same-page anchor to whichever came first. heading_id
     # de-duplicates within a post; nothing could de-duplicate across them,
     # because each post's HTML is rendered (and cached) on its own.
+    led = lead ? lead_content(post, prefix) : nil
+    content, cut = led if led
     content = content.gsub(%r{<(h[1-6])([^>]*) id="[^"]*"}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2)}" }
     # The link is there exactly when a block did not fit -- or when the
     # author wrote a teaser, which says the same thing about the post. It
@@ -79,7 +102,7 @@ module Cards
     # On the stats' own line, so a card without one is the bytes it was.
     series_note = series ? series_card_note(post) : ''
     <<~HTML
-      <div class="card post-list-item">
+      <div class="card post-list-item#{led ? ' post-list-item--lead' : ''}">
         <div class="post-header">
           #{date_badge(post, link: prefix, pinned: pinned)}
           <div class="post-body">

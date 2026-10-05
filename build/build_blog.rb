@@ -335,6 +335,11 @@ LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
 # unless a site asks for it, because it reshapes every post page it
 # touches -- and a site is entitled to have had the shape it has.
 LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
+# The first card on the front page opened with its post's picture. Off
+# unless a site asks for it: a card is cut by height, so a picture that
+# stands after the opening paragraph usually falls outside it, and a
+# front page that suddenly leads with one is a front page reshaped.
+LAYOUT_LEAD_CARD = SiteConfig.get('layout', 'lead_card', default: false) == true
 # The menu repeated under the content. It carries no search field, so with
 # an empty `nav:` there would be nothing left in it to show -- but a site
 # with a menu may still not want it twice.
@@ -1515,6 +1520,12 @@ def hero_for(post)
   wanted = setting.nil? ? LAYOUT_HERO : !%w[false no 0].include?(setting.to_s.strip.downcase)
   return nil unless wanted
 
+  first_usable_image(post)
+end
+
+# A post's first picture worth showing large, with the file it shows --
+# the question the hero asks of a post and the lead card asks too.
+def first_usable_image(post)
   block = (post['content'] || []).find do |b|
     b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
   end
@@ -2265,7 +2276,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   heading_kind: nil, heading_variant: nil, heading_icon: nil,
                   heading_href: nil, feed_path: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil,
-                  oldest_first: false)
+                  oldest_first: false, lead: false)
   pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
     # The landing page is the newest slice for a timeline and part one for
@@ -2297,6 +2308,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
       # A series' cards say "part 3 of 19", so a page whose own posts did
       # not change is still out of date the day a twentieth part arrives.
       oldest_first ? posts.size : '',
+      lead ? 'lead' : '',
       lifted ? POST_DIGEST[lifted['__path']] : '',
       page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
     ].map(&:to_s).join('|'))
@@ -2310,14 +2322,21 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # rather than duplicated. Anchored pagination is unaffected either
     # way -- the landing page is the only flexible one, and lifting keeps
     # its item count identical, so no /page/N/ boundary moves.
+    # layout.lead_card: the card that opens the landing page -- the pinned
+    # post where there is one, since that is what stands first -- is the
+    # one that leads with its picture. Never a card further down, and never
+    # a page under /page/N/: those are written once and left alone.
+    leads = lead && landing
     if pinned && number > fixed
       rest = page_posts.reject { |post| post.equal?(pinned) }
-      list_html = ([Cards.render_list_item(pinned, pinned: true)] +
+      list_html = ([Cards.render_list_item(pinned, pinned: true, lead: leads)] +
                    rest.map { |post| Cards.render_list_item(post) }).join("\n")
     else
       # oldest_first is the series' listing and nothing else (see
       # anchored_pages), which is where a card says which part it is.
-      list_html = page_posts.map { |post| Cards.render_list_item(post, series: oldest_first) }.join("\n")
+      list_html = page_posts.each_with_index.map do |post, i|
+        Cards.render_list_item(post, series: oldest_first, lead: leads && i.zero?)
+      end.join("\n")
     end
     pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first)
     # Without this distinction, every listing page would share one identical <title>.
@@ -3220,7 +3239,8 @@ end
 # Czech front page paged into the English /page/N/ and named the English
 # front page as its canonical address -- a search engine then files /cs/
 # as a copy of /. Empty on the site's own language, where nothing changes.
-page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post)
+page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post,
+                           lead: LAYOUT_LEAD_CARD)
 
 # Which tags the posts carry, by address (build/tags.rb). Early, because
 # the writing app below counts them too; the sitemap reads the map at the end.

@@ -256,6 +256,13 @@ colors:
 #   # that doesn't use them. A post with no usable image (or only a 1x1
 #   # tracking pixel out of an old import) keeps the ordinary layout.
 #   hero: false
+#   # Open the front page's first card with its post's first picture, under
+#   # the title and above the opening words. A card is otherwise cut by
+#   # height, so a picture that comes after the first paragraph is usually
+#   # left out of it. Only that one card (the pinned post, where there is
+#   # one), only on the front page itself, and it carries the class
+#   # post-list-item--lead for a stylesheet to dress. Default: false.
+#   lead_card: false
 # --- end of layout ---
 
 # Optional. The menu across the top. Without this key the menu is what the

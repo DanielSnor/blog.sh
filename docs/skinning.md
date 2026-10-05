@@ -112,6 +112,19 @@ unconditionally and then take it back property by property, and a rule that
 undoes another is the kind a later change quietly stops undoing. Scope
 positively instead.
 
+One card can be more than first by position. With `layout.lead_card` on
+in `config/site.yml`, the card that opens the front page is handed its
+post's first picture -- placed before its words, whatever the height
+budget would have cut -- and marked for you:
+
+```css
+.post-list-item--lead .content figure img { width: 100%; }
+```
+
+Without the setting no card carries the class, and a rule scoped to it
+does nothing; `.page-first .post-list-item:first-child` alone cannot do
+this, because the picture is usually not in the card to be styled.
+
 The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
 listing names itself.
