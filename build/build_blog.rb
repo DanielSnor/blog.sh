@@ -1609,6 +1609,26 @@ def toc_html(entries)
   %(<nav class="toc" aria-label="#{h(t('post.toc_label'))}"><p class="toc-heading">#{h(t('post.toc_heading'))}</p><ol>#{items}</ol></nav>\n                )
 end
 
+# The sentence that places a part: the series by name, then which part of
+# how many. One function, because two places say it -- the head of the
+# post's own page and its card on the series' listing -- and a reader who
+# met it in one has to recognise it in the other.
+def series_part_label(slug, in_series, index)
+  t('post.series_part', name: h(SERIES_NAMES[slug].to_s), number: index + 1, total: in_series.size)
+end
+
+# The same sentence on a card, for the one listing where it is the point:
+# the series' own. Every row there is a part, and without this the page
+# said which posts belong and not which comes when -- the date beside each
+# is when it was written, which a part numbered by hand need not follow.
+# Not a link: the listing it would lead to is the page it stands on.
+def series_card_note(post)
+  slug, in_series, index = Series.series_context(post)
+  return '' if slug.nil? || in_series.size < 2
+
+  %(<p class="series-note">#{series_part_label(slug, in_series, index)}</p>)
+end
+
 # Where a post sits in its series, and the way on. Only ever within the
 # series: chronological neighbours across a whole archive are usually
 # unrelated -- on an archive assembled from twenty-two sources, "next" is
@@ -1669,7 +1689,7 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   return '' if slug.nil? || in_series.size < 2
 
   if position == :top
-    label = t('post.series_part', name: h(SERIES_NAMES[slug].to_s), number: index + 1, total: in_series.size)
+    label = series_part_label(slug, in_series, index)
     # A link only where the listing is written. A series whose name will
     # not fit an address gets no page (Slug.pageable?, refused out loud
     # further down), and every part still linked to it: a 404 in the head
@@ -2274,6 +2294,9 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     key = Digest::SHA256.hexdigest([
       base_path, number, fixed, oldest_first, heading, heading_kind, heading_variant,
       heading_icon, heading_href, feed_path, title, description,
+      # A series' cards say "part 3 of 19", so a page whose own posts did
+      # not change is still out of date the day a twentieth part arrives.
+      oldest_first ? posts.size : '',
       lifted ? POST_DIGEST[lifted['__path']] : '',
       page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
     ].map(&:to_s).join('|'))
@@ -2292,7 +2315,9 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
       list_html = ([Cards.render_list_item(pinned, pinned: true)] +
                    rest.map { |post| Cards.render_list_item(post) }).join("\n")
     else
-      list_html = page_posts.map { |post| Cards.render_list_item(post) }.join("\n")
+      # oldest_first is the series' listing and nothing else (see
+      # anchored_pages), which is where a card says which part it is.
+      list_html = page_posts.map { |post| Cards.render_list_item(post, series: oldest_first) }.join("\n")
     end
     pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first)
     # Without this distinction, every listing page would share one identical <title>.

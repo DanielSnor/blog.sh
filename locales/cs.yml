@@ -93,7 +93,7 @@ post:
   reading_minutes_under: "< 1 min"
   toc_heading: "Na téhle stránce"
   toc_label: "Obsah"
-  series_part: "Díl %{number} ze %{total} — %{name}"
+  series_part: "%{name} — díl %{number} z %{total}"
   series_draft_joins: "Série %{name} — publikovaných dílů: %{count}, po publikaci díl %{number}."
   series_draft_new: "Žádný publikovaný příspěvek zatím sérii „%{name}“ nenese — překlep, nebo první díl?"
   series_previous: "← %{title}"

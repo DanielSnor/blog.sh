@@ -82,6 +82,15 @@ goes in is still being decided; the suffix and the date both come off at the tag
   The app on a phone is a desk now. `translate <slug> --lang <code> --json` hands a language's text
   out the same way, and a file saying `lang:` beside `edits:` and `base:` brings it back.
 
+### Changed
+
+- **A part of a series names the series first.** "Nový Sean.cz — part 3 of 19" where the note used
+  to read "Part 3 of 19 of Nový Sean.cz" -- in all three languages -- so a reader meets what they
+  are in before where they are in it. The same line now stands on each card of the series' own
+  listing, which until now showed which posts belong and not which comes when; there it is words,
+  not a link to the page it stands on. Every post in a series and every page of a series' listing
+  is rewritten by the next build.
+
 
 ## 1.9 -- 2026-09-28
 

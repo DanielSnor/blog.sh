@@ -94,7 +94,7 @@ post:
   reading_minutes_under: "< 1 min"
   toc_heading: "On this page"
   toc_label: "Table of contents"
-  series_part: "Part %{number} of %{total} of %{name}"
+  series_part: "%{name} — part %{number} of %{total}"
   series_draft_joins: "Series %{name} -- published parts: %{count}; published, this would be part %{number}."
   series_draft_new: "No published post carries the series \"%{name}\" yet -- a typo, or the first part?"
   series_previous: "← %{title}"

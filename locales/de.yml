@@ -95,7 +95,7 @@ post:
   reading_minutes_under: "< 1 Min."
   toc_heading: "Auf dieser Seite"
   toc_label: "Inhaltsverzeichnis"
-  series_part: "Teil %{number} von %{total} von %{name}"
+  series_part: "%{name} — Teil %{number} von %{total}"
   series_draft_joins: "Serie %{name} -- veröffentlichte Teile: %{count}; veröffentlicht wäre dies Teil %{number}."
   series_draft_new: "Noch kein veröffentlichter Beitrag trägt die Serie „%{name}“ -- Tippfehler oder erster Teil?"
   series_previous: "← %{title}"

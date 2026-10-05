@@ -14,17 +14,21 @@
 module Cards
   module_function
 
-  def render_list_item(post, pinned: false)
+  def render_list_item(post, pinned: false, series: false)
     # The pinned copy is rendered separately and NOT cached under the same
     # key: it differs from the post's ordinary appearance by exactly the
     # badge mark, and caching one over the other would leak the mark into
     # the chronological copy (or lose it from the pinned one).
     return build_list_item(post, pinned: true) if pinned
+    # The copy on a series' own listing carries the part's number, and is
+    # kept out of the cache for the same reason: the card every other
+    # listing shows must stay the card it was.
+    return build_list_item(post, series: true) if series
 
     LIST_ITEM_CACHE[post] ||= build_list_item(post)
   end
 
-  def build_list_item(post, pinned: false)
+  def build_list_item(post, pinned: false, series: false)
     prefix = post_href(post)
     # A post that wrote its own teaser shows exactly that here, and nothing
     # below it: the listing is where the site invites, and an author who wrote
@@ -72,13 +76,15 @@ module Cards
     read_more = teaser || cut ? %(<a class="read-more" href="#{prefix}">#{h(t('post.read_more'))}</a>) : ''
     title = post_heading_html(post, 'h2', prefix)
     stats = post_meta_html(post, reading_labels(post))
+    # On the stats' own line, so a card without one is the bytes it was.
+    series_note = series ? series_card_note(post) : ''
     <<~HTML
       <div class="card post-list-item">
         <div class="post-header">
           #{date_badge(post, link: prefix, pinned: pinned)}
           <div class="post-body">
             #{title}
-            #{stats}
+            #{stats}#{series_note}
             <div class="content">
               #{content}
             </div>
