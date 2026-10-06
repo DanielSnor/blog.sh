@@ -57,10 +57,16 @@ when 'version', '--version', '-v'
     require_relative '../lib/colors_css'
     colors = data.is_a?(Hash) ? data['colors'] : nil
     accent = %w[light dark].to_h { |mode| [mode, ColorsCss.color_for(colors, mode, 'accent')] }
+    # ...and the rest of what its pages are set in -- the ground, the text
+    # on it, the text beside it, the rules -- resolved the same way, so an
+    # app can wear the blog's whole look and not its accent alone.
+    palette = %w[light dark].to_h do |mode|
+      [mode, %w[bg text meta_text border].to_h { |key| [key, ColorsCss.color_for(colors, mode, key)] }]
+    end
     puts JSON.pretty_generate('ok' => true, 'engine' => BlogSh::VERSION,
                               'max_mb' => max_mb.positive? ? max_mb : 24,
                               'site' => SiteHeader.identity.merge('lang' => I18n.lang.to_s, 'locales' => locales,
-                                                                  'accent' => accent))
+                                                                  'accent' => accent, 'palette' => palette))
   else
     puts "blog.sh #{BlogSh::VERSION}"
   end

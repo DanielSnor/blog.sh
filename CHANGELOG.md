@@ -35,7 +35,9 @@ goes in is still being decided; the suffix and the date both come off at the tag
   translation's title and text, and the label a language gives a tag.
 - **`version --json` says the site's accent.** `site.accent` carries the palette's accent for
   light and for dark, resolved as colors.css resolves it, so an app can wear the blog's colour
-  the way `/write/` does.
+  the way `/write/` does. `site.palette` carries the rest of what the pages are set in -- `bg`,
+  `text`, `meta_text` and `border`, for light and for dark -- so an app can wear the blog's
+  ground and ink too.
 - **`./blog.sh on-this-day [--date MM-DD] [--json]`.** The same selection in the terminal: every
   post of the day, and which of them the card shows in which window.
 - **A draft can be edited from the phone.** *Open a draft from the blog* in `/write/` lists the
