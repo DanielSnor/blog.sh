@@ -13,12 +13,14 @@ A link to this page is also in the in-editor help, so it's at hand while you wri
 - [Blockquotes](#blockquotes)
 - [Chat](#chat)
 - [Horizontal rule](#horizontal-rule)
+- [Teaser](#teaser)
 - [Code blocks](#code-blocks)
 - [Tables](#tables)
 - [Images](#images)
 - [Video](#video)
 - [Audio](#audio)
 - [Attachments](#attachments)
+- [The link card](#the-link-card)
 - [Escaping](#escaping)
 - [Deliberately not supported](#deliberately-not-supported)
 
@@ -31,18 +33,26 @@ First line \
 second line right under it.
 ```
 
+::: example
+
 First line \
 second line right under it.
 
+::: end
+
 ```
 First paragraph.
 
 Second paragraph.
 ```
 
+::: example
+
 First paragraph.
 
 Second paragraph.
+
+::: end
 
 ## Headings
 
@@ -59,11 +69,15 @@ Hashes at the start of the line, one to six by level. A heading has to sit on it
 
 The first two levels are what this article uses for its own sections, so here's a sample from level three down:
 
+::: example
+
 ### Level three heading
 
 #### Level four heading
 
 ##### Level five heading
+
+::: end
 
 ## Emphasis
 
@@ -71,7 +85,11 @@ The first two levels are what this article uses for its own sections, so here's 
 **bold**, *italic*, ~~strikethrough~~ and `code inside a sentence`
 ```
 
+::: example
+
 **bold**, *italic*, ~~strikethrough~~ and `code inside a sentence`
+
+::: end
 
 Emphasis can be combined and nested:
 
@@ -79,7 +97,11 @@ Emphasis can be combined and nested:
 **bold text with *italics* inside**
 ```
 
+::: example
+
 **bold text with *italics* inside**
+
+::: end
 
 They can also sit straight next to each other, with no space between. The
 three stars in the middle are read as two: the closing pair for the bold,
@@ -91,8 +113,12 @@ too — one closes the italic, the pair opens the bold.
 *italic***bold**
 ```
 
+::: example
+
 **bold***italic*
 *italic***bold**
+
+::: end
 
 ## Links
 
@@ -103,7 +129,11 @@ Text in square brackets, address in round ones. A title in quotes can follow the
 [Example with a title](https://example.com "Tooltip on hover")
 ```
 
+::: example
+
 [Example](https://example.com) and [Example with a title](https://example.com "Tooltip on hover")
+
+::: end
 
 An address written directly in a sentence turns into a link by itself, no markup needed:
 
@@ -111,7 +141,11 @@ An address written directly in a sentence turns into a link by itself, no markup
 I write about it at https://example.com regularly.
 ```
 
+::: example
+
 I write about it at https://example.com regularly.
+
+::: end
 
 ## Lists
 
@@ -123,19 +157,27 @@ Bullets start with a dash or an asterisk, an ordered list with a number and a pe
 - third bullet
 ```
 
+::: example
+
 - first bullet
 - second bullet
 - third bullet
 
+::: end
+
 ```
 1. first item
 2. second item
 3. third item
 ```
 
+::: example
+
 1. first item
 2. second item
 3. third item
+
+::: end
 
 A task list marks items with square brackets — rendered as checkboxes (read-only; a visitor can't tick your to-dos):
 
@@ -144,8 +186,12 @@ A task list marks items with square brackets — rendered as checkboxes (read-on
 - [ ] publish it
 ```
 
+::: example
+
 - [x] write the post
 - [ ] publish it
+
+::: end
 
 The numbers don't matter, they're renumbered when rendered. A nested list is indented by two spaces:
 
@@ -158,12 +204,16 @@ The numbers don't matter, they're renumbered when rendered. A nested list is ind
   2. parsley
 ```
 
+::: example
+
 - fruit
   - apple
   - pear
 - vegetables
   1. carrot
   2. parsley
+
+::: end
 
 ## Blockquotes
 
@@ -174,8 +224,12 @@ Every line of a quote starts with `>`.
 > and go on till you come to the end: then stop.
 ```
 
+::: example
+
 > Begin at the beginning, the King said gravely,
 > and go on till you come to the end: then stop.
+
+::: end
 
 A last line opening with an em dash (or `--`) becomes the attribution:
 
@@ -185,9 +239,13 @@ A last line opening with an em dash (or `--`) becomes the attribution:
 > — Lewis Carroll
 ```
 
+::: example
+
 > Begin at the beginning, and go on
 > till you come to the end: then stop.
 > — Lewis Carroll
+
+::: end
 
 ## Chat
 
@@ -201,10 +259,14 @@ Holmes: Elementary.
 
 Written as:
 
+::: example
+
     ```chat
     Watson: What does it mean?
     Holmes: Elementary.
     ```
+
+::: end
 
 ## Horizontal rule
 
@@ -214,7 +276,11 @@ A line of three or more dashes, on its own.
 ---
 ```
 
+::: example
+
 ---
+
+::: end
 
 ## Teaser
 
@@ -261,10 +327,14 @@ The first line is the header, the second a dash separator, the rest is data. Col
 | second row | ~435 | **7 to 9** |
 ```
 
+::: example
+
 | Column | Right | Center |
 | --- | ---: | :---: |
 | first row | 6228 | 1 |
 | second row | ~435 | **7 to 9** |
+
+::: end
 
 Regular formatting works inside cells, links included. A wide table scrolls within itself, same as a code block.
 
@@ -276,9 +346,13 @@ Start with the separator instead and the table has no header at all -- every lin
 | Ctrl + v | Paste |
 ```
 
+::: example
+
 | --- | --- |
 | Ctrl + c | Copy |
 | Ctrl + v | Paste |
+
+::: end
 
 ## Images
 
@@ -312,7 +386,11 @@ Two exclamation marks, otherwise same as an image. Works for a local file (.mp4,
 !![Video caption](https://framatube.org/w/kkGMgK9ZtnKfYAgnEtQxbv)
 ```
 
+::: example
+
 !![The very first video on YouTube](https://www.youtube.com/watch?v=jNQXAC9IVRw)
+
+::: end
 
 A bare YouTube address on its own line does **not** turn into a player — it becomes an ordinary link. That's deliberate, so a video can also just be linked to.
 
@@ -377,7 +455,11 @@ To write a character that means something in Markdown, put a backslash in front 
 \*not italics\*, the mask \*.mp4, \`backticks\` and \[square brackets\]
 ```
 
+::: example
+
 \*not italics\*, the mask \*.mp4, \`backticks\` and \[square brackets\]
+
+::: end
 
 Seven characters that carry meaning in Markdown can be escaped:
 

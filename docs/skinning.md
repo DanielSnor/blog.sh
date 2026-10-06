@@ -129,6 +129,60 @@ The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
 listing names itself.
 
+## What the markup marks for you
+
+A stylesheet can only style what it can select. Each of these was one run
+of text, or one element among identical ones, until a skin needed to tell
+the parts apart -- so each is marked, and each looks exactly as it did
+until a rule of yours says otherwise.
+
+**The parts of the series sentence.** "Nový Sean.cz — part 3 of 19" is
+three spans: `.series-note__name`, `.series-note__sep` and
+`.series-note__part`. On the series' own listing every card repeats the
+name the heading has just said:
+
+```css
+.listing-heading--series ~ .post-list-item .series-note__name,
+.listing-heading--series ~ .post-list-item .series-note__sep { display: none; }
+```
+
+The joiner is a span of its own so that hiding the name does not leave a
+dash opening the line.
+
+**The year of an archive page.** Its heading says a kind and a value, as
+a tag's and a series' do: `.listing-heading__kind` is the word "Archive",
+`.listing-heading__value` is the year, and the year alone is the link
+back to the map of years. Whatever sets the value apart on
+`.listing-heading--tag` now works on `.listing-heading--archive` too.
+
+**A listing's own tag.** On `/tag/hills/` every card has "hills" among
+its pills. That pill is `.tag-pill.tag-pill-own` there, and an ordinary
+`.tag-pill` on every other page:
+
+```css
+.tag-pill-own { opacity: 0.5; }
+```
+
+**A count of nothing.** The three numbers under a post -- favourites,
+boosts, replies -- are `.post-stat`; one that is zero is
+`.post-stat.post-stat--zero` as well. The zero is still written, so the
+row keeps its three places; whether it is worth reading is yours to say:
+
+```css
+.post-stat--zero { visibility: hidden; }
+```
+
+The numbers are filled in by a script after the page loads, so this is a
+class you will not find by reading the built HTML.
+
+**A result on the cheat sheet.** On `/markdown/` what a source becomes
+stands in `<div class="md-example">`, right under the `<pre>` that shows
+the source. Without a rule it is invisible, which is the default look:
+
+```css
+.md-example { border-left: 2px solid var(--accent); padding-left: 1rem; }
+```
+
 ## Structures the engine leans on
 
 Three rules in `site.css` are not decoration -- other things are built on
@@ -240,6 +294,40 @@ Cap the children instead:
 .content > * { max-width: 62ch; }
 ```
 
+### Something sticky is as wide as its column, and letters are not
+
+A `position: sticky` heading with a background covers what scrolls under
+it -- across its own width, which is the column's. Type does not stay
+inside the column: the hook of a "j", an italic's lean, a hanging quote
+all reach a pixel or two past the edge, and those pixels scroll by beside
+the bar, uncovered. It reads as a rendering fault and is not one.
+
+Carry the background past the column instead of trimming the text:
+
+```css
+.archive-section h2 {
+  position: sticky; top: 0;
+  background: var(--card-bg);
+  margin-inline: -0.5rem; padding-inline: 0.5rem;
+}
+```
+
+### A link stretched over a row needs the whole row to stand in
+
+Making a row one target usually means stretching its link over it:
+`position: absolute; inset: 0` on the link, `position: relative` on the
+row. In a row that is laid out as a grid this covers one cell, not the
+row. An absolutely positioned child of a grid container that is placed in
+a grid area takes that AREA as its containing block, and a link you put in
+the title column is placed in one.
+
+Take the placement off the stretched box:
+
+```css
+.archive-list li { display: grid; position: relative; }
+.archive-list li a::after { content: ""; position: absolute; inset: 0; grid-area: auto; }
+```
+
 ## Checking a skin
 
 The failures above have one thing in common: each was invisible in the way
@@ -274,6 +362,23 @@ Three traps in browser tooling, all of which have cost an afternoon here:
 - The preview cache outlives a reload. A different origin
   (`127.0.0.1` instead of `localhost`) gets you one clean look; after
   that, version the stylesheet's address in the built page.
+- `:focus` and `:focus-visible` do not match in a headless browser unless
+  the page is told it has focus -- a window nobody is looking at has
+  none. A focus ring that "does not work" there may be fine, and one that
+  was never drawn may pass; turn focus emulation on before judging either,
+  and then press Tab for real once.
+
+And one in the engine's own tooling. `./blog.sh rebuild` does not wait for
+a run that is already going -- a scheduled publish, a sidebar refresh. It
+says so, marks the site as owing a deploy and leaves; the next scheduled
+run sends what you changed. So "I rebuilt and the site looks the same" is
+sometimes the truth for another minute. Before deciding a rule does not
+work, compare the stylesheet the live site serves with the one you wrote:
+
+```bash
+curl -s https://YOUR-BLOG/assets/css/skin.css | shasum -a 256
+shasum -a 256 assets/css/skin.css
+```
 
 ## Two skins that exist
 

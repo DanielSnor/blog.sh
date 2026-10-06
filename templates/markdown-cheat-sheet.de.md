@@ -13,12 +13,14 @@ Ein Link auf diese Seite steht auch in der Editor-Hilfe, sie ist beim Schreiben 
 - [Zitate](#zitate)
 - [Chat](#chat)
 - [Trennlinie](#trennlinie)
+- [Anrisstext](#anrisstext)
 - [Codeblöcke](#codeblocke)
 - [Tabellen](#tabellen)
 - [Bilder](#bilder)
 - [Video](#video)
 - [Audio](#audio)
 - [Anhänge](#anhange)
+- [Die Linkkarte](#die-linkkarte)
 - [Escaping](#escaping)
 - [Bewusst nicht unterstützt](#bewusst-nicht-unterstutzt)
 
@@ -31,18 +33,26 @@ Erste Zeile \
 zweite direkt darunter.
 ```
 
+::: example
+
 Erste Zeile \
 zweite direkt darunter.
 
+::: end
+
 ```
 Erster Absatz.
 
 Zweiter Absatz.
 ```
 
+::: example
+
 Erster Absatz.
 
 Zweiter Absatz.
+
+::: end
 
 ## Überschriften
 
@@ -59,11 +69,15 @@ Rauten am Zeilenanfang, eine bis sechs je nach Ebene. Eine Überschrift braucht 
 
 Die ersten beiden Ebenen nutzt dieser Artikel selbst für seine Abschnitte, hier deshalb eine Probe ab Ebene drei:
 
+::: example
+
 ### Überschrift dritter Ebene
 
 #### Überschrift vierter Ebene
 
 ##### Überschrift fünfter Ebene
+
+::: end
 
 ## Hervorhebungen
 
@@ -71,7 +85,11 @@ Die ersten beiden Ebenen nutzt dieser Artikel selbst für seine Abschnitte, hier
 **fett**, *kursiv*, ~~durchgestrichen~~ und `Code mitten im Satz`
 ```
 
+::: example
+
 **fett**, *kursiv*, ~~durchgestrichen~~ und `Code mitten im Satz`
+
+::: end
 
 Hervorhebungen lassen sich kombinieren und verschachteln:
 
@@ -79,7 +97,11 @@ Hervorhebungen lassen sich kombinieren und verschachteln:
 **fetter Text mit *Kursivem* darin**
 ```
 
+::: example
+
 **fetter Text mit *Kursivem* darin**
+
+::: end
 
 Sie dürfen auch unmittelbar nebeneinander stehen, ohne Leerzeichen. Die
 drei Sterne in der Mitte werden als zwei gelesen: das schließende Paar
@@ -91,8 +113,12 @@ es auch — einer schließt das Kursive, das Paar öffnet den Fettdruck.
 *kursiv***fett**
 ```
 
+::: example
+
 **fett***kursiv*
 *kursiv***fett**
+
+::: end
 
 ## Links
 
@@ -103,7 +129,11 @@ Text in eckigen Klammern, Adresse in runden. Nach der Adresse kann ein Titel in 
 [Beispiel mit Titel](https://example.com "Tooltip beim Überfahren")
 ```
 
+::: example
+
 [Beispiel](https://example.com) und [Beispiel mit Titel](https://example.com "Tooltip beim Überfahren")
+
+::: end
 
 Eine direkt im Satz geschriebene Adresse wird von selbst zum Link, ganz ohne Markup:
 
@@ -111,7 +141,11 @@ Eine direkt im Satz geschriebene Adresse wird von selbst zum Link, ganz ohne Mar
 Darüber schreibe ich regelmäßig auf https://example.com.
 ```
 
+::: example
+
 Darüber schreibe ich regelmäßig auf https://example.com.
+
+::: end
 
 ## Listen
 
@@ -123,19 +157,27 @@ Aufzählungen beginnen mit Bindestrich oder Sternchen, eine nummerierte Liste mi
 - dritter Punkt
 ```
 
+::: example
+
 - erster Punkt
 - zweiter Punkt
 - dritter Punkt
 
+::: end
+
 ```
 1. erster Eintrag
 2. zweiter Eintrag
 3. dritter Eintrag
 ```
 
+::: example
+
 1. erster Eintrag
 2. zweiter Eintrag
 3. dritter Eintrag
+
+::: end
 
 Eine Aufgabenliste markiert Einträge mit eckigen Klammern — gerendert als Checkboxen (nur lesbar; Besucher haken deine Aufgaben nicht ab):
 
@@ -144,8 +186,12 @@ Eine Aufgabenliste markiert Einträge mit eckigen Klammern — gerendert als Che
 - [ ] veröffentlichen
 ```
 
+::: example
+
 - [x] Beitrag schreiben
 - [ ] veröffentlichen
+
+::: end
 
 Die Zahlen sind egal, beim Rendern wird neu durchnummeriert. Eine verschachtelte Liste wird um zwei Leerzeichen eingerückt:
 
@@ -158,12 +204,16 @@ Die Zahlen sind egal, beim Rendern wird neu durchnummeriert. Eine verschachtelte
   2. Petersilie
 ```
 
+::: example
+
 - Obst
   - Apfel
   - Birne
 - Gemüse
   1. Karotte
   2. Petersilie
+
+::: end
 
 ## Zitate
 
@@ -174,8 +224,12 @@ Jede Zeile eines Zitats beginnt mit `>`.
 > und lies, bis du ans Ende kommst: dann hör auf.
 ```
 
+::: example
+
 > Fang am Anfang an, sagte der König ernst,
 > und lies, bis du ans Ende kommst: dann hör auf.
+
+::: end
 
 Eine letzte Zeile, die mit einem Gedankenstrich (oder `--`) beginnt, wird
 zur Quellenangabe:
@@ -186,9 +240,13 @@ zur Quellenangabe:
 > — Lewis Carroll
 ```
 
+::: example
+
 > Fang am Anfang an und lies,
 > bis du ans Ende kommst: dann hör auf.
 > — Lewis Carroll
+
+::: end
 
 ## Chat
 
@@ -202,10 +260,14 @@ Holmes: Elementar.
 
 Geschrieben als:
 
+::: example
+
     ```chat
     Watson: Was bedeutet das?
     Holmes: Elementar.
     ```
+
+::: end
 
 ## Trennlinie
 
@@ -215,7 +277,11 @@ Eine Zeile aus drei oder mehr Bindestrichen, für sich allein.
 ---
 ```
 
+::: example
+
 ---
+
+::: end
 
 ## Anrisstext
 
@@ -262,10 +328,14 @@ Die erste Zeile ist der Kopf, die zweite ein Bindestrich-Trenner, der Rest sind 
 | zweite Zeile | ~435 | **7 bis 9** |
 ```
 
+::: example
+
 | Spalte | Rechts | Zentriert |
 | --- | ---: | :---: |
 | erste Zeile | 6228 | 1 |
 | zweite Zeile | ~435 | **7 bis 9** |
+
+::: end
 
 In Zellen funktioniert normale Formatierung, Links eingeschlossen. Eine breite Tabelle scrollt in sich selbst, wie ein Codeblock.
 
@@ -277,9 +347,13 @@ Fängst du gleich mit der Trennzeile an, hat die Tabelle gar keine Kopfzeile -- 
 | Ctrl + v | Einfügen |
 ```
 
+::: example
+
 | --- | --- |
 | Ctrl + c | Kopieren |
 | Ctrl + v | Einfügen |
+
+::: end
 
 ## Bilder
 
@@ -311,7 +385,11 @@ Zwei Ausrufezeichen, sonst wie ein Bild. Funktioniert für eine lokale Datei (.m
 !![Videounterschrift](https://www.youtube.com/watch?v=jNQXAC9IVRw)
 ```
 
+::: example
+
 !![Das allererste Video auf YouTube](https://www.youtube.com/watch?v=jNQXAC9IVRw)
+
+::: end
 
 Eine bloße YouTube-Adresse auf eigener Zeile wird **nicht** zum Player — sie wird ein gewöhnlicher Link. Das ist Absicht, damit sich ein Video auch einfach nur verlinken lässt.
 
@@ -376,7 +454,11 @@ Um ein Zeichen zu schreiben, das in Markdown etwas bedeutet, stell ihm einen Bac
 \*kein Kursiv\*, die Maske \*.mp4, \`Backticks\` und \[eckige Klammern\]
 ```
 
+::: example
+
 \*kein Kursiv\*, die Maske \*.mp4, \`Backticks\` und \[eckige Klammern\]
+
+::: end
 
 Sieben Zeichen mit Bedeutung in Markdown lassen sich escapen:
 

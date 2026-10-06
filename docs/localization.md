@@ -55,7 +55,11 @@ from both.
 2. **`templates/markdown-cheat-sheet.<lang>.md`** -- the source of the
    generated `/markdown/` syntax page. Optional: without it the page falls
    back to English wholesale. Translate the prose, keep the syntax examples
-   as they are -- they are what the page exists to show.
+   as they are -- they are what the page exists to show. Keep the
+   `::: example` and `::: end` lines too, each on a line of its own around
+   what a source becomes: they are not shown, they put the result in an
+   element a stylesheet can set apart. A sheet without them builds the
+   page it always did.
 
 3. **`write/locales/<lang>.yml`** -- the strings of the `/write/` page,
    which is a separate app: it runs in a browser with no Ruby behind it,

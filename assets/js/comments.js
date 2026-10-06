@@ -62,13 +62,21 @@
     return null;
   }
 
+  // A count of nothing is marked, not left out: most posts on a long archive
+  // read "0 0 0", which is noise a stylesheet may want to quieten -- but a
+  // row that sometimes has three numbers and sometimes none would move
+  // everything beside it, and whether zero is worth saying is the site's call.
+  function statClass(count) {
+    return Number(count) === 0 ? 'post-stat post-stat--zero' : 'post-stat';
+  }
+
   function renderPostStats(stats, key) {
     var known = threadCounts[key];
     var comments = known === undefined ? stats.comments : known;
     return (
-      '<span class="post-stat" title="' + esc(i18n.stats_favourited) + '">' + STAR_ICON + ' ' + esc(stats.favourites) + '</span>' +
-      '<span class="post-stat" title="' + esc(i18n.stats_boosted) + '">' + BOOST_ICON + ' ' + esc(stats.reblogs) + '</span>' +
-      '<span class="post-stat" title="' + esc(i18n.stats_comments) + '">' + COMMENT_ICON + ' <span class="reply-count">' + esc(comments) + '</span></span>'
+      '<span class="' + statClass(stats.favourites) + '" title="' + esc(i18n.stats_favourited) + '">' + STAR_ICON + ' ' + esc(stats.favourites) + '</span>' +
+      '<span class="' + statClass(stats.reblogs) + '" title="' + esc(i18n.stats_boosted) + '">' + BOOST_ICON + ' ' + esc(stats.reblogs) + '</span>' +
+      '<span class="' + statClass(comments) + '" title="' + esc(i18n.stats_comments) + '">' + COMMENT_ICON + ' <span class="reply-count">' + esc(comments) + '</span></span>'
     );
   }
 
@@ -79,7 +87,11 @@
     threadCounts[key] = count;
     var stats = statsContainerFor(key);
     var value = stats && stats.querySelector('.reply-count');
-    if (value) value.textContent = count;
+    if (value) {
+      value.textContent = count;
+      // The live thread can disagree with what cron counted, in either direction.
+      value.parentNode.className = statClass(count);
+    }
   }
 
   // --- rendering --------------------------------------------------------

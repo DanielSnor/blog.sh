@@ -96,6 +96,21 @@ goes in is still being decided; the suffix and the date both come off at the tag
   listing, which until now showed which posts belong and not which comes when; there it is words,
   not a link to the page it stands on. Every post in a series and every page of a series' listing
   is rewritten by the next build.
+- **Five things a skin could not select are marked.** Nothing looks different until a stylesheet
+  says so (`docs/skinning.md`, "What the markup marks for you"):
+  the series sentence is three spans -- the name, what joins it, the part -- so a series' own
+  listing can drop the name every card repeats;
+  the heading of an archive year says its kind and its year separately, as a tag's does, and the
+  year alone is the link back to the map of years (the word "Archive" was part of the link);
+  on a tag's listing the pill of that tag is `tag-pill-own`;
+  a count of zero under a post is `post-stat--zero`;
+  and on the markdown cheat sheet what a source becomes stands in `md-example`.
+  Every listing of a tag, every archive year and the cheat sheet are rewritten by the next build.
+
+### Fixed
+
+- **The cheat sheet's contents list had lost two sections.** The teaser (1.5) and the link card
+  (1.7) were added to the sheet and never to the list at its top, in all three languages.
 
 
 ## 1.9 -- 2026-09-28

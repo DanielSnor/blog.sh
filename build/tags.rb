@@ -65,7 +65,7 @@ module Tags
       end
       write_listing(data[:posts], index_template, File.join(CONTENT_ROOT, 'tag', slug),
                     base_path: loc("/tag/#{slug}"), heading: data[:name],
-                    heading_kind: t('tag.kind'), heading_variant: 'tag',
+                    heading_kind: t('tag.kind'), heading_variant: 'tag', own_tag: slug,
                     # The page's own slug, not its display name: the name is
                     # whichever spelling the archive used first, and looking
                     # the icon up by that made the heading depend on which

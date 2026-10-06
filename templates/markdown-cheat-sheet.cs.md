@@ -13,12 +13,14 @@ Odkaz na tuhle stránku je i v nápovědě v editoru, takže ji máte při psan�
 - [Citace](#citace)
 - [Chat](#chat)
 - [Vodorovná čára](#vodorovna-cara)
+- [Upoutávka](#upoutavka)
 - [Blok kódu](#blok-kodu)
 - [Tabulky](#tabulky)
 - [Obrázky](#obrazky)
 - [Video](#video)
 - [Audio](#audio)
 - [Přílohy](#prilohy)
+- [Karta odkazu](#karta-odkazu)
 - [Escapování](#escapovani)
 - [Záměrně nepodporované](#zamerne-nepodporovane)
 
@@ -31,18 +33,26 @@ První řádek \
 druhý hned pod ním.
 ```
 
+::: example
+
 První řádek \
 druhý hned pod ním.
 
+::: end
+
 ```
 První odstavec.
 
 Druhý odstavec.
 ```
 
+::: example
+
 První odstavec.
 
 Druhý odstavec.
+
+::: end
 
 ## Nadpisy
 
@@ -59,11 +69,15 @@ Mřížky na začátku řádku, jedna až šest podle úrovně. Nadpis musí bý
 
 První dvě úrovně používá tenhle článek na své vlastní sekce, takže tady je ukázka od třetí níž:
 
+::: example
+
 ### Nadpis třetí úrovně
 
 #### Nadpis čtvrté úrovně
 
 ##### Nadpis páté úrovně
+
+::: end
 
 ## Zvýraznění textu
 
@@ -71,7 +85,11 @@ První dvě úrovně používá tenhle článek na své vlastní sekce, takže t
 **tučně**, *kurzívou*, ~~přeškrtnutě~~ a `kód uvnitř věty`
 ```
 
+::: example
+
 **tučně**, *kurzívou*, ~~přeškrtnutě~~ a `kód uvnitř věty`
+
+::: end
 
 Zvýraznění jde kombinovat a vnořovat do sebe:
 
@@ -79,7 +97,11 @@ Zvýraznění jde kombinovat a vnořovat do sebe:
 **tučný text s *kurzívou* uvnitř**
 ```
 
+::: example
+
 **tučný text s *kurzívou* uvnitř**
+
+::: end
 
 Můžou taky stát hned vedle sebe, bez mezery. Trojice hvězdiček uprostřed
 se čte jako dvě: zavírací pár tučného a jedna, která otevírá kurzívu.
@@ -90,8 +112,12 @@ Funguje to i obráceně — jedna zavírá kurzívu, pár otevírá tučné.
 *kurzívou***tučně**
 ```
 
+::: example
+
 **tučně***kurzívou*
 *kurzívou***tučně**
+
+::: end
 
 ## Odkazy
 
@@ -102,7 +128,11 @@ Text v hranatých závorkách, adresa v kulatých. Za adresu se dá přidat titu
 [Příklad s titulkem](https://example.com "Bublina po najetí myší")
 ```
 
+::: example
+
 [Příklad](https://example.com) a [Příklad s titulkem](https://example.com "Bublina po najetí myší")
+
+::: end
 
 Adresa napsaná přímo ve větě se na odkaz změní sama, není ji potřeba nijak označovat:
 
@@ -110,7 +140,11 @@ Adresa napsaná přímo ve větě se na odkaz změní sama, není ji potřeba ni
 Píšu o tom na https://example.com pravidelně.
 ```
 
+::: example
+
 Píšu o tom na https://example.com pravidelně.
+
+::: end
 
 ## Seznamy
 
@@ -122,19 +156,27 @@ Odrážky začínají pomlčkou nebo hvězdičkou, číslovaný seznam číslem 
 - třetí odrážka
 ```
 
+::: example
+
 - první odrážka
 - druhá odrážka
 - třetí odrážka
 
+::: end
+
 ```
 1. první bod
 2. druhý bod
 3. třetí bod
 ```
 
+::: example
+
 1. první bod
 2. druhý bod
 3. třetí bod
+
+::: end
 
 Zaškrtávací seznam značí položky hranatými závorkami — vykreslí se jako checkboxy (jen ke čtení; návštěvník vaše úkoly neodškrtá):
 
@@ -143,8 +185,12 @@ Zaškrtávací seznam značí položky hranatými závorkami — vykreslí se ja
 - [ ] publikovat ho
 ```
 
+::: example
+
 - [x] napsat příspěvek
 - [ ] publikovat ho
+
+::: end
 
 Na číslech nezáleží, při zobrazení se přepočítají. Vnořený seznam se odsadí o dvě mezery:
 
@@ -157,12 +203,16 @@ Na číslech nezáleží, při zobrazení se přepočítají. Vnořený seznam s
   2. petržel
 ```
 
+::: example
+
 - ovoce
   - jablko
   - hruška
 - zelenina
   1. mrkev
   2. petržel
+
+::: end
 
 ## Citace
 
@@ -173,8 +223,12 @@ Každý řádek citace začíná znakem `>`.
 > Zastavme ich bratia, veď sa ony stratia, Slováci ožijú.
 ```
 
+::: example
+
 > Nad Tatrou sa blýska, hromy divo bijú.
 > Zastavme ich bratia, veď sa ony stratia, Slováci ožijú.
+
+::: end
 
 Poslední řádek začínající dlouhou pomlčkou (nebo `--`) se stane atribucí:
 
@@ -184,9 +238,13 @@ Poslední řádek začínající dlouhou pomlčkou (nebo `--`) se stane atribuc�
 > — Lewis Carroll
 ```
 
+::: example
+
 > Začni na začátku a pokračuj,
 > dokud nedojdeš na konec: pak přestaň.
 > — Lewis Carroll
+
+::: end
 
 ## Chat
 
@@ -200,10 +258,14 @@ Holmes: Elementární.
 
 Zapsáno jako:
 
+::: example
+
     ```chat
     Watson: Co to znamená?
     Holmes: Elementární.
     ```
+
+::: end
 
 ## Vodorovná čára
 
@@ -213,7 +275,11 @@ Zapsáno jako:
 ---
 ```
 
+::: example
+
 ---
+
+::: end
 
 ## Upoutávka
 
@@ -260,10 +326,14 @@ První řádek je hlavička, druhý oddělovač s pomlčkami, zbytek data. Dvojt
 | druhý řádek | ~435 | **7 až 9** |
 ```
 
+::: example
+
 | Sloupec | Vpravo | Na střed |
 | --- | ---: | :---: |
 | první řádek | 6228 | 1 |
 | druhý řádek | ~435 | **7 až 9** |
+
+::: end
 
 V buňkách funguje běžné formátování včetně odkazů. Široká tabulka se posouvá sama v sobě, stejně jako blok kódu.
 
@@ -275,9 +345,13 @@ Když začneš rovnou oddělovačem, tabulka žádnou hlavičku nemá a každý 
 | Ctrl + v | Vložit |
 ```
 
+::: example
+
 | --- | --- |
 | Ctrl + c | Kopírovat |
 | Ctrl + v | Vložit |
+
+::: end
 
 ## Obrázky
 
@@ -309,7 +383,11 @@ Dva vykřičníky, jinak stejně jako obrázek. Funguje pro soubor (.mp4, .mov, 
 !![Popisek videa](https://www.youtube.com/watch?v=jNQXAC9IVRw)
 ```
 
+::: example
+
 !![Úplně první video na YouTube](https://www.youtube.com/watch?v=jNQXAC9IVRw)
+
+::: end
 
 Samotná adresa na YouTube napsaná na řádku se na přehrávač **nezmění** — z ní bude obyčejný odkaz. To je schválně, aby šlo na video jen odkázat.
 
@@ -374,7 +452,11 @@ Když chcete napsat znak, který má v markdownu význam, předsaďte mu zpětn�
 \*tohle není kurzíva\*, maska \*.mp4, \`apostrofy\` a \[hranaté závorky\]
 ```
 
+::: example
+
 \*tohle není kurzíva\*, maska \*.mp4, \`apostrofy\` a \[hranaté závorky\]
+
+::: end
 
 Escapovat jde sedm znaků, které v markdownu něco znamenají:
 

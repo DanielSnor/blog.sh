@@ -151,11 +151,24 @@ module Archive
             %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
         end
 
+        # The heading says a kind and a value, as a tag's and a series' do:
+        # "Archive" and "2026" used to be one run of text inside one link, so
+        # a stylesheet that sets the value apart everywhere else could not do
+        # it here. Cut from the one translated title, which still names the
+        # page in its <title>; a language that puts the year anywhere but
+        # last keeps the heading whole, as it was.
+        year_kind, year_rest = t('archive.year_title', year: "\u0000").split("\u0000", 2)
+        year_heading = if year_rest == '' && !year_kind.strip.empty?
+                         listing_heading_html(year.to_s, kind: year_kind.strip, variant: 'archive',
+                                              icon: :calendar, icon_first: true,
+                                              value_href: archive_path)
+                       else
+                         listing_heading_html(t('archive.year_title', year: year), variant: 'archive',
+                                              icon: :calendar, value_href: archive_path)
+                       end
         BuildCache.remember_page(year_dest, year_key)
         Output.emit(year_dest,
-             layout(listing_heading_html(t('archive.year_title', year: year),
-                                         variant: 'archive', icon: :calendar,
-                                         value_href: archive_path) + "\n" +
+             layout(year_heading + "\n" +
                     sections.join("\n") +
                     # Below the list and on the left, which is where a post's own
                     # "back" link has always sat. A way out belongs at the end of

@@ -173,6 +173,37 @@ end
 CHEAT_SHEET_SOURCE = cheat_sheet_source
 CHEAT_SHEET_PATH = '/markdown/'
 
+# The sheet shows a source and, under it, what that source becomes. The
+# second half came out as bare paragraphs, lists and quotes, in the same
+# column and the same type as the sentences explaining them -- so a reader
+# could not tell "this is the result" from "this is the next remark", and a
+# stylesheet had nothing to set the result apart with.
+#
+# Which blocks ARE a result cannot be worked out: a remark sometimes stands
+# between a source and its result, and a result is sometimes deliberately
+# not what the source says (six heading levels shown, three drawn). So the
+# sheet says it itself, with a line of its own before and after:
+#
+#     ::: example
+#     ...
+#     ::: end
+#
+# Not syntax -- nothing outside this one file reads it, and the sheet does
+# not teach it. Each marker is a paragraph by the time it gets here, and
+# the two become the opening and the closing of one element. A sheet that
+# opens one and never closes it (a translation in progress) gets the
+# markers taken out and no element at all, rather than a page whose every
+# following block is nested in the one that was left open.
+def cheat_sheet_examples(html)
+  marks = html.scan(%r{<p>::: (example|end)</p>}).flatten
+  paired = marks.each_slice(2).all? { |pair| pair == %w[example end] }
+  html.gsub(%r{<p>::: (example|end)</p>}) do
+    next '' unless paired
+
+    Regexp.last_match(1) == 'example' ? '<div class="md-example">' : '</div>'
+  end
+end
+
 # Everything that used to be hardcoded in templates and here lives in
 # config/site.yml. SITE_BASE_URL may be overridden by env.sh -- it's the one
 # value that's allowed to depend on the environment.
@@ -1624,8 +1655,31 @@ end
 # how many. One function, because two places say it -- the head of the
 # post's own page and its card on the series' listing -- and a reader who
 # met it in one has to recognise it in the other.
+#
+# Three spans, and the words between them exactly what the sentence always
+# was: the name, what joins it to the rest, and the part. As one run of text
+# a stylesheet could do nothing with it -- on the series' own listing every
+# card repeats the name the heading above has just said, and neither hiding
+# it nor setting the number apart was possible. The joiner is a span of its
+# own so that hiding the name does not leave a dash opening the line.
+#
+# Cut out of the one translated sentence rather than out of three new keys:
+# whatever stands between the name and the first letter or digit is the
+# joiner, in whichever order a language puts the two.
 def series_part_label(slug, in_series, index)
-  t('post.series_part', name: h(SERIES_NAMES[slug].to_s), number: index + 1, total: in_series.size)
+  before, after = t('post.series_part', name: "\u0000", number: index + 1, total: in_series.size)
+                  .split("\u0000", 2)
+  return series_note_span('part', before.to_s) if after.nil?
+
+  lead = before.match(/\A(.*?)([^\p{L}\p{N}]*)\z/m)
+  tail = after.match(/\A([^\p{L}\p{N}]*)(.*)\z/m)
+  series_note_span('part', lead[1]) + series_note_span('sep', lead[2]) +
+    series_note_span('name', h(SERIES_NAMES[slug].to_s)) +
+    series_note_span('sep', tail[1]) + series_note_span('part', tail[2])
+end
+
+def series_note_span(role, text)
+  text.empty? ? '' : %(<span class="series-note__#{role}">#{text}</span>)
 end
 
 # The same sentence on a card, for the one listing where it is the point:
@@ -2093,7 +2147,12 @@ end
 # to the index of tags, a year to the map of years. The same address the
 # "back" link at the foot carries -- a reader who has scrolled to the top
 # of a long year should not have to scroll to the bottom to leave it.
-def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil, value_href: nil)
+# `icon_first:` is for the one heading whose kind is READ rather than hidden:
+# a year of the archive says "Archive 2026", the word and the year side by
+# side, and the icon opens the line as it always did instead of landing
+# between the two.
+def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil, value_href: nil,
+                         icon_first: false)
   value = value.to_s
   kind = kind.to_s
   return '' if value.empty? && kind.empty?
@@ -2112,7 +2171,7 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   # its natural size instead of the heading's, and a screen reader read it
   # out as a graphic nobody had named.
   icon_svg = icon.is_a?(String) ? heading_icon_dress(icon) : LISTING_HEADING_ICONS[icon]
-  parts << icon_svg unless icon_svg.to_s.empty?
+  parts.insert(icon_first ? 0 : -1, icon_svg) unless icon_svg.to_s.empty?
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
   parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
@@ -2272,11 +2331,29 @@ LISTING_HEADING_ICONS = {
                  '<line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>'
 }.freeze
 
+# On a tag's own listing every card carries that tag among its pills: the
+# one thing all of them have in common, said again in each row under a
+# heading that has said it already. It stays -- it is one of the post's
+# tags, and a row with it taken out would read as a post that lacks it --
+# but it is marked, so a stylesheet can quieten it.
+#
+# Marked on the finished page rather than in the card: a card is rendered
+# once and shown on every listing its post appears in (Cards::LIST_ITEM_CACHE),
+# and a copy per tag would render each post as many times as it has tags.
+# The whole opening tag is matched, so nothing an author wrote can be taken
+# for a pill.
+def mark_own_tag(list_html, slug)
+  href = loc("/tag/#{slug}/")
+  list_html.gsub(%(<a class="tag-pill" href="#{href}">)) do
+    %(<a class="tag-pill tag-pill-own" href="#{href}">)
+  end
+end
+
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   heading_kind: nil, heading_variant: nil, heading_icon: nil,
                   heading_href: nil, feed_path: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil,
-                  oldest_first: false, lead: false)
+                  oldest_first: false, lead: false, own_tag: nil)
   pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
     # The landing page is the newest slice for a timeline and part one for
@@ -2308,7 +2385,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
       # A series' cards say "part 3 of 19", so a page whose own posts did
       # not change is still out of date the day a twentieth part arrives.
       oldest_first ? posts.size : '',
-      lead ? 'lead' : '',
+      lead ? 'lead' : '', own_tag,
       lifted ? POST_DIGEST[lifted['__path']] : '',
       page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
     ].map(&:to_s).join('|'))
@@ -2338,6 +2415,7 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
         Cards.render_list_item(post, series: oldest_first, lead: leads && i.zero?)
       end.join("\n")
     end
+    list_html = mark_own_tag(list_html, own_tag) if own_tag
     pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = landing ? title : "#{title} – #{t('pagination.page', number: number)}"
@@ -3524,7 +3602,7 @@ if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))
   cheat_blocks, = MarkdownParser.parse_body(cheat_body, nil)
   cheat_title = cheat_meta['title'] || t('markdown_page.default_title')
-  content_html = Blocks.render_content(cheat_blocks, CHEAT_SHEET_PATH)
+  content_html = cheat_sheet_examples(Blocks.render_content(cheat_blocks, CHEAT_SHEET_PATH))
   cheat_sheet_template = ERB.new(File.read(File.join(ROOT, 'templates', 'markdown_cheat_sheet.html.erb'), encoding: 'utf-8'))
   Output.emit(File.join(CONTENT_ROOT, 'markdown', 'index.html'),
        layout(cheat_sheet_template.result(binding),
