@@ -883,6 +883,14 @@ wrote. Then, in load order:
   never runs shows no button instead of a dead one. It refuses to appear
   at all where the clipboard is unavailable: an insecure origin, or a
   browser without `navigator.clipboard.writeText`.
+- **The 404 page** (`not-found.js`) is the one script a single page asks
+  for by itself rather than through the layout: `/404.html` is one file
+  for every missing address, and only the browser showing it knows which.
+  It reads the address in the bar, puts its words into the page's search
+  field -- the last part that holds a letter, separators turned to
+  spaces -- and shows the archive pill of a year the address names. It
+  searches nothing and redirects nowhere; without it the page is an empty
+  field and the pills that are always there.
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.

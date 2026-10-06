@@ -3598,7 +3598,7 @@ def searchable_tags(post)
 end
 
 # The map of the archive and a page per year (build/archive.rb).
-Archive.write(posts)
+ARCHIVE_YEARS = Archive.write(posts).freeze
 
 # posts is sorted newest-first, so splitting into "first N" / "the rest" is
 # also the split into recent / archive -- no further sorting needed.
@@ -3658,14 +3658,67 @@ NOT_FOUND_SIGN =
   %(<line x1="46" y1="98" x2="74" y2="98"/>) +
   %(</svg>)
 
+# The page said where to go -- "the menu above and the search box" -- and
+# offered nothing to go with: under the sentence there was no field and no
+# link, and on a phone the menu it pointed at is folded behind a button. A
+# reader who landed here had been told there is a way on and left to find
+# it.
+#
+# So the two things the sentence names stand under it. A search field, the
+# bar's own form with a class added, which the page's script fills with
+# the words of the address that was not found: this file is one page for
+# every missing address and cannot know which, but the browser showing it
+# does (assets/js/not-found.js). And a row of the ways out a menu need not
+# have -- back to the front, the map of the archive, the index of tags --
+# written as the pills a post's tags are, so every skin already dresses
+# them. Each only where the site has the page it leads to.
+#
+# A year the missing address names gets a pill of its own, straight to
+# that year of the archive. All of them are written here, hidden, and the
+# script shows the one that matches: the page then changes once a year,
+# when a new year gets a page, and never names one that has none.
+#
+# No word here is new. The labels are the ones their destinations carry
+# already -- the post page's own "back to list", the archive's heading and
+# its years', the tag index's heading.
+def not_found_search_html
+  %(        <form class="search-form not-found-search" action="#{loc('/search/')}" method="get" role="search">\n) +
+    %(          <input type="search" name="q" id="not-found-q" placeholder="#{h(t('nav.search_placeholder'))}" ) +
+    %(aria-label="#{h(t('nav.search_label'))}" autocomplete="off">\n) +
+    %(          <button type="submit" aria-label="#{h(t('nav.search_label'))}">\n) +
+    %(            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">) +
+    %(<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>\n) +
+    %(          </button>\n        </form>\n)
+end
+
+def not_found_links_html(archive_years, tag_index)
+  pill = lambda do |kind, href, label, extra = ''|
+    %(<a class="tag-pill not-found-link not-found-link--#{kind}" href="#{h(href)}"#{extra}>#{h(label)}</a>)
+  end
+  pills = [pill.call('back', loc('/'), t('post.back_to_list'))]
+  unless archive_years.empty?
+    pills << pill.call('archive', loc('/archive/'), t('archive.title'))
+    archive_years.each do |year|
+      pills << pill.call('year', loc("/archive/#{year}/"), t('archive.year_title', year: year),
+                         %( data-year="#{year}" hidden))
+    end
+  end
+  pills << pill.call('tags', loc('/tag/'), t('tags.title')) if tag_index
+  %(        <div class="tags not-found-links">#{pills.join}</div>\n)
+end
+
 Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:not_found]),
      layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
             %(        #{NOT_FOUND_SIGN}\n) +
-            %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
+            %(        <p class="search-tagline">#{t('not_found.body')}</p>\n) +
+            not_found_search_html +
+            not_found_links_html(ARCHIVE_YEARS, !tags_map.empty?),
             title: t('not_found.page_title', site_title: SITE_TITLE),
             description: t('not_found.page_description'),
             path: '/404.html',
-            extra_head: %(\n  <meta name="robots" content="noindex">)))
+            # The script is this page's alone, so only this page asks for it.
+            extra_head: %(\n  <meta name="robots" content="noindex">) +
+                        %(\n  <script src="/assets/js/not-found.js" defer></script>)))
 
 if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))

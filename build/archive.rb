@@ -184,5 +184,9 @@ module Archive
                     path: loc("/archive/#{year}/")))
       end
     end
+    # The years that got a page, newest first -- for whoever wants to point
+    # at one (the 404 page does). Read off the same grouping the pages were
+    # written from, so a year named here is a page that exists.
+    archive_by_year.keys.sort.reverse
   end
 end

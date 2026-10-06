@@ -138,7 +138,13 @@ post page carries how long the post takes to read, counted at 200 words
 a minute -- the same figure `./blog.sh stats` reports; a post too short
 to time says "under a minute". And the build writes a `noindex`
 `/404.html` in the site's own chrome, menu and search field included, so
-a dead end is somewhere to go on from.
+a dead end is somewhere to go on from. Under its sentence stand a search
+field of its own -- filled, where the browser runs scripts, with the
+words of the address that was not found -- and pills back to the front
+page, to the archive and to the index of tags; an address that names a
+year the archive has gets a pill straight to that year. The page is one
+file for every missing address, served by your host: it is written in the
+site's first language whatever language the address was in.
 
 **Backdating** isn't part of that flow -- publishing means "now" -- but
 the frontmatter parser still honors a `date:` line you type in by hand

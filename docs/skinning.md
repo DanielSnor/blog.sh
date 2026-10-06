@@ -191,6 +191,28 @@ a type's listing, on every page of a series, on an archive year and on
 the map of years. It is not on `/page/N/` of a tag, so do not build a
 layout that needs it there.
 
+**The ways on from the 404 page.** Under its sentence the page has a
+search field and a row of pills. Both are things you have styled already,
+with a class added: the field is the bar's `<form class="search-form">`
+and is also `.not-found-search`; the pills are a post's tag pills, in
+`<div class="tags not-found-links">`, each `.tag-pill.not-found-link`
+and one of `--back`, `--archive`, `--year`, `--tags`. So a skin gets them
+dressed without a rule -- and usually wants two anyway, because a 404
+that centres its sentence will want these centred with it:
+
+```css
+.not-found-search { margin-inline: auto; }
+.not-found-links  { text-align: center; }
+```
+
+`site.css` gives the field a border (the bar's field has none: it is a
+light patch on a coloured strip) and makes the input fill its form with
+`main .not-found-search input` -- one step heavier than the bar's rule on
+purpose, so the width your skin gave the field in the bar does not shrink
+this one. A year's pill carries `hidden` until the page's script shows
+it; if you give `.not-found-link` a `display`, keep
+`.not-found-link[hidden] { display: none; }` after it.
+
 **A result on the cheat sheet.** On `/markdown/` what a source becomes
 stands in `<div class="md-example">`, right under the `<pre>` that shows
 the source. Without a rule it is invisible, which is the default look:

@@ -1352,6 +1352,29 @@ a.tag-pill:hover { background: var(--accent); color: #ffffff; }
 @media (max-width: 700px) {
   .not-found-sign { width: 240px; }
 }
+/* The two ways on the 404 page puts under its sentence. The field is the
+   bar's own form (.search-form) with a class added, so a skin that has
+   dressed the one has dressed the other; what is said here is only what
+   differs once it stands on the page's ground instead of the bar's -- a
+   line around it, since the bar's field is a light patch on a coloured
+   strip and here it would be white on white, and room to read a few
+   words back.
+   The input's width alone is said with `main` in front: it is structure,
+   not looks -- the field fills its form, whatever width a skin gave the
+   one in the bar -- and a skin's `.search-form input` must not win it by
+   coming later. Everything else is at the bar's own weight, so a skin
+   overrides it by saying nothing special. */
+.not-found-search { display: flex; width: 100%; max-width: 24rem; margin-top: 1.25rem; }
+main .not-found-search input[type="search"] { width: 100%; }
+.not-found-search input[type="search"] { height: 36px; border: 1px solid var(--border); font-size: 0.9rem; }
+.not-found-search button { width: 36px; height: 36px; }
+/* The pills are a post's tag pills (.tags, .tag-pill) with classes of
+   their own beside: the line above them is the one that closes a post
+   before its tags. A year's pill arrives hidden and the script shows the
+   one the address names -- and an author's `display` beats the browser's
+   own [hidden] rule, so it is said here that hidden means hidden. */
+.not-found-links { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.not-found-link[hidden] { display: none; }
 .search-tip { color: var(--meta-text); font-size: 0.85rem; margin-bottom: 1.5rem; }
 .search-status { color: var(--meta-text); font-size: 0.9rem; }
 .search-archive-pending { font-style: italic; }

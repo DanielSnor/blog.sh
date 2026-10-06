@@ -107,6 +107,14 @@ goes in is still being decided; the suffix and the date both come off at the tag
   numbering starts from says "the beginning" where the link to older posts would stand. A series
   is paged by parts and says neither. Every page under `/page/N/` is rewritten by the next build,
   once.
+- **The 404 page offers what its sentence promises.** It said "the menu above and the search box
+  are the way on" and put neither under the sentence. Now a search field stands there, filled with
+  the words of the address that was not found (`/posts/2019/a-day-out/` becomes "a day out";
+  nothing is searched until the reader asks), and under it pills back to the front page, to the
+  archive and to the index of tags -- each only where the site has that page -- plus the year of
+  the archive when the address names one it has. No word on the page is new: the labels are the
+  ones those pages already carry. For a skin: `.not-found-search`, `.not-found-links`,
+  `.not-found-link--back`, `--archive`, `--year`, `--tags`.
 - **A listing's heading says how many it holds.** A small number after the name, as the index of
   tags writes it: posts under a tag or of a type, parts of a series, posts of an archive year and
   of the whole archive. On a tag's or a type's listing it stands on the first page only -- that
