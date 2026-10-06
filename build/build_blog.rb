@@ -1969,10 +1969,48 @@ def page_url(number, fixed, base_path, oldest_first: false)
   "#{base_path}/page/#{number}/"
 end
 
+# The days a page of a timeline covers, oldest to newest, with whatever
+# the two ends share said once: "12.–18. 9. 2026", "28. 8. – 3. 9. 2026",
+# "30. 12. 2025 – 2. 1. 2026", or the one day when it is one. How much is
+# shared decides the shape and each language writes its own (the
+# pagination.dates_* keys); the full date is the site's ordinary one.
+def page_dates_label(posts)
+  days = posts.map { |post| post_display_time(post) }
+  from = days.min
+  to = days.max
+  return nil unless from
+
+  full = t('date_format')
+  if from.year != to.year
+    t('pagination.dates_year', from: from.strftime(full), to: to.strftime(full))
+  elsif from.month != to.month
+    t('pagination.dates_year', from: from.strftime(t('pagination.dates_year_from')), to: to.strftime(full))
+  elsif from.day != to.day
+    t('pagination.dates_month', from: from.strftime(t('pagination.dates_month_from')),
+                                to: to.strftime(t('pagination.dates_month_to')))
+  else
+    to.strftime(full)
+  end
+end
+
 # No "x / total" counter: the total changes whenever a new page is created,
 # which would put a differing byte on every single page again -- the very
 # churn the oldest-anchored slicing above exists to avoid.
-def pagination_html(number, fixed, base_path = '', oldest_first: false)
+#
+# What a number without a total cannot say is WHERE the page is. Pages are
+# counted from the oldest post, so the continuation right behind the front
+# page carries the highest number there is, and "page 663" reads as deep in
+# the archive when it is last week. So a page of a timeline says the days
+# it covers beside its number -- which answers the question the total was
+# wanted for, and is as fixed as the page: it is read off the page's own
+# posts, and those are the one thing about it that does not change.
+#
+# And the page the numbering starts from says that it is the start. It
+# had a link back and nothing where the link on stood, which is also what
+# a page whose link failed to draw looks like.
+#
+# `posts:` are the page's own; without them the label is the number alone.
+def pagination_html(number, fixed, base_path = '', oldest_first: false, posts: nil)
   return '' if fixed.zero?
 
   # A series reads forwards. Its pages are numbered in reading order, the
@@ -1987,9 +2025,21 @@ def pagination_html(number, fixed, base_path = '', oldest_first: false)
   end
 
   newer = number <= fixed ? %(<a href="#{page_url(number + 1, fixed, base_path)}">#{h(t('pagination.newer'))}</a>) : ''
-  older = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path)}">#{h(t('pagination.older'))}</a>) : ''
-  label = number > fixed ? t('pagination.latest') : t('pagination.page', number: number)
-  %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{newer}<span>#{h(label)}</span>#{older}</nav>)
+  older = if number > 1
+            %(<a href="#{page_url(number - 1, fixed, base_path)}">#{h(t('pagination.older'))}</a>)
+          else
+            %(<span class="pagination-start">#{h(t('pagination.start'))}</span>)
+          end
+  # The front of the listing is "latest" and needs no dates: what it holds
+  # is whatever is newest, and it says so.
+  label = if number > fixed
+            h(t('pagination.latest'))
+          else
+            dates = posts && page_dates_label(posts)
+            h(t('pagination.page', number: number)) +
+              (dates ? %(<span class="pagination-sep"> · </span><span class="pagination-dates">#{h(dates)}</span>) : '')
+          end
+  %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{newer}<span>#{label}</span>#{older}</nav>)
 end
 
 # Templates only contain their own <main>; the header, nav, sidebar and
@@ -2151,8 +2201,14 @@ end
 # a year of the archive says "Archive 2026", the word and the year side by
 # side, and the icon opens the line as it always did instead of landing
 # between the two.
+# `count:` is how many the listing holds -- posts under a tag, parts of a
+# series, posts of a year -- as a bare number after the value, the way the
+# index of tags writes it beside each tag. A number and not a phrase: the
+# heading has said what is being counted, and "35 posts" would need three
+# forms of the word in one of the three languages for what the eye takes in
+# as "35" either way.
 def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil, value_href: nil,
-                         icon_first: false)
+                         icon_first: false, count: nil)
   value = value.to_s
   kind = kind.to_s
   return '' if value.empty? && kind.empty?
@@ -2175,6 +2231,7 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
   parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
+  parts << %(<sup class="listing-heading__count">#{count.to_i}</sup>) if count
   # h1, not h2. This is what the page is about -- the tag being listed, the
   # search being run -- and the posts under it are h2 already, so at h2 it
   # was a sibling of the things it introduces rather than their heading. A
@@ -2379,12 +2436,23 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # rebuilt. Measured on one archive: 766 files for a post dated 2003
     # against 12 for one dated today.
     lifted = pinned && number > fixed ? pinned : nil
+    # How many the listing holds, said in its heading -- but only where
+    # saying it is free. The heading stands on every page of the listing,
+    # and a count on all of them would rewrite every page of a tag each
+    # time a post takes that tag: the churn the anchored pages exist to
+    # avoid, bought back for a number. The page at the listing's own
+    # address is rewritten by a new post anyway, so it carries the count
+    # and the continuations do not. A series is the exception that costs
+    # nothing: its cards say "part 3 of 19", so a new part already
+    # rewrites every page of it.
+    heading_count = heading && (landing || oldest_first) ? posts.size : nil
     key = Digest::SHA256.hexdigest([
       base_path, number, fixed, oldest_first, heading, heading_kind, heading_variant,
       heading_icon, heading_href, feed_path, title, description,
       # A series' cards say "part 3 of 19", so a page whose own posts did
       # not change is still out of date the day a twentieth part arrives.
       oldest_first ? posts.size : '',
+      heading_count.to_s,
       lead ? 'lead' : '', own_tag,
       lifted ? POST_DIGEST[lifted['__path']] : '',
       page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
@@ -2416,11 +2484,12 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
       end.join("\n")
     end
     list_html = mark_own_tag(list_html, own_tag) if own_tag
-    pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first)
+    pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first, posts: page_posts)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = landing ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
-                                        icon: heading_icon, value_href: heading_href)
+                                        icon: heading_icon, value_href: heading_href,
+                                        count: heading_count)
     # Tags, series and content types all name themselves; the landing page is
     # the only listing that arrives here with nothing, and it is the only one
     # that would otherwise have no h1 (see home_heading_html).

@@ -133,8 +133,9 @@ listing names itself.
 
 A stylesheet can only style what it can select. Each of these was one run
 of text, or one element among identical ones, until a skin needed to tell
-the parts apart -- so each is marked, and each looks exactly as it did
-until a rule of yours says otherwise.
+the parts apart -- so each is marked. Most look exactly as they did
+until a rule of yours says otherwise; the page dates and the count are
+new words on the page, and `site.css` styles those two.
 
 **The parts of the series sentence.** "Nový Sean.cz — part 3 of 19" is
 three spans: `.series-note__name`, `.series-note__sep` and
@@ -174,6 +175,21 @@ row keeps its three places; whether it is worth reading is yours to say:
 
 The numbers are filled in by a script after the page loads, so this is a
 class you will not find by reading the built HTML.
+
+**The days a page covers.** Under a listing, the label between the two
+links is `page 12` followed by `.pagination-sep` (the dot) and
+`.pagination-dates`; on the page the numbering starts from,
+`.pagination-start` stands where the link to older posts would.
+`site.css` hides the dot and puts the dates on a line of their own under
+the number; to have them on one line, show the dot and make the dates
+inline -- and then look at it on a phone, where two links and a range
+across a new year do not fit beside each other.
+
+**How many a listing holds.** The number after a heading's name is
+`<sup class="listing-heading__count">` -- on the first page of a tag's or
+a type's listing, on every page of a series, on an archive year and on
+the map of years. It is not on `/page/N/` of a tag, so do not build a
+layout that needs it there.
 
 **A result on the cheat sheet.** On `/markdown/` what a source becomes
 stands in `<div class="md-example">`, right under the `<pre>` that shows

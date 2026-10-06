@@ -116,6 +116,17 @@ pagination:
   older: "Older →"
   latest: "latest"
   page: "page %{number}"
+  # The days a page of a listing covers, oldest to newest. Whatever both
+  # ends share is said once: "Sep 12–18, 2026" (one month), "Aug 28 – Sep
+  # 3, 2026" (one year); across a new year, two whole dates. The *_from and
+  # *_to patterns are strftime; a whole date is date_format above.
+  dates_month: "%{from}–%{to}"
+  dates_month_from: "%b %-d"
+  dates_month_to: "%-d, %Y"
+  dates_year: "%{from} – %{to}"
+  dates_year_from: "%b %-d"
+  # On the page the numbering starts from, where the "Older" link would be.
+  start: "the beginning"
 
 tag:
   feed_title: "%{name} – %{site_title}"

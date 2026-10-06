@@ -260,7 +260,11 @@ end -- the obvious way -- shifts every page boundary each time a post
 is published, rewriting the whole archive on every deploy. Anchoring to
 the oldest makes old pages immutable; the landing page absorbs new
 posts and splits only when full. Same reason there's no "page X of Y"
-label: the total would put a changing byte on every page.
+label: the total would put a changing byte on every page. What the total
+was wanted for -- where in the archive a page is, when the page right
+behind the front one carries the highest number there is -- a page says
+with the days it covers, beside its number. Those are read off the page's
+own posts, so they are exactly as fixed as the page.
 
 **Attributes live in the frontmatter, actions live in a dialog.** A
 post's type and tags are edited where the text is -- prefilled in the

@@ -117,6 +117,18 @@ pagination:
   older: "Ältere →"
   latest: "neueste"
   page: "Seite %{number}"
+  # Die Tage, die eine Seite der Liste umfasst, vom ältesten zum neuesten.
+  # Was beide Enden gemeinsam haben, steht einmal: „12.–18.09.2026“ (ein
+  # Monat), „28.08. – 03.09.2026“ (ein Jahr); über den Jahreswechsel zwei
+  # ganze Daten. Die Muster *_from und *_to sind strftime, das ganze Datum
+  # ist date_format oben.
+  dates_month: "%{from}–%{to}"
+  dates_month_from: "%d."
+  dates_month_to: "%d.%m.%Y"
+  dates_year: "%{from} – %{to}"
+  dates_year_from: "%d.%m."
+  # Auf der Seite, bei der die Zählung beginnt, anstelle von „Ältere“.
+  start: "der Anfang"
 
 tag:
   feed_title: "%{name} – %{site_title}"

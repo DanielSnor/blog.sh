@@ -115,6 +115,17 @@ pagination:
   older: "Starší →"
   latest: "nejnovější"
   page: "strana %{number}"
+  # Dny, které stránka výpisu pokrývá, od nejstaršího po nejnovější. Co mají
+  # oba konce společné, se řekne jednou: „12.–18. 9. 2026“ (týž měsíc),
+  # „28. 8. – 3. 9. 2026“ (týž rok); přes přelom roku dvě celá data. Vzory
+  # *_from a *_to jsou strftime, celé datum je date_format výš.
+  dates_month: "%{from}–%{to}"
+  dates_month_from: "%-d."
+  dates_month_to: "%-d. %-m. %Y"
+  dates_year: "%{from} – %{to}"
+  dates_year_from: "%-d. %-m."
+  # Na stránce, od které se čísluje, místo odkazu „Starší“.
+  start: "začátek"
 
 tag:
   feed_title: "%{name} – %{site_title}"

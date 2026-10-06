@@ -98,6 +98,21 @@ goes in is still being decided; the suffix and the date both come off at the tag
   listing, which until now showed which posts belong and not which comes when; there it is words,
   not a link to the page it stands on. Every post in a series and every page of a series' listing
   is rewritten by the next build.
+- **A page of a listing says the days it covers.** "page 663 · Sep 12–18, 2026" where it said
+  "page 663": pages are numbered from the oldest post, so the one right behind the front page
+  carries the highest number, and a number without a total says nothing about where it is. There
+  is still no total -- it would rewrite every page each time one is added -- and the dates need
+  none: they are read off the page's own posts. What the two ends share is said once (one month,
+  one year), in each language's own way, on a line of their own under the number. The page the
+  numbering starts from says "the beginning" where the link to older posts would stand. A series
+  is paged by parts and says neither. Every page under `/page/N/` is rewritten by the next build,
+  once.
+- **A listing's heading says how many it holds.** A small number after the name, as the index of
+  tags writes it: posts under a tag or of a type, parts of a series, posts of an archive year and
+  of the whole archive. On a tag's or a type's listing it stands on the first page only -- that
+  page is rewritten by a new post anyway, and on all of them it would rewrite every page of a tag
+  each time a post takes it. A series says it on every page, which costs nothing: its cards
+  already count the parts.
 - **Five things a skin could not select are marked.** Nothing looks different until a stylesheet
   says so (`docs/skinning.md`, "What the markup marks for you"):
   the series sentence is three spans -- the name, what joins it, the part -- so a series' own

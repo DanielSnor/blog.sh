@@ -1325,6 +1325,10 @@ a.tag-pill:hover { background: var(--accent); color: #ffffff; }
    line. 0.02em rather than a round number because that is where the
    calendar's box and the cap height of the heading line up. */
 .listing-heading__icon { vertical-align: 0.02em; margin-right: var(--listing-heading-gap); color: var(--meta-text); }
+/* How many the listing holds: small and dimmed beside the name, as the
+   index of tags writes it beside each tag, so the heading still reads as
+   its name first. */
+.listing-heading__count { font-size: 0.5em; font-weight: 400; opacity: 0.75; margin-left: 0.25em; }
 
 /* A heading that is also a way back. It keeps the heading's own colour
    until the pointer is on it -- underlined orange at 1.6rem would read as
@@ -1388,6 +1392,16 @@ main .post-list-item:last-child { margin-bottom: 0; }
   transition: 0.3s ease-in-out;
 }
 .pagination a:hover { color: var(--hover-invert); }
+/* The days a page covers stand under its number, not beside it. Beside
+   would be one line on a desk and none on a phone -- two links and "page
+   12 · 30. 12. 2025 – 2. 1. 2026" do not fit, and a flex row that runs out
+   of room breaks the dates wherever it happens to -- and a bar that is one
+   line here and two there is two bars to keep right. The dot that joins
+   the two in the markup is for a reader with no stylesheet; here the line
+   break says it. */
+.pagination > span { text-align: center; }
+.pagination-sep { display: none; }
+.pagination-dates { display: block; }
 
 aside .card { margin-bottom: 1.5rem; }
 

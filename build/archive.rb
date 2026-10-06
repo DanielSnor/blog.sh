@@ -106,7 +106,10 @@ module Archive
       # not changed since new year's eve 2014 and never will.
       Output.cached_emit(File.join(CONTENT_ROOT, 'archive', 'index.html'),
                   Digest::SHA256.hexdigest(rows.join)) do
-        layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
+        # The whole archive, counted: the sum of the numbers the rows show,
+        # so the key above already holds it.
+        layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar,
+                                    count: archive_by_year.values.sum(&:length)) +
                %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
                title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
                description: t('archive.description', site_title: SITE_TITLE),
@@ -161,10 +164,11 @@ module Archive
         year_heading = if year_rest == '' && !year_kind.strip.empty?
                          listing_heading_html(year.to_s, kind: year_kind.strip, variant: 'archive',
                                               icon: :calendar, icon_first: true,
-                                              value_href: archive_path)
+                                              value_href: archive_path, count: in_year.length)
                        else
                          listing_heading_html(t('archive.year_title', year: year), variant: 'archive',
-                                              icon: :calendar, value_href: archive_path)
+                                              icon: :calendar, value_href: archive_path,
+                                              count: in_year.length)
                        end
         BuildCache.remember_page(year_dest, year_key)
         Output.emit(year_dest,
