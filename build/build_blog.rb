@@ -390,6 +390,12 @@ LAYOUT_LEAD_CARD = SiteConfig.get('layout', 'lead_card', default: false) == true
 
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
+# A header without its picture: the name and the claim stand on the page
+# itself. Only a plain `false` asks for it -- the picture is what every
+# site has had, so anything else in that key leaves it where it was.
+# `banner.src` stays what it is either way: a page with no picture of
+# its own is still shared with that one (DEFAULT_OG_IMAGE).
+BANNER_SHOW_IMAGE = SiteConfig.get('banner', 'show_image', default: true) != false
 ANALYTICS = SiteConfig.get('analytics')
 SITE_COLORS = SiteConfig.get('colors', default: {})
 # The browser chrome around the page (address bar on phones, title bar in
@@ -2649,6 +2655,7 @@ end
 
 Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
+                        plain_banner: !BANNER_SHOW_IMAGE,
                         fonts: SiteConfig.get('fonts', default: {}),
                         fonts_dir: File.join(ROOT, 'assets', 'fonts')))
 ico = build_favicon_ico

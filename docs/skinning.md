@@ -337,6 +337,33 @@ The chip is a `<nav>`, so the menu's own rules reach it -- gap, minimum
 height, borders. Its rule says all of them again; if you restyle it from
 scratch, say them again too, or it will quietly grow into a menu bar.
 
+### A header without its picture is the same header
+
+With `banner.show_image: false` the markup is the banner's with the `<img>`
+taken out and nothing else moved:
+
+```
+.banner-wrap.banner-wrap--plain
+  a.banner-link        empty, named by aria-label; laid over the whole header
+  .banner-overlay      as before
+    .banner-title
+    .banner-claim
+  .banner-tools / #theme-toggle
+```
+
+The stylesheet's own rules for it all hang on `:where(.banner-wrap--plain)`,
+which weighs nothing: each is exactly as heavy as the rule it replaces, and
+your `.banner-overlay`, `.banner-title` or `.banner-claim` wins as it always
+has. The scrims are excluded the same way, so
+`.banner-wrap:has(.banner-claim)::after { content: none; }` in a skin still
+switches one off on a site that shows its picture.
+
+A skin that already draws its own header -- `.banner { display: none; }`,
+its own layout for the overlay -- loses nothing by the setting and has
+nothing to change: the site looks the same, and its readers stop downloading
+a picture nobody showed them. If your skin leaves the header to the engine,
+`.banner-wrap--plain` is the class to hang a plain header's look on.
+
 ### The excerpt is a positioning context
 
 `.content.excerpt` is `max-height: 500px; overflow: hidden; position:

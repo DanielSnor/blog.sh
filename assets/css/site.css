@@ -354,9 +354,15 @@ nav a[aria-current="page"]:hover {
    class the template emits is deliberate -- an overlay toggle then changes
    one stylesheet instead of re-rendering every page in the archive. Where
    :has() is unsupported the scrim simply isn't painted, which costs a little
-   contrast rather than breaking the header. */
-.banner-wrap:has(.banner-title)::before,
-.banner-wrap:has(.banner-claim)::after {
+   contrast rather than breaking the header.
+
+   A header without its picture (banner.show_image: false, below) has
+   nothing to darken. It is excluded inside :where() and not by a bare
+   :not(), which would have made these three selectors one class heavier
+   -- and every skin that switches a scrim off with the selector as it
+   stood would have got it back, on sites that never touched the setting. */
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-title)::before,
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-claim)::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -364,11 +370,11 @@ nav a[aria-current="page"]:hover {
   pointer-events: none;
 }
 
-.banner-wrap:has(.banner-title)::before {
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-title)::before {
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
 }
 
-.banner-wrap:has(.banner-claim)::after {
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-claim)::after {
   background: linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
 }
 
@@ -472,9 +478,45 @@ nav a[aria-current="page"]:hover {
      was being read off the photograph itself. So on a phone the scrim
      becomes the shape the text became: a band across the bottom. The
      title keeps the corner it was drawn for. */
-  .banner-wrap:has(.banner-claim)::after {
+  .banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-claim)::after {
     background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 55%);
   }
+}
+
+/* A header without its picture: banner.show_image: false. The name and
+   the claim stand on the page itself, one under the other at the left
+   edge, in the page's own text colours (colors.css gives the two their
+   defaults for this case; a colour the site set is kept).
+
+   The markup is the banner's with the <img> taken out and nothing else
+   moved -- the link is still there, empty, and here it is laid over the
+   whole header so the header is one way home as the picture was.
+
+   Every rule hangs on :where(), which weighs nothing: each is exactly as
+   heavy as the rule it replaces above and wins only by coming later. A
+   skin that already draws its own header out of these elements -- hides
+   the picture, sets `.banner-overlay`, `.banner-title` -- is loaded after
+   this file and wins every one of them back with the selectors it has
+   always used. Such a site turns the picture off and looks the same; its
+   readers just stop downloading a picture nobody showed them.
+
+   This block has to stay BELOW the phone's rules for the banner: the
+   sizes and the padding here are for every width. */
+:where(.banner-wrap--plain) { min-height: 3.25rem; }
+:where(.banner-wrap--plain) .banner-link { position: absolute; inset: 0; z-index: 1; }
+:where(.banner-wrap--plain) .banner-overlay { position: static; padding: 1.4rem 1.5rem 1.2rem; }
+:where(.banner-wrap--plain) .banner-title,
+:where(.banner-wrap--plain) .banner-claim { text-shadow: none; }
+/* Scaled from the configured sizes, as the phone's are: 45px and 20px are
+   sizes for a line laid across a picture, and 32px and 16px are what the
+   same two lines want on a page. A site that set its own keeps the ratio. */
+:where(.banner-wrap--plain) .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.711); }
+:where(.banner-wrap--plain) .banner-claim {
+  max-width: none;
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  font-size: calc(var(--banner-claim-size, 20px) * 0.8);
+  text-align: left;
 }
 
 /* The two controls that belong to the reader rather than to the site:

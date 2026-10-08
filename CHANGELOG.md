@@ -107,6 +107,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `base:` required so a change made elsewhere in the meantime is refused rather than overwritten.
   The app on a phone is a desk now. `translate <slug> --lang <code> --json` hands a language's text
   out the same way, and a file saying `lang:` beside `edits:` and `base:` brings it back.
+- **`banner.show_image: false`.** A header without its picture: the short name and the description
+  stand on the page itself, in the page's own text colours, and the whole header is still the link
+  home. The markup is the banner's with the `<img>` taken out and nothing else moved -- the wrap
+  gains `banner-wrap--plain` -- and the default rules for it weigh nothing, so a skin that already
+  draws its own header and hides the picture looks exactly as it did, and its readers stop
+  downloading a file nobody showed them. `banner.src` stays: it is also the picture a page with
+  none of its own is shared with.
 - **`layout.lead_card`.** With it on, the card that opens the front page -- the pinned post where
   there is one -- leads with its post's first picture, under the title and above the opening
   words. A card is cut by height, so a picture written after the first paragraph is usually left

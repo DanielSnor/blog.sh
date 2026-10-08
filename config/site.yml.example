@@ -36,7 +36,8 @@
 #
 #   site        title, short_name, description, author, (author_name), lang, locale, (locales),
 #               timezone, base_url, (page_size), (extra_css)
-#   banner      src, alt, width, height, (show_title), (show_claim), (claim)
+#   banner      src, alt, width, height, (show_title), (show_claim), (claim),
+#               (show_image)
 #   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
 #               pill_bg, (banner_title), (banner_claim)
 #   fonts       (faces), (banner_title), (banner_title_size),
@@ -156,6 +157,12 @@ banner:
   # banner image. Turn either off if the image is busy enough on its own.
   # show_title: true
   # show_claim: true
+  # Optional (default true): false leaves the picture out of the header.
+  # The short name and the description then stand on the page itself, in
+  # the page's own text colours, and the whole header is still the way
+  # home. Everything above stays as it is: `src` is also the picture a
+  # page with none of its own is shared with.
+  # show_image: true
   # Optional: overrides ONLY the banner overlay's claim text -- everywhere
   # else (meta description, RSS, listing pages) keeps using site.description
   # unchanged. Exists because site.description must stay plain text (see

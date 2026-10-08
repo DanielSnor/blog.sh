@@ -507,6 +507,18 @@ whether they render at all, and `colors.<mode>.banner_title` /
 the meta description and the feed. Their typeface and size are
 [`fonts`](#the-palette-and-the-headers-type).
 
+`banner.show_image: false` leaves the picture out of the header. The short
+name and the description then stand on the page itself, one under the other
+at the left edge, and the whole header is still the link home. Their colours
+default to the page's own `text` and `meta_text` instead of the pair chosen
+for reading over a picture -- `banner_title` / `banner_claim` still override
+them -- and their sizes are scaled down from the configured ones (32px and
+16px with the defaults), since 45px is a size for a line laid across a
+picture. Leave `src`, `alt`, `width` and `height` as they are: `src` is
+also the picture a page with none of its own is shared with, and `alt`
+becomes the name of the link. It is a key to set by hand; `./style.sh` does
+not ask about it.
+
 ## 5. First build and local preview
 
 ```bash
