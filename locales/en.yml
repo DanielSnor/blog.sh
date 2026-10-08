@@ -1702,6 +1702,14 @@ setup:
   doctor_clean: "✅ Nothing else needs attention."
   doctor_rest: "Still worth doing"
   doctor_hint: "./blog.sh doctor says this again any time, and ./style.sh handles the appearance ones."
+  # The launcher for a Mac: an icon in Applications that opens Terminal in
+  # the site's folder and runs ./blog.sh.
+  q_launcher: "Put an icon in Applications that opens this blog with a double-click?"
+  launcher_made: "✅ The launcher is ready: %{path}"
+  launcher_first_run: "   On the first double-click macOS asks whether it may control Terminal — allow it, or the icon does nothing. Terminal keeps its window open afterwards; closing it after a clean exit is a setting in Terminal (Settings → Profiles → Shell). ./setup.sh --launcher makes it again."
+  launcher_failed: "⚠️  The launcher could not be made: %{error}"
+  launcher_taken: "⚠️  %{path} is an application blog.sh did not make. Leaving it alone."
+  launcher_mac_only: "blog.sh can only make a launcher on a Mac."
 
 # lib/wizard.rb -- what ./setup.sh and ./style.sh both say: asking a
 # question that can be skipped, choosing from a list, and the moment at

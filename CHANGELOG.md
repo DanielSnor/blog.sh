@@ -107,6 +107,14 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `base:` required so a change made elsewhere in the meantime is refused rather than overwritten.
   The app on a phone is a desk now. `translate <slug> --lang <code> --json` hands a language's text
   out the same way, and a file saying `lang:` beside `edits:` and `base:` brings it back.
+- **A launcher on a Mac.** `./setup.sh` ends by offering an icon in Applications, named after the
+  site and wearing its favicon, that opens Terminal in the site's folder and runs `./blog.sh` --
+  for the author to whom "open Terminal and type" is three things to get wrong. Built from what
+  macOS ships (`osacompile`, `sips`, `iconutil`, `codesign`); nothing is installed. The answer to
+  Enter is no, an application of the same name that blog.sh did not make is never replaced, and
+  `./setup.sh --launcher` makes it later or makes it again for a site that moved. macOS asks once
+  whether it may control Terminal, and Terminal keeps its window open afterwards; the wizard says
+  both. Elsewhere the question is not asked.
 - **`/series/`: the index of series.** A line for every series that has a page -- its name, how
   many parts, the years they span -- with the one still being written first. A series could be
   reached only from a post that belongs to it, and `/series/` answered 404 with every address under

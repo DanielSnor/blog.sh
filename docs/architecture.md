@@ -274,7 +274,10 @@ poster frame is imported as an image -- a `video` block with no media would
 render as "video unavailable".
 
 `scripts/import.rb` is a second wizard rather than a menu entry in
-`blog.sh`, and always previews in dry-run before writing. `lib/site_header.rb`
+`blog.sh`, and always previews in dry-run before writing. `lib/launcher.rb`
+is the one piece that is for a single platform: on a Mac `setup.sh` can put
+an icon in Applications that opens Terminal in the site's folder and runs
+`./blog.sh`, built with tools macOS ships. `lib/site_header.rb`
 is shared by both wizards so the site-identity block can't drift between
 them.
 

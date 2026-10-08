@@ -112,6 +112,29 @@ The system nano is as old as the system Ruby -- if the editor step
 complains about options, set your own: `export EDITOR=vim` (or `code -w`,
 or plain `nano`).
 
+**An icon instead of `cd myblog && ./blog.sh`.** On a Mac `./setup.sh`
+ends by offering to put a launcher in Applications: an icon, named after
+the site and wearing its favicon, that opens Terminal in the site's folder
+and runs `./blog.sh`. It is nothing more than that -- no window of its
+own, nothing blog.sh does not do -- and the answer to Enter is no, since a
+yes puts something outside this folder. `./setup.sh --launcher` makes it
+at any later time, and makes it again for a site whose folder moved: the
+folder is written into the launcher, so one site has one launcher.
+
+Three things to know about it, all of them macOS's:
+
+- The first double-click asks whether the launcher may control Terminal.
+  Allow it. Refused, the icon does nothing, and the question is not asked
+  again -- the switch is then in System Settings → Privacy & Security →
+  Automation.
+- Terminal keeps the window open after blog.sh ends, saying the process
+  completed. Whether it closes instead is Terminal's own setting:
+  Settings → Profiles → Shell → "When the shell exits".
+- It lands in `/Applications`, or in `~/Applications` for an account that
+  may not write there. An application of the same name that blog.sh did
+  not make is never replaced; `BLOG_SH_LAUNCHER_DIR=<folder>` puts the
+  launcher somewhere else.
+
 ### Linux (Debian/Ubuntu shown; any distro works)
 
 ```bash

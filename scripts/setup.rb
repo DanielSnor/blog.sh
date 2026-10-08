@@ -67,6 +67,7 @@ require_relative '../lib/version'
 require_relative '../lib/site_header'
 require_relative '../lib/publish_slots'
 require_relative '../lib/path_glob'
+require_relative '../lib/launcher'
 
 # A script that ASKS has to flush before it blocks. stdout is block
 # buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
@@ -739,6 +740,7 @@ def review_and_write(site, env)
   env.values.each { |name, value| ENV[name] = value }
 
   puts Tui.paint(t('env_permissions', path: relative(ENV_SH)), :dim) if env.changed?
+  offer_launcher
   puts
   puts t('next_steps')
   puts
@@ -747,6 +749,69 @@ end
 
 def relative(path)
   path.sub("#{ROOT}/", '')
+end
+
+# --- the launcher ----------------------------------------------------
+#
+# An icon in Applications that opens this site's blog.sh (lib/launcher.rb).
+# Offered once the config is written, on a Mac, to a site that has none --
+# and made on request by `./setup.sh --launcher`, which is how a site that
+# was set up long ago gets one, and how a site that moved gets its own
+# made again.
+
+# The name as the config holds it NOW: on a first run the wizard has just
+# written it, and the copy read at the top of this file is from before.
+def launcher_name
+  data = begin
+    YamlCompat.load_file(SITE_YML)
+  rescue StandardError
+    nil
+  end
+  data.is_a?(Hash) ? data.dig('site', 'short_name').to_s : ''
+end
+
+# The site's own favicon, or the one the engine ships until there is one:
+# the first build is what copies that into place, and the wizard runs
+# before any build has.
+def launcher_icon
+  [File.join(ROOT, 'assets', 'images', 'favicon.png'),
+   File.join(ROOT, 'assets', 'images', 'defaults', 'favicon.png')].find { |file| File.file?(file) }
+end
+
+def make_launcher
+  bundle, problem = Launcher.create(root: ROOT, site_name: launcher_name, icon: launcher_icon)
+  case problem
+  when nil
+    puts Tui.paint(t('launcher_made', path: bundle), :green)
+    # The two things about it that are macOS's and that nobody is told
+    # anywhere else: the question on the first double-click, and the
+    # window Terminal leaves behind.
+    puts Tui.paint(t('launcher_first_run'), :dim)
+    true
+  when :unsupported
+    puts t('launcher_mac_only')
+    false
+  when :taken
+    puts Tui.paint(t('launcher_taken', path: Launcher.path(launcher_name)), :yellow)
+    false
+  else
+    puts Tui.paint(t('launcher_failed', error: problem), :yellow)
+    false
+  end
+end
+
+def offer_launcher
+  return unless Launcher.supported?
+  return if Launcher.points_at?(Launcher.path(launcher_name), ROOT)
+
+  puts
+  # The answers above are written and done with; with them still in the
+  # frame the question would repaint the screen over what was just said.
+  Wizard.context = []
+  # No by default, and Esc is no: a yes here puts something on the
+  # machine outside this folder, and nothing that does that is the answer
+  # to Enter -- or to an input that simply ran out.
+  make_launcher if Wizard.confirm(t('q_launcher'), default: false, escape: false)
 end
 
 # Closing with doctor rather than a congratulation: the wizard covers the
@@ -778,5 +843,8 @@ def run_doctor
   puts Tui.paint(t('doctor_hint'), :dim)
   puts
 end
+
+# `./setup.sh --launcher`: the launcher and nothing else.
+exit(make_launcher ? 0 : 1) if ARGV.include?('--launcher')
 
 Wizard.guard { run }

@@ -1671,6 +1671,14 @@ setup:
   doctor_clean: "✅ Nic dalšího nepotřebuje pozornost."
   doctor_rest: "Ještě by stálo za to"
   doctor_hint: "./blog.sh doctor tohle řekne kdykoli znovu a ty vzhledové věci vyřeší ./style.sh."
+  # Spouštěč pro Mac: ikona v Aplikacích, která otevře Terminál ve složce
+  # webu a spustí ./blog.sh.
+  q_launcher: "Vytvořit v Aplikacích ikonu, která tenhle blog otevře poklepáním?"
+  launcher_made: "✅ Spouštěč je hotový: %{path}"
+  launcher_first_run: "   Při prvním poklepání se macOS zeptá, jestli smí ovládat Terminál — povol to, jinak ikona nic neudělá. Okno Terminálu po skončení zůstane otevřené; zavírat ho po čistém ukončení se nastavuje v Terminálu (Nastavení → Profily → Shell). Znovu ho vytvoří ./setup.sh --launcher."
+  launcher_failed: "⚠️  Spouštěč se nepodařilo vytvořit: %{error}"
+  launcher_taken: "⚠️  V %{path} už je aplikace, kterou blog.sh nevytvořil. Nechávám ji být."
+  launcher_mac_only: "Spouštěč umí blog.sh vytvořit jen na Macu."
 
 # lib/wizard.rb — co říkají ./setup.sh i ./style.sh: otázka, která jde
 # přeskočit, výběr ze seznamu, a ta chvíle na konci, kdy se všechno

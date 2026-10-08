@@ -1686,6 +1686,14 @@ setup:
   doctor_clean: "✅ Sonst braucht nichts Aufmerksamkeit."
   doctor_rest: "Lohnt sich noch"
   doctor_hint: "./blog.sh doctor sagt das jederzeit wieder, und die Punkte zum Aussehen erledigt ./style.sh."
+  # Der Starter für den Mac: ein Symbol in den Programmen, das das Terminal
+  # im Ordner der Website öffnet und ./blog.sh startet.
+  q_launcher: "Ein Symbol in den Programmen anlegen, das diesen Blog per Doppelklick öffnet?"
+  launcher_made: "✅ Der Starter ist fertig: %{path}"
+  launcher_first_run: "   Beim ersten Doppelklick fragt macOS, ob er das Terminal steuern darf — erlauben, sonst tut das Symbol nichts. Das Terminal lässt sein Fenster danach offen; das Schließen nach sauberem Ende stellt man im Terminal ein (Einstellungen → Profile → Shell). ./setup.sh --launcher legt ihn neu an."
+  launcher_failed: "⚠️  Der Starter konnte nicht angelegt werden: %{error}"
+  launcher_taken: "⚠️  %{path} ist ein Programm, das blog.sh nicht angelegt hat. Es bleibt unangetastet."
+  launcher_mac_only: "Einen Starter kann blog.sh nur auf einem Mac anlegen."
 
 # lib/wizard.rb -- was ./setup.sh und ./style.sh gemeinsam sagen: eine
 # überspringbare Frage, eine Auswahl aus einer Liste, und der Moment am
