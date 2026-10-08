@@ -191,6 +191,13 @@ the post is `.comment.comment--author`. The script tells it by the
 address of the announcement, so it works for a live thread, a moderated
 one and a Bluesky one alike.
 
+**An answer to a comment.** A reply that answers another reply, rather
+than the post, is `.comment.comment--reply`, and `site.css` sets it in by
+the width of a picture (`margin-left`, less below 700px). One step
+whatever the depth: the list is in thread order, so an answer already
+stands under what it answers. To have the thread flat again, set the
+margin to zero.
+
 **The search's count and its matches.** The status over the results is
 `<span class="search-count">4</span> <span class="search-unit">results</span>`,
 so a skin can keep the number and drop the word. In a result's title and

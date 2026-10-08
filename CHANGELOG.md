@@ -143,6 +143,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
   page is rewritten by a new post anyway, and on all of them it would rewrite every page of a tag
   each time a post takes it. A series says it on every page, which costs nothing: its cards
   already count the parts.
+- **A thread reads as a conversation.** A reply to somebody's comment, rather than to the post,
+  is set in under it -- one step, however deep the exchange goes. In a live thread the page
+  reads it off the thread; on a moderated site cron writes `reply: true` into `comments.json`
+  for such a comment, so the indent appears with the next refresh. `comment--reply` for a skin.
 - **The search says why a result is there.** The words that were asked for are marked in a
   result's title and excerpt -- as written, accents and all: "ctyri" marks "Čtyři". Only what
   the card shows is marked; a match deeper in the post marks nothing.

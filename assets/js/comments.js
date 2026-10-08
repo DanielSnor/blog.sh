@@ -162,7 +162,12 @@
       ? comment.html
       : esc(comment.text || '').replace(/\n/g, '<br>');
     return (
-      '<div class="comment' + (byOwner(comment, owner || {}) ? ' comment--author' : '') + '">' +
+      // An answer to another comment rather than to the post is set in under
+      // it -- one step, however deep the exchange goes: the list arrives in
+      // thread order, so an answer already stands under what it answers,
+      // and a staircase of six steps is unreadable on a phone.
+      '<div class="comment' + (byOwner(comment, owner || {}) ? ' comment--author' : '') +
+        (comment.reply ? ' comment--reply' : '') + '">' +
         // 40x40 is what .comment-avatar is in the stylesheet, said here too
         // so the row is its right height before the picture arrives -- a
         // thread of twenty replies used to shuffle downwards as they landed.
@@ -209,7 +214,7 @@
 
   // --- Mastodon (live thread) -------------------------------------------
 
-  function mastodonComment(status) {
+  function mastodonComment(status, rootId) {
     var acct = status.account || {};
     // Attachments live outside the sanitised content, so without this
     // mapping an approved picture reply rendered as just its words. A
@@ -228,7 +233,8 @@
       date: status.created_at,
       favourites: status.favourites_count,
       html: status.content,
-      media: media
+      media: media,
+      reply: status.in_reply_to_id != null && String(status.in_reply_to_id) !== String(rootId)
     };
   }
 
@@ -251,7 +257,7 @@
       .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
       .then(function (ctx) {
         var replies = (ctx.descendants || []).filter(function (s) { return !s.sensitive; });
-        render(container, tootUrl, replyLink, false, replies.map(mastodonComment));
+        render(container, tootUrl, replyLink, false, replies.map(function (s) { return mastodonComment(s, parsed.id); }));
       })
       .catch(function () {
         container.innerHTML = replyLink;
@@ -279,8 +285,9 @@
     return 'https://bsky.app/profile/' + post.author.handle + '/post/' + rkey;
   }
 
-  function blueskyComment(post) {
+  function blueskyComment(post, rootUri) {
     var author = post.author || {};
+    var parent = post.record && post.record.reply && post.record.reply.parent && post.record.reply.parent.uri;
     // The view embed carries the images (thumb + fullsize, alt included);
     // a labelled post keeps them folded away, same instinct as Mastodon's
     // sensitive flag.
@@ -302,7 +309,8 @@
       date: post.record.createdAt,
       favourites: post.likeCount,
       text: post.record.text,
-      media: media
+      media: media,
+      reply: !!parent && parent !== rootUri
     };
   }
 
@@ -314,7 +322,7 @@
       .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
       .then(function (data) {
         var replies = flattenBlueskyReplies(data.thread && data.thread.replies, []);
-        render(container, uri, replyLink, false, replies.map(blueskyComment));
+        render(container, uri, replyLink, false, replies.map(function (p) { return blueskyComment(p, uri); }));
       })
       .catch(function () {
         container.innerHTML = replyLink;

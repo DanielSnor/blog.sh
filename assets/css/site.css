@@ -1601,6 +1601,14 @@ aside .card { margin-bottom: 1.5rem; }
   padding: 0.85rem 0;
 }
 .comment:first-of-type { border-top: none; padding-top: 0; }
+/* An answer to a comment stands in under it by the width of a picture
+   and its gap, so its own picture lines up with the words above. One
+   step and no more, whatever the depth: see renderComment. Less on a
+   phone, where that much would take a fifth of the line. */
+.comment--reply { margin-left: 3.25rem; }
+@media (max-width: 700px) {
+  .comment--reply { margin-left: 1.5rem; }
+}
 
 .comment-avatar {
   width: 40px;

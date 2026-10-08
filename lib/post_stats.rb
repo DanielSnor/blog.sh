@@ -247,7 +247,7 @@ module PostStats
         'reblogs' => status['reblogs_count'].to_i,
         'comments' => shown.size
       },
-      'comments' => shown.map { |s| mastodon_comment(s) }
+      'comments' => shown.map { |s| mastodon_comment(s, root_id: status['id']) }
     }
   end
 
@@ -317,7 +317,14 @@ module PostStats
   # showing readers raw markup. Everything else here is the reply
   # author's to choose, i.e. anyone in the Fediverse, and the client
   # escapes all of it (assets/js/comments.js).
-  def mastodon_comment(status)
+  #
+  # `reply` says the comment answers another comment rather than the post.
+  # The list is flat and in thread order, so that one bit is all a page
+  # needs to set an answer in under what it answers -- and without it a
+  # conversation between two people read as two unrelated remarks. Only
+  # written when true: a thread with no sub-conversation is the list it
+  # always was, byte for byte.
+  def mastodon_comment(status, root_id: nil)
     account = status['account'] || {}
     record = {
       'id' => status['id'].to_s,
@@ -331,6 +338,8 @@ module PostStats
     }
     media = mastodon_comment_media(status)
     record['media'] = media unless media.empty?
+    parent = status['in_reply_to_id'].to_s
+    record['reply'] = true if !root_id.nil? && !parent.empty? && parent != root_id.to_s
     record
   end
 
@@ -413,7 +422,7 @@ module PostStats
         'reblogs' => post['repostCount'].to_i,
         'comments' => shown.size
       },
-      'comments' => shown.map { |p| bluesky_comment(p) }
+      'comments' => shown.map { |p| bluesky_comment(p, root_uri: post['uri']) }
     }
   end
 
@@ -534,7 +543,7 @@ module PostStats
   # the client that escapes it. Keeping the two networks in differently
   # named fields is deliberate -- the field name says how the body may be
   # treated, instead of leaving the client to guess.
-  def bluesky_comment(post)
+  def bluesky_comment(post, root_uri: nil)
     author = post['author'] || {}
     handle = author['handle'].to_s
     rkey = post['uri'].to_s.split('/').last
@@ -551,6 +560,8 @@ module PostStats
     }
     media = bluesky_comment_media(post, url)
     record['media'] = media unless media.empty?
+    parent = post.dig('record', 'reply', 'parent', 'uri').to_s
+    record['reply'] = true if !root_uri.nil? && !parent.empty? && parent != root_uri.to_s
     record
   end
 
