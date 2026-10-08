@@ -2764,9 +2764,26 @@ def queue_entries
   end.sort_by { |entry| entry[:time] }
 end
 
+# Whether anything has ever run the queue on this installation: the
+# heartbeat publish-scheduled.sh leaves each time it is run (doctor reads
+# the same file). A blog nobody has given a cron line has none.
+def scheduler_ran?
+  !Publishing.scheduler_last_run.nil?
+end
+
+# What is said about a post whose time has passed. Where a scheduler runs,
+# the post is the scheduler's and the advice is to wait for it. Where
+# nothing ever has, "wait for the cron" is advice to wait for something
+# that will not come -- a blog set up to try things out has no cron, and
+# its overdue post sat in the queue telling its author exactly that
+# (Pavel, 8. 10. 2026). There the sentence says so and says what to do.
+def queue_overdue_refusal
+  t(scheduler_ran? ? 'cli.queue_swap_overdue' : 'cli.queue_swap_overdue_no_scheduler')
+end
+
 def queue_row(entry, index)
   time = entry[:time].getlocal.strftime(t('date_time_format'))
-  overdue = entry[:time] <= Time.now ? "  #{t('cli.queue_overdue')}" : ''
+  overdue = entry[:time] <= Time.now ? "  #{t(scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler')}" : ''
   format('%2d.  %s  %s%s', index + 1, time, entry[:slug], overdue)
 end
 
@@ -2940,7 +2957,7 @@ def cmd_queue_screen
       # because only the write has a line to say.
       first_future = entries.index { |entry| entry[:time] > Time.now }
       if first_future.nil? || selected < first_future
-        status = t('cli.queue_swap_overdue')
+        status = queue_overdue_refusal
       else
         target = queue_carry_screen(entries, selected, first_future, screen)
         if target && target != selected
@@ -3505,7 +3522,7 @@ end
 def queue_carry(entries, index)
   first_future = entries.index { |entry| entry[:time] > Time.now }
   if first_future.nil? || index < first_future
-    puts t('cli.queue_swap_overdue')
+    puts queue_overdue_refusal
     puts
     return false
   end
@@ -3610,7 +3627,7 @@ def queue_swap(entries, index, other_index)
 
   entry, other = entries[index], entries[other_index]
   if entry[:time] <= Time.now || other[:time] <= Time.now
-    puts t('cli.queue_swap_overdue')
+    puts queue_overdue_refusal
     puts
     return false
   end
@@ -6843,12 +6860,12 @@ def queue_move_as_json(which, slug, to)
         target = Integer(to.to_s, exception: false)
         refuse('bad_position', t('cli.queue_bad_position', count: entries.size)) unless target&.between?(1, entries.size)
         target -= 1
-        refuse('overdue', t('cli.queue_swap_overdue')) if overdue.call(index) || overdue.call(target)
+        refuse('overdue', queue_overdue_refusal) if overdue.call(index) || overdue.call(target)
         target == index ? true : queue_carry_apply(entries, index, target)
       end
     end
     refuse('not_moved', warnings.join(' ')) unless moved
-    { 'ok' => true, 'queue' => queue_rows, 'warnings' => warnings }
+    { 'ok' => true, 'queue' => queue_rows, 'scheduler' => queue_scheduler, 'warnings' => warnings }
   end
 end
 
@@ -6860,8 +6877,17 @@ def queue_rows
   end
 end
 
+# Who publishes the queue, for a program that shows it: when something
+# last ran it, or null where nothing ever has. A row can say `overdue`,
+# and only this says whether waiting will help -- with null the reader
+# offers to publish the post now instead of showing a clock.
+def queue_scheduler
+  last = Publishing.scheduler_last_run
+  { 'last_run' => last && last.iso8601 }
+end
+
 def queue_as_json
-  puts JSON.pretty_generate('ok' => true, 'queue' => queue_rows)
+  puts JSON.pretty_generate('ok' => true, 'queue' => queue_rows, 'scheduler' => queue_scheduler)
 end
 
 # How much of a post's text `match` carries: the terminal cuts the same

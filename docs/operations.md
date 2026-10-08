@@ -1100,7 +1100,7 @@ Three rules follow from "nobody is at the keyboard":
 | `props <slug> --rename <slug> --yes --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable` |
 | `props <slug> --versions --json` | `versions`: name, date, label, newest first | -- |
 | `props <slug> --restore-version <name> --yes --json` | the screen after the restore, the preview rebuilt | `version_unknown`, `version_unreadable` |
-| `queue --json` | `queue`: position, date, slug, year, title, overdue | -- |
+| `queue --json` | `queue`: position, date, slug, year, title, overdue; `scheduler`: `last_run`, when something last ran the queue, null where nothing ever has | -- |
 | `queue --up <slug> --json`, `--down <slug>`, `--move <slug> --to <n>` | the queue afterwards, `warnings`; nothing is rebuilt -- the screen rebuilds once on the way out, a program calls `rebuild --json` when it is done | `not_scheduled`, `ambiguous_slug`, `not_moved` (first, last, or its time has passed), `bad_position`, `overdue` |
 | `toot <slug> [--force] --json`, `bluesky <slug> [--force] --json` | `url`, `recovered` (Bluesky found the announcement on the account instead of sending one) | `wrong_network`, `no_network`, `still_draft`, `already_announced`, `unlisted`, `outside_window` (unless `--force`), `failed`, `not_sent` |
 | `drafts --json [<slug>]` | the drafts with their text, as the phone opens them | `not_found` |
@@ -1139,6 +1139,16 @@ reaches the engine over the SSH the server already has, on a key of its
 own with a forced command, the way the phone's shortcut does:
 
     restrict,command="/path/to/blog/scripts/remote.sh" ssh-ed25519 AAAA... app
+
+A request may also say which language its reader reads, `{"args":
+["doctor"], "lang": "cs"}`. A blog speaks its own language, and an app in
+Czech showing an English blog's diagnosis would show English; with
+`lang`, `check` and `doctor` -- the two answers that are sentences for a
+person, and that build nothing -- are said in that language, if the
+engine ships it. Every other command answers in the blog's language as
+before, because a command that may rebuild the site must not be handed
+another one. A language the engine does not have is not an error: the
+answer is then in the blog's own.
 
 `scripts/remote.sh` allows two words as the SSH command and nothing
 else. **`run`** runs one engine command: its argv arrives on standard
@@ -1205,8 +1215,13 @@ not there is a second way beside it:
 ```bash
 ./blog.sh pair                    # shows a code and waits for the app
 ./blog.sh pair --list             # the devices let in this way
-./blog.sh pair --revoke <name>    # takes one out (a name, or a fingerprint from --list)
+./blog.sh pair --revoke 2         # takes one out: its number, name or fingerprint from --list
 ```
+
+`--list` numbers the devices, and `--revoke` takes that number, the
+device's name (quotes or no quotes: `--revoke motorola edge 70 fusion`)
+or its fingerprint. With nothing after it, somebody at a terminal is
+asked which one, and nothing goes without a yes.
 
 `pair` draws a QR code in the terminal (and prints the same thing as a
 line of text, for an app with no camera to point). The app reads it and
@@ -1245,15 +1260,19 @@ and `doctor` mentions one that is left.
 It needs the blog and the SSH server in the same account: a plain
 server, or a Mac with Remote Login turned on. `pair` checks that SSH
 answers before it makes a code, and asks for the one thing it cannot
-know -- the address this machine has from where the phone is (`--host`
-and `--port` say it without being asked; `--no-wait` prints the code and
-leaves). Where the blog lives in a container the keys are the host's and
+know -- the address this machine has from where the phone is. What it
+offers is the machine's number on its network, which a phone on the same
+network can always use; a name works where the phone can look it up
+(`--host` and `--port` say it without being asked; `--no-wait` prints
+the code and leaves). Where the blog lives in a container the keys are the host's and
 `pair` cannot reach them; that setup is written by hand, as above.
 `BLOG_SH_AUTHORIZED_KEYS` names the file for an account whose sshd reads
 another one.
 
 For whoever writes an app: the code is a link,
-`blogsh://pair?v=1&h=<host>&p=<port>&u=<user>&k=<key>&f=<prints>&n=<site>`.
+`blogsh://pair?v=1&h=<host>&p=<port>&u=<user>&k=<key>&f=<prints>&n=<site>`,
+its values written as a web form writes them -- a space in the site's
+name is a `+`, and a `+` would be `%2B`.
 `k` is the 32 bytes of an ed25519 private key in URL-safe base64 with no
 padding; `f` is the SHA-256 fingerprints of the server's host keys in
 the same alphabet, joined by dots, and may be absent. Connect with that
@@ -1357,6 +1376,10 @@ move.
 `./blog.sh queue --json` prints the queue as data instead -- one row per
 scheduled post in publish order, with its position, time, slug, year,
 title and whether its time has already passed -- and acts on nothing.
+Beside the rows it says when something last ran the queue
+(`scheduler.last_run`), or null where nothing ever has: on such a blog a
+post past its time is nobody's to wait for, and both the screen and the
+refusal say so and point at `./blog.sh publish <slug>`.
 
 ## Attachments and the document type
 

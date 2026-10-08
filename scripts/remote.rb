@@ -116,7 +116,24 @@ def read_request
   args = request['args']
   refuse('bad_args', 'Every argument has to be a string.') unless args.all? { |a| a.is_a?(String) }
   refuse('bad_args', 'The first argument is the command.') if args.empty?
-  args
+  [args, spoken(request['lang'])]
+end
+
+# The language the caller reads: `"lang": "cs"` beside the args. The blog
+# speaks its own language, and an app in Czech showing an English blog's
+# diagnosis shows English -- reported twice by the first person to try it
+# (Pavel, 8. 10. 2026). Where the answer is sentences for a person and
+# nothing is built -- `check` and `doctor` -- the engine says them in the
+# language asked for, if it has one by that name.
+#
+# Only a language the engine ships a locale for, and by its exact name:
+# anything else -- missing, not a string, a path, a language nobody
+# translated -- is the blog's own language, as before. Never a refusal:
+# an app that sends its locale must not be turned away for being Finnish.
+def spoken(lang)
+  return nil unless lang.is_a?(String) && lang.match?(/\A[a-z]{2,3}\z/)
+
+  File.file?(File.join(ROOT, 'locales', "#{lang}.yml")) ? lang : nil
 end
 
 def clean?(value)
@@ -195,11 +212,14 @@ end
 
 deliver if ARGV.first == '--deliver'
 
-args = check(read_request)
+args, speak = read_request
+args = check(args)
 
 engine = File.join(ROOT, 'blog.sh')
+# BLOG_SH_SPEAK is named or UNSET, never inherited: what the forced
+# command's own environment says is not what this caller asked for.
 out, err, status = begin
-  Open3.capture3({ 'BLOG_SH_REMOTE' => '1' }, [engine, 'blog.sh'], *args, chdir: ROOT, stdin_data: '')
+  Open3.capture3({ 'BLOG_SH_REMOTE' => '1', 'BLOG_SH_SPEAK' => speak }, [engine, 'blog.sh'], *args, chdir: ROOT, stdin_data: '')
 rescue SystemCallError => e
   refuse('engine_failed', "Could not run the engine: #{e.message}")
 end

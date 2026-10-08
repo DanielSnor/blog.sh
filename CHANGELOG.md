@@ -115,9 +115,19 @@ goes in is still being decided; the suffix and the date both come off at the tag
   of the server's own keys, and a key good for one thing, once, for ten minutes: handing in the
   public half of a key the app made itself, which the engine then writes a line for, held to
   `scripts/remote.sh`. `pair --list` and `pair --revoke` show and remove the devices let in this
-  way. The engine writes only `restrict,command=` lines of its own, touches no line it did not
+  way: `--list` numbers them, and `--revoke` takes that number, the name or the fingerprint, or asks.
+  The engine writes only `restrict,command=` lines of its own, touches no line it did not
   write, and keeps the file as it was beside it. For a blog and an SSH server in one account; a
   container still wants its line written by hand. `doctor` mentions a code's line left behind.
+- **A program may say which language it reads.** `"lang": "cs"` beside `args` in a request to
+  `scripts/remote.sh`: `check` and `doctor` then say their findings in that language where the
+  engine ships it, instead of in the blog's. An app in Czech showed an English blog's diagnosis in
+  English. Only those two -- they build nothing -- and a language the engine does not have is the
+  blog's own, never a refusal.
+- **The queue says whether anything publishes it.** `queue --json` carries `scheduler.last_run`,
+  null on a blog nothing has ever run the queue on. There, a post past its time no longer says
+  "wait for the cron": it says nothing publishes the queue here and to publish the post with
+  `./blog.sh publish <slug>`. Nothing is published by looking -- publishing announces.
 - **A launcher on a Mac.** `./setup.sh` ends by offering an icon in Applications, named after the
   site and wearing its favicon, that opens Terminal in the site's folder and runs `./blog.sh` --
   for the author to whom "open Terminal and type" is three things to get wrong. Built from what

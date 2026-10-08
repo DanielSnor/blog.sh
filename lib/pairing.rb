@@ -221,19 +221,40 @@ module Pairing
 
   # Over SSH the session says which address and port it came in on, and
   # that is an address this machine demonstrably answers at. At the
-  # machine's own keyboard there is no such witness: its name on the local
-  # network is the best that can be offered, and whoever runs this is asked.
+  # machine's own keyboard there is no such witness, and what is offered
+  # is the machine's NUMBER on the network it is on: a phone on the same
+  # network always finds a number, and usually does not find a name -- a
+  # bare host name is known to this machine and to nobody else, which is
+  # what the first person to try this was offered and could not use
+  # (Pavel, 8. 10. 2026). The name is the fallback for a machine with no
+  # network to have a number on.
   def guess_address
     server = ENV['SSH_CONNECTION'].to_s.split
     return [server[2], server[3].to_i] if server.size == 4
 
-    local, status = begin
-      Open3.capture2e('scutil', '--get', 'LocalHostName')
-    rescue SystemCallError
-      ['', nil]
+    [lan_address || Socket.gethostname, 22]
+  end
+
+  # The address of the interface this machine reaches the rest of the
+  # world through. Asked of the system by pointing a datagram socket at an
+  # address nothing lives at (192.0.2.1 is reserved for documentation):
+  # nothing is sent, the system only decides which interface it WOULD use
+  # -- which on a machine with a VPN, a container bridge and a cable is
+  # the question worth asking, and a list of addresses does not answer it.
+  def lan_address
+    address = UDPSocket.open do |socket|
+      socket.connect('192.0.2.1', 9)
+      socket.addr.last
     end
-    name = status&.success? && !local.strip.empty? ? "#{local.strip}.local" : Socket.gethostname
-    [name, 22]
+    address.to_s.start_with?('127.') || address.to_s.empty? ? first_address : address
+  rescue SystemCallError, SocketError
+    first_address
+  end
+
+  def first_address
+    Socket.ip_address_list.find { |a| a.ipv4? && !a.ipv4_loopback? }&.ip_address
+  rescue SystemCallError, SocketError
+    nil
   end
 
   # The account this runs in, asked of the system: it is the account whose

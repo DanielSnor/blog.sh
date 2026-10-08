@@ -31,7 +31,14 @@ site_yml = File.join(ROOT, 'config', 'site.yml')
 lang = ConfigLang.of(site_yml)
 
 require_relative '../lib/i18n'
-I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)
+# The language this is SAID in: the blog's own, unless whoever asks reads
+# another one and said so (scripts/remote.rb hands an app's language over
+# in BLOG_SH_SPEAK). Safe here and only here: this script reports, it
+# builds nothing, so the language of its sentences is nobody's but the
+# reader's -- the pages of the site are written by the build, in theirs.
+spoken = ENV['BLOG_SH_SPEAK'].to_s
+spoken = '' unless spoken.match?(/\A[a-z]{2,3}\z/) && File.file?(File.join(ROOT, 'locales', "#{spoken}.yml"))
+I18n.force_lang(spoken.empty? ? (lang.to_s.empty? ? 'en' : lang.to_s) : spoken)
 
 require_relative '../lib/tui'
 require_relative '../lib/site_header'

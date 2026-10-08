@@ -5,7 +5,9 @@
 #
 #   ./blog.sh pair                    shows a code and waits for the app
 #   ./blog.sh pair --list             the devices let in this way
-#   ./blog.sh pair --revoke <name>    takes one out (a name or a fingerprint)
+#   ./blog.sh pair --revoke [<device>]  takes one out: its number, name or
+#                                     fingerprint from --list -- or, with
+#                                     nothing said, the one it asks about
 #
 #   --host <address> --port <n>       where the app is to connect, when the
 #                                     guess is wrong or nobody is there to ask
@@ -45,17 +47,29 @@ def value_of(flag)
   at && ARGV[at + 1]
 end
 
+# The words after --revoke, up to the next switch: a device is called
+# "motorola edge 70 fusion", and somebody who types that after --revoke
+# has said which device they mean -- with or without quotes around it.
+def revoke_words
+  at = ARGV.index('--revoke')
+  at ? ARGV.drop(at + 1).take_while { |word| !word.start_with?('--') } : []
+end
+
 KNOWN = %w[--list --revoke --host --port --no-wait].freeze
-with_value = %w[--revoke --host --port]
+with_value = %w[--host --port]
 skip = false
-unknown = ARGV.reject do |arg|
+named = revoke_words.size
+unknown = ARGV.each_with_index.reject do |arg, i|
   if skip
     skip = false
     next true
   end
+  at = ARGV.index('--revoke')
+  next true if at && i > at && i <= at + named
+
   skip = with_value.include?(arg)
   KNOWN.include?(arg)
-end
+end.map(&:first)
 abort t('unknown_option', option: unknown.join(' ')) unless unknown.empty?
 with_value.each { |flag| abort t('needs_value', option: flag) if ARGV.include?(flag) && value_of(flag).to_s.empty? }
 
@@ -88,15 +102,50 @@ if ARGV.include?('--list')
     puts t('list_none')
   else
     puts t('list_head')
-    devices.each { |device| puts t('list_row', name: device['name'], fingerprint: device['fingerprint']) }
+    devices.each_with_index do |device, i|
+      puts t('list_row', number: i + 1, name: device['name'], fingerprint: device['fingerprint'])
+    end
   end
   exit 0
 end
 
+# Which device --revoke means. Said outright it is a name (every device
+# of that name goes), a number from --list, or a fingerprint. Said by
+# nobody, somebody at a terminal is asked: about the only device where
+# there is one, by number where there are several -- and nothing is taken
+# out without a yes, because the next thing that device does is fail.
+def device_to_revoke(devices)
+  said = revoke_words.join(' ').strip
+  unless said.empty?
+    return said if devices.any? { |device| device['name'] == said }
+
+    numbered = said.match?(/\A\d+\z/) ? devices[said.to_i - 1] : nil
+    return numbered['fingerprint'] if numbered && said.to_i.positive?
+
+    return said
+  end
+  abort t('revoke_needs_device') unless Tui.interactive?
+  abort t('list_none') if devices.empty?
+
+  chosen = devices.first
+  if devices.size > 1
+    puts t('list_head')
+    devices.each_with_index { |device, i| puts t('list_row', number: i + 1, name: device['name'], fingerprint: device['fingerprint']) }
+    print t('q_revoke_which', count: devices.size)
+    number = $stdin.gets.to_s.strip
+    chosen = number.match?(/\A\d+\z/) && number.to_i.positive? ? devices[number.to_i - 1] : nil
+    abort t('revoke_none', which: number) unless chosen
+  end
+  print t('q_revoke', device: chosen['name'])
+  exit 0 unless Tui.yes?($stdin.gets)
+
+  chosen['fingerprint']
+end
+
 if ARGV.include?('--revoke')
-  which = value_of('--revoke')
+  which = device_to_revoke(Pairing.devices(root: ROOT))
   gone = keys_guarded { Pairing.revoke(root: ROOT, which: which) }
-  abort t('revoke_none', which: which) if gone.empty?
+  abort t('revoke_none', which: revoke_words.join(' ')) if gone.empty?
 
   gone.each { |device| puts t('revoked', device: device) }
   exit 0
