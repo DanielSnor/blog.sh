@@ -189,6 +189,7 @@ module Doctor
     findings.concat(of(:social_icons, check_social_icons(data)))
     findings.concat(of(:share, check_share(data)))
     findings.concat(of(:trash, check_trash(root)))
+    findings.concat(of(:pairing, check_pairing(root)))
     findings.concat(of(:deploy, check_deploy(root)))
     findings.concat(of(:deploy_keep, check_deploy_keep(data)))
     findings.concat(of(:online, check_online(data, root))) if online
@@ -1291,6 +1292,25 @@ module Doctor
   # for years on the installation this engine was built around and the only
   # way to see that was `du` on the server. A note here is how somebody
   # remembers the command exists.
+  # A pairing code that nobody used leaves its line in authorized_keys
+  # when the terminal that showed it was closed rather than left to finish.
+  # sshd has refused that key since its minute passed, so nothing is open
+  # -- but it is a line in the file that decides who may log in, and
+  # somebody reading that file should not have to work out what it is.
+  # Silent when there is none, and when the file cannot be read at all:
+  # an account with no authorized_keys has no leftovers in it.
+  def check_pairing(root)
+    require_relative 'pairing'
+    count = begin
+      Pairing.leftovers(root: root)
+    rescue SystemCallError, ArgumentError
+      0
+    end
+    return [] if count.zero?
+
+    [warn(I18n.t('doctor.pairing_leftover', count: count, path: Pairing.keys_file), I18n.t('doctor.pairing_leftover_fix'))]
+  end
+
   def check_trash(root)
     dir = File.join(root, 'trash')
     return [] unless Dir.exist?(dir)

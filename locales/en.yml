@@ -737,6 +737,8 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      reads the configuration and says what is wrong with it
+      ./blog.sh pair [--list] [--revoke <device>]
+                                     shows a code an app on a phone connects with
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      walks the archive and says what is broken in it;
                                      --json prints every finding as data, uncapped;
@@ -1156,7 +1158,36 @@ import:
 # wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on
 # its own: it is read by someone who does not know which file the setting
 # lives in, let alone which key.
+# ./blog.sh pair: the code that lets an app in (lib/pairing.rb).
+pair:
+  intro: "This code lets an app into the blog %{site}. It is good until %{time} and for one use."
+  how: "In the app choose \"Add a blog\" → \"Scan a code\" and point the camera here:"
+  as_text: "With nothing to scan with, paste it into the app as text:"
+  waiting: "Waiting for the app… (Ctrl-C cancels the code)"
+  paired: "✅ Connected: %{device}"
+  paired_note: "   The code opens nothing any more. ./blog.sh pair --list shows the devices and ./blog.sh pair --revoke takes one out."
+  expired: "The code ran out and nobody used it. Nothing has changed."
+  cancelled: "Cancelled. The code is no longer good."
+  q_address: "The address this machine has from where the phone is [%{address}]: "
+  bad_address: "❌ \"%{address}\" is not an address to connect to: a name or a number, with no spaces."
+  no_sshd: "❌ Nothing answers SSH on port %{port} here, so the app would have nowhere to connect."
+  no_sshd_mac: "   Turn it on in System Settings → General → Sharing → Remote Login and run ./blog.sh pair again."
+  no_sshd_other: "   Start sshd on this machine (or name its port with --port), or set the app up by hand as docs/operations.md describes."
+  container: "   The blog runs in a container: the keys for logging in are the host's, not the container's. Set the app up by hand as docs/operations.md describes."
+  no_keygen: "❌ ssh-keygen is missing; a code cannot be made without it."
+  small_window: "The window is too small for the code (it wants at least %{cols} × %{rows} characters). Make it larger and run ./blog.sh pair again, or use the code as text."
+  list_none: "No device has been let into this blog by a code."
+  list_head: "Devices let in by a code:"
+  list_row: "  %{name}   SHA256:%{fingerprint}"
+  revoked: "✅ Removed: %{device}"
+  revoke_none: "❌ There is no device called \"%{which}\" here. ./blog.sh pair --list shows which there are."
+  write_failed: "❌ %{path} could not be written: %{error}"
+  unknown_option: "pair does not know %{option} -- it takes --list, --revoke <device>, --host <address>, --port <number> and --no-wait."
+  needs_value: "%{option} wants a value."
+
 doctor:
+  pairing_leftover: "%{path} still holds a line from a pairing code that ran out (%{count}). It opens nothing: SSH has refused that key since."
+  pairing_leftover_fix: "./blog.sh pair --list tidies it away."
   json_and_strip: "❌ --json and --strip-location cannot run together: --json is a document about the installation as it stands, --strip-location rewrites photographs. Run them one at a time."
   tag_icons_ok: "Tag icons: %{count}, all of them drawable."
   tag_icon_stripped: "The `icon_svg` of the tag \"%{tag}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from, and whoever wrote it should say whether that source is worth trusting."

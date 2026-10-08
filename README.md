@@ -139,6 +139,7 @@ scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers
                            refresh-sidebar.sh cron: refreshes only the sidebar widgets (no site rebuild)
                            publish-scheduled.sh cron: publishes whatever the queue has come due
                            receive.sh         takes a whole post over one SSH connection into incoming/
+                           pair.rb            ./blog.sh pair: lets an app in by a code it reads (enroll.sh takes its key)
                            migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
 lib/import/              Import adapters plus the layer they share (media, run, CLI)
@@ -280,6 +281,9 @@ says what you are running.
                                # --online also asks the feeds, the analytics script, the access
                                # token and the deploy target -- whether it answers, what is in its root;
                                # --json prints the findings as data instead of a screenful
+./blog.sh pair [--list] [--revoke <device>]
+                               # shows a code an app reads to connect, with no key or address typed;
+                               # --list names the devices let in this way, --revoke takes one out
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
 ./blog.sh check [--online] [--json] [--repair] [--languages]

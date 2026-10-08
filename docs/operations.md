@@ -1197,6 +1197,73 @@ Hand it over as the script's argument, which it takes the same way:
 command without a password. The app writes this line too, from the
 blog's place and the command it is reached through.
 
+### Letting an app in by a code
+
+Writing that line by hand stays what it is, and for whoever would rather
+not there is a second way beside it:
+
+```bash
+./blog.sh pair                    # shows a code and waits for the app
+./blog.sh pair --list             # the devices let in this way
+./blog.sh pair --revoke <name>    # takes one out (a name, or a fingerprint from --list)
+```
+
+`pair` draws a QR code in the terminal (and prints the same thing as a
+line of text, for an app with no camera to point). The app reads it and
+is connected; nobody types an address, a user name or a key. What the
+code holds is where to connect -- the address, the port, the account --
+the fingerprints of this server's own SSH keys, so the app knows it
+reached this machine, and a key that is good for **one thing, once, for
+ten minutes**: handing in the public half of a key the app made itself.
+The engine then replaces the code's line in `~/.ssh/authorized_keys`
+with an ordinary one for the app's key, held to `scripts/remote.sh` like
+a line written by hand. The key the app lives on never leaves the
+device, and the one that was on the screen opens nothing once it has
+been used.
+
+What `pair` does to `authorized_keys`, since that is the file that
+decides who may log in:
+
+- It writes only lines that begin `restrict,command=` and name a script
+  of this installation. What an app hands in is taken only if it is
+  exactly one ed25519 public key.
+- It touches only lines it wrote itself, known by the comment that ends
+  them (`blog.sh:<device>`, and `blog.sh-pair:<id>` while a code waits)
+  together with this installation's path. Every other line -- a key of
+  your own, another blog's devices -- is written back as it was.
+- The file as it was before each change is kept beside it as
+  `authorized_keys.blog-sh.bak`.
+
+The ten minutes are kept by the engine: the code's key can do nothing
+but ask it, and it refuses a key that arrives late. The code's line also
+carries sshd's own `expiry-time` as a second lock; that one is coarse
+(sshd reads it to the minute, and in summer time an hour late), so a
+line nobody came for may sit in the file that much longer before sshd
+itself refuses it. The next `./blog.sh pair`, of any kind, removes it,
+and `doctor` mentions one that is left.
+
+It needs the blog and the SSH server in the same account: a plain
+server, or a Mac with Remote Login turned on. `pair` checks that SSH
+answers before it makes a code, and asks for the one thing it cannot
+know -- the address this machine has from where the phone is (`--host`
+and `--port` say it without being asked; `--no-wait` prints the code and
+leaves). Where the blog lives in a container the keys are the host's and
+`pair` cannot reach them; that setup is written by hand, as above.
+`BLOG_SH_AUTHORIZED_KEYS` names the file for an account whose sshd reads
+another one.
+
+For whoever writes an app: the code is a link,
+`blogsh://pair?v=1&h=<host>&p=<port>&u=<user>&k=<key>&f=<prints>&n=<site>`.
+`k` is the 32 bytes of an ed25519 private key in URL-safe base64 with no
+padding; `f` is the SHA-256 fingerprints of the server's host keys in
+the same alphabet, joined by dots, and may be absent. Connect with that
+key, refuse a server whose key is not among the fingerprints, ask for
+the command `enroll` and write one line of JSON, `{"key": "ssh-ed25519
+AAAA...", "name": "the device's name"}`. The answer is one object:
+`{"ok": true, "device": "..."}`, or `ok: false` with `error` one of
+`expired`, `used`, `unknown_code`, `bad_key`, `bad_request`. From then
+on the app's own key works as any app's does.
+
 ## Pinning a post to the front page
 
 The `[c]` action in `./blog.sh props <slug>` pins a published post --

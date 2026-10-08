@@ -108,6 +108,16 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `base:` required so a change made elsewhere in the meantime is refused rather than overwritten.
   The app on a phone is a desk now. `translate <slug> --lang <code> --json` hands a language's text
   out the same way, and a file saying `lang:` beside `edits:` and `base:` brings it back.
+- **`./blog.sh pair`: an app is let in by reading a code.** Reaching the engine from an app has
+  meant copying the app's key out and writing a line into `~/.ssh/authorized_keys` by hand; that
+  stays, and beside it `pair` draws a QR code in the terminal that an app reads and is connected --
+  no address, user name or key typed anywhere. The code holds where to connect, the fingerprints
+  of the server's own keys, and a key good for one thing, once, for ten minutes: handing in the
+  public half of a key the app made itself, which the engine then writes a line for, held to
+  `scripts/remote.sh`. `pair --list` and `pair --revoke` show and remove the devices let in this
+  way. The engine writes only `restrict,command=` lines of its own, touches no line it did not
+  write, and keeps the file as it was beside it. For a blog and an SSH server in one account; a
+  container still wants its line written by hand. `doctor` mentions a code's line left behind.
 - **A launcher on a Mac.** `./setup.sh` ends by offering an icon in Applications, named after the
   site and wearing its favicon, that opens Terminal in the site's folder and runs `./blog.sh` --
   for the author to whom "open Terminal and type" is three things to get wrong. Built from what

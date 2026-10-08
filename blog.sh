@@ -14,6 +14,7 @@
 #   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
 #   ./blog.sh doctor [--online] [--strip-location]
+#   ./blog.sh pair [--list] [--revoke <device>]
 #   ./blog.sh check [--online] [--json] [--repair]
 #   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
 #   ./blog.sh stats [--json]
@@ -97,6 +98,13 @@ case "${1:-}" in
   export)
     shift
     exec ruby scripts/export.rb "$@"
+    ;;
+  # A code for an app to read (lib/pairing.rb). No env.sh: it asks nothing
+  # of the network or of a deploy target, and it has to work on an
+  # installation that has not got that far.
+  pair)
+    shift
+    exec ruby scripts/pair.rb "$@"
     ;;
   # Counts the archive on disk, so it needs no env.sh either -- and it is
   # the command most likely to be piped somewhere (--json), which is

@@ -716,6 +716,8 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
+      ./blog.sh pair [--list] [--revoke <zařízení>]
+                                     ukáže kód, kterým se připojí aplikace v telefonu
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      projde archiv a řekne, co je v něm rozbité;
                                      --json vypíše všechny nálezy jako data, bez stropu;
@@ -1126,7 +1128,36 @@ import:
 # špatně (lib/doctor.rb). Každý řádek s radou musí dávat smysl sám o sobě:
 # čte ho někdo, kdo neví, ve kterém souboru to nastavení bydlí, natož pod
 # kterým klíčem.
+# ./blog.sh pair: kód, který pustí aplikaci k blogu (lib/pairing.rb).
+pair:
+  intro: "Tenhle kód pustí aplikaci k blogu %{site}. Platí do %{time} a jde použít jednou."
+  how: "V aplikaci zvol „Přidat blog“ → „Naskenovat kód“ a namiř foťák sem:"
+  as_text: "Kdo nemá čím skenovat, vloží ho do aplikace jako text:"
+  waiting: "Čekám na aplikaci… (Ctrl-C kód zruší)"
+  paired: "✅ Připojeno: %{device}"
+  paired_note: "   Kód už nic neotevírá. Zařízení vypíše ./blog.sh pair --list a odebere ./blog.sh pair --revoke."
+  expired: "Kód vypršel a nikdo ho nepoužil. Nic se nezměnilo."
+  cancelled: "Zrušeno. Kód už neplatí."
+  q_address: "Adresa, na které je tenhle počítač vidět z telefonu [%{address}]: "
+  bad_address: "❌ „%{address}“ není adresa, na kterou se dá připojit: čekám jméno nebo číslo bez mezer."
+  no_sshd: "❌ Na portu %{port} tady neodpovídá SSH, takže by se aplikace neměla kam připojit."
+  no_sshd_mac: "   Zapni ho v Nastavení systému → Obecné → Sdílení → Vzdálené přihlášení a pusť ./blog.sh pair znovu."
+  no_sshd_other: "   Spusť na tomhle stroji sshd (nebo řekni port přes --port), případně aplikaci nastav ručně podle docs/operations.md."
+  container: "   Blog běží v kontejneru: klíče pro přihlášení drží hostitel, ne kontejner. Aplikaci nastav ručně podle docs/operations.md."
+  no_keygen: "❌ Chybí ssh-keygen; bez něj kód nevyrobím."
+  small_window: "Okno je na kód malé (potřebuje šířku %{cols} a výšku %{rows}). Zvětši ho a pusť ./blog.sh pair znovu, nebo použij kód jako text."
+  list_none: "K tomuhle blogu není kódem připojené žádné zařízení."
+  list_head: "Zařízení připojená kódem:"
+  list_row: "  %{name}   SHA256:%{fingerprint}"
+  revoked: "✅ Odebráno: %{device}"
+  revoke_none: "❌ Zařízení „%{which}“ tu není. ./blog.sh pair --list vypíše, která jsou."
+  write_failed: "❌ %{path} se nepodařilo zapsat: %{error}"
+  unknown_option: "pair nezná %{option} -- bere --list, --revoke <zařízení>, --host <adresa>, --port <číslo> a --no-wait."
+  needs_value: "%{option} chce hodnotu."
+
 doctor:
+  pairing_leftover: "V %{path} zůstal řádek po párovacím kódu, který vypršel (počet: %{count}). Nic neotevírá, SSH ten klíč už odmítá."
+  pairing_leftover_fix: "./blog.sh pair --list ho uklidí."
   json_and_strip: "❌ --json a --strip-location naráz nejdou: --json je popis instalace, jak vypadá teď, kdežto --strip-location přepisuje fotky. Pusť je po jednom."
   tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."
   tag_icon_stripped: "`icon_svg` štítku „%{tag}“ nese něco, co engine před vykreslením odstraní — skript, styl, obsluhu události nebo adresu javascript:. Stránky jsou v pořádku; ikona ale není tím, odkud byla zkopírovaná, a jestli tomu zdroji věřit, rozhodne jen ten, kdo ji vkládal."
