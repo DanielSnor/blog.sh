@@ -2009,8 +2009,9 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   max-height: 22rem;
 }
 
-/* The index of series at /series/. A line each -- name, parts, years --
-   under a rule, the way the archive map rules its years: there are a
+/* The index of series (build_blog.rb, SERIES_PAGES). A line each -- name,
+   parts, years -- under a rule, the way the archive map rules its years:
+   there are a
    handful of these on a site where there are hundreds of tags, and each
    is a thing to open rather than a word to scan for. */
 .series-index { list-style: none; margin: 0; padding: 0; }
