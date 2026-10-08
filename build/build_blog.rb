@@ -212,6 +212,19 @@ SITE_TITLE = SiteConfig.fetch('site', 'title')
 SITE_SHORT_NAME = SiteConfig.fetch('site', 'short_name')
 SITE_DESCRIPTION = SiteConfig.fetch('site', 'description')
 SITE_AUTHOR = SiteConfig.fetch('site', 'author')
+# The author's name as a name. `site.author` is the name as the site's own
+# sentences need it, and in a language that inflects names that is not the
+# name: a Czech site says "na osobním webu Daniela Šnora", so `author` is
+# written in the genitive -- and then stood, in the genitive, alone under a
+# hero title, in the structured data as the Person's name, and in English
+# on that site's /en/ pages ("on Daniela Šnora's personal site").
+# `site.author_name` is the form that stands alone. Optional: without it
+# `author` is the name everywhere, as it always was, so a site that never
+# heard of this key builds exactly what it built.
+SITE_AUTHOR_NAME = begin
+  own = SiteConfig.get('site', 'author_name', default: nil).to_s.strip
+  own.empty? ? SITE_AUTHOR : own
+end
 # Stylesheets loaded after the site's own, so a skin can live in a file of
 # the site's own rather than in an edited template. Local paths only, and
 # the refusal is loud: every page carries style-src 'self', so a
@@ -3302,7 +3315,10 @@ end
 # widgets would be a second copy of the site chrome to keep in sync for a
 # page whose entire job is to leave. noindex keeps it out of search
 # results in favour of the canonical target.
-def redirect_stub_html(post)
+# `to:` and `lang:` are for an address that belonged to one language's text
+# (Translations.former_slugs): the stub then leads to that language's page
+# and says so in that language's title, wherever it stands.
+def redirect_stub_html(post, to: nil, lang: nil)
   # Escaped in every attribute it appears in, not only in the text of the
   # link. The address is built out of the post's slug or its draft token,
   # which are values from a post file -- the writer refuses the shapes
@@ -3310,16 +3326,17 @@ def redirect_stub_html(post)
   # close the attribute to put markup on the page. draft_banner, forty
   # lines up, has always done it this way; this stub had three places
   # where it did not.
-  url = h("#{SITE_BASE_URL}#{post_href(post)}")
+  url = h("#{SITE_BASE_URL}#{to || post_href(post)}")
+  title = lang ? post_title_for(Translations.for_lang(post, lang)) : post_title_for(post)
   <<~HTML
     <!doctype html>
-    <html lang="#{SITE_LANG}">
+    <html lang="#{lang || SITE_LANG}">
     <head>
     <meta charset="utf-8">
     <meta http-equiv="refresh" content="0; url=#{url}">
     <link rel="canonical" href="#{url}">
     <meta name="robots" content="noindex">
-    <title>#{h(post_title_for(post))}</title>
+    <title>#{h(title)}</title>
     </head>
     <body>
     <p>#{h(t('redirect.moved'))} <a href="#{url}">#{url}</a></p>
@@ -3383,7 +3400,52 @@ def written_already?(dest)
   @written_folded.key?(fold_path(dest))
 end
 
+# Whether two paths are one file on this volume: the same question
+# written_already? asks, of two names instead of a name and the index.
+def same_output?(one, other)
+  one == other || (case_folding_public? && fold_path(one) == fold_path(other))
+end
+
 (posts + pages + unlisted_posts).each do |post|
+  # The page this run wrote for the post. An old address that IS that page
+  # is not a debt and not a collision -- it is the post, answering. That
+  # happens the moment a translation keeps the slug of the post it was
+  # merged from: /en/posts/2019/that-slug/ is both the English page and,
+  # by the post's former_slugs, an address owed a redirect in this tree.
+  # The build used to say "already taken" once per such post on every run
+  # of that language, naming a fault where there was none.
+  own_page = File.join(output_dir(post), 'index.html')
+  # What this post has already stood a stub at in this run. An address
+  # written in both lists -- the post's and a translation's -- is one debt,
+  # paid once, to the language that says it is its own; the second mention
+  # is not another post in the way.
+  stood = []
+  # A translation's own old addresses. Served in two trees and no others:
+  # the site's root, where the text stood when it was a post of its own,
+  # and this language's, where it stands now -- both leading to this
+  # language's page. The root one is written by the run of the site's own
+  # language, which is the run that writes the root.
+  Translations.former_slugs(post, only: SITE_LOCALES - [SITE_OWN_LANG]).each do |lang, former|
+    next unless LANG_ROOT.empty? || lang == SITE_LANG
+
+    unless PostAddress.former_slug_refusal(former).nil?
+      warn t('build.former_slug_unusable', slug: post['slug'], entry: former.inspect)
+      next
+    end
+
+    dest = File.join(CONTENT_ROOT, 'posts', *former.split('/').reject(&:empty?), 'index.html')
+    next if same_output?(dest, own_page)
+
+    if written_already?(dest)
+      warn t('build.former_slug_taken', slug: post['slug'], former: former)
+      next
+    end
+
+    target = "#{Languages.lang_root_for(lang)}#{Languages.address_of(post, lang)}"
+    Output.emit(dest, redirect_stub_html(post, to: target, lang: lang))
+    stood << dest
+  end
+
   Array(post['former_slugs']).each do |former|
     # Asked of PostAddress, which is where redirect_from's own refusal
     # already lived. The rule was written out here and nowhere else, so
@@ -3399,6 +3461,8 @@ end
     parts = former.to_s.split('/').reject(&:empty?)
 
     dest = File.join(CONTENT_ROOT, 'posts', *parts, 'index.html')
+    next if same_output?(dest, own_page) || stood.any? { |one| same_output?(dest, one) }
+
     if written_already?(dest)
       warn t('build.former_slug_taken', slug: post['slug'], former: former)
       next
@@ -3565,7 +3629,7 @@ SERIES_MAP.each do |slug, in_series|
                 heading_kind: t('series.kind'), heading_variant: 'series',
                 heading_icon: :series,
                 title: t('series.title', name: name, short_name: SITE_SHORT_NAME),
-                description: t('series.description', name: name, author: SITE_AUTHOR))
+                description: t('series.description', name: name, author: SITE_AUTHOR, author_name: SITE_AUTHOR_NAME))
 end
 
 PRESENT_TYPES.each do |type|
@@ -3575,7 +3639,7 @@ PRESENT_TYPES.each do |type|
                 base_path: loc("/type/#{type}"), heading: label, heading_variant: 'type',
                 heading_icon: :"type_#{type}",
                 title: t('type.title', label: label, short_name: SITE_SHORT_NAME),
-                description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
+                description: t('type.description', label: label.downcase, author: SITE_AUTHOR, author_name: SITE_AUTHOR_NAME))
 end
 
 

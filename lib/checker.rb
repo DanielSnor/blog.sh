@@ -749,7 +749,7 @@ module Checker
         # screens down, and was counted here all the same -- so a link to
         # it passed as sound in the same run that said the entry is
         # unusable.
-        Array(post['former_slugs']).each do |former|
+        former_addresses(post).each do |former|
           paths << "/posts/#{former}/" if PostAddress.former_slug_refusal(former).nil?
         end
         # The same question of a redirect_from, which the build refuses
@@ -1697,7 +1697,7 @@ module Checker
     # somebody would go looking, did not ask at all: an archive carrying
     # a former slug that will never be served was called sound.
     findings += posts.flat_map do |post|
-      Array(post['former_slugs']).filter_map do |former|
+      former_addresses(post).filter_map do |former|
         next if PostAddress.former_slug_refusal(former).nil?
 
         warn(t('former_slug_unusable', slug: post['slug'].to_s, entry: former.to_s),
@@ -1728,7 +1728,7 @@ module Checker
       live[fold_name(post_path(post))] ||= post
     end
     posts.each do |post|
-      Array(post['former_slugs']).each do |former|
+      former_addresses(post).each do |former|
         next unless PostAddress.former_slug_refusal(former).nil?
 
         holder = live[fold_name("/posts/#{former.to_s.split('/').reject(&:empty?).join('/')}/")]
@@ -1755,11 +1755,23 @@ module Checker
     capped(findings, cap)
   end
 
+  # Every "<year>/<slug>" the post owes a redirect at under /posts/: its
+  # own, and the ones a translation carries (Translations.former_slugs) --
+  # a text that was a post of its own before it was merged in keeps the
+  # address it had, and the build stands a stub there that leads to that
+  # language's page. The address is the same kind of debt either way, so
+  # every question asked of one is asked of both: whether its shape can be
+  # served, whether something else now stands there, whether two posts
+  # claim it.
+  def former_addresses(post)
+    Array(post['former_slugs']) + Translations.former_slugs(post).map(&:last)
+  end
+
   def check_redirects(posts, cap = nil)
     claims = Hash.new { |h, k| h[k] = [] }
     posts.each do |post|
       Array(post['redirect_from']).each { |origin| claims[origin.to_s] << post['slug'] }
-      Array(post['former_slugs']).each { |former| claims["/posts/#{former}/"] << post['slug'] }
+      former_addresses(post).each { |former| claims["/posts/#{former}/"] << post['slug'] }
     end
     capped(claims.filter_map do |origin, slugs|
       next if slugs.uniq.size < 2

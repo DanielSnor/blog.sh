@@ -138,12 +138,12 @@ tag:
   # .listing-heading__kind in site.css).
   kind: "Schlagwort"
   title: "Schlagwort: %{name} – %{short_name}"
-  description: "Beiträge mit dem Schlagwort %{name} auf der persönlichen Seite von %{author}."
+  description: "Beiträge mit dem Schlagwort %{name} auf der persönlichen Seite von %{author_name}."
 
 series:
   kind: "Serie"
   title: "%{name} – %{short_name}"
-  description: "Die Serie %{name} auf der persönlichen Seite von %{author}, in Lesereihenfolge."
+  description: "Die Serie %{name} auf der persönlichen Seite von %{author_name}, in Lesereihenfolge."
 
 type:
   text: "Text"
@@ -155,7 +155,7 @@ type:
   link: "Links"
   document: "Dokumente"
   title: "%{label} – %{short_name}"
-  description: "Beiträge vom Typ %{label} auf der persönlichen Seite von %{author}."
+  description: "Beiträge vom Typ %{label} auf der persönlichen Seite von %{author_name}."
 
 index:
   empty: "Noch keine Beiträge dieses Typs."

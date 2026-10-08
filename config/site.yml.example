@@ -34,7 +34,7 @@
 # (brackets) is optional and commented out where it lives; the rest of
 # this file explains each one where it stands.
 #
-#   site        title, short_name, description, author, lang, locale, (locales),
+#   site        title, short_name, description, author, (author_name), lang, locale, (locales),
 #               timezone, base_url, (page_size), (extra_css)
 #   banner      src, alt, width, height, (show_title), (show_claim), (claim)
 #   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
@@ -81,6 +81,12 @@ site:
   # listing-page descriptions, none of which should ever see raw HTML.
   description: "Personal web/log of Your Name"
   author: "Your Name"
+  # The same name as it stands alone -- under a hero title, in what search
+  # engines read as the author, and on the pages of a language other than
+  # the site's own. Only a language that inflects names needs it: there
+  # `author` is the form its sentences take ("na osobním webu Daniela
+  # Šnora") and this is the name itself. Left out, `author` is used.
+  # author_name: "Daniel Šnor"
   # Selects locales/<lang>.yml (see lib/i18n.rb). "en", "cs" and "de" ship with the
   # engine; add another locales/<code>.yml to support a different language --
   # any key missing from it falls back to English.

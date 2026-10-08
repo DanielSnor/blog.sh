@@ -139,7 +139,7 @@ tag:
 series:
   kind: "Série"
   title: "%{name} – %{short_name}"
-  description: "Série %{name} na osobním webu, kde %{author} píše — v pořadí ke čtení."
+  description: "Série %{name} na osobním webu, kde %{author_name} píše — v pořadí ke čtení."
 
 type:
   text: "Text"

@@ -398,6 +398,26 @@ body. The post then looks exactly as it did before the translation existed
 -- which matters, because a half-empty translation would otherwise give
 that language a page with the wrong words on it.
 
+**An address that belonged to a translation** is kept with it. When two
+posts that were the same piece in two languages are made one -- the
+English post becomes the Czech post's `translations.en` -- the English
+post's address is still out on the web. Put into the post's own
+`former_slugs` it would lead to the post, which at the site's root is the
+Czech page. Written into the translation instead, it leads to the
+translated one:
+
+```json
+"translations": { "en": { "title": "…", "slug": "the-old-slug", "content": [ … ],
+                          "former_slugs": ["2019/the-old-slug"] } }
+```
+
+`/posts/2019/the-old-slug/` then redirects to `/en/posts/2019/the-old-slug/`.
+The same list covers a translation whose `slug:` you change by hand: the
+old address in that language's tree redirects to the new one. Nothing
+writes this list for you -- it is for the merge, which is done by hand --
+but nothing drops it either: `translate` and an edit from an app carry it
+across.
+
 **A post you have not translated is not hidden.** It stays in the other
 language's listing and the link on it goes to the address the post really
 has, so the same words never stand at two addresses. The language switcher

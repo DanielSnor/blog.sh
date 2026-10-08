@@ -147,4 +147,31 @@ module Translations
   def written?(one)
     one.is_a?(Hash) && !Array(one['content']).empty?
   end
+
+  # The old addresses of ONE language's text, as [language, "year/slug"].
+  #
+  # A post's own `former_slugs` are the addresses the POST has had, and a
+  # redirect from one leads to the post in the language of the tree it
+  # stands in. That cannot say what a merge needs said: a text that used to
+  # be a post of its own -- an English post beside a Czech one, before the
+  # two became one post with a translation -- had an address of its own,
+  # and whoever still follows it wants the English text, not the Czech
+  # post it now belongs to. Kept with that language's words, the entry
+  # says whose address it was.
+  #
+  # Only of a language that HAS a text: a redirect to a page the build
+  # does not make is a redirect to a 404. `only:` narrows it to the
+  # languages a caller will actually serve.
+  FORMER_KEY = 'former_slugs'
+
+  def former_slugs(post, only: nil)
+    entry = post.is_a?(Hash) ? post['translations'] : nil
+    return [] unless entry.is_a?(Hash)
+
+    entry.flat_map do |lang, one|
+      next [] unless written?(one) && (only.nil? || only.include?(lang.to_s))
+
+      Array(one[FORMER_KEY]).map { |former| [lang.to_s, former.to_s] }
+    end
+  end
 end

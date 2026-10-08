@@ -18,6 +18,18 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Added
 
+- **An old address can belong to a translation.** Two posts that were one piece in two languages
+  become one post with a translation -- and the second one's address, which the post's own
+  `former_slugs` could only send to the post in the site's own language, now leads to the
+  translated page: a translation may carry `former_slugs` of its own
+  (`translations.en.former_slugs: ["2019/the-old-slug"]`). The redirect stands at the site's
+  root and in that language's tree; `check` asks of it what it asks of any old address, and
+  saving the translation again keeps it.
+- **`site.author_name`.** The author's name as it stands alone -- under a hero title, as the
+  person the structured data names, and on the pages of a language other than the site's own.
+  For a language that inflects names: there `author` is the form its sentences take ("na webu
+  Daniela Šnora") and this is the name itself. Optional; without it `author` is used everywhere,
+  as before.
 - **A series has a name per language.** `series:` in `config/site.<lang>.yml` gives a series the
   name that language shows -- over its listing, in the sentence that places a part, in the page's
   title -- keyed like `tags:` by the name the posts write or by its slug. The series itself stays
@@ -164,6 +176,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Fixed
 
+- **A second language's build called a post's own page "already taken".** A translation that kept
+  the slug of the post it was merged from stands, in its own tree, at an address the post's
+  `former_slugs` also names; the build warned once per such post on every run. An old address
+  that is the post's own page is the post answering, and is passed over without a word.
 - **The cheat sheet's contents list had lost two sections.** The teaser (1.5) and the link card
   (1.7) were added to the sheet and never to the list at its top, in all three languages.
 

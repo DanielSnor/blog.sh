@@ -102,7 +102,7 @@ module Discovery
       # language the engine speaks here: a Slovak branch borrowing Czech
       # furniture (site.ui_language) is still Slovak to a reader.
       'inLanguage' => SITE_LANG,
-      'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR },
+      'author' => { '@type' => 'Person', 'name' => SITE_AUTHOR_NAME },
       'image' => post_og_image(post),
       'description' => post_description(post)
     }

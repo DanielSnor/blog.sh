@@ -135,12 +135,12 @@ tag:
   # sight by default (see .listing-heading__kind in site.css).
   kind: "Tag"
   title: "Tag: %{name} – %{short_name}"
-  description: "Posts tagged %{name} on %{author}'s personal site."
+  description: "Posts tagged %{name} on %{author_name}'s personal site."
 
 series:
   kind: "Series"
   title: "%{name} – %{short_name}"
-  description: "The series %{name} on the personal site of %{author}, in reading order."
+  description: "The series %{name} on the personal site of %{author_name}, in reading order."
 
 type:
   text: "Text"
@@ -152,7 +152,7 @@ type:
   link: "Links"
   document: "Documents"
   title: "%{label} – %{short_name}"
-  description: "Posts of type %{label} on %{author}'s personal site."
+  description: "Posts of type %{label} on %{author_name}'s personal site."
 
 index:
   empty: "No posts of this type yet."

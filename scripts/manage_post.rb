@@ -5253,6 +5253,12 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
       address = address.sub(/-+\z/, '')
     end
     one['slug'] = address
+    # The entry is written anew on every save -- and the old addresses this
+    # language's text is owed redirects at are not something a save may
+    # drop. They are not text and no editor shows them, so they are carried
+    # across untouched (Translations.former_slugs).
+    kept = Array(entry[Translations::FORMER_KEY]).map(&:to_s).reject { |former| former.strip.empty? }
+    one[Translations::FORMER_KEY] = kept unless kept.empty?
     # A PAGE lives in the root of its language, which is where the engine
     # keeps its own names: a page addressed `assets` in German would be
     # written over /de/assets/ and take the stylesheet down with it. The

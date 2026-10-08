@@ -56,7 +56,7 @@ module Tags
         Output.emit(File.join(CONTENT_ROOT, 'tag', slug, 'rss.xml'),
              Feeds.render_rss(data[:posts], path: loc("/tag/#{slug}/rss.xml"),
                         title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
-                        description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
+                        description: t('tag.description', name: data[:name], author: SITE_AUTHOR, author_name: SITE_AUTHOR_NAME),
                         # The page this feed belongs to, in the language the
                         # feed is written in -- the site root was every
                         # language's answer, which sent a German subscriber
@@ -77,7 +77,7 @@ module Tags
                     heading_href: (tags_map.empty? ? nil : loc('/tag/')),
                     feed_path: FEED_TAG_SLUGS.include?(slug) ? loc("/tag/#{slug}/rss.xml") : nil,
                     title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
-                    description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
+                    description: t('tag.description', name: data[:name], author: SITE_AUTHOR, author_name: SITE_AUTHOR_NAME))
     end
   end
 
